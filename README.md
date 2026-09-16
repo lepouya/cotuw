@@ -13,6 +13,17 @@ force that once ruined the world, eventually requiring an uneasy alliance.
   and game specifications.
 - [Roadmap](ROADMAP.md) — milestones and implementation work.
 
+## Development
+
+Install Node.js 26 and Rust before starting desktop development.
+
+```sh
+npm install
+npm run dev        # browser
+npm run tauri dev  # desktop
+npm run check      # required before completing a coding task
+```
+
 ## Working principles
 
 - Start with a small playable RTS core, then expand.
