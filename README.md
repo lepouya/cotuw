@@ -11,6 +11,7 @@ force that once ruined the world, eventually requiring an uneasy alliance.
 
 - [Design](DESIGN.md) — vision, requirements, technical direction, decisions,
   and game specifications.
+- [Roadmap](ROADMAP.md) — milestones and implementation work.
 
 ## Working principles
 
