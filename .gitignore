@@ -1,0 +1,24 @@
+# JavaScript and Vite
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Tauri and Rust
+src-tauri/target/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Test output and local tooling
+playwright-report/
+test-results/
+.vite/
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
