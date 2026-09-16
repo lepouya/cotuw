@@ -17,7 +17,7 @@
 - Wrap Markdown lines at 80 characters or fewer.
 - Do not add comments that merely restate code; comment intent, constraints,
   trade-offs, or non-obvious behavior.
-- Keep coments and commit messages concise and informative; explain motivation
+- Keep comments and commit messages concise and informative; explain motivation
   only when it is not clear from the change itself.
 
 ## Implementation
@@ -36,4 +36,5 @@
 - Make the smallest coherent change that fully satisfies the request; include
   necessary local refactoring, but preserve unrelated work.
 - Verify changes in proportion to their risk and scope.
+- Run `npm run check` before considering a coding task complete.
 - Use original or appropriately licensed code, assets, and content.

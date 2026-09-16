@@ -17,14 +17,14 @@ proof of concept.
 
 ### Codebase
 
-- [ ] 0.4 Scaffold the Tauri 2, Vite, TypeScript, and Babylon.js application.
+- [x] 0.4 Scaffold the Tauri 2, Vite, TypeScript, and Babylon.js application.
 - [ ] 0.5 Establish small module boundaries for simulation, rendering, and
       platform services.
-- [ ] 0.6 Add the basic development, type-checking, and build commands.
+- [x] 0.6 Add the basic development, type-checking, and build commands.
 
 ### Proof of concept
 
-- [ ] 0.7 Run the game in a browser and the Tauri development shell.
+- [x] 0.7 Run the game in a browser and the Tauri development shell.
 - [ ] 0.8 Render one small map with a strategy camera.
 - [ ] 0.9 Render one controllable actor with basic selection feedback.
 - [ ] 0.10 Accept a movement command and move the actor to its target.
