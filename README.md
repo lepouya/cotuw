@@ -21,8 +21,14 @@ Install Node.js 26 and Rust before starting desktop development.
 npm install
 npm run dev        # browser
 npm run tauri dev  # desktop
+npm run test:visual # browser screenshot checks
 npm run check      # required before completing a coding task
 ```
+
+The visual test starts the Vite app in headless Chromium, captures the terrain,
+and verifies that its initial bounds fill the viewport without clipping. It writes
+an HTML report to `playwright-report/`; CI uploads that report after a failed check.
+Install its browser locally once with `npx playwright install chromium`.
 
 ## Working principles
 

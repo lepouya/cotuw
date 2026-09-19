@@ -23,4 +23,11 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
+      - run: npx playwright install chromium
       - run: npm run check
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: playwright-report/
+          if-no-files-found: ignore

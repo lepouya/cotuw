@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck:ts && vite build",
@@ -13,13 +16,14 @@
     "format:check:ts": "prettier --check .",
     "format:check:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "lint": "npm run lint:ts && npm run lint:rs",
-    "lint:ts": "oxlint src vite.config.ts",
+    "lint:ts": "oxlint src tests e2e vite.config.ts vitest.config.ts playwright.config.ts",
     "lint:rs": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "typecheck": "npm run typecheck:ts && npm run typecheck:rs",
     "typecheck:ts": "tsc --noEmit",
     "typecheck:rs": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
-    "test": "npm run test:ts && npm run test:rs",
+    "test": "npm run test:ts && npm run test:visual && npm run test:rs",
     "test:ts": "vitest run --passWithNoTests",
+    "test:visual": "playwright test",
     "test:rs": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "preview": "vite preview",
@@ -29,8 +33,12 @@
     "@babylonjs/core": "^9"
   },
   "devDependencies": {
+    "@playwright/test": "^1",
     "@tauri-apps/cli": "^2",
+    "@types/node": "^26",
+    "@types/pngjs": "^6",
     "oxlint": "^1",
+    "pngjs": "^7",
     "prettier": "^3",
     "typescript": "^7",
     "vite": "^8",
