@@ -1,7 +1,7 @@
 :root {
   color: #e8ecdf;
-  background: #101a1d;
-  font-family: Georgia, "Times New Roman", serif;
+  background: #091216;
+  font-family: Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -10,51 +10,63 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
 }
 
-.landing {
-  box-sizing: border-box;
-  display: grid;
-  align-content: center;
-  min-height: 100vh;
-  padding: clamp(2rem, 8vw, 8rem);
-  background:
-    radial-gradient(circle at 70% 30%, #315d59 0%, transparent 34%),
-    radial-gradient(circle at 20% 75%, #573f27 0%, transparent 31%),
-    linear-gradient(135deg, #0b1219, #182c2c 52%, #11191a);
+.game-shell,
+#game-canvas {
+  width: 100%;
+  height: 100vh;
+}
+
+.game-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+#game-canvas {
+  display: block;
+  touch-action: none;
+}
+
+.terrain-hud {
+  position: absolute;
+  top: clamp(1rem, 3vw, 2.5rem);
+  left: clamp(1rem, 3vw, 2.5rem);
+  max-width: 18rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgb(179 157 98 / 55%);
+  border-radius: 0.25rem;
+  background: rgb(6 18 20 / 82%);
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
+  pointer-events: none;
+}
+
+.terrain-hud p {
+  margin: 0.45rem 0 0;
+  color: #c5d0c5;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .eyebrow {
-  margin: 0 0 1rem;
+  margin: 0;
   color: #cfac62;
-  font-family: Arial, sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 h1 {
-  max-width: 12ch;
-  margin: 0;
+  margin: 0.35rem 0 0;
   color: #f4f0df;
-  font-size: clamp(3rem, 8vw, 7rem);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
   font-weight: 400;
-  line-height: 0.88;
+  line-height: 1;
 }
 
-h1 span {
-  display: block;
-  color: #cfac62;
-  font-size: 0.49em;
-  line-height: 1.08;
-}
-
-.summary {
-  max-width: 38rem;
-  margin: 2rem 0 0;
-  color: #c4cdc4;
-  font-family: Arial, sans-serif;
-  font-size: clamp(1rem, 2vw, 1.25rem);
-  line-height: 1.55;
+.terrain-hud .controls {
+  color: #d8bd79;
 }

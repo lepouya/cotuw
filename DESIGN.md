@@ -157,6 +157,24 @@ co-op, with each player controlling a different faction.
 - **Initial delivery focus:** Windows and macOS; browser compatibility remains a
   core constraint.
 
+### Prototype — 2026-09-16
+
+- **Terrain proof of concept:** a 100 by 100 tile heightfield uses shared grid
+  corners, exposing four corner heights per tile. It is rendered with Babylon.js
+  through an orthographic, isometric strategy camera with orbit, pan, and zoom
+  controls. The map is a two-dimensional tile array backed by a canonical shared
+  corner-height grid. Each tile exposes its four current corner heights and an
+  ordered stack of colored or string-addressed texture layers, each with an RGB
+  tint and an alpha.
+  Tile and map-boundary lines remain intentionally visible for debugging.
+
+### Prototype — 2026-09-19
+
+- **Dynamic terrain editing:** Terrain heights and tile-layer stacks mutate
+  through batched map edits. Each completed edit identifies its affected tile
+  bounds and changed data types so renderers can update without exposing
+  unsynchronized writable tile fields.
+
 ### To decide
 
 - **Core match**
