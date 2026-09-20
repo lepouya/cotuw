@@ -35,7 +35,7 @@ export function createGameView(
   window.addEventListener("resize", resize);
 
   const camera = createStrategyCamera(scene, canvas, map);
-  camera.fitToMap();
+  camera.resetView();
   const lighting = createLighting(scene, lightingConfig);
   engine.runRenderLoop(() => scene.render());
 

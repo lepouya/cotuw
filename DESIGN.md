@@ -188,11 +188,21 @@ co-op, with each player controlling a different faction.
   across chunk rebuilds so visual animation state is independent of terrain
   mutation.
 - **Game view setup:** Creating a game view installs the standard strategy
-  camera, fits it to the map footprint at the level's ground height of zero, and
-  creates lighting from the level's view configuration. Terraforming does not
-  alter camera framing. The view exposes tile focusing and its lights for
-  scripted changes. Callers add only the world-specific renderers and overlays
-  they need.
+  camera, frames its starting view on the map center at the level's ground
+  height of zero, and creates lighting from the level's view configuration.
+  Terraforming does not alter camera framing. The view exposes tile focusing and
+  its lights for scripted changes. Callers add only the world-specific renderers
+  and overlays they need.
+- **Camera framing and zoom:** Zoom is the height of the viewport measured in
+  tiles, so framing means the same thing on any map or tile size. A view starts
+  on a two dozen tile slice of the map, close enough to read a tile's texture
+  without hiding the terrain around it, and small maps start fitted instead.
+  Zooming in stops a couple of tiles short of the ground and zooming out stops
+  once the whole map is framed; fitting the map is a deliberate call, not the
+  starting point. Resizing the window keeps the player's zoom and only re-fits
+  the aspect ratio. Left-drag pans and right-drag swings the view angle, which
+  reverses Babylon's defaults. Dragging carries the ground with the pointer at
+  every zoom level, which rules out panning momentum.
 
 ### To decide
 

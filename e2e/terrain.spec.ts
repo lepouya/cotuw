@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { PNG } from "pngjs";
 
-test("the initial terrain view fills the viewport without clipping", async ({
+test("the initial view starts close enough to read tile detail", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -14,14 +14,215 @@ test("the initial terrain view fills the viewport without clipping", async ({
     contentType: "image/png",
   });
 
-  const image = PNG.sync.read(screenshot);
-  const bounds = findTerrainBounds(image);
+  const bounds = findTerrainBounds(PNG.sync.read(screenshot));
+
+  expect(bounds.left).toBeLessThan(5);
+  expect(bounds.right).toBeGreaterThan(bounds.width - 5);
+  expect(bounds.top).toBeLessThan(5);
+  expect(bounds.bottom).toBeGreaterThan(bounds.height - 5);
+});
+
+test("zooming out from the start reveals the whole map", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  const canvas = page.locator("#game-canvas");
+
+  await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+  await page.mouse.move(640, 360);
+  await page.mouse.wheel(0, 6_000);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
+
+  const screenshot = await canvas.screenshot();
+  await testInfo.attach("zoomed-out-terrain", {
+    body: screenshot,
+    contentType: "image/png",
+  });
+
+  const bounds = findTerrainBounds(PNG.sync.read(screenshot));
 
   expect(bounds.left).toBeGreaterThan(20);
   expect(bounds.right).toBeLessThan(bounds.width - 20);
   expect(bounds.top).toBeGreaterThan(20);
-  expect(bounds.bottom).toBeGreaterThan(bounds.height * 0.84);
   expect(bounds.bottom).toBeLessThan(bounds.height - 20);
+});
+
+test("zoom limits span a handful of tiles to the whole map", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const zoom = await page.evaluate(async () => {
+    const sourceRoot: string = "/src";
+    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
+    const { PROTOTYPE_VIEW_OPTIONS } = await import(
+      `${sourceRoot}/prototype.ts`
+    );
+    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "1280px";
+    canvas.style.height = "720px";
+    document.body.append(canvas);
+
+    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
+    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+    const camera = view.scene.activeCamera;
+    const tilesInView = () => camera.orthoTop - camera.orthoBottom;
+    const wheel = (deltaY: number) =>
+      canvas.dispatchEvent(
+        new WheelEvent("wheel", { deltaY, cancelable: true }),
+      );
+
+    const initial = tilesInView();
+    wheel(-10_000);
+    const closest = tilesInView();
+    wheel(20_000);
+    const furthest = tilesInView();
+
+    view.dispose();
+    canvas.remove();
+    return { initial, closest, furthest };
+  });
+
+  expect(zoom.initial).toBeCloseTo(24);
+  expect(zoom.closest).toBeCloseTo(2);
+  // Far enough out for the whole 100 tile map, without a sea of empty space.
+  expect(zoom.furthest).toBeGreaterThan(100);
+  expect(zoom.furthest).toBeLessThan(140);
+});
+
+test("dragging carries the ground with the pointer at every zoom", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const drags = await page.evaluate(async () => {
+    const sourceRoot: string = "/src";
+    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
+    const { PROTOTYPE_VIEW_OPTIONS } = await import(
+      `${sourceRoot}/prototype.ts`
+    );
+    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "1280px";
+    canvas.style.height = "720px";
+    document.body.append(canvas);
+
+    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
+    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+    const camera = view.scene.activeCamera;
+    const frame = () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const dragPan = (fromX: number, toX: number) => {
+      const pointer = (type: string, clientX: number) =>
+        canvas.dispatchEvent(
+          new PointerEvent(type, {
+            pointerId: 1,
+            pointerType: "mouse",
+            button: 0,
+            buttons: 1,
+            clientX,
+            clientY: 360,
+          }),
+        );
+      pointer("pointerdown", fromX);
+      pointer("pointermove", toX);
+      pointer("pointerup", toX);
+    };
+    /** World units the ground travels per dragged pixel. */
+    const measureDrag = async (zoomDelta: number) => {
+      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: zoomDelta }));
+      await frame();
+      const { x, z } = camera.target;
+      const worldPerPixel =
+        (camera.orthoTop - camera.orthoBottom) / canvas.clientHeight;
+
+      dragPan(500, 700);
+      await frame();
+      await frame();
+      const moved = Math.hypot(camera.target.x - x, camera.target.z - z);
+      return moved / 200 / worldPerPixel;
+    };
+
+    const close = await measureDrag(-10_000);
+    const far = await measureDrag(20_000);
+    view.dispose();
+    canvas.remove();
+    return { close, far };
+  });
+
+  expect(drags.close).toBeCloseTo(1, 2);
+  expect(drags.far).toBeCloseTo(1, 2);
+});
+
+test("left-drag pans and right-drag orbits", async ({ page }) => {
+  await page.goto("/");
+
+  const drags = await page.evaluate(async () => {
+    const sourceRoot: string = "/src";
+    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
+    const { PROTOTYPE_VIEW_OPTIONS } = await import(
+      `${sourceRoot}/prototype.ts`
+    );
+    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "1280px";
+    canvas.style.height = "720px";
+    document.body.append(canvas);
+
+    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
+    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+    const camera = view.scene.activeCamera;
+    const frame = () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const drag = async (button: number) => {
+      const before = {
+        alpha: camera.alpha,
+        beta: camera.beta,
+        x: camera.target.x,
+        z: camera.target.z,
+      };
+      const pointer = (type: string, clientX: number, clientY: number) =>
+        canvas.dispatchEvent(
+          new PointerEvent(type, {
+            pointerId: 1,
+            pointerType: "mouse",
+            button,
+            buttons: button === 0 ? 1 : 2,
+            clientX,
+            clientY,
+          }),
+        );
+      pointer("pointerdown", 500, 360);
+      pointer("pointermove", 620, 300);
+      pointer("pointerup", 620, 300);
+      await frame();
+      await frame();
+      return {
+        swung:
+          Math.abs(camera.alpha - before.alpha) +
+          Math.abs(camera.beta - before.beta),
+        panned: Math.hypot(
+          camera.target.x - before.x,
+          camera.target.z - before.z,
+        ),
+      };
+    };
+
+    const left = await drag(0);
+    const right = await drag(2);
+    view.dispose();
+    canvas.remove();
+    return { left, right };
+  });
+
+  expect(drags.left.panned).toBeGreaterThan(0);
+  expect(drags.left.swung).toBe(0);
+  expect(drags.right.swung).toBeGreaterThan(0);
+  expect(drags.right.panned).toBe(0);
 });
 
 test("a close, low-angle view keeps foreground terrain visible", async ({
@@ -32,9 +233,9 @@ test("a close, low-angle view keeps foreground terrain visible", async ({
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await page.mouse.move(640, 360);
-  await page.mouse.down();
+  await page.mouse.down({ button: "right" });
   await page.mouse.move(640, 40, { steps: 12 });
-  await page.mouse.up();
+  await page.mouse.up({ button: "right" });
   await page.mouse.wheel(0, -1600);
   await page.evaluate(
     () =>
@@ -51,30 +252,48 @@ test("a close, low-angle view keeps foreground terrain visible", async ({
   expect(bounds.bottom).toBeGreaterThan(bounds.height * 0.82);
 });
 
-test("resizing re-fits the terrain without clipping its sides", async ({
+test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
   page,
-}, testInfo) => {
+}) => {
   await page.goto("/");
-  const canvas = page.locator("#game-canvas");
 
-  await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
-  await page.setViewportSize({ width: 720, height: 1_080 });
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
+  const view = await page.evaluate(async () => {
+    const sourceRoot: string = "/src";
+    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
+    const { PROTOTYPE_VIEW_OPTIONS } = await import(
+      `${sourceRoot}/prototype.ts`
+    );
+    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "1280px";
+    canvas.style.height = "720px";
+    document.body.append(canvas);
 
-  const screenshot = await canvas.screenshot();
-  await testInfo.attach("resized-terrain", {
-    body: screenshot,
-    contentType: "image/png",
+    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
+    const gameView = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+    const camera = gameView.scene.activeCamera;
+    const viewHeight = () => camera.orthoTop - camera.orthoBottom;
+    const aspectRatio = () =>
+      (camera.orthoRight - camera.orthoLeft) / viewHeight();
+
+    canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -800 }));
+    const zoomed = viewHeight();
+    canvas.style.width = "720px";
+    canvas.style.height = "1080px";
+    window.dispatchEvent(new Event("resize"));
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+
+    const resized = { height: viewHeight(), aspectRatio: aspectRatio() };
+    gameView.dispose();
+    canvas.remove();
+    return { zoomed, resized };
   });
 
-  const bounds = findTerrainBounds(PNG.sync.read(screenshot));
-  expect(bounds.left).toBeGreaterThan(20);
-  expect(bounds.right).toBeLessThan(bounds.width - 20);
+  expect(view.zoomed).toBeLessThan(24);
+  expect(view.resized.height).toBeCloseTo(view.zoomed);
+  expect(view.resized.aspectRatio).toBeCloseTo(720 / 1_080);
 });
 
 test("terraforming refreshes height and layer geometry", async ({ page }) => {
