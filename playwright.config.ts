@@ -2,7 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 30_000,
+  // Windows WebGL canvas captures can take longer than the default budget.
+  timeout: 90_000,
   reporter: [
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],

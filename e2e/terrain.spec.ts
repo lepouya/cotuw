@@ -648,7 +648,22 @@ test("loads layered terrain textures and advances both water passes", async ({
     );
     const baseNormalY = baseMesh?.getVerticesData("normal")?.[1];
     const firstTwoTileUvs = baseMesh?.getVerticesData("uv")?.slice(0, 16);
-    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    const waterMoved = await new Promise<boolean>((resolve) => {
+      const deadline = performance.now() + 5_000;
+      const waitForMovement = () => {
+        if (
+          initialOffset !== water?.uOffset &&
+          initialRippleOffset !== ripples?.uOffset
+        ) {
+          resolve(true);
+        } else if (performance.now() >= deadline) {
+          resolve(false);
+        } else {
+          requestAnimationFrame(waitForMovement);
+        }
+      };
+      requestAnimationFrame(waitForMovement);
+    });
 
     return {
       texturesReady:
@@ -661,9 +676,7 @@ test("loads layered terrain textures and advances both water passes", async ({
         clutter?.hasAlpha === true &&
         water?.hasAlpha === true &&
         ripples?.hasAlpha === true,
-      waterMoved:
-        initialOffset !== water?.uOffset &&
-        initialRippleOffset !== ripples?.uOffset,
+      waterMoved,
       rippleScale: ripples?.uScale,
       wrapModes: [water?.wrapU, water?.wrapV, ripples?.wrapU, ripples?.wrapV],
       firstTwoTileUvs,
