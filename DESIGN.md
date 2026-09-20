@@ -169,6 +169,17 @@ co-op, with each player controlling a different faction.
 
 ### Prototype — 2026-09-19
 
+- **Layer transparency:** A tile layer's alpha is the layer's own knob, so a
+  texture that carries an alpha channel can hand transparency over to the layer
+  rather than capping it. A layer can also feather: at each corner its alpha is
+  averaged with the tiles that share that corner, counting tiles without the
+  layer as clear, which turns a tile-stepped outline into a soft edge. The
+  prototype's river uses both, fading from opaque midstream to nearly clear at
+  its banks.
+- **Animated water:** Water combines two independently scrolling samples of one
+  texture. The body pass preserves the river's depth and shoreline alpha, while
+  a lighter, differently scaled ripple pass uses the texture's alpha. This is a
+  rendering effect and does not enter deterministic simulation state.
 - **Dynamic terrain editing:** Terrain state is mutable and intentionally open
   to trusted game code. Simulation code mutates it directly and reports the
   affected tile bounds through the map's observable. Rendering systems own

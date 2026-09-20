@@ -4,6 +4,11 @@ import { Color4, Observable, Vector3 } from "@babylonjs/core";
 export type TileLayer = {
   texture?: string;
   color: Color4;
+  /**
+   * Fades the layer's alpha out at corners shared with tiles that do not carry
+   * it, so its outline reads as a soft edge instead of a staircase of tiles.
+   */
+  featherEdges?: boolean;
 };
 
 /** Inclusive tile coordinates affected by terraforming. */

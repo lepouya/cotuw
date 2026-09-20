@@ -9,6 +9,13 @@ import type { TileLayer } from "./map";
 import type { GameView, GameViewOptions } from "./render";
 const TILE_COUNT = 100;
 const TILE_SIZE = 1;
+/** Tiles from the river's midline to its bank. */
+const WATER_HALF_WIDTH = 5;
+/** Water opacity at the midline and at the last tile before the bank. */
+const WATER_DEEP_ALPHA = 0.98;
+const WATER_SHORE_ALPHA = 0.06;
+/** Keeps the crossing ripple layer visible without obscuring the riverbed. */
+const WATER_RIPPLE_ALPHA = 0.3;
 
 export const PROTOTYPE_VIEW_OPTIONS = {
   clearColor: new Color4(0.035, 0.07, 0.09, 1),
@@ -26,9 +33,11 @@ export function createTerrainPrototype(canvas: HTMLCanvasElement): GameView {
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
-  createTerrainMeshes(view.scene, map, { debugOverlay: true });
+  createTerrainMeshes(view.scene, map);
 
-  canvas.dataset.terrainReady = "true";
+  view.scene.executeWhenReady(() => {
+    canvas.dataset.terrainReady = "true";
+  });
   return view;
 }
 
@@ -48,27 +57,55 @@ export function createPrototypeMap(): TerrainMap {
     },
     createLayers: (x, z) => {
       const variation = Math.sin(x * 0.23) * 0.025 + Math.cos(z * 0.19) * 0.02;
+      const waterCenter = 52 + Math.sin(x * 0.08) * 8;
+      const depth = 1 - Math.abs(z + 0.5 - waterCenter) / WATER_HALF_WIDTH;
       const layers: TileLayer[] = [
         {
-          color: new Color4(0.19 + variation, 0.36 + variation, 0.29, 1),
+          texture: "terrain/dirt",
+          color: new Color4(
+            0.86 + variation,
+            0.9 + variation,
+            0.88 + variation,
+            1,
+          ),
         },
       ];
 
-      if (Math.sin(x * 0.18 + z * 0.11) > 0.72) {
+      if (depth > 0) {
+        const alpha = waterAlpha(depth);
         layers.push({
-          texture: "terrain/dirt",
-          color: new Color4(0.62, 0.4, 0.22, 0.46),
+          texture: "terrain/water",
+          color: new Color4(0.74, 0.94, 0.98, alpha),
+          featherEdges: true,
+        });
+        layers.push({
+          texture: "terrain/water-ripples",
+          color: new Color4(0.82, 0.98, 1, alpha * WATER_RIPPLE_ALPHA),
+          featherEdges: true,
         });
       }
 
-      if (Math.sin(x * 0.47 - z * 0.29) > 0.9) {
+      // Clutter is a top overlay, so optional clutter never shifts either
+      // water pass to a different physical height on neighboring tiles.
+      if (Math.sin(x * 0.47 - z * 0.29) > 0.78) {
         layers.push({
           texture: "terrain/clutter",
-          color: new Color4(0.56, 0.83, 0.61, 0.56),
+          color: new Color4(0.99, 0.66, 0.33, 1),
         });
       }
 
       return layers;
     },
   });
+}
+
+/**
+ * Fades the river out towards its banks, so the tile edge where it meets dirt
+ * is faint enough to read as a soft shoreline rather than a staircase.
+ *
+ * @param depth 0 at the bank, 1 at the midline.
+ */
+function waterAlpha(depth: number): number {
+  const eased = depth * depth * (3 - 2 * depth);
+  return WATER_SHORE_ALPHA + (WATER_DEEP_ALPHA - WATER_SHORE_ALPHA) * eased;
 }
