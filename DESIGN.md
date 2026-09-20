@@ -159,21 +159,29 @@ co-op, with each player controlling a different faction.
 
 ### Prototype — 2026-09-16
 
-- **Terrain proof of concept:** a 100 by 100 tile heightfield uses shared grid
-  corners, exposing four corner heights per tile. It is rendered with Babylon.js
-  through an orthographic, isometric strategy camera with orbit, pan, and zoom
-  controls. The map is a two-dimensional tile array backed by a canonical shared
-  corner-height grid. Each tile exposes its four current corner heights and an
-  ordered stack of colored or string-addressed texture layers, each with an RGB
-  tint and an alpha.
-  Tile and map-boundary lines remain intentionally visible for debugging.
+- **Terrain proof of concept:** a 100 by 100 tile heightfield uses a shared grid
+  of corner heights. Babylon.js renders it through an orthographic, isometric
+  strategy camera with orbit, pan, and zoom controls. The map keeps its
+  canonical shared corner-height grid separate from its per-tile visual layers.
+  Each tile has an ordered stack of colored or string-addressed texture layers,
+  each with an RGBA color. The prototype enables optional tile and map-boundary
+  lines for debugging.
 
 ### Prototype — 2026-09-19
 
-- **Dynamic terrain editing:** Terrain heights and tile-layer stacks mutate
-  through batched map edits. Each completed edit identifies its affected tile
-  bounds and changed data types so renderers can update without exposing
-  unsynchronized writable tile fields.
+- **Dynamic terrain editing:** Terrain state is mutable and intentionally open
+  to trusted game code. Simulation code mutates it directly and reports the
+  affected tile bounds through the map's observable. Rendering systems own
+  their subscriptions, batch reports by frame, rebuild only affected terrain
+  chunks, and unsubscribe when disposed. Shared materials and textures persist
+  across chunk rebuilds so visual animation state is independent of terrain
+  mutation.
+- **Game view setup:** Creating a game view installs the standard strategy
+  camera, fits it to the map footprint at the level's ground height of zero, and
+  creates lighting from the level's view configuration. Terraforming does not
+  alter camera framing. The view exposes tile focusing and its lights for
+  scripted changes. Callers add only the world-specific renderers and overlays
+  they need.
 
 ### To decide
 
