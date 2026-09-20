@@ -77,43 +77,97 @@ test("resizing re-fits the terrain without clipping its sides", async ({
   expect(bounds.right).toBeLessThan(bounds.width - 20);
 });
 
-test("a batched terrain edit refreshes Babylon geometry", async ({ page }) => {
+test("terraforming refreshes height and layer geometry", async ({ page }) => {
   await page.goto("/");
 
   const heights = await page.evaluate(async () => {
     const sourceRoot: string = "/src";
     const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { createTerrainPrototype } = await import(
+    const { PROTOTYPE_VIEW_OPTIONS } = await import(
       `${sourceRoot}/prototype.ts`
+    );
+    const { createGameView, createTerrainMeshes } = await import(
+      `${sourceRoot}/render/index.ts`
     );
     const canvas = document.createElement("canvas");
     canvas.style.width = "240px";
     canvas.style.height = "240px";
     document.body.append(canvas);
 
-    const map = new TerrainMap(1, 1, 1, () => 0);
-    map.addTileLayer(0, 0, { tint: [0.2, 0.4, 0.3], alpha: 1 });
-    const view = createTerrainPrototype(canvas, map);
-    const mesh = () => view.scene.getMeshByName("terrain-layer-0-color");
+    const map = new TerrainMap({
+      width: 1,
+      height: 1,
+      tileSize: 1,
+    });
+    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+    createTerrainMeshes(view.scene, map);
+    const lighting = {
+      clearColor: view.scene.clearColor.asArray(),
+      skyColor: view.lighting.sky.diffuse.asArray(),
+      skyIntensity: view.lighting.sky.intensity,
+      sunColor: view.lighting.sun.diffuse.asArray(),
+      sunIntensity: view.lighting.sun.intensity,
+    };
+    const mesh = () => view.scene.getMeshByName("terrain-0-0-layer-0-plain");
+    const baseColor = view.scene.clearColor.clone().set(0.2, 0.4, 0.3, 1);
+    map.layersAt(0, 0).push({ color: baseColor });
+    map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
     const before = mesh()?.getVerticesData("position")?.[1];
 
-    map.edit(
-      (terrain: {
-        setCorner: (x: number, z: number, height: number) => void;
-      }) => terrain.setCorner(0, 0, 7),
-    );
+    map.setHeight(0, 0, 7);
+    map.layersAt(0, 0).push({
+      texture: "terrain/dirt",
+      color: baseColor.clone().set(1, 1, 1, 0.5),
+    });
+    map.notifyChange(map.tilesAroundCorner(0, 0));
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
     const after = mesh()?.getVerticesData("position")?.[1];
+    const addedLayer = Boolean(
+      view.scene.getMeshByName("terrain-0-0-layer-1-texture-terrain/dirt"),
+    );
 
+    map.layersAt(0, 0).pop();
+    map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const removedLayer = !view.scene.getMeshByName(
+      "terrain-0-0-layer-1-texture-terrain/dirt",
+    );
+
+    const subscribed = map.onChangedObservable.hasObservers();
     view.dispose();
+    const unsubscribed = !map.onChangedObservable.hasObservers();
     canvas.remove();
-    return { before, after };
+    return {
+      before,
+      after,
+      addedLayer,
+      removedLayer,
+      subscribed,
+      unsubscribed,
+      lighting,
+    };
   });
 
   expect(heights.before).toBe(0);
   expect(heights.after).toBe(7);
+  expect(heights.addedLayer).toBe(true);
+  expect(heights.removedLayer).toBe(true);
+  expect(heights.subscribed).toBe(true);
+  expect(heights.unsubscribed).toBe(true);
+  expect(heights.lighting).toEqual({
+    clearColor: [0.035, 0.07, 0.09, 1],
+    skyColor: [0.6, 0.78, 0.77],
+    skyIntensity: 1.05,
+    sunColor: [1, 1, 1],
+    sunIntensity: 1.3,
+  });
 });
 
 function findTerrainBounds(image: PNG): {

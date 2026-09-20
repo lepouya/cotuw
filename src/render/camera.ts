@@ -1,6 +1,5 @@
 import { ArcRotateCamera, Camera, Scene, Vector3 } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
-import { cornerPoint } from "./world";
 
 const INITIAL_VIEW_FILL = 0.76;
 const MINIMUM_CAMERA_DISTANCE = 160;
@@ -20,8 +19,8 @@ const FAR_CLIP_MARGIN = 100;
 export type StrategyCamera = {
   /** Positions the camera so the whole map is visible. */
   fitToMap: () => void;
-  /** Extends the clipping range after a terrain-height edit. */
-  updateClipRange: () => void;
+  /** Moves the view target to the center of a tile without changing the zoom. */
+  focusOnTile: (x: number, z: number) => void;
 };
 
 export function createStrategyCamera(
@@ -72,9 +71,19 @@ export function createStrategyCamera(
     camera.radius = safeDistance;
     camera.maxZ = safeDistance * 2 + FAR_CLIP_MARGIN;
   };
+  /**
+   * Retargets without letting Babylon re-derive alpha, beta and radius from the
+   * unchanged camera position, which would tilt the fixed isometric view.
+   */
+  const retarget = (target: Vector3) =>
+    camera.setTarget(target, false, false, true);
   const fitToMap = () => {
+    retarget(Vector3.Zero());
     setDistance(cameraDistanceForMap(map));
     setViewHeight(viewHeightToFitMap(camera, canvas, map));
+  };
+  const focusOnTile = (x: number, z: number) => {
+    retarget(map.worldPoint(x + 0.5, z + 0.5, 0));
   };
 
   const zoom = (event: WheelEvent) => {
@@ -89,15 +98,7 @@ export function createStrategyCamera(
   });
   scene.onBeforeRenderObservable.add(syncViewBounds);
 
-  return {
-    fitToMap,
-    updateClipRange: () => {
-      camera.maxZ = Math.max(
-        camera.maxZ,
-        cameraDistanceForMap(map) * 2 + FAR_CLIP_MARGIN,
-      );
-    },
-  };
+  return { fitToMap, focusOnTile };
 }
 
 function syncOrthographicBounds(
@@ -130,18 +131,19 @@ function viewHeightToFitMap(
   let minY = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
 
-  for (let z = 0; z <= map.height; z += 1) {
-    for (let x = 0; x <= map.width; x += 1) {
-      const viewPoint = Vector3.TransformCoordinates(
-        cornerPoint(map, x, z),
-        viewMatrix,
-      );
+  const groundCorners = [
+    map.worldPoint(0, 0, 0),
+    map.worldPoint(map.width, 0, 0),
+    map.worldPoint(0, map.height, 0),
+    map.worldPoint(map.width, map.height, 0),
+  ];
 
-      minX = Math.min(minX, viewPoint.x);
-      maxX = Math.max(maxX, viewPoint.x);
-      minY = Math.min(minY, viewPoint.y);
-      maxY = Math.max(maxY, viewPoint.y);
-    }
+  for (const corner of groundCorners) {
+    const viewPoint = Vector3.TransformCoordinates(corner, viewMatrix);
+    minX = Math.min(minX, viewPoint.x);
+    maxX = Math.max(maxX, viewPoint.x);
+    minY = Math.min(minY, viewPoint.y);
+    maxY = Math.max(maxY, viewPoint.y);
   }
 
   const requiredViewHeight = Math.max(maxY - minY, (maxX - minX) / aspectRatio);
@@ -149,23 +151,9 @@ function viewHeightToFitMap(
 }
 
 function cameraDistanceForMap(map: TerrainMap): number {
-  let lowestHeight = Number.POSITIVE_INFINITY;
-  let highestHeight = Number.NEGATIVE_INFINITY;
-
-  for (let z = 0; z <= map.height; z += 1) {
-    for (let x = 0; x <= map.width; x += 1) {
-      const height = map.getCorner(x, z);
-      lowestHeight = Math.min(lowestHeight, height);
-      highestHeight = Math.max(highestHeight, height);
-    }
-  }
-
   const mapDiagonal = Math.hypot(
     map.width * map.tileSize,
     map.height * map.tileSize,
   );
-  return Math.max(
-    mapDiagonal + highestHeight - lowestHeight,
-    MINIMUM_CAMERA_DISTANCE,
-  );
+  return Math.max(mapDiagonal, MINIMUM_CAMERA_DISTANCE);
 }

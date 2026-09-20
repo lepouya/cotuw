@@ -3,103 +3,212 @@ import {
   DynamicTexture,
   Material,
   Mesh,
+  type Observer,
   Scene,
   StandardMaterial,
   VertexData,
 } from "@babylonjs/core";
-import type { TerrainMap, TileCorners, TileLayer } from "../map";
-import { worldPoint } from "./world";
+import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
+import { createDebugOverlay } from "./debug-overlay";
 
-const LAYER_OFFSET = 0.012;
-const UNTEXTURED = "color";
+const CHUNK_SIZE = 32;
+export const TERRAIN_LAYER_OFFSET = 0.012;
 
 type LayerTile = {
   x: number;
   z: number;
   layer: TileLayer;
-  corners: Readonly<TileCorners>;
 };
 
-/** The height above the terrain surface occupied by the layer stack. */
-export function layerStackHeight(map: TerrainMap): number {
-  return map.layerCount * LAYER_OFFSET;
-}
+type LayerGroup = {
+  layerIndex: number;
+  texture?: string;
+  tiles: LayerTile[];
+};
 
 export type TerrainMeshes = {
-  /** Rebuilds terrain geometry from the current map state. */
-  refresh: () => void;
+  dispose: () => void;
 };
 
-/** Builds one mesh per layer index and texture, so each draws in one call. */
+export type TerrainMeshOptions = {
+  debugOverlay?: boolean;
+};
+
+/** Builds independently replaceable terrain chunks with shared materials. */
 export function createTerrainMeshes(
   scene: Scene,
   map: TerrainMap,
+  { debugOverlay = false }: TerrainMeshOptions = {},
 ): TerrainMeshes {
-  let meshes: Mesh[] = [];
+  const chunkMeshes = new Map<string, Mesh[]>();
+  const materials = new Map<string | undefined, StandardMaterial>();
 
-  const refresh = () => {
-    for (const mesh of meshes) {
-      mesh.dispose(false, true);
+  const materialFor = (texture?: string) => {
+    let material = materials.get(texture);
+
+    if (!material) {
+      material = createLayerMaterial(scene, texture);
+      materials.set(texture, material);
     }
-    meshes = [];
 
-    const layerCount = map.layerCount;
+    return material;
+  };
 
-    for (let layerIndex = 0; layerIndex < layerCount; layerIndex += 1) {
-      const groups = new Map<string, LayerTile[]>();
+  const rebuildChunk = (chunkX: number, chunkZ: number) => {
+    const chunkKey = `${chunkX},${chunkZ}`;
 
-      for (let z = 0; z < map.height; z += 1) {
-        for (let x = 0; x < map.width; x += 1) {
-          const layer = map.getTileLayer(x, z, layerIndex);
+    for (const mesh of chunkMeshes.get(chunkKey) ?? []) {
+      mesh.dispose();
+    }
 
-          if (!layer) {
-            continue;
+    const minX = chunkX * CHUNK_SIZE;
+    const minZ = chunkZ * CHUNK_SIZE;
+    const maxX = Math.min(minX + CHUNK_SIZE, map.width);
+    const maxZ = Math.min(minZ + CHUNK_SIZE, map.height);
+    const groups = new Map<number, Map<string | undefined, LayerGroup>>();
+
+    for (let z = minZ; z < maxZ; z += 1) {
+      for (let x = minX; x < maxX; x += 1) {
+        for (const [layerIndex, layer] of map.layersAt(x, z).entries()) {
+          const texture = layer.texture || undefined;
+          let layerGroups = groups.get(layerIndex);
+
+          if (!layerGroups) {
+            layerGroups = new Map();
+            groups.set(layerIndex, layerGroups);
           }
 
-          const key = layer.texture ?? UNTEXTURED;
-          const tiles = groups.get(key) ?? [];
-          tiles.push({ x, z, layer, corners: map.getTileCorners(x, z) });
-          groups.set(key, tiles);
+          let group = layerGroups.get(texture);
+
+          if (!group) {
+            group = { layerIndex, texture, tiles: [] };
+            layerGroups.set(texture, group);
+          }
+
+          group.tiles.push({ x, z, layer });
         }
       }
+    }
 
-      for (const [texture, tiles] of groups) {
-        meshes.push(createLayerMesh(scene, map, layerIndex, texture, tiles));
+    const meshes: Mesh[] = [];
+    for (const layerGroups of groups.values()) {
+      for (const group of layerGroups.values()) {
+        meshes.push(
+          createLayerMesh(
+            scene,
+            map,
+            chunkX,
+            chunkZ,
+            group,
+            materialFor(group.texture),
+          ),
+        );
+      }
+    }
+    chunkMeshes.set(chunkKey, meshes);
+  };
+
+  const dirtyChunks = new Set<string>();
+  const markDirty = ({ minX, minZ, maxX, maxZ }: TerrainBounds) => {
+    const minChunkX = Math.floor(minX / CHUNK_SIZE);
+    const minChunkZ = Math.floor(minZ / CHUNK_SIZE);
+    const maxChunkX = Math.floor(maxX / CHUNK_SIZE);
+    const maxChunkZ = Math.floor(maxZ / CHUNK_SIZE);
+
+    for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
+      for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+        dirtyChunks.add(`${chunkX},${chunkZ}`);
       }
     }
   };
 
-  refresh();
-  return { refresh };
+  const refreshDirtyChunks = () => {
+    for (const key of dirtyChunks) {
+      const [chunkX, chunkZ] = key.split(",").map(Number);
+      rebuildChunk(chunkX, chunkZ);
+    }
+    dirtyChunks.clear();
+  };
+
+  let refreshObserver: Observer<Scene> | undefined;
+  let disposed = false;
+  const overlay = debugOverlay
+    ? createDebugOverlay(scene, map, { layerOffset: TERRAIN_LAYER_OFFSET })
+    : undefined;
+  const changeObserver = map.onChangedObservable.add((bounds) => {
+    markDirty(bounds);
+
+    if (!refreshObserver) {
+      refreshObserver = scene.onBeforeRenderObservable.addOnce(() => {
+        refreshDirtyChunks();
+        refreshObserver = undefined;
+      });
+    }
+  });
+  const dispose = () => {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    overlay?.dispose();
+    map.onChangedObservable.remove(changeObserver);
+    if (refreshObserver) {
+      scene.onBeforeRenderObservable.remove(refreshObserver);
+    }
+    scene.onDisposeObservable.remove(sceneDisposeObserver);
+
+    for (const meshes of chunkMeshes.values()) {
+      for (const mesh of meshes) {
+        mesh.dispose();
+      }
+    }
+    for (const material of materials.values()) {
+      material.dispose(true, true);
+    }
+    chunkMeshes.clear();
+    materials.clear();
+    dirtyChunks.clear();
+  };
+  const sceneDisposeObserver = scene.onDisposeObservable.add(dispose);
+
+  markDirty({ minX: 0, minZ: 0, maxX: map.width - 1, maxZ: map.height - 1 });
+  refreshDirtyChunks();
+  return { dispose };
 }
 
 function createLayerMesh(
   scene: Scene,
   map: TerrainMap,
-  layerIndex: number,
-  texture: string,
-  tiles: LayerTile[],
+  chunkX: number,
+  chunkZ: number,
+  { layerIndex, texture, tiles }: LayerGroup,
+  material: StandardMaterial,
 ): Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
-  const heightOffset = layerIndex * LAYER_OFFSET;
+  const heightOffset = layerIndex * TERRAIN_LAYER_OFFSET;
 
-  for (const { x, z, layer, corners: tileCorners } of tiles) {
+  for (const { x, z, layer } of tiles) {
     const vertexOffset = positions.length / 3;
     const corners = [
-      [x, z, tileCorners.nw],
-      [x, z + 1, tileCorners.sw],
-      [x + 1, z, tileCorners.ne],
-      [x + 1, z + 1, tileCorners.se],
+      [x, z],
+      [x, z + 1],
+      [x + 1, z],
+      [x + 1, z + 1],
     ] as const;
 
-    for (const [cornerX, cornerZ, height] of corners) {
-      const position = worldPoint(map, cornerX, cornerZ, height + heightOffset);
+    for (const [cornerX, cornerZ] of corners) {
+      const position = map.worldPoint(
+        cornerX,
+        cornerZ,
+        map.heightAt(cornerX, cornerZ) + heightOffset,
+      );
       positions.push(position.x, position.y, position.z);
-      colors.push(...layer.tint, layer.alpha);
+      layer.color.toArray(colors, colors.length);
     }
 
     indices.push(
@@ -114,7 +223,11 @@ function createLayerMesh(
   }
 
   VertexData.ComputeNormals(positions, indices, normals);
-  const mesh = new Mesh(`terrain-layer-${layerIndex}-${texture}`, scene);
+  const textureName = texture ? `texture-${texture}` : "plain";
+  const mesh = new Mesh(
+    `terrain-${chunkX}-${chunkZ}-layer-${layerIndex}-${textureName}`,
+    scene,
+  );
   const vertexData = new VertexData();
   vertexData.positions = positions;
   vertexData.indices = indices;
@@ -123,23 +236,20 @@ function createLayerMesh(
   vertexData.uvs = uvs;
   vertexData.applyToMesh(mesh);
   mesh.hasVertexAlpha = true;
-  mesh.material = createLayerMaterial(scene, texture, layerIndex);
+  mesh.material = material;
   return mesh;
 }
 
-function createLayerMaterial(
-  scene: Scene,
-  texture: string,
-  layerIndex: number,
-): StandardMaterial {
+function createLayerMaterial(scene: Scene, texture?: string): StandardMaterial {
+  const textureName = texture ? `texture-${texture}` : "plain";
   const material = new StandardMaterial(
-    `terrain-material-${layerIndex}-${texture}`,
+    `terrain-material-${textureName}`,
     scene,
   );
   material.diffuseColor = Color3.White();
   material.specularColor = Color3.Black();
 
-  if (texture !== UNTEXTURED) {
+  if (texture) {
     material.diffuseTexture = createLayerTexture(scene, texture);
     material.useAlphaFromDiffuseTexture = true;
     material.transparencyMode = Material.MATERIAL_ALPHABLEND;

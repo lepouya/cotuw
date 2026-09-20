@@ -6,21 +6,36 @@ import {
   Vector3,
 } from "@babylonjs/core";
 
-export function createLighting(scene: Scene): void {
-  const skyLight = new HemisphericLight(
-    "sky-light",
-    new Vector3(0, 1, 0),
-    scene,
-  );
-  skyLight.intensity = 1.05;
-  skyLight.diffuse = new Color3(0.6, 0.78, 0.77);
-  skyLight.groundColor = new Color3(0.08, 0.12, 0.1);
+export type LightingConfig = {
+  skyColor: Color3;
+  groundColor: Color3;
+  sunColor: Color3;
+  sunDirection: Vector3;
+  skyIntensity: number;
+  sunIntensity: number;
+};
 
-  const sunLight = new DirectionalLight(
+export type GameLighting = {
+  sky: HemisphericLight;
+  sun: DirectionalLight;
+};
+
+export function createLighting(
+  scene: Scene,
+  config: LightingConfig,
+): GameLighting {
+  const sky = new HemisphericLight("sky-light", Vector3.Up(), scene);
+  sky.intensity = config.skyIntensity;
+  sky.diffuse = config.skyColor.clone();
+  sky.groundColor = config.groundColor.clone();
+
+  const sun = new DirectionalLight(
     "sun-light",
-    new Vector3(-0.5, -1, 0.35),
+    config.sunDirection.clone().normalize(),
     scene,
   );
-  sunLight.position = new Vector3(35, 70, -45);
-  sunLight.intensity = 1.3;
+  sun.diffuse = config.sunColor.clone();
+  sun.intensity = config.sunIntensity;
+
+  return { sky, sun };
 }

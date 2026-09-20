@@ -1,7 +1,12 @@
-import { Color3, Mesh, MeshBuilder, Scene, Vector3 } from "@babylonjs/core";
+import {
+  Color3,
+  Mesh,
+  MeshBuilder,
+  type Observer,
+  Scene,
+  Vector3,
+} from "@babylonjs/core";
 import type { TerrainMap } from "../map";
-import { layerStackHeight } from "./terrain-mesh";
-import { cornerPoint } from "./world";
 
 const GRID_OFFSET = 0.035;
 
@@ -13,13 +18,13 @@ export type GridStyle = {
 };
 
 export type DebugOverlayOptions = {
+  layerOffset: number;
   grids?: GridStyle[];
   boundaryColor?: Color3;
 };
 
 export type DebugOverlay = {
-  /** Rebuilds debug lines from the current map state. */
-  refresh: () => void;
+  dispose: () => void;
 };
 
 /** Draws grid and map-boundary lines above the terrain for debugging. */
@@ -27,12 +32,13 @@ export function createDebugOverlay(
   scene: Scene,
   map: TerrainMap,
   {
+    layerOffset,
     grids = [
       { name: "tile-grid", interval: 1, color: new Color3(0.12, 0.26, 0.27) },
       { name: "major-grid", interval: 10, color: new Color3(0.76, 0.59, 0.27) },
     ],
     boundaryColor = new Color3(0.95, 0.78, 0.35),
-  }: DebugOverlayOptions = {},
+  }: DebugOverlayOptions,
 ): DebugOverlay {
   for (const { interval } of grids) {
     if (!Number.isInteger(interval) || interval < 1) {
@@ -47,15 +53,43 @@ export function createDebugOverlay(
     }
     meshes = [];
 
-    const heightOffset = layerStackHeight(map) + GRID_OFFSET;
+    const heightOffset = map.layerCount * layerOffset + GRID_OFFSET;
     for (const grid of grids) {
       meshes.push(createGrid(scene, map, grid, heightOffset));
     }
     meshes.push(createMapBoundary(scene, map, boundaryColor, heightOffset));
   };
 
+  let refreshObserver: Observer<Scene> | undefined;
+  let disposed = false;
+  const changeObserver = map.onChangedObservable.add(() => {
+    if (!refreshObserver) {
+      refreshObserver = scene.onBeforeRenderObservable.addOnce(() => {
+        refresh();
+        refreshObserver = undefined;
+      });
+    }
+  });
+  const dispose = () => {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    map.onChangedObservable.remove(changeObserver);
+    if (refreshObserver) {
+      scene.onBeforeRenderObservable.remove(refreshObserver);
+    }
+    scene.onDisposeObservable.remove(sceneDisposeObserver);
+    for (const mesh of meshes) {
+      mesh.dispose();
+    }
+    meshes = [];
+  };
+  const sceneDisposeObserver = scene.onDisposeObservable.add(dispose);
+
   refresh();
-  return { refresh };
+  return { dispose };
 }
 
 function createGrid(
@@ -70,7 +104,7 @@ function createGrid(
     const row: Vector3[] = [];
 
     for (let x = 0; x <= map.width; x += 1) {
-      row.push(cornerPoint(map, x, z, heightOffset));
+      row.push(map.cornerPoint(x, z, heightOffset));
     }
 
     lines.push(row);
@@ -80,7 +114,7 @@ function createGrid(
     const column: Vector3[] = [];
 
     for (let z = 0; z <= map.height; z += 1) {
-      column.push(cornerPoint(map, x, z, heightOffset));
+      column.push(map.cornerPoint(x, z, heightOffset));
     }
 
     lines.push(column);
@@ -101,11 +135,11 @@ function createMapBoundary(
     "map-boundary",
     {
       points: [
-        cornerPoint(map, 0, 0, heightOffset),
-        cornerPoint(map, map.width, 0, heightOffset),
-        cornerPoint(map, map.width, map.height, heightOffset),
-        cornerPoint(map, 0, map.height, heightOffset),
-        cornerPoint(map, 0, 0, heightOffset),
+        map.cornerPoint(0, 0, heightOffset),
+        map.cornerPoint(map.width, 0, heightOffset),
+        map.cornerPoint(map.width, map.height, heightOffset),
+        map.cornerPoint(0, map.height, heightOffset),
+        map.cornerPoint(0, 0, heightOffset),
       ],
     },
     scene,

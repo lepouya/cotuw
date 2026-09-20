@@ -1,10 +1,16 @@
 export { createStrategyCamera, type StrategyCamera } from "./camera";
 export {
-  createDebugOverlay,
-  type DebugOverlay,
-  type DebugOverlayOptions,
-  type GridStyle,
-} from "./debug-overlay";
-export { createGameView, type GameView } from "./game-view";
-export { createLighting } from "./lighting";
-export { createTerrainMeshes, type TerrainMeshes } from "./terrain-mesh";
+  createGameView,
+  type GameView,
+  type GameViewOptions,
+} from "./game-view";
+export {
+  createLighting,
+  type GameLighting,
+  type LightingConfig,
+} from "./lighting";
+export {
+  createTerrainMeshes,
+  type TerrainMeshes,
+  type TerrainMeshOptions,
+} from "./terrain-mesh";
