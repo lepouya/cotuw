@@ -410,7 +410,7 @@ test("a feathered layer fades to clear at the tiles that lack it", async ({
 
     // One row of three tiles, with water only in the middle one.
     const color = (alpha: number) =>
-      PROTOTYPE_VIEW_OPTIONS.clearColor.clone().set(1, 1, 1, alpha);
+      PROTOTYPE_VIEW_OPTIONS.clearColor.toColor4().set(1, 1, 1, alpha);
     const map = new TerrainMap({
       width: 3,
       height: 1,
@@ -473,7 +473,7 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
       `${sourceRoot}/render/index.ts`
     );
     const color = (value: number) =>
-      PROTOTYPE_VIEW_OPTIONS.clearColor.clone().set(1, 1, 1, value);
+      PROTOTYPE_VIEW_OPTIONS.clearColor.toColor4().set(1, 1, 1, value);
     const map = new TerrainMap({
       width: 33,
       height: 1,
@@ -563,7 +563,7 @@ test("loads layered terrain textures and advances both water passes", async ({
       `${sourceRoot}/render/index.ts`
     );
     const color = (red: number, green: number, blue: number, alpha: number) =>
-      PROTOTYPE_VIEW_OPTIONS.clearColor.clone().set(red, green, blue, alpha);
+      PROTOTYPE_VIEW_OPTIONS.clearColor.toColor4().set(red, green, blue, alpha);
     const canvas = document.createElement("canvas");
     canvas.id = "texture-preview";
     canvas.style.width = "720px";

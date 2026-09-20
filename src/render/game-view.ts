@@ -1,4 +1,4 @@
-import { Color4, Engine, Scene } from "@babylonjs/core";
+import { Color3, Color4, Engine, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import { createStrategyCamera } from "./camera";
 import type { StrategyCamera } from "./camera";
@@ -6,7 +6,7 @@ import { createLighting } from "./lighting";
 import type { GameLighting, LightingConfig } from "./lighting";
 
 export type GameViewOptions = {
-  clearColor: Color4;
+  clearColor: Color3;
   lighting: LightingConfig;
 };
 
@@ -27,7 +27,7 @@ export function createGameView(
 ): GameView {
   const engine = new Engine(canvas, true);
   const scene = new Scene(engine);
-  scene.clearColor = clearColor.clone();
+  scene.clearColor = Color4.FromColor3(clearColor);
 
   const suppressContextMenu = (event: Event) => event.preventDefault();
   const resize = () => engine.resize();

@@ -18,7 +18,7 @@ const WATER_SHORE_ALPHA = 0.06;
 const WATER_RIPPLE_ALPHA = 0.3;
 
 export const PROTOTYPE_VIEW_OPTIONS = {
-  clearColor: new Color4(0.035, 0.07, 0.09, 1),
+  clearColor: new Color3(0.035, 0.07, 0.09),
   lighting: {
     skyColor: new Color3(0.6, 0.78, 0.77),
     groundColor: new Color3(0.08, 0.12, 0.1),
