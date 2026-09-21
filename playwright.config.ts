@@ -8,6 +8,14 @@ export default defineConfig({
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
   ],
+  // macOS builds run in WKWebView, so WebKit is checked there too. Windows uses
+  // WebView2, which Chromium covers.
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    ...(process.platform === "darwin"
+      ? [{ name: "webkit", use: { browserName: "webkit" as const } }]
+      : []),
+  ],
   use: {
     baseURL: "http://127.0.0.1:1420",
     viewport: { width: 1280, height: 720 },

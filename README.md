@@ -27,11 +27,17 @@ npm run test:visual # browser screenshot checks
 npm run check      # required before completing a coding task
 ```
 
-The visual test starts the Vite app in headless Chromium, captures the terrain,
-and verifies that its initial bounds fill the viewport without clipping. It
-writes an HTML report to `playwright-report/`; CI uploads that report after a
-failed check. Install its browser locally once with
-`npx playwright install chromium`.
+The visual tests start the Vite app in headless Chromium. They check the
+camera, terrain rendering, terrain editing, and texture behavior, some through
+canvas screenshots and some through in-page helpers in `e2e/harness.ts`. They
+write an HTML report to `playwright-report/`; CI uploads that report after a
+failed check. Install the browsers locally once with
+`npx playwright install chromium`, plus `webkit` on macOS, where the tests also
+run against WebKit to match the Tauri webview.
+
+Terrain textures must tile without a seam. After editing one, make its opposite
+edges match with `node scripts/reconcile-texture-edges.mjs <png>...`, which
+rewrites the files in place; the unit tests verify the result.
 
 ## Working principles
 
