@@ -20,7 +20,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 ### Codebase
 
 - [x] 0.4 Scaffold the Tauri 2, Vite, TypeScript, and Babylon.js application.
-- [x] 0.5 Establish small module boundaries for simulation, rendering, and
+- [ ] 0.5 Establish small module boundaries for simulation, rendering, and
       platform services.
 - [x] 0.6 Add the basic development, type-checking, and build commands.
 
@@ -78,12 +78,12 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Interface
 
-- [ ] 0.29 Define the minimap's information, camera-frustum treatment, and
-      input behavior for the prototype.
+- [ ] 0.29 Define the minimap's information, camera-frustum treatment, and input
+      behavior for the prototype.
 - [ ] 0.30 Render a corner minimap showing terrain, stationary-object
       footprints, actors, current selection, and the camera viewport.
-- [ ] 0.31 Support minimap navigation while keeping it independent of
-      simulation state.
+- [ ] 0.31 Support minimap navigation while keeping it independent of simulation
+      state.
 
 ### Verification
 
@@ -98,9 +98,9 @@ base-building RTS loop, its technical architecture, and its player interface.
       that can round-trip through serialization before level content is locked.
 - [ ] 0.35 Add the fixed Command Center, Materials Refinery, Harvester, Field
       Barracks, Trooper, and Scout with data-driven costs and timing.
-- [ ] 0.36 Implement direct blueprint placement, rotation, the baseline
-      one-slot infrastructure queue, construction timers, support coverage,
-      disconnection shutdown, cancellation, and resale.
+- [ ] 0.36 Implement direct blueprint placement, rotation, the baseline one-slot
+      infrastructure queue, construction timers, support coverage, disconnection
+      shutdown, cancellation, and resale.
 - [ ] 0.37 Implement finite Materials sites, paid Harvester production, one
       assigned Harvester per Refinery, automated collection and delivery,
       depletion, reassignment, and loot.
@@ -124,17 +124,17 @@ base-building RTS loop, its technical architecture, and its player interface.
       compact phone and tablet landscape browser profiles without hover or
       right-click.
 - [ ] 0.46 Integrate the required animated textures, skeletal actors,
-      articulated buildings, tracer and weapon effects, ambient objects,
-      damage effects, construction stages, and resource-depletion visuals.
+      articulated buildings, tracer and weapon effects, ambient objects, damage
+      effects, construction stages, and resource-depletion visuals.
 - [ ] 0.47 Replace the prototype bindings with the locked mouse, keyboard, and
       touch controls; camera presets; smooth Focus and Follow; and
       reduced-motion behavior.
 
 ### Playable-slice verification
 
-- [ ] 0.48 Add focused tests for economy, construction support, production,
-      fog, combat, wolf AI and its saved state, objectives, save
-      round-tripping, and restart reconstruction.
+- [ ] 0.48 Add focused tests for economy, construction support, production, fog,
+      combat, wolf AI and its saved state, objectives, save round-tripping, and
+      restart reconstruction.
 - [ ] 0.49 Add a browser end-to-end check for the complete M0 loop from the
       starting Command Center through victory and post-victory free play.
 - [ ] 0.50 Add compact landscape interaction checks using touch-style input and
