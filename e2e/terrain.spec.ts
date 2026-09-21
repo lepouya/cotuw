@@ -327,7 +327,6 @@ test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
     const zoomed = viewHeight();
     canvas.style.width = "720px";
     canvas.style.height = "1080px";
-    window.dispatchEvent(new Event("resize"));
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );

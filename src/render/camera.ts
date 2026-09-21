@@ -119,10 +119,12 @@ export function createStrategyCamera(
   /** Keeps the player's zoom, only re-clamping it against the new viewport. */
   const handleResize = () => setViewHeight(viewHeight);
   canvas.addEventListener("wheel", zoom, { passive: false });
-  window.addEventListener("resize", handleResize);
+  // Observing the canvas catches layout-driven resizes that skip the window.
+  const resizeObserver = new ResizeObserver(handleResize);
+  resizeObserver.observe(canvas);
   scene.onDisposeObservable.add(() => {
     canvas.removeEventListener("wheel", zoom);
-    window.removeEventListener("resize", handleResize);
+    resizeObserver.disconnect();
   });
   scene.onBeforeRenderObservable.add(syncViewBounds);
 

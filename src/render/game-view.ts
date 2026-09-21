@@ -25,13 +25,19 @@ export function createGameView(
   map: TerrainMap,
   { clearColor, lighting: lightingConfig }: GameViewOptions,
 ): GameView {
-  const engine = new Engine(canvas, true);
+  // Render at device pixels so HiDPI displays stay sharp; the camera and pointer
+  // math stay in CSS pixels.
+  const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
   const scene = new Scene(engine);
   scene.clearColor = Color4.FromColor3(clearColor);
 
   const suppressContextMenu = (event: Event) => event.preventDefault();
   const resize = () => engine.resize();
   canvas.addEventListener("contextmenu", suppressContextMenu);
+  // The canvas can resize without the window (side panels, layout changes). A
+  // window resize still matters for pixel-ratio changes between displays.
+  const resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(canvas);
   window.addEventListener("resize", resize);
 
   const camera = createStrategyCamera(scene, canvas, map);
@@ -47,6 +53,7 @@ export function createGameView(
     dispose: () => {
       canvas.removeEventListener("contextmenu", suppressContextMenu);
       window.removeEventListener("resize", resize);
+      resizeObserver.disconnect();
       scene.dispose();
       engine.dispose();
     },
