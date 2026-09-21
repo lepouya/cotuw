@@ -1,6 +1,5 @@
 import {
   Color3,
-  DynamicTexture,
   Material,
   Mesh,
   Observer,
@@ -349,11 +348,10 @@ function createLayerMaterial(scene: Scene, texture?: string): StandardMaterial {
 
   if (texture) {
     const source = terrainTextureSource(texture);
-    material.diffuseTexture = createLayerTexture(scene, texture);
-    const hasAlpha = source?.hasAlpha ?? true;
-    const layerAlphaOnly = source ? "layerAlphaOnly" in source : false;
-    material.useAlphaFromDiffuseTexture = hasAlpha && !layerAlphaOnly;
-    if (hasAlpha) {
+    material.diffuseTexture = createLayerTexture(scene, source);
+    material.useAlphaFromDiffuseTexture =
+      source.hasAlpha && !("layerAlphaOnly" in source);
+    if (source.hasAlpha) {
       material.transparencyMode = Material.MATERIAL_ALPHABLEND;
     }
   }
@@ -361,54 +359,30 @@ function createLayerMaterial(scene: Scene, texture?: string): StandardMaterial {
   return material;
 }
 
-function createLayerTexture(scene: Scene, textureId: string): Texture {
-  const source = terrainTextureSource(textureId);
-  if (source) {
-    const texture = new Texture(source.url, scene);
-    texture.hasAlpha = source.hasAlpha;
-    // Mirrored wrapping is continuous even if authored edge pixels differ by
-    // a small amount after resizing or compression.
-    texture.wrapU = Texture.MIRROR_ADDRESSMODE;
-    texture.wrapV = Texture.MIRROR_ADDRESSMODE;
-    if ("scale" in source) {
-      texture.uScale = source.scale.u;
-      texture.vScale = source.scale.v;
-    }
-    return texture;
+function createLayerTexture(
+  scene: Scene,
+  source: TerrainTextureSource,
+): Texture {
+  const texture = new Texture(source.url, scene);
+  texture.hasAlpha = source.hasAlpha;
+  // Mirrored wrapping is continuous even if authored edge pixels differ by
+  // a small amount after resizing or compression.
+  texture.wrapU = Texture.MIRROR_ADDRESSMODE;
+  texture.wrapV = Texture.MIRROR_ADDRESSMODE;
+  if ("scale" in source) {
+    texture.uScale = source.scale.u;
+    texture.vScale = source.scale.v;
   }
-
-  const texture = new DynamicTexture(
-    `terrain-texture-${textureId}`,
-    { width: 64, height: 64 },
-    scene,
-    false,
-  );
-  const context = texture.getContext() as CanvasRenderingContext2D;
-  context.clearRect(0, 0, 64, 64);
-
-  if (textureId === "terrain/dirt") {
-    context.fillStyle = "rgb(255 255 255 / 56%)";
-    for (let index = 0; index < 14; index += 1) {
-      const x = (index * 23 + 7) % 64;
-      const y = (index * 37 + 11) % 64;
-      context.fillRect(x, y, 7, 5);
-    }
-  } else {
-    context.fillStyle = "rgb(255 255 255 / 75%)";
-    for (let index = 0; index < 19; index += 1) {
-      const x = (index * 17 + 5) % 64;
-      const y = (index * 29 + 13) % 64;
-      context.beginPath();
-      context.arc(x, y, 1.5, 0, Math.PI * 2);
-      context.fill();
-    }
-  }
-
-  texture.hasAlpha = true;
-  texture.update(false);
   return texture;
 }
 
-function terrainTextureSource(textureId: string) {
+type TerrainTextureSource =
+  (typeof TERRAIN_TEXTURES)[keyof typeof TERRAIN_TEXTURES];
+
+function terrainTextureSource(textureId: string): TerrainTextureSource {
+  if (!Object.prototype.hasOwnProperty.call(TERRAIN_TEXTURES, textureId)) {
+    throw new Error(`Unknown terrain texture "${textureId}".`);
+  }
+
   return TERRAIN_TEXTURES[textureId as keyof typeof TERRAIN_TEXTURES];
 }
