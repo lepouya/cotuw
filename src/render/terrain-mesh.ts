@@ -2,7 +2,7 @@ import {
   Color3,
   Material,
   Mesh,
-  Observer,
+  type Observer,
   Scene,
   StandardMaterial,
   Texture,
@@ -12,6 +12,7 @@ import {
 import { createDebugOverlay } from "./debug-overlay";
 
 import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
+
 const CHUNK_SIZE = 32;
 export const TERRAIN_LAYER_OFFSET = 0.012;
 
@@ -315,6 +316,8 @@ function cornerAlpha(
     return layer.color.a;
   }
 
+  // Matches the empty-string normalization used when grouping tiles into meshes.
+  const texture = layer.texture || undefined;
   let total = 0;
   let sampled = 0;
   for (const [x, z] of [
@@ -329,7 +332,7 @@ function cornerAlpha(
 
     const neighbor = map
       .layersAt(x, z)
-      .find((candidate) => candidate.texture === layer.texture);
+      .find((candidate) => (candidate.texture || undefined) === texture);
     total += neighbor?.color.a ?? 0;
     sampled += 1;
   }
