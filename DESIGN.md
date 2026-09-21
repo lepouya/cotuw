@@ -12,10 +12,10 @@ The title remains tentative until a formal trademark review is warranted.
 
 ## Setting and story
 
-Humanity is beginning interstellar exploration when an alarming signal draws
-the Anomaly Response Command to a damaged frontier world. ARC encounters the
-Circle of Repose, an elven pilgrimage that arrived first in response to a
-prophecy commanding it to quiet the Unquiet.
+Humanity is beginning interstellar exploration when an alarming signal draws the
+Anomaly Response Command to a damaged frontier world. ARC encounters the Circle
+of Repose, an elven pilgrimage that arrived first in response to a prophecy
+commanding it to quiet the Unquiet.
 
 Neither expedition initially understands the world's citadels, lost caches, or
 ancient inhabitants. ARC seeks to secure and exploit them; the Circle believes
@@ -25,8 +25,8 @@ central antagonist.
 The mid-to-late campaign reveals the Everwake: ancient inhabitants who changed
 themselves into deathless demonic forms, devastated their world, and were
 imprisoned by the citadels. They call their transformation ascension and call
-the player the Chainbearer. ARC and the Circle must eventually cooperate
-against the crisis their conflict helped release.
+the player the Chainbearer. ARC and the Circle must eventually cooperate against
+the crisis their conflict helped release.
 
 ## Gameplay pillars
 
@@ -36,10 +36,9 @@ against the crisis their conflict helped release.
    infrastructure, mobility, defense, and battlefield tools.
 3. **A living hostile world** — ancient sites, unstable wards, corruption, and
    world events create strategic decisions beyond attacking the opponent.
-4. **Approachable strategic depth** — scouting, planning, and map control
-   matter more than extreme actions-per-minute.
-5. **Small playable core first** — expand only after the basic RTS loop is
-   fun.
+4. **Approachable strategic depth** — scouting, planning, and map control matter
+   more than extreme actions-per-minute.
+5. **Small playable core first** — expand only after the basic RTS loop is fun.
 
 ## Requirements and scope
 
@@ -79,8 +78,8 @@ and environmental pressure rather than only conventional faction bases.
 
 ARC is the human military expedition sent to investigate the signal. Its
 identity centers on machines, explosives, artificial intelligence, disciplined
-organization, industry, and connected infrastructure. Its campaign addresses
-the player as **Commander** and is the recommended first campaign.
+organization, industry, and connected infrastructure. Its campaign addresses the
+player as **Commander** and is the recommended first campaign.
 
 Its selected early names are **Command Center**, **Materials Refinery**,
 **Harvester**, **Field Barracks**, **Trooper**, **Scout**, **Medic**, and
@@ -90,9 +89,9 @@ Its selected early names are **Command Center**, **Materials Refinery**,
 
 The Circle is an elven pilgrimage, not all elven civilization. The elves are a
 post-industrial, interstellar people attuned to nature; their ships, structures,
-and vehicles are alive. The Circle cultivates rather than extracts and
-addresses the player as **Guide** or **Guide of the Circle**. Its campaign is
-intended for players with more RTS familiarity.
+and vehicles are alive. The Circle cultivates rather than extracts and addresses
+the player as **Guide** or **Guide of the Circle**. Its campaign is intended for
+players with more RTS familiarity.
 
 Its selected parallel names are **Heartgrove**, **Lifebloom Conservatory**,
 **Cultivator**, **Sentinel**, **Wayfinder**, **Healer**, and **Artificer**.
@@ -101,8 +100,8 @@ Its selected parallel names are **Heartgrove**, **Lifebloom Conservatory**,
 
 The Everwake are the concealed world antagonists and remain non-playable. ARC
 and the Circle do not initially know what the Unquiet are. The Everwake's
-identity, self-name, and demonic nature are revealed only in the middle or
-later story.
+identity, self-name, and demonic nature are revealed only in the middle or later
+story.
 
 ## Economy and construction
 
@@ -117,8 +116,8 @@ later story.
 - One worker gathers both common and rare yields from data-driven sites: ARC's
   **Harvester** returns to a **Materials Refinery**, while the Circle's
   **Cultivator** returns to a **Lifebloom Conservatory**.
-- Resources use unlimited global faction stockpiles. Deposited resources are
-  not tied to storage buildings and survive building loss.
+- Resources use unlimited global faction stockpiles. Deposited resources are not
+  tied to storage buildings and survive building loss.
 - ARC places paid blueprints directly within construction support. No builder
   unit is required. Cancelling unfinished construction gives a full refund.
 - Completed ARC buildings require an unbroken support chain to the **Command
@@ -141,15 +140,15 @@ later story.
 - One support unit services one target at a time, and only one provider may
   service a target. It must stop within range; a moving target may be followed
   within a limited pursuit distance.
-- A building uses contextual **Repair** without a builder. Repair restores 1%
-  of maximum health per second and charges each tick before applying health.
+- A building uses contextual **Repair** without a builder. Repair restores 1% of
+  maximum health per second and charges each tick before applying health.
 - Repairing 100% health costs 50% of the building's original common-resource
   cost. Each job costs that amount multiplied by its starting missing-health
   fraction and never uses rare or exotic resources.
 - Unaffordable or disconnected repair pauses and later resumes. Cancellation
   keeps restored health because unpaid future ticks require no refund.
-- Construction and building repair share a faction-wide infrastructure pool.
-  A faction has one baseline slot; ARC Command Center upgrades may add slots.
+- Construction and building repair share a faction-wide infrastructure pool. A
+  faction has one baseline slot; ARC Command Center upgrades may add slots.
 - Deployable actors have a stable unit-serviced or infrastructure-serviced
   policy that never changes with mode. Infrastructure repair requires the actor
   to be fully deployed and connected or operating as a network root.
@@ -164,22 +163,22 @@ later story.
   menu or sidebar. Building types have a finite, data-driven number of tiers,
   and some buildings have no upgrades.
 - Tiers form a strictly linear sequence and require the preceding tier. There
-  are no mutually exclusive building-upgrade branches; broader branching
-  choices belong to the separate research system.
+  are no mutually exclusive building-upgrade branches; broader branching choices
+  belong to the separate research system.
 - Upgrades never change a building's tile footprint, anchor, orientation, or
   collision. They may add visible modules, animation, lighting, textures, and
   other tier details. The installed tier appears in the sidebar and beside the
   building's world-space health or status display.
-- A transformation requiring a different footprint is a separate building
-  type rather than an upgrade tier.
+- A transformation requiring a different footprint is a separate building type
+  rather than an upgrade tier.
 - Campaign progression unlocks the maximum tier available for each building
   type. Installed upgrades remain local to the current level and do not carry
   into later levels; a level script may explicitly place an upgraded building.
 - Replacements begin unupgraded unless scripted. Deployable buildings retain
   their installed upgrades when changing modes.
-- An upgrade may improve its building or provide a faction-wide capability
-  while that building remains operational. Selling or destroying the building
-  removes its installed effects.
+- An upgrade may improve its building or provide a faction-wide capability while
+  that building remains operational. Selling or destroying the building removes
+  its installed effects.
 - Command Center upgrades may add infrastructure slots or construction range;
   Barracks upgrades may unlock advanced units; Radar upgrades may extend range
   or add detectable kinds. Building upgrades remain distinct from permanent
@@ -187,8 +186,8 @@ later story.
 - Level saves store installed tiers and in-progress upgrade state. Campaign
   saves store the maximum tiers unlocked by campaign progression.
 - The full upgrade cost is paid when it enters the shared infrastructure queue.
-  Active upgrading consumes one slot, while waiting work does not. Each
-  building may have only one waiting or active upgrade.
+  Active upgrading consumes one slot, while waiting work does not. Each building
+  may have only one waiting or active upgrade.
 - A completed building cannot have repair and upgrade work waiting or active at
   the same time. Starting either requires cancelling the other under its normal
   cancellation rules.
@@ -204,10 +203,10 @@ later story.
 - Cancelling an unfinished upgrade gives a full refund and preserves the last
   completed tier. Selling or undeploying requires cancellation first.
   Destruction loses the paid upgrade cost.
-- Infrastructure-capacity changes apply immediately. If active work exceeds
-  the new limit, the oldest jobs continue and newer excess jobs pause with
-  their progress, payment, and original priority preserved. A stable job ID
-  resolves equal-time ties, and one grouped warning reports the capacity loss.
+- Infrastructure-capacity changes apply immediately. If active work exceeds the
+  new limit, the oldest jobs continue and newer excess jobs pause with their
+  progress, payment, and original priority preserved. A stable job ID resolves
+  equal-time ties, and one grouped warning reports the capacity loss.
 - Upgrades are excluded from M0. Individual building tiers, effects, costs,
   timing, and presentation remain later content and balance work.
 
@@ -217,22 +216,22 @@ later story.
   factions, balance, maps, campaigns, objectives, visual assets, audio, and
   localization. Base-game content uses the same public schemas wherever
   practical.
-- Mission behavior uses deterministic, sandboxed events and actions. Mods
-  cannot run arbitrary JavaScript or native code, access unrestricted platform
+- Mission behavior uses deterministic, sandboxed events and actions. Mods cannot
+  run arbitrary JavaScript or native code, access unrestricted platform
   services, or initially provide unrestricted interface extensions.
 - The public mod schema is a living compatibility contract that must be
   revisited as game data evolves without weakening deterministic simulation,
   save compatibility, browser portability, or security.
 - Single-player provides a modding console, bound to backtick by default and
-  rebindable, with an on-screen Advanced or Developer menu alternative.
-  Opening it pauses by default. It provides history, autocomplete, help, and
-  clear errors while exposing approved inspection and deterministic command
-  APIs, never an unrestricted code or operating-system shell.
-- Read-only console use has no progression consequence. The first
-  state-changing command warns the player and permanently marks that level
-  session and its derived saves as modified. Those saves remain usable but
-  cannot award official completion, achievements, or progression unlocks;
-  returning to a clean save or restart restores eligibility.
+  rebindable, with an on-screen Advanced or Developer menu alternative. Opening
+  it pauses by default. It provides history, autocomplete, help, and clear
+  errors while exposing approved inspection and deterministic command APIs,
+  never an unrestricted code or operating-system shell.
+- Read-only console use has no progression consequence. The first state-changing
+  command warns the player and permanently marks that level session and its
+  derived saves as modified. Those saves remain usable but cannot award official
+  completion, achievements, or progression unlocks; returning to a clean save or
+  restart restores eligibility.
 - A mod may be an ordinary directory during development. Distribution uses a
   ZIP-compatible `.cotuwmod` archive with a required manifest containing its
   stable namespaced ID, metadata, semantic version, license, compatibility
@@ -240,9 +239,8 @@ later story.
 - Package paths cannot escape the package boundary. Browser and desktop builds
   use the same format, validate before activation, and leave invalid packages
   installed but disabled with actionable errors.
-- Package format is independent of distribution source, allowing local files,
-  a future workshop, and third-party repositories to distribute the same
-  bundle.
+- Package format is independent of distribution source, allowing local files, a
+  future workshop, and third-party repositories to distribute the same bundle.
 - Mod support and the deferred map editor remain independent features.
 
 ## Controls and interface
@@ -291,19 +289,19 @@ later story.
   remain on the surface layer.
 - One air layer and one subterranean layer are sufficient initially; rendered
   altitude and depth are not tactical bands.
-- Air movement ignores ordinary surface terrain and footprints but respects
-  map bounds and authored air blockers. Takeoff and landing are explicit layer
+- Air movement ignores ordinary surface terrain and footprints but respects map
+  bounds and authored air blockers. Takeoff and landing are explicit layer
   transitions, and landing requires a valid surface footprint.
 - Burrowed actors ignore ordinary surface obstacles but respect subterranean
-  blockers. Burrowing and emerging are explicit transitions; cross-layer
-  attacks require an explicit compatible weapon or ability.
+  blockers. Burrowing and emerging are explicit transitions; cross-layer attacks
+  require an explicit compatible weapon or ability.
 - Watercraft traverse water; amphibious profiles traverse land and water and
   cross valid shorelines without changing occupancy layers.
 - Mixed-layer groups are permitted. Each actor resolves movement with its own
   profile, while every weapon declares which layers it can target.
 - Passenger transport is a reusable capability; an APC is one planned use.
-  Boarding is explicit, and passengers cannot attack, provide vision, or
-  receive world commands while loaded.
+  Boarding is explicit, and passengers cannot attack, provide vision, or receive
+  world commands while loaded.
 - Transports retain passenger identities, health, veterancy, and persistent
   state. Unloading places the same actors in nearby positions they can traverse.
 - Destroying a transport attempts an emergency unload. Survivors take 50% of
@@ -312,16 +310,16 @@ later story.
 - Oversized units have selection areas spanning more than one square tile and
   use authored movement clearance distinct from selection bounds.
 - Deployability is separate from size. Deployable actors retain one identity
-  across mobile and grid-aligned deployed modes, and each actor declares
-  whether completed deployment can be reversed.
-- Deployment uses a nearby grid-snapped preview, a valid reserved footprint,
-  and a timed transition. Capabilities declare whether they operate while
-  mobile, deployed, or both.
+  across mobile and grid-aligned deployed modes, and each actor declares whether
+  completed deployment can be reversed.
+- Deployment uses a nearby grid-snapped preview, a valid reserved footprint, and
+  a timed transition. Capabilities declare whether they operate while mobile,
+  deployed, or both.
 - A deployed actor may be a network consumer, relay, root, or nonparticipant.
   Network participation begins when deployment completes and ends when
   undeployment begins.
-- The playable map uses an irregular mask within a rectangular data grid.
-  Camera bounds follow explored terrain and do not expose the full map early.
+- The playable map uses an irregular mask within a rectangular data grid. Camera
+  bounds follow explored terrain and do not expose the full map early.
 
 ## Fog, stealth, and detection
 
@@ -332,8 +330,8 @@ later story.
 - Detection has no levels. It matches authored signature type, concealment
   category, occupancy layer, and range deterministically.
 - Detectors may provide full detection in current vision or a coarse sensor
-  contact through fog. Radar, sonar, magical detectors, quantum locks, and
-  traps share this capability model.
+  contact through fog. Radar, sonar, magical detectors, quantum locks, and traps
+  share this capability model.
 - Direct targeting requires full detection. Compatible Attack Ground, line,
   projectile, and area effects can strike undetected actors through blind fire.
 - Attacking, using hostile abilities, taking blind damage, or making physical
@@ -346,13 +344,13 @@ later story.
 
 ## Campaign
 
-- The player chooses ARC or the Circle and remains with that side throughout
-  its campaign. Both campaigns show different perspectives on the same crisis.
+- The player chooses ARC or the Circle and remains with that side throughout its
+  campaign. Both campaigns show different perspectives on the same crisis.
 - ARC and the Circle do not know about one another before their first conflict
   over a citadel or lost cache. Each initially understands the other, not the
   Everwake, as its main opponent.
-- The factions eventually ally. In single-player the other faction remains an
-  AI ally; future cooperative play may assign it to another player.
+- The factions eventually ally. In single-player the other faction remains an AI
+  ally; future cooperative play may assign it to another player.
 - Both campaigns are immediately available. ARC is labeled **Recommended First
   Campaign** and the Circle **Advanced Campaign**.
 - Easy, Normal, and Hard are independent of campaign choice. Easy multiplies
@@ -368,8 +366,8 @@ later story.
 - Damage, cadence, acquisition, pursuit, line of fire, and targetable occupancy
   layers are data-driven and deterministic.
 - Combat actors and armed defensive structures earn one kill when at least 35%
-  of a destroyed target's remaining unrecovered damage ledger is theirs. At
-  most two contributors can qualify.
+  of a destroyed target's remaining unrecovered damage ledger is theirs. At most
+  two contributors can qualify.
 - Healing removes damage contributions proportionally. Dead contributors remain
   in the denominator but cannot receive promotions.
 - Veterancy is level-local: 10 kills grants +25% base damage; 25 adds +25% base
@@ -382,20 +380,20 @@ later story.
 
 - NPC actors use the same movement, pathfinding, targeting, visibility, damage,
   and command systems as player-controlled actors.
-- Each actor uses deterministic, serializable state for immediate behavior,
-  with stable identifiers resolving equal choices. Encounter coordinators may
-  share goals or alerts, while actors still execute their own actions.
-- Future faction AI layers a strategic director and group controllers above
-  the same actor controllers. Mission scripts assign goals or ordinary
-  commands rather than replacing core simulation logic.
+- Each actor uses deterministic, serializable state for immediate behavior, with
+  stable identifiers resolving equal choices. Encounter coordinators may share
+  goals or alerts, while actors still execute their own actions.
+- Future faction AI layers a strategic director and group controllers above the
+  same actor controllers. Mission scripts assign goals or ordinary commands
+  rather than replacing core simulation logic.
 - M0 wolves use idle-at-home, alerted, pursuing, attacking, investigating,
   returning-home, and regenerating states. They have no economy, base-building
   logic, or strategic director.
 - A wolf retains a valid current target. Otherwise it selects the nearest
   detected, reachable hostile within its leash, using stable actor ID to break
   ties, without value targeting or coordinated focus fire.
-- A den alert shares an attacker's last-known position but not continuing
-  hidden knowledge. Each wolf chooses its own target after detection. Lost or
+- A den alert shares an attacker's last-known position but not continuing hidden
+  knowledge. Each wolf chooses its own target after detection. Lost or
   unreachable targets are investigated before returning home, and no alert
   overrides the hard leash.
 - Opposing-faction base planning, economy, production, expansion, defense, and
@@ -421,8 +419,8 @@ a later tutorial could be made.
   125%-scale alpha occupy a den and require multiple Troopers.
 - Defeating all six wolves completes the objective. The player may continue in
   free play afterward.
-- Command Center destruction or a failed mandatory objective causes hard
-  defeat. Economic or military dead ends remain player-judged soft defeats.
+- Command Center destruction or a failed mandatory objective causes hard defeat.
+  Economic or military dead ends remain player-judged soft defeats.
 - A first successful run should take about 15 to 25 minutes; a familiar replay
   about 10 to 15 minutes. Neither is a hard timer.
 - M0 includes contextual notifications, two simple explanatory popups, full
@@ -440,13 +438,13 @@ a later tutorial could be made.
   are required in M0. Loading begins paused.
 - Level and campaign saves are separate schemas. A level save owns one mission
   snapshot; a campaign save owns longer-lived choices and progression.
-- Authoritative simulation state is serialized. Rendering objects, cached
-  paths, effects, and platform handles are reconstructed.
+- Authoritative simulation state is serialized. Rendering objects, cached paths,
+  effects, and platform handles are reconstructed.
 - Implemented systems preserve passenger identities, occupancy transitions,
   deployment state and reservations, veterancy, temporary reveals, and
   authoritative sensor contacts or detection effects.
-- Incompatible saves fail with a clear explanation. Cross-build migration is
-  not required for M0.
+- Incompatible saves fail with a clear explanation. Cross-build migration is not
+  required for M0.
 
 ## Open decisions
 

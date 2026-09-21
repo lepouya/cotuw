@@ -25,7 +25,10 @@
 - Respect the locked technical direction in `DESIGN.md`.
 - Keep the game core browser-runnable; isolate Tauri-specific behavior behind
   platform-service boundaries.
-- Keep simulation deterministic and independent of rendering and platform APIs.
+- Keep simulation deterministic and independent of the render loop. It must run
+  deterministically at a high tick rate even when the screen refresh rate is low
+  or the rendering engine is lagging, and must not depend on GPU/DOM/Tauri
+  state.
 - Prefer data-driven content for game balance, campaigns, and future mods.
 - Do not change a locked design decision or add major dependencies without
   explicit direction.
