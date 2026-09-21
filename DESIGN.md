@@ -11,19 +11,21 @@ forces, and fight across a living world that becomes progressively more hostile.
 
 ## Setting and story
 
-Two rival coalitions fight over a damaged frontier world governed by remnants of
-ancient glyph engines: systems that respond to symbols, ritual, and will.
+Humanity is beginning interstellar exploration when an alarming signal draws
+the Anomaly Response Command to a damaged frontier world. ARC encounters the
+Circle of Repose, an elven pilgrimage that arrived first in response to a
+prophecy commanding it to quiet the Unquiet.
 
-- The technology-and-weapons coalition seeks to stabilize the world through
-  industry and controlled use of the old systems.
-- The magic-and-nature coalition seeks to preserve the world's old balances and
-  resist industrial extraction.
-- Their war destabilizes the world's seals and awakens the force that ruined it
-  before.
+Neither expedition initially understands the world's citadels, lost caches, or
+ancient inhabitants. ARC seeks to secure and exploit them; the Circle believes
+they are essential to its pilgrimage. Each side first treats the other as the
+central antagonist.
 
-The single-player campaign lets the player choose either coalition. Both
-narratives escalate from faction conflict to an uneasy alliance against the
-awakened world threat. Neither steel nor magic can save the world alone.
+The mid-to-late campaign reveals the Everwake: ancient inhabitants who changed
+themselves into deathless demonic forms, devastated their world, and were
+imprisoned by the citadels. They call their transformation ascension and call
+the player the Chainbearer. ARC and the Circle must eventually cooperate
+against the crisis their conflict helped release.
 
 ## Gameplay pillars
 
@@ -33,17 +35,20 @@ awakened world threat. Neither steel nor magic can save the world alone.
    infrastructure, mobility, defense, and battlefield tools.
 3. **A living hostile world** — ancient sites, unstable wards, corruption, and
    world events create strategic decisions beyond attacking the opponent.
-4. **Approachable strategic depth** — scouting, planning, and map control matter
-   more than extreme actions-per-minute.
-5. **Small playable core first** — expand only after the basic RTS loop is fun.
+4. **Approachable strategic depth** — scouting, planning, and map control
+   matter more than extreme actions-per-minute.
+5. **Small playable core first** — expand only after the basic RTS loop is
+   fun.
 
 ## Requirements and scope
 
 - 3D world with an isometric/top-down strategy camera.
 - Visual readability over photorealism.
-- Desktop first: Windows and macOS.
-- Linux/SteamOS, browser, Android, and iOS are future targets.
-- Eventual small-session multiplayer, roughly four players; no massively
+- Desktop first: Windows and macOS through Tauri.
+- The core remains browser-runnable. M0 also validates compact phone and tablet
+  landscape browser layouts with touch-style input.
+- Linux/SteamOS and native Android and iOS builds are future targets.
+- Eventual small-session multiplayer, roughly 2-8 players; no massively
   multiplayer features.
 - Data-driven game content to support balancing, campaigns, and eventual mods.
 - Original setting, names, art, and lore.
@@ -62,86 +67,373 @@ portable.
 
 ## Core match
 
-### Initial target
-
-- Traditional RTS loop: establish a base, gather resources, build production,
-  scout, expand, and defeat the opponent.
-- One small map, one resource system, one enemy AI, and a clear win/lose
-  condition.
-- The world threat begins as map pressure, not a conventional third
-  base-building opponent.
+The traditional RTS loop is to establish a base, gather resources, construct
+production, train forces, scout, expand, and defeat mission opposition. The
+world may also contain neutral or local forces, unknown structures, objectives,
+and environmental pressure rather than only conventional faction bases.
 
 ## Factions
 
-### Technology and weapons coalition
+### Anomaly Response Command
 
-**Narrative:** A human-led, multi-peoples coalition that favors industry,
-disciplined organization, and controlled use of ancient systems.
+ARC is the human military expedition sent to investigate the signal. Its
+identity centers on machines, explosives, artificial intelligence, disciplined
+organization, industry, and connected infrastructure. Its campaign addresses
+the player as **Commander** and is the recommended first campaign.
 
-**Identity:** Factories, power networks, armored units, artillery, repairs,
-modular structures, and strong defensive positions.
+Its selected early names are **Command Center**, **Materials Refinery**,
+**Harvester**, **Field Barracks**, **Trooper**, **Scout**, **Medic**, and
+**Mechanic**.
 
-**Strengths:** Reliable production, durable combined arms, static defense,
-long-range firepower, repair, and logistical scaling.
+### Circle of Repose
 
-**Weaknesses:** Slower relocation; reliance on infrastructure; vulnerable to
-power disruption and flanking.
+The Circle is an elven pilgrimage, not all elven civilization. The elves are a
+post-industrial, interstellar people attuned to nature; their ships, structures,
+and vehicles are alive. The Circle cultivates rather than extracts and
+addresses the player as **Guide** or **Guide of the Circle**. Its campaign is
+intended for players with more RTS familiarity.
 
-### Magic and nature coalition
+Its selected parallel names are **Heartgrove**, **Lifebloom Conservatory**,
+**Cultivator**, **Sentinel**, **Wayfinder**, **Healer**, and **Artificer**.
 
-**Narrative:** A coalition of peoples bound to the living world that resists
-extraction and seeks control of the old powers on its own terms.
+### The Everwake
 
-**Identity:** Living structures, ley-line influence, bonded creatures, healing,
-concealment, mobility, and terrain manipulation.
+The Everwake are the concealed world antagonists and remain non-playable. ARC
+and the Circle do not initially know what the Unquiet are. The Everwake's
+identity, self-name, and demonic nature are revealed only in the middle or
+later story.
 
-**Strengths:** Flexible expansion, mobility, localized regeneration, ambushes,
-adaptive defenses, and control of terrain or world sites.
+## Economy and construction
 
-**Weaknesses:** Less direct siege power; dependence on favorable terrain and
-connected magical infrastructure.
+- The full game uses three parallel resource roles with faction-specific names
+  and collection presentation.
+- ARC's common resource is **Industrial Materials** or **Materials**; the
+  Circle's is **Lifebloom** or **Bloom**.
+- ARC's rare resource is **Strategic Catalysts** or **Catalysts**; the Circle's
+  is **Ley Resonance** or **Resonance**.
+- The exotic Everwake resource remains hidden until the story reveal and has no
+  selected name yet.
+- One worker gathers both common and rare yields from data-driven sites: ARC's
+  **Harvester** returns to a **Materials Refinery**, while the Circle's
+  **Cultivator** returns to a **Lifebloom Conservatory**.
+- Resources use unlimited global faction stockpiles. Deposited resources are
+  not tied to storage buildings and survive building loss.
+- ARC places paid blueprints directly within construction support. No builder
+  unit is required. Cancelling unfinished construction gives a full refund.
+- Completed ARC buildings require an unbroken support chain to the **Command
+  Center**. Disconnected buildings stop operating, extending support, and
+  providing active vision; interrupted work pauses with progress preserved.
+- Buildings and fully deployed mobile structures may be sold. Mobile units and
+  vehicles may not. The refund is half the resources invested in construction
+  and completed installed upgrades, multiplied by the current-health fraction
+  and independently rounded down for each resource. Campaign unlocks do not
+  count as investment.
 
-### Awakened world threat
+## Repair and healing
 
-**Narrative:** The restrained force beneath or beyond the world that previously
-ruined it.
+- ARC uses a **Medic** for human units and a **Mechanic** for mobile machines
+  and vehicles. The Circle uses a **Healer** for biological units and an
+  **Artificer** for mobile living constructs and vehicles.
+- Support units are unarmed. They automatically service a nearby eligible unit
+  while idle, or prioritize a manually selected target, and consume no faction
+  resources.
+- One support unit services one target at a time, and only one provider may
+  service a target. It must stop within range; a moving target may be followed
+  within a limited pursuit distance.
+- A building uses contextual **Repair** without a builder. Repair restores 1%
+  of maximum health per second and charges each tick before applying health.
+- Repairing 100% health costs 50% of the building's original common-resource
+  cost. Each job costs that amount multiplied by its starting missing-health
+  fraction and never uses rare or exotic resources.
+- Unaffordable or disconnected repair pauses and later resumes. Cancellation
+  keeps restored health because unpaid future ticks require no refund.
+- Construction and building repair share a faction-wide infrastructure pool.
+  A faction has one baseline slot; ARC Command Center upgrades may add slots.
+- Deployable actors have a stable unit-serviced or infrastructure-serviced
+  policy that never changes with mode. Infrastructure repair requires the actor
+  to be fully deployed and connected or operating as a network root.
+- Player actors have no universal passive regeneration or standard recovery
+  structure. Actor, upgrade, aura, or scripted regeneration is an explicit
+  exception and updates the veterancy damage ledger normally.
+- Destroyed actors are not repaired, healed, or revived by these systems.
 
-**Identity:** Rifts, corruption, hostile guardians, escalating events, contested
-ancient sites, and later large-scale assaults.
+## Building upgrades
 
-**Rule:** It is initially non-playable and environmental. It becomes
-increasingly organized through the campaign.
+- Upgrades are installed on individual building actors through their context
+  menu or sidebar. Building types have a finite, data-driven number of tiers,
+  and some buildings have no upgrades.
+- Tiers form a strictly linear sequence and require the preceding tier. There
+  are no mutually exclusive building-upgrade branches; broader branching
+  choices belong to the separate research system.
+- Upgrades never change a building's tile footprint, anchor, orientation, or
+  collision. They may add visible modules, animation, lighting, textures, and
+  other tier details. The installed tier appears in the sidebar and beside the
+  building's world-space health or status display.
+- A transformation requiring a different footprint is a separate building
+  type rather than an upgrade tier.
+- Campaign progression unlocks the maximum tier available for each building
+  type. Installed upgrades remain local to the current level and do not carry
+  into later levels; a level script may explicitly place an upgraded building.
+- Replacements begin unupgraded unless scripted. Deployable buildings retain
+  their installed upgrades when changing modes.
+- An upgrade may improve its building or provide a faction-wide capability
+  while that building remains operational. Selling or destroying the building
+  removes its installed effects.
+- Command Center upgrades may add infrastructure slots or construction range;
+  Barracks upgrades may unlock advanced units; Radar upgrades may extend range
+  or add detectable kinds. Building upgrades remain distinct from permanent
+  research and technology-tree progression.
+- Level saves store installed tiers and in-progress upgrade state. Campaign
+  saves store the maximum tiers unlocked by campaign progression.
+- The full upgrade cost is paid when it enters the shared infrastructure queue.
+  Active upgrading consumes one slot, while waiting work does not. Each
+  building may have only one waiting or active upgrade.
+- A completed building cannot have repair and upgrade work waiting or active at
+  the same time. Starting either requires cancelling the other under its normal
+  cancellation rules.
+- A building operates at its last completed tier during upgrading. New effects
+  apply only at completion. Disconnection pauses the work and yields its slot;
+  damage does not interrupt it.
+- Completing any upgrade fully restores the building to its current maximum
+  health. A tier may explicitly change maximum health; an unusual reduction
+  clamps current health to the new maximum. Cancelling provides no healing.
+- Upgrades do not increase the repair-price basis. A full repair continues to
+  cost 50% of the base common-resource construction cost. Upgrade spending
+  increases resale investment but not repair price.
+- Cancelling an unfinished upgrade gives a full refund and preserves the last
+  completed tier. Selling or undeploying requires cancellation first.
+  Destruction loses the paid upgrade cost.
+- Infrastructure-capacity changes apply immediately. If active work exceeds
+  the new limit, the oldest jobs continue and newer excess jobs pause with
+  their progress, payment, and original priority preserved. A stable job ID
+  resolves equal-time ties, and one grouped warning reports the capacity loss.
+- Upgrades are excluded from M0. Individual building tiers, effects, costs,
+  timing, and presentation remain later content and balance work.
 
-## Units and structures
+## Mod support
 
-### Unit role vocabulary
+- Initial mod support covers data and content: units, buildings, upgrades,
+  factions, balance, maps, campaigns, objectives, visual assets, audio, and
+  localization. Base-game content uses the same public schemas wherever
+  practical.
+- Mission behavior uses deterministic, sandboxed events and actions. Mods
+  cannot run arbitrary JavaScript or native code, access unrestricted platform
+  services, or initially provide unrestricted interface extensions.
+- The public mod schema is a living compatibility contract that must be
+  revisited as game data evolves without weakening deterministic simulation,
+  save compatibility, browser portability, or security.
+- Single-player provides a modding console, bound to backtick by default and
+  rebindable, with an on-screen Advanced or Developer menu alternative.
+  Opening it pauses by default. It provides history, autocomplete, help, and
+  clear errors while exposing approved inspection and deterministic command
+  APIs, never an unrestricted code or operating-system shell.
+- Read-only console use has no progression consequence. The first
+  state-changing command warns the player and permanently marks that level
+  session and its derived saves as modified. Those saves remain usable but
+  cannot award official completion, achievements, or progression unlocks;
+  returning to a clean save or restart restores eligibility.
+- A mod may be an ordinary directory during development. Distribution uses a
+  ZIP-compatible `.cotuwmod` archive with a required manifest containing its
+  stable namespaced ID, metadata, semantic version, license, compatibility
+  ranges, dependencies, conflicts, and content roots.
+- Package paths cannot escape the package boundary. Browser and desktop builds
+  use the same format, validate before activation, and leave invalid packages
+  installed but disabled with actionable errors.
+- Package format is independent of distribution source, allowing local files,
+  a future workshop, and third-party repositories to distribute the same
+  bundle.
+- Mod support and the deferred map editor remain independent features.
 
-- Vanguard: armored frontline.
-- Skirmisher: scout, raider, or ambusher.
-- Artificer: builder, repairer, or siege engineer.
-- Channeler: support, shields, buffs, or battlefield magic.
-- Warden: control, summons, or terrain manipulation.
+## Controls and interface
+
+- Primary click selects or issues the contextual default command. Primary drag
+  box-selects friendly mobile units. Shift-click adds or removes units.
+- Secondary click opens a radial context menu. Secondary drag pans; Shift plus
+  secondary drag rotates. Every secondary action has an on-screen alternative.
+- Touch uses taps, one-finger empty-world panning, explicit box-selection and
+  queued-order modes, and on-screen camera controls.
+- Move, Attack, Attack Move, Clear, Gather, Collect, Board, Unload, Focus, and
+  Follow appear only where applicable and use shape as well as color.
+- The camera provides orthographic Isometric, Top-down, Grid, and Reset View
+  presets. Preset and focus changes ease unless reduced motion is enabled.
+- The sidebar owns selection details, contextual actions, construction and
+  production, queues, and a keyboard-free Cancel action.
+- The top bar owns the game menu, resources, objectives, alerts, elapsed level
+  time, and single-player pause and speed controls.
+- The minimap is north-up, distinguishes explored terrain from current vision,
+  respects detection, supports camera navigation, and accepts commands only in
+  an explicit command mode.
 
 ## Maps and world systems
 
-### Map elements
+- Mobile units use continuous world positions; the tile grid defines terrain,
+  pathfinding, building placement, and stationary footprints.
+- Terrain provides per-profile passability, slope limits, and movement costs.
+  Routes minimize estimated travel time and recalculate when blockers change.
+- Friendly mobile actors use soft separation. Detected opponents are hard local
+  blockers; physical contact with an undetected same-layer opponent forces a
+  temporary reveal.
+- Movement profiles and occupancy layers are separate. Initial layers are
+  **surface**, **air**, and **subterranean**. Watercraft and amphibious units
+  remain on the surface layer.
+- One air layer and one subterranean layer are sufficient initially; rendered
+  altitude and depth are not tactical bands.
+- Air movement ignores ordinary surface terrain and footprints but respects
+  map bounds and authored air blockers. Takeoff and landing are explicit layer
+  transitions, and landing requires a valid surface footprint.
+- Burrowed actors ignore ordinary surface obstacles but respect subterranean
+  blockers. Burrowing and emerging are explicit transitions; cross-layer
+  attacks require an explicit compatible weapon or ability.
+- Watercraft traverse water; amphibious profiles traverse land and water and
+  cross valid shorelines without changing occupancy layers.
+- Mixed-layer groups are permitted. Each actor resolves movement with its own
+  profile, while every weapon declares which layers it can target.
+- Passenger transport is a reusable capability; an APC is one planned use.
+  Boarding is explicit, and passengers cannot attack, provide vision, or
+  receive world commands while loaded.
+- Transports retain passenger identities, health, veterancy, and persistent
+  state. Unloading places the same actors in nearby positions they can traverse.
+- Destroying a transport attempts an emergency unload. Survivors take 50% of
+  maximum health as damage and are briefly stunned; passengers without a valid
+  position die. Any otherwise sellable transport must be empty.
+- Oversized units have selection areas spanning more than one square tile and
+  use authored movement clearance distinct from selection bounds.
+- Deployability is separate from size. Deployable actors retain one identity
+  across mobile and grid-aligned deployed modes, and each actor declares
+  whether completed deployment can be reversed.
+- Deployment uses a nearby grid-snapped preview, a valid reserved footprint,
+  and a timed transition. Capabilities declare whether they operate while
+  mobile, deployed, or both.
+- A deployed actor may be a network consumer, relay, root, or nonparticipant.
+  Network participation begins when deployment completes and ends when
+  undeployment begins.
+- The playable map uses an irregular mask within a rectangular data grid.
+  Camera bounds follow explored terrain and do not expose the full map early.
 
-- Expansion locations and resource sites.
-- Ancient sites with risks and rewards.
-- Wards, rifts, or corrupted regions that create pressure.
-- Terrain that supports flanking, defense, ambushes, and strategic movement.
+## Fog, stealth, and detection
+
+- Terrain is **Unexplored**, **Explored**, or currently **Visible**. Actor
+  detection is a separate per-faction state.
+- Concealment categories are **Exposed**, **Camouflaged**, **Cloaked**, and the
+  layer-derived **Subterranean** category.
+- Detection has no levels. It matches authored signature type, concealment
+  category, occupancy layer, and range deterministically.
+- Detectors may provide full detection in current vision or a coarse sensor
+  contact through fog. Radar, sonar, magical detectors, quantum locks, and
+  traps share this capability model.
+- Direct targeting requires full detection. Compatible Attack Ground, line,
+  projectile, and area effects can strike undetected actors through blind fire.
+- Attacking, using hostile abilities, taking blind damage, or making physical
+  contact normally suppresses concealment for three seconds. Ordinary reveal
+  does not itself bypass fog or line of sight.
+- Allies share vision, detections, sensor contacts, and temporary reveals but
+  never unit control.
+- A friendly concealed actor shows when at least one opponent fully detects it,
+  but never identifies the detector, its channel, or its coverage.
 
 ## Campaign
 
-1. **Claim:** Establish the chosen faction's goals and teach the core RTS loop.
-2. **Escalation:** Intensify the war with the opposing faction.
-3. **Unease:** Reveal instability around ancient sites and the world threat.
-4. **Revelation:** Show that neither faction understands the crisis completely.
-5. **Alliance:** Create an uneasy coalition with the former enemy.
-6. **Reckoning:** Use both approaches to confront the awakened threat.
+- The player chooses ARC or the Circle and remains with that side throughout
+  its campaign. Both campaigns show different perspectives on the same crisis.
+- ARC and the Circle do not know about one another before their first conflict
+  over a citadel or lost cache. Each initially understands the other, not the
+  Everwake, as its main opponent.
+- The factions eventually ally. In single-player the other faction remains an
+  AI ally; future cooperative play may assign it to another player.
+- Both campaigns are immediately available. ARC is labeled **Recommended First
+  Campaign** and the Circle **Advanced Campaign**.
+- Easy, Normal, and Hard are independent of campaign choice. Easy multiplies
+  enemy health and damage by `sqrt(0.5)`; Hard uses `sqrt(2)`; Normal is the
+  baseline. Other behavior is unchanged unless explicitly revised.
+- Difficulty may be overridden per level. Changing it during play restarts the
+  level; existing level saves retain their original difficulty.
 
-Alliance missions should work with an AI ally first and leave room for future
-co-op, with each player controlling a different faction.
+## Combat and veterancy
+
+- Direct and automatic attacks require detected compatible targets. Attack Move
+  engages compatible detected targets and resumes its route afterward.
+- Damage, cadence, acquisition, pursuit, line of fire, and targetable occupancy
+  layers are data-driven and deterministic.
+- Combat actors and armed defensive structures earn one kill when at least 35%
+  of a destroyed target's remaining unrecovered damage ledger is theirs. At
+  most two contributors can qualify.
+- Healing removes damage contributions proportionally. Dead contributors remain
+  in the denominator but cannot receive promotions.
+- Veterancy is level-local: 10 kills grants +25% base damage; 25 adds +25% base
+  attack speed; 50 raises damage to +50%; 100 raises speed to +50%; 200 raises
+  both to +75%.
+- Five purpose-made SVG badges appear on promoted actors. New actors begin at
+  zero unless a level script explicitly specifies otherwise.
+
+## NPC AI
+
+- NPC actors use the same movement, pathfinding, targeting, visibility, damage,
+  and command systems as player-controlled actors.
+- Each actor uses deterministic, serializable state for immediate behavior,
+  with stable identifiers resolving equal choices. Encounter coordinators may
+  share goals or alerts, while actors still execute their own actions.
+- Future faction AI layers a strategic director and group controllers above
+  the same actor controllers. Mission scripts assign goals or ordinary
+  commands rather than replacing core simulation logic.
+- M0 wolves use idle-at-home, alerted, pursuing, attacking, investigating,
+  returning-home, and regenerating states. They have no economy, base-building
+  logic, or strategic director.
+- A wolf retains a valid current target. Otherwise it selects the nearest
+  detected, reachable hostile within its leash, using stable actor ID to break
+  ties, without value targeting or coordinated focus fire.
+- A den alert shares an attacker's last-known position but not continuing
+  hidden knowledge. Each wolf chooses its own target after detection. Lost or
+  unreachable targets are investigated before returning home, and no alert
+  overrides the hard leash.
+- Opposing-faction base planning, economy, production, expansion, defense, and
+  attack planning require a later strategic-AI design pass.
+
+## Milestone 0 playable slice
+
+M0 is a canon-compatible standalone ARC prototype, not the canonical first
+campaign level or a literal tutorial. It is the minimum viable level from which
+a later tutorial could be made.
+
+- A fixed **Command Center** starts in a safe map-edge pocket.
+- Starting Materials cover a **Materials Refinery** and its separately paid
+  first **Harvester**. Each Refinery has one Harvester slot. The player gathers
+  finite Materials, builds a **Field Barracks**, and trains **Troopers** and
+  **Scouts**.
+- The compact branching map includes buildable ground, a traversable slope, an
+  impassable ridge, rough slow terrain, a narrow route, landmarks, and ordinary
+  Materials loot sufficient for roughly two or three Troopers.
+- Fog hides the map. Scouts move faster and see farther but are too fragile to
+  defeat the lone wolf.
+- One Trooper can defeat the first lone wolf. Four normal wolves and one
+  125%-scale alpha occupy a den and require multiple Troopers.
+- Defeating all six wolves completes the objective. The player may continue in
+  free play afterward.
+- Command Center destruction or a failed mandatory objective causes hard
+  defeat. Economic or military dead ends remain player-judged soft defeats.
+- A first successful run should take about 15 to 25 minutes; a familiar replay
+  about 10 to 15 minutes. Neither is a hard timer.
+- M0 includes contextual notifications, two simple explanatory popups, full
+  save/load/restart coverage, and compact landscape browser UI checks.
+- M0 excludes the Circle, Everwake, rare and exotic resources, repair, healing,
+  upgrades, veterancy, stealth, special movement layers, oversized deployables,
+  multiplayer, native mobile builds, a map editor, mod management, and the
+  modding console.
+
+## Persistence
+
+- Level definitions are immutable content; level saves are mutable runtime
+  snapshots with stable actor identifiers and versioned envelopes.
+- Manual save, load, restart, one rolling quicksave, and one rolling autosave
+  are required in M0. Loading begins paused.
+- Level and campaign saves are separate schemas. A level save owns one mission
+  snapshot; a campaign save owns longer-lived choices and progression.
+- Authoritative simulation state is serialized. Rendering objects, cached
+  paths, effects, and platform handles are reconstructed.
+- Implemented systems preserve passenger identities, occupancy transitions,
+  deployment state and reservations, veterancy, temporary reveals, and
+  authoritative sensor contacts or detection effects.
+- Incompatible saves fail with a clear explanation. Cross-build migration is
+  not required for M0.
 
 ## Decision record
 
@@ -149,10 +441,11 @@ co-op, with each player controlling a different faction.
 
 - **Working title:** _Citadels of the Unquiet World_. It remains tentative until
   a formal trademark review is warranted.
-- **Theme:** science-fantasy RTS: an industrial coalition and a magic-and-nature
-  coalition awaken a world-threatening force, then must cooperate to stop it.
-- **Campaign premise:** the player chooses either coalition; both campaigns
-  progress from faction war to the shared threat.
+- **Theme foundation:** An industrial power and a magic-and-nature power awaken
+  a world-threatening force and must eventually cooperate. The 2026-09-20
+  faction decisions supersede the original generic coalition placeholders.
+- **Campaign premise:** The player chooses one of two campaigns; both progress
+  from faction conflict to the shared threat.
 - **Technical direction:** Tauri 2, Vite, npm, TypeScript, and Babylon.js.
 - **Initial delivery focus:** Windows and macOS; browser compatibility remains a
   core constraint.
@@ -182,11 +475,10 @@ co-op, with each player controlling a different faction.
   rendering effect and does not enter deterministic simulation state.
 - **Dynamic terrain editing:** Terrain state is mutable and intentionally open
   to trusted game code. Simulation code mutates it directly and reports the
-  affected tile bounds through the map's observable. Rendering systems own
-  their subscriptions, batch reports by frame, rebuild only affected terrain
-  chunks, and unsubscribe when disposed. Shared materials and textures persist
-  across chunk rebuilds so visual animation state is independent of terrain
-  mutation.
+  affected tile bounds through the map's observable. Rendering systems own their
+  subscriptions, batch reports by frame, rebuild only affected terrain chunks,
+  and unsubscribe when disposed. Shared materials and textures persist across
+  chunk rebuilds so visual animation state is independent of terrain mutation.
 - **Game view setup:** Creating a game view installs the standard strategy
   camera, frames its starting view on the map center at the level's ground
   height of zero, and creates lighting from the level's view configuration.
@@ -204,34 +496,81 @@ co-op, with each player controlling a different faction.
   reverses Babylon's defaults. Dragging carries the ground with the pointer at
   every zoom level, which rules out panning momentum.
 
+### Locked — 2026-09-20
+
+- **Faction identities:** The playable expeditions are the human Anomaly
+  Response Command and the elven Circle of Repose. The hidden ancient enemy is
+  the Everwake. The player titles are Commander, Guide, and Chainbearer.
+- **Campaign framing:** Humanity's first contact begins as a rivalry. The
+  Everwake reveal and the ARC-Circle alliance occur only later. ARC is the
+  recommended first campaign; the Circle is advanced.
+- **Economy:** Each faction has common, rare, and later exotic resource roles.
+  Common and rare yields share a worker and site model. Stockpiles are global
+  and unlimited.
+- **ARC infrastructure:** Direct blueprints, connected construction support,
+  operational shutdown on disconnection, paused progress, and health-scaled
+  building resale are authoritative.
+- **Recovery:** Free dedicated support units service mobile actors. Buildings
+  use paid one-percent-per-second repair through the shared infrastructure-work
+  pool. Passive regeneration is not a default.
+- **Building upgrades:** Upgrades belong to individual buildings, use finite
+  per-building tiers, and are capped by campaign unlocks. Installed tiers
+  remain level-local, contribute to resale value, and use the shared
+  infrastructure queue under the execution rules above.
+- **Modding foundation:** The initial surface is data-and-content driven, with
+  deterministic sandboxed mission behavior and a restricted single-player
+  experimentation console. Public schemas evolve under compatibility rules.
+- **Controls and presentation:** Selection, contextual commands, radial menus,
+  touch alternatives, camera presets, sidebar, top bar, alerts, minimap, health
+  bars, and animation requirements follow the specifications above.
+- **Movement architecture:** Continuous actors, grid-based terrain and
+  buildings, weighted traversal, movement profiles, occupancy layers,
+  transports, and deployable oversized actors use the resolved models above.
+- **Information model:** Terrain vision and actor detection are separate.
+  Concealment and detectors are categorical and deterministic, with no
+  detection levels.
+- **Combat progression:** Direct targeting requires detection. Blind fire may
+  hit hidden actors. Veterancy uses the 35% unrecovered-damage rule and five
+  offensive ranks.
+- **M0:** The standalone ARC slice and its exact economy, roster, six-wolf map,
+  interface, persistence, completion, and timing targets are locked as defined
+  above.
+- **Persistence:** Save/load/restart is an M0 architecture gate. Level and
+  campaign saves remain separate.
+- **Prototype controls:** The 2026-09-19 left-drag pan and right-drag rotation
+  description remains a record of the current implementation, not the final
+  binding design.
+- **Supporting record:** Detailed rationale, alternatives, and deferred
+  questions remain in `docs/design-questionnaire.md`.
+
+### Locked — 2026-09-21
+
+- **Mod packaging:** Development directories and portable `.cotuwmod` archives
+  share one manifest-driven, validated format across browser and desktop
+  builds. Distribution channels remain independent of that format.
+- **NPC AI architecture:** Actors share player simulation systems and use
+  deterministic local controllers. Encounter, squad, and strategic layers add
+  coordination without replacing actor movement, combat, or perception. M0
+  wolves retain stable local targets and share only last-known alert positions.
+
 ### To decide
 
-- **Core match**
-  - Minimum playable RTS loop and first vertical-slice scope.
-  - Match duration and intended army size.
-  - Resource, construction, production, and victory systems.
-  - Exact win condition or conditions.
-  - Economy: harvesting, control points, salvage, ley wells, or a combination.
-  - Desired level of unit micro and automation.
-  - How active the world threat is in skirmish play.
-- **Factions and units**
-  - Faction economies, unit rosters, technologies, and signatures.
-  - Starting units and structures for each faction.
-  - Unit roster and counter relationships.
-  - Construction and production rules.
-  - Tech tiers and faction-specific upgrades.
-  - Alliance-only units or abilities for late campaign missions.
+- **Factions and campaigns**
+  - Full rosters, counters, faction motifs, technologies, and campaign levels.
+  - Exact Everwake resource, citadel, cache, and reveal details.
+  - Alliance-only units or abilities and the later skirmish structure.
 - **Maps and world systems**
-  - Map structure, world events, neutral threats, and environmental systems.
-  - Initial map size and terrain palette.
-  - Resource placement rules.
+  - Campaign map sizes, terrain palettes, resource placement, and neutral
+    systems beyond M0.
   - World-event cadence and escalation.
   - Whether corruption spreads, and how players counter or exploit it.
-- **Campaign and skirmish**
-  - Campaign structure and initial skirmish map set.
 - **Interface and presentation**
-  - Camera, controls, UI, and accessibility requirements.
-  - Art direction, audio direction, and asset-production approach.
+  - Final bindings, accessibility tuning, art direction, audio direction, and
+    asset-production approach.
 - **Future systems**
-  - Multiplayer model, lobby flow, networking, and save/replay requirements.
-  - Modding scope and content-data format.
+  - Technology-tree and permanent-research design.
+  - Opposing-faction and allied strategic AI, including economy, base planning,
+    production, expansion, defense, and attacks.
+  - Mod dependencies, load order, schema evolution, save compatibility,
+    distribution policy, and command surfaces.
+  - Multiplayer model, lobby flow, networking, and replay requirements.
