@@ -3,15 +3,16 @@ import {
   DynamicTexture,
   Material,
   Mesh,
-  type Observer,
+  Observer,
   Scene,
   StandardMaterial,
   Texture,
   VertexData,
 } from "@babylonjs/core";
-import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
+
 import { createDebugOverlay } from "./debug-overlay";
 
+import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
 const CHUNK_SIZE = 32;
 export const TERRAIN_LAYER_OFFSET = 0.012;
 
@@ -294,6 +295,9 @@ function createLayerMesh(
     ({ layer }) => layer.color.a < 1 || layer.featherEdges,
   );
   mesh.material = material;
+  // Layers overlap at almost the same depth, so blending order must follow the
+  // layer stack rather than Babylon's distance sort between their meshes.
+  mesh.alphaIndex = layerIndex;
   return mesh;
 }
 

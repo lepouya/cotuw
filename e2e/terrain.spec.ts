@@ -729,6 +729,12 @@ test("loads layered terrain textures and advances both water passes", async ({
       firstTwoTileUvs,
       opaqueBase: baseMesh?.hasVertexAlpha === false,
       upwardNormal: typeof baseNormalY === "number" && baseNormalY > 0,
+      // Blend order must follow the layer stack, not camera distance.
+      alphaIndices: [
+        "terrain-0-0-layer-1-texture-terrain/water",
+        "terrain-0-0-layer-2-texture-terrain/water-ripples",
+        "terrain-0-0-layer-1-texture-terrain/clutter",
+      ].map((name) => view.scene.getMeshByName(name)?.alphaIndex),
     };
   });
 
