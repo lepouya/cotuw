@@ -9,6 +9,8 @@ const MINIMUM_VIEW_TILES = 2;
 /** The framing a new view starts at, in tiles across the viewport's height. */
 const INITIAL_VIEW_TILES = 24;
 const ZOOM_SENSITIVITY = 0.0015;
+/** Pixels per wheel line, for browsers that report line-based deltas. */
+const WHEEL_LINE_PIXELS = 16;
 const INITIAL_ALPHA = -Math.PI / 4;
 const INITIAL_BETA = Math.PI / 3.2;
 const LOWER_BETA_LIMIT = Math.PI / 7;
@@ -110,7 +112,8 @@ export function createStrategyCamera(
   };
 
   const zoom = (event: WheelEvent) => {
-    setViewHeight(viewHeight * Math.exp(event.deltaY * ZOOM_SENSITIVITY));
+    const pixels = wheelDeltaPixels(event, canvas.clientHeight);
+    setViewHeight(viewHeight * Math.exp(pixels * ZOOM_SENSITIVITY));
     event.preventDefault();
   };
   /** Keeps the player's zoom, only re-clamping it against the new viewport. */
@@ -124,6 +127,18 @@ export function createStrategyCamera(
   scene.onBeforeRenderObservable.add(syncViewBounds);
 
   return { resetView, fitToMap, focusOnTile };
+}
+
+/** Wheel travel in pixels; Firefox mice report lines instead of pixels. */
+function wheelDeltaPixels(event: WheelEvent, pageHeight: number): number {
+  switch (event.deltaMode) {
+    case WheelEvent.DOM_DELTA_LINE:
+      return event.deltaY * WHEEL_LINE_PIXELS;
+    case WheelEvent.DOM_DELTA_PAGE:
+      return event.deltaY * pageHeight;
+    default:
+      return event.deltaY;
+  }
 }
 
 function syncOrthographicBounds(

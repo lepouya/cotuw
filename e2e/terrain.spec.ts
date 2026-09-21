@@ -94,6 +94,53 @@ test("zoom limits span a handful of tiles to the whole map", async ({
   expect(zoom.furthest).toBeLessThan(140);
 });
 
+test("wheel zoom normalizes line and page deltas to pixels", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const zooms = await page.evaluate(async () => {
+    const sourceRoot: string = "/src";
+    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
+    const { PROTOTYPE_VIEW_OPTIONS } = await import(
+      `${sourceRoot}/prototype.ts`
+    );
+    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "1280px";
+    canvas.style.height = "720px";
+    document.body.append(canvas);
+
+    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
+    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+    const camera = view.scene.activeCamera;
+    const viewHeight = () => camera.orthoTop - camera.orthoBottom;
+    /** How much one wheel event scales the visible height. */
+    const zoomFactor = (deltaY: number, deltaMode: number) => {
+      const before = viewHeight();
+      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY, deltaMode }));
+      return viewHeight() / before;
+    };
+
+    const zooms = {
+      pixels: zoomFactor(-160, WheelEvent.DOM_DELTA_PIXEL),
+      lines: zoomFactor(-10, WheelEvent.DOM_DELTA_LINE),
+      pages: zoomFactor(-0.2, WheelEvent.DOM_DELTA_PAGE),
+    };
+
+    view.dispose();
+    canvas.remove();
+    return zooms;
+  });
+
+  const zoomFor = (pixels: number) => Math.exp(-pixels * 0.0015);
+  expect(zooms.pixels).toBeCloseTo(zoomFor(160));
+  // Ten lines are 16 px each, so they match the 160 px step exactly.
+  expect(zooms.lines).toBeCloseTo(zoomFor(160));
+  // A fifth of the 720 px viewport height is 144 px.
+  expect(zooms.pages).toBeCloseTo(zoomFor(144));
+});
+
 test("dragging carries the ground with the pointer at every zoom", async ({
   page,
 }) => {
@@ -695,6 +742,7 @@ test("loads layered terrain textures and advances both water passes", async ({
     firstTwoTileUvs: [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 2, 0, 2, 1],
     opaqueBase: true,
     upwardNormal: true,
+    alphaIndices: [1, 2, 1],
   });
 });
 
