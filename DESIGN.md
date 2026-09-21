@@ -8,6 +8,7 @@ when it informs a prototype, implementation, or content decision.
 _Citadels of the Unquiet World_ is an approachable science-fantasy real-time
 strategy game. Players build bases, control territory, assemble combined-arms
 forces, and fight across a living world that becomes progressively more hostile.
+The title remains tentative until a formal trademark review is warranted.
 
 ## Setting and story
 
@@ -256,6 +257,9 @@ later story.
   Follow appear only where applicable and use shape as well as color.
 - The camera provides orthographic Isometric, Top-down, Grid, and Reset View
   presets. Preset and focus changes ease unless reduced motion is enabled.
+- Camera zoom is measured in visible tile rows so framing is independent of map
+  and tile size. New views show roughly 24 rows or fit a smaller map; resizing
+  preserves the player's zoom. Direct panning has no momentum.
 - The sidebar owns selection details, contextual actions, construction and
   production, queues, and a keyboard-free Cancel action.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed level
@@ -268,6 +272,15 @@ later story.
 
 - Mobile units use continuous world positions; the tile grid defines terrain,
   pathfinding, building placement, and stationary footprints.
+- Heightfield terrain uses a shared grid of corner heights. Each tile has an
+  ordered stack of color- or texture-backed visual layers with independent RGBA
+  tint and optional edge feathering. Tile and map-boundary lines are optional
+  debug overlays.
+- Scrolling textures and future frame-based terrain animation are rendering
+  effects and do not enter deterministic terrain state.
+- Trusted game code may mutate terrain and report affected tile bounds.
+  Renderers batch those reports by frame and rebuild only affected chunks while
+  preserving shared material and texture state.
 - Terrain provides per-profile passability, slope limits, and movement costs.
   Routes minimize estimated travel time and recalculate when blockers change.
 - Friendly mobile actors use soft separation. Detected opponents are hard local
@@ -435,125 +448,7 @@ a later tutorial could be made.
 - Incompatible saves fail with a clear explanation. Cross-build migration is
   not required for M0.
 
-## Decision record
-
-### Locked — 2026-09-15
-
-- **Working title:** _Citadels of the Unquiet World_. It remains tentative until
-  a formal trademark review is warranted.
-- **Theme foundation:** An industrial power and a magic-and-nature power awaken
-  a world-threatening force and must eventually cooperate. The 2026-09-20
-  faction decisions supersede the original generic coalition placeholders.
-- **Campaign premise:** The player chooses one of two campaigns; both progress
-  from faction conflict to the shared threat.
-- **Technical direction:** Tauri 2, Vite, npm, TypeScript, and Babylon.js.
-- **Initial delivery focus:** Windows and macOS; browser compatibility remains a
-  core constraint.
-
-### Prototype — 2026-09-16
-
-- **Terrain proof of concept:** a 100 by 100 tile heightfield uses a shared grid
-  of corner heights. Babylon.js renders it through an orthographic, isometric
-  strategy camera with orbit, pan, and zoom controls. The map keeps its
-  canonical shared corner-height grid separate from its per-tile visual layers.
-  Each tile has an ordered stack of colored or string-addressed texture layers,
-  each with an RGBA color. The prototype enables optional tile and map-boundary
-  lines for debugging.
-
-### Prototype — 2026-09-19
-
-- **Layer transparency:** A tile layer's alpha is the layer's own knob, so a
-  texture that carries an alpha channel can hand transparency over to the layer
-  rather than capping it. A layer can also feather: at each corner its alpha is
-  averaged with the tiles that share that corner, counting tiles without the
-  layer as clear, which turns a tile-stepped outline into a soft edge. The
-  prototype's river uses both, fading from opaque midstream to nearly clear at
-  its banks.
-- **Animated water:** Water combines two independently scrolling samples of one
-  texture. The body pass preserves the river's depth and shoreline alpha, while
-  a lighter, differently scaled ripple pass uses the texture's alpha. This is a
-  rendering effect and does not enter deterministic simulation state.
-- **Dynamic terrain editing:** Terrain state is mutable and intentionally open
-  to trusted game code. Simulation code mutates it directly and reports the
-  affected tile bounds through the map's observable. Rendering systems own their
-  subscriptions, batch reports by frame, rebuild only affected terrain chunks,
-  and unsubscribe when disposed. Shared materials and textures persist across
-  chunk rebuilds so visual animation state is independent of terrain mutation.
-- **Game view setup:** Creating a game view installs the standard strategy
-  camera, frames its starting view on the map center at the level's ground
-  height of zero, and creates lighting from the level's view configuration.
-  Terraforming does not alter camera framing. The view exposes tile focusing and
-  its lights for scripted changes. Callers add only the world-specific renderers
-  and overlays they need.
-- **Camera framing and zoom:** Zoom is the height of the viewport measured in
-  tiles, so framing means the same thing on any map or tile size. A view starts
-  on a two dozen tile slice of the map, close enough to read a tile's texture
-  without hiding the terrain around it, and small maps start fitted instead.
-  Zooming in stops a couple of tiles short of the ground and zooming out stops
-  once the whole map is framed; fitting the map is a deliberate call, not the
-  starting point. Resizing the window keeps the player's zoom and only re-fits
-  the aspect ratio. Left-drag pans and right-drag swings the view angle, which
-  reverses Babylon's defaults. Dragging carries the ground with the pointer at
-  every zoom level, which rules out panning momentum.
-
-### Locked — 2026-09-20
-
-- **Faction identities:** The playable expeditions are the human Anomaly
-  Response Command and the elven Circle of Repose. The hidden ancient enemy is
-  the Everwake. The player titles are Commander, Guide, and Chainbearer.
-- **Campaign framing:** Humanity's first contact begins as a rivalry. The
-  Everwake reveal and the ARC-Circle alliance occur only later. ARC is the
-  recommended first campaign; the Circle is advanced.
-- **Economy:** Each faction has common, rare, and later exotic resource roles.
-  Common and rare yields share a worker and site model. Stockpiles are global
-  and unlimited.
-- **ARC infrastructure:** Direct blueprints, connected construction support,
-  operational shutdown on disconnection, paused progress, and health-scaled
-  building resale are authoritative.
-- **Recovery:** Free dedicated support units service mobile actors. Buildings
-  use paid one-percent-per-second repair through the shared infrastructure-work
-  pool. Passive regeneration is not a default.
-- **Building upgrades:** Upgrades belong to individual buildings, use finite
-  per-building tiers, and are capped by campaign unlocks. Installed tiers
-  remain level-local, contribute to resale value, and use the shared
-  infrastructure queue under the execution rules above.
-- **Modding foundation:** The initial surface is data-and-content driven, with
-  deterministic sandboxed mission behavior and a restricted single-player
-  experimentation console. Public schemas evolve under compatibility rules.
-- **Controls and presentation:** Selection, contextual commands, radial menus,
-  touch alternatives, camera presets, sidebar, top bar, alerts, minimap, health
-  bars, and animation requirements follow the specifications above.
-- **Movement architecture:** Continuous actors, grid-based terrain and
-  buildings, weighted traversal, movement profiles, occupancy layers,
-  transports, and deployable oversized actors use the resolved models above.
-- **Information model:** Terrain vision and actor detection are separate.
-  Concealment and detectors are categorical and deterministic, with no
-  detection levels.
-- **Combat progression:** Direct targeting requires detection. Blind fire may
-  hit hidden actors. Veterancy uses the 35% unrecovered-damage rule and five
-  offensive ranks.
-- **M0:** The standalone ARC slice and its exact economy, roster, six-wolf map,
-  interface, persistence, completion, and timing targets are locked as defined
-  above.
-- **Persistence:** Save/load/restart is an M0 architecture gate. Level and
-  campaign saves remain separate.
-- **Prototype controls:** The 2026-09-19 left-drag pan and right-drag rotation
-  description remains a record of the current implementation, not the final
-  binding design.
-- **Supporting record:** Detailed rationale, alternatives, and deferred
-  questions remain in `docs/design-questionnaire.md`.
-
-### Locked — 2026-09-21
-
-- **Mod packaging:** Development directories and portable `.cotuwmod` archives
-  share one manifest-driven, validated format across browser and desktop
-  builds. Distribution channels remain independent of that format.
-- **NPC AI architecture:** Actors share player simulation systems and use
-  deterministic local controllers. Encounter, squad, and strategic layers add
-  coordination without replacing actor movement, combat, or perception. M0
-  wolves retain stable local targets and share only last-known alert positions.
-
-### To decide
+## Open decisions
 
 - **Factions and campaigns**
   - Full rosters, counters, faction motifs, technologies, and campaign levels.
@@ -565,12 +460,12 @@ a later tutorial could be made.
   - World-event cadence and escalation.
   - Whether corruption spreads, and how players counter or exploit it.
 - **Interface and presentation**
-  - Final bindings, accessibility tuning, art direction, audio direction, and
-    asset-production approach.
+  - Accessibility tuning, art direction, audio direction, and asset-production
+    approach.
 - **Future systems**
   - Technology-tree and permanent-research design.
-  - Opposing-faction and allied strategic AI, including economy, base planning,
-    production, expansion, defense, and attacks.
-  - Mod dependencies, load order, schema evolution, save compatibility,
-    distribution policy, and command surfaces.
-  - Multiplayer model, lobby flow, networking, and replay requirements.
+  - Opposing-faction and allied strategic AI behavior, including economy, base
+    planning, production, expansion, defense, and attacks.
+  - Deterministic mod dependency and load-order resolution, overrides, save
+    compatibility across mod changes, trust and signing, and exact console APIs.
+  - Multiplayer session rules, lobby flow, networking, and replay requirements.

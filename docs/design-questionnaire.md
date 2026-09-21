@@ -156,17 +156,16 @@ The project-level synchronization pass is complete:
 
 - `DESIGN.md` and `README.md` now use the selected ARC, Circle, and Everwake
   identities rather than the earlier generic coalition premise.
-- `DESIGN.md` records the locked decisions under their 2026-09-20 and
-  2026-09-21 dates, including M0 persistence as an architecture gate.
+- `DESIGN.md` incorporates the resolved decisions into their owning sections,
+  including M0 persistence as an architecture gate.
 - `ROADMAP.md` now schedules the expanded economy, construction, production,
   fog, combat, wolf AI, interface, persistence, responsive-browser, and
   verification work required for the playable slice. Early selection and
   movement spikes are distinguished from their production implementations.
 - M0's starting Materials and roadmap both account for the Refinery and its
   separately paid first Harvester, avoiding an initial economy deadlock.
-- The historical prototype camera bindings remain recorded as current
-  implementation history, while the locked input design explicitly supersedes
-  them for future implementation.
+- The locked input design supersedes the prototype camera bindings for future
+  implementation.
 
 ## Established constraints
 
