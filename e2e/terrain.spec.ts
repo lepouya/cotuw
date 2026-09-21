@@ -1,10 +1,26 @@
 import { expect, test } from "@playwright/test";
 import { PNG } from "pngjs";
 
+import type { Page } from "@playwright/test";
+
+/** Summed channel distance that separates terrain from antialiased clear color. */
+const CLEAR_COLOR_TOLERANCE = 40;
+
+/** In-page test helpers, loaded by `openHarness`. */
+declare const harness: typeof import("./harness");
+
+async function openHarness(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const harnessPath: string = "/e2e/harness.ts";
+    Object.assign(window, { harness: await import(harnessPath) });
+  });
+}
+
 test("the initial view starts close enough to read tile detail", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await openHarness(page);
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
@@ -14,7 +30,10 @@ test("the initial view starts close enough to read tile detail", async ({
     contentType: "image/png",
   });
 
-  const bounds = findTerrainBounds(PNG.sync.read(screenshot));
+  const bounds = findTerrainBounds(
+    PNG.sync.read(screenshot),
+    await page.evaluate(() => harness.clearColorBytes()),
+  );
 
   expect(bounds.left).toBeLessThan(5);
   expect(bounds.right).toBeGreaterThan(bounds.width - 5);
@@ -25,7 +44,7 @@ test("the initial view starts close enough to read tile detail", async ({
 test("zooming out from the start reveals the whole map", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await openHarness(page);
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
@@ -42,7 +61,10 @@ test("zooming out from the start reveals the whole map", async ({
     contentType: "image/png",
   });
 
-  const bounds = findTerrainBounds(PNG.sync.read(screenshot));
+  const bounds = findTerrainBounds(
+    PNG.sync.read(screenshot),
+    await page.evaluate(() => harness.clearColorBytes()),
+  );
 
   expect(bounds.left).toBeGreaterThan(20);
   expect(bounds.right).toBeLessThan(bounds.width - 20);
@@ -53,37 +75,19 @@ test("zooming out from the start reveals the whole map", async ({
 test("zoom limits span a handful of tiles to the whole map", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
-  const zoom = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "1280px";
-    canvas.style.height = "720px";
-    document.body.append(canvas);
+  const zoom = await page.evaluate(() => {
+    const { createTestView, viewHeight, wheel } = harness;
+    const { canvas, camera, dispose } = createTestView();
 
-    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    const camera = view.scene.activeCamera;
-    const tilesInView = () => camera.orthoTop - camera.orthoBottom;
-    const wheel = (deltaY: number) =>
-      canvas.dispatchEvent(
-        new WheelEvent("wheel", { deltaY, cancelable: true }),
-      );
+    const initial = viewHeight(camera);
+    wheel(canvas, -10_000);
+    const closest = viewHeight(camera);
+    wheel(canvas, 20_000);
+    const furthest = viewHeight(camera);
 
-    const initial = tilesInView();
-    wheel(-10_000);
-    const closest = tilesInView();
-    wheel(20_000);
-    const furthest = tilesInView();
-
-    view.dispose();
-    canvas.remove();
+    dispose();
     return { initial, closest, furthest };
   });
 
@@ -97,29 +101,16 @@ test("zoom limits span a handful of tiles to the whole map", async ({
 test("wheel zoom normalizes line and page deltas to pixels", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
-  const zooms = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "1280px";
-    canvas.style.height = "720px";
-    document.body.append(canvas);
-
-    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    const camera = view.scene.activeCamera;
-    const viewHeight = () => camera.orthoTop - camera.orthoBottom;
+  const zooms = await page.evaluate(() => {
+    const { createTestView, viewHeight, wheel } = harness;
+    const { canvas, camera, dispose } = createTestView();
     /** How much one wheel event scales the visible height. */
     const zoomFactor = (deltaY: number, deltaMode: number) => {
-      const before = viewHeight();
-      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY, deltaMode }));
-      return viewHeight() / before;
+      const before = viewHeight(camera);
+      wheel(canvas, deltaY, deltaMode);
+      return viewHeight(camera) / before;
     };
 
     const zooms = {
@@ -128,8 +119,7 @@ test("wheel zoom normalizes line and page deltas to pixels", async ({
       pages: zoomFactor(-0.2, WheelEvent.DOM_DELTA_PAGE),
     };
 
-    view.dispose();
-    canvas.remove();
+    dispose();
     return zooms;
   });
 
@@ -144,60 +134,29 @@ test("wheel zoom normalizes line and page deltas to pixels", async ({
 test("dragging carries the ground with the pointer at every zoom", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
   const drags = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "1280px";
-    canvas.style.height = "720px";
-    document.body.append(canvas);
-
-    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    const camera = view.scene.activeCamera;
-    const frame = () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const dragPan = (fromX: number, toX: number) => {
-      const pointer = (type: string, clientX: number) =>
-        canvas.dispatchEvent(
-          new PointerEvent(type, {
-            pointerId: 1,
-            pointerType: "mouse",
-            button: 0,
-            buttons: 1,
-            clientX,
-            clientY: 360,
-          }),
-        );
-      pointer("pointerdown", fromX);
-      pointer("pointermove", toX);
-      pointer("pointerup", toX);
-    };
+    const { createTestView, frames, pointer, viewHeight, wheel } = harness;
+    const { canvas, camera, dispose } = createTestView();
     /** World units the ground travels per dragged pixel. */
     const measureDrag = async (zoomDelta: number) => {
-      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: zoomDelta }));
-      await frame();
+      wheel(canvas, zoomDelta);
+      await frames(1);
       const { x, z } = camera.target;
-      const worldPerPixel =
-        (camera.orthoTop - camera.orthoBottom) / canvas.clientHeight;
+      const worldPerPixel = viewHeight(camera) / canvas.clientHeight;
 
-      dragPan(500, 700);
-      await frame();
-      await frame();
+      pointer(canvas, "pointerdown", { x: 500, y: 360 });
+      pointer(canvas, "pointermove", { x: 700, y: 360 });
+      pointer(canvas, "pointerup", { x: 700, y: 360 });
+      await frames(2);
       const moved = Math.hypot(camera.target.x - x, camera.target.z - z);
       return moved / 200 / worldPerPixel;
     };
 
     const close = await measureDrag(-10_000);
     const far = await measureDrag(20_000);
-    view.dispose();
-    canvas.remove();
+    dispose();
     return { close, far };
   });
 
@@ -206,25 +165,11 @@ test("dragging carries the ground with the pointer at every zoom", async ({
 });
 
 test("left-drag pans and right-drag orbits", async ({ page }) => {
-  await page.goto("/");
+  await openHarness(page);
 
   const drags = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "1280px";
-    canvas.style.height = "720px";
-    document.body.append(canvas);
-
-    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    const camera = view.scene.activeCamera;
-    const frame = () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const { createTestView, frames, pointer } = harness;
+    const { canvas, camera, dispose } = createTestView();
     const drag = async (button: number) => {
       const before = {
         alpha: camera.alpha,
@@ -232,22 +177,10 @@ test("left-drag pans and right-drag orbits", async ({ page }) => {
         x: camera.target.x,
         z: camera.target.z,
       };
-      const pointer = (type: string, clientX: number, clientY: number) =>
-        canvas.dispatchEvent(
-          new PointerEvent(type, {
-            pointerId: 1,
-            pointerType: "mouse",
-            button,
-            buttons: button === 0 ? 1 : 2,
-            clientX,
-            clientY,
-          }),
-        );
-      pointer("pointerdown", 500, 360);
-      pointer("pointermove", 620, 300);
-      pointer("pointerup", 620, 300);
-      await frame();
-      await frame();
+      pointer(canvas, "pointerdown", { button, x: 500, y: 360 });
+      pointer(canvas, "pointermove", { button, x: 620, y: 300 });
+      pointer(canvas, "pointerup", { button, x: 620, y: 300 });
+      await frames(2);
       return {
         swung:
           Math.abs(camera.alpha - before.alpha) +
@@ -261,8 +194,7 @@ test("left-drag pans and right-drag orbits", async ({ page }) => {
 
     const left = await drag(0);
     const right = await drag(2);
-    view.dispose();
-    canvas.remove();
+    dispose();
     return { left, right };
   });
 
@@ -275,7 +207,7 @@ test("left-drag pans and right-drag orbits", async ({ page }) => {
 test("a close, low-angle view keeps foreground terrain visible", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await openHarness(page);
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
@@ -295,45 +227,34 @@ test("a close, low-angle view keeps foreground terrain visible", async ({
     contentType: "image/png",
   });
 
-  const bounds = findTerrainBounds(PNG.sync.read(screenshot));
+  const bounds = findTerrainBounds(
+    PNG.sync.read(screenshot),
+    await page.evaluate(() => harness.clearColorBytes()),
+  );
   expect(bounds.bottom).toBeGreaterThan(bounds.height * 0.82);
 });
 
 test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
   const view = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView } = await import(`${sourceRoot}/render/index.ts`);
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "1280px";
-    canvas.style.height = "720px";
-    document.body.append(canvas);
+    const { createTestView, frames, viewAspectRatio, viewHeight, wheel } =
+      harness;
+    const { canvas, camera, dispose } = createTestView();
 
-    const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
-    const gameView = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    const camera = gameView.scene.activeCamera;
-    const viewHeight = () => camera.orthoTop - camera.orthoBottom;
-    const aspectRatio = () =>
-      (camera.orthoRight - camera.orthoLeft) / viewHeight();
-
-    canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -800 }));
-    const zoomed = viewHeight();
+    wheel(canvas, -800);
+    const zoomed = viewHeight(camera);
     canvas.style.width = "720px";
     canvas.style.height = "1080px";
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await frames(2);
 
-    const resized = { height: viewHeight(), aspectRatio: aspectRatio() };
-    gameView.dispose();
-    canvas.remove();
+    const resized = {
+      height: viewHeight(camera),
+      aspectRatio: viewAspectRatio(camera),
+    };
+    dispose();
     return { zoomed, resized };
   });
 
@@ -343,72 +264,50 @@ test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
 });
 
 test("terraforming refreshes height and layer geometry", async ({ page }) => {
-  await page.goto("/");
+  await openHarness(page);
 
   const heights = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView, createTerrainMeshes } = await import(
-      `${sourceRoot}/render/index.ts`
-    );
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "240px";
-    canvas.style.height = "240px";
-    document.body.append(canvas);
-
-    const map = new TerrainMap({
-      width: 1,
-      height: 1,
-      tileSize: 1,
+    const { color, createTestView, frames } = harness;
+    const { map, scene, view, dispose } = createTestView({
+      map: { width: 1, height: 1, tileSize: 1 },
+      size: { width: 240, height: 240 },
+      terrain: true,
     });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    createTerrainMeshes(view.scene, map);
     const lighting = {
-      clearColor: view.scene.clearColor.asArray(),
+      clearColor: scene.clearColor.asArray(),
       skyColor: view.lighting.sky.diffuse.asArray(),
       skyIntensity: view.lighting.sky.intensity,
       sunColor: view.lighting.sun.diffuse.asArray(),
       sunIntensity: view.lighting.sun.intensity,
     };
-    const mesh = () => view.scene.getMeshByName("terrain-0-0-layer-0-plain");
-    const baseColor = view.scene.clearColor.clone().set(0.2, 0.4, 0.3, 1);
-    map.layersAt(0, 0).push({ color: baseColor });
+    const mesh = () => scene.getMeshByName("terrain-0-0-layer-0-plain");
+    map.layersAt(0, 0).push({ color: color(0.2, 0.4, 0.3, 1) });
     map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await frames(2);
     const before = mesh()?.getVerticesData("position")?.[1];
 
     map.setHeight(0, 0, 7);
     map.layersAt(0, 0).push({
       texture: "terrain/dirt",
-      color: baseColor.clone().set(1, 1, 1, 0.5),
+      color: color(1, 1, 1, 0.5),
     });
     map.notifyChange(map.tilesAroundCorner(0, 0));
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await frames(2);
     const after = mesh()?.getVerticesData("position")?.[1];
     const addedLayer = Boolean(
-      view.scene.getMeshByName("terrain-0-0-layer-1-texture-terrain/dirt"),
+      scene.getMeshByName("terrain-0-0-layer-1-texture-terrain/dirt"),
     );
 
     map.layersAt(0, 0).pop();
     map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
-    const removedLayer = !view.scene.getMeshByName(
+    await frames(2);
+    const removedLayer = !scene.getMeshByName(
       "terrain-0-0-layer-1-texture-terrain/dirt",
     );
 
     const subscribed = map.onChangedObservable.hasObservers();
-    view.dispose();
+    dispose();
     const unsubscribed = !map.onChangedObservable.hasObservers();
-    canvas.remove();
     return {
       before,
       after,
@@ -438,63 +337,47 @@ test("terraforming refreshes height and layer geometry", async ({ page }) => {
 test("a feathered layer fades to clear at the tiles that lack it", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
-  const water = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView, createTerrainMeshes } = await import(
-      `${sourceRoot}/render/index.ts`
-    );
-    const canvas = document.createElement("canvas");
-    canvas.style.width = "240px";
-    canvas.style.height = "240px";
-    document.body.append(canvas);
-
+  const water = await page.evaluate(() => {
+    const { color, createTestView } = harness;
     // One row of three tiles, with water only in the middle one.
-    const color = (alpha: number) =>
-      PROTOTYPE_VIEW_OPTIONS.clearColor.toColor4().set(1, 1, 1, alpha);
-    const map = new TerrainMap({
-      width: 3,
-      height: 1,
-      tileSize: 1,
-      createLayers: (x: number) => [
-        { texture: "terrain/dirt", color: color(1) },
-        ...(x === 1
-          ? [
-              {
-                texture: "terrain/water",
-                color: color(1),
-                featherEdges: true,
-              },
-            ]
-          : []),
-      ],
+    const { scene, dispose } = createTestView({
+      map: {
+        width: 3,
+        height: 1,
+        tileSize: 1,
+        createLayers: (x) => [
+          { texture: "terrain/dirt", color: color(1, 1, 1, 1) },
+          ...(x === 1
+            ? [
+                {
+                  texture: "terrain/water",
+                  color: color(1, 1, 1, 1),
+                  featherEdges: true,
+                },
+              ]
+            : []),
+        ],
+      },
+      size: { width: 240, height: 240 },
+      terrain: true,
     });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    createTerrainMeshes(view.scene, map);
-    const mesh = view.scene.getMeshByName(
-      "terrain-0-0-layer-1-texture-terrain/water",
-    );
-    const colors = mesh?.getVerticesData("color") ?? [];
-    const dirt = view.scene.getMeshByName(
-      "terrain-0-0-layer-0-texture-terrain/dirt",
-    );
-    const dirtColors = dirt?.getVerticesData("color") ?? [];
+    const colors =
+      scene
+        .getMeshByName("terrain-0-0-layer-1-texture-terrain/water")
+        ?.getVerticesData("color") ?? [];
+    const dirtColors =
+      scene
+        .getMeshByName("terrain-0-0-layer-0-texture-terrain/dirt")
+        ?.getVerticesData("color") ?? [];
     const alphas = [];
     for (let index = 3; index < colors.length; index += 4) {
       alphas.push(colors[index]);
     }
 
-    view.dispose();
-    canvas.remove();
-    return {
-      alphas,
-      dirtAlphas: [dirtColors[3], dirtColors[7]],
-    };
+    dispose();
+    return { alphas, dirtAlphas: [dirtColors[3], dirtColors[7]] };
   });
 
   // Every corner of the lone water tile touches a dry tile, and the two
@@ -507,56 +390,46 @@ test("a feathered layer fades to clear at the tiles that lack it", async ({
 test("feathering invalidates the neighboring chunk at a tile edit", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
   const alpha = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView, createTerrainMeshes } = await import(
-      `${sourceRoot}/render/index.ts`
-    );
-    const color = (value: number) =>
-      PROTOTYPE_VIEW_OPTIONS.clearColor.toColor4().set(1, 1, 1, value);
-    const map = new TerrainMap({
-      width: 33,
-      height: 1,
-      tileSize: 1,
-      createLayers: (x: number) => [
-        { texture: "terrain/dirt", color: color(1) },
-        ...(x === 31
-          ? [
-              {
-                texture: "terrain/water",
-                color: color(1),
-                featherEdges: true,
-              },
-            ]
-          : []),
-      ],
+    const { color, createTestView, frames } = harness;
+    const { map, scene, dispose } = createTestView({
+      map: {
+        width: 33,
+        height: 1,
+        tileSize: 1,
+        createLayers: (x) => [
+          { texture: "terrain/dirt", color: color(1, 1, 1, 1) },
+          ...(x === 31
+            ? [
+                {
+                  texture: "terrain/water",
+                  color: color(1, 1, 1, 1),
+                  featherEdges: true,
+                },
+              ]
+            : []),
+        ],
+      },
+      terrain: true,
     });
-    const canvas = document.createElement("canvas");
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    createTerrainMeshes(view.scene, map);
-    const waterMesh = () =>
-      view.scene.getMeshByName("terrain-0-0-layer-1-texture-terrain/water");
-    const rightEdgeAlpha = () => waterMesh()?.getVerticesData("color")?.[11];
+    const rightEdgeAlpha = () =>
+      scene
+        .getMeshByName("terrain-0-0-layer-1-texture-terrain/water")
+        ?.getVerticesData("color")?.[11];
     const before = rightEdgeAlpha();
 
     map.layersAt(32, 0).push({
       texture: "terrain/water",
-      color: color(1),
+      color: color(1, 1, 1, 1),
       featherEdges: true,
     });
     map.notifyChange({ minX: 32, minZ: 0, maxX: 32, maxZ: 0 });
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await frames(2);
     const after = rightEdgeAlpha();
 
-    view.dispose();
+    dispose();
     return { before, after };
   });
 
@@ -567,12 +440,10 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
 test("prototype water keeps fixed layer slots across clutter tiles", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
-  const layerIndices = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { createPrototypeMap } = await import(`${sourceRoot}/prototype.ts`);
-    const map = createPrototypeMap();
+  const layerIndices = await page.evaluate(() => {
+    const map = harness.createPrototypeMap();
     const water = new Set<number>();
     const ripples = new Set<number>();
 
@@ -585,10 +456,7 @@ test("prototype water keeps fixed layer slots across clutter tiles", async ({
       }
     }
 
-    return {
-      water: [...water],
-      ripples: [...ripples],
-    };
+    return { water: [...water], ripples: [...ripples] };
   });
 
   expect(layerIndices).toEqual({ water: [1], ripples: [2] });
@@ -597,99 +465,57 @@ test("prototype water keeps fixed layer slots across clutter tiles", async ({
 test("loads layered terrain textures and advances both water passes", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openHarness(page);
 
   const textureState = await page.evaluate(async () => {
-    const sourceRoot: string = "/src";
-    const { TerrainMap } = await import(`${sourceRoot}/map.ts`);
-    const { PROTOTYPE_VIEW_OPTIONS } = await import(
-      `${sourceRoot}/prototype.ts`
-    );
-    const { createGameView, createTerrainMeshes } = await import(
-      `${sourceRoot}/render/index.ts`
-    );
-    const color = (red: number, green: number, blue: number, alpha: number) =>
-      PROTOTYPE_VIEW_OPTIONS.clearColor.toColor4().set(red, green, blue, alpha);
-    const canvas = document.createElement("canvas");
-    canvas.id = "texture-preview";
-    canvas.style.width = "720px";
-    canvas.style.height = "720px";
-    document.body.append(canvas);
-
-    const map = new TerrainMap({
-      width: 3,
-      height: 3,
-      tileSize: 1,
-      createLayers: (x: number) => [
-        {
-          texture: "terrain/dirt",
-          color: color(1, 1, 1, 1),
-        },
-        ...(x === 1
-          ? [
-              {
-                texture: "terrain/water",
-                color: color(1, 1, 1, 0.82),
-              },
-              {
-                texture: "terrain/water-ripples",
-                color: color(1, 1, 1, 0.3),
-              },
-            ]
-          : []),
-        ...(x === 2
-          ? [
-              {
-                texture: "terrain/clutter",
-                color: color(1, 1, 1, 1),
-              },
-            ]
-          : []),
-      ],
+    const { color, createTestView, frames } = harness;
+    const { scene, dispose } = createTestView({
+      map: {
+        width: 3,
+        height: 3,
+        tileSize: 1,
+        createLayers: (x) => [
+          { texture: "terrain/dirt", color: color(1, 1, 1, 1) },
+          ...(x === 1
+            ? [
+                { texture: "terrain/water", color: color(1, 1, 1, 0.82) },
+                {
+                  texture: "terrain/water-ripples",
+                  color: color(1, 1, 1, 0.3),
+                },
+              ]
+            : []),
+          ...(x === 2
+            ? [{ texture: "terrain/clutter", color: color(1, 1, 1, 1) }]
+            : []),
+        ],
+      },
+      size: { width: 720, height: 720 },
+      terrain: true,
     });
-    const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-    createTerrainMeshes(view.scene, map);
-    await view.scene.whenReadyAsync();
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await scene.whenReadyAsync();
+    await frames(2);
 
-    const material = view.scene.getMaterialByName(
-      "terrain-material-texture-terrain/water",
-    );
-    const rippleMaterial = view.scene.getMaterialByName(
-      "terrain-material-texture-terrain/water-ripples",
-    );
-    const dirtMaterial = view.scene.getMaterialByName(
-      "terrain-material-texture-terrain/dirt",
-    );
-    const clutterMaterial = view.scene.getMaterialByName(
-      "terrain-material-texture-terrain/clutter",
-    );
-    const water = material?.getActiveTextures()[0] as
-      | {
-          hasAlpha: boolean;
-          isReady: () => boolean;
-          uOffset: number;
-          wrapU: number;
-          wrapV: number;
-        }
-      | undefined;
+    const activeTexture = (name: string) =>
+      scene
+        .getMaterialByName(`terrain-material-texture-terrain/${name}`)
+        ?.getActiveTextures()[0] as
+        | {
+            hasAlpha: boolean;
+            isReady: () => boolean;
+            uOffset: number;
+            uScale: number;
+            wrapU: number;
+            wrapV: number;
+          }
+        | undefined;
+    const dirt = activeTexture("dirt");
+    const clutter = activeTexture("clutter");
+    const water = activeTexture("water");
+    const ripples = activeTexture("water-ripples");
     const initialOffset = water?.uOffset;
-    const ripples = rippleMaterial?.getActiveTextures()[0] as
-      | {
-          hasAlpha: boolean;
-          isReady: () => boolean;
-          uOffset: number;
-          uScale: number;
-          wrapU: number;
-          wrapV: number;
-        }
-      | undefined;
     const initialRippleOffset = ripples?.uOffset;
-    const dirt = dirtMaterial?.getActiveTextures()[0];
-    const clutter = clutterMaterial?.getActiveTextures()[0];
-    const baseMesh = view.scene.getMeshByName(
+    const baseMesh = scene.getMeshByName(
       "terrain-0-0-layer-0-texture-terrain/dirt",
     );
     const baseNormalY = baseMesh?.getVerticesData("normal")?.[1];
@@ -711,7 +537,7 @@ test("loads layered terrain textures and advances both water passes", async ({
       requestAnimationFrame(waitForMovement);
     });
 
-    return {
+    const state = {
       texturesReady:
         dirt?.isReady() &&
         clutter?.isReady() &&
@@ -733,8 +559,10 @@ test("loads layered terrain textures and advances both water passes", async ({
         "terrain-0-0-layer-1-texture-terrain/water",
         "terrain-0-0-layer-2-texture-terrain/water-ripples",
         "terrain-0-0-layer-1-texture-terrain/clutter",
-      ].map((name) => view.scene.getMeshByName(name)?.alphaIndex),
+      ].map((name) => scene.getMeshByName(name)?.alphaIndex),
     };
+    dispose();
+    return state;
   });
 
   expect(textureState).toEqual({
@@ -785,7 +613,11 @@ function countChangedPixels(before: PNG, after: PNG): number {
   return changed;
 }
 
-function findTerrainBounds(image: PNG): {
+/** Terrain is every pixel that differs visibly from the scene's clear color. */
+function findTerrainBounds(
+  image: PNG,
+  [clearRed, clearGreen, clearBlue]: number[],
+): {
   left: number;
   right: number;
   top: number;
@@ -801,14 +633,12 @@ function findTerrainBounds(image: PNG): {
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
       const pixel = (y * image.width + x) * 4;
-      const red = image.data[pixel];
-      const green = image.data[pixel + 1];
-      const blue = image.data[pixel + 2];
-      const isTerrain =
-        (green > blue + 6 && green > 25) ||
-        (red > 100 && green > 80 && blue < 100);
+      const difference =
+        Math.abs(image.data[pixel] - clearRed) +
+        Math.abs(image.data[pixel + 1] - clearGreen) +
+        Math.abs(image.data[pixel + 2] - clearBlue);
 
-      if (isTerrain) {
+      if (difference > CLEAR_COLOR_TOLERANCE) {
         left = Math.min(left, x);
         right = Math.max(right, x);
         top = Math.min(top, y);

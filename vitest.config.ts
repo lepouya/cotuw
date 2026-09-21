@@ -5,5 +5,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
+    // Babylon probes localStorage at import; Node's webstorage warns about it
+    // and Babylon falls back to memory when the global is absent.
+    execArgv: ["--no-experimental-webstorage"],
   },
 });
