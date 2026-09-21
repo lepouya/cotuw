@@ -16,7 +16,7 @@
     "format:check:ts": "prettier --check .",
     "format:check:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "lint": "npm run lint:ts && npm run lint:rs",
-    "lint:ts": "oxlint src tests e2e vite.config.ts vitest.config.ts playwright.config.ts",
+    "lint:ts": "oxlint src tests e2e scripts vite.config.ts vitest.config.ts playwright.config.ts",
     "lint:rs": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "typecheck": "npm run typecheck:ts && npm run typecheck:rs",
     "typecheck:ts": "tsc --noEmit",
