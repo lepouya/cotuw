@@ -7,18 +7,27 @@
   and game specifications.
 - Put future focused documentation in `docs/`. Do not duplicate information
   already owned by `README.md` or `DESIGN.md`.
-- When a design choice is locked, record it in `DESIGN.md` with its date.
+- When a design choice is locked, record it in `DESIGN.md`.
 
 ## Documentation
 
 - Keep writing concise but complete. Explain only what helps a developer or
   reader make, understand, or verify a decision.
+- Describe the current state, never the history of how it got there. Edit the
+  affected text in place rather than recording what it replaced, what was
+  removed, or what something used to be. Version control holds the history.
 - Use Markdown lists instead of tables.
 - Wrap Markdown lines at 80 characters or fewer.
-- Do not add comments that merely restate code; comment intent, constraints,
-  trade-offs, or non-obvious behavior.
-- Keep comments and commit messages concise and informative; explain motivation
-  only when it is not clear from the change itself.
+- Comment intent, constraints, trade-offs, and non-obvious behavior. Drop the
+  comment when the name and surrounding code already carry it.
+- Keep comments short and plainly worded. Prefer one line. A comment longer
+  than the code it explains is usually over-explaining.
+- Say the thing directly. No throat-clearing, no restating the signature, no
+  flourishes such as em-dash asides or invented metaphors.
+- Use a doc comment for a contract a caller cannot infer from the signature,
+  and a line comment for local rationale at the point it applies.
+- Keep commit messages concise and informative; explain motivation only when
+  it is not clear from the change itself.
 
 ## Implementation
 
