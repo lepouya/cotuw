@@ -263,6 +263,37 @@ test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
   expect(view.resized.aspectRatio).toBeCloseTo(720 / 1_080);
 });
 
+test("a canvas that loses its size does not strand the camera", async ({
+  page,
+}) => {
+  await openHarness(page);
+
+  const view = await page.evaluate(async () => {
+    const { createTestView, frames, viewAspectRatio, viewHeight } = harness;
+    const { canvas, camera, dispose } = createTestView();
+
+    const before = viewHeight(camera);
+    // A hidden canvas measures 0x0, and NaN bounds never recover.
+    canvas.style.display = "none";
+    await frames(3);
+    const hidden = viewHeight(camera);
+    canvas.style.display = "block";
+    await frames(3);
+
+    const restored = {
+      height: viewHeight(camera),
+      aspectRatio: viewAspectRatio(camera),
+    };
+    dispose();
+    return { before, hidden, restored };
+  });
+
+  expect(view.before).toBeCloseTo(24);
+  expect(Number.isFinite(view.hidden)).toBe(true);
+  expect(view.restored.height).toBeCloseTo(view.before);
+  expect(view.restored.aspectRatio).toBeCloseTo(1_280 / 720);
+});
+
 test("terraforming refreshes height and layer geometry", async ({ page }) => {
   await openHarness(page);
 
@@ -585,8 +616,8 @@ test("loads layered terrain textures and advances both water passes", async ({
     alphaChannels: true,
     waterMoved: true,
     rippleScale: 1.37,
-    // Babylon's MIRROR_ADDRESSMODE constant is 2.
-    wrapModes: [2, 2, 2, 2],
+    // Babylon's WRAP_ADDRESSMODE constant is 1.
+    wrapModes: [1, 1, 1, 1],
     firstTwoTileUvs: [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 2, 0, 2, 1],
     opaqueBase: true,
     upwardNormal: true,

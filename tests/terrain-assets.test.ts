@@ -3,36 +3,53 @@ import { readFile } from "node:fs/promises";
 import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
 
-const texturePaths = ["dirt.png", "clutter.png", "water.png"] as const;
+import { TERRAIN_TEXTURES } from "../src/render/terrain-mesh";
+
+type TextureId = keyof typeof TERRAIN_TEXTURES;
+
+const textureIds = Object.keys(TERRAIN_TEXTURES) as TextureId[];
+// Several ids can sample one file, so seams only need checking once per file.
+const texturePaths = [
+  ...new Set(Object.values(TERRAIN_TEXTURES).map((source) => source.url)),
+];
+
+async function readTexture(url: string): Promise<PNG> {
+  return PNG.sync.read(
+    await readFile(new URL(`../public${url}`, import.meta.url)),
+  );
+}
 
 describe("terrain texture assets", () => {
-  test.each(texturePaths)("%s has matching opposite edges", async (name) => {
-    const png = PNG.sync.read(
-      await readFile(
-        new URL(`../public/assets/terrain/${name}`, import.meta.url),
-      ),
-    );
-
-    expect(maximumEdgeDelta(png)).toEqual({ horizontal: 0, vertical: 0 });
+  // Terrain samples with WRAP_ADDRESSMODE, so a texture whose opposite edges
+  // disagree shows a seam at every repeat.
+  test.each(texturePaths)("%s has matching opposite edges", async (url) => {
+    expect(maximumEdgeDelta(await readTexture(url))).toEqual({
+      horizontal: 0,
+      vertical: 0,
+    });
   });
 
-  test("keeps the intended alpha channels", async () => {
-    const textures = await Promise.all(
-      texturePaths.map(async (name) =>
-        PNG.sync.read(
-          await readFile(
-            new URL(`../public/assets/terrain/${name}`, import.meta.url),
-          ),
-        ),
-      ),
-    );
-    const [dirt, clutter, water] = textures.map(alphaRange);
+  test.each(textureIds)(
+    "%s declares its alpha channel honestly",
+    async (id) => {
+      const source = TERRAIN_TEXTURES[id];
+      const alpha = alphaRange(await readTexture(source.url));
 
-    expect(dirt).toEqual({ minimum: 255, maximum: 255 });
-    expect(clutter.minimum).toBe(0);
-    expect(clutter.maximum).toBe(255);
-    expect(water.minimum).toBeLessThan(255);
-    expect(water.maximum).toBeGreaterThan(0);
+      if (source.hasAlpha) {
+        expect(alpha.minimum).toBeLessThan(255);
+        expect(alpha.maximum).toBeGreaterThan(0);
+      } else {
+        expect(alpha).toEqual({ minimum: 255, maximum: 255 });
+      }
+    },
+  );
+
+  test("clutter masks tiles rather than tinting them", async () => {
+    const clutter = alphaRange(
+      await readTexture(TERRAIN_TEXTURES["terrain/clutter"].url),
+    );
+
+    expect(clutter).toEqual({ minimum: 0, maximum: 255 });
   });
 });
 

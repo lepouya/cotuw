@@ -17,7 +17,8 @@ import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
 const CHUNK_SIZE = 32;
 export const TERRAIN_LAYER_OFFSET = 0.012;
 
-const TERRAIN_TEXTURES = {
+/** Textures a layer can name, and how each is sampled. */
+export const TERRAIN_TEXTURES = {
   "terrain/dirt": { url: "/assets/terrain/dirt.png", hasAlpha: false },
   "terrain/clutter": {
     url: "/assets/terrain/clutter.png",
@@ -164,11 +165,10 @@ export function createTerrainMeshes(
   const animationObserver = scene.onBeforeRenderObservable.add(() => {
     const elapsedSeconds = scene.getEngine().getDeltaTime() / 1000;
 
-    // Mirrored addressing repeats with period 2, not 1: wrapping any sooner
-    // snaps the scroll onto the mirrored copy.
+    // One offset unit is one full repeat, so wrapping never moves the phase.
     for (const [texture, speed] of animatedTextures) {
-      texture.uOffset = (texture.uOffset + speed.u * elapsedSeconds) % 2;
-      texture.vOffset = (texture.vOffset + speed.v * elapsedSeconds) % 2;
+      texture.uOffset = (texture.uOffset + speed.u * elapsedSeconds) % 1;
+      texture.vOffset = (texture.vOffset + speed.v * elapsedSeconds) % 1;
     }
   });
   const overlay = debugOverlay
@@ -275,7 +275,7 @@ function createLayerMesh(
       positions.push(position.x, position.y, position.z);
       colors.push(r, g, b, cornerAlpha(map, layer, cornerX, cornerZ));
       // Global tile coordinates keep the texture phase continuous across
-      // neighboring quads and chunk boundaries.
+      // quads and chunk boundaries.
       uvs.push(cornerX, cornerZ);
     }
 
@@ -327,7 +327,7 @@ export function cornerAlpha(
     return layer.color.a;
   }
 
-  // Matches the empty-string normalization used when grouping tiles into meshes.
+  // Same empty-string normalization as the mesh grouping.
   const texture = layer.texture || undefined;
   let total = 0;
   let sampled = 0;
@@ -379,10 +379,10 @@ function createLayerTexture(
 ): Texture {
   const texture = new Texture(source.url, scene);
   texture.hasAlpha = source.hasAlpha;
-  // Mirrored wrapping is continuous even if authored edge pixels differ by
-  // a small amount after resizing or compression.
-  texture.wrapU = Texture.MIRROR_ADDRESSMODE;
-  texture.wrapV = Texture.MIRROR_ADDRESSMODE;
+  // Repeating rather than mirroring, which would alternate reflected copies.
+  // Relies on matching opposite edges; see scripts/reconcile-texture-edges.mjs.
+  texture.wrapU = Texture.WRAP_ADDRESSMODE;
+  texture.wrapV = Texture.WRAP_ADDRESSMODE;
   if ("scale" in source) {
     texture.uScale = source.scale.u;
     texture.vScale = source.scale.v;

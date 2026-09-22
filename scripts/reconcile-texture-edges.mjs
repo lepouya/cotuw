@@ -1,3 +1,7 @@
+// Makes a texture's opposite edges identical so it repeats without a seam,
+// rewriting each PNG in place. Not idempotent: every run blends the edge band
+// further, so run it on freshly edited art, never on an already-reconciled
+// file. The terrain asset tests check the result.
 import { readFile, writeFile } from "node:fs/promises";
 
 import { PNG } from "pngjs";
@@ -10,6 +14,8 @@ if (texturePaths.length === 0) {
 
 for (const texturePath of texturePaths) {
   const png = PNG.sync.read(await readFile(texturePath));
+  // Blending across a band rather than the edge pixels alone keeps the
+  // correction from reading as a hard line of its own.
   const band = Math.max(2, Math.round(Math.min(png.width, png.height) / 32));
 
   reconcileAxis(png, band, "horizontal");
@@ -24,6 +30,8 @@ function reconcileAxis(png, band, axis) {
 
   for (let distance = 0; distance < band; distance += 1) {
     const progress = distance / (band - 1);
+    // Full blend at the edge easing to none at the band's inner limit, so the
+    // two edges end up identical and the interior is untouched.
     const strength = (1 + Math.cos(Math.PI * progress)) / 2;
 
     for (let cross = 0; cross < crossSpan; cross += 1) {
@@ -40,6 +48,8 @@ function pixelIndex(png, axis, along, cross) {
   return (y * png.width + x) * 4;
 }
 
+// Blends premultiplied, so color under near-transparent pixels cannot bleed
+// into the result.
 function blendPair(source, target, first, second, strength) {
   const firstAlpha = source[first + 3] / 255;
   const secondAlpha = source[second + 3] / 255;

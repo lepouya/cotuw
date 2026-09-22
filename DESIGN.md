@@ -272,8 +272,11 @@ story.
   pathfinding, building placement, and stationary footprints.
 - Heightfield terrain uses a shared grid of corner heights. Each tile has an
   ordered stack of color- or texture-backed visual layers with independent RGBA
-  tint and optional edge feathering. Tile and map-boundary lines are optional
-  debug overlays.
+  tint and optional edge feathering. A layer may pin itself to a fixed slot so
+  that layers only some tiles carry do not shift the stack out of alignment
+  between neighbors. Tile and map-boundary lines are optional debug overlays.
+- Terrain textures repeat by wrapping, so authored tiles must have matching
+  opposite edges.
 - Scrolling textures and future frame-based terrain animation are rendering
   effects and do not enter deterministic terrain state.
 - Trusted game code may mutate terrain and report affected tile bounds.
