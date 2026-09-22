@@ -6,6 +6,7 @@ import {
   Scene,
   Vector3,
 } from "@babylonjs/core";
+
 import type { TerrainMap } from "../map";
 
 const GRID_OFFSET = 0.035;
@@ -27,7 +28,6 @@ export type DebugOverlay = {
   dispose: () => void;
 };
 
-/** Draws grid and map-boundary lines above the terrain for debugging. */
 export function createDebugOverlay(
   scene: Scene,
   map: TerrainMap,
