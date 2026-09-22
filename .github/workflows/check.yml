@@ -34,3 +34,28 @@ jobs:
           name: playwright-report-${{ matrix.os }}
           path: playwright-report/
           if-no-files-found: ignore
+
+  # Desktop packaging is Windows and macOS first, but the core stays
+  # browser-runnable, so Linux checks the web build without the Tauri crate.
+  web:
+    name: ubuntu-latest (browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run format:check:ts
+      - run: npm run lint:ts
+      - run: npm run typecheck:ts
+      - run: npm run test:ts
+      - run: npm run test:visual
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-ubuntu-latest
+          path: playwright-report/
+          if-no-files-found: ignore
