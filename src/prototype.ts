@@ -7,6 +7,7 @@ import { createGameView, createTerrainMeshes } from "./render";
 
 import type { TileLayer } from "./map";
 import type { GameView, GameViewOptions } from "./render";
+
 const TILE_COUNT = 100;
 const TILE_SIZE = 1;
 /** Tiles from the river's midline to its bank. */
@@ -14,8 +15,13 @@ const WATER_HALF_WIDTH = 5;
 /** Water opacity at the midline and at the last tile before the bank. */
 const WATER_DEEP_ALPHA = 0.98;
 const WATER_SHORE_ALPHA = 0.06;
-/** Keeps the crossing ripple layer visible without obscuring the riverbed. */
+/** Ripple opacity, as a fraction of the water beneath it. */
 const WATER_RIPPLE_ALPHA = 0.3;
+/** Water, ripples and clutter are each optional, so their slots are fixed. */
+const DIRT_SLOT = 0;
+const WATER_SLOT = 1;
+const WATER_RIPPLE_SLOT = 2;
+const CLUTTER_SLOT = 3;
 
 export const PROTOTYPE_VIEW_OPTIONS = {
   clearColor: new Color3(0.035, 0.07, 0.09),
@@ -62,6 +68,7 @@ export function createPrototypeMap(): TerrainMap {
       const layers: TileLayer[] = [
         {
           texture: "terrain/dirt",
+          slot: DIRT_SLOT,
           color: new Color4(
             0.86 + variation,
             0.9 + variation,
@@ -75,21 +82,22 @@ export function createPrototypeMap(): TerrainMap {
         const alpha = waterAlpha(depth);
         layers.push({
           texture: "terrain/water",
+          slot: WATER_SLOT,
           color: new Color4(0.74, 0.94, 0.98, alpha),
           featherEdges: true,
         });
         layers.push({
           texture: "terrain/water-ripples",
+          slot: WATER_RIPPLE_SLOT,
           color: new Color4(0.82, 0.98, 1, alpha * WATER_RIPPLE_ALPHA),
           featherEdges: true,
         });
       }
 
-      // Clutter is a top overlay, so optional clutter never shifts either
-      // water pass to a different physical height on neighboring tiles.
       if (Math.sin(x * 0.47 - z * 0.29) > 0.78) {
         layers.push({
           texture: "terrain/clutter",
+          slot: CLUTTER_SLOT,
           color: new Color4(0.99, 0.66, 0.33, 1),
         });
       }
@@ -100,8 +108,7 @@ export function createPrototypeMap(): TerrainMap {
 }
 
 /**
- * Fades the river out towards its banks, so the tile edge where it meets dirt
- * is faint enough to read as a soft shoreline rather than a staircase.
+ * Fades the river towards its banks so its edge reads as a shoreline.
  *
  * @param depth 0 at the bank, 1 at the midline.
  */

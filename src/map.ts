@@ -1,17 +1,22 @@
 import { Color4, Observable, Vector3 } from "@babylonjs/core";
 
-/** Visual coverage for one whole tile. Array order controls layer order. */
+/** Visual coverage for one whole tile. Array order sets layer order. */
 export type TileLayer = {
   texture?: string;
   color: Color4;
   /**
-   * Fades the layer's alpha out at corners shared with tiles that do not carry
-   * it, so its outline reads as a soft edge instead of a staircase of tiles.
+   * Fixed stack position, overriding the array index. Optional layers need it
+   * so neighboring tiles keep the same height and blend order.
    */
+  slot?: number;
+  /** Fades alpha at corners shared with tiles that lack the layer. */
   featherEdges?: boolean;
 };
 
-/** Inclusive tile coordinates affected by terraforming. */
+export function layerSlot(layer: TileLayer, index: number): number {
+  return layer.slot ?? index;
+}
+
 export type TerrainBounds = {
   minX: number;
   minZ: number;
@@ -27,10 +32,7 @@ export type TerrainMapOptions = {
   createLayers?: (x: number, z: number) => TileLayer[];
 };
 
-/**
- * Mutable terrain state. Heights live on the shared corner grid while visual
- * layers live on tiles; neither storage model is hidden behind tile views.
- */
+/** Mutable terrain: heights on the shared corner grid, layers on tiles. */
 export class TerrainMap {
   readonly width: number;
   readonly height: number;
@@ -65,11 +67,31 @@ export class TerrainMap {
     }
   }
 
+  containsCorner(x: number, z: number): boolean {
+    return x >= 0 && z >= 0 && x <= this.width && z <= this.height;
+  }
+
+  containsTile(x: number, z: number): boolean {
+    return x >= 0 && z >= 0 && x < this.width && z < this.height;
+  }
+
   cornerIndex(x: number, z: number): number {
+    if (!this.containsCorner(x, z)) {
+      throw new RangeError(
+        `Corner (${x}, ${z}) is outside a ${this.width}x${this.height} map.`,
+      );
+    }
+
     return z * (this.width + 1) + x;
   }
 
   tileIndex(x: number, z: number): number {
+    if (!this.containsTile(x, z)) {
+      throw new RangeError(
+        `Tile (${x}, ${z}) is outside a ${this.width}x${this.height} map.`,
+      );
+    }
+
     return z * this.width + x;
   }
 
@@ -101,7 +123,9 @@ export class TerrainMap {
     let count = 0;
 
     for (const layers of this.layers) {
-      count = Math.max(count, layers.length);
+      for (const [index, layer] of layers.entries()) {
+        count = Math.max(count, layerSlot(layer, index) + 1);
+      }
     }
 
     return count;
@@ -111,7 +135,6 @@ export class TerrainMap {
     this.onChangedObservable.notifyObservers(bounds);
   }
 
-  /** Tile bounds touched when a shared corner height changes. */
   tilesAroundCorner(x: number, z: number): TerrainBounds {
     return {
       minX: Math.max(0, x - 1),

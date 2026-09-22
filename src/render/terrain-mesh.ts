@@ -9,6 +9,7 @@ import {
   VertexData,
 } from "@babylonjs/core";
 
+import { layerSlot } from "../map";
 import { createDebugOverlay } from "./debug-overlay";
 
 import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
@@ -25,9 +26,8 @@ const TERRAIN_TEXTURES = {
   "terrain/water": {
     url: "/assets/terrain/water.png",
     hasAlpha: true,
-    // The ripples carry their own alpha, which would cap even the deepest
-    // water at about two thirds opaque. The tile layer owns the transparency
-    // instead, so a layer can fade water out towards a shore.
+    // The texture's own alpha caps even the deepest water at about two thirds
+    // opaque, so the tile layer owns transparency and can fade to a shore.
     layerAlphaOnly: true,
     scrollSpeed: { u: 0.025, v: 0.012 },
   },
@@ -104,7 +104,8 @@ export function createTerrainMeshes(
 
     for (let z = minZ; z < maxZ; z += 1) {
       for (let x = minX; x < maxX; x += 1) {
-        for (const [layerIndex, layer] of map.layersAt(x, z).entries()) {
+        for (const [index, layer] of map.layersAt(x, z).entries()) {
+          const layerIndex = layerSlot(layer, index);
           const texture = layer.texture || undefined;
           let layerGroups = groups.get(layerIndex);
 

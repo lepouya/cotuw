@@ -437,29 +437,44 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
   expect(alpha.after).toBe(1);
 });
 
-test("prototype water keeps fixed layer slots across clutter tiles", async ({
+test("every prototype layer keeps one fixed slot across the map", async ({
   page,
 }) => {
   await openHarness(page);
 
-  const layerIndices = await page.evaluate(() => {
+  const slots = await page.evaluate(() => {
     const map = harness.createPrototypeMap();
-    const water = new Set<number>();
-    const ripples = new Set<number>();
+    const byTexture = new Map<string, Set<number>>();
 
     for (let z = 0; z < map.height; z += 1) {
       for (let x = 0; x < map.width; x += 1) {
         for (const [index, layer] of map.layersAt(x, z).entries()) {
-          if (layer.texture === "terrain/water") water.add(index);
-          if (layer.texture === "terrain/water-ripples") ripples.add(index);
+          const texture = layer.texture ?? "";
+          let occupied = byTexture.get(texture);
+
+          if (!occupied) {
+            occupied = new Set();
+            byTexture.set(texture, occupied);
+          }
+
+          occupied.add(harness.layerSlot(layer, index));
         }
       }
     }
 
-    return { water: [...water], ripples: [...ripples] };
+    return Object.fromEntries(
+      [...byTexture].map(([texture, occupied]) => [texture, [...occupied]]),
+    );
   });
 
-  expect(layerIndices).toEqual({ water: [1], ripples: [2] });
+  // Each of these is optional, so a layer taking its slot from its array
+  // position would stack differently on tiles with a different combination.
+  expect(slots).toEqual({
+    "terrain/dirt": [0],
+    "terrain/water": [1],
+    "terrain/water-ripples": [2],
+    "terrain/clutter": [3],
+  });
 });
 
 test("loads layered terrain textures and advances both water passes", async ({

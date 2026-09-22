@@ -71,6 +71,47 @@ describe("TerrainMap", () => {
     });
   });
 
+  test("rejects coordinates outside the map instead of aliasing a neighbor", () => {
+    const map = new TerrainMap({ width: 3, height: 2, tileSize: 1 });
+
+    // Row-major indexing would quietly turn corner (4, 0) into corner (0, 1).
+    expect(() => map.cornerIndex(4, 0)).toThrow(RangeError);
+    expect(() => map.heightAt(-1, 0)).toThrow(RangeError);
+    expect(() => map.setHeight(0, 3, 1)).toThrow(RangeError);
+    expect(() => map.tileIndex(3, 0)).toThrow(RangeError);
+    expect(() => map.layersAt(0, 2)).toThrow(RangeError);
+  });
+
+  test("accepts every corner and tile on the map", () => {
+    const map = new TerrainMap({ width: 3, height: 2, tileSize: 1 });
+
+    expect(map.containsCorner(3, 2)).toBe(true);
+    expect(map.containsCorner(4, 2)).toBe(false);
+    expect(map.containsTile(2, 1)).toBe(true);
+    expect(map.containsTile(3, 1)).toBe(false);
+    // Corners run one past the tiles on each axis.
+    expect(() => map.heightAt(3, 2)).not.toThrow();
+    expect(() => map.layersAt(2, 1)).not.toThrow();
+  });
+
+  test("counts pinned slots rather than stack depth", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 1,
+      createLayers: (x) =>
+        x === 0
+          ? [{ color: new Color4(1, 1, 1, 1) }]
+          : [
+              { color: new Color4(1, 1, 1, 1) },
+              { color: new Color4(1, 1, 1, 1), slot: 3 },
+            ],
+    });
+
+    // Two layers, but the top one sits on slot 3, so the stack is four deep.
+    expect(map.layerCount).toBe(4);
+  });
+
   test("publishes bounded terrain changes to subscribers", () => {
     const map = new TerrainMap({ width: 2, height: 2, tileSize: 1 });
     const listener = vi.fn();

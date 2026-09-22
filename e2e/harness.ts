@@ -9,6 +9,7 @@ import { createGameView, createTerrainMeshes } from "../src/render";
 import type { ArcRotateCamera } from "@babylonjs/core";
 import type { TerrainMapOptions } from "../src/map";
 
+export { layerSlot } from "../src/map";
 export { createPrototypeMap } from "../src/prototype";
 
 export type TestViewOptions = {
@@ -62,7 +63,6 @@ export const color = (
   alpha: number,
 ) => new Color4(red, green, blue, alpha);
 
-/** Resolves after the given number of animation frames. */
 export async function frames(count = 2): Promise<void> {
   for (let index = 0; index < count; index += 1) {
     await new Promise<void>((resolve) =>
