@@ -72,3 +72,17 @@ h1 {
 .terrain-hud .controls {
   color: #d8bd79;
 }
+
+.minimap {
+  position: absolute;
+  top: clamp(1rem, 3vw, 2.5rem);
+  right: clamp(1rem, 3vw, 2.5rem);
+  width: clamp(9rem, 22vw, 14rem);
+  aspect-ratio: 1;
+  border: 1px solid rgb(179 157 98 / 55%);
+  border-radius: 0.25rem;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
+  cursor: pointer;
+  /* Drags pan the camera, never the page. */
+  touch-action: none;
+}

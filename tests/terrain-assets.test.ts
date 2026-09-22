@@ -44,6 +44,22 @@ describe("terrain texture assets", () => {
     },
   );
 
+  test.each(textureIds)(
+    "%s has a minimap color matching its pixels",
+    async (id) => {
+      const source = TERRAIN_TEXTURES[id];
+      const mean = meanColor(await readTexture(source.url));
+      // Layer-alpha-only textures cover the tile however sparse their alpha.
+      const coverage = "layerAlphaOnly" in source ? 1 : mean.coverage;
+      const [red, green, blue, minimapCoverage] = source.minimapColor;
+
+      expect(red).toBeCloseTo(mean.red, 2);
+      expect(green).toBeCloseTo(mean.green, 2);
+      expect(blue).toBeCloseTo(mean.blue, 2);
+      expect(minimapCoverage).toBeCloseTo(coverage, 2);
+    },
+  );
+
   test("clutter masks tiles rather than tinting them", async () => {
     const clutter = alphaRange(
       await readTexture(TERRAIN_TEXTURES["terrain/clutter"].url),
@@ -77,6 +93,29 @@ function maximumEdgeDelta(png: PNG) {
   }
 
   return { horizontal, vertical };
+}
+
+/** Alpha-weighted mean color in 0-1 channels, and the mean alpha. */
+function meanColor(png: PNG) {
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let weight = 0;
+
+  for (let index = 0; index < png.data.length; index += 4) {
+    const alpha = png.data[index + 3] / 255;
+    red += png.data[index] * alpha;
+    green += png.data[index + 1] * alpha;
+    blue += png.data[index + 2] * alpha;
+    weight += alpha;
+  }
+
+  return {
+    red: red / weight / 255,
+    green: green / weight / 255,
+    blue: blue / weight / 255,
+    coverage: weight / (png.data.length / 4),
+  };
 }
 
 function alphaRange(png: PNG) {

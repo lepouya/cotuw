@@ -17,12 +17,20 @@ import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
 const CHUNK_SIZE = 32;
 export const TERRAIN_LAYER_OFFSET = 0.012;
 
-/** Textures a layer can name, and how each is sampled. */
+/**
+ * Textures a layer can name, and how each is sampled. `minimapColor` is the
+ * texture's mean color, with alpha as the share of a tile it covers.
+ */
 export const TERRAIN_TEXTURES = {
-  "terrain/dirt": { url: "/assets/terrain/dirt.png", hasAlpha: false },
+  "terrain/dirt": {
+    url: "/assets/terrain/dirt.png",
+    hasAlpha: false,
+    minimapColor: [0.472, 0.339, 0.217, 1],
+  },
   "terrain/clutter": {
     url: "/assets/terrain/clutter.png",
     hasAlpha: true,
+    minimapColor: [0.409, 0.373, 0.341, 0.05],
   },
   "terrain/water": {
     url: "/assets/terrain/water.png",
@@ -31,12 +39,14 @@ export const TERRAIN_TEXTURES = {
     // opaque, so the tile layer owns transparency and can fade to a shore.
     layerAlphaOnly: true,
     scrollSpeed: { u: 0.025, v: 0.012 },
+    minimapColor: [0.189, 0.497, 0.557, 1],
   },
   "terrain/water-ripples": {
     url: "/assets/terrain/water.png",
     hasAlpha: true,
     scale: { u: 1.37, v: 1.37 },
     scrollSpeed: { u: -0.018, v: 0.032 },
+    minimapColor: [0.189, 0.497, 0.557, 0.65],
   },
 } as const;
 
@@ -393,7 +403,7 @@ function createLayerTexture(
 type TerrainTextureSource =
   (typeof TERRAIN_TEXTURES)[keyof typeof TERRAIN_TEXTURES];
 
-function terrainTextureSource(textureId: string): TerrainTextureSource {
+export function terrainTextureSource(textureId: string): TerrainTextureSource {
   if (!Object.prototype.hasOwnProperty.call(TERRAIN_TEXTURES, textureId)) {
     throw new Error(`Unknown terrain texture "${textureId}".`);
   }

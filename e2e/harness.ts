@@ -4,13 +4,18 @@ import { Color4 } from "@babylonjs/core";
 
 import { TerrainMap } from "../src/map";
 import { PROTOTYPE_VIEW_OPTIONS } from "../src/prototype";
-import { createGameView, createTerrainMeshes } from "../src/render";
+import {
+  createGameView,
+  createMinimap,
+  createTerrainMeshes,
+} from "../src/render";
 
 import type { ArcRotateCamera } from "@babylonjs/core";
 import type { TerrainMapOptions } from "../src/map";
 
 export { layerSlot } from "../src/map";
 export { createPrototypeMap } from "../src/prototype";
+export { minimapProjection } from "../src/render/minimap";
 
 export type TestViewOptions = {
   map?: TerrainMapOptions;
@@ -18,6 +23,8 @@ export type TestViewOptions = {
   size?: { width: number; height: number };
   /** Also builds the terrain meshes for the map. */
   terrain?: boolean;
+  /** Also adds a minimap, pinned on top of the page at this size in CSS px. */
+  minimapSize?: number;
 };
 
 /** A game view on a fresh canvas, so tests never touch the app's own view. */
@@ -25,6 +32,7 @@ export function createTestView({
   map: mapOptions = { width: 100, height: 100, tileSize: 1 },
   size = { width: 1280, height: 720 },
   terrain = false,
+  minimapSize,
 }: TestViewOptions = {}) {
   const canvas = document.createElement("canvas");
   canvas.style.width = `${size.width}px`;
@@ -37,6 +45,22 @@ export function createTestView({
     createTerrainMeshes(view.scene, map);
   }
 
+  let minimapCanvas: HTMLCanvasElement | undefined;
+  if (minimapSize !== undefined) {
+    minimapCanvas = document.createElement("canvas");
+    // Pinned over the app so real pointer input reaches it.
+    Object.assign(minimapCanvas.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: `${minimapSize}px`,
+      height: `${minimapSize}px`,
+      zIndex: "10",
+    });
+    document.body.append(minimapCanvas);
+    createMinimap(view.scene, map, view.camera, minimapCanvas);
+  }
+
   return {
     canvas,
     map,
@@ -46,6 +70,7 @@ export function createTestView({
     dispose: () => {
       view.dispose();
       canvas.remove();
+      minimapCanvas?.remove();
     },
   };
 }

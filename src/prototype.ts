@@ -3,7 +3,7 @@
 import { Color3, Color4, Vector3 } from "@babylonjs/core";
 
 import { TerrainMap } from "./map";
-import { createGameView, createTerrainMeshes } from "./render";
+import { createGameView, createMinimap, createTerrainMeshes } from "./render";
 
 import type { TileLayer } from "./map";
 import type { GameView, GameViewOptions } from "./render";
@@ -35,11 +35,15 @@ export const PROTOTYPE_VIEW_OPTIONS = {
   },
 } satisfies GameViewOptions;
 
-export function createTerrainPrototype(canvas: HTMLCanvasElement): GameView {
+export function createTerrainPrototype(
+  canvas: HTMLCanvasElement,
+  minimapCanvas: HTMLCanvasElement,
+): GameView {
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
   createTerrainMeshes(view.scene, map);
+  createMinimap(view.scene, map, view.camera, minimapCanvas);
 
   view.scene.executeWhenReady(() => {
     canvas.dataset.terrainReady = "true";

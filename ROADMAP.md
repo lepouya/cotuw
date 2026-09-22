@@ -78,11 +78,11 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Interface
 
-- [ ] 0.29 Define the minimap's information, camera-frustum treatment, and input
+- [x] 0.29 Define the minimap's information, camera-frustum treatment, and input
       behavior for the prototype.
 - [ ] 0.30 Render a corner minimap showing terrain, stationary-object
       footprints, actors, current selection, and the camera viewport.
-- [ ] 0.31 Support minimap navigation while keeping it independent of simulation
+- [x] 0.31 Support minimap navigation while keeping it independent of simulation
       state.
 
 ### Verification

@@ -15,6 +15,7 @@ export {
   type GameLighting,
   type LightingConfig,
 } from "./lighting";
+export { createMinimap, type Minimap } from "./minimap";
 export {
   createTerrainMeshes,
   TERRAIN_LAYER_OFFSET,
