@@ -145,22 +145,9 @@ export function createTerrainMeshes(
   };
 
   const dirtyChunks = new Set<string>();
-  const markDirty = ({ minX, minZ, maxX, maxZ }: TerrainBounds) => {
-    // Feathered corner alpha reads the immediately neighboring tiles. Expand
-    // invalidation so edits along a chunk boundary also rebuild that neighbor.
-    const minChunkX = Math.floor(Math.max(0, minX - 1) / CHUNK_SIZE);
-    const minChunkZ = Math.floor(Math.max(0, minZ - 1) / CHUNK_SIZE);
-    const maxChunkX = Math.floor(
-      Math.min(map.width - 1, maxX + 1) / CHUNK_SIZE,
-    );
-    const maxChunkZ = Math.floor(
-      Math.min(map.height - 1, maxZ + 1) / CHUNK_SIZE,
-    );
-
-    for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
-      for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
-        dirtyChunks.add(`${chunkX},${chunkZ}`);
-      }
+  const markDirty = (bounds: TerrainBounds) => {
+    for (const key of chunksForBounds(map, bounds)) {
+      dirtyChunks.add(key);
     }
   };
 
@@ -231,6 +218,29 @@ export function createTerrainMeshes(
   return { dispose };
 }
 
+/**
+ * Chunks that must be rebuilt for an edit, widened by one tile because
+ * feathered corner alpha reads the neighboring tiles.
+ */
+export function chunksForBounds(
+  map: TerrainMap,
+  { minX, minZ, maxX, maxZ }: TerrainBounds,
+): string[] {
+  const minChunkX = Math.floor(Math.max(0, minX - 1) / CHUNK_SIZE);
+  const minChunkZ = Math.floor(Math.max(0, minZ - 1) / CHUNK_SIZE);
+  const maxChunkX = Math.floor(Math.min(map.width - 1, maxX + 1) / CHUNK_SIZE);
+  const maxChunkZ = Math.floor(Math.min(map.height - 1, maxZ + 1) / CHUNK_SIZE);
+  const keys: string[] = [];
+
+  for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
+    for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+      keys.push(`${chunkX},${chunkZ}`);
+    }
+  }
+
+  return keys;
+}
+
 function createLayerMesh(
   scene: Scene,
   map: TerrainMap,
@@ -296,18 +306,18 @@ function createLayerMesh(
     ({ layer }) => layer.color.a < 1 || layer.featherEdges,
   );
   mesh.material = material;
-  // Layers overlap at almost the same depth, so blending order must follow the
-  // layer stack rather than Babylon's distance sort between their meshes.
+  // Layers overlap at almost the same depth, so blend order must follow the
+  // stack rather than Babylon's distance sort.
   mesh.alphaIndex = layerIndex;
   return mesh;
 }
 
 /**
- * The layer's own alpha, or — when it feathers — the average across the tiles
+ * The layer's own alpha, or when it feathers, the average across the tiles
  * meeting at this corner, counting tiles without the layer as clear. Tiles off
- * the map are left out of the average so borders do not feather inward.
+ * the map are skipped so borders do not feather inward.
  */
-function cornerAlpha(
+export function cornerAlpha(
   map: TerrainMap,
   layer: TileLayer,
   cornerX: number,
@@ -327,7 +337,7 @@ function cornerAlpha(
     [cornerX - 1, cornerZ],
     [cornerX, cornerZ],
   ]) {
-    if (x < 0 || z < 0 || x >= map.width || z >= map.height) {
+    if (!map.containsTile(x, z)) {
       continue;
     }
 
