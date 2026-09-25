@@ -1,17 +1,16 @@
 import { Vector3 } from "@babylonjs/core";
 
 import { layerSlot } from "../map";
-import { terrainTextureSource } from "./terrain-mesh";
+import { DEFAULT_ACTOR_COLOR } from "./actor";
+import { watchCanvasSize } from "./canvas-size";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainBounds, TerrainMap } from "../map";
 import type { StrategyCamera } from "./camera";
 
-type Rgb = [number, number, number];
+export type Rgb = [number, number, number];
 type ScreenPoint = { x: number; y: number };
 
-/** Shows through wherever the map doesn't reach, like unlayered ground. */
-const BACKGROUND: Rgb = [0.02, 0.043, 0.051];
 const OUTLINE_COLOR = "rgb(242 199 89)";
 /** Outline stroke width, in CSS pixels. */
 const OUTLINE_WIDTH = 1.5;
@@ -27,9 +26,30 @@ const DRAG_THRESHOLD = 4;
 /** Brightness change per unit of slope, lit from the northwest. */
 const HILLSHADE_STRENGTH = 1.2;
 const HILLSHADE_LIMIT = 0.3;
+const SELECTED_ACTOR_COLOR = "rgb(255 220 112)";
+/** Selected marker outline width, in CSS pixels. */
+const SELECTED_ACTOR_OUTLINE_WIDTH = 1.5;
+/** Marker radius in CSS pixels. */
+const ACTOR_RADIUS = 3;
 
 export type Minimap = {
+  /** Re-reads `actors` before the next redraw. Call it when they change. */
+  refreshActors: () => void;
   dispose: () => void;
+};
+
+/** Render-only information for a mobile actor shown on the minimap. */
+export type MinimapActor = {
+  id: string;
+  worldPosition: { x: number; z: number };
+  /** Renderer-facing marker color, independent of simulation state. */
+  color?: Rgb;
+  selected?: boolean;
+};
+
+export type MinimapOptions = {
+  /** Read on creation, on resize, and after each `refreshActors` call. */
+  actors?: () => readonly MinimapActor[];
 };
 
 /**
@@ -42,6 +62,7 @@ export function createMinimap(
   map: TerrainMap,
   camera: StrategyCamera,
   canvas: HTMLCanvasElement,
+  { actors = () => [] }: MinimapOptions = {},
 ): Minimap {
   const context = canvas.getContext("2d");
   const terrain = document.createElement("canvas");
@@ -52,10 +73,13 @@ export function createMinimap(
     throw new Error("The minimap requires a 2D canvas context.");
   }
 
+  // Shows around the map and through unlayered ground, as in the main view.
+  const { r, g, b } = scene.clearColor;
+  const background: Rgb = [r, g, b];
   let needsDraw = true;
   const terrainPixels = terrainContext.createImageData(map.width, map.height);
   const paint = (bounds: TerrainBounds) => {
-    paintTerrain(map, terrainPixels.data, bounds);
+    paintTerrain(map, terrainPixels.data, bounds, background);
     terrainContext.putImageData(
       terrainPixels,
       0,
@@ -83,14 +107,33 @@ export function createMinimap(
     needsDraw = true;
   };
   resize();
-  // Window resizes also carry pixel-ratio changes between displays.
-  const resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(canvas);
-  window.addEventListener("resize", resize);
+  const canvasSize = watchCanvasSize(canvas);
 
   let outline: ScreenPoint[] = [];
+  let actorMarkers: ActorMarker[] = [];
   // Runs after each main render, so the outline matches the frame on screen.
+  // Actors change at the simulation's pace, not every frame.
+  let actorsStale = true;
   const draw = () => {
+    if (canvasSize.takeChange()) {
+      resize();
+      actorsStale = true;
+    }
+    if (actorsStale) {
+      actorsStale = false;
+      const nextActorMarkers = actors().map(
+        ({ id, worldPosition, color = DEFAULT_ACTOR_COLOR, selected }) => ({
+          id,
+          point: projection.toMinimap(worldPosition),
+          color,
+          selected: selected ?? false,
+        }),
+      );
+      if (!sameActorMarkers(nextActorMarkers, actorMarkers)) {
+        actorMarkers = nextActorMarkers;
+        needsDraw = true;
+      }
+    }
     const footprint = camera.viewFootprint().map(projection.toMinimap);
     if (!needsDraw && samePoints(footprint, outline)) {
       return;
@@ -101,7 +144,7 @@ export function createMinimap(
     const ratio = canvas.width / Math.max(canvas.clientWidth, 1);
     const { mapRect } = projection;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.fillStyle = cssColor(BACKGROUND);
+    context.fillStyle = cssColor(background);
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     // The source has exactly one terrain color per tile. Keep those cells
     // legible instead of blending neighboring terrain while scaling.
@@ -113,6 +156,7 @@ export function createMinimap(
       mapRect.width,
       mapRect.height,
     );
+    drawActors(context, actorMarkers);
     drawFootprint(context, footprint);
   };
   const renderObserver = scene.onAfterRenderObservable.add(draw);
@@ -223,8 +267,7 @@ export function createMinimap(
     map.onChangedObservable.remove(changeObserver);
     scene.onAfterRenderObservable.remove(renderObserver);
     scene.onDisposeObservable.remove(sceneDisposeObserver);
-    resizeObserver.disconnect();
-    window.removeEventListener("resize", resize);
+    canvasSize.dispose();
     canvas.removeEventListener("pointerdown", handlePointerDown);
     canvas.removeEventListener("pointermove", handlePointerMove);
     canvas.removeEventListener("pointerup", handlePointerUp);
@@ -233,7 +276,49 @@ export function createMinimap(
   };
   const sceneDisposeObserver = scene.onDisposeObservable.add(dispose);
 
-  return { dispose };
+  return {
+    refreshActors: () => {
+      actorsStale = true;
+    },
+    dispose,
+  };
+}
+
+type ActorMarker = {
+  id: string;
+  point: ScreenPoint;
+  color: Rgb;
+  selected: boolean;
+};
+
+function drawActors(context: CanvasRenderingContext2D, actors: ActorMarker[]) {
+  for (const { point, color, selected } of actors) {
+    context.beginPath();
+    context.arc(point.x, point.y, ACTOR_RADIUS, 0, Math.PI * 2);
+    context.fillStyle = cssColor(color);
+    context.fill();
+    if (selected) {
+      context.lineWidth = SELECTED_ACTOR_OUTLINE_WIDTH;
+      context.strokeStyle = SELECTED_ACTOR_COLOR;
+      context.stroke();
+    }
+  }
+}
+
+function sameActorMarkers(left: ActorMarker[], right: ActorMarker[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (actor, index) =>
+        actor.id === right[index]?.id &&
+        actor.point.x === right[index]?.point.x &&
+        actor.point.y === right[index]?.point.y &&
+        actor.color.every(
+          (channel, colorIndex) => channel === right[index]?.color[colorIndex],
+        ) &&
+        actor.selected === right[index]?.selected,
+    )
+  );
 }
 
 /** Maps between world ground points and minimap CSS pixels, north up. */
@@ -277,12 +362,11 @@ export function minimapProjection(
 
 /** Pulls a world point onto the map, so the view never centers off it. */
 export function clampToMap(point: Vector3, map: TerrainMap): Vector3 {
-  const halfWidth = (map.width * map.tileSize) / 2;
-  const halfHeight = (map.height * map.tileSize) / 2;
+  const { minX, maxX, minZ, maxZ } = map.worldBounds;
   return new Vector3(
-    Math.min(Math.max(point.x, -halfWidth), halfWidth),
+    Math.min(Math.max(point.x, minX), maxX),
     0,
-    Math.min(Math.max(point.z, -halfHeight), halfHeight),
+    Math.min(Math.max(point.z, minZ), maxZ),
   );
 }
 
@@ -291,10 +375,11 @@ export function paintTerrain(
   map: TerrainMap,
   pixels: Uint8ClampedArray,
   bounds: TerrainBounds,
+  background: Rgb,
 ): void {
   for (let z = bounds.minZ; z <= bounds.maxZ; z += 1) {
     for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
-      const [red, green, blue] = tileColor(map, x, z);
+      const [red, green, blue] = tileColor(map, x, z, background);
       const offset = ((map.height - 1 - z) * map.width + x) * 4;
       pixels[offset] = red * 255;
       pixels[offset + 1] = green * 255;
@@ -304,18 +389,23 @@ export function paintTerrain(
   }
 }
 
-/** A tile's layers composited in slot order, then hillshaded. */
-export function tileColor(map: TerrainMap, x: number, z: number): Rgb {
-  const color: Rgb = [...BACKGROUND];
+/** A tile's layers composited over `background` in slot order, then hillshaded. */
+export function tileColor(
+  map: TerrainMap,
+  x: number,
+  z: number,
+  background: Rgb,
+): Rgb {
+  const color: Rgb = [...background];
   const layers = map
     .layersAt(x, z)
     .map((layer, index) => ({ layer, slot: layerSlot(layer, index) }))
     .sort((a, b) => a.slot - b.slot);
 
   for (const { layer } of layers) {
-    const [red, green, blue, coverage] = layer.texture
-      ? terrainTextureSource(layer.texture).minimapColor
-      : [1, 1, 1, 1];
+    const [red, green, blue, coverage] = layer.type?.graphics?.minimapColor ?? [
+      1, 1, 1, 1,
+    ];
     const tint: Rgb = [
       red * layer.color.r,
       green * layer.color.g,

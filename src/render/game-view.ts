@@ -1,6 +1,7 @@
 import { Color3, Color4, Engine, Scene } from "@babylonjs/core";
 
 import { createStrategyCamera } from "./camera";
+import { watchCanvasSize } from "./canvas-size";
 import { createLighting } from "./lighting";
 
 import type { TerrainMap } from "../map";
@@ -32,18 +33,18 @@ export function createGameView(
   scene.clearColor = Color4.FromColor3(clearColor);
 
   const suppressContextMenu = (event: Event) => event.preventDefault();
-  const resize = () => engine.resize();
   canvas.addEventListener("contextmenu", suppressContextMenu);
-  // The canvas can resize without the window, and the window resize still
-  // matters for pixel-ratio changes between displays.
-  const resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(canvas);
-  window.addEventListener("resize", resize);
+  const canvasSize = watchCanvasSize(canvas);
 
   const camera = createStrategyCamera(scene, canvas, map);
   camera.resetView();
   const lighting = createLighting(scene, lightingConfig);
-  engine.runRenderLoop(() => scene.render());
+  engine.runRenderLoop(() => {
+    if (canvasSize.takeChange()) {
+      engine.resize();
+    }
+    scene.render();
+  });
 
   return {
     engine,
@@ -52,8 +53,7 @@ export function createGameView(
     lighting,
     dispose: () => {
       canvas.removeEventListener("contextmenu", suppressContextMenu);
-      window.removeEventListener("resize", resize);
-      resizeObserver.disconnect();
+      canvasSize.dispose();
       scene.dispose();
       engine.dispose();
     },

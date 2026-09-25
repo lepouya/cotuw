@@ -1,15 +1,19 @@
-import { Color4 } from "@babylonjs/core";
+import { Color4, NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { TerrainMap } from "../src/map";
-import { chunksForBounds, cornerAlpha } from "../src/render/terrain-mesh";
+import {
+  chunksForBounds,
+  cornerAlpha,
+  createTerrainMeshes,
+} from "../src/render/terrain-mesh";
 
-import type { TileLayer } from "../src/map";
+import type { TileLayer, TileType } from "../src/map";
 
+const waterType: TileType = { id: "water", featherEdges: true };
 const water = (alpha: number): TileLayer => ({
-  texture: "terrain/water",
+  type: waterType,
   color: new Color4(1, 1, 1, alpha),
-  featherEdges: true,
 });
 
 /** A map whose tiles carry a feathered water layer only where `wet` says so. */
@@ -30,7 +34,7 @@ describe("cornerAlpha", () => {
   test("keeps the flat tile alpha when the layer does not feather", () => {
     const map = wetMap(3, 3, () => true);
     const layer: TileLayer = {
-      texture: "terrain/water",
+      type: { id: "water" },
       color: new Color4(1, 1, 1, 0.4),
     };
 
@@ -75,23 +79,7 @@ describe("cornerAlpha", () => {
     expect(cornerAlpha(map, water(1), 1, 1)).toBeCloseTo((1 + 0.5 * 3) / 4);
   });
 
-  test("treats an empty texture name and no texture as the same layer", () => {
-    const plain = (texture: string | undefined): TileLayer => ({
-      texture,
-      color: new Color4(1, 1, 1, 1),
-      featherEdges: true,
-    });
-    const map = new TerrainMap({
-      width: 2,
-      height: 2,
-      tileSize: 1,
-      createLayers: () => [plain("")],
-    });
-
-    expect(cornerAlpha(map, plain(undefined), 1, 1)).toBe(1);
-  });
-
-  test("ignores a neighbor layer that uses a different texture", () => {
+  test("ignores a neighbor layer of a different type", () => {
     const map = new TerrainMap({
       width: 2,
       height: 2,
@@ -99,10 +87,78 @@ describe("cornerAlpha", () => {
       createLayers: (x, z) =>
         x === 0 && z === 0
           ? [water(1)]
-          : [{ texture: "terrain/dirt", color: new Color4(1, 1, 1, 1) }],
+          : [{ type: { id: "dirt" }, color: new Color4(1, 1, 1, 1) }],
     });
 
     expect(cornerAlpha(map, water(1), 1, 1)).toBe(0.25);
+  });
+});
+
+describe("createTerrainMeshes", () => {
+  test("groups and feathers layers by type ID, not object identity", () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    // Each tile builds its own type object, as loaded or modded maps may.
+    const map = new TerrainMap({
+      width: 2,
+      height: 2,
+      tileSize: 1,
+      createLayers: () => [
+        {
+          type: { id: "water", featherEdges: true },
+          color: new Color4(1, 1, 1, 1),
+        },
+      ],
+    });
+
+    createTerrainMeshes(scene, map, { debugOverlay: true });
+    const water = scene.meshes.filter(({ name }) =>
+      name.includes("tile-water"),
+    );
+    const overlay = scene.meshes.filter(({ name }) =>
+      ["tile-grid", "major-grid", "map-boundary"].includes(name),
+    );
+
+    expect(water).toHaveLength(1);
+    expect(
+      cornerAlpha(
+        map,
+        { type: { id: "water", featherEdges: true }, color: new Color4() },
+        1,
+        1,
+      ),
+    ).toBe(1);
+    expect(overlay).toHaveLength(3);
+    expect(overlay.every(({ isPickable }) => !isPickable)).toBe(true);
+    engine.dispose();
+  });
+
+  test("rejects conflicting definitions for one type ID", () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 1,
+      createLayers: (x) => [
+        {
+          type: {
+            id: "ground",
+            graphics: {
+              url: x === 0 ? "/dirt.png" : "/grass.png",
+              hasAlpha: false,
+              minimapColor: [0.5, 0.5, 0.5, 1],
+            },
+          },
+          color: new Color4(1, 1, 1, 1),
+        },
+      ],
+    });
+
+    expect(() => createTerrainMeshes(scene, map)).toThrow(
+      "Conflicting terrain tile type ID: ground",
+    );
+    engine.dispose();
   });
 });
 

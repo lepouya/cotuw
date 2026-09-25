@@ -3,15 +3,15 @@ import { readFile } from "node:fs/promises";
 import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
 
-import { TERRAIN_TEXTURES } from "../src/render/terrain-mesh";
+import { PROTOTYPE_TILE_TYPES } from "../src/prototype";
 
-type TextureId = keyof typeof TERRAIN_TEXTURES;
+import type { TileGraphics } from "../src/map";
 
-const textureIds = Object.keys(TERRAIN_TEXTURES) as TextureId[];
-// Several ids can sample one file, so seams only need checking once per file.
-const texturePaths = [
-  ...new Set(Object.values(TERRAIN_TEXTURES).map((source) => source.url)),
-];
+const tileGraphics = Object.values(PROTOTYPE_TILE_TYPES).map(
+  ({ id, graphics }): [string, TileGraphics] => [id, graphics],
+);
+// Several types can sample one file, so seams only need checking once per file.
+const texturePaths = [...new Set(tileGraphics.map(([, { url }]) => url))];
 
 async function readTexture(url: string): Promise<PNG> {
   return PNG.sync.read(
@@ -29,10 +29,9 @@ describe("terrain texture assets", () => {
     });
   });
 
-  test.each(textureIds)(
+  test.each(tileGraphics)(
     "%s declares its alpha channel honestly",
-    async (id) => {
-      const source = TERRAIN_TEXTURES[id];
+    async (_id, source) => {
       const alpha = alphaRange(await readTexture(source.url));
 
       if (source.hasAlpha) {
@@ -44,13 +43,12 @@ describe("terrain texture assets", () => {
     },
   );
 
-  test.each(textureIds)(
+  test.each(tileGraphics)(
     "%s has a minimap color matching its pixels",
-    async (id) => {
-      const source = TERRAIN_TEXTURES[id];
+    async (_id, source) => {
       const mean = meanColor(await readTexture(source.url));
       // Layer-alpha-only textures cover the tile however sparse their alpha.
-      const coverage = "layerAlphaOnly" in source ? 1 : mean.coverage;
+      const coverage = source.layerAlphaOnly ? 1 : mean.coverage;
       const [red, green, blue, minimapCoverage] = source.minimapColor;
 
       expect(red).toBeCloseTo(mean.red, 2);
@@ -62,7 +60,7 @@ describe("terrain texture assets", () => {
 
   test("clutter masks tiles rather than tinting them", async () => {
     const clutter = alphaRange(
-      await readTexture(TERRAIN_TEXTURES["terrain/clutter"].url),
+      await readTexture(PROTOTYPE_TILE_TYPES.clutter.graphics.url),
     );
 
     expect(clutter).toEqual({ minimum: 0, maximum: 255 });

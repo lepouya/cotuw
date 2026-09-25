@@ -1,20 +1,49 @@
 import { Color4, Observable, Vector3 } from "@babylonjs/core";
 
-/** Visual coverage for one whole tile. Array order sets layer order. */
-export type TileLayer = {
-  texture?: string;
-  color: Color4;
+import type { WorldBounds } from "./simulation/world";
+
+/** Absorbs floating-point error in positions derived from the map edge. */
+const EDGE_TOLERANCE_TILES = 1e-9;
+
+/** How a tile type is drawn. */
+export type TileGraphics = {
+  /** An image that repeats once per tile. */
+  url: string;
+  hasAlpha: boolean;
+  /** Ignores the image's alpha, so the layer color alone sets opacity. */
+  layerAlphaOnly?: boolean;
+  /** Image repeats per tile. */
+  scale?: { u: number; v: number };
+  /** Image repeats per second. */
+  scrollSpeed?: { u: number; v: number };
+  /** The image's mean color, with alpha as the share of a tile it covers. */
+  minimapColor: readonly [number, number, number, number];
+};
+
+/** A kind of terrain layer, shared by every tile that carries it. */
+export type TileType = {
+  /** Layers whose types share an ID render and blend as one type. */
+  id: string;
   /**
-   * Fixed stack position, overriding the array index. Optional layers need it
-   * so neighboring tiles keep the same height and blend order.
+   * Fixed stack position, overriding the layer's array index. Optional types
+   * need it so neighboring tiles keep the same height and blend order.
    */
   slot?: number;
-  /** Fades alpha at corners shared with tiles that lack the layer. */
+  /** Fades alpha at corners shared with tiles that lack this type. */
   featherEdges?: boolean;
+  /** Absent for a plain surface drawn in the layer color alone. */
+  graphics?: TileGraphics;
+};
+
+/** Visual coverage for one whole tile. Array order sets layer order. */
+export type TileLayer = {
+  /** Absent for a plain, unpinned, unfeathered layer. */
+  type?: TileType;
+  color: Color4;
 };
 
 export function layerSlot(layer: TileLayer, index: number): number {
-  return layer.slot ?? index;
+  return layer.type?.slot ?? index;
 }
 
 export type TerrainBounds = {
@@ -37,6 +66,8 @@ export class TerrainMap {
   readonly width: number;
   readonly height: number;
   readonly tileSize: number;
+  /** The map's horizontal extent, centered on the world origin. */
+  readonly worldBounds: WorldBounds;
   readonly heights: Float32Array;
   readonly layers: TileLayer[][];
   readonly onChangedObservable = new Observable<TerrainBounds>();
@@ -51,6 +82,14 @@ export class TerrainMap {
     this.width = width;
     this.height = height;
     this.tileSize = tileSize;
+    const halfWidth = (width * tileSize) / 2;
+    const halfHeight = (height * tileSize) / 2;
+    this.worldBounds = {
+      minX: -halfWidth,
+      maxX: halfWidth,
+      minZ: -halfHeight,
+      maxZ: halfHeight,
+    };
     this.heights = new Float32Array((width + 1) * (height + 1));
     this.layers = Array.from({ length: width * height });
 
@@ -97,9 +136,9 @@ export class TerrainMap {
 
   worldPoint(x: number, z: number, height: number): Vector3 {
     return new Vector3(
-      x * this.tileSize - (this.width * this.tileSize) / 2,
+      x * this.tileSize + this.worldBounds.minX,
       height,
-      z * this.tileSize - (this.height * this.tileSize) / 2,
+      z * this.tileSize + this.worldBounds.minZ,
     );
   }
 
@@ -109,6 +148,51 @@ export class TerrainMap {
 
   heightAt(x: number, z: number): number {
     return this.heights[this.cornerIndex(x, z)];
+  }
+
+  /** Returns the rendered height of the terrain mesh at continuous world X/Z. */
+  heightAtWorldPosition(worldX: number, worldZ: number): number {
+    const rawGridX = (worldX - this.worldBounds.minX) / this.tileSize;
+    const rawGridZ = (worldZ - this.worldBounds.minZ) / this.tileSize;
+
+    if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) {
+      throw new RangeError(
+        `World position (${worldX}, ${worldZ}) is not finite.`,
+      );
+    }
+    if (
+      rawGridX < -EDGE_TOLERANCE_TILES ||
+      rawGridZ < -EDGE_TOLERANCE_TILES ||
+      rawGridX > this.width + EDGE_TOLERANCE_TILES ||
+      rawGridZ > this.height + EDGE_TOLERANCE_TILES
+    ) {
+      throw new RangeError(
+        `World position (${worldX}, ${worldZ}) is outside a ` +
+          `${this.width}x${this.height} map.`,
+      );
+    }
+
+    const gridX = Math.min(Math.max(rawGridX, 0), this.width);
+    const gridZ = Math.min(Math.max(rawGridZ, 0), this.height);
+    // The far map edge belongs to its preceding tile, with a fraction of one.
+    const tileX = Math.min(Math.floor(gridX), this.width - 1);
+    const tileZ = Math.min(Math.floor(gridZ), this.height - 1);
+    const x = gridX - tileX;
+    const z = gridZ - tileZ;
+    const topLeft = this.heightAt(tileX, tileZ);
+    const bottomLeft = this.heightAt(tileX, tileZ + 1);
+    const topRight = this.heightAt(tileX + 1, tileZ);
+    const bottomRight = this.heightAt(tileX + 1, tileZ + 1);
+
+    // Match the terrain mesh's two triangles: top-left/top-right/bottom-left,
+    // then top-right/bottom-right/bottom-left.
+    if (x + z <= 1) {
+      return topLeft * (1 - x - z) + topRight * x + bottomLeft * z;
+    }
+
+    return (
+      topRight * (1 - z) + bottomLeft * (1 - x) + bottomRight * (x + z - 1)
+    );
   }
 
   setHeight(x: number, z: number, height: number): void {

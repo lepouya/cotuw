@@ -113,3 +113,71 @@ test("scrolling over the minimap never zooms the main view", async ({
 
   expect(await viewHeight()).toBe(heightBefore);
 });
+
+test("actor markers redraw at their current world positions", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const pixels = await page.evaluate(async () => {
+    const harnessPath: string = "/e2e/harness.ts";
+    const { createMinimap, createTestView, frames, minimapProjection } =
+      await import(harnessPath);
+    const test = createTestView({
+      map: { width: 10, height: 10, tileSize: 1 },
+      size: { width: 200, height: 200 },
+    });
+    const canvas = document.createElement("canvas");
+    Object.assign(canvas.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "200px",
+      height: "200px",
+      zIndex: "20",
+    });
+    document.body.append(canvas);
+    const actor = { id: "trooper", worldPosition: { x: -2, z: 0 } };
+    const minimap = createMinimap(
+      test.scene,
+      test.map,
+      test.view.camera,
+      canvas,
+      {
+        actors: () => [actor],
+      },
+    );
+    await frames(2);
+
+    const pixelAt = (worldPosition: { x: number; z: number }) => {
+      const point = minimapProjection(test.map, 200, 200).toMinimap(
+        worldPosition,
+      );
+      const ratio = canvas.width / canvas.clientWidth;
+      return Array.from(
+        canvas
+          .getContext("2d")!
+          .getImageData(
+            Math.round(point.x * ratio),
+            Math.round(point.y * ratio),
+            1,
+            1,
+          ).data,
+      );
+    };
+    const first = pixelAt(actor.worldPosition);
+    const previousPosition = actor.worldPosition;
+    actor.worldPosition = { x: 2, z: 0 };
+    minimap.refreshActors();
+    await frames(2);
+    const oldPosition = pixelAt(previousPosition);
+    const second = pixelAt(actor.worldPosition);
+
+    test.dispose();
+    canvas.remove();
+    return { first, oldPosition, second };
+  });
+
+  expect(pixels.first).toEqual([222, 88, 31, 255]);
+  expect(pixels.oldPosition).not.toEqual([222, 88, 31, 255]);
+  expect(pixels.second).toEqual([222, 88, 31, 255]);
+});

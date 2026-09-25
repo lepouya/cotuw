@@ -1,9 +1,8 @@
 // Runs inside the page under test: the specs load it through the Vite dev
 // server, so its imports resolve to the same module instances as the app's.
-import { Color4 } from "@babylonjs/core";
+import { Color3, Color4, Vector3 } from "@babylonjs/core";
 
 import { TerrainMap } from "../src/map";
-import { PROTOTYPE_VIEW_OPTIONS } from "../src/prototype";
 import {
   createGameView,
   createMinimap,
@@ -11,11 +10,70 @@ import {
 } from "../src/render";
 
 import type { ArcRotateCamera } from "@babylonjs/core";
-import type { TerrainMapOptions } from "../src/map";
+import type { TerrainMapOptions, TileType } from "../src/map";
+import type { GameViewOptions } from "../src/render";
 
-export { layerSlot } from "../src/map";
-export { createPrototypeMap } from "../src/prototype";
+export { createMinimap } from "../src/render";
 export { minimapProjection } from "../src/render/minimap";
+export { Matrix, Vector3 } from "@babylonjs/core";
+
+export const TEST_VIEW_OPTIONS = {
+  clearColor: new Color3(0.035, 0.07, 0.09),
+  lighting: {
+    skyColor: new Color3(0.6, 0.78, 0.77),
+    groundColor: new Color3(0.08, 0.12, 0.1),
+    sunColor: Color3.White(),
+    sunDirection: new Vector3(-0.5, -1, 0.35),
+    skyIntensity: 1.05,
+    sunIntensity: 1.3,
+  },
+} satisfies GameViewOptions;
+
+/** Tile types over the checked-in terrain images, pinned like real content. */
+export const TEST_TILE_TYPES = {
+  dirt: {
+    id: "dirt",
+    slot: 0,
+    graphics: {
+      url: "/assets/terrain/dirt.png",
+      hasAlpha: false,
+      minimapColor: [0.47, 0.34, 0.22, 1],
+    },
+  },
+  water: {
+    id: "water",
+    slot: 1,
+    featherEdges: true,
+    graphics: {
+      url: "/assets/terrain/water.png",
+      hasAlpha: true,
+      layerAlphaOnly: true,
+      scrollSpeed: { u: 0.025, v: 0.012 },
+      minimapColor: [0.19, 0.5, 0.56, 1],
+    },
+  },
+  waterRipples: {
+    id: "water-ripples",
+    slot: 2,
+    featherEdges: true,
+    graphics: {
+      url: "/assets/terrain/water.png",
+      hasAlpha: true,
+      scale: { u: 1.37, v: 1.37 },
+      scrollSpeed: { u: -0.018, v: 0.032 },
+      minimapColor: [0.19, 0.5, 0.56, 0.65],
+    },
+  },
+  clutter: {
+    id: "clutter",
+    slot: 3,
+    graphics: {
+      url: "/assets/terrain/clutter.png",
+      hasAlpha: true,
+      minimapColor: [0.41, 0.37, 0.34, 0.05],
+    },
+  },
+} satisfies Record<string, TileType>;
 
 export type TestViewOptions = {
   map?: TerrainMapOptions;
@@ -40,7 +98,7 @@ export function createTestView({
   document.body.append(canvas);
 
   const map = new TerrainMap(mapOptions);
-  const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
+  const view = createGameView(canvas, map, TEST_VIEW_OPTIONS);
   if (terrain) {
     createTerrainMeshes(view.scene, map);
   }
@@ -77,7 +135,7 @@ export function createTestView({
 
 /** The scene's clear color as 0-255 channels, for spotting terrain in shots. */
 export const clearColorBytes = () =>
-  PROTOTYPE_VIEW_OPTIONS.clearColor
+  TEST_VIEW_OPTIONS.clearColor
     .asArray()
     .map((channel) => Math.round(channel * 255));
 

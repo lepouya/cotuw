@@ -10,7 +10,7 @@ describe("TerrainMap", () => {
       tileSize: 2,
       createHeight: (x, z) => x + z * 10,
       createLayers: (x, z) => [
-        { texture: `${x},${z}`, color: new Color4(1, 1, 1, 1) },
+        { type: { id: `${x},${z}` }, color: new Color4(1, 1, 1, 1) },
       ],
     });
 
@@ -18,8 +18,40 @@ describe("TerrainMap", () => {
       0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23,
     ]);
     expect(map.layers).toHaveLength(6);
-    expect(map.layersAt(1, 1)[0].texture).toBe("1,1");
+    expect(map.layersAt(1, 1)[0].type?.id).toBe("1,1");
     expect(map.layerCount).toBe(1);
+  });
+
+  test("interpolates terrain height at a continuous world position", () => {
+    const map = new TerrainMap({
+      width: 1,
+      height: 1,
+      tileSize: 2,
+      createHeight: (x, z) => [0, 10, 20, 30][z * 2 + x]!,
+    });
+
+    // World (0, 0) is the tile centre. It lies on the mesh's diagonal.
+    expect(map.heightAtWorldPosition(0, 0)).toBe(15);
+    // This point lies on the first mesh triangle.
+    expect(map.heightAtWorldPosition(-0.5, -0.5)).toBe(7.5);
+    // This point lies on the second mesh triangle.
+    expect(map.heightAtWorldPosition(0.5, 0.5)).toBe(22.5);
+  });
+
+  test("accepts world positions on map edges and rejects positions outside", () => {
+    const map = new TerrainMap({
+      width: 1,
+      height: 1,
+      tileSize: 2,
+      createHeight: (x, z) => x + z * 2,
+    });
+
+    expect(map.heightAtWorldPosition(1, 1)).toBe(3);
+    expect(map.heightAtWorldPosition(1 + 1e-12, 1)).toBe(3);
+    expect(() => map.heightAtWorldPosition(-1.01, 0)).toThrow(RangeError);
+    expect(() => map.heightAtWorldPosition(Number.NaN, 0)).toThrow(
+      "not finite",
+    );
   });
 
   test("exposes live mutable terrain storage", () => {
@@ -27,7 +59,7 @@ describe("TerrainMap", () => {
 
     map.setHeight(1, 1, 4);
     map.layersAt(0, 0).push({
-      texture: "terrain/grass",
+      type: { id: "grass" },
       color: new Color4(1, 1, 1, 0.5),
     });
     map.layersAt(0, 0)[0].color.a = 0.75;
@@ -104,7 +136,7 @@ describe("TerrainMap", () => {
           ? [{ color: new Color4(1, 1, 1, 1) }]
           : [
               { color: new Color4(1, 1, 1, 1) },
-              { color: new Color4(1, 1, 1, 1), slot: 3 },
+              { type: { id: "top", slot: 3 }, color: new Color4(1, 1, 1, 1) },
             ],
     });
 

@@ -16,6 +16,9 @@ const INITIAL_ALPHA = -Math.PI / 4;
 const INITIAL_BETA = Math.PI / 3.2;
 const LOWER_BETA_LIMIT = Math.PI / 7;
 const UPPER_BETA_LIMIT = Math.PI / 2.15;
+const NEAR_CLIP = 0.01;
+/** Replaced by the distance-based far clip once the view is framed. */
+const INITIAL_FAR_CLIP = 500;
 /** Extra depth range beyond twice the camera distance. */
 const FAR_CLIP_MARGIN = 100;
 /** How long a glide takes to reach its destination, whatever the distance. */
@@ -57,8 +60,8 @@ export function createStrategyCamera(
   camera.upperBetaLimit = UPPER_BETA_LIMIT;
   camera.lowerRadiusLimit = MINIMUM_CAMERA_DISTANCE;
   camera.upperRadiusLimit = MINIMUM_CAMERA_DISTANCE;
-  camera.minZ = 0.01;
-  camera.maxZ = 500;
+  camera.minZ = NEAR_CLIP;
+  camera.maxZ = INITIAL_FAR_CLIP;
   // Panning must stick to the pointer, so it cannot glide after release.
   camera.panningInertia = 0;
   camera.attachControl(canvas, true);
@@ -161,20 +164,30 @@ export function createStrategyCamera(
     setViewHeight(viewHeight * Math.exp(pixels * ZOOM_SENSITIVITY));
     event.preventDefault();
   };
-  // Keeps the player's zoom, re-clamped to the new viewport.
-  const handleResize = () => setViewHeight(viewHeight);
+  let syncedWidth = canvas.clientWidth;
+  let syncedHeight = canvas.clientHeight;
+  // Runs in the same frame as the engine's resize. A new canvas size keeps the
+  // player's zoom, re-clamped to the new viewport.
+  const syncToCanvas = () => {
+    if (
+      canvas.clientWidth === syncedWidth &&
+      canvas.clientHeight === syncedHeight
+    ) {
+      syncViewBounds();
+      return;
+    }
+    syncedWidth = canvas.clientWidth;
+    syncedHeight = canvas.clientHeight;
+    setViewHeight(viewHeight);
+  };
   canvas.addEventListener("wheel", zoom, { passive: false });
   canvas.addEventListener("pointerdown", cancelGlide);
-  // Observing the canvas catches layout-driven resizes that skip the window.
-  const resizeObserver = new ResizeObserver(handleResize);
-  resizeObserver.observe(canvas);
   scene.onDisposeObservable.add(() => {
     canvas.removeEventListener("wheel", zoom);
     canvas.removeEventListener("pointerdown", cancelGlide);
-    resizeObserver.disconnect();
   });
   scene.onBeforeRenderObservable.add(advanceGlide);
-  scene.onBeforeRenderObservable.add(syncViewBounds);
+  scene.onBeforeRenderObservable.add(syncToCanvas);
 
   return {
     resetView,

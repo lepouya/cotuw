@@ -9,46 +9,20 @@ import {
   VertexData,
 } from "@babylonjs/core";
 
-import { layerSlot } from "../map";
 import { createDebugOverlay } from "./debug-overlay";
 
-import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
+import type {
+  TerrainBounds,
+  TerrainMap,
+  TileGraphics,
+  TileLayer,
+  TileType,
+} from "../map";
+import type { AbstractMesh } from "@babylonjs/core";
 
 const CHUNK_SIZE = 32;
 export const TERRAIN_LAYER_OFFSET = 0.012;
-
-/**
- * Textures a layer can name, and how each is sampled. `minimapColor` is the
- * texture's mean color, with alpha as the share of a tile it covers.
- */
-export const TERRAIN_TEXTURES = {
-  "terrain/dirt": {
-    url: "/assets/terrain/dirt.png",
-    hasAlpha: false,
-    minimapColor: [0.472, 0.339, 0.217, 1],
-  },
-  "terrain/clutter": {
-    url: "/assets/terrain/clutter.png",
-    hasAlpha: true,
-    minimapColor: [0.409, 0.373, 0.341, 0.05],
-  },
-  "terrain/water": {
-    url: "/assets/terrain/water.png",
-    hasAlpha: true,
-    // The texture's own alpha caps even the deepest water at about two thirds
-    // opaque, so the tile layer owns transparency and can fade to a shore.
-    layerAlphaOnly: true,
-    scrollSpeed: { u: 0.025, v: 0.012 },
-    minimapColor: [0.189, 0.497, 0.557, 1],
-  },
-  "terrain/water-ripples": {
-    url: "/assets/terrain/water.png",
-    hasAlpha: true,
-    scale: { u: 1.37, v: 1.37 },
-    scrollSpeed: { u: -0.018, v: 0.032 },
-    minimapColor: [0.189, 0.497, 0.557, 0.65],
-  },
-} as const;
+export const TERRAIN_PICK_KIND = "terrain";
 
 type LayerTile = {
   x: number;
@@ -58,7 +32,7 @@ type LayerTile = {
 
 type LayerGroup = {
   layerIndex: number;
-  texture?: string;
+  type?: TileType;
   tiles: LayerTile[];
 };
 
@@ -77,23 +51,45 @@ export function createTerrainMeshes(
   { debugOverlay = false }: TerrainMeshOptions = {},
 ): TerrainMeshes {
   const chunkMeshes = new Map<string, Mesh[]>();
+  const tileTypes = new Map<string, TileType>();
+  // Types without graphics share one plain material.
   const materials = new Map<string | undefined, StandardMaterial>();
   const animatedTextures = new Map<Texture, { u: number; v: number }>();
+  const canonicalType = (type?: TileType): TileType | undefined => {
+    if (!type) {
+      return undefined;
+    }
+    const known = tileTypes.get(type.id);
+    if (known && !sameTileType(known, type)) {
+      throw new Error(`Conflicting terrain tile type ID: ${type.id}.`);
+    }
+    if (known) {
+      return known;
+    }
+    const copy = structuredClone(type);
+    tileTypes.set(copy.id, copy);
+    return copy;
+  };
+  // Validate the complete content catalog before allocating scene resources.
+  for (let z = 0; z < map.height; z += 1) {
+    for (let x = 0; x < map.width; x += 1) {
+      for (const { type } of map.layersAt(x, z)) {
+        canonicalType(type);
+      }
+    }
+  }
 
-  const materialFor = (texture?: string) => {
-    let material = materials.get(texture);
+  const materialFor = (type?: TileType) => {
+    const textured = type?.graphics ? type : undefined;
+    let material = materials.get(textured?.id);
 
     if (!material) {
-      material = createLayerMaterial(scene, texture);
-      materials.set(texture, material);
+      material = createLayerMaterial(scene, textured);
+      materials.set(textured?.id, material);
 
-      const source = texture ? terrainTextureSource(texture) : undefined;
-      if (
-        source &&
-        "scrollSpeed" in source &&
-        material.diffuseTexture instanceof Texture
-      ) {
-        animatedTextures.set(material.diffuseTexture, source.scrollSpeed);
+      const scrollSpeed = textured?.graphics?.scrollSpeed;
+      if (scrollSpeed && material.diffuseTexture instanceof Texture) {
+        animatedTextures.set(material.diffuseTexture, scrollSpeed);
       }
     }
 
@@ -102,11 +98,6 @@ export function createTerrainMeshes(
 
   const rebuildChunk = (chunkX: number, chunkZ: number) => {
     const chunkKey = `${chunkX},${chunkZ}`;
-
-    for (const mesh of chunkMeshes.get(chunkKey) ?? []) {
-      mesh.dispose();
-    }
-
     const minX = chunkX * CHUNK_SIZE;
     const minZ = chunkZ * CHUNK_SIZE;
     const maxX = Math.min(minX + CHUNK_SIZE, map.width);
@@ -116,8 +107,8 @@ export function createTerrainMeshes(
     for (let z = minZ; z < maxZ; z += 1) {
       for (let x = minX; x < maxX; x += 1) {
         for (const [index, layer] of map.layersAt(x, z).entries()) {
-          const layerIndex = layerSlot(layer, index);
-          const texture = layer.texture || undefined;
+          const type = canonicalType(layer.type);
+          const layerIndex = type?.slot ?? index;
           let layerGroups = groups.get(layerIndex);
 
           if (!layerGroups) {
@@ -125,11 +116,11 @@ export function createTerrainMeshes(
             groups.set(layerIndex, layerGroups);
           }
 
-          let group = layerGroups.get(texture);
+          let group = layerGroups.get(type?.id);
 
           if (!group) {
-            group = { layerIndex, texture, tiles: [] };
-            layerGroups.set(texture, group);
+            group = { layerIndex, type, tiles: [] };
+            layerGroups.set(type?.id, group);
           }
 
           group.tiles.push({ x, z, layer });
@@ -147,10 +138,13 @@ export function createTerrainMeshes(
             chunkX,
             chunkZ,
             group,
-            materialFor(group.texture),
+            materialFor(group.type),
           ),
         );
       }
+    }
+    for (const mesh of chunkMeshes.get(chunkKey) ?? []) {
+      mesh.dispose();
     }
     chunkMeshes.set(chunkKey, meshes);
   };
@@ -218,6 +212,7 @@ export function createTerrainMeshes(
     }
     chunkMeshes.clear();
     materials.clear();
+    tileTypes.clear();
     animatedTextures.clear();
     dirtyChunks.clear();
   };
@@ -226,6 +221,43 @@ export function createTerrainMeshes(
   markDirty({ minX: 0, minZ: 0, maxX: map.width - 1, maxZ: map.height - 1 });
   refreshDirtyChunks();
   return { dispose };
+}
+
+function sameTileType(left: TileType, right: TileType): boolean {
+  return (
+    left.id === right.id &&
+    left.slot === right.slot &&
+    Boolean(left.featherEdges) === Boolean(right.featherEdges) &&
+    sameGraphics(left.graphics, right.graphics)
+  );
+}
+
+function sameGraphics(
+  left: TileGraphics | undefined,
+  right: TileGraphics | undefined,
+): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+  return (
+    left.url === right.url &&
+    left.hasAlpha === right.hasAlpha &&
+    Boolean(left.layerAlphaOnly) === Boolean(right.layerAlphaOnly) &&
+    samePair(left.scale, right.scale) &&
+    samePair(left.scrollSpeed, right.scrollSpeed) &&
+    left.minimapColor.every(
+      (channel, index) => channel === right.minimapColor[index],
+    )
+  );
+}
+
+function samePair(
+  left: { u: number; v: number } | undefined,
+  right: { u: number; v: number } | undefined,
+): boolean {
+  return left && right
+    ? left.u === right.u && left.v === right.v
+    : left === right;
 }
 
 /**
@@ -256,7 +288,7 @@ function createLayerMesh(
   map: TerrainMap,
   chunkX: number,
   chunkZ: number,
-  { layerIndex, texture, tiles }: LayerGroup,
+  { layerIndex, type, tiles }: LayerGroup,
   material: StandardMaterial,
 ): Mesh {
   const positions: number[] = [];
@@ -300,9 +332,8 @@ function createLayerMesh(
   }
 
   VertexData.ComputeNormals(positions, indices, normals);
-  const textureName = texture ? `texture-${texture}` : "plain";
   const mesh = new Mesh(
-    `terrain-${chunkX}-${chunkZ}-layer-${layerIndex}-${textureName}`,
+    `terrain-${chunkX}-${chunkZ}-layer-${layerIndex}-${tileTypeName(type)}`,
     scene,
   );
   const vertexData = new VertexData();
@@ -313,13 +344,19 @@ function createLayerMesh(
   vertexData.uvs = uvs;
   vertexData.applyToMesh(mesh);
   mesh.hasVertexAlpha = tiles.some(
-    ({ layer }) => layer.color.a < 1 || layer.featherEdges,
+    ({ layer }) => layer.color.a < 1 || layer.type?.featherEdges,
   );
   mesh.material = material;
+  mesh.metadata = { pickKind: TERRAIN_PICK_KIND };
   // Layers overlap at almost the same depth, so blend order must follow the
   // stack rather than Babylon's distance sort.
   mesh.alphaIndex = layerIndex;
   return mesh;
+}
+
+/** Whether a mesh is one of this renderer's orderable terrain surfaces. */
+export function isTerrainPickMesh(mesh: AbstractMesh | null): boolean {
+  return mesh?.metadata?.pickKind === TERRAIN_PICK_KIND;
 }
 
 /**
@@ -333,12 +370,10 @@ export function cornerAlpha(
   cornerX: number,
   cornerZ: number,
 ): number {
-  if (!layer.featherEdges) {
+  if (!layer.type?.featherEdges) {
     return layer.color.a;
   }
 
-  // Same empty-string normalization as the mesh grouping.
-  const texture = layer.texture || undefined;
   let total = 0;
   let sampled = 0;
   for (const [x, z] of [
@@ -353,7 +388,7 @@ export function cornerAlpha(
 
     const neighbor = map
       .layersAt(x, z)
-      .find((candidate) => (candidate.texture || undefined) === texture);
+      .find((candidate) => candidate.type?.id === layer.type?.id);
     total += neighbor?.color.a ?? 0;
     sampled += 1;
   }
@@ -361,21 +396,24 @@ export function cornerAlpha(
   return sampled > 0 ? total / sampled : 0;
 }
 
-function createLayerMaterial(scene: Scene, texture?: string): StandardMaterial {
-  const textureName = texture ? `texture-${texture}` : "plain";
+function tileTypeName(type?: TileType): string {
+  return type ? `tile-${type.id}` : "plain";
+}
+
+function createLayerMaterial(scene: Scene, type?: TileType): StandardMaterial {
   const material = new StandardMaterial(
-    `terrain-material-${textureName}`,
+    `terrain-material-${tileTypeName(type)}`,
     scene,
   );
   material.diffuseColor = Color3.White();
   material.specularColor = Color3.Black();
 
-  if (texture) {
-    const source = terrainTextureSource(texture);
-    material.diffuseTexture = createLayerTexture(scene, source);
+  const graphics = type?.graphics;
+  if (graphics) {
+    material.diffuseTexture = createLayerTexture(scene, graphics);
     material.useAlphaFromDiffuseTexture =
-      source.hasAlpha && !("layerAlphaOnly" in source);
-    if (source.hasAlpha) {
+      graphics.hasAlpha && !graphics.layerAlphaOnly;
+    if (graphics.hasAlpha) {
       material.transparencyMode = Material.MATERIAL_ALPHABLEND;
     }
   }
@@ -383,30 +421,16 @@ function createLayerMaterial(scene: Scene, texture?: string): StandardMaterial {
   return material;
 }
 
-function createLayerTexture(
-  scene: Scene,
-  source: TerrainTextureSource,
-): Texture {
-  const texture = new Texture(source.url, scene);
-  texture.hasAlpha = source.hasAlpha;
+function createLayerTexture(scene: Scene, graphics: TileGraphics): Texture {
+  const texture = new Texture(graphics.url, scene);
+  texture.hasAlpha = graphics.hasAlpha;
   // Repeating rather than mirroring, which would alternate reflected copies.
   // Relies on matching opposite edges; see scripts/reconcile-texture-edges.mjs.
   texture.wrapU = Texture.WRAP_ADDRESSMODE;
   texture.wrapV = Texture.WRAP_ADDRESSMODE;
-  if ("scale" in source) {
-    texture.uScale = source.scale.u;
-    texture.vScale = source.scale.v;
+  if (graphics.scale) {
+    texture.uScale = graphics.scale.u;
+    texture.vScale = graphics.scale.v;
   }
   return texture;
-}
-
-type TerrainTextureSource =
-  (typeof TERRAIN_TEXTURES)[keyof typeof TERRAIN_TEXTURES];
-
-export function terrainTextureSource(textureId: string): TerrainTextureSource {
-  if (!Object.prototype.hasOwnProperty.call(TERRAIN_TEXTURES, textureId)) {
-    throw new Error(`Unknown terrain texture "${textureId}".`);
-  }
-
-  return TERRAIN_TEXTURES[textureId as keyof typeof TERRAIN_TEXTURES];
 }

@@ -24,6 +24,7 @@ test("the initial view starts close enough to read tile detail", async ({
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+  await expect(canvas).toHaveAttribute("data-actor-ready", "true");
   const screenshot = await canvas.screenshot();
   await testInfo.attach("initial-terrain", {
     body: screenshot,
@@ -319,21 +320,21 @@ test("terraforming refreshes height and layer geometry", async ({ page }) => {
 
     map.setHeight(0, 0, 7);
     map.layersAt(0, 0).push({
-      texture: "terrain/dirt",
+      type: { id: "overlay" },
       color: color(1, 1, 1, 0.5),
     });
     map.notifyChange(map.tilesAroundCorner(0, 0));
     await frames(2);
     const after = mesh()?.getVerticesData("position")?.[1];
     const addedLayer = Boolean(
-      scene.getMeshByName("terrain-0-0-layer-1-texture-terrain/dirt"),
+      scene.getMeshByName("terrain-0-0-layer-1-tile-overlay"),
     );
 
     map.layersAt(0, 0).pop();
     map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
     await frames(2);
     const removedLayer = !scene.getMeshByName(
-      "terrain-0-0-layer-1-texture-terrain/dirt",
+      "terrain-0-0-layer-1-tile-overlay",
     );
 
     const subscribed = map.onChangedObservable.hasObservers();
@@ -371,7 +372,7 @@ test("a feathered layer fades to clear at the tiles that lack it", async ({
   await openHarness(page);
 
   const water = await page.evaluate(() => {
-    const { color, createTestView } = harness;
+    const { color, createTestView, TEST_TILE_TYPES } = harness;
     // One row of three tiles, with water only in the middle one.
     const { scene, dispose } = createTestView({
       map: {
@@ -379,15 +380,9 @@ test("a feathered layer fades to clear at the tiles that lack it", async ({
         height: 1,
         tileSize: 1,
         createLayers: (x) => [
-          { texture: "terrain/dirt", color: color(1, 1, 1, 1) },
+          { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
           ...(x === 1
-            ? [
-                {
-                  texture: "terrain/water",
-                  color: color(1, 1, 1, 1),
-                  featherEdges: true,
-                },
-              ]
+            ? [{ type: TEST_TILE_TYPES.water, color: color(1, 1, 1, 1) }]
             : []),
         ],
       },
@@ -396,11 +391,11 @@ test("a feathered layer fades to clear at the tiles that lack it", async ({
     });
     const colors =
       scene
-        .getMeshByName("terrain-0-0-layer-1-texture-terrain/water")
+        .getMeshByName("terrain-0-0-layer-1-tile-water")
         ?.getVerticesData("color") ?? [];
     const dirtColors =
       scene
-        .getMeshByName("terrain-0-0-layer-0-texture-terrain/dirt")
+        .getMeshByName("terrain-0-0-layer-0-tile-dirt")
         ?.getVerticesData("color") ?? [];
     const alphas = [];
     for (let index = 3; index < colors.length; index += 4) {
@@ -424,22 +419,16 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
   await openHarness(page);
 
   const alpha = await page.evaluate(async () => {
-    const { color, createTestView, frames } = harness;
+    const { color, createTestView, frames, TEST_TILE_TYPES } = harness;
     const { map, scene, dispose } = createTestView({
       map: {
         width: 33,
         height: 1,
         tileSize: 1,
         createLayers: (x) => [
-          { texture: "terrain/dirt", color: color(1, 1, 1, 1) },
+          { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
           ...(x === 31
-            ? [
-                {
-                  texture: "terrain/water",
-                  color: color(1, 1, 1, 1),
-                  featherEdges: true,
-                },
-              ]
+            ? [{ type: TEST_TILE_TYPES.water, color: color(1, 1, 1, 1) }]
             : []),
         ],
       },
@@ -447,14 +436,13 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
     });
     const rightEdgeAlpha = () =>
       scene
-        .getMeshByName("terrain-0-0-layer-1-texture-terrain/water")
+        .getMeshByName("terrain-0-0-layer-1-tile-water")
         ?.getVerticesData("color")?.[11];
     const before = rightEdgeAlpha();
 
     map.layersAt(32, 0).push({
-      texture: "terrain/water",
+      type: TEST_TILE_TYPES.water,
       color: color(1, 1, 1, 1),
-      featherEdges: true,
     });
     map.notifyChange({ minX: 32, minZ: 0, maxX: 32, maxZ: 0 });
     await frames(2);
@@ -468,71 +456,34 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
   expect(alpha.after).toBe(1);
 });
 
-test("every prototype layer keeps one fixed slot across the map", async ({
-  page,
-}) => {
-  await openHarness(page);
-
-  const slots = await page.evaluate(() => {
-    const map = harness.createPrototypeMap();
-    const byTexture = new Map<string, Set<number>>();
-
-    for (let z = 0; z < map.height; z += 1) {
-      for (let x = 0; x < map.width; x += 1) {
-        for (const [index, layer] of map.layersAt(x, z).entries()) {
-          const texture = layer.texture ?? "";
-          let occupied = byTexture.get(texture);
-
-          if (!occupied) {
-            occupied = new Set();
-            byTexture.set(texture, occupied);
-          }
-
-          occupied.add(harness.layerSlot(layer, index));
-        }
-      }
-    }
-
-    return Object.fromEntries(
-      [...byTexture].map(([texture, occupied]) => [texture, [...occupied]]),
-    );
-  });
-
-  // Each of these is optional, so a layer taking its slot from its array
-  // position would stack differently on tiles with a different combination.
-  expect(slots).toEqual({
-    "terrain/dirt": [0],
-    "terrain/water": [1],
-    "terrain/water-ripples": [2],
-    "terrain/clutter": [3],
-  });
-});
-
 test("loads layered terrain textures and advances both water passes", async ({
   page,
 }) => {
   await openHarness(page);
 
   const textureState = await page.evaluate(async () => {
-    const { color, createTestView, frames } = harness;
+    const { color, createTestView, frames, TEST_TILE_TYPES } = harness;
     const { scene, dispose } = createTestView({
       map: {
         width: 3,
         height: 3,
         tileSize: 1,
         createLayers: (x) => [
-          { texture: "terrain/dirt", color: color(1, 1, 1, 1) },
+          { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
           ...(x === 1
             ? [
-                { texture: "terrain/water", color: color(1, 1, 1, 0.82) },
                 {
-                  texture: "terrain/water-ripples",
+                  type: TEST_TILE_TYPES.water,
+                  color: color(1, 1, 1, 0.82),
+                },
+                {
+                  type: TEST_TILE_TYPES.waterRipples,
                   color: color(1, 1, 1, 0.3),
                 },
               ]
             : []),
           ...(x === 2
-            ? [{ texture: "terrain/clutter", color: color(1, 1, 1, 1) }]
+            ? [{ type: TEST_TILE_TYPES.clutter, color: color(1, 1, 1, 1) }]
             : []),
         ],
       },
@@ -544,7 +495,7 @@ test("loads layered terrain textures and advances both water passes", async ({
 
     const activeTexture = (name: string) =>
       scene
-        .getMaterialByName(`terrain-material-texture-terrain/${name}`)
+        .getMaterialByName(`terrain-material-tile-${name}`)
         ?.getActiveTextures()[0] as
         | {
             hasAlpha: boolean;
@@ -561,9 +512,7 @@ test("loads layered terrain textures and advances both water passes", async ({
     const ripples = activeTexture("water-ripples");
     const initialOffset = water?.uOffset;
     const initialRippleOffset = ripples?.uOffset;
-    const baseMesh = scene.getMeshByName(
-      "terrain-0-0-layer-0-texture-terrain/dirt",
-    );
+    const baseMesh = scene.getMeshByName("terrain-0-0-layer-0-tile-dirt");
     const baseNormalY = baseMesh?.getVerticesData("normal")?.[1];
     const firstTwoTileUvs = baseMesh?.getVerticesData("uv")?.slice(0, 16);
     const waterMoved = await new Promise<boolean>((resolve) => {
@@ -602,9 +551,9 @@ test("loads layered terrain textures and advances both water passes", async ({
       upwardNormal: typeof baseNormalY === "number" && baseNormalY > 0,
       // Blend order must follow the layer stack, not camera distance.
       alphaIndices: [
-        "terrain-0-0-layer-1-texture-terrain/water",
-        "terrain-0-0-layer-2-texture-terrain/water-ripples",
-        "terrain-0-0-layer-1-texture-terrain/clutter",
+        "terrain-0-0-layer-1-tile-water",
+        "terrain-0-0-layer-2-tile-water-ripples",
+        "terrain-0-0-layer-3-tile-clutter",
       ].map((name) => scene.getMeshByName(name)?.alphaIndex),
     };
     dispose();
@@ -621,7 +570,7 @@ test("loads layered terrain textures and advances both water passes", async ({
     firstTwoTileUvs: [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 2, 0, 2, 1],
     opaqueBase: true,
     upwardNormal: true,
-    alphaIndices: [1, 2, 1],
+    alphaIndices: [1, 2, 3],
   });
 });
 

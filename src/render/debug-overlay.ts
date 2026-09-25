@@ -10,6 +10,11 @@ import {
 import type { TerrainMap } from "../map";
 
 const GRID_OFFSET = 0.035;
+/** Tiles between the default major grid lines. */
+const MAJOR_GRID_INTERVAL = 10;
+const TILE_GRID_COLOR = new Color3(0.12, 0.26, 0.27);
+const MAJOR_GRID_COLOR = new Color3(0.76, 0.59, 0.27);
+const BOUNDARY_COLOR = new Color3(0.95, 0.78, 0.35);
 
 export type GridStyle = {
   name: string;
@@ -34,10 +39,14 @@ export function createDebugOverlay(
   {
     layerOffset,
     grids = [
-      { name: "tile-grid", interval: 1, color: new Color3(0.12, 0.26, 0.27) },
-      { name: "major-grid", interval: 10, color: new Color3(0.76, 0.59, 0.27) },
+      { name: "tile-grid", interval: 1, color: TILE_GRID_COLOR },
+      {
+        name: "major-grid",
+        interval: MAJOR_GRID_INTERVAL,
+        color: MAJOR_GRID_COLOR,
+      },
     ],
-    boundaryColor = new Color3(0.95, 0.78, 0.35),
+    boundaryColor = BOUNDARY_COLOR,
   }: DebugOverlayOptions,
 ): DebugOverlay {
   for (const { interval } of grids) {
@@ -122,6 +131,7 @@ function createGrid(
 
   const grid = MeshBuilder.CreateLineSystem(name, { lines }, scene);
   grid.color = color;
+  grid.isPickable = false;
   return grid;
 }
 
@@ -145,5 +155,6 @@ function createMapBoundary(
     scene,
   );
   boundary.color = color;
+  boundary.isPickable = false;
   return boundary;
 }

@@ -10,7 +10,10 @@ import {
   tileColor,
 } from "../src/render/minimap";
 
-import type { TerrainMapOptions } from "../src/map";
+import type { TerrainMapOptions, TileType } from "../src/map";
+import type { Rgb } from "../src/render/minimap";
+
+const BLACK: Rgb = [0, 0, 0];
 
 const opaque = (red: number, green: number, blue: number) =>
   new Color4(red, green, blue, 1);
@@ -94,29 +97,43 @@ describe("pointNearPolygon", () => {
 });
 
 describe("tileColor", () => {
+  test("unlayered ground shows the background", () => {
+    expect(tileColor(flatMap(), 0, 0, [0.1, 0.2, 0.3])).toEqual([
+      0.1, 0.2, 0.3,
+    ]);
+  });
+
   test("an opaque untextured layer shows its own color on flat ground", () => {
     const map = flatMap({ createLayers: () => [{ color: opaque(1, 0, 0) }] });
 
-    expect(tileColor(map, 1, 1)).toEqual([1, 0, 0]);
+    expect(tileColor(map, 1, 1, BLACK)).toEqual([1, 0, 0]);
   });
 
   test("composites layers in slot order rather than array order", () => {
     const map = flatMap({
       createLayers: () => [
-        { color: new Color4(0, 0, 1, 0.5), slot: 1 },
-        { color: opaque(1, 0, 0), slot: 0 },
+        { type: { id: "top", slot: 1 }, color: new Color4(0, 0, 1, 0.5) },
+        { type: { id: "base", slot: 0 }, color: opaque(1, 0, 0) },
       ],
     });
 
-    expect(tileColor(map, 0, 0)).toEqual([0.5, 0, 0.5]);
+    expect(tileColor(map, 0, 0, BLACK)).toEqual([0.5, 0, 0.5]);
   });
 
   test("tints each texture's mean color by the layer color", () => {
+    const dirt: TileType = {
+      id: "dirt",
+      graphics: {
+        url: "/dirt.png",
+        hasAlpha: false,
+        minimapColor: [0.472, 0.339, 0.217, 1],
+      },
+    };
     const map = flatMap({
-      createLayers: () => [{ texture: "terrain/dirt", color: opaque(1, 1, 1) }],
+      createLayers: () => [{ type: dirt, color: opaque(1, 1, 1) }],
     });
 
-    expect(tileColor(map, 0, 0)).toEqual([0.472, 0.339, 0.217]);
+    expect(tileColor(map, 0, 0, BLACK)).toEqual([0.472, 0.339, 0.217]);
   });
 
   test("lights slopes facing the northwest and shades those facing away", () => {
@@ -132,8 +149,8 @@ describe("tileColor", () => {
       createLayers: layers,
     });
 
-    expect(tileColor(facingWest, 1, 1)[0]).toBeGreaterThan(0.5);
-    expect(tileColor(facingSouth, 1, 1)[0]).toBeLessThan(0.5);
+    expect(tileColor(facingWest, 1, 1, BLACK)[0]).toBeGreaterThan(0.5);
+    expect(tileColor(facingSouth, 1, 1, BLACK)[0]).toBeLessThan(0.5);
   });
 });
 
@@ -146,7 +163,7 @@ describe("paintTerrain", () => {
     });
     const pixels = new Uint8ClampedArray(2 * 2 * 4);
 
-    paintTerrain(map, pixels, { minX: 0, minZ: 1, maxX: 1, maxZ: 1 });
+    paintTerrain(map, pixels, { minX: 0, minZ: 1, maxX: 1, maxZ: 1 }, BLACK);
 
     // Row 0 is z = 1, the north edge; row 1 (z = 0) stays untouched.
     expect([...pixels]).toEqual([
