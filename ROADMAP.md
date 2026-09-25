@@ -28,9 +28,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 - [x] 0.7 Run the game in a browser and the Tauri development shell.
 - [x] 0.8 Render one small map with a strategy camera.
-- [ ] 0.9 Render one placeholder actor and prove pointer hit-testing with
+- [x] 0.9 Render one placeholder actor and prove pointer hit-testing with
       temporary selection feedback.
-- [ ] 0.10 Prove direct target movement on an unobstructed surface before
+- [x] 0.10 Prove direct target movement on an unobstructed surface before
       introducing terrain-aware path finding.
 
 ### Terrain and map content
@@ -49,9 +49,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Actors and movement
 
-- [ ] 0.17 Define the prototype actor's simulation state, movement properties,
+- [x] 0.17 Define the prototype actor's simulation state, movement properties,
       target command, and deterministic update rules.
-- [ ] 0.18 Render a visible vehicle-like actor at its simulated world position.
+- [ ] 0.18 Render a visible Trooper actor at its simulated world position.
 - [ ] 0.19 Replace the direct-motion spike with data-driven target commands and
       movement along a valid path.
 - [ ] 0.20 Provide path finding that respects terrain and occupancy, replans
@@ -94,8 +94,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Playable-slice integration
 
-- [ ] 0.34 Define immutable level content and mutable, stable-ID runtime state
-      that can round-trip through serialization before level content is locked.
+- [ ] 0.34 Define immutable scenario content and mutable, stable-ID runtime
+      state that can round-trip through serialization before mission content is
+      locked.
 - [ ] 0.35 Add the fixed Command Center, Materials Refinery, Harvester, Field
       Barracks, Trooper, and Scout with data-driven costs and timing.
 - [ ] 0.36 Implement direct blueprint placement, rotation, the baseline one-slot
@@ -149,7 +150,7 @@ base-building RTS loop, its technical architecture, and its player interface.
   feedback, animation, minimap, and touch-accessible controls satisfy the M0
   rules in [DESIGN.md](DESIGN.md).
 - Manual save/load, quicksave, autosave, and restart round-trip authoritative
-  level state or reject incompatible data clearly.
+  mission state or reject incompatible data clearly.
 - The mission supports post-victory free play, hard defeat, and player-judged
   soft defeat, and an RTS-familiar first-time player can finish without
   developer guidance.

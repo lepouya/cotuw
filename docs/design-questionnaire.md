@@ -112,13 +112,13 @@ No known contradiction remains among the resolved questionnaire decisions.
 This audit corrected or clarified:
 
 - M0 is canon-compatible but remains a standalone prototype mission rather than
-  the canonical first campaign level.
+  the canonical first campaign mission.
 - Defeating all six wolves is the exact victory trigger; revealing every map
   tile is not an additional completion condition.
 - M0 must prove weighted movement with slow rough terrain rather than leaving
   all terrain cost binary.
 - Single-player pause and result rules apply to the standalone M0 mission as
-  well as campaign levels.
+  well as campaign missions.
 - The opening factions are the human ARC expedition and the elven Circle
   pilgrimage. Older multi-peoples coalition language does not describe the
   campaign opening.
@@ -140,7 +140,7 @@ This audit corrected or clarified:
   boundaries for later work.
 - Q26's repair and healing rules use the shared infrastructure-work pool
   without placing recovery systems in M0.
-- Q27's level-local building upgrades are distinct from campaign unlock caps
+- Q27's mission-local building upgrades are distinct from campaign unlock caps
   and permanent research. Upgrade spending affects resale but not repair price.
 - A completed building cannot repair and upgrade simultaneously, avoiding
   ambiguous healing and queue behavior when multiple infrastructure slots
@@ -248,7 +248,7 @@ group are they commanding?
 - M0 is a canon-compatible depiction of ARC's first foothold rather than a
   training simulation or a disconnected test arena.
 - Its premise and faction behavior fit the real game world, but M0 is a
-  standalone prototype mission rather than the canonical first campaign level.
+  standalone prototype mission rather than the canonical first campaign mission.
   Its exact map, events, encounter composition, balance values, and assets
   remain provisional.
 - ARC identity is visible through its terminology, unit and building names,
@@ -488,8 +488,8 @@ a battlefield commander?
 
 #### Draft answer
 
-- Guiding directive: if this game had a tutorial level, design the most minimal
-  version of that level that still showcases what the game is.
+- Guiding directive: if this game had a tutorial mission, design the most
+  minimal version of that mission that still showcases what the game is.
 - Milestone 0 is not a literal tutorial. It is the minimum viable playable
   foundation for what a future tutorial could teach.
 - A full scripted tutorial, gated steps, and polished onboarding presentation
@@ -1715,7 +1715,8 @@ may provide an emergency recovery path without introducing ancient caches.
 - A den farther into the map contains four normal wolves and one alpha wolf,
   providing the larger final fight.
 - The alpha is visually 25% larger than a normal wolf and has more health. It
-  serves as the boss of the M0 level; its exact health remains a balance value.
+  serves as the boss of the M0 mission; its exact health remains a balance
+  value.
 - One Trooper can defeat the lone wolf, but a Scout cannot. This establishes the
   Trooper as the basic combat unit without erasing the Scout's vulnerability.
 - Defeating the five-wolf den pack, including its alpha, requires multiple
@@ -2101,7 +2102,7 @@ damage application understandable.
   actions. Save, load, and restart are required in M0.
 - The center shows compact primary-objective text and progress, expandable for
   full details.
-- The right side shows resource totals, elapsed level time, and an alert
+- The right side shows resource totals, elapsed mission time, and an alert
   indicator for important off-screen events.
 - M0 displays only Materials. Later factions and tiers display their relevant
   known resources, while the exotic resource remains completely absent until
@@ -2363,7 +2364,7 @@ M0 includes:
   time controls defined in Q10-Q17.
 - The animation and state-driven presentation examples defined in Q18.
 - Manual saves, quicksave, autosave, load, and restart using serializable,
-  deterministic simulation state and data-driven level definitions.
+  deterministic simulation state and data-driven scenario definitions.
 - Browser and desktop-Tauri execution, plus landscape browser testing at phone
   and tablet viewports using touch-style input.
 - Prototype-quality art with the required readability and essential gameplay
@@ -2392,12 +2393,12 @@ not commit the final campaign to that exact content.
 - Save, load, and restart are required parts of M0 rather than later polish.
 - Proving serialization is an architecture gate: the simulation model and map
   format must round-trip correctly before their shapes are treated as stable or
-  substantial level content is built on top of them.
-- Immutable level definitions and mutable runtime snapshots remain separate,
+  substantial mission content is built on top of them.
+- Immutable scenario definitions and mutable runtime snapshots remain separate,
   data-driven, and serializable without renderer or platform objects.
 - Runtime objects use stable identifiers so relationships such as orders,
   targets, production, Harvester assignment, and objectives can be restored.
-- Restart reconstructs the pristine scenario from its level definition. Load
+- Restart reconstructs the pristine scenario from its scenario definition. Load
   reconstructs a saved runtime snapshot. Both use the same model-validation
   and world-construction boundaries wherever practical.
 - Platform services handle storage and file access, while the deterministic
@@ -2409,7 +2410,7 @@ not commit the final campaign to that exact content.
 - A single-player game may be saved manually at any point rather than only at
   checkpoints.
 - Opening the save interface pauses simulation before the snapshot is taken.
-- A snapshot preserves the level and map state, terrain mutations, remaining
+- A snapshot preserves the mission and map state, terrain mutations, remaining
   resources, faction stockpiles, fog exploration, actors, stable identifiers,
   positions, health, and destroyed state.
 - It also preserves issued orders and targets, construction and production
@@ -2417,7 +2418,7 @@ not commit the final campaign to that exact content.
   patch and collection progress, support-network state, wildlife encounter and
   regeneration state, objectives, completion state, elapsed simulation time,
   and deterministic random state if randomness is later introduced.
-- As the resolved post-M0 systems are implemented, level saves also preserve
+- As the resolved post-M0 systems are implemented, mission saves also preserve
   occupancy-layer transitions, transport passenger identities, deployment
   modes and footprint reservations, veterancy, concealment state, temporary
   reveals, and authoritative sensor contacts or detection effects.
@@ -2439,28 +2440,28 @@ not commit the final campaign to that exact content.
 - Explicit schema versions provide a future migration boundary without forcing
   the initial prototype to support indefinite backward compatibility.
 
-#### Resolved follow-up: Are level and campaign saves separate?
+#### Resolved follow-up: Are mission and campaign saves separate?
 
-- Level saves and campaign saves use separate files and schemas.
-- A **level save** owns the complete runtime snapshot for one active mission,
+- Mission saves and campaign saves use separate files and schemas.
+- A **mission save** owns the complete runtime snapshot for one active mission,
   including the simulation details listed above.
 - A **campaign save** owns longer-lived campaign progression and choices rather
-  than embedding the active level's world state.
-- A level save may reference its originating campaign through a stable campaign
-  identifier, but that reference does not merge the two save formats.
+  than embedding the active mission's world state.
+- A mission save may reference its originating campaign through a stable
+  campaign identifier, but that reference does not merge the two save formats.
 - Exact campaign-save fields and the rules for committing mission results to a
   campaign remain part of the later campaign-structure design.
 
-#### Resolved follow-up: How are manual level saves organized?
+#### Resolved follow-up: How are manual mission saves organized?
 
-- Manual level saves appear in a list rather than a fixed set of numbered
+- Manual mission saves appear in a list rather than a fixed set of numbered
   slots.
 - The player may create multiple saves without an artificial in-game count
   limit; actual storage failures are handled explicitly by the platform
   service.
-- Each save has a player-editable name and displays the level name, save
+- Each save has a player-editable name and displays the mission name, save
   timestamp, and elapsed simulation time.
-- The Load interface uses the same metadata and clearly distinguishes level
+- The Load interface uses the same metadata and clearly distinguishes mission
   saves from separate campaign saves.
 
 #### Resolved follow-up: Does M0 include quicksave and autosave?
@@ -2483,13 +2484,13 @@ not commit the final campaign to that exact content.
   platform boundaries should avoid foreclosing multiplayer later, but M0 does
   not implement speculative multiplayer infrastructure.
 
-#### Resolved follow-up: Is M0 a campaign level?
+#### Resolved follow-up: Is M0 a campaign mission?
 
 - M0 is a standalone prototype mission launched from the single-player menu.
-- It is not the canonical first ARC campaign level and does not write campaign
+- It is not the canonical first ARC campaign mission and does not write campaign
   progression.
 - Its structure demonstrates the minimum experience that a later tutorial
-  level should be able to support. M0 includes limited contextual help but not
+  mission should be able to support. M0 includes limited contextual help but not
   a gated sequence of tutorial instructions or staged onboarding.
 - The M0 map, wolves, pacing, and prototype assets do not become commitments to
   final campaign content merely because they prove the required systems.
@@ -2532,15 +2533,15 @@ not commit the final campaign to that exact content.
 
 #### Resolved follow-up: Does M0 include a map editor or mod tools?
 
-- M0 requires data-driven, serializable level definitions that load without
+- M0 requires data-driven, serializable scenario definitions that load without
   renderer-specific state.
-- M0 levels may be authored directly as project data with developer-facing
+- M0 scenarios may be authored directly as project data with developer-facing
   validation and test support.
 - A player-facing map editor, mod browser, mod-packaging workflow, and modding
   console remain outside M0.
 - Map-editor work is deferred until the project begins designing and producing
-  full levels, when real authoring needs can shape the tool instead of an early
-  speculative interface.
+  full scenarios, when real authoring needs can shape the tool instead of an
+  early speculative interface.
 
 ### Q20. How will we judge whether the slice succeeds?
 
@@ -2596,11 +2597,11 @@ viewport with touch-style input and no keyboard, hover, or right-click.
 - Ordinary notifications and alerts are non-modal and never pause simulation.
 - The two explanatory popups pause single-player until the player dismisses
   them.
-- Whether each popup has been dismissed is authoritative level state and is
-  included in manual, quick, and automatic level saves.
+- Whether each popup has been dismissed is authoritative mission state and is
+  included in manual, quick, and automatic mission saves.
 - Loading does not repeat a popup that had already been dismissed in that
   snapshot.
-- Restarting reconstructs the pristine level state, so both popups may appear
+- Restarting reconstructs the pristine mission state, so both popups may appear
   again during the new run.
 
 #### Resolved M0 acceptance checklist
@@ -2639,8 +2640,8 @@ viewport with touch-style input and no keyboard, hover, or right-click.
   damage effects, building stages, and four resource-depletion visuals prove
   the animation paths selected in Q18 without controlling simulation timing.
 - **Persistence:** Manual saves, quicksave, and autosave round-trip the complete
-  authoritative level state within the same build. Loading begins paused,
-  restart reconstructs the pristine level, and incompatible versions fail with
+  authoritative mission state within the same build. Loading begins paused,
+  restart reconstructs the pristine mission, and incompatible versions fail with
   a clear explanation rather than corrupting state.
 - **Platforms and layout:** The slice runs in the browser and desktop Tauri
   shell. Its core actions remain usable in compact phone and tablet landscape
@@ -2984,8 +2985,8 @@ These actors and rules are outside the M0/MVP scope.
   removes network participation, and releases every reserved footprint.
 - The resulting non-blocking wreck or debris follows the existing cleanup
   rules for the actor's current mode and presentation.
-- A level may mark the stable actor identity as mission-critical. Destroying it
-  causes hard defeat regardless of its mode. A mobile Command Center crawler
+- A mission may mark the stable actor identity as mission-critical. Destroying
+  it causes hard defeat regardless of its mode. A mobile Command Center crawler
   therefore remains the same critical headquarters while moving.
 - Mobile units, vehicles, and deployable actors in mobile mode cannot be sold.
   Only ordinary completed buildings and fully deployed actors are eligible.
@@ -3218,7 +3219,7 @@ Stealth and detection are outside the M0/MVP scope.
 **State:** Resolved for the full game; excluded from M0.
 
 Track combat contribution so surviving combat actors can earn offensive bonuses
-and a visible rank through repeated kills during a level.
+and a visible rank through repeated kills during a mission.
 
 #### Kill-credit rule
 
@@ -3302,19 +3303,19 @@ and a visible rank through repeated kills during a level.
 - Unarmed buildings cannot contribute, although all buildings remain eligible
   targets for attackers' kill credit.
 
-#### Resolved follow-up: Does veterancy persist between levels?
+#### Resolved follow-up: Does veterancy persist between missions?
 
-- Veterancy is earned and used within one level. It does not transfer from one
-  campaign level to another.
+- Veterancy is earned and used within one mission. It does not transfer from
+  one campaign mission to another.
 - Every newly produced or otherwise newly introduced actor starts with zero
   credited kills and no veteran rank.
-- A level definition or mission script may explicitly create a prebuilt actor
+- A mission definition or mission script may explicitly create a prebuilt actor
   with a specified kill count or rank when the scenario requires it. This is a
   deliberate content exception, not a general way to purchase or deploy new
   veteran actors.
-- Level saves preserve current kill counts and ranks because they are part of
+- Mission saves preserve current kill counts and ranks because they are part of
   the active simulation snapshot.
-- Restarting restores the level's initial scripted values. Destroying an actor
+- Restarting restores the mission's initial scripted values. Destroying an actor
   or selling an eligible building or fully deployed actor removes its current
   veterancy. Any replacement starts at zero unless explicitly scripted
   otherwise.
@@ -3368,7 +3369,7 @@ and a visible rank through repeated kills during a level.
 
 #### Difficulty modes
 
-- Both campaigns and their individual levels support **Easy**, **Normal**, and
+- Both campaigns and their individual missions support **Easy**, **Normal**, and
   **Hard**.
 - **Easy:** Enemies use `sqrt(0.5)`, approximately 70.71%, of their Normal
   health and damage. The two factors combine to an approximately 50% combat
@@ -3392,31 +3393,32 @@ and a visible rank through repeated kills during a level.
 
 - The player chooses a default difficulty when starting a campaign, and the
   campaign save stores that preference.
-- Before each level, the difficulty selector starts at the campaign default but
-  allows a one-level override.
-- Overriding one level does not silently change the campaign default.
-- A level save stores the effective difficulty and concrete scaling parameters
-  used when that level began. Changing the campaign default later does not
-  alter existing level saves.
+- Before each mission, the difficulty selector starts at the campaign default
+  but allows a one-mission override.
+- Overriding one mission does not silently change the campaign default.
+- A mission save stores the effective difficulty and concrete scaling parameters
+  used when that mission began. Changing the campaign default later does not
+  alter existing mission saves.
 
-#### Resolved follow-up: Can difficulty change during a level?
+#### Resolved follow-up: Can difficulty change during a mission?
 
 - Difficulty never rescales a battle already in progress.
 - The pause menu offers **Change Difficulty and Restart**, which discards the
-  current runtime state and reconstructs the level at the newly selected
+  current runtime state and reconstructs the mission at the newly selected
   difficulty.
-- Existing manual, quick, and automatic level saves retain the difficulty on
-  which they were created and do not change when the level is restarted at
+- Existing manual, quick, and automatic mission saves retain the difficulty on
+  which they were created and do not change when the mission is restarted at
   another setting.
 
 #### Resolved follow-up: Does difficulty affect progression or rewards?
 
 - Easy, Normal, and Hard all grant full campaign progress, story access, and
   gameplay unlocks.
-- Difficulty does not alter level resources, unit unlocks, or campaign rewards.
-- The campaign save records the highest difficulty completed for each level.
-- Completing a level on Hard also satisfies Normal and Easy completion records;
-  completing it on Normal also satisfies Easy.
+- Difficulty does not alter mission resources, unit unlocks, or campaign
+  rewards.
+- The campaign save records the highest difficulty completed for each mission.
+- Completing a mission on Hard also satisfies Normal and Easy completion
+  records; completing it on Normal also satisfies Easy.
 - Difficulty-specific achievements may use those records later without locking
   gameplay content behind a difficulty setting.
 - No score multiplier is required unless a later design introduces a formal
@@ -3646,11 +3648,11 @@ changes, support-network behavior, destruction, resale, and save data.
 - Each building type defines a finite number of upgrade tiers. The number may
   differ by building, and some buildings have no upgrades.
 - Campaign progression determines the highest tier that may be installed for
-  each building type. Early campaign levels may permit no upgrades at all.
+  each building type. Early campaign missions may permit no upgrades at all.
 - That campaign unlock is only an availability cap. Purchased and installed
-  upgrades belong to the current level and are not carried into the next one.
-  A level script may still place a building at a specified tier.
-- A newly constructed replacement begins unupgraded unless the level script
+  upgrades belong to the current mission and are not carried into the next one.
+  A mission script may still place a building at a specified tier.
+- A newly constructed replacement begins unupgraded unless the mission script
   says otherwise. A deployable building retains its installed upgrades while
   changing between its mobile and deployed modes.
 - An installed upgrade may improve the building itself or grant a
@@ -3665,7 +3667,7 @@ changes, support-network behavior, destruction, resale, and save data.
   technology-tree progression.
 - Q8's sale basis includes the building's construction cost and every
   completed, installed upgrade cost. Campaign unlocks add no resale value.
-- Level saves record each building's installed tier and any in-progress
+- Mission saves record each building's installed tier and any in-progress
   upgrade state. Campaign saves record the maximum tiers unlocked through
   campaign progression.
 
@@ -3801,10 +3803,10 @@ distribution, and how saves identify required mods.
 - Read-only inspection commands do not affect campaign eligibility.
 - Before the first state-changing console command, the game warns the player
   that the current session will be marked modified. The marker persists in
-  level saves made from that session.
+  mission saves made from that session.
 - Modified saves remain playable and saveable but cannot award official
   campaign completion, achievements, or progression unlocks. Loading a clean
-  save or restarting the level without state-changing console use restores
+  save or restarting the mission without state-changing console use restores
   eligibility.
 
 #### Resolved Q28 follow-up: How are mods packaged?

@@ -65,7 +65,25 @@ The core game remains browser-runnable. Tauri-specific functionality must stay
 behind platform-service boundaries so simulation, rendering, and UI remain
 portable.
 
-## Core match
+The simulation advances in fixed ticks counted from real time, independent of
+rendering. Players, NPC AI, and mission scripts change actors only through
+serializable commands queued for the start of the next tick. Rendering
+interpolates between immutable states from the last two committed ticks. A tick
+commits atomically; invalid behavior output faults and stops the simulation
+without publishing partial state.
+
+## Mission terminology
+
+- A campaign is a faction's long-form narrative and progression.
+- A story point is a campaign beat that may contain dialogue, choices, and one
+  or more missions.
+- A mission is one authored, playable scenario. It owns objectives, scripts,
+  result, free play, saves, restart, and replay.
+- A scenario is the immutable authored setup from which a mission starts.
+- A session is one continuous runtime instance of a mission. It is not the
+  general name for playable content.
+
+## Core mission
 
 The traditional RTS loop is to establish a base, gather resources, construct
 production, train forces, scout, expand, and defeat mission opposition. The
@@ -172,8 +190,9 @@ story.
 - A transformation requiring a different footprint is a separate building type
   rather than an upgrade tier.
 - Campaign progression unlocks the maximum tier available for each building
-  type. Installed upgrades remain local to the current level and do not carry
-  into later levels; a level script may explicitly place an upgraded building.
+  type. Installed upgrades remain local to the current mission and do not carry
+  into later missions; a mission script may explicitly place an upgraded
+  building.
 - Replacements begin unupgraded unless scripted. Deployable buildings retain
   their installed upgrades when changing modes.
 - An upgrade may improve its building or provide a faction-wide capability while
@@ -183,7 +202,7 @@ story.
   Barracks upgrades may unlock advanced units; Radar upgrades may extend range
   or add detectable kinds. Building upgrades remain distinct from permanent
   research and technology-tree progression.
-- Level saves store installed tiers and in-progress upgrade state. Campaign
+- Mission saves store installed tiers and in-progress upgrade state. Campaign
   saves store the maximum tiers unlocked by campaign progression.
 - The full upgrade cost is paid when it enters the shared infrastructure queue.
   Active upgrading consumes one slot, while waiting work does not. Each building
@@ -228,7 +247,7 @@ story.
   errors while exposing approved inspection and deterministic command APIs,
   never an unrestricted code or operating-system shell.
 - Read-only console use has no progression consequence. The first state-changing
-  command warns the player and permanently marks that level session and its
+  command warns the player and permanently marks that mission session and its
   derived saves as modified. Those saves remain usable but cannot award official
   completion, achievements, or progression unlocks; returning to a clean save or
   restart restores eligibility.
@@ -260,7 +279,7 @@ story.
   preserves the player's zoom. Direct panning has no momentum.
 - The sidebar owns selection details, contextual actions, construction and
   production, queues, and a keyboard-free Cancel action.
-- The top bar owns the game menu, resources, objectives, alerts, elapsed level
+- The top bar owns the game menu, resources, objectives, alerts, elapsed mission
   time, and single-player pause and speed controls.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
@@ -277,6 +296,8 @@ story.
   between neighbors. Tile and map-boundary lines are optional debug overlays.
 - Terrain textures repeat by wrapping, so authored tiles must have matching
   opposite edges.
+- Tile type IDs resolve one canonical visual definition. Conflicting definitions
+  with the same ID are invalid content.
 - Scrolling textures and future frame-based terrain animation are rendering
   effects and do not enter deterministic terrain state.
 - Trusted game code may mutate terrain and report affected tile bounds.
@@ -359,8 +380,8 @@ story.
 - Easy, Normal, and Hard are independent of campaign choice. Easy multiplies
   enemy health and damage by `sqrt(0.5)`; Hard uses `sqrt(2)`; Normal is the
   baseline. Other behavior is unchanged unless explicitly revised.
-- Difficulty may be overridden per level. Changing it during play restarts the
-  level; existing level saves retain their original difficulty.
+- Difficulty may be overridden per mission. Changing it during play restarts
+  the mission; existing mission saves retain their original difficulty.
 
 ## Combat and veterancy
 
@@ -373,11 +394,11 @@ story.
   two contributors can qualify.
 - Healing removes damage contributions proportionally. Dead contributors remain
   in the denominator but cannot receive promotions.
-- Veterancy is level-local: 10 kills grants +25% base damage; 25 adds +25% base
-  attack speed; 50 raises damage to +50%; 100 raises speed to +50%; 200 raises
-  both to +75%.
+- Veterancy is mission-local: 10 kills grants +25% base damage; 25 adds +25%
+  base attack speed; 50 raises damage to +50%; 100 raises speed to +50%; 200
+  raises both to +75%.
 - Five purpose-made SVG badges appear on promoted actors. New actors begin at
-  zero unless a level script explicitly specifies otherwise.
+  zero unless a mission script explicitly specifies otherwise.
 
 ## NPC AI
 
@@ -405,7 +426,8 @@ story.
 ## Milestone 0 playable slice
 
 M0 is a canon-compatible standalone ARC prototype, not the canonical first
-campaign level or a literal tutorial. It is the minimum viable level from which
+campaign mission or a literal tutorial. It is the minimum viable mission from
+which
 a later tutorial could be made.
 
 - A fixed **Command Center** starts in a safe map-edge pocket.
@@ -435,12 +457,13 @@ a later tutorial could be made.
 
 ## Persistence
 
-- Level definitions are immutable content; level saves are mutable runtime
-  snapshots with stable actor identifiers and versioned envelopes.
+- Scenario definitions are immutable content; mission saves are mutable runtime
+  snapshots with stable actor identifiers and versioned envelopes. Actor IDs
+  are never reassigned within a mission, including after saving and loading.
 - Manual save, load, restart, one rolling quicksave, and one rolling autosave
   are required in M0. Loading begins paused.
-- Level and campaign saves are separate schemas. A level save owns one mission
-  snapshot; a campaign save owns longer-lived choices and progression.
+- Mission and campaign saves are separate schemas. A mission save owns one
+  mission snapshot; a campaign save owns longer-lived choices and progression.
 - Authoritative simulation state is serialized. Rendering objects, cached paths,
   effects, and platform handles are reconstructed.
 - Implemented systems preserve passenger identities, occupancy transitions,
@@ -452,7 +475,7 @@ a later tutorial could be made.
 ## Open decisions
 
 - **Factions and campaigns**
-  - Full rosters, counters, faction motifs, technologies, and campaign levels.
+  - Full rosters, counters, faction motifs, technologies, and campaign missions.
   - Exact Everwake resource, citadel, cache, and reveal details.
   - Alliance-only units or abilities and the later skirmish structure.
 - **Maps and world systems**
