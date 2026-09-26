@@ -14,6 +14,8 @@ awaken the deathless Everwake, eventually requiring an uneasy alliance.
 - [Roadmap](ROADMAP.md) — milestones and implementation work.
 - [Design questionnaire](docs/design-questionnaire.md) — detailed rationale,
   alternatives, and queued design questions.
+- [Actor assets](docs/actor-assets.md) — infantry GLB generation and rig
+  contract.
 
 ## Development
 

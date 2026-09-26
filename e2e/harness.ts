@@ -15,7 +15,7 @@ import type { GameViewOptions } from "../src/render";
 
 export { createMinimap } from "../src/render";
 export { minimapProjection } from "../src/render/minimap";
-export { Matrix, Vector3 } from "@babylonjs/core";
+export { EngineStore, Matrix, Vector3 } from "@babylonjs/core";
 
 export const TEST_VIEW_OPTIONS = {
   clearColor: new Color3(0.035, 0.07, 0.09),

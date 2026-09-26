@@ -60,6 +60,8 @@ the crisis their conflict helped release.
 - Package manager: npm
 - Language: TypeScript
 - 3D rendering: Babylon.js
+- Actor models and skeletal clips: glTF 2.0 binary assets (`.glb`), referenced
+  by actor graphics definitions. Keep editor source files for authored assets.
 
 The core game remains browser-runnable. Tauri-specific functionality must stay
 behind platform-service boundaries so simulation, rendering, and UI remain

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import type { Page } from "@playwright/test";
+import type { AbstractMesh } from "@babylonjs/core";
 import type { GameView } from "../src/render";
 
 type ActorInteractionTest = {
@@ -30,6 +31,84 @@ async function openHarness(page: Page): Promise<void> {
   });
 }
 
+test("starts with stand-ins while actor models load", async ({ page }) => {
+  let releaseLoads = () => {};
+  const heldLoads = new Promise<void>((resolve) => {
+    releaseLoads = resolve;
+  });
+  let actorRequests = 0;
+  await page.route("**/assets/actors/*.glb", async (route) => {
+    actorRequests += 1;
+    await heldLoads;
+    await route.continue();
+  });
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const canvas = page.locator("#game-canvas");
+  await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+  await expect(canvas).toHaveAttribute("data-actor-ready", "true");
+  await expect.poll(() => actorRequests).toBeGreaterThan(0);
+  expect(
+    await page.evaluate(async () => {
+      const harnessPath: string = "/e2e/harness.ts";
+      const { EngineStore } = await import(harnessPath);
+      const scene = EngineStore.Instances[0].scenes[0];
+      return scene
+        .getTransformNodeByName("actor-prototype-trooper-root")!
+        .getChildMeshes()
+        .every((mesh: AbstractMesh) => mesh.skeleton === null);
+    }),
+  ).toBe(true);
+
+  releaseLoads();
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        const harnessPath: string = "/e2e/harness.ts";
+        const { EngineStore } = await import(harnessPath);
+        const scene = EngineStore.Instances[0].scenes[0];
+        return scene
+          .getTransformNodeByName("actor-prototype-trooper-root")!
+          .getChildMeshes()
+          .some((mesh: AbstractMesh) => mesh.skeleton !== null);
+      }),
+    )
+    .toBe(true);
+});
+
+test("replaces each stand-in when its own model loads", async ({ page }) => {
+  let releaseScout = () => {};
+  const heldScout = new Promise<void>((resolve) => {
+    releaseScout = resolve;
+  });
+  await page.route("**/assets/actors/arc-scout.glb", async (route) => {
+    await heldScout;
+    await route.continue();
+  });
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-actor-ready",
+    "true",
+  );
+  const hasSkin = (actorId: string) =>
+    page.evaluate(async (id) => {
+      const harnessPath: string = "/e2e/harness.ts";
+      const { EngineStore } = await import(harnessPath);
+      const scene = EngineStore.Instances[0].scenes[0];
+      return scene
+        .getTransformNodeByName(`actor-${id}-root`)
+        ?.getChildMeshes()
+        .some((mesh: AbstractMesh) => mesh.skeleton !== null);
+    }, actorId);
+
+  await expect.poll(() => hasSkin("prototype-trooper")).toBe(true);
+  expect(await hasSkin("prototype-scout")).toBe(false);
+
+  releaseScout();
+  await expect.poll(() => hasSkin("prototype-scout")).toBe(true);
+});
+
 test("clicking a selected actor issues direct terrain movement", async ({
   page,
 }) => {
@@ -50,11 +129,23 @@ test("clicking a selected actor issues direct terrain movement", async ({
       height: "480px",
     });
     document.body.append(canvas, minimap);
-    const view = createTerrainPrototype(canvas, minimap);
+    const view = (await createTerrainPrototype(canvas, minimap)) as GameView;
     await frames(2);
 
-    const trooper = view.scene.getMeshByName("actor-prototype-trooper")!;
-    const scout = view.scene.getMeshByName("actor-prototype-scout")!;
+    const trooper = view.scene.getTransformNodeByName(
+      "actor-prototype-trooper-root",
+    )!;
+    const scout = view.scene.getTransformNodeByName(
+      "actor-prototype-scout-root",
+    )!;
+    const trooperSkin = trooper.getChildMeshes().find((mesh) => mesh.skeleton)!;
+    const scoutSkin = scout.getChildMeshes().find((mesh) => mesh.skeleton)!;
+    const rigsIndependent =
+      trooperSkin.skeleton !== scoutSkin.skeleton &&
+      trooperSkin
+        .skeleton!.bones.find((bone) => bone.name === "left-leg")!
+        .getTransformNode()!
+        .isDescendantOf(trooper);
     const pointOnScreen = (
       point: ReturnType<typeof trooper.getAbsolutePosition>,
     ) => {
@@ -74,8 +165,12 @@ test("clicking a selected actor issues direct terrain movement", async ({
           projected.y * (canvas.clientHeight / view.engine.getRenderHeight()),
       };
     };
-    const trooperScreen = pointOnScreen(trooper.getAbsolutePosition());
-    const scoutScreen = pointOnScreen(scout.getAbsolutePosition());
+    const trooperScreen = pointOnScreen(
+      trooper.getAbsolutePosition().add(new Vector3(0, 1.3, 0)),
+    );
+    const scoutScreen = pointOnScreen(
+      scout.getAbsolutePosition().add(new Vector3(0, 1.1, 0)),
+    );
     const trooperTarget = new Vector3(4, 0, -10);
     const scoutTarget = new Vector3(0, 0, -5);
     window.actorInteractionTest = {
@@ -86,12 +181,15 @@ test("clicking a selected actor issues direct terrain movement", async ({
       view,
     };
     return {
+      rigsIndependent,
       scout: scoutScreen,
       scoutTerrain: pointOnScreen(scoutTarget),
       trooper: trooperScreen,
       trooperTerrain: pointOnScreen(trooperTarget),
     };
   });
+
+  expect(targets.rigsIndependent).toBe(true);
 
   await page.mouse.click(targets.trooper.clientX, targets.trooper.clientY);
   await page.waitForFunction(
@@ -117,13 +215,37 @@ test("clicking a selected actor issues direct terrain movement", async ({
   await page.waitForFunction(
     () => window.actorInteractionTest?.canvas.dataset.actorTarget !== undefined,
   );
+  const legSwing = await page.evaluate(async () => {
+    const scene = window.actorInteractionTest!.view.scene;
+    const mesh = scene
+      .getTransformNodeByName("actor-prototype-trooper-root")!
+      .getChildMeshes()
+      .find((candidate) => candidate.skeleton)!;
+    const leg = mesh
+      .skeleton!.bones.find((bone) => bone.name === "left-leg")!
+      .getTransformNode()!;
+    let largestRotation = 0;
+    for (let frame = 0; frame < 20; frame++) {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      largestRotation = Math.max(
+        largestRotation,
+        Math.abs(leg.rotationQuaternion?.x ?? 0),
+      );
+    }
+    return largestRotation;
+  });
+  expect(legSwing).toBeGreaterThan(0.04);
   await page.waitForFunction(() => {
     const test = window.actorInteractionTest;
     if (!test) {
       return false;
     }
 
-    const trooper = test.view.scene.getMeshByName("actor-prototype-trooper");
+    const trooper = test.view.scene.getTransformNodeByName(
+      "actor-prototype-trooper-root",
+    );
     return (
       trooper !== null && trooper.getAbsolutePosition().x > test.initialTrooperX
     );
@@ -144,14 +266,20 @@ test("clicking a selected actor issues direct terrain movement", async ({
       return false;
     }
 
-    const scout = test.view.scene.getMeshByName("actor-prototype-scout");
+    const scout = test.view.scene.getTransformNodeByName(
+      "actor-prototype-scout-root",
+    );
     return scout !== null && scout.getAbsolutePosition().x < test.initialScoutX;
   });
 
   const result = await page.evaluate(() => {
     const test = window.actorInteractionTest!;
-    const trooper = test.view.scene.getMeshByName("actor-prototype-trooper")!;
-    const scout = test.view.scene.getMeshByName("actor-prototype-scout")!;
+    const trooper = test.view.scene.getTransformNodeByName(
+      "actor-prototype-trooper-root",
+    )!;
+    const scout = test.view.scene.getTransformNodeByName(
+      "actor-prototype-scout-root",
+    )!;
     const result = {
       selected: test.canvas.dataset.actorSelected,
       selectedActor: test.canvas.dataset.selectedActor,

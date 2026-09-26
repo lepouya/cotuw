@@ -14,9 +14,11 @@ import {
   createGameView,
   createMinimap,
   createActorViewRegistry,
+  createMeshAppearance,
   createTerrainMeshes,
 } from "./render";
 import { createActor } from "./simulation/actor";
+import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
 import { startSimulationLoop } from "./simulation/loop";
 import {
   createMissionSimulation,
@@ -25,12 +27,7 @@ import {
 
 import type { Scene } from "@babylonjs/core";
 import type { TileLayer, TileType } from "./map";
-import type {
-  ActorAppearance,
-  ActorAppearanceCatalog,
-  GameView,
-  GameViewOptions,
-} from "./render";
+import type { ActorAppearance, GameView, GameViewOptions } from "./render";
 import type { Actor, ActorBehavior, ActorDefinition } from "./simulation/actor";
 
 const TILE_COUNT = 100;
@@ -96,11 +93,33 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
     id: "arc-trooper",
     behaviorId: "direct-move",
     movement: { speed: 4 },
+    graphics: {
+      url: "/assets/actors/arc-trooper.glb",
+      minimapColor: [0.82, 0.28, 0.1],
+      bounds: { radius: 0.45, height: 1.95 },
+      clips: {
+        idle: "idle",
+        locomotion: "walk",
+        turn: { left: "turn-left", right: "turn-right" },
+      },
+      cycleDistance: 2.1,
+    },
   },
   {
     id: "arc-scout",
     behaviorId: "direct-move",
     movement: { speed: 7 },
+    graphics: {
+      url: "/assets/actors/arc-scout.glb",
+      minimapColor: [0.12, 0.62, 0.82],
+      bounds: { radius: 0.4, height: 1.65 },
+      clips: {
+        idle: "idle",
+        locomotion: "walk",
+        turn: { left: "turn-left", right: "turn-right" },
+      },
+      cycleDistance: 1.5,
+    },
   },
 ] satisfies readonly ActorDefinition[];
 
@@ -167,10 +186,10 @@ export const PROTOTYPE_VIEW_OPTIONS = {
   },
 } satisfies GameViewOptions;
 
-export function createTerrainPrototype(
+export async function createTerrainPrototype(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
-): GameView {
+): Promise<GameView> {
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
@@ -182,7 +201,7 @@ export function createTerrainPrototype(
     definitions: PROTOTYPE_ACTOR_DEFINITIONS,
     tickSeconds: SIMULATION_TICK_SECONDS,
   });
-  const appearances = createPrototypeActorAppearances(view.scene);
+  const appearances = createPrototypeStandInAppearances(view.scene);
   const actorViews = createActorViewRegistry(view.scene, map, appearances);
   actorViews.update(simulation.actors, 1);
   const input = createCommandInput(canvas, view.scene, {
@@ -242,49 +261,61 @@ export function createTerrainPrototype(
     input.dispose();
     view.scene.onBeforeRenderObservable.remove(renderObserver);
     actorViews.dispose();
+    for (const appearance of appearances.values()) appearance.dispose();
   });
 
-  view.scene.executeWhenReady(() => {
+  view.scene.onAfterRenderObservable.addOnce(() => {
     canvas.dataset.terrainReady = "true";
     canvas.dataset.actorReady = "true";
   });
+
+  await Promise.all(
+    PROTOTYPE_ACTOR_DEFINITIONS.map(async ({ id, graphics }) => {
+      let appearance: ActorAppearance;
+      try {
+        appearance = await loadSkinnedActorAppearance(view.scene, graphics);
+      } catch (error) {
+        console.error(`Actor ${id} uses a stand-in model.`, error);
+        return;
+      }
+      if (view.scene.isDisposed) {
+        appearance.dispose();
+        return;
+      }
+      const previous = appearances.get(id);
+      appearances.set(id, appearance);
+      actorViews.update(simulation.actors, loop.tickProgress());
+      previous?.dispose();
+    }),
+  );
   return view;
 }
 
-function createPrototypeActorAppearances(scene: Scene): ActorAppearanceCatalog {
-  return new Map([
-    [
-      "arc-trooper",
-      placeholderAppearance(scene, "arc-trooper", [0.82, 0.28, 0.1], 1.4),
-    ],
-    [
-      "arc-scout",
-      placeholderAppearance(scene, "arc-scout", [0.12, 0.62, 0.82], 0.9),
-    ],
-  ]);
-}
-
-/** A colored box standing on its origin, until real models exist. */
-function placeholderAppearance(
+function createPrototypeStandInAppearances(
   scene: Scene,
-  definitionId: string,
-  color: [number, number, number],
-  height: number,
-): ActorAppearance {
-  const mesh = MeshBuilder.CreateBox(
-    `actor-template-${definitionId}`,
-    { width: 0.7, height, depth: 0.7 },
-    scene,
+): Map<string, ActorAppearance> {
+  return new Map(
+    PROTOTYPE_ACTOR_DEFINITIONS.map(({ id, graphics }) => {
+      const { radius, height } = graphics.bounds;
+      const mesh = MeshBuilder.CreateBox(
+        `actor-template-${id}`,
+        { width: radius * 1.4, height, depth: radius * 1.4 },
+        scene,
+      );
+      mesh.position.y = height / 2;
+      const material = new StandardMaterial(
+        `actor-template-${id}-material`,
+        scene,
+      );
+      material.diffuseColor = new Color3(...graphics.minimapColor);
+      material.specularColor = new Color3(0.12, 0.12, 0.12);
+      mesh.material = material;
+      return [
+        id,
+        createMeshAppearance(mesh, graphics.bounds, graphics.minimapColor),
+      ];
+    }),
   );
-  mesh.position.y = height / 2;
-  const material = new StandardMaterial(
-    `actor-template-${definitionId}-material`,
-    scene,
-  );
-  material.diffuseColor = new Color3(...color);
-  material.specularColor = new Color3(0.12, 0.12, 0.12);
-  mesh.material = material;
-  return { mesh, minimapColor: color };
 }
 
 function createPrototypeActors(map: TerrainMap): Actor[] {

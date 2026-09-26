@@ -32,3 +32,9 @@ export function clampToBounds(
     z: Math.min(Math.max(z, minZ), maxZ),
   };
 }
+
+/** Signed radians from one facing to another, turning the short way round. */
+export function shortestTurn(from: number, to: number): number {
+  const turn = to - from;
+  return turn - Math.PI * 2 * Math.round(turn / (Math.PI * 2));
+}

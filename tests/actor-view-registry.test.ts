@@ -1,18 +1,23 @@
 import {
   MeshBuilder,
   NullEngine,
+  Ray,
   Scene,
   StandardMaterial,
+  TransformNode,
+  Vector3,
 } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { TerrainMap } from "../src/map";
+import { createMeshAppearance, stableUnit } from "../src/render/actor";
 import {
   createActorViewRegistry,
   interpolatePose,
 } from "../src/render/actor-view-registry";
 
-import type { ActorPose } from "../src/render/actor";
+import type { ActorAppearance, ActorPose } from "../src/render/actor";
+import type { ActorMotion } from "../src/render/actor-gait";
 import type { ActorRenderState } from "../src/simulation/actor";
 
 function pose(x: number, z: number, facing: number): ActorPose {
@@ -59,19 +64,22 @@ describe("interpolatePose", () => {
 });
 
 describe("actor view registry", () => {
-  function setup() {
+  function setup(appearance?: (scene: Scene) => ActorAppearance) {
     const engine = new NullEngine();
     const scene = new Scene(engine);
     const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
     const template = MeshBuilder.CreateBox("template", { size: 1 }, scene);
     template.position.y = 0.5;
     template.material = new StandardMaterial("template-material", scene);
-    const views = createActorViewRegistry(
-      scene,
-      map,
-      new Map([["trooper", { mesh: template }]]),
-    );
-    return { engine, scene, template, views };
+    const appearances = new Map([
+      [
+        "trooper",
+        appearance?.(scene) ??
+          createMeshAppearance(template, { radius: 0.5, height: 1 }),
+      ],
+    ]);
+    const views = createActorViewRegistry(scene, map, appearances);
+    return { appearances, engine, scene, template, views };
   }
 
   test("clones the appearance mesh and hides the template", () => {
@@ -96,7 +104,9 @@ describe("actor view registry", () => {
 
     views.update([{ ...actor("odd"), definitionId: "unknown" }], 1);
 
-    expect(views.actorIdForMesh(scene.getMeshByName("actor-odd"))).toBe("odd");
+    expect(views.actorIdForMesh(scene.getMeshByName("actor-odd-pick"))).toBe(
+      "odd",
+    );
 
     views.dispose();
     engine.dispose();
@@ -118,16 +128,40 @@ describe("actor view registry", () => {
     engine.dispose();
   });
 
+  test("rebuilds a view when its appearance finishes loading", () => {
+    const { appearances, engine, scene, views } = setup();
+    views.update([actor("a")], 1);
+    views.setSelectedActor("a");
+    const standIn = scene.getMeshByName("actor-a")!;
+
+    const loaded = MeshBuilder.CreateSphere("loaded", {}, scene);
+    loaded.material = new StandardMaterial("loaded-material", scene);
+    const loadedAppearance = createMeshAppearance(loaded, {
+      radius: 0.4,
+      height: 1.2,
+    });
+    appearances.set("trooper", loadedAppearance);
+    views.update([actor("a")], 1);
+
+    expect(standIn.isDisposed()).toBe(true);
+    expect(scene.getMeshByName("actor-a")!.material).toBe(loaded.material);
+    expect(scene.getMeshByName("actor-a-selection")!.isEnabled()).toBe(true);
+
+    views.dispose();
+    loadedAppearance.dispose();
+    engine.dispose();
+  });
+
   test("creates and removes views as actors come and go", () => {
     const { engine, scene, views } = setup();
 
     views.update([actor("a"), actor("b")], 1);
-    const meshB = scene.getMeshByName("actor-b");
-    expect(views.actorIdForMesh(meshB)).toBe("b");
+    const pickB = scene.getMeshByName("actor-b-pick");
+    expect(views.actorIdForMesh(pickB)).toBe("b");
 
     views.update([actor("a")], 1);
     expect(scene.getMeshByName("actor-b")).toBeNull();
-    expect(views.actorIdForMesh(meshB)).toBeUndefined();
+    expect(views.actorIdForMesh(pickB)).toBeUndefined();
 
     views.dispose();
     engine.dispose();
@@ -162,4 +196,81 @@ describe("actor view registry", () => {
     views.dispose();
     engine.dispose();
   });
+
+  test("picks the visible mesh and an invisible proxy sized by the bounds", () => {
+    const { engine, scene, views } = setup();
+
+    views.update([actor("a")], 1);
+    views.setSelectedActor("a");
+    const pick = scene.getMeshByName("actor-a-pick")!;
+    const ring = scene.getMeshByName("actor-a-selection")!;
+
+    expect(views.actorIdForMesh(scene.getMeshByName("actor-a"))).toBe("a");
+    expect(scene.getMeshByName("actor-a")!.isPickable).toBe(true);
+    expect(pick.isVisible).toBe(false);
+    expect(pick.getBoundingInfo().boundingBox.extendSize.y).toBeCloseTo(0.5);
+    expect(ring.getBoundingInfo().boundingBox.extendSize.x).toBeCloseTo(
+      0.5 + 0.15 + 0.03,
+    );
+
+    views.dispose();
+    engine.dispose();
+  });
+
+  test("picks model geometry outside the proxy", () => {
+    const { engine, scene, views } = setup((scene) => {
+      const mesh = MeshBuilder.CreateBox(
+        "extended-model",
+        { size: 0.2 },
+        scene,
+      );
+      mesh.position.set(0, 0.5, 1);
+      return createMeshAppearance(mesh, { radius: 0.5, height: 1 });
+    });
+    views.update([actor("a")], 1);
+
+    const ray = new Ray(new Vector3(0, 0.5, 2), new Vector3(0, 0, -1));
+    const hit = scene.pickWithRay(
+      ray,
+      (mesh) => views.actorIdForMesh(mesh) !== undefined,
+    );
+
+    expect(hit?.pickedMesh?.name).toBe("actor-a");
+    views.dispose();
+    engine.dispose();
+  });
+
+  test("animates from the rendered motion, turning the short way", () => {
+    const motions: ActorMotion[] = [];
+    const disposed: string[] = [];
+    const { engine, views } = setup((scene) => ({
+      bounds: { radius: 0.5, height: 1 },
+      instantiate: (name) => ({
+        root: new TransformNode(name, scene),
+        animate: (motion) => motions.push({ ...motion }),
+        dispose: () => disposed.push(name),
+      }),
+      dispose: () => {},
+    }));
+
+    views.update([actor("a", 0, Math.PI - 0.1)], 1);
+    views.update([actor("a", 3, -Math.PI + 0.1)], 1);
+
+    const motion = motions[motions.length - 1];
+    expect(motion.distance).toBeCloseTo(3);
+    expect(motion.turn).toBeCloseTo(0.2);
+
+    views.update([], 1);
+    expect(disposed).toEqual(["actor-a"]);
+    views.dispose();
+    engine.dispose();
+  });
+});
+
+test("stable unit values stay in range and differ between IDs", () => {
+  const values = ["a", "b", "prototype-trooper"].map(stableUnit);
+
+  expect(values.every((value) => value >= 0 && value < 1)).toBe(true);
+  expect(new Set(values).size).toBe(values.length);
+  expect(stableUnit("a")).toBe(values[0]);
 });

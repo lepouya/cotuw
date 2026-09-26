@@ -1,10 +1,13 @@
 export { createStrategyCamera, type StrategyCamera } from "./camera";
 export {
   createActorRenderer,
+  createMeshAppearance,
   type ActorAppearance,
+  type ActorInstance,
   type ActorPose,
   type ActorRenderer,
 } from "./actor";
+export { type ActorMotion } from "./actor-gait";
 export {
   createActorViewRegistry,
   type ActorAppearanceCatalog,

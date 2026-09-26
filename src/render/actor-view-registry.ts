@@ -1,8 +1,10 @@
 import { Color3, MeshBuilder, StandardMaterial } from "@babylonjs/core";
 
+import { shortestTurn } from "../simulation/world";
 import {
   actorIdForPickMesh,
   createActorRenderer,
+  createMeshAppearance,
   DEFAULT_ACTOR_COLOR,
 } from "./actor";
 
@@ -15,7 +17,7 @@ const SELECTION_COLOR = new Color3(1, 0.86, 0.44);
 /** Edge length of the stand-in cube for actors without an appearance. */
 const FALLBACK_ACTOR_SIZE = 0.6;
 
-/** Appearances keyed by actor definition ID. */
+/** Appearances keyed by actor definition ID. Changes apply on the next update. */
 export type ActorAppearanceCatalog = ReadonlyMap<string, ActorAppearance>;
 
 export type ActorViewRegistry = {
@@ -33,16 +35,13 @@ export type ActorViewRegistry = {
 
 /**
  * Owns actor presentation and maps renderer picks back to stable actor IDs.
- * Hides each appearance's template mesh; the caller still owns it.
+ * The caller still owns the appearances.
  */
 export function createActorViewRegistry(
   scene: Scene,
   map: TerrainMap,
   appearances: ActorAppearanceCatalog,
 ): ActorViewRegistry {
-  for (const { mesh } of appearances.values()) {
-    mesh.setEnabled(false);
-  }
   const selectionMaterial = new StandardMaterial(
     "actor-selection-material",
     scene,
@@ -57,7 +56,11 @@ export function createActorViewRegistry(
 
   const renderers = new Map<
     string,
-    { renderer: ActorRenderer; definitionId: string }
+    {
+      renderer: ActorRenderer;
+      definitionId: string;
+      appearance: ActorAppearance;
+    }
   >();
   const previousPoses = new Map<string, ActorPose>();
   const pose: ActorPose = { worldPosition: { x: 0, z: 0 }, facing: 0 };
@@ -68,8 +71,13 @@ export function createActorViewRegistry(
     for (const actor of actors) {
       present.add(actor.id);
       const view = renderers.get(actor.id);
-      // An ID reused for another kind of actor is a new actor to draw.
-      if (view && view.definitionId !== actor.definitionId) {
+      const appearance = appearanceFor(actor.definitionId);
+      // A changed kind or appearance needs a fresh set of render resources.
+      if (
+        view &&
+        (view.definitionId !== actor.definitionId ||
+          view.appearance !== appearance)
+      ) {
         remove(actor.id);
       }
       if (!renderers.has(actor.id)) {
@@ -77,13 +85,14 @@ export function createActorViewRegistry(
           scene,
           map,
           actor,
-          appearanceFor(actor.definitionId),
+          appearance,
           selectionMaterial,
         );
         renderer.setSelected(actor.id === selectedActorId);
         renderers.set(actor.id, {
           renderer,
           definitionId: actor.definitionId,
+          appearance,
         });
       }
     }
@@ -128,7 +137,7 @@ export function createActorViewRegistry(
       renderers.clear();
       previousPoses.clear();
       selectionMaterial.dispose();
-      fallback?.mesh.dispose(false, true);
+      fallback?.dispose();
     },
     setSelectedActor: (actorId) => {
       selectedActorId = actorId;
@@ -156,8 +165,10 @@ function createFallbackAppearance(scene: Scene): ActorAppearance {
   const material = new StandardMaterial("actor-fallback-material", scene);
   material.diffuseColor = new Color3(...DEFAULT_ACTOR_COLOR);
   mesh.material = material;
-  mesh.setEnabled(false);
-  return { mesh };
+  return createMeshAppearance(mesh, {
+    radius: FALLBACK_ACTOR_SIZE * Math.SQRT1_2,
+    height: FALLBACK_ACTOR_SIZE,
+  });
 }
 
 /**
@@ -181,8 +192,7 @@ export function interpolatePose(
   const { x, z } = previous.worldPosition;
   into.worldPosition.x = x + (current.worldPosition.x - x) * progress;
   into.worldPosition.z = z + (current.worldPosition.z - z) * progress;
-  const turn = current.facing - previous.facing;
-  const shortestTurn = turn - Math.PI * 2 * Math.round(turn / (Math.PI * 2));
-  into.facing = previous.facing + shortestTurn * progress;
+  into.facing =
+    previous.facing + shortestTurn(previous.facing, current.facing) * progress;
   return into;
 }

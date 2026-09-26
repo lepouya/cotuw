@@ -8,6 +8,32 @@ export type ActorDefinition = {
   movement?: {
     speed: number;
   };
+  /** Render-only; the simulation never reads it. */
+  graphics?: ActorGraphics;
+};
+
+/** How a type of actor is drawn. */
+export type ActorGraphics = {
+  /** A glTF binary (`.glb`) holding the model, skin, and clips. */
+  url: string;
+  /** Minimap marker color, in 0-1 channels. */
+  minimapColor?: [number, number, number];
+  /** A cylinder on the ground point that picking and selection use. */
+  bounds: { radius: number; height: number };
+  clips: ActorClips;
+  /** Ground units traveled during one locomotion clip cycle. */
+  cycleDistance: number;
+};
+
+/** Animation clip names within an actor's model. */
+export type ActorClips = {
+  idle: string;
+  locomotion: string;
+  /**
+   * Leans layered over idle and locomotion while turning. Each starts at the
+   * neutral pose and ends at the full lean.
+   */
+  turn?: { left: string; right: string };
 };
 
 /** Mutable, serializable runtime state for one actor. */

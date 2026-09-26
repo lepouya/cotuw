@@ -51,7 +51,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 - [x] 0.17 Define the prototype actor's simulation state, movement properties,
       target command, and deterministic update rules.
-- [ ] 0.18 Render a visible Trooper actor at its simulated world position.
+- [x] 0.18 Render a visible Trooper actor at its simulated world position.
 - [ ] 0.19 Replace the direct-motion spike with data-driven target commands and
       movement along a valid path.
 - [ ] 0.20 Provide path finding that respects terrain and occupancy, replans

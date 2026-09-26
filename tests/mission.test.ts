@@ -141,6 +141,50 @@ describe("mission definitions", () => {
       create({ id: "trooper", behaviorId: "walk", movement: { speed: -1 } }),
     ).toThrow(RangeError);
   });
+
+  test("keeps nested definition data immutable inside behaviors", () => {
+    const frozen: boolean[] = [];
+    const inspect: ActorBehavior = {
+      handleCommand: () => false,
+      update: (_target, definition) => {
+        const graphics = definition.graphics!;
+        frozen.push(
+          Object.isFrozen(graphics),
+          Object.isFrozen(graphics.bounds),
+          Object.isFrozen(graphics.minimapColor),
+          Object.isFrozen(graphics.clips),
+          Object.isFrozen(graphics.clips.turn),
+        );
+      },
+    };
+    const simulation = createMissionSimulation({
+      state: createMissionState([actor("graphic-1", "graphic")]),
+      behaviorRegistry: new Map([["inspect", inspect]]),
+      bounds,
+      definitions: [
+        {
+          id: "graphic",
+          behaviorId: "inspect",
+          graphics: {
+            url: "/actor.glb",
+            minimapColor: [1, 0.5, 0],
+            bounds: { radius: 0.5, height: 1 },
+            clips: {
+              idle: "idle",
+              locomotion: "walk",
+              turn: { left: "left", right: "right" },
+            },
+            cycleDistance: 1,
+          },
+        },
+      ],
+      tickSeconds: 1,
+    });
+
+    simulation.tick();
+
+    expect(frozen).toEqual([true, true, true, true, true]);
+  });
 });
 
 describe("mission commands", () => {

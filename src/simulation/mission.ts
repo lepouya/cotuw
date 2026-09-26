@@ -269,6 +269,17 @@ function indexDefinitions(
     if (definition.movement) {
       Object.freeze(definition.movement);
     }
+    if (definition.graphics) {
+      Object.freeze(definition.graphics.bounds);
+      if (definition.graphics.minimapColor) {
+        Object.freeze(definition.graphics.minimapColor);
+      }
+      if (definition.graphics.clips.turn) {
+        Object.freeze(definition.graphics.clips.turn);
+      }
+      Object.freeze(definition.graphics.clips);
+      Object.freeze(definition.graphics);
+    }
     Object.freeze(definition);
     definitionsById.set(definition.id, definition);
   }
