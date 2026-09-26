@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "assets:infantry": "node --no-experimental-webstorage scripts/generate-infantry.ts",
     "build": "npm run typecheck:ts && vite build",
     "format": "npm run format:ts && npm run format:rs",
     "format:ts": "prettier --write .",
@@ -30,9 +31,11 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@babylonjs/core": "^9"
+    "@babylonjs/core": "^9",
+    "@babylonjs/loaders": "^9"
   },
   "devDependencies": {
+    "@babylonjs/serializers": "^9",
     "@playwright/test": "^1",
     "@tauri-apps/cli": "^2",
     "@types/node": "^26",
