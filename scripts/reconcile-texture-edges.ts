@@ -6,6 +6,8 @@ import { readFile, writeFile } from "node:fs/promises";
 
 import { PNG } from "pngjs";
 
+type Axis = "horizontal" | "vertical";
+
 const texturePaths = process.argv.slice(2);
 
 if (texturePaths.length === 0) {
@@ -23,7 +25,7 @@ for (const texturePath of texturePaths) {
   await writeFile(texturePath, PNG.sync.write(png));
 }
 
-function reconcileAxis(png, band, axis) {
+function reconcileAxis(png: PNG, band: number, axis: Axis): void {
   const source = Buffer.from(png.data);
   const span = axis === "horizontal" ? png.width : png.height;
   const crossSpan = axis === "horizontal" ? png.height : png.width;
@@ -42,7 +44,12 @@ function reconcileAxis(png, band, axis) {
   }
 }
 
-function pixelIndex(png, axis, along, cross) {
+function pixelIndex(
+  png: PNG,
+  axis: Axis,
+  along: number,
+  cross: number,
+): number {
   const x = axis === "horizontal" ? along : cross;
   const y = axis === "horizontal" ? cross : along;
   return (y * png.width + x) * 4;
@@ -50,7 +57,13 @@ function pixelIndex(png, axis, along, cross) {
 
 // Blends premultiplied, so color under near-transparent pixels cannot bleed
 // into the result.
-function blendPair(source, target, first, second, strength) {
+function blendPair(
+  source: Buffer,
+  target: Buffer,
+  first: number,
+  second: number,
+  strength: number,
+): void {
   const firstAlpha = source[first + 3] / 255;
   const secondAlpha = source[second + 3] / 255;
   const seamAlpha = (firstAlpha + secondAlpha) / 2;
@@ -78,6 +91,6 @@ function blendPair(source, target, first, second, strength) {
   }
 }
 
-function mix(from, to, amount) {
+function mix(from: number, to: number, amount: number): number {
   return from + (to - from) * amount;
 }

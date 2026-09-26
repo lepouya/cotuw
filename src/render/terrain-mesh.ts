@@ -425,7 +425,7 @@ function createLayerTexture(scene: Scene, graphics: TileGraphics): Texture {
   const texture = new Texture(graphics.url, scene);
   texture.hasAlpha = graphics.hasAlpha;
   // Repeating rather than mirroring, which would alternate reflected copies.
-  // Relies on matching opposite edges; see scripts/reconcile-texture-edges.mjs.
+  // Relies on matching opposite edges; see scripts/reconcile-texture-edges.ts.
   texture.wrapU = Texture.WRAP_ADDRESSMODE;
   texture.wrapV = Texture.WRAP_ADDRESSMODE;
   if (graphics.scale) {

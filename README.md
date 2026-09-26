@@ -37,7 +37,7 @@ run against WebKit to match the Tauri webview.
 
 Terrain textures repeat by wrapping, so they must tile without a seam. After
 editing one, make its opposite edges match with
-`node scripts/reconcile-texture-edges.mjs <png>...`, which rewrites the files in
+`node scripts/reconcile-texture-edges.ts <png>...`, which rewrites the files in
 place; the unit tests verify the result. Run it on freshly edited art only:
 each run blends the edge band further, so re-running it on an already
 reconciled texture degrades the art without changing the test outcome.
