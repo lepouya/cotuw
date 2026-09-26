@@ -6,7 +6,12 @@ import type {
   ActorDefinition,
   ActorRenderState,
 } from "./actor";
-import type { ActorCommand, CommandOutcome, ScheduledCommand } from "./command";
+import type { TerrainMap, TerrainState } from "../map";
+import type {
+  CommandOutcome,
+  MissionCommand,
+  ScheduledCommand,
+} from "./command";
 import type { WorldBounds } from "./world";
 
 /** The authoritative, serializable state of one playable mission. */
@@ -18,6 +23,8 @@ export type MissionState = {
   commands: ScheduledCommand[];
   /** IDs that cannot be assigned again during this mission. */
   retiredActorIds: string[];
+  /** The mission's simulation terrain; absent until the first snapshot. */
+  terrain?: TerrainState;
 };
 
 export function createMissionState(actors: readonly Actor[]): MissionState {
@@ -25,13 +32,18 @@ export function createMissionState(actors: readonly Actor[]): MissionState {
 }
 
 export type MissionSimulationOptions = {
-  /** Copied on creation, so later caller mutations cannot change the mission. */
+  /** Copied so later caller mutations cannot change the mission. */
   state: MissionState;
   /** Executable behaviors that definitions name by `behaviorId`. */
   behaviorRegistry: ReadonlyMap<string, ActorBehavior>;
   bounds: WorldBounds;
   definitions: readonly ActorDefinition[];
   tickSeconds: number;
+  /**
+   * Terrain the mission owns and changes only through terrain commands. Terrain
+   * in `state` replaces it, as when loading a save.
+   */
+  map?: TerrainMap;
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -45,12 +57,12 @@ export type MissionSimulation = {
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /** Queues a command for the next tick and returns that tick's number. */
-  submitCommand: (command: ActorCommand) => number;
+  submitCommand: (command: MissionCommand) => number;
   /** Adds a copy of the actor, validated like the initial state. */
   spawnActor: (actor: Actor) => void;
   /** Returns whether an actor with this ID existed. */
   removeActor: (id: string) => boolean;
-  /** A deep copy of the current state, for saves and replays. */
+  /** A deep copy of the current state and terrain, for saves and replays. */
   snapshot: () => MissionState;
   /**
    * Applies queued commands, then advances every actor by one tick. Outcomes
@@ -65,6 +77,7 @@ export function createMissionSimulation({
   bounds,
   definitions,
   tickSeconds,
+  map,
 }: MissionSimulationOptions): MissionSimulation {
   if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) {
     throw new RangeError(
@@ -89,6 +102,10 @@ export function createMissionSimulation({
   let actorsById = new Map<string, Actor>();
   const usedActorIds = new Set(state.retiredActorIds);
   let actorVersion = 0;
+  const definitionFor = (actor: Actor): ActorDefinition =>
+    definitionsById.get(actor.definitionId)!;
+  const behaviorFor = (actor: Actor): ActorBehavior =>
+    behaviorsById.get(definitionFor(actor).behaviorId)!;
   const ensureValidActor = (actor: Actor) => {
     if (!isFinitePosition(actor.worldPosition)) {
       throw new RangeError(`Actor ${actor.id} has an invalid world position.`);
@@ -106,6 +123,7 @@ export function createMissionSimulation({
     ) {
       throw new RangeError(`Actor ${actor.id} has an invalid move target.`);
     }
+    behaviorFor(actor).validateActor?.(actor, definitionFor(actor));
   };
   const register = (actor: Actor): Actor => {
     if (usedActorIds.has(actor.id)) {
@@ -113,26 +131,39 @@ export function createMissionSimulation({
     }
     if (!definitionsById.has(actor.definitionId)) {
       throw new Error(
-        `Actor ${actor.id} references unknown definition ${actor.definitionId}.`,
+        `Actor ${actor.id} references unknown definition ` +
+          `${actor.definitionId}.`,
       );
     }
     ensureValidActor(actor);
-    const committed = freezeActor(actor);
+    const committed = deepFreeze(actor);
     actorsById.set(committed.id, committed);
     usedActorIds.add(committed.id);
     return committed;
   };
   state.actors = freezeActors(state.actors.map(register));
+  if (state.terrain) {
+    if (!map) {
+      throw new Error("Mission state has terrain but no map to restore.");
+    }
+    map.restoreTerrainState(state.terrain);
+    // The map holds live terrain; snapshots read it back.
+    delete state.terrain;
+  }
 
-  const definitionFor = (actor: Actor): ActorDefinition =>
-    definitionsById.get(actor.definitionId)!;
-  const behaviorFor = (actor: Actor): ActorBehavior =>
-    behaviorsById.get(definitionFor(actor).behaviorId)!;
   const applyCommand = (
-    command: ActorCommand,
+    command: MissionCommand,
     tick: number,
     workingActorsById: ReadonlyMap<string, Actor>,
   ): CommandOutcome => {
+    if (command.kind === "terrain") {
+      const edit = structuredClone(command);
+      if (!map || !map.isValidTerrainEdit(edit)) {
+        return { tick, command: edit, accepted: false };
+      }
+      map.editTerrain(edit);
+      return { tick, command: edit, accepted: true };
+    }
     let appliedCommand = structuredClone(command);
     const outcome: CommandOutcome = {
       tick,
@@ -208,7 +239,13 @@ export function createMissionSimulation({
       actorVersion += 1;
       return true;
     },
-    snapshot: () => structuredClone(state),
+    snapshot: () => {
+      const snapshot = structuredClone(state);
+      if (map) {
+        snapshot.terrain = map.terrainState();
+      }
+      return snapshot;
+    },
     tick: () => {
       const workingActors = state.actors.map((actor) => structuredClone(actor));
       const workingActorsById = new Map(
@@ -229,7 +266,9 @@ export function createMissionSimulation({
         ensureValidActor(actor);
       }
 
-      const committedActors = freezeActors(workingActors.map(freezeActor));
+      const committedActors = freezeActors(
+        workingActors.map((actor) => deepFreeze(actor)),
+      );
       state = {
         tick: state.tick + 1,
         actors: committedActors,
@@ -266,35 +305,22 @@ function indexDefinitions(
         `Actor definition ${definition.id} has an invalid movement speed.`,
       );
     }
-    if (definition.movement) {
-      Object.freeze(definition.movement);
-    }
-    if (definition.graphics) {
-      Object.freeze(definition.graphics.bounds);
-      if (definition.graphics.minimapColor) {
-        Object.freeze(definition.graphics.minimapColor);
-      }
-      if (definition.graphics.clips.turn) {
-        Object.freeze(definition.graphics.clips.turn);
-      }
-      Object.freeze(definition.graphics.clips);
-      Object.freeze(definition.graphics);
-    }
-    Object.freeze(definition);
+    deepFreeze(definition);
+    behaviorRegistry
+      .get(definition.behaviorId)!
+      .validateDefinition?.(definition);
     definitionsById.set(definition.id, definition);
   }
   return definitionsById;
 }
 
 /** Prevents callers from mutating state published after a committed tick. */
-function freezeActor(actor: Actor): Actor {
-  Object.freeze(actor.worldPosition);
-  if (actor.movement) {
-    Object.freeze(actor.movement.target);
-    Object.freeze(actor.movement);
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
   }
-  Object.freeze(actor);
-  return actor;
+  return value;
 }
 
 function freezeActors(actors: Actor[]): Actor[] {

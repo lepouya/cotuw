@@ -1,6 +1,7 @@
+import type { TerrainEdit } from "../map";
 import type { WorldPosition } from "./world";
 
-/** Orders an actor straight to a target. */
+/** Orders an actor to approach a target using its movement rules. */
 export type MoveCommand = {
   kind: "move";
   actorId: string;
@@ -19,15 +20,23 @@ export type StopCommand = {
  */
 export type ActorCommand = MoveCommand | StopCommand;
 
+/**
+ * Changes a mission's simulation terrain at the start of a tick, so saves and
+ * replays capture it. An invalid edit is rejected whole.
+ */
+export type TerrainCommand = TerrainEdit & { kind: "terrain" };
+
+export type MissionCommand = ActorCommand | TerrainCommand;
+
 /** A command waiting for the start of the tick numbered `tick`. */
 export type ScheduledCommand = {
   tick: number;
-  command: ActorCommand;
+  command: MissionCommand;
 };
 
-/** Whether an actor accepted a command at the start of `tick`. */
+/** Whether the mission accepted a command at the start of `tick`. */
 export type CommandOutcome = {
   tick: number;
-  command: ActorCommand;
+  command: MissionCommand;
   accepted: boolean;
 };

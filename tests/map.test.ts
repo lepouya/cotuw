@@ -22,6 +22,37 @@ describe("TerrainMap", () => {
     expect(map.layerCount).toBe(1);
   });
 
+  test("stores simulation terrain independently from visual layers", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 2,
+      createTerrain: (x) => ({
+        typeId: x === 0 ? "path" : "cliff",
+        surfacePassable: x === 0,
+      }),
+    });
+
+    expect(map.terrainAt(0, 0)).toEqual({
+      typeId: "path",
+      surfacePassable: true,
+    });
+    expect(map.tileAtWorldPosition(-1, 0)).toEqual({ x: 0, z: 0 });
+    expect(map.tileAtWorldPosition(2, 0)).toEqual({ x: 1, z: 0 });
+    expect(map.tileCenter(1, 0)).toEqual({ x: 1, z: 0 });
+  });
+
+  test("calculates the steepest rendered triangle grade for a tile", () => {
+    const map = new TerrainMap({
+      width: 1,
+      height: 1,
+      tileSize: 2,
+      createHeight: (x, z) => (x === 1 && z === 1 ? 2 : 0),
+    });
+
+    expect(map.slopeAt(0, 0)).toBe(Math.SQRT2);
+  });
+
   test("interpolates terrain height at a continuous world position", () => {
     const map = new TerrainMap({
       width: 1,
@@ -156,5 +187,54 @@ describe("TerrainMap", () => {
 
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(bounds, expect.anything());
+    expect(map.navigationChanges.version).toBe(2);
+  });
+
+  test("tracks bounded navigation changes separately from visual changes", () => {
+    const map = new TerrainMap({ width: 3, height: 2, tileSize: 1 });
+    const first = { minX: 0, minZ: 0, maxX: 0, maxZ: 0 };
+    const second = { minX: 2, minZ: 1, maxX: 2, maxZ: 1 };
+
+    map.notifyChange(first);
+    map.notifyChange(second, { affectsNavigation: false });
+
+    expect(map.navigationChanges.version).toBe(1);
+    expect(map.navigationChanges.since(0)).toEqual([first]);
+    expect(map.navigationChanges.since(1)).toEqual([]);
+  });
+
+  test("forgets navigation changes beyond its retained history", () => {
+    const map = new TerrainMap({ width: 1, height: 1, tileSize: 1 });
+    const bounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0 };
+    for (let change = 0; change < 200; change += 1) map.notifyChange(bounds);
+
+    expect(map.navigationChanges.since(199)).toEqual([bounds]);
+    expect(map.navigationChanges.since(0)).toBeUndefined();
+    expect(map.navigationChanges.since(201)).toBeUndefined();
+  });
+
+  test("allows only declared terrain types", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 1,
+      terrainTypeIds: ["plain", "rough"],
+    });
+
+    map.setTerrain(1, 0, { typeId: "rough" });
+    expect(map.terrainAt(1, 0).typeId).toBe("rough");
+    expect(() => map.setTerrain(1, 0, { typeId: "lava" })).toThrow(
+      "Terrain type lava is not declared",
+    );
+    expect(map.terrainAt(1, 0).typeId).toBe("rough");
+    expect(
+      () =>
+        new TerrainMap({
+          width: 1,
+          height: 1,
+          tileSize: 1,
+          terrainTypeIds: ["rough"],
+        }),
+    ).toThrow("Terrain type plain is not declared");
   });
 });

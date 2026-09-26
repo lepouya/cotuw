@@ -7,6 +7,8 @@ export type ActorDefinition = {
   behaviorId: string;
   movement?: {
     speed: number;
+    /** Resolves terrain rules outside actor state. */
+    profileId?: string;
   };
   /** Render-only; the simulation never reads it. */
   graphics?: ActorGraphics;
@@ -43,19 +45,35 @@ export type Actor = {
   worldPosition: WorldPosition;
   /** Radians clockwise from the world's positive Z axis. */
   facing: number;
-  /** Present only while a movement-capable actor has a direct move order. */
-  movement?: {
-    target: WorldPosition;
-  };
+  /** Present only while a movement-capable actor has an active move order. */
+  movement?: MovementOrder;
 };
 
-/** The immutable subset of actor state a renderer needs to present an actor. */
-export type ActorRenderState = {
-  readonly id: string;
-  readonly definitionId: string;
-  readonly worldPosition: Readonly<WorldPosition>;
-  readonly facing: number;
+/** A move order and the route its behavior is following. */
+export type MovementOrder = {
+  target: WorldPosition;
+  /** The target or closest reachable point this route will actually reach. */
+  destination?: WorldPosition;
+  /** False when `destination` is only an approach to the requested target. */
+  reachedTarget?: boolean;
+  /** Stops retries until navigation changes after a route becomes blocked. */
+  blocked?: boolean;
+  /** Route points; absent on legacy or behavior-specific orders. */
+  waypoints?: WorldPosition[];
+  waypointIndex?: number;
+  navigationVersion?: number;
 };
+
+type DeepReadonly<T> = T extends readonly (infer Item)[]
+  ? readonly DeepReadonly<Item>[]
+  : T extends object
+    ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
+    : T;
+
+/** The immutable subset of actor state a renderer needs to present an actor. */
+export type ActorRenderState = DeepReadonly<
+  Pick<Actor, "id" | "definitionId" | "worldPosition" | "facing" | "movement">
+>;
 
 export type ActorOptions = {
   id: string;
@@ -91,4 +109,8 @@ export type ActorBehavior = {
     command: ActorCommand,
   ) => boolean;
   update: (actor: Actor, definition: ActorDefinition, seconds: number) => void;
+  /** Throws when a definition cannot run this behavior. */
+  validateDefinition?: (definition: ActorDefinition) => void;
+  /** Throws when behavior-owned actor state is invalid. */
+  validateActor?: (actor: Actor, definition: ActorDefinition) => void;
 };
