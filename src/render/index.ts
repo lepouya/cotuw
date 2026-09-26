@@ -40,6 +40,7 @@ export {
   type MinimapActor,
   type MinimapOptions,
 } from "./minimap";
+export { createMovementPathView, type MovementPathView } from "./movement-path";
 export {
   createTerrainMeshes,
   isTerrainPickMesh,
