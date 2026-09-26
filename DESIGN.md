@@ -274,6 +274,10 @@ story.
   queued-order modes, and on-screen camera controls.
 - Move, Attack, Attack Move, Clear, Gather, Collect, Board, Unload, Focus, and
   Follow appear only where applicable and use shape as well as color.
+- A selected mobile actor with an active route shows a ground-hugging dotted
+  path to its resolved destination. If that destination differs from the
+  requested point, the requested point uses a distinct blocked marker. A
+  rejected move order briefly shows the same marker at its target.
 - The camera provides orthographic Isometric, Top-down, Grid, and Reset View
   presets. Preset and focus changes ease unless reduced motion is enabled.
 - Camera zoom is measured in visible tile rows so framing is independent of map
@@ -302,11 +306,37 @@ story.
   with the same ID are invalid content.
 - Scrolling textures and future frame-based terrain animation are rendering
   effects and do not enter deterministic terrain state.
-- Trusted game code may mutate terrain and report affected tile bounds.
-  Renderers batch those reports by frame and rebuild only affected chunks while
-  preserving shared material and texture state.
+- A mission owns its simulation terrain: corner heights and tile terrain. They
+  change only through terrain commands at the start of a tick, so saves and
+  replays capture every edit. A terrain command applies whole or is rejected.
+  A faulted tick stops the mission for good, so its terrain edits are not
+  rolled back.
+- Terrain changes report affected tile bounds. Renderers batch those reports by
+  frame and rebuild only affected chunks while preserving shared material and
+  texture state.
 - Terrain provides per-profile passability, slope limits, and movement costs.
   Routes minimize estimated travel time and recalculate when blockers change.
+  - A tile's terrain type sets its cost or blocks it for each profile. A map
+    declares its terrain types, and edits cannot introduce undeclared ones.
+    Every declared type must be priced by every profile that moves on it.
+    Slope up to the profile's limit raises cost linearly; steeper tiles are
+    blocked unless authored as passable. Out-of-bounds tiles block every
+    profile.
+  - Routes step between the eight neighboring tiles, and a diagonal step needs
+    both tiles beside it passable. The route is then straightened wherever a
+    direct segment crosses only passable tiles and is no slower.
+  - An actor on an edge or corner shared with a passable tile stands on that
+    tile. An actor standing on a blocked tile may step off it to a neighbor.
+  - A target the actor cannot reach resolves to the reachable tile closest to
+    it. If no tile is closer than the actor's own, a new order is rejected and
+    any current order continues. A recalculated order finishes at the center
+    of the actor's own tile only if that tile was already its destination;
+    otherwise it waits as blocked.
+  - A route recalculates when a navigation change touches it. Blocked orders
+    and orders that stop short of their target recalculate after any
+    navigation change. A route that meets a blocker its checks missed
+    recalculates once that tick, then waits as blocked. Presentation-only
+    terrain edits are not navigation changes.
 - Friendly mobile actors use soft separation. Detected opponents are hard local
   blockers; physical contact with an undetected same-layer opponent forces a
   temporary reveal.
@@ -466,8 +496,11 @@ a later tutorial could be made.
   are required in M0. Loading begins paused.
 - Mission and campaign saves are separate schemas. A mission save owns one
   mission snapshot; a campaign save owns longer-lived choices and progression.
-- Authoritative simulation state is serialized. Rendering objects, cached paths,
-  effects, and platform handles are reconstructed.
+- Authoritative simulation state is serialized. Rendering objects, navigation
+  caches, effects, and platform handles are reconstructed.
+- A mission snapshot includes simulation terrain and its navigation version.
+  An actor's active route is simulation state, so a loaded mission continues
+  every move exactly as an uninterrupted one would, without recalculating.
 - Implemented systems preserve passenger identities, occupancy transitions,
   deployment state and reservations, veterancy, temporary reveals, and
   authoritative sensor contacts or detection effects.

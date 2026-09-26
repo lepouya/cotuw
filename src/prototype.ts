@@ -13,6 +13,7 @@ import {
   createCommandInput,
   createGameView,
   createMinimap,
+  createMovementPathView,
   createActorViewRegistry,
   createMeshAppearance,
   createTerrainMeshes,
@@ -20,6 +21,7 @@ import {
 import { createActor } from "./simulation/actor";
 import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
 import { startSimulationLoop } from "./simulation/loop";
+import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import {
   createMissionSimulation,
   createMissionState,
@@ -28,12 +30,14 @@ import {
 import type { Scene } from "@babylonjs/core";
 import type { TileLayer, TileType } from "./map";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
-import type { Actor, ActorBehavior, ActorDefinition } from "./simulation/actor";
+import type { Actor, ActorDefinition } from "./simulation/actor";
+import type { MovementProfile } from "./simulation/navigation";
 
 const TILE_COUNT = 100;
 const TILE_SIZE = 1;
-/** Tiles from the river's midline to its bank. */
-const WATER_HALF_WIDTH = 5;
+/** Tiles from the pond's midline to its bank. */
+const WATER_HALF_WIDTH = 10;
+const WATER_CENTER = { x: 42, z: 58 };
 /** Water opacity at the midline and at the last tile before the bank. */
 const WATER_DEEP_ALPHA = 0.98;
 const WATER_SHORE_ALPHA = 0.06;
@@ -44,55 +48,20 @@ const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Covers background-tab throttling to one timer callback per second. */
 const MAX_CATCH_UP_SECONDS = 5;
 
-/** Unobstructed straight-line motion, until path finding replaces it. */
-export const directMoveBehavior: ActorBehavior = {
-  handleCommand: (actor, definition, command) => {
-    switch (command.kind) {
-      case "move":
-        if (!definition.movement) {
-          return false;
-        }
-        actor.movement = { target: { ...command.target } };
-        return true;
-      case "stop":
-        delete actor.movement;
-        return true;
-    }
+export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
+  {
+    id: "surface-ground",
+    maxSlope: 0.75,
+    slopeCostAtLimit: 2,
+    terrainCosts: { plain: 1, path: 0.8, rough: 2.25, water: null },
   },
-  update: (actor, definition, seconds) => {
-    const target = actor.movement?.target;
-    if (!target || !definition.movement) {
-      return;
-    }
-
-    const xDistance = target.x - actor.worldPosition.x;
-    const zDistance = target.z - actor.worldPosition.z;
-    const distance = Math.hypot(xDistance, zDistance);
-    if (distance === 0) {
-      delete actor.movement;
-      return;
-    }
-
-    actor.facing = Math.atan2(xDistance, zDistance);
-    const travel = Math.min(definition.movement.speed * seconds, distance);
-    actor.worldPosition.x += (xDistance / distance) * travel;
-    actor.worldPosition.z += (zDistance / distance) * travel;
-
-    if (travel === distance) {
-      actor.worldPosition = { ...target };
-      delete actor.movement;
-    }
-  },
-};
-
-export const PROTOTYPE_ACTOR_BEHAVIORS: ReadonlyMap<string, ActorBehavior> =
-  new Map([["direct-move", directMoveBehavior]]);
+];
 
 export const PROTOTYPE_ACTOR_DEFINITIONS = [
   {
     id: "arc-trooper",
-    behaviorId: "direct-move",
-    movement: { speed: 4 },
+    behaviorId: "terrain-move",
+    movement: { speed: 4, profileId: "surface-ground" },
     graphics: {
       url: "/assets/actors/arc-trooper.glb",
       minimapColor: [0.82, 0.28, 0.1],
@@ -107,8 +76,8 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-scout",
-    behaviorId: "direct-move",
-    movement: { speed: 7 },
+    behaviorId: "terrain-move",
+    movement: { speed: 7, profileId: "surface-ground" },
     graphics: {
       url: "/assets/actors/arc-scout.glb",
       minimapColor: [0.12, 0.62, 0.82],
@@ -196,19 +165,27 @@ export async function createTerrainPrototype(
   createTerrainMeshes(view.scene, map);
   const simulation = createMissionSimulation({
     state: createMissionState(createPrototypeActors(map)),
-    behaviorRegistry: PROTOTYPE_ACTOR_BEHAVIORS,
+    behaviorRegistry: new Map([
+      [
+        "terrain-move",
+        createTerrainMoveBehavior(map, PROTOTYPE_MOVEMENT_PROFILES),
+      ],
+    ]),
     bounds: map.worldBounds,
     definitions: PROTOTYPE_ACTOR_DEFINITIONS,
     tickSeconds: SIMULATION_TICK_SECONDS,
+    map,
   });
   const appearances = createPrototypeStandInAppearances(view.scene);
   const actorViews = createActorViewRegistry(view.scene, map, appearances);
+  const movementPath = createMovementPathView(view.scene, map);
   actorViews.update(simulation.actors, 1);
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: actorViews.actorIdForMesh,
     submitCommand: simulation.submitCommand,
     onSelectionChanged: (actorId) => {
       actorViews.setSelectedActor(actorId);
+      movementPath.setSelectedActor(actorId);
       minimap.refreshActors();
       canvas.dataset.actorSelected = String(actorId !== undefined);
       canvas.dataset.selectedActor = actorId ?? "";
@@ -236,6 +213,12 @@ export async function createTerrainPrototype(
     afterTick: (outcomes) => {
       minimap.refreshActors();
       for (const { command, accepted } of outcomes) {
+        if (command.kind === "move") {
+          canvas.dataset.moveStatus = accepted ? "accepted" : "unreachable";
+          if (!accepted) {
+            movementPath.showRejectedTarget(command.actorId, command.target);
+          }
+        }
         if (accepted && command.kind === "move") {
           canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
         }
@@ -255,12 +238,14 @@ export async function createTerrainPrototype(
       minimap.refreshActors();
     }
     actorViews.update(simulation.actors, loop.tickProgress());
+    movementPath.update(simulation.actors);
   });
   view.scene.onDisposeObservable.add(() => {
     loop.stop();
     input.dispose();
     view.scene.onBeforeRenderObservable.remove(renderObserver);
     actorViews.dispose();
+    movementPath.dispose();
     for (const appearance of appearances.values()) appearance.dispose();
   });
 
@@ -319,50 +304,48 @@ function createPrototypeStandInAppearances(
 }
 
 function createPrototypeActors(map: TerrainMap): Actor[] {
-  const positionAt = (x: number, z: number) => {
-    const point = map.worldPoint(x, z, 0);
-    return { x: point.x, z: point.z };
-  };
-
   return [
     createActor({
       id: "prototype-trooper",
       definitionId: "arc-trooper",
-      worldPosition: positionAt(46, 40),
+      worldPosition: map.tileCenter(46, 40),
     }),
     createActor({
       id: "prototype-scout",
       definitionId: "arc-scout",
-      worldPosition: positionAt(55, 45),
+      worldPosition: map.tileCenter(55, 45),
     }),
   ];
 }
 
 export function createPrototypeMap(): TerrainMap {
-  const mapCenter = TILE_COUNT / 2;
   return new TerrainMap({
     width: TILE_COUNT,
     height: TILE_COUNT,
     tileSize: TILE_SIZE,
-    createHeight: (x, z) => {
-      const distanceFromCenter = Math.hypot(x - mapCenter, z - mapCenter);
-      const ridge = Math.max(0, 1 - distanceFromCenter / 55) * 2.8;
-      const rolling = Math.sin(x * 0.16) * 0.65 + Math.cos(z * 0.13) * 0.55;
-      const detail = Math.sin((x + z) * 0.37) * 0.2;
-
-      return ridge + rolling + detail;
-    },
+    createHeight: prototypeHeightAt,
+    createTerrain: prototypeTerrainAt,
+    terrainTypeIds: ["plain", "path", "rough", "water"],
     createLayers: (x, z) => {
+      const terrain = prototypeTerrainAt(x, z);
       const variation = Math.sin(x * 0.23) * 0.025 + Math.cos(z * 0.19) * 0.02;
-      const waterCenter = 52 + Math.sin(x * 0.08) * 8;
-      const depth = 1 - Math.abs(z + 0.5 - waterCenter) / WATER_HALF_WIDTH;
+      const depth =
+        1 -
+        Math.hypot(x + 0.5 - WATER_CENTER.x, z + 0.5 - WATER_CENTER.z) /
+          WATER_HALF_WIDTH;
+      const terrainTint =
+        terrain.typeId === "path"
+          ? [1.08, 0.98, 0.78]
+          : terrain.typeId === "rough"
+            ? [0.68, 0.78, 0.64]
+            : [0.86, 0.9, 0.88];
       const layers: TileLayer[] = [
         {
           type: PROTOTYPE_TILE_TYPES.dirt,
           color: new Color4(
-            0.86 + variation,
-            0.9 + variation,
-            0.88 + variation,
+            terrainTint[0] + variation,
+            terrainTint[1] + variation,
+            terrainTint[2] + variation,
             1,
           ),
         },
@@ -380,7 +363,7 @@ export function createPrototypeMap(): TerrainMap {
         });
       }
 
-      if (Math.sin(x * 0.47 - z * 0.29) > 0.78) {
+      if (terrain.typeId === "rough" || Math.sin(x * 0.47 - z * 0.29) > 0.82) {
         layers.push({
           type: PROTOTYPE_TILE_TYPES.clutter,
           color: new Color4(0.99, 0.66, 0.33, 1),
@@ -392,8 +375,37 @@ export function createPrototypeMap(): TerrainMap {
   });
 }
 
+/** Authored semantics stay independent of Babylon terrain layers. */
+function prototypeTerrainAt(x: number, z: number) {
+  const border = x < 3 || z < 3 || x >= TILE_COUNT - 3 || z >= TILE_COUNT - 3;
+  const pond =
+    Math.hypot(x + 0.5 - WATER_CENTER.x, z + 0.5 - WATER_CENTER.z) <
+    WATER_HALF_WIDTH;
+  const path =
+    (z >= 31 && z <= 34 && x >= 8 && x <= 91) ||
+    (z >= 67 && z <= 70 && x >= 20 && x <= 91) ||
+    (x >= 82 && x <= 85 && z >= 32 && z <= 69);
+  const rough = x >= 40 && x <= 57 && z >= 45 && z <= 61;
+
+  return {
+    typeId: pond ? "water" : path ? "path" : rough ? "rough" : "plain",
+    outOfBounds: border || undefined,
+  };
+}
+
+/** A gentle hill plus a high ridge with two deliberately legible crossings. */
+function prototypeHeightAt(x: number, z: number): number {
+  const hillDistance = Math.hypot(x - 39, z - 47);
+  const hill = Math.max(0, 1 - hillDistance / 18) ** 2 * 3.5;
+  const inRidge = x >= 61 && x <= 65 && z >= 12 && z <= 88;
+  const inCrossing = (z >= 30 && z <= 36) || (z >= 66 && z <= 72);
+  const ridge = inRidge && !inCrossing ? 6 : 0;
+  const rolling = Math.sin(x * 0.13) * 0.08 + Math.cos(z * 0.11) * 0.07;
+  return hill + ridge + rolling;
+}
+
 /**
- * Fades the river towards its banks so its edge reads as a shoreline.
+ * Fades the pond towards its banks so its edge reads as a shoreline.
  *
  * @param depth 0 at the bank, 1 at the midline.
  */

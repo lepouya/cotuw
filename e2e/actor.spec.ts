@@ -109,7 +109,7 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
   await expect.poll(() => hasSkin("prototype-scout")).toBe(true);
 });
 
-test("clicking a selected actor issues direct terrain movement", async ({
+test("clicking a selected actor issues terrain-aware movement", async ({
   page,
 }) => {
   await openHarness(page);
@@ -215,6 +215,13 @@ test("clicking a selected actor issues direct terrain movement", async ({
   await page.waitForFunction(
     () => window.actorInteractionTest?.canvas.dataset.actorTarget !== undefined,
   );
+  await page.waitForFunction(() => {
+    const scene = window.actorInteractionTest?.view.scene;
+    return Boolean(
+      scene?.getMeshByName("movement-path-route") &&
+      scene.getMeshByName("movement-path-destination"),
+    );
+  });
   const legSwing = await page.evaluate(async () => {
     const scene = window.actorInteractionTest!.view.scene;
     const mesh = scene

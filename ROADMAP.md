@@ -41,8 +41,8 @@ base-building RTS loop, its technical architecture, and its player interface.
       deterministic terrain state.
 - [x] 0.13 Keep scrolling UV effects available independently for layers that
       need them.
-- [ ] 0.14 Create a movement-test map with hills, cliffs, and paths.
-- [ ] 0.15 Define which slopes, cliffs, and path surfaces are traversable for
+- [x] 0.14 Create a movement-test map with hills, cliffs, and paths.
+- [x] 0.15 Define which slopes, cliffs, and path surfaces are traversable for
       the prototype actor.
 - [ ] 0.16 Make that map data-driven and loadable without renderer-specific
       state.
@@ -52,7 +52,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.17 Define the prototype actor's simulation state, movement properties,
       target command, and deterministic update rules.
 - [x] 0.18 Render a visible Trooper actor at its simulated world position.
-- [ ] 0.19 Replace the direct-motion spike with data-driven target commands and
+- [x] 0.19 Replace the direct-motion spike with data-driven target commands and
       movement along a valid path.
 - [ ] 0.20 Provide path finding that respects terrain and occupancy, replans
       when blockers change, and reports unreachable targets clearly.

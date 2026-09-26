@@ -314,7 +314,10 @@ test("terraforming refreshes height and layer geometry", async ({ page }) => {
     };
     const mesh = () => scene.getMeshByName("terrain-0-0-layer-0-plain");
     map.layersAt(0, 0).push({ color: color(0.2, 0.4, 0.3, 1) });
-    map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
+    map.notifyChange(
+      { minX: 0, minZ: 0, maxX: 0, maxZ: 0 },
+      { affectsNavigation: false },
+    );
     await frames(2);
     const before = mesh()?.getVerticesData("position")?.[1];
 
@@ -331,7 +334,10 @@ test("terraforming refreshes height and layer geometry", async ({ page }) => {
     );
 
     map.layersAt(0, 0).pop();
-    map.notifyChange({ minX: 0, minZ: 0, maxX: 0, maxZ: 0 });
+    map.notifyChange(
+      { minX: 0, minZ: 0, maxX: 0, maxZ: 0 },
+      { affectsNavigation: false },
+    );
     await frames(2);
     const removedLayer = !scene.getMeshByName(
       "terrain-0-0-layer-1-tile-overlay",
@@ -444,7 +450,10 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
       type: TEST_TILE_TYPES.water,
       color: color(1, 1, 1, 1),
     });
-    map.notifyChange({ minX: 32, minZ: 0, maxX: 32, maxZ: 0 });
+    map.notifyChange(
+      { minX: 32, minZ: 0, maxX: 32, maxZ: 0 },
+      { affectsNavigation: false },
+    );
     await frames(2);
     const after = rightEdgeAlpha();
 
