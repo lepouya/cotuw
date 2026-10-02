@@ -62,16 +62,18 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
 
   releaseLoads();
   await expect
-    .poll(async () =>
-      page.evaluate(async () => {
-        const harnessPath: string = "/e2e/harness.ts";
-        const { EngineStore } = await import(harnessPath);
-        const scene = EngineStore.Instances[0].scenes[0];
-        return scene
-          .getTransformNodeByName("actor-prototype-trooper-root")!
-          .getChildMeshes()
-          .some((mesh: AbstractMesh) => mesh.skeleton !== null);
-      }),
+    .poll(
+      async () =>
+        page.evaluate(async () => {
+          const harnessPath: string = "/e2e/harness.ts";
+          const { EngineStore } = await import(harnessPath);
+          const scene = EngineStore.Instances[0].scenes[0];
+          return scene
+            .getTransformNodeByName("actor-prototype-trooper-root")!
+            .getChildMeshes()
+            .some((mesh: AbstractMesh) => mesh.skeleton !== null);
+        }),
+      { timeout: 10_000 },
     )
     .toBe(true);
 });

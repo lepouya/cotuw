@@ -63,11 +63,11 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Structures and selection
 
-- [ ] 0.23 Define footprint data for stationary objects that occupy one or more
+- [x] 0.23 Define footprint data for stationary objects that occupy one or more
       tiles, including placement origin, occupied tiles, and blocking behavior.
-- [ ] 0.24 Render one multi-tile building or stationary object aligned to its
+- [x] 0.24 Render one multi-tile building or stationary object aligned to its
       footprint and terrain.
-- [ ] 0.25 Include occupied structure tiles in placement and path-finding
+- [x] 0.25 Include occupied structure tiles in placement and path-finding
       constraints.
 - [ ] 0.26 Replace the selection spike with persistent individual-selection
       state and production visual feedback.

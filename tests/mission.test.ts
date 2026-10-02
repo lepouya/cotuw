@@ -147,14 +147,7 @@ describe("mission definitions", () => {
     const inspect: ActorBehavior = {
       handleCommand: () => false,
       update: (_target, definition) => {
-        const graphics = definition.graphics!;
-        frozen.push(
-          Object.isFrozen(graphics),
-          Object.isFrozen(graphics.bounds),
-          Object.isFrozen(graphics.minimapColor),
-          Object.isFrozen(graphics.clips),
-          Object.isFrozen(graphics.clips.turn),
-        );
+        frozen.push(Object.isFrozen(definition.movement));
       },
     };
     const simulation = createMissionSimulation({
@@ -165,17 +158,7 @@ describe("mission definitions", () => {
         {
           id: "graphic",
           behaviorId: "inspect",
-          graphics: {
-            url: "/actor.glb",
-            minimapColor: [1, 0.5, 0],
-            bounds: { radius: 0.5, height: 1 },
-            clips: {
-              idle: "idle",
-              locomotion: "walk",
-              turn: { left: "left", right: "right" },
-            },
-            cycleDistance: 1,
-          },
+          movement: { speed: 1 },
         },
       ],
       tickSeconds: 1,
@@ -183,7 +166,7 @@ describe("mission definitions", () => {
 
     simulation.tick();
 
-    expect(frozen).toEqual([true, true, true, true, true]);
+    expect(frozen).toEqual([true]);
   });
 });
 

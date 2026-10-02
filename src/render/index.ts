@@ -2,6 +2,7 @@ export { createStrategyCamera, type StrategyCamera } from "./camera";
 export {
   createActorRenderer,
   createMeshAppearance,
+  DEFAULT_ACTOR_COLOR,
   type ActorAppearance,
   type ActorInstance,
   type ActorPose,
@@ -41,6 +42,13 @@ export {
   type MinimapOptions,
 } from "./minimap";
 export { createMovementPathView, type MovementPathView } from "./movement-path";
+export type { ActorGraphics } from "./skinned-actor-appearance";
+export {
+  createTilePlacedActorViewRegistry,
+  type TilePlacedActorAppearance,
+  type TilePlacedActorAppearanceCatalog,
+  type TilePlacedActorViewRegistry,
+} from "./tile-placed-actor-view";
 export {
   createTerrainMeshes,
   isTerrainPickMesh,

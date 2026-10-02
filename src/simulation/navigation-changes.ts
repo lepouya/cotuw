@@ -1,12 +1,28 @@
-import type { TerrainBounds } from "../map";
+import type { TerrainBounds } from "./grid";
+import type { OccupancyLayer } from "./occupancy";
+
+export type NavigationChangeEffect = "increase" | "decrease" | "mixed" | "none";
+
+export type NavigationChange = {
+  bounds: TerrainBounds;
+  /** Omitted when every occupancy layer may be affected. */
+  layers?: OccupancyLayer[];
+  effect: NavigationChangeEffect;
+};
+
+/** Queries for navigation consumers, which never record or restart. */
+export type NavigationChangeView = Pick<
+  NavigationChangeLog,
+  "version" | "generation" | "since" | "entriesSince"
+>;
 
 /**
  * Versioned tile bounds whose navigation may have changed. Terrain edits and
- * future blockers such as structures record into the same log.
+ * actor footprints record into the same log.
  */
 export class NavigationChangeLog {
   private readonly historyLimit: number;
-  private readonly history: { version: number; bounds: TerrainBounds }[] = [];
+  private readonly history: (NavigationChange & { version: number })[] = [];
   private currentVersion = 0;
   private currentGeneration = 0;
 
@@ -29,14 +45,31 @@ export class NavigationChangeLog {
 
   /** Continues from `version` with no history, as after loading a save. */
   restart(version: number): void {
+    if (!Number.isSafeInteger(version) || version < 0) {
+      throw new RangeError("Invalid navigation version.");
+    }
     this.currentVersion = version;
     this.currentGeneration += 1;
     this.history.length = 0;
   }
 
-  record(bounds: Readonly<TerrainBounds>): void {
+  record(
+    bounds: Readonly<TerrainBounds>,
+    {
+      layers,
+      effect = "mixed",
+    }: {
+      layers?: readonly OccupancyLayer[];
+      effect?: NavigationChangeEffect;
+    } = {},
+  ): void {
     this.currentVersion += 1;
-    this.history.push({ version: this.version, bounds: { ...bounds } });
+    this.history.push({
+      version: this.version,
+      bounds: { ...bounds },
+      layers: layers && [...layers],
+      effect,
+    });
     if (this.history.length > this.historyLimit) {
       this.history.shift();
     }
@@ -44,6 +77,14 @@ export class NavigationChangeLog {
 
   /** Changes after `version`, or `undefined` when retained history is too new. */
   since(version: number): readonly Readonly<TerrainBounds>[] | undefined {
+    return this.entriesSince(version)?.map(({ bounds }) => bounds);
+  }
+
+  /** Detailed changes after `version`, optionally limited to one layer. */
+  entriesSince(
+    version: number,
+    layer?: OccupancyLayer,
+  ): readonly Readonly<NavigationChange>[] | undefined {
     if (version === this.version) {
       return [];
     }
@@ -58,6 +99,16 @@ export class NavigationChangeLog {
     }
     return this.history
       .filter((change) => change.version > version)
-      .map(({ bounds }) => bounds);
+      .filter(
+        (change) =>
+          layer === undefined ||
+          change.layers === undefined ||
+          change.layers.includes(layer),
+      )
+      .map(({ bounds, layers, effect }) => ({
+        bounds: { ...bounds },
+        layers: layers && [...layers],
+        effect,
+      }));
   }
 }

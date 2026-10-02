@@ -1,4 +1,15 @@
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
+import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
+import { TerrainGrid } from "./terrain";
+import {
+  createTilePlacedActor,
+  evaluateFootprint,
+  footprintPlacementFor,
+  isTilePlacedActor,
+  isValidTilePlacement,
+  tilePlacedPose,
+  validatePlacementDefinition,
+} from "./placement";
 
 import type {
   Actor,
@@ -6,13 +17,53 @@ import type {
   ActorDefinition,
   ActorRenderState,
 } from "./actor";
-import type { TerrainMap, TerrainState } from "../map";
 import type {
   CommandOutcome,
   MissionCommand,
   ScheduledCommand,
 } from "./command";
+import type { FootprintPlacement } from "./occupancy";
+import type {
+  ActorPlacement,
+  PlacementEvaluation,
+  PlacementReason,
+} from "./placement";
+import type { TerrainState } from "./terrain";
 import type { WorldBounds } from "./world";
+
+/** Actor state that behaviors must leave unchanged. */
+type ActorIdentity = Pick<Actor, "id" | "definitionId" | "tilePlacement">;
+
+function actorIdentity(actor: Actor): ActorIdentity {
+  return {
+    id: actor.id,
+    definitionId: actor.definitionId,
+    tilePlacement: actor.tilePlacement && structuredClone(actor.tilePlacement),
+  };
+}
+
+function sameTilePlacement(
+  left: Actor["tilePlacement"],
+  right: Actor["tilePlacement"],
+): boolean {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      left.origin.x === right.origin.x &&
+      left.origin.z === right.origin.z &&
+      left.quarterTurns === right.quarterTurns)
+  );
+}
+
+/** Actor changes a tick stages before committing them. */
+type WorkingActors = {
+  actors: Actor[];
+  actorsById: Map<string, Actor>;
+  usedIds: Set<string>;
+  retiredIds: string[];
+  lifecycleChanges: number;
+};
 
 /** The authoritative, serializable state of one playable mission. */
 export type MissionState = {
@@ -28,7 +79,12 @@ export type MissionState = {
 };
 
 export function createMissionState(actors: readonly Actor[]): MissionState {
-  return { tick: 0, actors: [...actors], commands: [], retiredActorIds: [] };
+  return {
+    tick: 0,
+    actors: [...actors],
+    commands: [],
+    retiredActorIds: [],
+  };
 }
 
 export type MissionSimulationOptions = {
@@ -41,9 +97,15 @@ export type MissionSimulationOptions = {
   tickSeconds: number;
   /**
    * Terrain the mission owns and changes only through terrain commands. Terrain
-   * in `state` replaces it, as when loading a save.
+   * in `state` replaces it after validation. Dispose the previous mission
+   * before assigning this world to another mission.
    */
-  map?: TerrainMap;
+  map?: TerrainGrid;
+  /**
+   * Footprints on `map`, rebuilt from the mission's tile-placed actors and
+   * changed only by the mission. Footprint definitions require it.
+   */
+  occupancy?: OccupancyGrid;
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -56,6 +118,8 @@ export type MissionSimulation = {
   readonly tickSeconds: number;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
+  /** Checks the same placement constraints used when commands are applied. */
+  evaluatePlacement: (placement: ActorPlacement) => PlacementEvaluation;
   /** Queues a command for the next tick and returns that tick's number. */
   submitCommand: (command: MissionCommand) => number;
   /** Adds a copy of the actor, validated like the initial state. */
@@ -64,6 +128,8 @@ export type MissionSimulation = {
   removeActor: (id: string) => boolean;
   /** A deep copy of the current state and terrain, for saves and replays. */
   snapshot: () => MissionState;
+  /** Stops updates and releases terrain rules before replacing the mission. */
+  dispose: () => void;
   /**
    * Applies queued commands, then advances every actor by one tick. Outcomes
    * carry each command as applied, with move targets clamped to the bounds.
@@ -78,6 +144,7 @@ export function createMissionSimulation({
   definitions,
   tickSeconds,
   map,
+  occupancy,
 }: MissionSimulationOptions): MissionSimulation {
   if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) {
     throw new RangeError(
@@ -85,6 +152,9 @@ export function createMissionSimulation({
     );
   }
   ensureValidBounds(bounds);
+  if (occupancy && (!map || !occupancy.isForTerrain(map))) {
+    throw new RangeError("Mission occupancy must belong to its terrain map.");
+  }
   if (!Number.isInteger(initialState.tick) || initialState.tick < 0) {
     throw new RangeError("Mission state tick must be a non-negative integer.");
   }
@@ -93,20 +163,50 @@ export function createMissionSimulation({
   if (new Set(state.retiredActorIds).size !== state.retiredActorIds.length) {
     throw new Error("Mission state contains duplicate retired actor IDs.");
   }
+  const savedTerrain = state.terrain;
+  const restoringSnapshot = savedTerrain !== undefined;
+  if (savedTerrain && !map) {
+    throw new Error("Mission state has terrain but no map to restore.");
+  }
+  delete state.terrain;
   const worldBounds = { ...bounds };
   const behaviorsById = new Map(behaviorRegistry);
   const definitionsById = indexDefinitions(
     structuredClone(definitions),
     behaviorsById,
+    map,
+    occupancy,
   );
   let actorsById = new Map<string, Actor>();
-  const usedActorIds = new Set(state.retiredActorIds);
+  let usedActorIds = new Set(state.retiredActorIds);
   let actorVersion = 0;
+  let faulted = false;
+  let disposed = false;
+  const ensureRunning = () => {
+    if (disposed) throw new Error("Mission simulation is disposed.");
+    if (faulted) throw new Error("Mission simulation is faulted.");
+  };
   const definitionFor = (actor: Actor): ActorDefinition =>
     definitionsById.get(actor.definitionId)!;
   const behaviorFor = (actor: Actor): ActorBehavior =>
     behaviorsById.get(definitionFor(actor).behaviorId)!;
   const ensureValidActor = (actor: Actor) => {
+    if (
+      typeof actor.id !== "string" ||
+      actor.id.length === 0 ||
+      !definitionsById.has(actor.definitionId)
+    ) {
+      throw new RangeError("Actor has an invalid identity.");
+    }
+    const definition = definitionFor(actor);
+    if (
+      (definition.footprint !== undefined) !==
+      (actor.tilePlacement !== undefined)
+    ) {
+      throw new RangeError(
+        `Actor ${actor.id} requires its definition's tile placement.`,
+      );
+    }
     if (!isFinitePosition(actor.worldPosition)) {
       throw new RangeError(`Actor ${actor.id} has an invalid world position.`);
     }
@@ -116,6 +216,29 @@ export function createMissionSimulation({
     if (!Number.isFinite(actor.facing)) {
       throw new RangeError(`Actor ${actor.id} has an invalid facing.`);
     }
+    if (!isOccupancyLayer(actor.occupancyLayer)) {
+      throw new RangeError(`Actor ${actor.id} has an invalid occupancy layer.`);
+    }
+    if (isTilePlacedActor(actor)) {
+      if (
+        !isValidTilePlacement(actor.tilePlacement) ||
+        actor.movement !== undefined ||
+        actor.occupancyLayer !== definition.footprint!.layer
+      ) {
+        throw new RangeError(
+          `Actor ${actor.id} has an invalid tile placement.`,
+        );
+      }
+      // Footprint definitions require a map.
+      const pose = tilePlacedPose(map!, actor, definition);
+      if (
+        actor.worldPosition.x !== pose.worldPosition.x ||
+        actor.worldPosition.z !== pose.worldPosition.z ||
+        actor.facing !== pose.facing
+      ) {
+        throw new RangeError(`Actor ${actor.id} changed its tile-placed pose.`);
+      }
+    }
     const target = actor.movement?.target;
     if (
       target &&
@@ -124,6 +247,18 @@ export function createMissionSimulation({
       throw new RangeError(`Actor ${actor.id} has an invalid move target.`);
     }
     behaviorFor(actor).validateActor?.(actor, definitionFor(actor));
+  };
+  const validateUpdate = (actor: Actor, before: ActorIdentity) => {
+    if (
+      actor.id !== before.id ||
+      actor.definitionId !== before.definitionId ||
+      !sameTilePlacement(actor.tilePlacement, before.tilePlacement)
+    ) {
+      throw new RangeError(
+        `Actor ${before.id} changed its identity or placement.`,
+      );
+    }
+    ensureValidActor(actor);
   };
   const register = (actor: Actor): Actor => {
     if (usedActorIds.has(actor.id)) {
@@ -135,6 +270,16 @@ export function createMissionSimulation({
           `${actor.definitionId}.`,
       );
     }
+    // Position and facing follow from a tile placement, so callers need not
+    // reproduce them exactly.
+    const definition = definitionFor(actor);
+    if (
+      isTilePlacedActor(actor) &&
+      definition.footprint &&
+      isValidTilePlacement(actor.tilePlacement)
+    ) {
+      Object.assign(actor, tilePlacedPose(map!, actor, definition));
+    }
     ensureValidActor(actor);
     const committed = deepFreeze(actor);
     actorsById.set(committed.id, committed);
@@ -142,19 +287,117 @@ export function createMissionSimulation({
     return committed;
   };
   state.actors = freezeActors(state.actors.map(register));
-  if (state.terrain) {
-    if (!map) {
-      throw new Error("Mission state has terrain but no map to restore.");
+
+  const evaluatePlacement = (
+    placement: ActorPlacement,
+    actors: Iterable<Actor>,
+    usedIds: ReadonlySet<string>,
+  ): PlacementEvaluation => {
+    const reject = (reason: PlacementReason): PlacementEvaluation => ({
+      accepted: false,
+      reason,
+      tiles: [],
+    });
+    const { actorId, definitionId, origin, quarterTurns = 0 } = placement;
+    if (
+      !map ||
+      !occupancy ||
+      typeof actorId !== "string" ||
+      actorId.length === 0 ||
+      !isValidTilePlacement({ origin, quarterTurns })
+    ) {
+      return reject("invalid-actor");
     }
-    map.restoreTerrainState(state.terrain);
-    // The map holds live terrain; snapshots read it back.
-    delete state.terrain;
+    if (usedIds.has(actorId)) {
+      return reject("used-id");
+    }
+    const definition = definitionsById.get(definitionId);
+    if (!definition) {
+      return reject("unknown-definition");
+    }
+    if (!definition.footprint) {
+      return reject("not-placeable");
+    }
+    const actor = createTilePlacedActor(map, definition, placement);
+    const evaluation = evaluateFootprint(
+      map,
+      occupancy,
+      actor,
+      definition,
+      actors,
+    );
+    if (evaluation.accepted) {
+      try {
+        ensureValidActor(actor);
+      } catch {
+        return { ...reject("invalid-actor"), tiles: evaluation.tiles };
+      }
+    }
+    return evaluation;
+  };
+
+  // Validate the whole candidate world without publishing edits or losing the
+  // live world's navigation history when initialization fails.
+  const initialFootprints: FootprintPlacement[] = [];
+  if (map && (savedTerrain || occupancy)) {
+    const candidateMap = new TerrainGrid({
+      width: map.width,
+      height: map.height,
+      tileSize: map.tileSize,
+      terrainTypeIds: [...map.terrainTypeIds],
+      createHeight: (x, z) => map.heightAt(x, z),
+      createTerrain: (x, z) => map.terrainAt(x, z),
+    });
+    if (savedTerrain) candidateMap.restoreTerrainState(savedTerrain);
+    const candidateOccupancy = new OccupancyGrid(candidateMap);
+    for (const actor of state.actors) {
+      if (!isTilePlacedActor(actor)) continue;
+      // A save keeps units that crossed nonblocking footprints.
+      const evaluation = evaluateFootprint(
+        candidateMap,
+        candidateOccupancy,
+        actor,
+        definitionFor(actor),
+        restoringSnapshot ? undefined : state.actors,
+      );
+      if (!evaluation.accepted) {
+        throw new RangeError(
+          `Actor ${actor.id} has invalid placement: ${evaluation.reason}.`,
+        );
+      }
+      candidateOccupancy.place(evaluation.footprint);
+      initialFootprints.push(evaluation.footprint);
+    }
   }
+
+  /** Places the footprints of committed tile-placed actors. */
+  const rebuildOccupancy = () => {
+    occupancy!.clear();
+    for (const actor of state.actors) {
+      if (isTilePlacedActor(actor)) {
+        occupancy!.place(footprintPlacementFor(actor, definitionFor(actor)));
+      }
+    }
+  };
+  if (occupancy) {
+    occupancy.clear();
+    for (const footprint of initialFootprints) occupancy.place(footprint);
+  }
+  if (savedTerrain) map!.restoreTerrainState(savedTerrain);
+  if (map && occupancy) {
+    const navigationVersion = map.navigationChanges.version;
+    // Scenario or restored occupancy is the baseline, not a dynamic change.
+    map.navigationChanges.restart(restoringSnapshot ? navigationVersion : 0);
+  }
+  const releaseTerrainRule =
+    map && occupancy
+      ? map.addEditRule((edit) => occupancy.allowsTerrainEdit(edit))
+      : undefined;
 
   const applyCommand = (
     command: MissionCommand,
     tick: number,
-    workingActorsById: ReadonlyMap<string, Actor>,
+    working: WorkingActors,
   ): CommandOutcome => {
     if (command.kind === "terrain") {
       const edit = structuredClone(command);
@@ -164,13 +407,50 @@ export function createMissionSimulation({
       map.editTerrain(edit);
       return { tick, command: edit, accepted: true };
     }
+    if (command.kind === "place-actor") {
+      const applied = structuredClone(command);
+      const evaluation = evaluatePlacement(
+        applied,
+        working.actors,
+        working.usedIds,
+      );
+      if (!evaluation.accepted) {
+        return {
+          tick,
+          command: applied,
+          accepted: false,
+          reason: evaluation.reason,
+        };
+      }
+      occupancy!.place(evaluation.footprint);
+      working.actors.push(evaluation.actor);
+      working.actorsById.set(evaluation.actor.id, evaluation.actor);
+      working.usedIds.add(evaluation.actor.id);
+      working.lifecycleChanges += 1;
+      return { tick, command: applied, accepted: true };
+    }
+    if (command.kind === "remove-actor") {
+      const applied = structuredClone(command);
+      const actor = working.actorsById.get(applied.actorId);
+      if (!actor) {
+        return { tick, command: applied, accepted: false };
+      }
+      if (isTilePlacedActor(actor)) {
+        occupancy!.remove(actor.id);
+      }
+      working.actorsById.delete(actor.id);
+      working.actors.splice(working.actors.indexOf(actor), 1);
+      working.retiredIds.push(actor.id);
+      working.lifecycleChanges += 1;
+      return { tick, command: applied, accepted: true };
+    }
     let appliedCommand = structuredClone(command);
     const outcome: CommandOutcome = {
       tick,
       command: appliedCommand,
       accepted: false,
     };
-    const actor = workingActorsById.get(command.actorId);
+    const actor = working.actorsById.get(command.actorId);
     if (!actor) {
       return outcome;
     }
@@ -184,12 +464,13 @@ export function createMissionSimulation({
       };
       outcome.command = appliedCommand;
     }
+    const before = actorIdentity(actor);
     outcome.accepted = behaviorFor(actor).handleCommand(
       actor,
       definitionFor(actor),
       appliedCommand,
     );
-    ensureValidActor(actor);
+    validateUpdate(actor, before);
     return outcome;
   };
 
@@ -208,7 +489,10 @@ export function createMissionSimulation({
       const actor = actorsById.get(id);
       return actor && structuredClone(actor);
     },
+    evaluatePlacement: (placement) =>
+      evaluatePlacement(structuredClone(placement), state.actors, usedActorIds),
     submitCommand: (command) => {
+      ensureRunning();
       state.commands.push({
         tick: state.tick,
         command: structuredClone(command),
@@ -216,17 +500,44 @@ export function createMissionSimulation({
       return state.tick;
     },
     spawnActor: (actor) => {
+      ensureRunning();
       const copy = structuredClone(actor);
+      let footprint: FootprintPlacement | undefined;
+      if (copy.tilePlacement !== undefined) {
+        const evaluation = evaluatePlacement(
+          {
+            actorId: copy.id,
+            definitionId: copy.definitionId,
+            ...copy.tilePlacement,
+          },
+          state.actors,
+          usedActorIds,
+        );
+        if (!evaluation.accepted) {
+          throw new RangeError(
+            `Actor ${copy.id} has invalid placement: ${evaluation.reason}.`,
+          );
+        }
+        footprint = evaluation.footprint;
+      }
       state = {
         ...state,
         actors: freezeActors([...state.actors, register(copy)]),
       };
+      // Registered first, so a rejected actor never leaves occupancy behind.
+      if (footprint) {
+        occupancy!.place(footprint);
+      }
       actorVersion += 1;
     },
     removeActor: (id) => {
+      ensureRunning();
       const actor = actorsById.get(id);
       if (!actor) {
         return false;
+      }
+      if (isTilePlacedActor(actor)) {
+        occupancy!.remove(id);
       }
       actorsById.delete(id);
       state = {
@@ -246,37 +557,70 @@ export function createMissionSimulation({
       }
       return snapshot;
     },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      releaseTerrainRule?.();
+    },
     tick: () => {
-      const workingActors = state.actors.map((actor) => structuredClone(actor));
-      const workingActorsById = new Map(
-        workingActors.map((actor) => [actor.id, actor]),
-      );
-      const outcomes = state.commands
-        .filter(({ tick }) => tick <= state.tick)
-        .map(({ command }) =>
-          applyCommand(command, state.tick, workingActorsById),
+      ensureRunning();
+      const due = state.commands.filter(({ tick }) => tick <= state.tick);
+      const terrainBefore =
+        map && due.some(({ command }) => command.kind === "terrain")
+          ? map.terrainState()
+          : undefined;
+      const navigationVersion = map?.navigationChanges.version;
+      try {
+        const actors = state.actors.map((actor) => structuredClone(actor));
+        const working: WorkingActors = {
+          actors,
+          actorsById: new Map(actors.map((actor) => [actor.id, actor])),
+          usedIds: new Set(usedActorIds),
+          retiredIds: [...state.retiredActorIds],
+          lifecycleChanges: 0,
+        };
+        const outcomes = due.map(({ command }) =>
+          applyCommand(command, state.tick, working),
         );
 
-      for (const actor of workingActors) {
-        behaviorFor(actor).update(actor, definitionFor(actor), tickSeconds);
-        // Rounding in a behavior's motion must not carry an actor off the map.
-        if (isFinitePosition(actor.worldPosition)) {
-          actor.worldPosition = clampToBounds(actor.worldPosition, worldBounds);
+        for (const actor of working.actors) {
+          const before = actorIdentity(actor);
+          behaviorFor(actor).update(actor, definitionFor(actor), tickSeconds);
+          // Rounding in a behavior's motion must not carry an actor off the map.
+          if (isFinitePosition(actor.worldPosition)) {
+            actor.worldPosition = clampToBounds(
+              actor.worldPosition,
+              worldBounds,
+            );
+          }
+          validateUpdate(actor, before);
         }
-        ensureValidActor(actor);
-      }
 
-      const committedActors = freezeActors(
-        workingActors.map((actor) => deepFreeze(actor)),
-      );
-      state = {
-        tick: state.tick + 1,
-        actors: committedActors,
-        commands: state.commands.filter(({ tick }) => tick > state.tick),
-        retiredActorIds: state.retiredActorIds,
-      };
-      actorsById = new Map(committedActors.map((actor) => [actor.id, actor]));
-      return outcomes;
+        const committedActors = freezeActors(
+          working.actors.map((actor) => deepFreeze(actor)),
+        );
+        state = {
+          ...state,
+          tick: state.tick + 1,
+          actors: committedActors,
+          retiredActorIds: working.retiredIds,
+          commands: state.commands.filter(({ tick }) => tick > state.tick),
+        };
+        actorsById = new Map(committedActors.map((actor) => [actor.id, actor]));
+        usedActorIds = working.usedIds;
+        actorVersion += working.lifecycleChanges;
+        return outcomes;
+      } catch (error) {
+        faulted = true;
+        // Return the world to the last committed tick, so no partial terrain or
+        // footprint state stays published.
+        if (map) {
+          if (terrainBefore) map.restoreTerrainState(terrainBefore);
+          if (occupancy) rebuildOccupancy();
+          map.navigationChanges.restart(navigationVersion!);
+        }
+        throw error;
+      }
     },
   };
 }
@@ -284,6 +628,8 @@ export function createMissionSimulation({
 function indexDefinitions(
   definitions: readonly ActorDefinition[],
   behaviorRegistry: ReadonlyMap<string, ActorBehavior>,
+  map: TerrainGrid | undefined,
+  occupancy: OccupancyGrid | undefined,
 ): Map<string, ActorDefinition> {
   const definitionsById = new Map<string, ActorDefinition>();
   for (const definition of definitions) {
@@ -304,6 +650,18 @@ function indexDefinitions(
       throw new RangeError(
         `Actor definition ${definition.id} has an invalid movement speed.`,
       );
+    }
+    if (
+      (definition.footprint || definition.placement) &&
+      (!map || !occupancy)
+    ) {
+      throw new Error(
+        `Actor definition ${definition.id} placement requires a terrain map ` +
+          "and occupancy.",
+      );
+    }
+    if (map) {
+      validatePlacementDefinition(definition, map);
     }
     deepFreeze(definition);
     behaviorRegistry

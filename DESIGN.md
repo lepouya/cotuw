@@ -71,8 +71,8 @@ The simulation advances in fixed ticks counted from real time, independent of
 rendering. Players, NPC AI, and mission scripts change actors only through
 serializable commands queued for the start of the next tick. Rendering
 interpolates between immutable states from the last two committed ticks. A tick
-commits atomically; invalid behavior output faults and stops the simulation
-without publishing partial state.
+commits actor, footprint, and terrain state atomically; invalid behavior output
+permanently faults the simulation and restores the last committed state.
 
 ## Mission terminology
 
@@ -309,8 +309,6 @@ story.
 - A mission owns its simulation terrain: corner heights and tile terrain. They
   change only through terrain commands at the start of a tick, so saves and
   replays capture every edit. A terrain command applies whole or is rejected.
-  A faulted tick stops the mission for good, so its terrain edits are not
-  rolled back.
 - Terrain changes report affected tile bounds. Renderers batch those reports by
   frame and rebuild only affected chunks while preserving shared material and
   texture state.
@@ -342,7 +340,38 @@ story.
   temporary reveal.
 - Movement profiles and occupancy layers are separate. Initial layers are
   **surface**, **air**, and **subterranean**. Watercraft and amphibious units
-  remain on the surface layer.
+  remain on the surface layer. An actor's current occupancy layer is runtime
+  state so explicit takeoff, landing, burrowing, and emerging can change it.
+- Footprints define occupied tile offsets, an occupancy layer, and whether
+  they block movement. Runtime occupancy is keyed by stable actor ID. Placement
+  and removal update every footprint tile atomically.
+- Buildings and other tile-placed objects use the actor identity and lifecycle.
+  Actor definitions own optional footprint and terrain-placement rules; a
+  definition with a footprint cannot also define movement. A tile-placed actor
+  adds an origin and clockwise quarter-turn rotation, matching `facing`, to
+  ordinary actor state. The simulation derives its position and facing from
+  that placement. Surface placement rejects map bounds, unbuildable or
+  disallowed terrain, excessive slope, occupied footprints, and ground units.
+- Terrain edits that change a footprint tile or one of its corner heights are
+  rejected, so a placed footprint keeps satisfying its placement rules.
+- Actor identities and placed origins, rotations, and layers stay fixed during
+  ordinary behavior updates. Footprint definitions require placed runtime
+  state. Placement commands carry only the actor ID, definition, origin, and
+  rotation, and report their tick-time rejection reason.
+- Occupancy is a derived spatial index, separate from terrain, rebuilt from
+  tile-placed actors when a mission starts, loads, or faults. Saves do not store
+  a second authoritative copy of footprint state. Initialization validates an
+  isolated candidate world before changing live terrain or occupancy.
+  Restoration validates footprints without replaying placement-time ground-unit
+  exclusion; units may cross nonblocking objects. Occupancy consumers receive
+  only read-only queries. Renderer-owned appearance catalogs remain outside
+  actor definitions used by the simulation.
+- A mission owns its occupancy-based terrain-edit constraint and releases it
+  on disposal. Occupancy indexes do not register terrain rules themselves.
+- Terrain queries, edits, serialization, and navigation use a renderer-neutral
+  grid. Babylon map helpers add visual layers, vectors, and render
+  notifications. Edits and restoration reject noninteger coordinates, nonfinite
+  heights, and invalid terrain flags before changing state.
 - One air layer and one subterranean layer are sufficient initially; rendered
   altitude and depth are not tactical bands.
 - Air movement ignores ordinary surface terrain and footprints but respects map

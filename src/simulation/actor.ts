@@ -1,4 +1,6 @@
 import type { ActorCommand } from "./command";
+import type { Footprint, OccupancyLayer } from "./occupancy";
+import type { TileCoord } from "./grid";
 import type { WorldPosition } from "./world";
 
 /** Immutable, data-driven capabilities shared by a type of actor. */
@@ -10,32 +12,15 @@ export type ActorDefinition = {
     /** Resolves terrain rules outside actor state. */
     profileId?: string;
   };
-  /** Render-only; the simulation never reads it. */
-  graphics?: ActorGraphics;
-};
-
-/** How a type of actor is drawn. */
-export type ActorGraphics = {
-  /** A glTF binary (`.glb`) holding the model, skin, and clips. */
-  url: string;
-  /** Minimap marker color, in 0-1 channels. */
-  minimapColor?: [number, number, number];
-  /** A cylinder on the ground point that picking and selection use. */
-  bounds: { radius: number; height: number };
-  clips: ActorClips;
-  /** Ground units traveled during one locomotion clip cycle. */
-  cycleDistance: number;
-};
-
-/** Animation clip names within an actor's model. */
-export type ActorClips = {
-  idle: string;
-  locomotion: string;
-  /**
-   * Leans layered over idle and locomotion while turning. Each starts at the
-   * neutral pose and ends at the full lean.
-   */
-  turn?: { left: string; right: string };
+  /** Present when this actor type can occupy a tile-aligned footprint. */
+  footprint?: Footprint;
+  /** Terrain constraints used when placing its footprint. */
+  placement?: {
+    /** Terrain types omitted here are invalid placement surfaces. */
+    terrainTypeIds: string[];
+    /** Maximum grade under any occupied surface tile. */
+    maxSlope: number;
+  };
 };
 
 /** Mutable, serializable runtime state for one actor. */
@@ -45,6 +30,14 @@ export type Actor = {
   worldPosition: WorldPosition;
   /** Radians clockwise from the world's positive Z axis. */
   facing: number;
+  /** The actor's current tactical layer; defaults to surface in authored data. */
+  occupancyLayer: OccupancyLayer;
+  /** Present while the actor is deployed at a tile-aligned footprint. */
+  tilePlacement?: {
+    origin: TileCoord;
+    /** Clockwise quarter turns around the placement origin. */
+    quarterTurns: number;
+  };
   /** Present only while a movement-capable actor has an active move order. */
   movement?: MovementOrder;
 };
@@ -62,6 +55,8 @@ export type MovementOrder = {
   waypoints?: WorldPosition[];
   waypointIndex?: number;
   navigationVersion?: number;
+  /** The occupancy layer the route was planned on. */
+  occupancyLayer?: OccupancyLayer;
 };
 
 type DeepReadonly<T> = T extends readonly (infer Item)[]
@@ -72,7 +67,16 @@ type DeepReadonly<T> = T extends readonly (infer Item)[]
 
 /** The immutable subset of actor state a renderer needs to present an actor. */
 export type ActorRenderState = DeepReadonly<
-  Pick<Actor, "id" | "definitionId" | "worldPosition" | "facing" | "movement">
+  Pick<
+    Actor,
+    | "id"
+    | "definitionId"
+    | "worldPosition"
+    | "facing"
+    | "occupancyLayer"
+    | "tilePlacement"
+    | "movement"
+  >
 >;
 
 export type ActorOptions = {
@@ -80,6 +84,7 @@ export type ActorOptions = {
   definitionId: string;
   worldPosition: WorldPosition;
   facing?: number;
+  occupancyLayer?: OccupancyLayer;
 };
 
 /** Creates mutable state without choosing a renderer or executable behavior. */
@@ -88,12 +93,14 @@ export function createActor({
   definitionId,
   worldPosition,
   facing = 0,
+  occupancyLayer = "surface",
 }: ActorOptions): Actor {
   return {
     id,
     definitionId,
     worldPosition: { ...worldPosition },
     facing,
+    occupancyLayer,
   };
 }
 

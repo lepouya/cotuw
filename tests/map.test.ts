@@ -85,7 +85,7 @@ describe("TerrainMap", () => {
     );
   });
 
-  test("exposes live mutable terrain storage", () => {
+  test("edits heights and exposes live visual layer storage", () => {
     const map = new TerrainMap({ width: 2, height: 2, tileSize: 1 });
 
     map.setHeight(1, 1, 4);

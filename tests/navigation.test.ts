@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { TerrainMap } from "../src/map";
+import { TerrainGrid } from "../src/simulation/terrain";
 import { createActor } from "../src/simulation/actor";
+import { OccupancyGrid } from "../src/simulation/occupancy";
 import {
   createMissionSimulation,
   createMissionState,
@@ -19,7 +20,7 @@ import {
   createTerrainMoveBehavior,
 } from "../src/simulation/terrain-movement";
 
-import type { TerrainTile } from "../src/map";
+import type { TerrainTile } from "../src/simulation/terrain";
 import type { ActorBehavior } from "../src/simulation/actor";
 import type { TerrainCommand } from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
@@ -32,7 +33,7 @@ const ground: MovementProfile = {
   terrainCosts: { plain: 1, path: 0.75, rough: 3, water: null },
 };
 
-function center(map: TerrainMap, x: number, z: number) {
+function center(map: TerrainGrid, x: number, z: number) {
   return map.tileCenter(x, z);
 }
 
@@ -43,7 +44,7 @@ describe("terrain traversal", () => {
       { typeId: "plain" },
       { typeId: "water" },
     ];
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 3,
       height: 1,
       tileSize: 1,
@@ -63,7 +64,7 @@ describe("terrain traversal", () => {
   });
 
   test("chooses a longer clear route over expensive rough terrain", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
@@ -73,7 +74,7 @@ describe("terrain traversal", () => {
     });
 
     const path = findNavigationPath(
-      new NavigationGrid(map, ground),
+      new NavigationGrid(map, new OccupancyGrid(map), ground),
       center(map, 0, 1),
       center(map, 4, 1),
     );
@@ -87,7 +88,7 @@ describe("terrain traversal", () => {
   });
 
   test("approaches the closest reachable tile for a blocked target", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
@@ -98,7 +99,7 @@ describe("terrain traversal", () => {
     });
 
     const path = findNavigationPath(
-      new NavigationGrid(map, ground),
+      new NavigationGrid(map, new OccupancyGrid(map), ground),
       center(map, 0, 1),
       center(map, 4, 1),
     );
@@ -110,10 +111,10 @@ describe("terrain traversal", () => {
   });
 
   test("straightens a route across open ground into one segment", () => {
-    const map = new TerrainMap({ width: 9, height: 9, tileSize: 1 });
+    const map = new TerrainGrid({ width: 9, height: 9, tileSize: 1 });
 
     const path = findNavigationPath(
-      new NavigationGrid(map, ground),
+      new NavigationGrid(map, new OccupancyGrid(map), ground),
       center(map, 0, 0),
       center(map, 6, 3),
     );
@@ -122,7 +123,7 @@ describe("terrain traversal", () => {
   });
 
   test("keeps straightened segments off blocked tiles and corners", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 7,
       height: 7,
       tileSize: 1,
@@ -131,7 +132,7 @@ describe("terrain traversal", () => {
         surfacePassable: x === 3 && z < 5 ? false : undefined,
       }),
     });
-    const grid = new NavigationGrid(map, ground);
+    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
     const from = center(map, 1, 1);
 
     const path = findNavigationPath(grid, from, center(map, 5, 1))!;
@@ -147,7 +148,7 @@ describe("terrain traversal", () => {
   });
 
   test("does not escape through a blocked tile it only touches", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
@@ -155,7 +156,7 @@ describe("terrain traversal", () => {
         typeId: x === 2 && z === 1 ? "water" : "plain",
       }),
     });
-    const grid = new NavigationGrid(map, ground);
+    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
     // On the shared edge between plain tile (1, 1) and water tile (2, 1).
     const from = { x: -0.5, z: 0 };
 
@@ -171,7 +172,7 @@ describe("terrain traversal", () => {
   });
 
   test("visits both side tiles where a segment crosses a tile corner", () => {
-    const map = new TerrainMap({ width: 3, height: 3, tileSize: 1 });
+    const map = new TerrainGrid({ width: 3, height: 3, tileSize: 1 });
     const visited: string[] = [];
 
     forEachTileOnSegment(map, center(map, 0, 0), center(map, 1, 1), (x, z) => {
@@ -182,13 +183,13 @@ describe("terrain traversal", () => {
   });
 
   test("resolves a target in another region without searching for it", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
       createTerrain: (x) => ({ typeId: x === 2 ? "water" : "plain" }),
     });
-    const grid = new NavigationGrid(map, ground);
+    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
 
     expect(grid.regionAt(0, 0)).toBe(grid.regionAt(1, 2));
     expect(grid.regionAt(0, 0)).not.toBe(grid.regionAt(4, 0));
@@ -196,19 +197,21 @@ describe("terrain traversal", () => {
   });
 
   test("caches tile costs until the map reports a navigation change", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 2,
       height: 1,
       tileSize: 1,
       terrainTypeIds: ["plain", "rough"],
     });
-    const grid = new NavigationGrid(map, ground);
+    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
     expect(grid.costAt(1, 0)).toBe(1);
 
-    map.setHeight(2, 0, 0.5);
-    map.setHeight(2, 1, 0.5);
-    expect(grid.costAt(1, 0)).toBe(1);
-    map.notifyChange({ minX: 1, minZ: 0, maxX: 1, maxZ: 0 });
+    map.editTerrain({
+      heights: [
+        { x: 2, z: 0, height: 0.5 },
+        { x: 2, z: 1, height: 0.5 },
+      ],
+    });
     expect(grid.costAt(1, 0)).toBeCloseTo(5 / 3);
 
     map.setTerrain(1, 0, { typeId: "rough" });
@@ -216,35 +219,35 @@ describe("terrain traversal", () => {
   });
 
   test("rejects declared terrain types a profile does not price", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 1,
       height: 1,
       tileSize: 1,
       terrainTypeIds: ["plain", "lava"],
     });
 
-    expect(() => new NavigationGrid(map, ground)).toThrow(
-      "has no cost for terrain lava",
-    );
+    expect(
+      () => new NavigationGrid(map, new OccupancyGrid(map), ground),
+    ).toThrow("has no cost for terrain lava");
   });
 
   test("rejects maps with terrain a profile does not price", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 1,
       height: 1,
       tileSize: 1,
       createTerrain: () => ({ typeId: "plains" }),
     });
 
-    expect(() => new NavigationGrid(map, ground)).toThrow(
-      "has no cost for terrain plains",
-    );
+    expect(
+      () => new NavigationGrid(map, new OccupancyGrid(map), ground),
+    ).toThrow("has no cost for terrain plains");
   });
 });
 
 describe("terrain movement", () => {
   test("rejects a command when no meaningful progress is possible", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 3,
       height: 1,
       tileSize: 1,
@@ -266,7 +269,7 @@ describe("terrain movement", () => {
   });
 
   test("keeps the current order when a new one is rejected", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 4,
       height: 1,
       tileSize: 1,
@@ -294,7 +297,7 @@ describe("terrain movement", () => {
   });
 
   test("rebuilds an incomplete saved route at the current map version", () => {
-    const map = new TerrainMap({ width: 3, height: 1, tileSize: 1 });
+    const map = new TerrainGrid({ width: 3, height: 1, tileSize: 1 });
     const saved = createActor({
       id: "trooper",
       definitionId: "trooper",
@@ -307,7 +310,10 @@ describe("terrain movement", () => {
     const simulation = createMissionSimulation({
       state: createMissionState([saved]),
       behaviorRegistry: new Map([
-        ["terrain-move", createTerrainMoveBehavior(map, [ground])],
+        [
+          "terrain-move",
+          createTerrainMoveBehavior(map, new OccupancyGrid(map), [ground]),
+        ],
       ]),
       bounds: map.worldBounds,
       definitions: [
@@ -325,7 +331,7 @@ describe("terrain movement", () => {
   });
 
   test("records the reachable endpoint separately from a blocked target", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
@@ -351,7 +357,7 @@ describe("terrain movement", () => {
   });
 
   test("moves more slowly while crossing rough terrain", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 3,
       height: 1,
       tileSize: 1,
@@ -370,7 +376,7 @@ describe("terrain movement", () => {
   });
 
   test("changes speed at the terrain boundary within a tick", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 3,
       height: 1,
       tileSize: 1,
@@ -391,7 +397,7 @@ describe("terrain movement", () => {
   });
 
   test("replans an active route after terrain changes", () => {
-    const map = new TerrainMap({ width: 5, height: 3, tileSize: 1 });
+    const map = new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
     const simulation = createMovementMission(map, 1, 1, 0, 1);
     simulation.submitCommand({
       kind: "move",
@@ -411,7 +417,7 @@ describe("terrain movement", () => {
   });
 
   test("does not replan a route for a distant terrain change", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 9,
       height: 5,
       tileSize: 1,
@@ -438,7 +444,7 @@ describe("terrain movement", () => {
   });
 
   test("replans an approach order when a distant change opens its target", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 7,
       height: 7,
       tileSize: 1,
@@ -464,7 +470,7 @@ describe("terrain movement", () => {
   });
 
   test("finishes an approach order after an unrelated change", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
@@ -491,7 +497,7 @@ describe("terrain movement", () => {
   });
 
   test("replans at once when a route meets an unexpected blocker", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 5,
       height: 3,
       tileSize: 1,
@@ -516,7 +522,10 @@ describe("terrain movement", () => {
     const simulation = createMissionSimulation({
       state: createMissionState([saved]),
       behaviorRegistry: new Map([
-        ["terrain-move", createTerrainMoveBehavior(map, [ground])],
+        [
+          "terrain-move",
+          createTerrainMoveBehavior(map, new OccupancyGrid(map), [ground]),
+        ],
       ]),
       bounds: map.worldBounds,
       definitions: [
@@ -537,7 +546,7 @@ describe("terrain movement", () => {
   });
 
   test("stops a segment at the first blocked tile", () => {
-    const map = new TerrainMap({
+    const map = new TerrainGrid({
       width: 3,
       height: 1,
       tileSize: 1,
@@ -545,7 +554,7 @@ describe("terrain movement", () => {
     });
 
     const step = advanceAlongSegment(
-      new NavigationGrid(map, ground),
+      new NavigationGrid(map, new OccupancyGrid(map), ground),
       center(map, 0, 0),
       center(map, 2, 0),
       1,
@@ -558,7 +567,7 @@ describe("terrain movement", () => {
   });
 
   test("keeps a blocked order and resumes it after navigation changes", () => {
-    const map = new TerrainMap({ width: 5, height: 1, tileSize: 1 });
+    const map = new TerrainGrid({ width: 5, height: 1, tileSize: 1 });
     const simulation = createMovementMission(map, 1, 0.25);
     simulation.submitCommand({
       kind: "move",
@@ -583,21 +592,24 @@ describe("terrain movement", () => {
   });
 
   test("rejects invalid movement profiles when behavior is configured", () => {
-    const map = new TerrainMap({ width: 1, height: 1, tileSize: 1 });
+    const map = new TerrainGrid({ width: 1, height: 1, tileSize: 1 });
     const invalid = { ...ground, terrainCosts: { plain: Number.NaN } };
 
-    expect(() => createTerrainMoveBehavior(map, [invalid])).toThrow(
-      "Invalid movement profile",
-    );
+    expect(() =>
+      createTerrainMoveBehavior(map, new OccupancyGrid(map), [invalid]),
+    ).toThrow("Invalid movement profile");
   });
 
   test("rejects definitions it cannot move when the mission starts", () => {
-    const map = new TerrainMap({ width: 1, height: 1, tileSize: 1 });
+    const map = new TerrainGrid({ width: 1, height: 1, tileSize: 1 });
     const create = (movement: { speed: number; profileId?: string }) =>
       createMissionSimulation({
         state: createMissionState([]),
         behaviorRegistry: new Map([
-          ["terrain-move", createTerrainMoveBehavior(map, [ground])],
+          [
+            "terrain-move",
+            createTerrainMoveBehavior(map, new OccupancyGrid(map), [ground]),
+          ],
         ]),
         bounds: map.worldBounds,
         definitions: [{ id: "trooper", behaviorId: "terrain-move", movement }],
@@ -614,7 +626,7 @@ describe("terrain movement", () => {
 });
 
 function createMovementMission(
-  map: TerrainMap,
+  map: TerrainGrid,
   speed: number,
   tickSeconds: number,
   tileX = 0,
@@ -629,7 +641,10 @@ function createMovementMission(
       }),
     ]),
     behaviorRegistry: new Map([
-      ["terrain-move", createTerrainMoveBehavior(map, [ground])],
+      [
+        "terrain-move",
+        createTerrainMoveBehavior(map, new OccupancyGrid(map), [ground]),
+      ],
     ]),
     bounds: map.worldBounds,
     definitions: [
@@ -645,16 +660,20 @@ function createMovementMission(
 
 describe("saved missions", () => {
   const createMap = () =>
-    new TerrainMap({
+    new TerrainGrid({
       width: 9,
       height: 5,
       tileSize: 1,
       terrainTypeIds: ["plain", "water"],
     });
   const createSimulation = (
-    map: TerrainMap,
+    map: TerrainGrid,
     state: MissionState,
-    behavior: ActorBehavior = createTerrainMoveBehavior(map, [ground]),
+    behavior: ActorBehavior = createTerrainMoveBehavior(
+      map,
+      new OccupancyGrid(map),
+      [ground],
+    ),
   ) =>
     createMissionSimulation({
       state,
@@ -737,7 +756,7 @@ describe("saved missions", () => {
 
   test("restores terrain into grids that cached the same version", () => {
     const map = createMap();
-    const grid = new NavigationGrid(map, ground);
+    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
     expect(grid.costAt(4, 2)).toBe(1);
     const walled = createMap();
     walled.editTerrain(wall(4));

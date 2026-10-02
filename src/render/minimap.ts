@@ -3,12 +3,13 @@ import { Vector3 } from "@babylonjs/core";
 import { layerSlot } from "../map";
 import { DEFAULT_ACTOR_COLOR } from "./actor";
 import { watchCanvasSize } from "./canvas-size";
+import type { Rgb } from "./color";
+export type { Rgb } from "./color";
 
 import type { Scene } from "@babylonjs/core";
-import type { TerrainBounds, TerrainMap } from "../map";
+import type { TerrainBounds, TerrainMap, TileCoord } from "../map";
 import type { StrategyCamera } from "./camera";
 
-export type Rgb = [number, number, number];
 type ScreenPoint = { x: number; y: number };
 
 const OUTLINE_COLOR = "rgb(242 199 89)";
@@ -38,10 +39,12 @@ export type Minimap = {
   dispose: () => void;
 };
 
-/** Render-only information for a mobile actor shown on the minimap. */
+/** Render-only information for an actor shown on the minimap. */
 export type MinimapActor = {
   id: string;
   worldPosition: { x: number; z: number };
+  /** Draws these tiles instead of a marker, as for a tile-placed actor. */
+  tiles?: readonly TileCoord[];
   /** Renderer-facing marker color, independent of simulation state. */
   color?: Rgb;
   selected?: boolean;
@@ -122,10 +125,24 @@ export function createMinimap(
     if (actorsStale) {
       actorsStale = false;
       const nextActorMarkers = actors().map(
-        ({ id, worldPosition, color = DEFAULT_ACTOR_COLOR, selected }) => ({
+        ({
+          id,
+          worldPosition,
+          tiles,
+          color = DEFAULT_ACTOR_COLOR,
+          selected,
+        }) => ({
           id,
           point: projection.toMinimap(worldPosition),
-          color,
+          tiles: tiles?.map(({ x, z }) =>
+            [
+              map.worldPoint(x, z, 0),
+              map.worldPoint(x + 1, z, 0),
+              map.worldPoint(x + 1, z + 1, 0),
+              map.worldPoint(x, z + 1, 0),
+            ].map(projection.toMinimap),
+          ),
+          color: [...color] as Rgb,
           selected: selected ?? false,
         }),
       );
@@ -287,14 +304,24 @@ export function createMinimap(
 type ActorMarker = {
   id: string;
   point: ScreenPoint;
+  /** Outlines of tiles to fill in place of the round marker. */
+  tiles?: ScreenPoint[][];
   color: Rgb;
   selected: boolean;
 };
 
 function drawActors(context: CanvasRenderingContext2D, actors: ActorMarker[]) {
-  for (const { point, color, selected } of actors) {
+  for (const { point, tiles, color, selected } of actors) {
     context.beginPath();
-    context.arc(point.x, point.y, ACTOR_RADIUS, 0, Math.PI * 2);
+    if (tiles) {
+      for (const [first, ...rest] of tiles) {
+        context.moveTo(first!.x, first!.y);
+        for (const corner of rest) context.lineTo(corner.x, corner.y);
+        context.closePath();
+      }
+    } else {
+      context.arc(point.x, point.y, ACTOR_RADIUS, 0, Math.PI * 2);
+    }
     context.fillStyle = cssColor(color);
     context.fill();
     if (selected) {
@@ -316,8 +343,20 @@ function sameActorMarkers(left: ActorMarker[], right: ActorMarker[]): boolean {
         actor.color.every(
           (channel, colorIndex) => channel === right[index]?.color[colorIndex],
         ) &&
-        actor.selected === right[index]?.selected,
+        actor.selected === right[index]?.selected &&
+        sameTilePolygons(actor.tiles, right[index]?.tiles),
     )
+  );
+}
+
+function sameTilePolygons(
+  left: ScreenPoint[][] | undefined,
+  right: ScreenPoint[][] | undefined,
+): boolean {
+  if (!left || !right) return left === right;
+  return (
+    left.length === right.length &&
+    left.every((polygon, index) => samePoints(polygon, right[index]!))
   );
 }
 

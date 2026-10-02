@@ -4,11 +4,11 @@ import { NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { exportInfantry, INFANTRY_ROLES } from "../scripts/infantry-model";
-import { PROTOTYPE_ACTOR_DEFINITIONS } from "../src/prototype";
+import { PROTOTYPE_ACTOR_GRAPHICS } from "../src/prototype";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
 import type { AbstractMesh, TransformNode } from "@babylonjs/core";
-import type { ActorGraphics } from "../src/simulation/actor";
+import type { ActorGraphics } from "../src/render/skinned-actor-appearance";
 
 test.each(INFANTRY_ROLES)("the committed %s GLB is current", async (role) => {
   const committed = readFileSync(`public/assets/actors/arc-${role}.glb`);
@@ -36,7 +36,7 @@ function skinnedMesh(root: TransformNode): AbstractMesh {
   return root.getChildMeshes().find((mesh) => mesh.skeleton)!;
 }
 
-describe.each(PROTOTYPE_ACTOR_DEFINITIONS)("$id model", ({ graphics }) => {
+describe.each([...PROTOTYPE_ACTOR_GRAPHICS])("%s model", (_id, graphics) => {
   test("gives each instance its own rig and clips", async () => {
     const { engine, scene, appearance } = await load(graphics);
     const first = appearance.instantiate("first", 0);
@@ -54,8 +54,8 @@ describe.each(PROTOTYPE_ACTOR_DEFINITIONS)("$id model", ({ graphics }) => {
       [
         graphics.clips.idle,
         graphics.clips.locomotion,
-        graphics.clips.turn.left,
-        graphics.clips.turn.right,
+        graphics.clips.turn!.left,
+        graphics.clips.turn!.right,
       ]
         .map((name) => `first-${name}`)
         .sort(),

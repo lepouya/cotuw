@@ -15,11 +15,22 @@ import {
   createMinimap,
   createMovementPathView,
   createActorViewRegistry,
+  createTilePlacedActorViewRegistry,
   createMeshAppearance,
   createTerrainMeshes,
+  DEFAULT_ACTOR_COLOR,
 } from "./render";
 import { createActor } from "./simulation/actor";
-import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
+import { OccupancyGrid } from "./simulation/occupancy";
+import {
+  createTilePlacedActor,
+  isTilePlacedActor,
+  occupiedTilesFor,
+} from "./simulation/placement";
+import {
+  loadSkinnedActorAppearance,
+  validateActorGraphics,
+} from "./render/skinned-actor-appearance";
 import { startSimulationLoop } from "./simulation/loop";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import {
@@ -30,8 +41,15 @@ import {
 import type { Scene } from "@babylonjs/core";
 import type { TileLayer, TileType } from "./map";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
-import type { Actor, ActorDefinition } from "./simulation/actor";
+import type {
+  Actor,
+  ActorDefinition,
+  ActorRenderState,
+} from "./simulation/actor";
 import type { MovementProfile } from "./simulation/navigation";
+import type { ActorGraphics } from "./render/skinned-actor-appearance";
+import type { TilePlacedActorAppearance } from "./render";
+import type { ActorPlacement } from "./simulation/placement";
 
 const TILE_COUNT = 100;
 const TILE_SIZE = 1;
@@ -47,6 +65,11 @@ const SIMULATION_TICK_SECONDS = 1 / 60;
 const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Covers background-tab throttling to one timer callback per second. */
 const MAX_CATCH_UP_SECONDS = 5;
+const PROTOTYPE_BLOCKER_ORIGIN = { x: 49, z: 39 };
+
+export type TerrainPrototypeControls = {
+  blockerToggle?: HTMLButtonElement;
+};
 
 export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
   {
@@ -62,7 +85,36 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
     id: "arc-trooper",
     behaviorId: "terrain-move",
     movement: { speed: 4, profileId: "surface-ground" },
-    graphics: {
+  },
+  {
+    id: "arc-scout",
+    behaviorId: "terrain-move",
+    movement: { speed: 7, profileId: "surface-ground" },
+  },
+  {
+    id: "arc-command-center-prototype",
+    behaviorId: "idle",
+    footprint: {
+      layer: "surface",
+      occupiedTiles: [
+        { x: 0, z: 0 },
+        { x: 1, z: 0 },
+        { x: 0, z: 1 },
+        { x: 1, z: 1 },
+      ],
+      blocksMovement: true,
+    },
+    placement: {
+      terrainTypeIds: ["plain", "path", "rough"],
+      maxSlope: 0.75,
+    },
+  },
+] satisfies readonly ActorDefinition[];
+
+export const PROTOTYPE_ACTOR_GRAPHICS = new Map<string, ActorGraphics>([
+  [
+    "arc-trooper",
+    {
       url: "/assets/actors/arc-trooper.glb",
       minimapColor: [0.82, 0.28, 0.1],
       bounds: { radius: 0.45, height: 1.95 },
@@ -73,12 +125,10 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
       },
       cycleDistance: 2.1,
     },
-  },
-  {
-    id: "arc-scout",
-    behaviorId: "terrain-move",
-    movement: { speed: 7, profileId: "surface-ground" },
-    graphics: {
+  ],
+  [
+    "arc-scout",
+    {
       url: "/assets/actors/arc-scout.glb",
       minimapColor: [0.12, 0.62, 0.82],
       bounds: { radius: 0.4, height: 1.65 },
@@ -89,8 +139,22 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
       },
       cycleDistance: 1.5,
     },
-  },
-] satisfies readonly ActorDefinition[];
+  ],
+]);
+
+export const PROTOTYPE_TILE_PLACED_APPEARANCES = new Map<
+  string,
+  TilePlacedActorAppearance
+>([
+  [
+    "arc-command-center-prototype",
+    {
+      height: 2.4,
+      color: [0.28, 0.38, 0.42],
+      minimapColor: [0.36, 0.7, 0.76],
+    },
+  ],
+]);
 
 /**
  * Water, ripples and clutter are each optional, so every type pins its slot.
@@ -158,31 +222,64 @@ export const PROTOTYPE_VIEW_OPTIONS = {
 export async function createTerrainPrototype(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
+  { blockerToggle }: TerrainPrototypeControls = {},
 ): Promise<GameView> {
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
   createTerrainMeshes(view.scene, map);
+  const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
     state: createMissionState(createPrototypeActors(map)),
     behaviorRegistry: new Map([
       [
         "terrain-move",
-        createTerrainMoveBehavior(map, PROTOTYPE_MOVEMENT_PROFILES),
+        createTerrainMoveBehavior(map, occupancy, PROTOTYPE_MOVEMENT_PROFILES),
       ],
+      ["idle", { handleCommand: () => false, update: () => {} }],
     ]),
     bounds: map.worldBounds,
     definitions: PROTOTYPE_ACTOR_DEFINITIONS,
     tickSeconds: SIMULATION_TICK_SECONDS,
     map,
+    occupancy,
   });
   const appearances = createPrototypeStandInAppearances(view.scene);
   const actorViews = createActorViewRegistry(view.scene, map, appearances);
+  const tilePlacedViews = createTilePlacedActorViewRegistry(
+    view.scene,
+    map,
+    PROTOTYPE_ACTOR_DEFINITIONS,
+    PROTOTYPE_TILE_PLACED_APPEARANCES,
+  );
   const movementPath = createMovementPathView(view.scene, map);
-  actorViews.update(simulation.actors, 1);
+  const partition = (actors: readonly ActorRenderState[]) => ({
+    actors,
+    mobile: actors.filter((actor) => !isTilePlacedActor(actor)),
+    placed: actors.filter(isTilePlacedActor),
+  });
+  // Split once per committed tick; the simulation replaces its array each tick.
+  let partitioned = partition(simulation.actors);
+  const actorsByKind = () => {
+    if (partitioned.actors !== simulation.actors) {
+      partitioned = partition(simulation.actors);
+    }
+    return partitioned;
+  };
+  const definitionsById = new Map(
+    PROTOTYPE_ACTOR_DEFINITIONS.map((definition) => [
+      definition.id,
+      definition,
+    ]),
+  );
+  actorViews.update(actorsByKind().mobile, 1);
+  tilePlacedViews.update(actorsByKind().placed);
+  let simulationFaulted = false;
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: actorViews.actorIdForMesh,
-    submitCommand: simulation.submitCommand,
+    submitCommand: (command) => {
+      if (!simulationFaulted) simulation.submitCommand(command);
+    },
     onSelectionChanged: (actorId) => {
       actorViews.setSelectedActor(actorId);
       movementPath.setSelectedActor(actorId);
@@ -192,22 +289,72 @@ export async function createTerrainPrototype(
     },
   });
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
-    actors: () =>
-      simulation.actors.map((actor) => ({
+    // Structures first, so unit markers draw over them.
+    actors: () => [
+      ...actorsByKind().placed.map((actor) => ({
+        id: actor.id,
+        worldPosition: actor.worldPosition,
+        tiles: occupiedTilesFor(
+          actor,
+          definitionsById.get(actor.definitionId)!,
+        ),
+        color: PROTOTYPE_TILE_PLACED_APPEARANCES.get(actor.definitionId)
+          ?.minimapColor,
+      })),
+      ...actorsByKind().mobile.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
         color: appearances.get(actor.definitionId)?.minimapColor,
         selected: actor.id === input.selectedActorId,
       })),
+    ],
   });
   input.select(undefined);
+  let nextBlockerId = 1;
+  let activeBlockerId = "prototype-command-center-0";
+  let blockerCommandPending = false;
+  const updateBlockerToggle = () => {
+    if (!blockerToggle) {
+      return;
+    }
+    blockerToggle.textContent =
+      simulation.actorById(activeBlockerId) !== undefined
+        ? "Remove 2×2 blocker"
+        : "Place 2×2 blocker";
+    blockerToggle.disabled = blockerCommandPending || simulationFaulted;
+  };
+  const toggleBlocker = () => {
+    if (blockerCommandPending || simulationFaulted) {
+      return;
+    }
+    blockerCommandPending = true;
+    const current = simulation.actorById(activeBlockerId);
+    if (current) {
+      simulation.submitCommand({
+        kind: "remove-actor",
+        actorId: current.id,
+      });
+    } else {
+      activeBlockerId = `prototype-command-center-${nextBlockerId++}`;
+      simulation.submitCommand({
+        kind: "place-actor",
+        ...blockerPlacement(activeBlockerId),
+      });
+    }
+    updateBlockerToggle();
+  };
+  blockerToggle?.addEventListener("click", toggleBlocker);
+  updateBlockerToggle();
   let knownActorVersion = simulation.actorVersion;
 
   const loop = startSimulationLoop(simulation, {
     pumpMilliseconds: SIMULATION_PUMP_MILLISECONDS,
     maxCatchUpSeconds: MAX_CATCH_UP_SECONDS,
-    beforeTick: () => actorViews.capturePreviousPoses(simulation.actors),
+    beforeTick: () => actorViews.capturePreviousPoses(actorsByKind().mobile),
     onFault: () => {
+      simulationFaulted = true;
+      blockerCommandPending = false;
+      updateBlockerToggle();
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
@@ -222,6 +369,13 @@ export async function createTerrainPrototype(
         if (accepted && command.kind === "move") {
           canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
         }
+        if (command.kind === "place-actor" || command.kind === "remove-actor") {
+          blockerCommandPending = false;
+          canvas.dataset.tilePlacedActorCommand = accepted
+            ? "accepted"
+            : "rejected";
+          updateBlockerToggle();
+        }
       }
     },
   });
@@ -235,16 +389,24 @@ export async function createTerrainPrototype(
       ) {
         input.select(undefined);
       }
+      const { placed } = actorsByKind();
+      tilePlacedViews.update(placed);
+      canvas.dataset.tilePlacedActorCount = String(placed.length);
+      updateBlockerToggle();
       minimap.refreshActors();
     }
-    actorViews.update(simulation.actors, loop.tickProgress());
-    movementPath.update(simulation.actors);
+    const { mobile } = actorsByKind();
+    actorViews.update(mobile, loop.tickProgress());
+    movementPath.update(mobile);
   });
   view.scene.onDisposeObservable.add(() => {
     loop.stop();
+    simulation.dispose();
     input.dispose();
+    blockerToggle?.removeEventListener("click", toggleBlocker);
     view.scene.onBeforeRenderObservable.remove(renderObserver);
     actorViews.dispose();
+    tilePlacedViews.dispose();
     movementPath.dispose();
     for (const appearance of appearances.values()) appearance.dispose();
   });
@@ -252,10 +414,12 @@ export async function createTerrainPrototype(
   view.scene.onAfterRenderObservable.addOnce(() => {
     canvas.dataset.terrainReady = "true";
     canvas.dataset.actorReady = "true";
+    canvas.dataset.tilePlacedActorReady = "true";
+    canvas.dataset.tilePlacedActorCount = String(actorsByKind().placed.length);
   });
 
   await Promise.all(
-    PROTOTYPE_ACTOR_DEFINITIONS.map(async ({ id, graphics }) => {
+    [...PROTOTYPE_ACTOR_GRAPHICS].map(async ([id, graphics]) => {
       let appearance: ActorAppearance;
       try {
         appearance = await loadSkinnedActorAppearance(view.scene, graphics);
@@ -269,7 +433,7 @@ export async function createTerrainPrototype(
       }
       const previous = appearances.get(id);
       appearances.set(id, appearance);
-      actorViews.update(simulation.actors, loop.tickProgress());
+      actorViews.update(actorsByKind().mobile, loop.tickProgress());
       previous?.dispose();
     }),
   );
@@ -280,7 +444,8 @@ function createPrototypeStandInAppearances(
   scene: Scene,
 ): Map<string, ActorAppearance> {
   return new Map(
-    PROTOTYPE_ACTOR_DEFINITIONS.map(({ id, graphics }) => {
+    [...PROTOTYPE_ACTOR_GRAPHICS].map(([id, graphics]) => {
+      validateActorGraphics(graphics);
       const { radius, height } = graphics.bounds;
       const mesh = MeshBuilder.CreateBox(
         `actor-template-${id}`,
@@ -292,7 +457,9 @@ function createPrototypeStandInAppearances(
         `actor-template-${id}-material`,
         scene,
       );
-      material.diffuseColor = new Color3(...graphics.minimapColor);
+      material.diffuseColor = new Color3(
+        ...(graphics.minimapColor ?? DEFAULT_ACTOR_COLOR),
+      );
       material.specularColor = new Color3(0.12, 0.12, 0.12);
       mesh.material = material;
       return [
@@ -315,7 +482,24 @@ function createPrototypeActors(map: TerrainMap): Actor[] {
       definitionId: "arc-scout",
       worldPosition: map.tileCenter(55, 45),
     }),
+    createPrototypeBlocker(map, "prototype-command-center-0"),
   ];
+}
+
+function blockerPlacement(actorId: string): ActorPlacement {
+  return {
+    actorId,
+    definitionId: "arc-command-center-prototype",
+    origin: { ...PROTOTYPE_BLOCKER_ORIGIN },
+  };
+}
+
+function createPrototypeBlocker(map: TerrainMap, actorId: string): Actor {
+  const placement = blockerPlacement(actorId);
+  const definition = PROTOTYPE_ACTOR_DEFINITIONS.find(
+    ({ id }) => id === placement.definitionId,
+  )!;
+  return createTilePlacedActor(map, definition, placement);
 }
 
 export function createPrototypeMap(): TerrainMap {

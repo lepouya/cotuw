@@ -73,6 +73,27 @@ h1 {
   color: #d8bd79;
 }
 
+.terrain-hud button {
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgb(216 189 121 / 70%);
+  border-radius: 0.2rem;
+  color: #f4f0df;
+  background: rgb(34 57 59 / 92%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.terrain-hud button:hover,
+.terrain-hud button:focus-visible {
+  background: rgb(49 77 78 / 96%);
+}
+
+.terrain-hud button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .minimap {
   position: absolute;
   top: clamp(1rem, 3vw, 2.5rem);

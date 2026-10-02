@@ -24,6 +24,7 @@ function movingActor({
     definitionId: "trooper",
     worldPosition: { x, z: 0 },
     facing: 0,
+    occupancyLayer: "surface",
     movement: {
       target,
       destination,

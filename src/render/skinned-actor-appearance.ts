@@ -7,10 +7,25 @@ import { RegisterSceneLoaderPlugin } from "@babylonjs/core/Loading/sceneLoader.j
 import { GLTFFileLoaderMetadata } from "@babylonjs/loaders/glTF/glTFFileLoader.metadata.js";
 
 import { createGaitState, stepGait } from "./actor-gait";
+import { isRgb } from "./color";
 
 import type { AssetContainer, Scene } from "@babylonjs/core";
-import type { ActorGraphics } from "../simulation/actor";
 import type { ActorAppearance, ActorInstance } from "./actor";
+import type { Rgb } from "./color";
+
+/** Renderer-owned GLB and animation configuration for one actor definition. */
+export type ActorGraphics = {
+  url: string;
+  minimapColor?: Rgb;
+  bounds: { radius: number; height: number };
+  clips: {
+    idle: string;
+    locomotion: string;
+    turn?: { left: string; right: string };
+  };
+  /** Ground units traveled during one locomotion clip cycle. */
+  cycleDistance: number;
+};
 
 // Actor assets use core glTF 2.0. Register more extensions here only when an
 // authored asset requires them, so unrelated formats stay out of startup.
@@ -42,6 +57,7 @@ export async function loadSkinnedActorAppearance(
   scene: Scene,
   graphics: ActorGraphics,
 ): Promise<ActorAppearance> {
+  validateActorGraphics(graphics);
   const assets = await LoadAssetContainerAsync(graphics.url, scene);
   let clips: ClipGroups;
   try {
@@ -59,17 +75,14 @@ export async function loadSkinnedActorAppearance(
   };
 }
 
-function prepareClips(
-  assets: AssetContainer,
-  { url, bounds, clips, cycleDistance }: ActorGraphics,
-): ClipGroups {
-  const invalid = (problem: string) =>
-    new Error(`Actor model ${url} ${problem}`);
-  if (assets.skeletons.length === 0) {
-    throw invalid("has no skin");
-  }
+export function validateActorGraphics({
+  url,
+  bounds,
+  cycleDistance,
+  minimapColor,
+}: ActorGraphics): void {
   if (!(cycleDistance > 0 && Number.isFinite(cycleDistance))) {
-    throw invalid("needs a positive cycle distance");
+    throw new RangeError(`Actor model ${url} needs a positive cycle distance`);
   }
   if (
     !Number.isFinite(bounds.radius) ||
@@ -77,7 +90,21 @@ function prepareClips(
     bounds.radius <= 0 ||
     bounds.height <= 0
   ) {
-    throw invalid("needs positive finite bounds");
+    throw new RangeError(`Actor model ${url} needs positive finite bounds`);
+  }
+  if (minimapColor !== undefined && !isRgb(minimapColor)) {
+    throw new RangeError(`Actor model ${url} needs a valid minimap color`);
+  }
+}
+
+function prepareClips(
+  assets: AssetContainer,
+  { url, clips }: ActorGraphics,
+): ClipGroups {
+  const invalid = (problem: string) =>
+    new Error(`Actor model ${url} ${problem}`);
+  if (assets.skeletons.length === 0) {
+    throw invalid("has no skin");
   }
   const clipNames = [
     clips.idle,

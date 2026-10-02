@@ -1,5 +1,89 @@
 import { expect, test } from "@playwright/test";
 
+test("refreshes footprint geometry and in-place color changes at the same center", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const results = await page.evaluate(async () => {
+    const minimapPath: string = "/src/render/minimap.ts";
+    const mapPath: string = "/src/map.ts";
+    const corePath: string = "/e2e/harness.ts";
+    const { createMinimap } = await import(minimapPath);
+    const { TerrainMap } = await import(mapPath);
+    const { EngineStore } = await import(corePath);
+    const scene = EngineStore.Instances[0].scenes[0];
+    const map = new TerrainMap({ width: 4, height: 4, tileSize: 1 });
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width:200px;height:200px";
+    document.body.append(canvas);
+    const context = canvas.getContext("2d")!;
+    let corners = 0;
+    const fills: {
+      corners: number;
+      color: string | CanvasGradient | CanvasPattern;
+    }[] = [];
+    const moveTo = context.moveTo.bind(context);
+    const fill = context.fill.bind(context);
+    const beginPath = context.beginPath.bind(context);
+    context.beginPath = () => {
+      corners = 0;
+      beginPath();
+    };
+    context.moveTo = (x, y) => {
+      corners++;
+      moveTo(x, y);
+    };
+    context.fill = () => {
+      fills.push({ corners, color: context.fillStyle });
+      fill();
+    };
+    const actor = {
+      id: "structure",
+      worldPosition: { x: 0, z: 0 },
+      tiles: [{ x: 1, z: 1 }],
+      color: [1, 0, 0],
+    };
+    const minimap = createMinimap(
+      scene,
+      map,
+      {
+        viewFootprint: () => [
+          { x: -1, z: -1 },
+          { x: 1, z: -1 },
+          { x: 1, z: 1 },
+          { x: -1, z: 1 },
+        ],
+      },
+      canvas,
+      { actors: () => [actor] },
+    );
+    try {
+      scene.onAfterRenderObservable.notifyObservers(scene);
+      const first = fills[0];
+      fills.length = 0;
+      actor.tiles = [
+        { x: 1, z: 1 },
+        { x: 2, z: 1 },
+      ];
+      minimap.refreshActors();
+      scene.onAfterRenderObservable.notifyObservers(scene);
+      const geometry = fills[0];
+      fills.length = 0;
+      actor.color[0] = 0;
+      actor.color[2] = 1;
+      minimap.refreshActors();
+      scene.onAfterRenderObservable.notifyObservers(scene);
+      return { first, geometry, color: fills[0] };
+    } finally {
+      minimap.dispose();
+      canvas.remove();
+    }
+  });
+  expect(results.first).toEqual({ corners: 1, color: "#ff0000" });
+  expect(results.geometry).toEqual({ corners: 2, color: "#ff0000" });
+  expect(results.color).toEqual({ corners: 2, color: "#0000ff" });
+});
+
 import type { Page } from "@playwright/test";
 
 /** In-page test helpers, loaded by `openHarness`. */

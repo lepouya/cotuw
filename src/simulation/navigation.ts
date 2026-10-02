@@ -1,6 +1,7 @@
 import { clampToBounds } from "./world";
 
-import type { TerrainMap, TileCoord } from "../map";
+import type { TerrainView, TileCoord } from "./terrain";
+import type { OccupancyLayer, OccupancyView } from "./occupancy";
 import type { WorldPosition } from "./world";
 
 export type MovementProfile = {
@@ -63,7 +64,7 @@ export function validateMovementProfile(profile: MovementProfile): void {
  * `undefined` when it is blocked.
  */
 export function traversalCostAt(
-  map: TerrainMap,
+  map: TerrainView,
   profile: MovementProfile,
   x: number,
   z: number,
@@ -106,8 +107,10 @@ export function traversalCostAt(
  * a navigation change. The cache is derived data and never affects results.
  */
 export class NavigationGrid {
-  readonly map: TerrainMap;
+  readonly map: TerrainView;
+  readonly occupancy: OccupancyView;
   readonly profile: MovementProfile;
+  readonly occupancyLayer: OccupancyLayer;
   /** Lowest cost per world unit, which keeps the A* estimate admissible. */
   readonly minimumCost: number;
   private readonly costs: Float64Array;
@@ -115,7 +118,12 @@ export class NavigationGrid {
   private version: number;
   private generation: number;
 
-  constructor(map: TerrainMap, profile: MovementProfile) {
+  constructor(
+    map: TerrainView,
+    occupancy: OccupancyView,
+    profile: MovementProfile,
+    occupancyLayer: OccupancyLayer = "surface",
+  ) {
     validateMovementProfile(profile);
     for (const typeId of map.terrainTypeIds) {
       if (!Object.prototype.hasOwnProperty.call(profile.terrainCosts, typeId)) {
@@ -125,7 +133,9 @@ export class NavigationGrid {
       }
     }
     this.map = map;
+    this.occupancy = occupancy;
     this.profile = profile;
+    this.occupancyLayer = occupancyLayer;
     this.minimumCost = Math.min(
       ...Object.values(profile.terrainCosts).filter(
         (cost): cost is number => cost !== null,
@@ -144,7 +154,9 @@ export class NavigationGrid {
     const index = this.map.tileIndex(x, z);
     let cost = this.costs[index]!;
     if (Number.isNaN(cost)) {
-      cost = traversalCostAt(this.map, this.profile, x, z) ?? BLOCKED_COST;
+      cost = this.occupancy.blocksMovementAt(x, z, this.occupancyLayer)
+        ? BLOCKED_COST
+        : (traversalCostAt(this.map, this.profile, x, z) ?? BLOCKED_COST);
       this.costs[index] = cost;
     }
     return cost === BLOCKED_COST ? undefined : cost;
@@ -177,9 +189,12 @@ export class NavigationGrid {
     if (sameGeneration && this.version === navigationChanges.version) {
       return;
     }
-    const changes = sameGeneration
-      ? navigationChanges.since(this.version)
+    const entries = sameGeneration
+      ? navigationChanges.entriesSince(this.version, this.occupancyLayer)
       : undefined;
+    const changes = entries
+      ?.filter(({ effect }) => effect !== "none")
+      .map(({ bounds }) => bounds);
     if (!changes) {
       this.costs.fill(UNKNOWN_COST);
     }
@@ -192,7 +207,7 @@ export class NavigationGrid {
         }
       }
     }
-    this.regions = undefined;
+    if (!changes || changes.length > 0) this.regions = undefined;
     this.version = navigationChanges.version;
     this.generation = navigationChanges.generation;
   }
@@ -294,7 +309,7 @@ export function findNavigationPath(
  * same corner rule as a diagonal step. Returns false if `visit` stopped it.
  */
 export function forEachTileOnSegment(
-  map: TerrainMap,
+  map: TerrainView,
   from: WorldPosition,
   to: WorldPosition,
   visit: (x: number, z: number, length: number) => boolean | void,
@@ -401,7 +416,7 @@ export function occupiedTile(
 
 /** The tile a mover occupies when it leaves `position` in this direction. */
 export function tileAlong(
-  map: TerrainMap,
+  map: TerrainView,
   position: WorldPosition,
   xDirection: number,
   zDirection: number,
@@ -561,7 +576,7 @@ function octileDistance(from: TileCoord, to: TileCoord): number {
   return Math.max(x, z) + (Math.SQRT2 - 1) * Math.min(x, z);
 }
 
-function tileForIndex(map: TerrainMap, index: number): TileCoord {
+function tileForIndex(map: TerrainView, index: number): TileCoord {
   return { x: index % map.width, z: Math.floor(index / map.width) };
 }
 

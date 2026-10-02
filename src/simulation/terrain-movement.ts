@@ -3,10 +3,13 @@ import {
   forEachTileOnSegment,
   NavigationGrid,
   occupiedTile,
+  segmentCost,
 } from "./navigation";
+import { isOccupancyLayer } from "./occupancy";
 import { isFinitePosition, withinBounds } from "./world";
 
-import type { TerrainBounds, TerrainMap } from "../map";
+import type { TerrainBounds, TerrainView } from "./terrain";
+import type { OccupancyLayer, OccupancyView } from "./occupancy";
 import type {
   Actor,
   ActorBehavior,
@@ -20,10 +23,12 @@ const POSITION_EPSILON = 1e-9;
 
 /** Creates deterministic continuous movement over weighted terrain routes. */
 export function createTerrainMoveBehavior(
-  map: TerrainMap,
+  map: TerrainView,
+  occupancy: OccupancyView,
   profiles: readonly MovementProfile[],
 ): ActorBehavior {
-  const grids = new Map<string, NavigationGrid>();
+  // Grids by profile ID, then by occupancy layer.
+  const grids = new Map<string, Map<OccupancyLayer, NavigationGrid>>();
   for (const profile of profiles) {
     if (grids.has(profile.id)) {
       throw new RangeError(`Duplicate movement profile: ${profile.id}.`);
@@ -32,14 +37,31 @@ export function createTerrainMoveBehavior(
       ...profile,
       terrainCosts: Object.freeze({ ...profile.terrainCosts }),
     });
-    grids.set(profile.id, new NavigationGrid(map, stored));
+    // Constructing the surface grid validates the profile against the map.
+    grids.set(
+      profile.id,
+      new Map([["surface", new NavigationGrid(map, occupancy, stored)]]),
+    );
   }
   // Definitions are validated before any command or update reaches them.
-  const gridFor = (definition: ActorDefinition): NavigationGrid =>
-    grids.get(definition.movement!.profileId!)!;
+  const gridFor = (
+    actor: Readonly<Actor>,
+    definition: ActorDefinition,
+  ): NavigationGrid => {
+    const byLayer = grids.get(definition.movement!.profileId!)!;
+    const layer = actor.occupancyLayer;
+    let grid = byLayer.get(layer);
+    if (!grid) {
+      const { profile } = byLayer.get("surface")!;
+      grid = new NavigationGrid(map, occupancy, profile, layer);
+      byLayer.set(layer, grid);
+    }
+    return grid;
+  };
   const changes = map.navigationChanges;
 
   const replan = (actor: Actor, order: MovementOrder, grid: NavigationGrid) => {
+    order.occupancyLayer = grid.occupancyLayer;
     const path = findNavigationPath(grid, actor.worldPosition, order.target);
     // An order may end on the actor's own tile only if that was already its
     // destination.
@@ -106,6 +128,12 @@ export function createTerrainMoveBehavior(
           `Actor ${actor.id} has an invalid route position.`,
         );
       }
+      if (
+        order.occupancyLayer !== undefined &&
+        !isOccupancyLayer(order.occupancyLayer)
+      ) {
+        throw new RangeError(`Actor ${actor.id} has an invalid route layer.`);
+      }
     },
     handleCommand: (actor, definition, command) => {
       switch (command.kind) {
@@ -113,7 +141,7 @@ export function createTerrainMoveBehavior(
           delete actor.movement;
           return true;
         case "move": {
-          const grid = gridFor(definition);
+          const grid = gridFor(actor, definition);
           const path = findNavigationPath(
             grid,
             actor.worldPosition,
@@ -128,6 +156,7 @@ export function createTerrainMoveBehavior(
             ...path,
             waypointIndex: 0,
             navigationVersion: changes.version,
+            occupancyLayer: grid.occupancyLayer,
           };
           return true;
         }
@@ -142,15 +171,16 @@ export function createTerrainMoveBehavior(
       if (!order) {
         return;
       }
-      const grid = gridFor(definition);
+      const grid = gridFor(actor, definition);
       const routeMissing =
         !order.waypoints ||
         order.waypointIndex === undefined ||
         order.destination === undefined ||
-        order.reachedTarget === undefined;
+        order.reachedTarget === undefined ||
+        order.occupancyLayer !== actor.occupancyLayer;
       let replanned = false;
       if (routeMissing || order.navigationVersion !== changes.version) {
-        if (routeMissing || needsReplan(map, actor, order)) {
+        if (routeMissing || needsReplan(grid, actor, order)) {
           replan(actor, order, grid);
           replanned = true;
         } else {
@@ -287,7 +317,7 @@ function getsCloser(
 }
 
 function sameTile(
-  map: TerrainMap,
+  map: TerrainView,
   left: WorldPosition,
   right: WorldPosition,
 ): boolean {
@@ -302,10 +332,22 @@ function sameTile(
  * them.
  */
 function needsReplan(
-  map: TerrainMap,
+  grid: NavigationGrid,
   actor: Actor,
   order: MovementOrder,
 ): boolean {
+  const { map } = grid;
+  const changes = map.navigationChanges.entriesSince(
+    order.navigationVersion ?? -1,
+    grid.occupancyLayer,
+  );
+  if (!changes) {
+    return true;
+  }
+  const relevant = changes.filter(({ effect }) => effect !== "none");
+  if (relevant.length === 0) {
+    return false;
+  }
   if (
     order.blocked ||
     order.reachedTarget !== true ||
@@ -314,12 +356,61 @@ function needsReplan(
   ) {
     return true;
   }
-  const changes = map.navigationChanges.since(order.navigationVersion ?? -1);
-  return !changes || routeIntersectsChanges(map, actor, order, changes);
+  const increases = relevant
+    .filter(({ effect }) => effect === "increase" || effect === "mixed")
+    .map(({ bounds }) => bounds);
+  if (routeIntersectsChanges(map, actor, order, increases)) {
+    return true;
+  }
+  const decreases = relevant
+    .filter(({ effect }) => effect === "decrease" || effect === "mixed")
+    .map(({ bounds }) => bounds);
+  return (
+    decreases.length > 0 &&
+    changesCouldShortenRoute(grid, actor, order, decreases)
+  );
+}
+
+/**
+ * Whether a route through any changed area could take less time than the
+ * remaining route, assuming the cheapest terrain all the way.
+ */
+function changesCouldShortenRoute(
+  grid: NavigationGrid,
+  actor: Actor,
+  order: MovementOrder,
+  changes: readonly Readonly<TerrainBounds>[],
+): boolean {
+  const { map } = grid;
+  const remaining = [
+    actor.worldPosition,
+    ...order.waypoints!.slice(order.waypointIndex),
+  ];
+  let routeCost = 0;
+  for (let index = 1; index < remaining.length; index += 1) {
+    const cost = segmentCost(grid, remaining[index - 1]!, remaining[index]!);
+    if (cost === undefined) {
+      return true;
+    }
+    routeCost += cost;
+  }
+  return changes.some((bounds) => {
+    const low = map.worldPositionAt(bounds.minX, bounds.minZ);
+    const high = map.worldPositionAt(bounds.maxX + 1, bounds.maxZ + 1);
+    const distanceToBounds = (point: WorldPosition) =>
+      Math.hypot(
+        point.x - Math.min(Math.max(point.x, low.x), high.x),
+        point.z - Math.min(Math.max(point.z, low.z), high.z),
+      );
+    const shortcutCost =
+      (distanceToBounds(actor.worldPosition) + distanceToBounds(order.target)) *
+      grid.minimumCost;
+    return shortcutCost + POSITION_EPSILON < routeCost;
+  });
 }
 
 function routeIntersectsChanges(
-  map: TerrainMap,
+  map: TerrainView,
   actor: Actor,
   order: MovementOrder,
   changes: readonly Readonly<TerrainBounds>[],

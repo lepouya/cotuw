@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { TerrainMap } from "../src/map";
+import { TerrainGrid } from "../src/simulation/terrain";
 import {
   createPrototypeMap,
   PROTOTYPE_MOVEMENT_PROFILES,
@@ -11,6 +11,7 @@ import {
   createMissionState,
 } from "../src/simulation/mission";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
+import { OccupancyGrid } from "../src/simulation/occupancy";
 
 import type { ActorCommand } from "../src/simulation/command";
 import type { MovementProfile } from "../src/simulation/navigation";
@@ -24,7 +25,7 @@ const profile: MovementProfile = {
 };
 
 function mission(tickSeconds = 0.5, speed = 4) {
-  const map = new TerrainMap({ width: 21, height: 21, tileSize: 1 });
+  const map = new TerrainGrid({ width: 21, height: 21, tileSize: 1 });
   return createMissionSimulation({
     state: createMissionState([
       createActor({
@@ -34,7 +35,10 @@ function mission(tickSeconds = 0.5, speed = 4) {
       }),
     ]),
     behaviorRegistry: new Map([
-      ["terrain-move", createTerrainMoveBehavior(map, [profile])],
+      [
+        "terrain-move",
+        createTerrainMoveBehavior(map, new OccupancyGrid(map), [profile]),
+      ],
     ]),
     bounds: map.worldBounds,
     definitions: [

@@ -1,4 +1,5 @@
-import type { TerrainEdit } from "../map";
+import type { TerrainEdit } from "./terrain";
+import type { ActorPlacement, PlacementReason } from "./placement";
 import type { WorldPosition } from "./world";
 
 /** Orders an actor to approach a target using its movement rules. */
@@ -26,7 +27,19 @@ export type ActorCommand = MoveCommand | StopCommand;
  */
 export type TerrainCommand = TerrainEdit & { kind: "terrain" };
 
-export type MissionCommand = ActorCommand | TerrainCommand;
+/** Places one definition-backed actor footprint at the start of a tick. */
+export type PlaceActorCommand = ActorPlacement & { kind: "place-actor" };
+
+/** Removes an actor by its stable ID. */
+export type RemoveActorCommand = {
+  kind: "remove-actor";
+  actorId: string;
+};
+
+export type ActorLifecycleCommand = PlaceActorCommand | RemoveActorCommand;
+
+export type MissionCommand =
+  ActorCommand | TerrainCommand | ActorLifecycleCommand;
 
 /** A command waiting for the start of the tick numbered `tick`. */
 export type ScheduledCommand = {
@@ -39,4 +52,6 @@ export type CommandOutcome = {
   tick: number;
   command: MissionCommand;
   accepted: boolean;
+  /** Placement failures as evaluated against the world at command application. */
+  reason?: PlacementReason;
 };
