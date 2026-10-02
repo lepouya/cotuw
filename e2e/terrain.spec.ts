@@ -25,7 +25,9 @@ test("the initial view starts close enough to read tile detail", async ({
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await expect(canvas).toHaveAttribute("data-actor-ready", "true");
-  const screenshot = await canvas.screenshot();
+  const screenshot = await canvas.screenshot({
+    style: ".camera-controls { visibility: hidden; }",
+  });
   await testInfo.attach("initial-terrain", {
     body: screenshot,
     contentType: "image/png",
@@ -56,7 +58,9 @@ test("zooming out from the start reveals the whole map", async ({
       new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
   );
 
-  const screenshot = await canvas.screenshot();
+  const screenshot = await canvas.screenshot({
+    style: ".camera-controls { visibility: hidden; }",
+  });
   await testInfo.attach("zoomed-out-terrain", {
     body: screenshot,
     contentType: "image/png",
@@ -147,9 +151,9 @@ test("dragging carries the ground with the pointer at every zoom", async ({
       const { x, z } = camera.target;
       const worldPerPixel = viewHeight(camera) / canvas.clientHeight;
 
-      pointer(canvas, "pointerdown", { x: 500, y: 360 });
-      pointer(canvas, "pointermove", { x: 700, y: 360 });
-      pointer(canvas, "pointerup", { x: 700, y: 360 });
+      pointer(canvas, "pointerdown", { button: 2, x: 500, y: 360 });
+      pointer(canvas, "pointermove", { button: 2, x: 700, y: 360 });
+      pointer(canvas, "pointerup", { button: 2, x: 700, y: 360 });
       await frames(2);
       const moved = Math.hypot(camera.target.x - x, camera.target.z - z);
       return moved / 200 / worldPerPixel;
@@ -165,22 +169,24 @@ test("dragging carries the ground with the pointer at every zoom", async ({
   expect(drags.far).toBeCloseTo(1, 2);
 });
 
-test("left-drag pans and right-drag orbits", async ({ page }) => {
+test("primary drag leaves the camera fixed, secondary pans, and Shift-secondary rotates", async ({
+  page,
+}) => {
   await openHarness(page);
 
   const drags = await page.evaluate(async () => {
     const { createTestView, frames, pointer } = harness;
     const { canvas, camera, dispose } = createTestView();
-    const drag = async (button: number) => {
+    const drag = async (button: number, shift = false) => {
       const before = {
         alpha: camera.alpha,
         beta: camera.beta,
         x: camera.target.x,
         z: camera.target.z,
       };
-      pointer(canvas, "pointerdown", { button, x: 500, y: 360 });
-      pointer(canvas, "pointermove", { button, x: 620, y: 300 });
-      pointer(canvas, "pointerup", { button, x: 620, y: 300 });
+      pointer(canvas, "pointerdown", { button, shift, x: 500, y: 360 });
+      pointer(canvas, "pointermove", { button, shift, x: 620, y: 300 });
+      pointer(canvas, "pointerup", { button, shift, x: 620, y: 300 });
       await frames(2);
       return {
         swung:
@@ -195,14 +201,17 @@ test("left-drag pans and right-drag orbits", async ({ page }) => {
 
     const left = await drag(0);
     const right = await drag(2);
+    const rotate = await drag(2, true);
     dispose();
-    return { left, right };
+    return { left, right, rotate };
   });
 
-  expect(drags.left.panned).toBeGreaterThan(0);
+  expect(drags.left.panned).toBe(0);
   expect(drags.left.swung).toBe(0);
-  expect(drags.right.swung).toBeGreaterThan(0);
-  expect(drags.right.panned).toBe(0);
+  expect(drags.right.swung).toBe(0);
+  expect(drags.right.panned).toBeGreaterThan(0);
+  expect(drags.rotate.swung).toBeGreaterThan(0);
+  expect(drags.rotate.panned).toBe(0);
 });
 
 test("a close, low-angle view keeps foreground terrain visible", async ({
@@ -213,16 +222,20 @@ test("a close, low-angle view keeps foreground terrain visible", async ({
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await page.mouse.move(640, 360);
+  await page.keyboard.down("Shift");
   await page.mouse.down({ button: "right" });
   await page.mouse.move(640, 40, { steps: 12 });
   await page.mouse.up({ button: "right" });
+  await page.keyboard.up("Shift");
   await page.mouse.wheel(0, -1600);
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
   );
 
-  const screenshot = await canvas.screenshot();
+  const screenshot = await canvas.screenshot({
+    style: ".camera-controls { visibility: hidden; }",
+  });
   await testInfo.attach("low-angle-terrain", {
     body: screenshot,
     contentType: "image/png",
@@ -588,9 +601,15 @@ test("water animation changes rendered pixels", async ({ page }, testInfo) => {
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
-  const before = PNG.sync.read(await canvas.screenshot());
+  const before = PNG.sync.read(
+    await canvas.screenshot({
+      style: ".camera-controls { visibility: hidden; }",
+    }),
+  );
   await page.waitForTimeout(500);
-  const afterBuffer = await canvas.screenshot();
+  const afterBuffer = await canvas.screenshot({
+    style: ".camera-controls { visibility: hidden; }",
+  });
   const after = PNG.sync.read(afterBuffer);
 
   await testInfo.attach("animated-water", {

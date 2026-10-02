@@ -18,11 +18,12 @@ const sidebar = createSidebar(
     definitions: PROTOTYPE_ACTOR_DEFINITIONS,
     presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
     goals: PROTOTYPE_GOALS,
-    selectActor: (id) => session?.selectActor(id),
+    selectActor: (id, additive) => session?.selectActor(id, additive),
   },
 );
 createTerrainPrototype(canvas, minimap, {
   ...sidebar.controls,
+  cameraControls: document.querySelector<HTMLElement>("#camera-controls")!,
   onStateChanged: sidebar.update,
   showActor: sidebar.showActor,
   onDispose: sidebar.dispose,

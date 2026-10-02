@@ -20,7 +20,7 @@ const REJECTED_MARKER_SECONDS = 1.5;
 
 export type MovementPathView = {
   dispose: () => void;
-  setSelectedActor: (actorId: string | undefined) => void;
+  setSelectedActors: (actorIds: readonly string[]) => void;
   showRejectedTarget: (
     actorId: string,
     target: Readonly<WorldPosition>,
@@ -45,69 +45,79 @@ type Route = {
 };
 
 /**
- * Draws the selected actor's remaining route and resolved destination. Dashes
+ * Draws selected actors' remaining routes and resolved destinations. Dashes
  * stay fixed on the ground and disappear as the actor passes them.
  */
 export function createMovementPathView(
   scene: Scene,
   map: TerrainMap,
 ): MovementPathView {
-  let selectedActorId: string | undefined;
-  let route: Route | undefined;
-  let rejectedMarkers: LinesMesh[] = [];
-  let rejectedTarget: WorldPosition | undefined;
-  let rejectedSeconds = 0;
+  let selected = new Set<string>();
+  const routes = new Map<string, Route>();
+  const rejected = new Map<
+    string,
+    { target: WorldPosition; seconds: number; markers: LinesMesh[] }
+  >();
   let disposed = false;
-
-  const clearRoute = () => {
+  const clearRoute = (id: string) => {
+    const route = routes.get(id);
     route?.line?.dispose();
     for (const marker of route?.markers ?? []) marker.dispose();
-    route = undefined;
+    routes.delete(id);
   };
-  const clearRejected = () => {
-    for (const marker of rejectedMarkers) marker.dispose();
-    rejectedMarkers = [];
-    rejectedTarget = undefined;
-    rejectedSeconds = 0;
+  const clearRejected = (id: string) => {
+    for (const marker of rejected.get(id)?.markers ?? []) marker.dispose();
+    rejected.delete(id);
+  };
+  const setSelectedActors = (ids: readonly string[]) => {
+    selected = new Set(ids);
+    for (const id of routes.keys()) if (!selected.has(id)) clearRoute(id);
+    for (const id of rejected.keys()) if (!selected.has(id)) clearRejected(id);
   };
   const refreshGroundGeometry = () => {
-    clearRoute();
-    if (!rejectedTarget) return;
-    for (const marker of rejectedMarkers) marker.dispose();
-    rejectedMarkers = createBlockedMarker(
-      scene,
-      map,
-      rejectedTarget,
-      groundOffset(map),
-    );
+    for (const id of routes.keys()) clearRoute(id);
+    for (const entry of rejected.values()) {
+      for (const marker of entry.markers) marker.dispose();
+      entry.markers = createBlockedMarker(
+        scene,
+        map,
+        entry.target,
+        groundOffset(map),
+      );
+    }
   };
   const update = (actors: readonly ActorRenderState[]) => {
-    if (rejectedSeconds > 0) {
-      rejectedSeconds -= scene.getEngine().getDeltaTime() / 1000;
-      if (rejectedSeconds <= 0) clearRejected();
+    const present = new Set(actors.map(({ id }) => id));
+    for (const [id, entry] of rejected) {
+      entry.seconds -= scene.getEngine().getDeltaTime() / 1000;
+      if (entry.seconds <= 0 || !present.has(id)) clearRejected(id);
     }
-    const actor = actors.find(({ id }) => id === selectedActorId);
-    const movement = actor?.movement;
-    if (
-      !actor ||
-      !movement?.waypoints ||
-      movement.waypointIndex === undefined ||
-      !movement.destination
-    ) {
-      clearRoute();
-      return;
+    for (const id of routes.keys()) if (!present.has(id)) clearRoute(id);
+    for (const actor of actors) {
+      if (!selected.has(actor.id)) continue;
+      const movement = actor.movement;
+      if (
+        !movement?.waypoints ||
+        movement.waypointIndex === undefined ||
+        !movement.destination
+      ) {
+        clearRoute(actor.id);
+        continue;
+      }
+      let route = routes.get(actor.id);
+      if (!route || !isSameRoute(route, actor.id, movement)) {
+        clearRoute(actor.id);
+        route = createRoute(scene, map, actor, movement);
+        routes.set(actor.id, route);
+      }
+      trimRoute(scene, route, actor, movement);
     }
-    if (!route || !isSameRoute(route, actor.id, movement)) {
-      clearRoute();
-      route = createRoute(scene, map, actor, movement);
-    }
-    trimRoute(scene, route, actor, movement);
   };
   const dispose = () => {
     if (disposed) return;
     disposed = true;
-    clearRoute();
-    clearRejected();
+    for (const id of routes.keys()) clearRoute(id);
+    for (const id of rejected.keys()) clearRejected(id);
     map.onChangedObservable.remove(terrainChangeObserver);
     scene.onDisposeObservable.remove(sceneDisposeObserver);
   };
@@ -116,27 +126,17 @@ export function createMovementPathView(
   );
   const sceneDisposeObserver: Observer<Scene> =
     scene.onDisposeObservable.add(dispose);
-
   return {
     dispose,
-    setSelectedActor: (actorId) => {
-      if (actorId !== selectedActorId) {
-        clearRoute();
-        clearRejected();
-      }
-      selectedActorId = actorId;
-    },
-    showRejectedTarget: (actorId, target) => {
-      if (actorId !== selectedActorId) return;
-      clearRejected();
-      rejectedMarkers = createBlockedMarker(
-        scene,
-        map,
-        target,
-        groundOffset(map),
-      );
-      rejectedTarget = { ...target };
-      rejectedSeconds = REJECTED_MARKER_SECONDS;
+    setSelectedActors,
+    showRejectedTarget: (id, target) => {
+      if (!selected.has(id)) return;
+      clearRejected(id);
+      rejected.set(id, {
+        target: { ...target },
+        seconds: REJECTED_MARKER_SECONDS,
+        markers: createBlockedMarker(scene, map, target, groundOffset(map)),
+      });
     },
     update,
   };
@@ -153,6 +153,10 @@ function isSameRoute(
   return (
     route.actorId === actorId &&
     samePoint(previous.target, movement.target) &&
+    (previous.requestedTarget === undefined
+      ? movement.requestedTarget === undefined
+      : movement.requestedTarget !== undefined &&
+        samePoint(previous.requestedTarget, movement.requestedTarget)) &&
     samePoint(previous.destination!, movement.destination!) &&
     previous.reachedTarget === movement.reachedTarget &&
     previous.blocked === movement.blocked &&
@@ -181,7 +185,12 @@ function createRoute(
     visibleDashes: 0,
   };
   if (movement.blocked) {
-    route.markers = createBlockedMarker(scene, map, movement.target, offset);
+    route.markers = createBlockedMarker(
+      scene,
+      map,
+      movement.requestedTarget ?? movement.target,
+      offset,
+    );
     return route;
   }
   route.markers.push(
@@ -194,9 +203,14 @@ function createRoute(
       offset,
     ),
   );
-  if (movement.reachedTarget === false) {
+  if (movement.reachedTarget === false || movement.requestedTarget) {
     route.markers.push(
-      ...createBlockedMarker(scene, map, movement.target, offset),
+      ...createBlockedMarker(
+        scene,
+        map,
+        movement.requestedTarget ?? movement.target,
+        offset,
+      ),
     );
   }
 

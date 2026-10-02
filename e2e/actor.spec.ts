@@ -216,8 +216,16 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       window.actorInteractionTest?.canvas.dataset.selectedActor ===
       "prototype-trooper",
   );
-  // Clicking the selected actor again deselects it.
+  // Repeated clicks retain selection; Shift-click removes the unit.
   await page.mouse.click(targets.trooper.clientX, targets.trooper.clientY);
+  await page.waitForFunction(
+    () =>
+      window.actorInteractionTest?.canvas.dataset.selectedActor ===
+      "prototype-trooper",
+  );
+  await page.keyboard.down("Shift");
+  await page.mouse.click(targets.trooper.clientX, targets.trooper.clientY);
+  await page.keyboard.up("Shift");
   await page.waitForFunction(
     () => window.actorInteractionTest?.canvas.dataset.actorSelected === "false",
   );

@@ -1,4 +1,10 @@
-import { Color3, MeshBuilder, StandardMaterial } from "@babylonjs/core";
+import {
+  Color3,
+  Matrix,
+  MeshBuilder,
+  StandardMaterial,
+  Vector3,
+} from "@babylonjs/core";
 
 import { shortestTurn } from "../simulation/world";
 import { createViewRegistry } from "./view-registry";
@@ -13,6 +19,7 @@ import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
 import type { ActorAppearance, ActorPose } from "./actor";
+import type { SelectionRect } from "./command-input";
 
 const SELECTION_COLOR = new Color3(1, 0.86, 0.44);
 /** Edge length of the stand-in cube for actors without an appearance. */
@@ -26,7 +33,8 @@ export type ActorViewRegistry = {
   /** Records poses to interpolate from. Call it right before each tick. */
   capturePreviousPoses: (actors: readonly ActorRenderState[]) => void;
   dispose: () => void;
-  setSelectedActor: (actorId: string | undefined) => void;
+  setSelectedActors: (actorIds: readonly string[]) => void;
+  actorIdsInRect: (canvas: HTMLCanvasElement, rect: SelectionRect) => string[];
   /**
    * Creates and removes views to match `actors`, then draws each one
    * `tickProgress` of the way from its previous pose to its current one.
@@ -57,7 +65,7 @@ export function createActorViewRegistry(
 
   const previousPoses = new Map<string, ActorPose>();
   const pose: ActorPose = { worldPosition: { x: 0, z: 0 }, facing: 0 };
-  let selectedActorId: string | undefined;
+  let selectedActorIds = new Set<string>();
 
   const renderers = createViewRegistry({
     keyFor: (actor: ActorRenderState) => ({
@@ -78,11 +86,16 @@ export function createActorViewRegistry(
         appearance,
         selectionMaterial,
       );
-      renderer.setSelected(actor.id === selectedActorId);
+      renderer.setSelected(selectedActorIds.has(actor.id));
       return renderer;
     },
   });
 
+  const setSelectedActors = (ids: readonly string[]) => {
+    selectedActorIds = new Set(ids);
+    for (const renderer of renderers.values())
+      renderer.setSelected(selectedActorIds.has(renderer.actorId));
+  };
   return {
     actorIdForMesh: (mesh) => {
       const actorId = actorIdForPickMesh(mesh);
@@ -111,11 +124,38 @@ export function createActorViewRegistry(
       selectionMaterial.dispose();
       fallback?.dispose();
     },
-    setSelectedActor: (actorId) => {
-      selectedActorId = actorId;
+    setSelectedActors,
+    actorIdsInRect: (canvas, rect) => {
+      if (!scene.activeCamera) return [];
+      const engine = scene.getEngine();
+      const bounds = canvas.getBoundingClientRect();
+      const viewport = scene.activeCamera.viewport.toGlobal(
+        engine.getRenderWidth(),
+        engine.getRenderHeight(),
+      );
+      const ids = [];
       for (const renderer of renderers.values()) {
-        renderer.setSelected(renderer.actorId === actorId);
+        const point = Vector3.Project(
+          renderer.selectionPoint(),
+          Matrix.Identity(),
+          scene.getTransformMatrix(),
+          viewport,
+        );
+        const x =
+          bounds.left + (point.x * bounds.width) / engine.getRenderWidth();
+        const y =
+          bounds.top + (point.y * bounds.height) / engine.getRenderHeight();
+        if (
+          point.z >= 0 &&
+          point.z <= 1 &&
+          x >= rect.left &&
+          x <= rect.right &&
+          y >= rect.top &&
+          y <= rect.bottom
+        )
+          ids.push(renderer.actorId);
       }
+      return ids;
     },
     update: (actors, tickProgress) => {
       renderers.sync(actors);

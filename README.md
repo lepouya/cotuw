@@ -37,7 +37,17 @@ uses a terrain tap followed by **Place building**. Select a barracks, open
 tiles beside it. Move units away if the exits become blocked. Construction and
 training are instant and have no resource or power requirements.
 
-**Selection** shows the selected actor and lets you remove buildings.
+Click or tap to select an actor. Shift-click or **Add units** toggles units in
+and out of the selection. Primary drag selects mobile units; touch uses **Box
+select**, which must be turned off before tapping a movement destination.
+Click or tap terrain to move selected units to separate nearby positions.
+**Stop** or `S` cancels their routes; **Clear** or `Esc` clears selection.
+
+Secondary drag pans the camera; Shift-secondary drag rotates. Touch drags on
+empty terrain pan when Box select is off. The world also provides camera pan,
+rotation, zoom, and reset buttons.
+
+**Selection** shows the selected actor or group and lets you remove buildings.
 **Units** also lists buildings that train units and the units in the field.
 **Goals** shows sandbox practice goals and current counts.
 **Building idle animation** controls rooftop equipment.

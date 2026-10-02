@@ -72,11 +72,11 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.51 Add a placement sandbox with rotated terrain previews, rejection
       feedback, building selection and removal, and an articulated prototype
       Command Center with renderer-owned idle animation.
-- [ ] 0.26 Replace the selection spike with persistent individual-selection
+- [x] 0.26 Replace the selection spike with persistent individual-selection
       state and production visual feedback.
-- [ ] 0.27 Support selecting multiple actors by additive selection and drag-box
+- [x] 0.27 Support selecting multiple actors by additive selection and drag-box
       selection.
-- [ ] 0.28 Issue a target command to every selected actor, with destinations
+- [x] 0.28 Issue a target command to every selected actor, with destinations
       resolved so the group does not converge on one tile.
 
 ### Interface

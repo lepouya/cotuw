@@ -266,8 +266,14 @@ story.
 
 ## Controls and interface
 
-- Primary click selects or issues the contextual default command. Primary drag
-  box-selects friendly mobile units. Shift-click adds or removes units.
+- Primary click selects or issues the contextual default command. Clicking a
+  selected actor keeps it selected. Primary drag box-selects friendly mobile
+  units. Shift-click toggles individual units; Shift-drag adds boxed units.
+  Buildings remain individually selected and cannot join a mobile group.
+- Stop cancels selected mobile actors' orders without clearing selection.
+  Clear removes selection without changing orders. Selection is client UI state.
+- Touch and on-screen controls provide persistent Box select and Add units
+  modes. Box select must be disabled before a terrain tap issues movement.
 - Secondary click opens a radial context menu. Secondary drag pans; Shift plus
   secondary drag rotates. Every secondary action has an on-screen alternative.
 - Touch uses taps, one-finger empty-world panning, explicit box-selection and

@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // Concurrent WebGL scenes compete for rendering time, including software GPUs.
+  workers: 2,
   // Windows WebGL canvas captures can take longer than the default budget.
   timeout: 90_000,
   reporter: [

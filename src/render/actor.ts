@@ -1,4 +1,9 @@
-import { AbstractMesh, MeshBuilder, TransformNode } from "@babylonjs/core";
+import {
+  AbstractMesh,
+  MeshBuilder,
+  TransformNode,
+  Vector3,
+} from "@babylonjs/core";
 
 import { shortestTurn } from "../simulation/world";
 
@@ -52,6 +57,7 @@ export type ActorPose = {
 
 export type ActorRenderer = {
   actorId: string;
+  selectionPoint: () => Vector3;
   setSelected: (selected: boolean) => void;
   update: (pose: ActorPose) => void;
   dispose: () => void;
@@ -147,6 +153,7 @@ export function createActorRenderer(
   update(initialState);
   return {
     actorId: id,
+    selectionPoint: () => root.position.add(new Vector3(0, height / 2, 0)),
     setSelected,
     update,
     dispose: () => {

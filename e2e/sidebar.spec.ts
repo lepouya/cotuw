@@ -249,7 +249,7 @@ test("sidebar derives custom content and can be disposed and recreated", async (
     const state = {
       actors,
       actorVersion: 0,
-      selectedActorId: "building",
+      selectedActorIds: ["building"],
       placementActive: false,
       faulted: false,
       canRemove: true,
@@ -265,7 +265,11 @@ test("sidebar derives custom content and can be disposed and recreated", async (
         "#producer-roster button",
       )!;
       producer.focus();
-      sidebar.update({ ...state, selectedActorId: "unit", canRemove: false });
+      sidebar.update({
+        ...state,
+        selectedActorIds: ["unit"],
+        canRemove: false,
+      });
       const retainedFocus = document.activeElement === producer;
       const retainedNode =
         root.querySelector("#producer-roster button") === producer;

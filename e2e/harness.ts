@@ -197,12 +197,18 @@ export function wheel(
 export function pointer(
   canvas: HTMLCanvasElement,
   type: "pointerdown" | "pointermove" | "pointerup",
-  { button = 0, x, y }: { button?: number; x: number; y: number },
+  {
+    button = 0,
+    x,
+    y,
+    shift = false,
+  }: { button?: number; x: number; y: number; shift?: boolean },
 ): void {
   canvas.dispatchEvent(
     new PointerEvent(type, {
       pointerId: 1,
       pointerType: "mouse",
+      shiftKey: shift,
       button,
       buttons: button === 0 ? 1 : 2,
       clientX: x,

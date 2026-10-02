@@ -47,7 +47,7 @@ function setup() {
     createHeight: (x) => (x === 5 ? 2 : 0),
   });
   const view = createMovementPathView(scene, map);
-  view.setSelectedActor("trooper");
+  view.setSelectedActors(["trooper"]);
   return { engine, map, scene, view };
 }
 
@@ -192,16 +192,56 @@ describe("movement path view", () => {
     engine.dispose();
   });
 
+  test("tracks multiple selected routes and preserves survivors when selection shrinks", () => {
+    const { engine, scene, view } = setup();
+    const actors = [
+      movingActor(),
+      { ...movingActor({ destination: { x: 3, z: 1 } }), id: "scout" },
+    ];
+    view.setSelectedActors(["trooper", "scout"]);
+    view.update(actors);
+    expect(
+      scene.meshes.filter((mesh) => mesh.name === "movement-path-route"),
+    ).toHaveLength(2);
+    const survivor = scene.getMeshByName("movement-path-route")!;
+    view.showRejectedTarget("scout", { x: 3, z: 3 });
+    view.setSelectedActors(["trooper"]);
+    view.update(actors);
+    expect(
+      scene.meshes.filter((mesh) => mesh.name === "movement-path-route"),
+    ).toEqual([survivor]);
+    expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
+    view.dispose();
+    engine.dispose();
+  });
+
+  test("a resolved group slot still marks its unreachable group click", () => {
+    const { engine, scene, view } = setup();
+    const actor = movingActor();
+    view.update([
+      {
+        ...actor,
+        movement: { ...actor.movement!, requestedTarget: { x: 3, z: 3 } },
+      },
+    ]);
+    expect(scene.getMeshByName("movement-path-destination")).not.toBeNull();
+    expect(
+      scene.getMeshByName("movement-path-unreachable-cross"),
+    ).not.toBeNull();
+    view.dispose();
+    engine.dispose();
+  });
+
   test("clears the tracker when selection or movement ends", () => {
     const { engine, scene, view } = setup();
     view.update([movingActor()]);
 
-    view.setSelectedActor(undefined);
+    view.setSelectedActors([]);
 
     expect(scene.getMeshByName("movement-path-route")).toBeNull();
     expect(scene.getMeshByName("movement-path-destination")).toBeNull();
 
-    view.setSelectedActor("trooper");
+    view.setSelectedActors(["trooper"]);
     view.update([{ ...movingActor(), movement: undefined }]);
     expect(scene.getMeshByName("movement-path-route")).toBeNull();
 

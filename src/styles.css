@@ -278,3 +278,50 @@ button:disabled {
     right: 0.5rem;
   }
 }
+
+.selection-box {
+  position: fixed;
+  z-index: 30;
+  border: 1px solid #eac97f;
+  background: rgb(234 201 127 / 12%);
+  pointer-events: none;
+}
+.unit-controls {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #354c48;
+}
+.unit-controls .building-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem;
+}
+.unit-controls .building-controls button {
+  padding: 0.3rem;
+}
+.unit-controls button[aria-pressed="true"] {
+  color: #eac97f;
+  border-color: #d8bd79;
+  background: #304e4d;
+}
+#movement-status:empty {
+  display: none;
+}
+.camera-controls {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, 2.75rem);
+  gap: 0.2rem;
+}
+.camera-controls button {
+  text-align: center;
+  padding: 0.3rem;
+  background: rgb(20 39 41 / 90%);
+}
+
+@media (max-width: 500px) {
+  .unit-controls .building-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

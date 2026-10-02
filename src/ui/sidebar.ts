@@ -18,7 +18,9 @@ export type DefinitionButton = {
 export type SidebarState = {
   actors: readonly ActorRenderState[];
   actorVersion: number;
-  selectedActorId?: string;
+  selectedActorIds: readonly string[];
+  boxMode?: boolean;
+  additiveMode?: boolean;
   placementActive: boolean;
   faulted: boolean;
   canRemove: boolean;
@@ -31,7 +33,7 @@ export function createSidebar(
     definitions: readonly ActorDefinition[];
     presentations: ReadonlyMap<string, ActorPresentation>;
     goals: readonly SidebarGoal[];
-    selectActor: (id: string) => void;
+    selectActor: (id: string, additive?: boolean) => void;
   },
 ) {
   const { definitions, presentations, goals, selectActor } = options;
@@ -60,7 +62,12 @@ export function createSidebar(
   const trainingLink = element<HTMLButtonElement>("open-training");
   const placementActions = element("placement-actions");
   const remove = element<HTMLButtonElement>("remove-building");
+  const boxSelect = element<HTMLButtonElement>("box-select");
+  const addSelection = element<HTMLButtonElement>("add-selection");
+  const stop = element<HTMLButtonElement>("stop-units");
+  const clearSelection = element<HTMLButtonElement>("clear-selection");
   const showTab = (id: string) => {
+    root.querySelector<HTMLElement>(".sidebar-content")!.scrollTop = 0;
     const focusedPanel = panels.find((panel) =>
       panel.contains(document.activeElement),
     );
@@ -155,11 +162,11 @@ export function createSidebar(
         });
       },
       updateSelection: (
-        selectedActorId: string | undefined,
+        selectedActorIds: ReadonlySet<string>,
         disabled: boolean,
       ) => {
         for (const [id, button] of buttons) {
-          button.setAttribute("aria-pressed", String(id === selectedActorId));
+          button.setAttribute("aria-pressed", String(selectedActorIds.has(id)));
           button.disabled = disabled;
         }
       },
@@ -180,7 +187,7 @@ export function createSidebar(
   });
   let actorsById = new Map<string, ActorRenderState>();
   let actorVersion: number | undefined;
-  let selectedActorId: string | undefined;
+  let selectionKey = "";
   let disabled: boolean | undefined;
   /** Production buildings open their training panel; others their details. */
   const showActor = (definitionId: string) =>
@@ -201,7 +208,7 @@ export function createSidebar(
       else if (button.dataset.actorId) {
         const actor = actorsById.get(button.dataset.actorId);
         if (!actor) return;
-        selectActor(actor.id);
+        selectActor(actor.id, event.shiftKey);
         showActor(actor.definitionId);
       }
     },
@@ -234,6 +241,11 @@ export function createSidebar(
       buildings,
       train,
       remove,
+      boxSelect,
+      addSelection,
+      stop,
+      clearSelection,
+      movementStatus: element("movement-status"),
       rotate: element<HTMLButtonElement>("rotate-building"),
       confirm: element<HTMLButtonElement>("confirm-building"),
       cancel: element<HTMLButtonElement>("cancel-building"),
@@ -245,6 +257,28 @@ export function createSidebar(
     update: (state: SidebarState) => {
       placementActions.hidden = !state.placementActive;
       remove.disabled = !state.canRemove;
+      const ids = state.selectedActorIds;
+      const selected = new Set(ids);
+      remove.hidden = !state.actors.some(
+        (actor) => selected.has(actor.id) && isTilePlacedActor(actor),
+      );
+      const nextSelectionKey = JSON.stringify(ids);
+      const unavailable = state.placementActive || state.faulted;
+      boxSelect.disabled = unavailable;
+      addSelection.disabled = unavailable;
+      boxSelect.setAttribute("aria-pressed", String(state.boxMode ?? false));
+      addSelection.setAttribute(
+        "aria-pressed",
+        String(state.additiveMode ?? false),
+      );
+      stop.disabled =
+        unavailable ||
+        !state.actors.some(
+          (actor) =>
+            selected.has(actor.id) &&
+            definitionById.get(actor.definitionId)?.movement,
+        );
+      clearSelection.disabled = unavailable || ids.length === 0;
       const membershipChanged = state.actorVersion !== actorVersion;
       if (membershipChanged) {
         actorVersion = state.actorVersion;
@@ -267,22 +301,37 @@ export function createSidebar(
           item.textContent = `${count ? "✓" : "○"} ${label} (${count})`;
         }
       }
-      const nextDisabled = state.placementActive || state.faulted;
+      const nextDisabled = unavailable;
       if (
         membershipChanged ||
-        selectedActorId !== state.selectedActorId ||
+        selectionKey !== nextSelectionKey ||
         disabled !== nextDisabled
       ) {
-        selectedActorId = state.selectedActorId;
+        selectionKey = nextSelectionKey;
+        const selectedActorId = ids.length === 1 ? ids[0] : undefined;
         disabled = nextDisabled;
-        roster.updateSelection(selectedActorId, disabled);
-        producers.updateSelection(selectedActorId, disabled);
+        roster.updateSelection(selected, disabled);
+        producers.updateSelection(selected, disabled);
         const actor = selectedActorId
           ? actorsById.get(selectedActorId)
           : undefined;
         const definition = actor && definitionById.get(actor.definitionId)!;
         const presentation = actor && presentations.get(actor.definitionId);
         trainingLink.hidden = !definition?.production;
+        if (ids.length > 1) {
+          const counts = new Map<string, number>();
+          for (const id of ids) {
+            const unit = actorsById.get(id);
+            if (unit)
+              counts.set(
+                unit.definitionId,
+                (counts.get(unit.definitionId) ?? 0) + 1,
+              );
+          }
+          selectionDetails.textContent = `${ids.length} units selected`;
+          selectionInfo.textContent = `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. Tap or click terrain to move the group.`;
+          return;
+        }
         selectionDetails.textContent = actor
           ? isTilePlacedActor(actor)
             ? `${nameFor(actor.definitionId)} · ${footprintSize(occupiedTilesFor(actor, definition!))} · ${actor.tilePlacement.quarterTurns * 90}°`

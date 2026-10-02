@@ -1,5 +1,7 @@
 import { ArcRotateCamera, Camera, Scene, Vector3 } from "@babylonjs/core";
 
+import { createPointerGesture } from "./pointer-gesture";
+
 import type { TerrainMap } from "../map";
 
 /** How much of the viewport the map footprint fills once fitted. */
@@ -27,6 +29,11 @@ const GLIDE_SECONDS = 0.3;
 export type StrategyCamera = {
   /** Frames the starting view: centered, close enough to read one tile. */
   resetView: () => void;
+  panView: (horizontal: number, vertical: number) => void;
+  rotateView: (radians: number) => void;
+  tiltView: (radians: number) => void;
+  zoomBy: (factor: number) => void;
+  setTouchPanEnabled: (enabled: (event: PointerEvent) => boolean) => void;
   fitToMap: () => void;
   /** Centers the view on a tile without changing the zoom. */
   focusOnTile: (x: number, z: number) => void;
@@ -65,10 +72,9 @@ export function createStrategyCamera(
   // Panning must stick to the pointer, so it cannot glide after release.
   camera.panningInertia = 0;
   camera.attachControl(canvas, true);
-  // Strategy convention: left-drag pans, right-drag orbits. Babylon's
-  // defaults are the other way round.
-  camera.movement.input.setInteractions("pointer", { button: 0 }, "pan");
-  camera.movement.input.setInteractions("pointer", { button: 2 }, "rotate");
+  // Pointer gestures are shared with unit selection and explicit touch modes.
+  camera.inputs.removeByType("ArcRotateCameraPointersInput");
+  camera.inputs.removeByType("ArcRotateCameraMouseWheelInput");
 
   let viewHeight = INITIAL_VIEW_TILES * map.tileSize;
   const syncViewBounds = () => {
@@ -115,6 +121,8 @@ export function createStrategyCamera(
   };
   // Small maps get fitted instead, so the start never overshoots the map.
   const resetView = () => {
+    camera.alpha = INITIAL_ALPHA;
+    camera.beta = INITIAL_BETA;
     moveTo(Vector3.Zero());
     setDistance(cameraDistanceForMap(map));
     setViewHeight(
@@ -143,9 +151,62 @@ export function createStrategyCamera(
       glide = undefined;
     }
   };
-  // Grabbing the main view takes over from a glide still in flight.
-  const cancelGlide = () => {
+  let touchPanEnabled = (_event: PointerEvent) => true;
+  const pointAt = (x: number, y: number) => {
+    camera.getViewMatrix();
+    const bounds = canvas.getBoundingClientRect();
+    return projectOntoPlane(
+      orthographicFrameOf(camera),
+      ((x - bounds.left - bounds.width / 2) * viewHeight) /
+        Math.max(bounds.height, 1),
+      ((bounds.height / 2 - y + bounds.top) * viewHeight) /
+        Math.max(bounds.height, 1),
+      0,
+    );
+  };
+  const pointer = createPointerGesture(canvas, {
+    start: (event) => {
+      const touch = event.pointerType === "touch";
+      if (!(
+        event.button === 2 ||
+        (touch && event.button === 0 && touchPanEnabled(event))
+      ))
+        return undefined;
+      glide = undefined;
+      return { rotate: !touch && event.shiftKey };
+    },
+    move: (event, gesture) => {
+      if (!gesture.dragged) return;
+      if (gesture.data.rotate) {
+        camera.alpha -= (event.clientX - gesture.last.clientX) * 0.005;
+        camera.beta = Math.max(
+          LOWER_BETA_LIMIT,
+          Math.min(
+            UPPER_BETA_LIMIT,
+            camera.beta - (event.clientY - gesture.last.clientY) * 0.005,
+          ),
+        );
+      } else {
+        const from = pointAt(gesture.last.clientX, gesture.last.clientY);
+        const to = pointAt(event.clientX, event.clientY);
+        moveTo(camera.target.add(from.subtract(to)));
+      }
+    },
+  });
+  const panView = (horizontal: number, vertical: number) => {
+    const bounds = canvas.getBoundingClientRect();
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+    const from = pointAt(centerX, centerY);
+    const to = pointAt(
+      centerX + horizontal * bounds.height * 0.18,
+      centerY + vertical * bounds.height * 0.18,
+    );
+    moveTo(camera.target.add(to.subtract(from)));
+  };
+  const rotateView = (radians: number) => {
     glide = undefined;
+    camera.alpha += radians;
   };
   const viewFootprint = (height = 0) =>
     orthographicViewFootprint(
@@ -181,16 +242,29 @@ export function createStrategyCamera(
     setViewHeight(viewHeight);
   };
   canvas.addEventListener("wheel", zoom, { passive: false });
-  canvas.addEventListener("pointerdown", cancelGlide);
   scene.onDisposeObservable.add(() => {
     canvas.removeEventListener("wheel", zoom);
-    canvas.removeEventListener("pointerdown", cancelGlide);
+    pointer.dispose();
   });
   scene.onBeforeRenderObservable.add(advanceGlide);
   scene.onBeforeRenderObservable.add(syncToCanvas);
 
   return {
     resetView,
+    panView,
+    rotateView,
+    tiltView: (radians) => {
+      glide = undefined;
+      camera.beta = Math.max(
+        LOWER_BETA_LIMIT,
+        Math.min(UPPER_BETA_LIMIT, camera.beta + radians),
+      );
+    },
+    zoomBy: (factor) => setViewHeight(viewHeight * factor),
+    setTouchPanEnabled: (enabled) => {
+      pointer.cancel();
+      touchPanEnabled = enabled;
+    },
     fitToMap,
     focusOnTile,
     focusOnPoint,

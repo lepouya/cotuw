@@ -132,7 +132,7 @@ describe("actor view registry", () => {
   test("rebuilds a view when its appearance finishes loading", () => {
     const { appearances, engine, scene, views } = setup();
     views.update([actor("a")], 1);
-    views.setSelectedActor("a");
+    views.setSelectedActors(["a"]);
     const standIn = scene.getMeshByName("actor-a")!;
 
     const loaded = MeshBuilder.CreateSphere("loaded", {}, scene);
@@ -184,14 +184,14 @@ describe("actor view registry", () => {
   test("rings the selected actor, including views created later", () => {
     const { engine, scene, views } = setup();
 
-    views.setSelectedActor("late");
+    views.setSelectedActors(["late"]);
     views.update([actor("late"), actor("other")], 1);
     const ring = () => scene.getMeshByName("actor-late-selection");
 
     expect(ring()?.isEnabled()).toBe(true);
     expect(scene.getMeshByName("actor-other-selection")).toBeNull();
 
-    views.setSelectedActor(undefined);
+    views.setSelectedActors([]);
     expect(ring()?.isEnabled()).toBe(false);
 
     views.dispose();
@@ -202,7 +202,7 @@ describe("actor view registry", () => {
     const { engine, scene, views } = setup();
 
     views.update([actor("a")], 1);
-    views.setSelectedActor("a");
+    views.setSelectedActors(["a"]);
     const pick = scene.getMeshByName("actor-a-pick")!;
     const ring = scene.getMeshByName("actor-a-selection")!;
 

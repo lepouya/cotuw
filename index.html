@@ -138,6 +138,23 @@
             </p>
           </section>
         </div>
+        <section class="unit-controls" aria-label="Unit controls">
+          <div
+            class="building-controls"
+            role="group"
+            aria-label="Selection and movement"
+          >
+            <button id="box-select" type="button" aria-pressed="false">
+              Box select
+            </button>
+            <button id="add-selection" type="button" aria-pressed="false">
+              Add units
+            </button>
+            <button id="stop-units" type="button" disabled>Stop (S)</button>
+            <button id="clear-selection" type="button" disabled>Clear</button>
+          </div>
+          <p id="movement-status" class="muted" role="status"></p>
+        </section>
         <section class="placement-panel" aria-label="Building placement">
           <div
             id="placement-actions"
@@ -164,13 +181,97 @@
             requirements
           </p>
           <p class="controls">
-            Click to select or move · Drag to pan<br />Right-drag to orbit ·
-            Scroll to zoom
+            Click to select or move · Shift-click to add<br />Drag to select ·
+            Right-drag to pan<br />Shift-right-drag to rotate · Scroll to zoom
           </p>
         </footer>
       </aside>
       <div class="game-viewport">
-        <canvas id="game-canvas" aria-label="Game world"></canvas>
+        <canvas id="game-canvas" aria-label="Game world" tabindex="0"></canvas>
+        <div
+          id="camera-controls"
+          class="camera-controls"
+          role="group"
+          aria-label="Camera controls"
+        >
+          <button
+            type="button"
+            data-camera-action="rotate-left"
+            aria-label="Rotate camera left"
+          >
+            ↶
+          </button>
+          <button
+            type="button"
+            data-camera-action="up"
+            aria-label="Pan camera up"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            data-camera-action="rotate-right"
+            aria-label="Rotate camera right"
+          >
+            ↷
+          </button>
+          <button
+            type="button"
+            data-camera-action="left"
+            aria-label="Pan camera left"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            data-camera-action="reset"
+            aria-label="Reset camera view"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            data-camera-action="right"
+            aria-label="Pan camera right"
+          >
+            →
+          </button>
+          <button
+            type="button"
+            data-camera-action="zoom-in"
+            aria-label="Zoom camera in"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            data-camera-action="down"
+            aria-label="Pan camera down"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            data-camera-action="zoom-out"
+            aria-label="Zoom camera out"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            data-camera-action="tilt-up"
+            aria-label="Tilt camera up"
+          >
+            Tilt ↑
+          </button>
+          <button
+            type="button"
+            data-camera-action="tilt-down"
+            aria-label="Tilt camera down"
+          >
+            Tilt ↓
+          </button>
+        </div>
         <canvas id="minimap" class="minimap" aria-label="Map overview"></canvas>
       </div>
     </main>
