@@ -75,6 +75,7 @@ write an HTML report to `playwright-report/`; CI uploads that report after a
 failed check. Install the browsers locally once with
 `npx playwright install chromium`, plus `webkit` on macOS, where the tests also
 run against WebKit to match the Tauri webview.
+Set `COTUW_TEST_PORT=1421` to run checks beside a server using the default port.
 
 Terrain textures repeat by wrapping, so they must tile without a seam. After
 editing one, make its opposite edges match with

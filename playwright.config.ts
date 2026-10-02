@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const testPort = Number(process.env.COTUW_TEST_PORT ?? 1420);
+const testUrl = `http://127.0.0.1:${testPort}`;
+
 export default defineConfig({
   testDir: "./e2e",
   // Concurrent WebGL scenes compete for rendering time, including software GPUs.
@@ -19,13 +22,13 @@ export default defineConfig({
       : []),
   ],
   use: {
-    baseURL: "http://127.0.0.1:1420",
+    baseURL: testUrl,
     viewport: { width: 1280, height: 720 },
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1",
-    url: "http://127.0.0.1:1420",
+    command: `npm run dev -- --host 127.0.0.1 --port ${testPort}`,
+    url: testUrl,
     reuseExistingServer: !process.env.CI,
   },
 });
