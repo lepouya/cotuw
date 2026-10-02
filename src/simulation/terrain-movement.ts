@@ -86,6 +86,7 @@ export function createTerrainMoveBehavior(
   };
 
   return {
+    navigationGrid: gridFor,
     canStandAt: (definition, { x, z }) => {
       const { profile } = grids
         .get(definition.movement!.profileId!)!
@@ -116,7 +117,8 @@ export function createTerrainMoveBehavior(
       const waypoints = order.waypoints ?? [];
       if (
         !waypoints.every(onMap) ||
-        (order.destination !== undefined && !onMap(order.destination))
+        (order.destination !== undefined && !onMap(order.destination)) ||
+        (order.requestedTarget !== undefined && !onMap(order.requestedTarget))
       ) {
         throw new RangeError(`Actor ${actor.id} has an invalid route.`);
       }
@@ -160,6 +162,9 @@ export function createTerrainMoveBehavior(
           }
           actor.movement = {
             target: { ...command.target },
+            ...(command.requestedTarget && {
+              requestedTarget: { ...command.requestedTarget },
+            }),
             ...path,
             waypointIndex: 0,
             navigationVersion: changes.version,

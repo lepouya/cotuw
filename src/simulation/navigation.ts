@@ -262,6 +262,38 @@ export function findNavigationPath(
   from: WorldPosition,
   target: WorldPosition,
 ): NavigationPath | undefined {
+  const resolved = resolveNavigationDestination(grid, from, target);
+  if (!resolved) return undefined;
+  const { start, end, reachedTarget } = resolved;
+  const { map } = grid;
+  const route = searchTiles(grid, start, end)
+    .slice(1)
+    .map(({ x, z }) => map.tileCenter(x, z));
+  const destination = reachedTarget
+    ? { ...target }
+    : map.tileCenter(end.x, end.z);
+  const last = route[route.length - 1];
+  if (!last || last.x !== destination.x || last.z !== destination.z) {
+    route.push(destination);
+  }
+  return {
+    waypoints: straightenRoute(
+      grid,
+      from,
+      route,
+      grid.costAt(start.x, start.z) !== undefined,
+    ),
+    destination,
+    reachedTarget,
+  };
+}
+
+/** Resolves reachable tiles without constructing a route to them. */
+export function resolveNavigationDestination(
+  grid: NavigationGrid,
+  from: WorldPosition,
+  target: WorldPosition,
+): { start: TileCoord; end: TileCoord; reachedTarget: boolean } | undefined {
   const { map } = grid;
   const start = occupiedTile(grid, from);
   const goal = map.tileAtWorldPosition(target.x, target.z);
@@ -286,21 +318,7 @@ export function findNavigationPath(
   const end = reachedTarget
     ? goal
     : closestTileInRegions(grid, regions, start, goal);
-  const route = searchTiles(grid, start, end)
-    .slice(1)
-    .map(({ x, z }) => map.tileCenter(x, z));
-  const destination = reachedTarget
-    ? { ...target }
-    : map.tileCenter(end.x, end.z);
-  const last = route[route.length - 1];
-  if (!last || last.x !== destination.x || last.z !== destination.z) {
-    route.push(destination);
-  }
-  return {
-    waypoints: straightenRoute(grid, from, route, startPassable),
-    destination,
-    reachedTarget,
-  };
+  return { start, end, reachedTarget };
 }
 
 /**

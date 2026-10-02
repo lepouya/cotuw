@@ -338,6 +338,20 @@ story.
     navigation change. A route that meets a blocker its checks missed
     recalculates once that tick, then waits as blocked. Presentation-only
     terrain edits are not navigation changes.
+- A group move is one serializable command resolved at the start of a tick.
+  Units receive distinct reachable tile-center destinations near the requested
+  point, using their own profiles and occupancy layers. Stable actor IDs order
+  assignment; distance to the click, distance to the unit, then tile order break
+  slot ties. Units retain their own speeds rather than waiting for the group.
+  Destinations avoid unselected units and assigned same-layer destinations.
+  An actor without an available destination keeps its current order. An
+  unreachable click uses separate approach positions and blocked-target
+  feedback.
+- Movement definitions author a separation radius independently of visual
+  bounds.
+  Friendly contact correction runs after movement, cannot cross blocked terrain,
+  and is bounded by half that tick's actual travel for moving units. Passing
+  units yield to stopped units; overlapping idle units separate gradually.
 - Friendly mobile actors use soft separation. Detected opponents are hard local
   blockers; physical contact with an undetected same-layer opponent forces a
   temporary reveal.

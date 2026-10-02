@@ -1,4 +1,8 @@
 import {
+  assignGroupDestinations,
+  separateMobileActors,
+} from "./group-movement";
+import {
   evaluateTraining as evaluateUnitTraining,
   validateProductionDefinitions,
 } from "./production";
@@ -144,6 +148,7 @@ export type MissionSimulation = {
   /**
    * Applies queued commands, then advances every actor by one tick. Outcomes
    * carry each command as applied, with move targets clamped to the bounds.
+   * Group moves report one move outcome per unique actor ID.
    */
   tick: () => CommandOutcome[];
 };
@@ -451,7 +456,52 @@ export function createMissionSimulation({
     command: MissionCommand,
     tick: number,
     working: WorkingActors,
-  ): CommandOutcome => {
+  ): CommandOutcome | CommandOutcome[] => {
+    if (command.kind === "group-move") {
+      if (
+        !isFinitePosition(command.target) ||
+        !Array.isArray(command.actorIds) ||
+        !command.actorIds.every(
+          (id) => typeof id === "string" && id.length > 0,
+        ) ||
+        command.actorIds.length === 0
+      ) {
+        return { tick, command: structuredClone(command), accepted: false };
+      }
+      const target = clampToBounds(command.target, worldBounds);
+      const ids = [...new Set(command.actorIds)].sort();
+      const movers = ids.flatMap((id) => {
+        const actor = working.actorsById.get(id);
+        if (!actor || !definitionFor(actor).movement) return [];
+        const grid = behaviorFor(actor).navigationGrid?.(
+          actor,
+          definitionFor(actor),
+        );
+        return grid ? [{ actor, definition: definitionFor(actor), grid }] : [];
+      });
+      const assignments = new Map(
+        assignGroupDestinations(
+          movers,
+          working.actors.map((actor) => ({
+            actor,
+            definition: definitionFor(actor),
+          })),
+          target,
+        ).map((assignment) => [assignment.command.actorId, assignment]),
+      );
+      return ids.flatMap((actorId) => {
+        const assignment = assignments.get(actorId);
+        if (!assignment?.assigned)
+          return [
+            {
+              tick,
+              command: { kind: "move" as const, actorId, target },
+              accepted: false,
+            },
+          ];
+        return applyCommand(assignment.command, tick, working);
+      });
+    }
     if (command.kind === "terrain") {
       const edit = structuredClone(command);
       if (!map || !map.isValidTerrainEdit(edit)) {
@@ -525,11 +575,18 @@ export function createMissionSimulation({
       return accepted;
     };
     if (command.kind === "move") {
-      if (!isFinitePosition(command.target))
+      if (
+        !isFinitePosition(command.target) ||
+        (command.requestedTarget !== undefined &&
+          !isFinitePosition(command.requestedTarget))
+      )
         return { tick, command: structuredClone(command), accepted: false };
       const applied = {
         ...command,
         target: clampToBounds(command.target, worldBounds),
+        ...(command.requestedTarget && {
+          requestedTarget: clampToBounds(command.requestedTarget, worldBounds),
+        }),
       };
       return { tick, command: applied, accepted: handle(applied) };
     }
@@ -658,10 +715,13 @@ export function createMissionSimulation({
           retiredIds: [...state.retiredActorIds],
           lifecycleChanges: 0,
         };
-        const outcomes = due.map(({ command }) =>
+        const outcomes = due.flatMap(({ command }) =>
           applyCommand(command, state.tick, working),
         );
 
+        const previousPositions = new Map(
+          working.actors.map((actor) => [actor.id, { ...actor.worldPosition }]),
+        );
         for (const actor of working.actors) {
           const before = actorIdentity(actor);
           behaviorFor(actor).update(actor, definitionFor(actor), tickSeconds);
@@ -674,6 +734,22 @@ export function createMissionSimulation({
           }
           validateUpdate(actor, before);
         }
+
+        separateMobileActors(
+          working.actors.flatMap((actor) => {
+            const definition = definitionFor(actor);
+            if (!definition.movement?.radius) return [];
+            const grid = behaviorFor(actor).navigationGrid?.(actor, definition);
+            return grid ? [{ actor, definition, grid }] : [];
+          }),
+          tickSeconds,
+          previousPositions,
+        );
+        for (const actor of working.actors)
+          validateUpdate(
+            actor,
+            actorIdentity(actorsById.get(actor.id) ?? actor),
+          );
 
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
@@ -729,6 +805,15 @@ function indexDefinitions(
     ) {
       throw new RangeError(
         `Actor definition ${definition.id} has an invalid movement speed.`,
+      );
+    }
+    if (
+      definition.movement?.radius !== undefined &&
+      (!Number.isFinite(definition.movement.radius) ||
+        definition.movement.radius <= 0)
+    ) {
+      throw new RangeError(
+        `Actor definition ${definition.id} has an invalid movement radius.`,
       );
     }
     if (

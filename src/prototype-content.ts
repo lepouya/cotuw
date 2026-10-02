@@ -20,12 +20,12 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
   {
     id: "arc-trooper",
     behaviorId: "terrain-move",
-    movement: { speed: 4, profileId: "surface-ground" },
+    movement: { speed: 4, profileId: "surface-ground", radius: 0.3 },
   },
   {
     id: "arc-scout",
     behaviorId: "terrain-move",
-    movement: { speed: 7, profileId: "surface-ground" },
+    movement: { speed: 7, profileId: "surface-ground", radius: 0.28 },
   },
   {
     id: "arc-command-center-prototype",

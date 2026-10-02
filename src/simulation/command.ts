@@ -8,6 +8,15 @@ export type MoveCommand = {
   kind: "move";
   actorId: string;
   target: WorldPosition;
+  /** Unreachable group click retained for destination feedback. */
+  requestedTarget?: WorldPosition;
+};
+
+/** Assigns distinct reachable destinations at the start of the tick. */
+export type GroupMoveCommand = {
+  kind: "group-move";
+  actorIds: string[];
+  target: WorldPosition;
 };
 
 /** Cancels an actor's current order. */
@@ -49,7 +58,7 @@ export type ActorLifecycleCommand =
   PlaceActorCommand | RemoveActorCommand | TrainUnitCommand;
 
 export type MissionCommand =
-  ActorCommand | TerrainCommand | ActorLifecycleCommand;
+  ActorCommand | GroupMoveCommand | TerrainCommand | ActorLifecycleCommand;
 
 /** A command waiting for the start of the tick numbered `tick`. */
 export type ScheduledCommand = {

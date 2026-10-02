@@ -1,6 +1,7 @@
 import type { ActorCommand } from "./command";
 import type { Footprint, OccupancyLayer } from "./occupancy";
 import type { TileCoord } from "./grid";
+import type { NavigationGrid } from "./navigation";
 import type { WorldPosition } from "./world";
 
 /** Immutable, data-driven capabilities shared by a type of actor. */
@@ -11,6 +12,8 @@ export type ActorDefinition = {
     speed: number;
     /** Resolves terrain rules outside actor state. */
     profileId?: string;
+    /** World-space radius for friendly separation and destination spacing. */
+    radius?: number;
   };
   /** Mobile actor definitions this building can train. */
   production?: { unitDefinitionIds: string[] };
@@ -47,6 +50,8 @@ export type Actor = {
 /** A move order and the route its behavior is following. */
 export type MovementOrder = {
   target: WorldPosition;
+  /** Group click that could only be approached, for blocked-target feedback. */
+  requestedTarget?: WorldPosition;
   /** The target or closest reachable point this route will actually reach. */
   destination?: WorldPosition;
   /** False when `destination` is only an approach to the requested target. */
@@ -108,6 +113,11 @@ export function createActor({
 
 /** Trusted code for one serializable behavior ID. It is never actor state. */
 export type ActorBehavior = {
+  /** Read-only navigation queries for group orders and local separation. */
+  navigationGrid?: (
+    actor: Readonly<Actor>,
+    definition: ActorDefinition,
+  ) => NavigationGrid;
   /**
    * Applies a validated command addressed to this actor. Move targets are
    * already inside the world bounds. Returns whether the actor accepted it.
