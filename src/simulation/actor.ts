@@ -87,6 +87,15 @@ export type DeepReadonly<T> = T extends readonly (infer Item)[]
     ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
     : T;
 
+/** Prevents callers from mutating published state. */
+export function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 /** The immutable subset of actor state a renderer needs to present an actor. */
 export type ActorRenderState = DeepReadonly<
   Pick<

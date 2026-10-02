@@ -1,3 +1,5 @@
+import { harvestingRecoveryCost } from "../src/simulation/economy";
+import type { ActorDefinition } from "../src/simulation/actor";
 import { describe, expect, test } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
 import { ECONOMY_SCENARIO } from "../src/content/economy-scenario";
@@ -71,9 +73,25 @@ const scenario = defineScenario({
     },
   ],
 });
-function fixture(state?: MissionState, tickSeconds = 1, fault = false) {
+function fixture(
+  state?: MissionState,
+  tickSeconds = 1,
+  fault: boolean | "move" = false,
+) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
+  const movement = createTerrainMoveBehavior(map, occupancy, [
+    {
+      id: "surface-ground",
+      maxSlope: 0.75,
+      slopeCostAtLimit: 2,
+      terrainCosts: { plain: 1, path: 0.8, rough: 2.25, water: null },
+    },
+  ]);
+  if (fault === "move")
+    movement.handleCommand = () => {
+      throw new Error("test move fault");
+    };
   const simulation = createMissionSimulation({
     state: state ?? createScenarioState(scenario, definitions),
     definitions,
@@ -82,23 +100,13 @@ function fixture(state?: MissionState, tickSeconds = 1, fault = false) {
     tickSeconds,
     bounds: map.worldBounds,
     behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, [
-          {
-            id: "surface-ground",
-            maxSlope: 0.75,
-            slopeCostAtLimit: 2,
-            terrainCosts: { plain: 1, path: 0.8, rough: 2.25, water: null },
-          },
-        ]),
-      ],
+      ["terrain-move", movement],
       [
         "idle",
         {
           handleCommand: () => false,
           update: () => {
-            if (fault) throw new Error("test fault");
+            if (fault === true) throw new Error("test fault");
           },
         },
       ],
@@ -285,6 +293,45 @@ describe("Materials economy", () => {
       );
       expect(() => fixture(saved)).toThrow("invalid construction");
     }
+  });
+
+  test("recovery costs use completed, empty Refineries of the matching worker type", () => {
+    const { simulation } = fixture();
+    const otherWorker: ActorDefinition = {
+      ...definitions.find((definition) => definition.harvesting)!,
+      id: "other-worker",
+      materialsCost: 10,
+    };
+    const otherRefinery: ActorDefinition = {
+      ...definitions.find((definition) => definition.refinery)!,
+      id: "other-refinery",
+      materialsCost: 200,
+      refinery: { harvesterDefinitionId: "other-worker" },
+      production: { unitDefinitionIds: ["other-worker"] },
+    };
+    const content = new Map(
+      [...definitions, otherWorker, otherRefinery].map((definition) => [
+        definition.id,
+        definition,
+      ]),
+    );
+    command(simulation, build());
+    expect(
+      harvestingRecoveryCost(simulation.economy!, simulation.actors, content),
+    ).toBe(150);
+    finishBuilding(simulation);
+    expect(
+      harvestingRecoveryCost(simulation.economy!, simulation.actors, content),
+    ).toBe(50);
+    command(simulation, {
+      kind: "train-unit",
+      actorId: "worker",
+      producerId: "refinery",
+      definitionId: "arc-harvester",
+    });
+    expect(
+      harvestingRecoveryCost(simulation.economy!, simulation.actors, content),
+    ).toBe(150);
   });
 
   test("same-tick placement spends against staged funds and rejects resources", () => {
@@ -608,6 +655,33 @@ describe("Materials economy", () => {
     until(simulation, () => worker(simulation).cargo > 0);
   });
 
+  test("a route blocked while travelling reports stalled harvesting", () => {
+    const { simulation, map } = workerFixture();
+    command(simulation, gather("far"));
+    advance(simulation, 2);
+    expect(worker(simulation).phase).toBe("travelling");
+    const { worldPosition } = simulation.actorById("worker")!;
+    const center = map.tileAtWorldPosition(worldPosition.x, worldPosition.z);
+    const ring = [-1, 0, 1].flatMap((dx) =>
+      [-1, 0, 1]
+        .filter((dz) => dx || dz)
+        .map((dz) => ({ x: center.x + dx, z: center.z + dz })),
+    );
+    command(simulation, {
+      kind: "terrain",
+      tiles: ring.map((tile) => ({
+        ...tile,
+        terrain: { typeId: "plain", surfacePassable: false },
+      })),
+    });
+    until(simulation, () => worker(simulation).phase === "blocked", 5);
+    command(simulation, {
+      kind: "terrain",
+      tiles: ring.map((tile) => ({ ...tile, terrain: { typeId: "plain" } })),
+    });
+    until(simulation, () => worker(simulation).cargo > 0);
+  });
+
   test("invalid economy and references fail restoration before changing live occupancy", () => {
     const { simulation, map, occupancy } = workerFixture();
     const saved = simulation.snapshot();
@@ -620,6 +694,39 @@ describe("Materials economy", () => {
     const bad = simulation.snapshot();
     bad.economy!.harvesters[0].refineryId = "missing";
     expect(() => fixture(bad)).toThrow("invalid economy");
+  });
+
+  test("a late economy fault rolls back a completed unit and its paid queue", () => {
+    const { simulation } = workerFixture();
+    const saved = simulation.snapshot();
+    saved.economy!.materials = 125;
+    const setup = fixture(saved).simulation;
+    command(setup, {
+      kind: "place-actor",
+      actorId: "barracks",
+      definitionId: "arc-field-barracks",
+      origin: { x: 9, z: 10 },
+    });
+    finishBuilding(setup, "barracks");
+    command(setup, {
+      kind: "train-unit",
+      actorId: "trooper",
+      producerId: "barracks",
+      definitionId: "arc-trooper",
+    });
+    advance(setup, 2);
+    const { simulation: failing, occupancy } = fixture(
+      setup.snapshot(),
+      1,
+      "move",
+    );
+    failing.submitCommand(gather());
+    const before = failing.snapshot();
+    expect(before.economy!.production[0].completedTicks).toBe(3);
+    expect(() => failing.tick()).toThrow("test move fault");
+    expect(failing.snapshot()).toEqual(before);
+    expect(failing.actorById("trooper")).toBeUndefined();
+    expect(occupancy.ownerAt(9, 10, "surface")).toBe("barracks");
   });
 
   test("a fault rolls back spending, production, resource state, and footprint edits together", () => {
@@ -695,6 +802,23 @@ describe("economy persistence", () => {
     expect(restored.snapshot()).toEqual(simulation.snapshot());
     expect(restored.actorById("next")!.construction).toBeUndefined();
     expect(restored.economy!.materials).toBe(200);
+  });
+
+  test("resource compatibility ignores coordinate key order and checks authored names", () => {
+    const { simulation } = fixture();
+    const save = JSON.parse(serializeMission(simulation.snapshot(), 1));
+    for (const resource of [
+      ...save.state.economy.sites,
+      ...save.state.economy.loot,
+    ])
+      resource.tile = { z: resource.tile.z, x: resource.tile.x };
+    expect(deserializeMission(JSON.stringify(save), scenario, 1)).toEqual(
+      simulation.snapshot(),
+    );
+    save.state.economy.sites[0].name = "Different patch";
+    expect(() => deserializeMission(JSON.stringify(save), scenario, 1)).toThrow(
+      "resource content",
+    );
   });
 
   test("rejects incompatible versions, scenario content, and tick rates", () => {

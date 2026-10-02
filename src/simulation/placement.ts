@@ -232,6 +232,29 @@ export function occupiedTilesFor(
   }));
 }
 
+/** On-map tiles that share an edge with `tiles` but are not among them. */
+export function adjacentTiles(
+  map: TerrainView,
+  tiles: readonly TileCoord[],
+): TileCoord[] {
+  const inside = new Set(tiles.map(tileKey));
+  const adjacent = new Map<string, TileCoord>();
+  for (const tile of tiles) {
+    for (const [dx, dz] of [
+      [0, 1],
+      [1, 0],
+      [0, -1],
+      [-1, 0],
+    ]) {
+      const next = { x: tile.x + dx, z: tile.z + dz };
+      const key = tileKey(next);
+      if (map.containsTile(next.x, next.z) && !inside.has(key))
+        adjacent.set(key, next);
+    }
+  }
+  return [...adjacent.values()];
+}
+
 /** The position and facing a tile placement implies. */
 export function tilePlacedPose(
   map: TerrainView,

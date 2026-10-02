@@ -108,6 +108,7 @@ export function createTilePlacedActorViewRegistry(
         definitionsById.get(actor.definitionId)!,
       );
       if (
+        preview ||
         tiles.some(
           ({ x, z }) =>
             x >= bounds.minX &&
@@ -244,53 +245,46 @@ export function createTilePlacedActorViewRegistry(
       preview && definition.production
         ? createProductionExitMarker(scene, map, root, tiles, facing)
         : undefined;
-    const progressMeshes =
-      !preview && actor.construction
-        ? ["background", "fill"].map((part) => {
-            const mesh = MeshBuilder.CreateBox(
-              `${root.name}-construction-${part}`,
-              {
-                width: 2 * map.tileSize,
-                height: 0.1,
-                depth: 0.16,
-              },
-              scene,
-            );
-            mesh.parent = root;
-            mesh.position.set(
-              worldPosition.x,
-              roof + 1.9 + (part === "fill" ? 0.06 : 0),
-              worldPosition.z,
-            );
-            mesh.isPickable = false;
-            mesh.material = shared(`construction-${part}`, (material) => {
-              material.emissiveColor =
-                part === "fill"
-                  ? new Color3(1, 0.78, 0.24)
-                  : new Color3(0.12, 0.16, 0.18);
-              material.disableLighting = true;
-            });
-            return mesh;
-          })
-        : [];
-    const bodyMeshes = root
-      .getChildMeshes()
-      .filter((mesh) => !progressMeshes.some((progress) => progress === mesh));
-    let constructing = false;
+    // The view key includes construction, so completion rebuilds the view.
+    const constructing = !preview && actor.construction !== undefined;
+    if (constructing)
+      for (const mesh of root.getChildMeshes()) mesh.visibility = 0.45;
+    const [, progressFill] = constructing
+      ? ["background", "fill"].map((part) => {
+          const mesh = MeshBuilder.CreateBox(
+            `${root.name}-construction-${part}`,
+            {
+              width: 2 * map.tileSize,
+              height: 0.1,
+              depth: 0.16,
+            },
+            scene,
+          );
+          mesh.parent = root;
+          mesh.position.set(
+            worldPosition.x,
+            roof + 1.9 + (part === "fill" ? 0.06 : 0),
+            worldPosition.z,
+          );
+          mesh.isPickable = false;
+          mesh.material = shared(`construction-${part}`, (material) => {
+            material.emissiveColor =
+              part === "fill"
+                ? new Color3(1, 0.78, 0.24)
+                : new Color3(0.12, 0.16, 0.18);
+            material.disableLighting = true;
+          });
+          return mesh;
+        })
+      : [];
     return {
       root,
-      update: (state: TilePlacedActorState) => {
-        constructing = !!state.construction;
-        for (const mesh of bodyMeshes)
-          mesh.visibility = constructing ? 0.45 : 1;
-        for (const mesh of progressMeshes) mesh.setEnabled(constructing);
-        if (state.construction && progressMeshes.length) {
-          const progress =
-            state.construction.completedTicks / state.construction.totalTicks;
-          progressMeshes[1]!.scaling.x = Math.max(0.01, progress);
-          progressMeshes[1]!.position.x =
-            worldPosition.x - map.tileSize * (1 - progress);
-        }
+      update: ({ construction }: TilePlacedActorState) => {
+        if (!progressFill || !construction) return;
+        const progress = construction.completedTicks / construction.totalTicks;
+        progressFill.scaling.x = Math.max(0.01, progress);
+        progressFill.position.x =
+          worldPosition.x - map.tileSize * (1 - progress);
       },
       animate: (seconds: number) => details?.update(constructing ? 0 : seconds),
       dispose: () => {

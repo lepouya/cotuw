@@ -1,4 +1,5 @@
 import { isOutcomeOf } from "../simulation/command";
+import { PRODUCTION_QUEUE_LIMIT } from "../simulation/economy";
 
 import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome, TrainUnitCommand } from "../simulation/command";
@@ -20,7 +21,7 @@ const REASONS: Record<TrainingReason, string> = {
   "insufficient-materials": "Not enough Materials for this unit.",
   "refinery-occupied": "This Refinery already has a Harvester or a paid order.",
   "under-construction": "Wait for this building to finish construction.",
-  "queue-full": "Production queue full (5 orders).",
+  "queue-full": `Production queue full (${PRODUCTION_QUEUE_LIMIT} orders).`,
 };
 
 /** Local pending feedback; the simulation rechecks every submitted request. */

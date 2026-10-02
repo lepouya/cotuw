@@ -583,10 +583,11 @@ story.
   paid-order cancellation, patch totals, and salvage commands. The top bar
   shows available Materials. Blue resource markers shrink in four stages and
   disappear at depletion; salvage uses hovering, rotating gold gift boxes
-  with red ribbons and disappears on collection. Both appear
-  on the minimap. Exhaustion, missing assignments, blocked routes, and an
-  unaffordable harvesting recovery have explanatory feedback. Building timers
-  show in Units and Selection, with a progress bar over translucent blueprints.
+  with red ribbons and disappears on collection. Both marker types follow
+  terrain edits and appear on the minimap. Exhaustion, missing assignments,
+  blocked routes, and unaffordable harvesting recovery have explanatory
+  feedback. Building timers show in Units and Selection, with a progress bar
+  over translucent blueprints.
   Gathering Harvesters lower and spin a drill with a green light; idle workers
   raise the drill and show amber. Refineries animate a rooftop fan and pump
   when complete. Reduced motion retains static activity cues.
@@ -595,8 +596,8 @@ story.
   production, blueprint progress and queue order, pending commands, and
   reserved or retired actor identities.
   Versioned JSON envelopes check scenario, tick rate, map dimensions, and
-  resource content before simulation validation. Manual save/load UI remains
-  pending.
+  authored resource names, coordinates, and yields before simulation
+  validation. Manual save/load UI remains pending.
 
 ## Milestone 0 playable slice
 

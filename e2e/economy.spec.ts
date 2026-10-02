@@ -143,6 +143,13 @@ test("default opening shows the Command Center, starting Materials, and paid con
   );
 });
 
+test("recreating economy controls does not duplicate resource actions", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  await expect(page.locator("#resource-overview button")).toHaveCount(5);
+});
+
 test("building timers disable production, and cancelling a blueprint fully refunds its cost", async ({
   page,
 }) => {
@@ -186,6 +193,84 @@ test("spending the bootstrap funds shows a stalled-economy recovery hint", async
   await expect(page.locator("#materials-counter")).toHaveText("100");
   await page.locator("#tab-units").click();
   await expect(page.locator("#economy-alert")).toContainText("Economy stalled");
+});
+
+test("Harvester controls use matching Refineries and type-specific load timing", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  await place(page, "#build-refinery", 12, 49);
+  await page.locator("#train-harvester").click();
+  await advance(page, 7);
+  await page.evaluate(async () => {
+    const controlsPath: string = "/src/ui/economy-controls.ts";
+    const contentPath: string = "/src/content/arc.ts";
+    const { createEconomyControls } = (await import(
+      controlsPath
+    )) as typeof import("../src/ui/economy-controls");
+    const { ARC_ACTOR_DEFINITIONS } = (await import(
+      contentPath
+    )) as typeof import("../src/content/arc");
+    const snapshot = window.economyHarness.view.simulation.snapshot();
+    window.economyHarness.view.engine.stopRenderLoop();
+    const refinery = snapshot.actors.find(
+      (actor) => actor.definitionId === "arc-materials-refinery",
+    )!;
+    const worker = snapshot.economy!.harvesters[0];
+    worker.phase = "gathering";
+    worker.targetSiteId = worker.activeSiteId = snapshot.economy!.sites[0].id;
+    const otherWorker = {
+      ...ARC_ACTOR_DEFINITIONS.find((definition) => definition.harvesting)!,
+      id: "other-worker",
+      materialsCost: 10,
+      harvesting: { capacity: 50, loadSeconds: 30, patchRadius: 2 },
+    };
+    const otherRefinery = {
+      ...ARC_ACTOR_DEFINITIONS.find((definition) => definition.refinery)!,
+      id: "other-refinery",
+      materialsCost: 200,
+      refinery: { harvesterDefinitionId: otherWorker.id },
+      production: { unitDefinitionIds: [otherWorker.id] },
+    };
+    snapshot.actors.push({
+      ...structuredClone(refinery),
+      id: "other-refinery",
+      definitionId: otherRefinery.id,
+    });
+    const root = document
+      .querySelector<HTMLElement>("#game-sidebar")!
+      .cloneNode(true) as HTMLElement;
+    root.id = "review-economy-root";
+    for (const button of root.querySelectorAll("[data-economy-action]"))
+      button.remove();
+    for (const panel of root.querySelectorAll<HTMLElement>("[role=tabpanel]"))
+      panel.hidden = false;
+    const controls = createEconomyControls(
+      root,
+      {
+        actors: snapshot.actors,
+        economy: snapshot.economy,
+        tickSeconds: 1 / 60,
+        submitCommand: () => 0,
+      },
+      {
+        definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
+        names: new Map(),
+        selectedActorId: () => worker.actorId,
+        enabled: () => true,
+        focus: () => {},
+        positionForTile: () => ({ x: 0, z: 0 }),
+      },
+    );
+    controls.refresh();
+    document.body.append(root);
+  });
+  const root = page.locator("#review-economy-root");
+  await expect(root.locator("#refinery-assignments button")).toHaveCount(1);
+  await expect(root.locator("#refinery-assignments button")).toContainText(
+    "Assigned to",
+  );
+  await expect(root.locator("#economy-alert")).toContainText("60 seconds");
 });
 
 for (const touch of [false, true]) {

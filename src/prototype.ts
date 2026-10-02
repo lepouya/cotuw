@@ -1,10 +1,12 @@
+// Throwaway prototype code: a sample map and the scene that shows it.
+// Replace this with real game setup once the prototype has served its purpose.
 import { createScenarioState } from "./simulation/scenario";
+import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
 import { createMaterialsSitesView } from "./render/materials-sites";
 import { createHarvesterAppearance } from "./render/harvester";
 import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
 import type { ScenarioDefinition } from "./simulation/scenario";
-import type { MissionState } from "./simulation/mission";
 import {
   PROTOTYPE_MAP_SIZE,
   WATER_HALF_WIDTH,
@@ -12,8 +14,6 @@ import {
   prototypeTerrainAt,
   prototypeHeightAt,
 } from "./content/prototype-terrain";
-// Throwaway prototype code: a sample map and the scene that shows it.
-// Replace this with real game setup once the prototype has served its purpose.
 import {
   Color3,
   Color4,
@@ -96,7 +96,6 @@ export type TerrainPrototypeControls = BuildingPlacementControls &
     buildings?: readonly DefinitionButton[];
     scenario?: ScenarioDefinition;
     economyRoot?: HTMLElement;
-    state?: MissionState;
     onReady?: (session: TerrainPrototype) => void;
     onDispose?: () => void;
     /** Updates after simulation ticks or changes to controls and selection. */
@@ -185,11 +184,9 @@ export async function createTerrainPrototype(
   createTerrainMeshes(view.scene, map);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
-    state:
-      controls.state ??
-      (controls.scenario
-        ? createScenarioState(controls.scenario, definitions)
-        : createMissionState([])),
+    state: controls.scenario
+      ? createScenarioState(controls.scenario, definitions)
+      : createMissionState([]),
     behaviorRegistry: new Map([
       [
         "terrain-move",
@@ -270,7 +267,10 @@ export async function createTerrainPrototype(
           command.target.z,
         );
         const site = simulation.economy.sites.find(
-          (site) => site.tile.x === tile.x && site.tile.z === tile.z,
+          (site) =>
+            site.remainingMaterials > 0 &&
+            site.tile.x === tile.x &&
+            site.tile.z === tile.z,
         );
         if (site) {
           simulation.submitCommand({
@@ -486,19 +486,10 @@ export async function createTerrainPrototype(
             canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
           else movementPath.showRejectedTarget(command.actorId, command.target);
         }
-        if (
-          (command.kind === "remove-actor" ||
-            command.kind === "sell-actor" ||
-            command.kind === "cancel-construction") &&
-          command.actorId === pendingRemovalId
-        )
+        const removal = isCommandOf(command, ACTOR_REMOVAL_KINDS);
+        if (removal && command.actorId === pendingRemovalId)
           pendingRemovalId = undefined;
-        if (
-          command.kind === "place-actor" ||
-          command.kind === "remove-actor" ||
-          command.kind === "sell-actor" ||
-          command.kind === "cancel-construction"
-        ) {
+        if (removal || command.kind === "place-actor") {
           canvas.dataset.tilePlacedActorCommand = accepted
             ? "accepted"
             : "rejected";

@@ -5,7 +5,7 @@ import {
   TransformNode,
 } from "@babylonjs/core";
 import { stableUnit } from "./actor";
-import type { Scene } from "@babylonjs/core";
+import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { EconomyView } from "../simulation/economy";
 
@@ -23,6 +23,12 @@ export function createMaterialsSitesView(
   giftMaterial.emissiveColor = new Color3(0.18, 0.09, 0.01);
   const ribbonMaterial = new StandardMaterial("materials-gift-ribbon", scene);
   ribbonMaterial.diffuseColor = new Color3(0.8, 0.13, 0.24);
+  const groundAt = (node: TransformNode) =>
+    map.heightAtWorldPosition(node.position.x, node.position.z);
+  // Markers stand on the ground at every depletion stage.
+  const seat = (mesh: AbstractMesh) => {
+    mesh.position.y = groundAt(mesh) + 0.45 * mesh.scaling.y;
+  };
   const sites = new Map(
     initial.sites.map((site) => {
       const mesh = MeshBuilder.CreateCylinder(
@@ -36,11 +42,8 @@ export function createMaterialsSitesView(
         scene,
       );
       const point = map.tileCenter(site.tile.x, site.tile.z);
-      mesh.position.set(
-        point.x,
-        map.heightAtWorldPosition(point.x, point.z) + 0.45,
-        point.z,
-      );
+      mesh.position.set(point.x, 0, point.z);
+      seat(mesh);
       mesh.isPickable = false;
       mesh.material = material;
       return [site.id, mesh] as const;
@@ -90,12 +93,15 @@ export function createMaterialsSitesView(
       }
       // Terrain under the gift receives contextual commands.
       for (const mesh of root.getChildMeshes()) mesh.isPickable = false;
-      return [
-        cache.id,
-        { root, ground, phase: stableUnit(cache.id) * Math.PI * 2 },
-      ] as const;
+      const gift = { root, ground, phase: stableUnit(cache.id) * Math.PI * 2 };
+      return [cache.id, gift] as const;
     }),
   );
+  // `animate` repositions gifts every frame from their stored ground.
+  const terrainObserver = map.onChangedObservable.add(() => {
+    for (const mesh of sites.values()) seat(mesh);
+    for (const gift of loot.values()) gift.ground = groundAt(gift.root);
+  });
   return {
     update: (economy: EconomyView) => {
       for (const site of economy.sites) {
@@ -103,7 +109,11 @@ export function createMaterialsSitesView(
         mesh.setEnabled(site.remainingMaterials > 0);
         const stage =
           Math.ceil((4 * site.remainingMaterials) / site.initialMaterials) / 4;
-        mesh.scaling.setAll(0.35 + 0.65 * stage);
+        const scale = 0.35 + 0.65 * stage;
+        if (mesh.scaling.y !== scale) {
+          mesh.scaling.setAll(scale);
+          seat(mesh);
+        }
       }
       for (const cache of economy.loot)
         loot.get(cache.id)!.root.setEnabled(!cache.collected);
@@ -115,6 +125,7 @@ export function createMaterialsSitesView(
       }
     },
     dispose: () => {
+      map.onChangedObservable.remove(terrainObserver);
       for (const mesh of sites.values()) mesh.dispose();
       for (const { root } of loot.values()) root.dispose();
       material.dispose();

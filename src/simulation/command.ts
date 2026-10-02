@@ -76,6 +76,24 @@ export type CancelConstructionCommand = {
 
 export type SellActorCommand = { kind: "sell-actor"; actorId: string };
 
+export const ECONOMY_COMMAND_KINDS = [
+  "gather",
+  "assign-refinery",
+  "return-cargo",
+  "cancel-production",
+] as const satisfies readonly EconomyCommand["kind"][];
+
+/** Commands that take a committed actor out of the mission. */
+export const ACTOR_REMOVAL_KINDS = [
+  "remove-actor",
+  "sell-actor",
+  "cancel-construction",
+] as const;
+export type ActorRemovalCommand = Extract<
+  MissionCommand,
+  { kind: (typeof ACTOR_REMOVAL_KINDS)[number] }
+>;
+
 export type MissionCommand =
   | ActorCommand
   | GroupMoveCommand
@@ -113,10 +131,17 @@ export type CommandOutcome<C extends MissionCommand = MissionCommand> =
       }
     : never;
 
-/** Narrows an outcome, and its rejection reason, to one command kind. */
+export function isCommandOf<K extends MissionCommand["kind"]>(
+  command: MissionCommand,
+  kinds: readonly K[],
+): command is Extract<MissionCommand, { kind: K }> {
+  return (kinds as readonly string[]).includes(command.kind);
+}
+
+/** Narrows an outcome, and its rejection reason, to the given command kinds. */
 export function isOutcomeOf<K extends MissionCommand["kind"]>(
   outcome: CommandOutcome,
-  kind: K,
+  ...kinds: K[]
 ): outcome is Extract<CommandOutcome, { command: { kind: K } }> {
-  return outcome.command.kind === kind;
+  return isCommandOf(outcome.command, kinds);
 }

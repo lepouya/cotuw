@@ -87,6 +87,51 @@ test.each([0, 1, 2, 3])(
   },
 );
 
+test("preview arrows follow terrain changes beyond the building footprint", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const map = new TerrainMap({
+      width: 12,
+      height: 12,
+      tileSize: 1,
+      createHeight: () => 0,
+    });
+    const views = createTilePlacedActorViewRegistry(
+      scene,
+      map,
+      [definition],
+      appearances,
+      { preview: true },
+    );
+    const actor = createTilePlacedActor(map, definition, {
+      actorId: "preview",
+      origin: { x: 5, z: 5 },
+    });
+    views.update([actor]);
+    const name = "tile-placed-actor-preview-root-exit-arrow";
+    const previous = scene.getMeshByName(name)!;
+    const heights = previous
+      .getVerticesData(VertexBuffer.PositionKind)!
+      .filter((_, index) => index % 3 === 1);
+    map.editTerrain({
+      heights: [
+        { x: 6, z: 8, height: 2 },
+        { x: 7, z: 8, height: 2 },
+      ],
+    });
+    views.animate(0);
+    const current = scene.getMeshByName(name)!;
+    const changed = current
+      .getVerticesData(VertexBuffer.PositionKind)!
+      .filter((_, index) => index % 3 === 1);
+    expect(Math.max(...changed)).toBeGreaterThan(Math.max(...heights));
+    views.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
 test("working signals are per Harvester and reduced motion preserves the visible state", () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
@@ -109,6 +154,7 @@ test("working signals are per Harvester and reduced motion preserves the visible
     expect(drill.rotation.z).toBe(rotation);
     first.setWorking!(false);
     expect(drill.position.y).toBe(idleDrill.position.y);
+    expect(scene.getMeshByName("first-work-beacon")!.scaling.y).toBe(1);
     first.dispose();
     second.dispose();
     appearance.dispose();
@@ -163,6 +209,66 @@ test("Refinery animation freezes during construction and progresses when operati
         .rotation.y,
     ).toBe(4);
     views.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("resource and gift markers follow edited terrain and release their observer", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const map = new TerrainMap({
+      width: 12,
+      height: 12,
+      tileSize: 1,
+      createHeight: () => 0,
+    });
+    const economy: EconomyState = {
+      materials: 0,
+      depositedMaterials: 0,
+      harvesters: [],
+      production: [],
+      sites: [
+        {
+          id: "site",
+          name: "Materials",
+          tile: { x: 5, z: 5 },
+          initialMaterials: 100,
+          remainingMaterials: 100,
+        },
+      ],
+      loot: [
+        {
+          id: "cache",
+          name: "Salvage",
+          tile: { x: 7, z: 5 },
+          materials: 25,
+          collected: false,
+        },
+      ],
+    };
+    const hadObservers = map.onChangedObservable.hasObservers();
+    const view = createMaterialsSitesView(scene, map, economy);
+    const site = scene.getMeshByName("materials-site")!;
+    const gift = scene.getTransformNodeByName("materials-cache-gift")!;
+    view.animate(1);
+    const siteHeight = site.position.y;
+    const giftHeight = gift.position.y;
+    map.editTerrain({
+      heights: [5, 6, 7, 8].flatMap((x) =>
+        [5, 6].map((z) => ({ x, z, height: 2 })),
+      ),
+    });
+    view.animate(1);
+    expect(site.position.y).toBeCloseTo(siteHeight + 2);
+    expect(gift.position.y).toBeCloseTo(giftHeight + 2);
+    economy.sites[0].remainingMaterials = 25;
+    view.update(economy);
+    site.computeWorldMatrix(true);
+    expect(site.getBoundingInfo().boundingBox.minimumWorld.y).toBeCloseTo(2);
+    view.dispose();
+    expect(map.onChangedObservable.hasObservers()).toBe(hadObservers);
   } finally {
     engine.dispose();
   }

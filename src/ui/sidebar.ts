@@ -4,6 +4,7 @@ import {
   occupiedTilesFor,
 } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
+import { materialsCost } from "../simulation/economy";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 
@@ -116,7 +117,7 @@ export function createSidebar(
         button: optionButton(
           element("building-options"),
           presentation.build,
-          `${description} · ${footprintSize(definition.footprint.occupiedTiles)} tiles${options.economy ? ` · ${definition.materialsCost ?? 0} Materials` : ""}`,
+          `${description} · ${footprintSize(definition.footprint.occupiedTiles)} tiles${options.economy ? ` · ${materialsCost(definition)} Materials` : ""}`,
         ),
       });
     }
@@ -124,7 +125,7 @@ export function createSidebar(
       const button = optionButton(
         element("training-options"),
         presentation.train,
-        `${presentation.description} · Speed ${definition.movement.speed}${options.economy ? ` · ${definition.materialsCost ?? 0} Materials · ${definition.trainingSeconds ?? 0}s` : ""}`,
+        `${presentation.description} · Speed ${definition.movement.speed}${options.economy ? ` · ${materialsCost(definition)} Materials · ${definition.trainingSeconds ?? 0}s` : ""}`,
       );
       button.disabled = true;
       train.push({ definitionId: definition.id, button });
@@ -269,7 +270,7 @@ export function createSidebar(
         if (counter && counter.textContent !== String(state.materials))
           counter.textContent = String(state.materials);
         for (const { definitionId, button } of buildings) {
-          const cost = definitionById.get(definitionId)?.materialsCost ?? 0;
+          const cost = materialsCost(definitionById.get(definitionId)!);
           button.disabled =
             state.placementActive || state.faulted || state.materials < cost;
           button.title =

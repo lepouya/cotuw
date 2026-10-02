@@ -34,6 +34,10 @@ export async function placeBuilding(
   x: number,
   z: number,
 ) {
+  const canvas = page.locator("#game-canvas");
+  const count = Number(
+    await canvas.getAttribute("data-tile-placed-actor-count"),
+  );
   await page.locator("#tab-buildings").click();
   await page.locator(`#${buttonId}`).click();
   const point = await terrainPoint(page, x, z);
@@ -46,6 +50,10 @@ export async function placeBuilding(
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-placement-active",
     "false",
+  );
+  await expect(canvas).toHaveAttribute(
+    "data-tile-placed-actor-count",
+    String(count + 1),
   );
 }
 

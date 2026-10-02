@@ -1,11 +1,12 @@
-import { ECONOMY_SCENARIO } from "./content/economy-scenario";
-import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
 import "./styles.css";
+import { ECONOMY_SCENARIO } from "./content/economy-scenario";
 import { createTerrainPrototype } from "./prototype";
 import {
+  ARC_ACTOR_DEFINITIONS,
   PROTOTYPE_ACTOR_DEFINITIONS,
   PROTOTYPE_ACTOR_PRESENTATIONS,
   PROTOTYPE_GOALS,
+  ECONOMY_GOALS,
 } from "./prototype-content";
 import { createSidebar } from "./ui/sidebar";
 
@@ -25,20 +26,7 @@ const sidebar = createSidebar(
     definitions,
     economy: !sandbox,
     presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
-    goals: sandbox
-      ? PROTOTYPE_GOALS
-      : [
-          {
-            definitionId: "arc-materials-refinery",
-            label: "Build a Materials Refinery",
-          },
-          { definitionId: "arc-harvester", label: "Produce a Harvester" },
-          {
-            definitionId: "arc-field-barracks",
-            label: "Build a Field Barracks",
-          },
-          { definitionId: "arc-trooper", label: "Train a Trooper" },
-        ],
+    goals: sandbox ? PROTOTYPE_GOALS : ECONOMY_GOALS,
     selectActor: (id, additive) => session?.selectActor(id, additive),
   },
 );

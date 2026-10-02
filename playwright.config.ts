@@ -1,6 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
 const testPort = Number(process.env.COTUW_TEST_PORT ?? 1420);
+if (!Number.isInteger(testPort) || testPort < 1 || testPort > 65535)
+  throw new RangeError("COTUW_TEST_PORT must be an integer from 1 to 65535.");
 const testUrl = `http://127.0.0.1:${testPort}`;
 
 export default defineConfig({
@@ -27,7 +29,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `npm run dev -- --host 127.0.0.1 --port ${testPort}`,
+    command: `npm run dev -- --host 127.0.0.1 --port ${testPort} --strictPort`,
     url: testUrl,
     reuseExistingServer: !process.env.CI,
   },

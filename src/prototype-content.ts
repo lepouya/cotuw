@@ -1,3 +1,4 @@
+import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
 import { createRefineryDetails } from "./render/refinery";
 import { createBarracksDetails } from "./render/barracks";
 import { createCommandCenterDetails } from "./render/command-center";
@@ -16,9 +17,9 @@ export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
   },
 ];
 
-export { ARC_ACTOR_DEFINITIONS } from "./content/arc";
-import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
+export { ARC_ACTOR_DEFINITIONS };
 
+/** The free sandbox omits the Materials economy. */
 export const PROTOTYPE_ACTOR_DEFINITIONS = ARC_ACTOR_DEFINITIONS.filter(
   (definition) =>
     !["arc-harvester", "arc-materials-refinery"].includes(definition.id),
@@ -59,19 +60,24 @@ export const PROTOTYPE_ACTOR_PRESENTATIONS = new Map<string, ActorPresentation>(
         build: { id: "build-barracks", label: "Build Field Barracks" },
       },
     ],
+    [
+      "arc-materials-refinery",
+      {
+        name: "Materials Refinery",
+        description: "One assigned Harvester",
+        build: { id: "build-refinery", label: "Build Materials Refinery" },
+      },
+    ],
+    [
+      "arc-harvester",
+      {
+        name: "Harvester",
+        description: "Collects and delivers Materials",
+        train: { id: "train-harvester", label: "Produce Harvester" },
+      },
+    ],
   ],
 );
-
-PROTOTYPE_ACTOR_PRESENTATIONS.set("arc-materials-refinery", {
-  name: "Materials Refinery",
-  description: "One assigned Harvester",
-  build: { id: "build-refinery", label: "Build Materials Refinery" },
-});
-PROTOTYPE_ACTOR_PRESENTATIONS.set("arc-harvester", {
-  name: "Harvester",
-  description: "Collects and delivers Materials",
-  train: { id: "train-harvester", label: "Produce Harvester" },
-});
 
 export const PROTOTYPE_ACTOR_NAMES = new Map(
   [...PROTOTYPE_ACTOR_PRESENTATIONS].map(([id, { name }]) => [id, name]),
@@ -85,6 +91,16 @@ export const PROTOTYPE_GOALS: readonly SidebarGoal[] = [
   { definitionId: "arc-field-barracks", label: "Build a Field Barracks" },
   { definitionId: "arc-trooper", label: "Train a Trooper" },
   { definitionId: "arc-scout", label: "Train a Scout" },
+];
+
+export const ECONOMY_GOALS: readonly SidebarGoal[] = [
+  {
+    definitionId: "arc-materials-refinery",
+    label: "Build a Materials Refinery",
+  },
+  { definitionId: "arc-harvester", label: "Produce a Harvester" },
+  { definitionId: "arc-field-barracks", label: "Build a Field Barracks" },
+  { definitionId: "arc-trooper", label: "Train a Trooper" },
 ];
 
 export const PROTOTYPE_ACTOR_GRAPHICS = new Map<string, ActorGraphics>([
@@ -140,11 +156,13 @@ export const PROTOTYPE_TILE_PLACED_APPEARANCES = new Map<
       createDetails: createBarracksDetails,
     },
   ],
+  [
+    "arc-materials-refinery",
+    {
+      height: 0.45,
+      color: [0.45, 0.38, 0.22],
+      minimapColor: [0.85, 0.65, 0.2],
+      createDetails: createRefineryDetails,
+    },
+  ],
 ]);
-
-PROTOTYPE_TILE_PLACED_APPEARANCES.set("arc-materials-refinery", {
-  height: 0.45,
-  color: [0.45, 0.38, 0.22],
-  minimapColor: [0.85, 0.65, 0.2],
-  createDetails: createRefineryDetails,
-});

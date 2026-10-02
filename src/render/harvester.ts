@@ -85,11 +85,12 @@ export function createHarvesterAppearance(
       beacon.parent = instance.root;
       beacon.position.set(0, 1.1, 0.25);
       beacon.material = signal;
-      let working = false;
+      let working: boolean | undefined;
       let elapsed = seed * Math.PI * 2;
       return {
         root: instance.root,
         setWorking: (next) => {
+          if (next === working) return;
           working = next;
           signal.diffuseColor.set(
             working ? 0.2 : 1,
@@ -100,6 +101,7 @@ export function createHarvesterAppearance(
             working ? 0.8 : 0.25,
           );
           drill.position.y = working ? 0.3 : 0.65;
+          beacon.scaling.y = 1;
         },
         animate: ({ seconds }) => {
           if (reducedMotion()) return;
@@ -108,8 +110,6 @@ export function createHarvesterAppearance(
             drill.rotation.z += seconds * 9;
             drill.position.y = 0.3 + Math.sin(elapsed * 12) * 0.035;
             beacon.scaling.y = 1 + Math.sin(elapsed * 5) * 0.2;
-          } else {
-            beacon.scaling.y = 1;
           }
         },
         dispose: () => {

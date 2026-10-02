@@ -1,5 +1,6 @@
 import { Color3, Mesh, StandardMaterial, VertexData } from "@babylonjs/core";
 import { footprintOverlayOffset } from "./footprint-overlay";
+import { clampToBounds } from "../simulation/world";
 import type { Scene, TransformNode } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 
@@ -47,10 +48,8 @@ export function createProductionExitMarker(
       center.z +
       forward.z * (extent + ahead * map.tileSize) -
       forward.x * side * map.tileSize;
-    const height = map.heightAtWorldPosition(
-      Math.max(map.worldBounds.minX, Math.min(map.worldBounds.maxX, x)),
-      Math.max(map.worldBounds.minZ, Math.min(map.worldBounds.maxZ, z)),
-    );
+    const ground = clampToBounds({ x, z }, map.worldBounds);
+    const height = map.heightAtWorldPosition(ground.x, ground.z);
     positions.push(x, height + heightOffset, z);
   }
   const mesh = new Mesh(`${root.name}-exit-arrow`, scene);

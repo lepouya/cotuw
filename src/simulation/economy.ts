@@ -1,11 +1,16 @@
 import { isTileCoord, tileKey } from "./grid";
-import { isTilePlacedActor, occupiedTilesFor } from "./placement";
+import {
+  adjacentTiles,
+  isTilePlacedActor,
+  occupiedTilesFor,
+} from "./placement";
 import { findNavigationPath } from "./navigation";
 
 import type {
   Actor,
   ActorDefinition,
   ActorBehavior,
+  ActorRenderState,
   DeepReadonly,
 } from "./actor";
 import type { TileCoord } from "./grid";
@@ -28,6 +33,15 @@ export type MaterialsLoot = {
   materials: number;
   collected: boolean;
 };
+export const HARVESTER_PHASES = [
+  "idle",
+  "travelling",
+  "gathering",
+  "returning",
+  "depleted",
+  "blocked",
+  "unassigned",
+] as const;
 export type HarvesterState = {
   actorId: string;
   refineryId?: string;
@@ -35,14 +49,8 @@ export type HarvesterState = {
   gatherProgress: number;
   targetSiteId?: string;
   activeSiteId?: string;
-  phase:
-    | "idle"
-    | "travelling"
-    | "gathering"
-    | "returning"
-    | "depleted"
-    | "blocked"
-    | "unassigned";
+  phase: (typeof HARVESTER_PHASES)[number];
+  /** Navigation version a blocked Harvester waits to change before retrying. */
   retryNavigationVersion?: number;
 };
 export type ProductionJob = {
@@ -71,18 +79,15 @@ export type EconomyReason =
   | "empty-cargo"
   | "missing-order";
 
+/** Outstanding paid orders one producer may hold. */
+export const PRODUCTION_QUEUE_LIMIT = 5;
+
 export const materialsCost = (definition: ActorDefinition) =>
   definition.materialsCost ?? 0;
-export const trainingTicks = (
-  definition: ActorDefinition,
-  tickSeconds: number,
-) => Math.max(1, Math.ceil((definition.trainingSeconds ?? 0) / tickSeconds));
 
-export const constructionTicks = (
-  definition: ActorDefinition,
-  tickSeconds: number,
-) =>
-  Math.max(1, Math.ceil((definition.constructionSeconds ?? 0) / tickSeconds));
+/** Timed work takes at least one tick. */
+export const secondsToTicks = (seconds = 0, tickSeconds: number) =>
+  Math.max(1, Math.ceil(seconds / tickSeconds));
 
 export function validateEconomyDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,
@@ -207,16 +212,8 @@ export function validateEconomyState(
       worker.cargo > gathering.capacity ||
       !isCount(worker.gatherProgress) ||
       worker.gatherProgress >=
-        Math.max(1, Math.ceil(gathering.loadSeconds / tickSeconds)) ||
-      ![
-        "idle",
-        "travelling",
-        "gathering",
-        "returning",
-        "depleted",
-        "blocked",
-        "unassigned",
-      ].includes(worker.phase) ||
+        secondsToTicks(gathering.loadSeconds, tickSeconds) ||
+      !HARVESTER_PHASES.includes(worker.phase) ||
       (worker.retryNavigationVersion !== undefined &&
         !isCount(worker.retryNavigationVersion)) ||
       (worker.targetSiteId !== undefined &&
@@ -265,14 +262,14 @@ export function validateEconomyState(
         ?.production?.unitDefinitionIds.includes(unit.id) ||
       job.paidMaterials !== materialsCost(unit) ||
       !isCount(job.completedTicks) ||
-      job.totalTicks !== trainingTicks(unit, tickSeconds) ||
+      job.totalTicks !== secondsToTicks(unit.trainingSeconds, tickSeconds) ||
       job.completedTicks > job.totalTicks ||
       typeof job.exitBlocked !== "boolean"
     )
       return invalid();
     jobIds.add(job.actorId);
     const count = (queues.get(job.producerId) ?? 0) + 1;
-    if (count > 5) return invalid();
+    if (count > PRODUCTION_QUEUE_LIMIT) return invalid();
     queues.set(job.producerId, count);
     if (unit.harvesting) {
       if (
@@ -294,6 +291,32 @@ export function refineryOccupied(
     economy.harvesters.some((worker) => worker.refineryId === refineryId) ||
     economy.production.some((job) => job.producerId === refineryId)
   );
+}
+
+/** Cost of the cheapest Refinery and Harvester pair still needed. */
+export function harvestingRecoveryCost(
+  economy: Pick<EconomyView, "harvesters" | "production">,
+  actors: readonly ActorRenderState[],
+  definitions: ReadonlyMap<string, ActorDefinition>,
+): number {
+  let cost = Infinity;
+  for (const definition of definitions.values()) {
+    if (!definition.refinery) continue;
+    const available = actors.some(
+      (actor) =>
+        actor.definitionId === definition.id &&
+        !actor.construction &&
+        !refineryOccupied(economy, actor.id),
+    );
+    cost = Math.min(
+      cost,
+      (available ? 0 : materialsCost(definition)) +
+        materialsCost(
+          definitions.get(definition.refinery.harvesterDefinitionId)!,
+        ),
+    );
+  }
+  return cost;
 }
 
 export type EconomyWorld = {
@@ -366,27 +389,32 @@ export function applyEconomyCommand(
   return;
 }
 
-/** Loss of a producer loses its paid orders, while onboard cargo survives. */
+/**
+ * Loss of a producer loses its paid orders, while onboard cargo survives.
+ * Returns the Harvesters whose automated movement the loss interrupts.
+ */
 export function removeEconomyActor(
   economy: EconomyState,
   actorId: string,
   retire: (id: string) => void,
-) {
-  for (const job of economy.production.filter(
-    (job) => job.producerId === actorId,
-  ))
-    retire(job.actorId);
+): string[] {
+  for (const job of economy.production)
+    if (job.producerId === actorId) retire(job.actorId);
   economy.production = economy.production.filter(
     (job) => job.producerId !== actorId,
   );
   economy.harvesters = economy.harvesters.filter(
     (worker) => worker.actorId !== actorId,
   );
+  const interrupted: string[] = [];
   for (const worker of economy.harvesters) {
     if (worker.refineryId !== actorId) continue;
+    // Idle Harvesters keep manual movement.
+    if (worker.phase !== "idle") interrupted.push(worker.actorId);
     delete worker.refineryId;
     worker.phase = "unassigned";
   }
+  return interrupted;
 }
 
 /** Advances work in stable actor-ID order against the staged tick. */
@@ -414,7 +442,7 @@ export function updateEconomy(
     if (job.completedTicks < job.totalTicks) continue;
     const result = world.evaluateSpawn(job);
     job.exitBlocked = !result.accepted;
-    if (!result.accepted || !("actor" in result)) continue;
+    if (!("actor" in result)) continue;
     economy.production.splice(economy.production.indexOf(job), 1);
     if (definitions.get(job.definitionId)?.harvesting) {
       economy.harvesters.push({
@@ -428,12 +456,13 @@ export function updateEconomy(
     world.spawn(result.actor);
     byId.set(result.actor.id, result.actor);
   }
-  const near = (actor: Actor, point: WorldPosition) =>
+  const distance = (actor: Actor, point: WorldPosition) =>
     Math.hypot(
       actor.worldPosition.x - point.x,
       actor.worldPosition.z - point.z,
-    ) <
-    map.tileSize * 0.3;
+    );
+  const near = (actor: Actor, point: WorldPosition) =>
+    distance(actor, point) < map.tileSize * 0.3;
   const reachable = (actor: Actor, target: WorldPosition) => {
     const definition = definitions.get(actor.definitionId)!;
     const grid = world.behaviors
@@ -444,6 +473,11 @@ export function updateEconomy(
       findNavigationPath(grid, actor.worldPosition, target)?.reachedTarget
     );
   };
+  const block = (worker: HarvesterState) => {
+    worker.phase = "blocked";
+    worker.retryNavigationVersion = map.navigationChanges.version;
+  };
+  /** Whether the actor has arrived; otherwise keeps or starts its route. */
   const routeTo = (
     actor: Actor,
     worker: HarvesterState,
@@ -453,15 +487,32 @@ export function updateEconomy(
       delete actor.movement;
       return true;
     }
-    if (actor.movement) return false;
-    if (!reachable(actor, target) || !move(actor, target)) {
-      worker.phase = "blocked";
-      worker.retryNavigationVersion = map.navigationChanges.version;
+    if (actor.movement) {
+      if (actor.movement.blocked) block(worker);
+    } else if (!reachable(actor, target) || !move(actor, target)) {
+      block(worker);
     }
     return false;
   };
+  /** The nearest reachable tile beside the Refinery. */
+  const refineryExit = (actor: Actor, refineryId: string) => {
+    const refinery = byId.get(refineryId);
+    if (!refinery || !isTilePlacedActor(refinery)) return undefined;
+    return adjacentTiles(
+      map,
+      occupiedTilesFor(refinery, definitions.get(refinery.definitionId)!),
+    )
+      .map((tile) => ({ tile, point: map.tileCenter(tile.x, tile.z) }))
+      .sort(
+        (a, b) =>
+          distance(actor, a.point) - distance(actor, b.point) ||
+          a.tile.z - b.tile.z ||
+          a.tile.x - b.tile.x,
+      )
+      .find(({ point }) => reachable(actor, point))?.point;
+  };
   for (const worker of [...economy.harvesters].sort((a, b) =>
-    a.actorId < b.actorId ? -1 : a.actorId > b.actorId ? 1 : 0,
+    a.actorId < b.actorId ? -1 : 1,
   )) {
     const actor = byId.get(worker.actorId)!;
     const gathering = definitions.get(actor.definitionId)!.harvesting!;
@@ -474,49 +525,15 @@ export function updateEconomy(
       if (worker.retryNavigationVersion === map.navigationChanges.version)
         continue;
       worker.phase = worker.cargo ? "returning" : "travelling";
+      delete worker.retryNavigationVersion;
       delete actor.movement;
     }
     if (worker.phase === "returning") {
-      if (actor.movement) {
-        if (actor.movement.blocked) {
-          worker.phase = "blocked";
-          worker.retryNavigationVersion = map.navigationChanges.version;
-        }
-        continue;
-      }
-      const refinery = byId.get(worker.refineryId)!;
-      if (!isTilePlacedActor(refinery)) continue;
-      const occupied = occupiedTilesFor(
-        refinery,
-        definitions.get(refinery.definitionId)!,
-      );
-      const keys = new Set(occupied.map(tileKey));
-      const exits = new Map<string, TileCoord>();
-      for (const tile of occupied)
-        for (const offset of [
-          { x: 0, z: 1 },
-          { x: 1, z: 0 },
-          { x: 0, z: -1 },
-          { x: -1, z: 0 },
-        ]) {
-          const next = { x: tile.x + offset.x, z: tile.z + offset.z };
-          if (map.containsTile(next.x, next.z) && !keys.has(tileKey(next)))
-            exits.set(tileKey(next), next);
-        }
-      const distance = (tile: TileCoord) => {
-        const point = map.tileCenter(tile.x, tile.z);
-        return Math.hypot(
-          actor.worldPosition.x - point.x,
-          actor.worldPosition.z - point.z,
-        );
-      };
-      const destination = [...exits.values()]
-        .sort((a, b) => distance(a) - distance(b) || a.z - b.z || a.x - b.x)
-        .map((tile) => map.tileCenter(tile.x, tile.z))
-        .find((point) => reachable(actor, point));
+      // Automated routes are the only movement while returning.
+      const destination =
+        actor.movement?.target ?? refineryExit(actor, worker.refineryId);
       if (!destination) {
-        worker.phase = "blocked";
-        worker.retryNavigationVersion = map.navigationChanges.version;
+        block(worker);
       } else if (routeTo(actor, worker, destination)) {
         economy.materials += worker.cargo;
         economy.depositedMaterials += worker.cargo;
@@ -554,27 +571,19 @@ export function updateEconomy(
       site = candidates.find((site) =>
         reachable(actor, map.tileCenter(site.tile.x, site.tile.z)),
       );
+      delete actor.movement;
       if (!site) {
-        worker.phase = candidates.length
-          ? "blocked"
-          : worker.cargo
-            ? "returning"
-            : "depleted";
-        worker.retryNavigationVersion = map.navigationChanges.version;
-        delete actor.movement;
+        if (candidates.length) block(worker);
+        else worker.phase = worker.cargo ? "returning" : "depleted";
         continue;
       }
       worker.activeSiteId = site.id;
       worker.phase = "travelling";
-      delete actor.movement;
     }
     const point = map.tileCenter(site.tile.x, site.tile.z);
     if (!routeTo(actor, worker, point)) continue;
     worker.phase = "gathering";
-    const loadTicks = Math.max(
-      1,
-      Math.ceil(gathering.loadSeconds / tickSeconds),
-    );
+    const loadTicks = secondsToTicks(gathering.loadSeconds, tickSeconds);
     worker.gatherProgress += gathering.capacity;
     while (
       worker.gatherProgress >= loadTicks &&

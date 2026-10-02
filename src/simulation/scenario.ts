@@ -1,3 +1,4 @@
+import { deepFreeze } from "./actor";
 import { createMissionState } from "./mission";
 import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
@@ -23,7 +24,7 @@ export type ScenarioDefinition = {
 export function defineScenario(
   content: ScenarioDefinition,
 ): ScenarioDefinition {
-  return freeze(structuredClone(content));
+  return deepFreeze(structuredClone(content));
 }
 
 export function createScenarioState(
@@ -110,26 +111,22 @@ export function deserializeMission(
     scenario.sites.some(
       (site, index) =>
         sites[index]?.id !== site.id ||
+        sites[index]?.name !== site.name ||
         sites[index]?.initialMaterials !== site.initialMaterials ||
-        JSON.stringify(sites[index]?.tile) !== JSON.stringify(site.tile),
+        sites[index]?.tile?.x !== site.tile.x ||
+        sites[index]?.tile?.z !== site.tile.z,
     ) ||
     scenario.loot.some(
       (cache, index) =>
         loot[index]?.id !== cache.id ||
+        loot[index]?.name !== cache.name ||
         loot[index]?.materials !== cache.materials ||
-        JSON.stringify(loot[index]?.tile) !== JSON.stringify(cache.tile),
+        loot[index]?.tile?.x !== cache.tile.x ||
+        loot[index]?.tile?.z !== cache.tile.z,
     )
   )
     throw new RangeError(
       "This mission save has incompatible resource content.",
     );
   return save.state;
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    for (const child of Object.values(value)) freeze(child);
-    Object.freeze(value);
-  }
-  return value;
 }

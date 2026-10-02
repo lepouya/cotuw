@@ -3,6 +3,7 @@ import type { WorldBounds } from "./world";
 import { createActor } from "./actor";
 import { tileKey } from "./grid";
 import {
+  adjacentTiles,
   isTilePlacedActor,
   mobileActorTiles,
   occupiedTilesFor,
@@ -103,21 +104,6 @@ export function evaluateTraining(
   )
     return reject("unsupported-unit");
 
-  const footprint = occupiedTilesFor(producer, definition);
-  const occupied = new Set(footprint.map(tileKey));
-  const candidates = new Map<string, TileCoord>();
-  for (const tile of footprint) {
-    for (const offset of [
-      { x: 0, z: 1 },
-      { x: 1, z: 0 },
-      { x: 0, z: -1 },
-      { x: -1, z: 0 },
-    ]) {
-      const next = { x: tile.x + offset.x, z: tile.z + offset.z };
-      if (map.containsTile(next.x, next.z) && !occupied.has(tileKey(next)))
-        candidates.set(tileKey(next), next);
-    }
-  }
   const unitTiles = mobileActorTiles(map, actors, "surface");
   const frontX = Math.round(Math.sin(producer.facing));
   const frontZ = Math.round(Math.cos(producer.facing));
@@ -130,7 +116,7 @@ export function evaluateTraining(
       (position.z - producer.worldPosition.z) ** 2
     );
   };
-  const tiles = [...candidates.values()].sort(
+  const tiles = adjacentTiles(map, occupiedTilesFor(producer, definition)).sort(
     (a, b) =>
       front(b) - front(a) ||
       distance(a) - distance(b) ||
