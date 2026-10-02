@@ -1,35 +1,8 @@
+import { terrainPoint, placeBuilding } from "./prototype-helpers";
 import { expect, test } from "@playwright/test";
 
 import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
-
-async function terrainPoint(page: Page, x: number, z: number) {
-  return page.evaluate(
-    async ({ x, z }) => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const prototypePath: string = "/src/prototype.ts";
-      const { EngineStore, Vector3, projectToCanvas } = await import(
-        harnessPath
-      );
-      const { createPrototypeMap } = await import(prototypePath);
-      const map = createPrototypeMap();
-      const point = map.tileCenter(x, z);
-      const engine = EngineStore.Instances[0];
-      const scene = engine.scenes[0];
-      const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
-      return projectToCanvas(
-        scene,
-        canvas,
-        new Vector3(
-          point.x,
-          map.heightAtWorldPosition(point.x, point.z),
-          point.z,
-        ),
-      );
-    },
-    { x, z },
-  );
-}
 
 async function ready(page: Page) {
   await page.goto("/");
@@ -72,12 +45,12 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
 }) => {
   await ready(page);
   const canvas = page.locator("#game-canvas");
-  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
+  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
   await page.locator("#build-command-center").click();
   const point = await terrainPoint(page, 55, 39);
   await page.mouse.move(point.x, point.y);
   await expect(canvas).toHaveAttribute("data-placement-status", "valid");
-  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
+  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
   expect(await buildingPreview(page)).toMatchObject({
     facing: 0,
     transparent: true,
@@ -93,7 +66,7 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
   });
   expect((await buildingPreview(page))!.entranceOffset[0]).toBeCloseTo(0.68);
   await page.mouse.click(point.x, point.y);
-  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "2");
+  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
   await expect(canvas).toHaveAttribute("data-placement-active", "false");
   expect(await buildingPreview(page)).toBeNull();
   await expect(canvas).toHaveAttribute(
@@ -130,7 +103,7 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
     preview: false,
   });
   await page.locator("#remove-building").click();
-  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
+  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
   await expect(canvas).toHaveAttribute("data-selected-actor", "");
   await expect(page.locator("#remove-building")).toBeDisabled();
 });
@@ -140,6 +113,12 @@ test("rejects occupied terrain and units without changing the world, and cancels
 }) => {
   await ready(page);
   const canvas = page.locator("#game-canvas");
+  await placeBuilding(page, "build-command-center", 49, 39);
+  await placeBuilding(page, "build-barracks", 45, 39);
+  await page.locator("#tab-units").click();
+  await page.locator("#train-trooper").click();
+  await expect(page.locator("#unit-roster button")).toHaveCount(1);
+  await page.locator("#tab-buildings").click();
   await page.locator("#build-command-center").click();
   const occupied = await terrainPoint(page, 49, 39);
   await page.mouse.move(occupied.x, occupied.y);
@@ -149,8 +128,18 @@ test("rejects occupied terrain and units without changing the world, and cancels
   );
   await expect(page.locator("#confirm-building")).toBeDisabled();
   await page.mouse.click(occupied.x, occupied.y);
-  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
-  const unit = await terrainPoint(page, 46, 40);
+  await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "2");
+  const unitTile = await page.evaluate(async () => {
+    const path: string = "/e2e/harness.ts";
+    const prototypePath: string = "/src/prototype.ts";
+    const { EngineStore } = await import(path);
+    const { createPrototypeMap } = await import(prototypePath);
+    const point = EngineStore.Instances[0].scenes[0]
+      .getTransformNodeByName("actor-trained-unit-1-root")!
+      .getAbsolutePosition();
+    return createPrototypeMap().tileAtWorldPosition(point.x, point.z);
+  });
+  const unit = await terrainPoint(page, unitTile.x, unitTile.z);
   await page.mouse.move(unit.x, unit.y);
   await expect(canvas).toHaveAttribute(
     "data-placement-status",
@@ -173,34 +162,38 @@ test("rejects occupied terrain and units without changing the world, and cancels
   ).toBe(false);
 });
 
-test("selects the starting building and freezes idle equipment when disabled", async ({
+test("selects a constructed building and freezes idle equipment when disabled", async ({
   page,
 }) => {
   await ready(page);
+  await placeBuilding(page, "build-command-center", 49, 39);
+
   const point = await page.evaluate(async () => {
     const path: string = "/e2e/harness.ts";
     const { EngineStore, projectToCanvas } = await import(path);
     const engine = EngineStore.Instances[0];
     const scene = engine.scenes[0];
     const mesh = scene.getMeshByName(
-      "tile-placed-actor-arc-command-center-prototype-0-root-command-cabin",
+      "tile-placed-actor-arc-command-center-prototype-1-root-command-cabin",
     )!;
     mesh.computeWorldMatrix(true);
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     return projectToCanvas(scene, canvas, mesh.getAbsolutePosition());
   });
   await page.mouse.click(point.x, point.y);
+  await page.mouse.click(point.x, point.y);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-selected-actor",
-    "arc-command-center-prototype-0",
+    "arc-command-center-prototype-1",
   );
+  await page.locator("#tab-buildings").click();
   await page.locator("#animate-building").uncheck();
   const angle = () =>
     page.evaluate(async () => {
       const path: string = "/e2e/harness.ts";
       const { EngineStore } = await import(path);
       return EngineStore.Instances[0].scenes[0].getTransformNodeByName(
-        "tile-placed-actor-arc-command-center-prototype-0-root-radar",
+        "tile-placed-actor-arc-command-center-prototype-1-root-radar",
       )!.rotation.y;
     });
   const frozen = await angle();
@@ -225,10 +218,10 @@ test("touch previews before explicit confirmation in compact landscape", async (
     await page.touchscreen.tap(point.x, point.y);
     const canvas = page.locator("#game-canvas");
     await expect(canvas).toHaveAttribute("data-placement-status", "valid");
-    await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
+    await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
     await page.locator("#rotate-building").tap();
     await page.locator("#confirm-building").tap();
-    await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "2");
+    await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
   } finally {
     await context.close();
   }
@@ -278,7 +271,7 @@ test("previews reject water, cliffs, and the playable-map boundary", async ({
     await page.mouse.click(point.x, point.y);
     await expect(page.locator("#game-canvas")).toHaveAttribute(
       "data-tile-placed-actor-count",
-      "1",
+      "0",
     );
   }
   await page.locator("#cancel-building").click();

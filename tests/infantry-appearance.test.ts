@@ -4,7 +4,7 @@ import { NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { exportInfantry, INFANTRY_ROLES } from "../scripts/infantry-model";
-import { PROTOTYPE_ACTOR_GRAPHICS } from "../src/prototype";
+import { PROTOTYPE_ACTOR_GRAPHICS } from "../src/prototype-content";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
 import type { AbstractMesh, TransformNode } from "@babylonjs/core";

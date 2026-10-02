@@ -8,44 +8,171 @@
   </head>
   <body>
     <main class="game-shell">
-      <canvas id="game-canvas"></canvas>
-      <section class="terrain-hud">
-        <p class="eyebrow">ARC placement sandbox</p>
-        <h1>Unquiet World</h1>
-        <p>100 * 100 tiles · shared corner heights</p>
-        <p class="controls">
-          Click units or buildings to select · Click terrain to move a unit ·
-          Drag to pan · Right-drag to orbit · Scroll to zoom
-        </p>
-        <div
-          class="building-controls"
-          role="group"
-          aria-label="Building placement"
-        >
-          <button id="build-command-center" type="button">
-            Place Command Center
+      <aside
+        id="game-sidebar"
+        class="game-sidebar"
+        aria-label="Command sidebar"
+      >
+        <header class="sidebar-header">
+          <p class="eyebrow">Anomaly Response Command</p>
+          <h1>Unquiet World</h1>
+          <p class="muted">Base &amp; infantry sandbox</p>
+        </header>
+        <div class="sidebar-tabs" role="tablist" aria-label="Command panels">
+          <button
+            id="tab-selection"
+            type="button"
+            role="tab"
+            aria-controls="panel-selection"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            Selection
           </button>
-          <button id="rotate-building" type="button" disabled>
-            Rotate 90° (R)
+          <button
+            id="tab-buildings"
+            type="button"
+            role="tab"
+            aria-controls="panel-buildings"
+            aria-selected="true"
+          >
+            Buildings
           </button>
-          <button id="confirm-building" type="button" disabled>
-            Place building
+          <button
+            id="tab-units"
+            type="button"
+            role="tab"
+            aria-controls="panel-units"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            Units
           </button>
-          <button id="cancel-building" type="button" disabled>
-            Cancel (Esc)
+          <button
+            id="tab-goals"
+            type="button"
+            role="tab"
+            aria-controls="panel-goals"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            Goals
           </button>
         </div>
-        <p id="placement-status" role="status"></p>
-        <p id="selection-details">Nothing selected</p>
-        <button id="remove-building" type="button" disabled>
-          Remove selected building
-        </button>
-        <label class="animation-control">
-          <input id="animate-building" type="checkbox" checked /> Building idle
-          animation
-        </label>
-      </section>
-      <canvas id="minimap" class="minimap"></canvas>
+        <div class="sidebar-content">
+          <section
+            id="panel-selection"
+            role="tabpanel"
+            aria-labelledby="tab-selection"
+            hidden
+          >
+            <p class="eyebrow">Current selection</p>
+            <h2 id="selection-details">Nothing selected</h2>
+            <p id="selection-info" class="muted"></p>
+            <button id="open-training" type="button" hidden>Train units</button>
+            <button id="remove-building" type="button" disabled>
+              Remove selected building
+            </button>
+          </section>
+          <section
+            id="panel-buildings"
+            role="tabpanel"
+            aria-labelledby="tab-buildings"
+          >
+            <p class="eyebrow">Establish your base</p>
+            <h2>Construction</h2>
+            <p class="muted">
+              Choose a structure, then place it on clear terrain.
+            </p>
+            <div id="building-options"></div>
+            <label class="animation-control"
+              ><input id="animate-building" type="checkbox" checked /> Building
+              idle animation</label
+            >
+          </section>
+          <section
+            id="panel-units"
+            role="tabpanel"
+            aria-labelledby="tab-units"
+            hidden
+          >
+            <p class="eyebrow">Assemble your forces</p>
+            <h2>Unit production</h2>
+            <p class="muted">
+              Select a production building below or on the map.
+            </p>
+            <div
+              id="producer-roster"
+              class="actor-list"
+              aria-label="Production buildings"
+            ></div>
+            <div
+              id="training-options"
+              class="training-controls"
+              role="group"
+              aria-label="Unit training"
+            ></div>
+            <p id="production-status" class="muted" role="status"></p>
+            <h3>Field units</h3>
+            <div
+              id="unit-roster"
+              class="actor-list"
+              aria-label="Field units"
+            ></div>
+          </section>
+          <section
+            id="panel-goals"
+            role="tabpanel"
+            aria-labelledby="tab-goals"
+            hidden
+          >
+            <p class="eyebrow">Scenario goals</p>
+            <h2>Build &amp; explore</h2>
+            <p class="muted">
+              Practice construction and training. This sandbox has no victory or
+              defeat condition.
+            </p>
+            <ul id="scenario-goals" class="scenario-goals"></ul>
+            <p class="muted">
+              Counts show buildings and units currently in the field.
+            </p>
+          </section>
+        </div>
+        <section class="placement-panel" aria-label="Building placement">
+          <div
+            id="placement-actions"
+            class="building-controls"
+            hidden
+            role="group"
+            aria-label="Placement actions"
+          >
+            <button id="rotate-building" type="button" disabled>
+              Rotate 90° (R)
+            </button>
+            <button id="confirm-building" type="button" disabled>
+              Place building
+            </button>
+            <button id="cancel-building" type="button" disabled>
+              Cancel (Esc)
+            </button>
+          </div>
+          <p id="placement-status" class="muted" role="status"></p>
+        </section>
+        <footer class="sidebar-footer">
+          <p class="muted">
+            Instant construction &amp; training · No resource or power
+            requirements
+          </p>
+          <p class="controls">
+            Click to select or move · Drag to pan<br />Right-drag to orbit ·
+            Scroll to zoom
+          </p>
+        </footer>
+      </aside>
+      <div class="game-viewport">
+        <canvas id="game-canvas" aria-label="Game world"></canvas>
+        <canvas id="minimap" class="minimap" aria-label="Map overview"></canvas>
+      </div>
     </main>
   </body>
 </html>

@@ -1,19 +1,36 @@
 import "./styles.css";
 import { createTerrainPrototype } from "./prototype";
+import {
+  PROTOTYPE_ACTOR_DEFINITIONS,
+  PROTOTYPE_ACTOR_PRESENTATIONS,
+  PROTOTYPE_GOALS,
+} from "./prototype-content";
+import { createSidebar } from "./ui/sidebar";
+
+import type { TerrainPrototype } from "./prototype";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
 const minimap = document.querySelector<HTMLCanvasElement>("#minimap")!;
-const button = (id: string) =>
-  document.querySelector<HTMLButtonElement>(`#${id}`)!;
+let session: TerrainPrototype | undefined;
+const sidebar = createSidebar(
+  document.querySelector<HTMLElement>("#game-sidebar")!,
+  {
+    definitions: PROTOTYPE_ACTOR_DEFINITIONS,
+    presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
+    goals: PROTOTYPE_GOALS,
+    selectActor: (id) => session?.selectActor(id),
+  },
+);
 createTerrainPrototype(canvas, minimap, {
-  build: button("build-command-center"),
-  rotate: button("rotate-building"),
-  confirm: button("confirm-building"),
-  cancel: button("cancel-building"),
-  remove: button("remove-building"),
-  status: document.querySelector<HTMLElement>("#placement-status")!,
-  selection: document.querySelector<HTMLElement>("#selection-details")!,
-  animate: document.querySelector<HTMLInputElement>("#animate-building")!,
+  ...sidebar.controls,
+  onStateChanged: sidebar.update,
+  showActor: sidebar.showActor,
+  onDispose: sidebar.dispose,
+  onReady: (ready) => {
+    session = ready;
+  },
 }).catch((error: unknown) => {
   console.error("The prototype failed to start.", error);
+  sidebar.controls.status.textContent =
+    "The prototype failed to start. Reload to try again.";
 });

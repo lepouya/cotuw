@@ -7,6 +7,8 @@ import type { ActorCommand } from "../simulation/command";
 export type CommandInputOptions = {
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   submitCommand: (command: ActorCommand) => void;
+  /** Runs only after a world click changes selection. */
+  onWorldSelectionChanged?: (actorId: string | undefined) => void;
   onSelectionChanged?: (actorId: string | undefined) => void;
   enabled?: () => boolean;
   canMove?: (actorId: string) => boolean;
@@ -30,6 +32,7 @@ export function createCommandInput(
     actorIdForMesh,
     submitCommand,
     onSelectionChanged,
+    onWorldSelectionChanged,
     enabled = () => true,
     canMove = () => true,
   }: CommandInputOptions,
@@ -59,6 +62,7 @@ export function createCommandInput(
       const pickedActorId = actorIdForMesh(pick.pickedMesh);
       if (pickedActorId) {
         select(pickedActorId === selectedActorId ? undefined : pickedActorId);
+        onWorldSelectionChanged?.(selectedActorId);
       } else if (
         selectedActorId &&
         canMove(selectedActorId) &&

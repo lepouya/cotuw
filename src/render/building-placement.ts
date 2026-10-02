@@ -6,7 +6,7 @@ import {
 } from "./footprint-overlay";
 import { isTerrainPickMesh } from "./terrain-mesh";
 import { createTilePlacedActor } from "../simulation/placement";
-import { tileBounds } from "../simulation/grid";
+import { footprintSize, tileKey } from "../simulation/grid";
 import { isOutcomeOf } from "../simulation/command";
 import { createTilePlacedActorViewRegistry } from "./tile-placed-actor-view";
 import { createPrimaryClick } from "./primary-click";
@@ -20,7 +20,6 @@ import type { ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorAppearance } from "./tile-placed-actor-view";
 
 export type BuildingPlacementControls = {
-  build?: HTMLButtonElement;
   rotate?: HTMLButtonElement;
   confirm?: HTMLButtonElement;
   cancel?: HTMLButtonElement;
@@ -40,12 +39,17 @@ const REASONS: Record<PlacementReason, string> = {
   "occupancy-conflict": "Another structure occupies this footprint.",
 };
 
-export type BuildingPlacementOptions = {
+export type BuildingPlacementChoice = {
+  build?: HTMLButtonElement;
   /** Must define a footprint. Placed actor IDs derive from its ID. */
   definition: ActorDefinition;
   appearance: TilePlacedActorAppearance;
   /** Display name for status text. */
   name: string;
+};
+
+export type BuildingPlacementOptions = {
+  buildings: readonly BuildingPlacementChoice[];
   controls: BuildingPlacementControls;
   onPlaced: (actorId: string) => void;
   onStart: () => void;
@@ -53,37 +57,31 @@ export type BuildingPlacementOptions = {
 
 type ScreenPoint = { clientX: number; clientY: number };
 
-/** Width × depth of the tiles' bounding box, for display. */
-export function footprintSize(tiles: readonly TileCoord[]): string {
-  const { minX, minZ, maxX, maxZ } = tileBounds(tiles);
-  return `${maxX - minX + 1} × ${maxZ - minZ + 1}`;
-}
-
 /** Preview is local UI state; placement is rechecked at the command's tick. */
 export function createBuildingPlacement(
   canvas: HTMLCanvasElement,
   scene: Scene,
   map: TerrainMap,
   simulation: MissionSimulation,
-  {
-    definition,
-    appearance,
-    name,
-    controls,
-    onPlaced,
-    onStart,
-  }: BuildingPlacementOptions,
+  { buildings, controls, onPlaced, onStart }: BuildingPlacementOptions,
 ) {
+  if (buildings.length === 0)
+    throw new RangeError("Building placement needs at least one building.");
+  let { definition, name } = buildings[0]!;
   const preview = createTilePlacedActorViewRegistry(
     scene,
     map,
-    [definition],
-    new Map([[definition.id, appearance]]),
+    buildings.map(({ definition }) => definition),
+    new Map(
+      buildings.map(({ definition, appearance }) => [
+        definition.id,
+        appearance,
+      ]),
+    ),
     { preview: true },
   );
   let active = false;
   let faulted = false;
-  let nextId = 1;
   let quarterTurns = 0;
   let origin: TileCoord | undefined;
   let pointer: ScreenPoint | undefined;
@@ -97,7 +95,7 @@ export function createBuildingPlacement(
   let overlayKey = "";
   let uiKey = "";
   let terrainRevision = 0;
-  const size = footprintSize(definition.footprint!.occupiedTiles);
+  const size = () => footprintSize(definition.footprint!.occupiedTiles);
   const message = (text: string) => {
     if (controls.status && controls.status.textContent !== text)
       controls.status.textContent = text;
@@ -105,7 +103,7 @@ export function createBuildingPlacement(
   const placement = (): ActorPlacement | undefined =>
     origin
       ? {
-          actorId: `${definition.id}-${nextId}`,
+          actorId: simulation.unusedActorId(`${definition.id}-`),
           definitionId: definition.id,
           origin,
           quarterTurns,
@@ -160,20 +158,10 @@ export function createBuildingPlacement(
     ]);
     if (nextStateKey === stateKey) return;
     stateKey = nextStateKey;
-    let candidate = active ? placement() : undefined;
-    let evaluation = candidate
+    const candidate = active ? placement() : undefined;
+    const evaluation = candidate
       ? simulation.evaluatePlacement(candidate)
       : undefined;
-    // A restored mission may already own or have retired our next ID.
-    while (
-      evaluation &&
-      !evaluation.accepted &&
-      evaluation.reason === "used-id"
-    ) {
-      nextId += 1;
-      candidate = placement();
-      evaluation = simulation.evaluatePlacement(candidate!);
-    }
     preview.update(
       candidate
         ? [
@@ -230,8 +218,10 @@ export function createBuildingPlacement(
             ? "valid"
             : evaluation.reason;
     canvas.dataset.placementRotation = String(quarterTurns);
-    canvas.dataset.placementOrigin = origin ? `${origin.x},${origin.z}` : "";
-    if (controls.build) controls.build.disabled = active || faulted;
+    canvas.dataset.placementOrigin = origin ? tileKey(origin) : "";
+    for (const { build } of buildings) {
+      if (build) build.disabled = active || faulted;
+    }
     if (controls.rotate)
       controls.rotate.disabled = !active || !!pendingId || faulted;
     if (controls.cancel)
@@ -246,15 +236,16 @@ export function createBuildingPlacement(
           : rejection
             ? rejection.text
             : !evaluation
-              ? `Point or tap on terrain to preview the ${size} footprint.`
+              ? `Point or tap on terrain to preview the ${name} (${size()}) footprint.`
               : evaluation.accepted
-                ? `Ready · ${quarterTurns * 90}° · Click terrain or press Place building.`
+                ? `${name} ready · ${quarterTurns * 90}° · Click terrain or press Place building.`
                 : REASONS[evaluation.reason],
       );
     }
   };
-  const start = () => {
+  const start = (building: BuildingPlacementChoice) => {
     if (active || faulted) return;
+    ({ definition, name } = building);
     active = true;
     origin = undefined;
     pointer = undefined;
@@ -288,7 +279,6 @@ export function createBuildingPlacement(
     }
     pendingId = candidate.actorId;
     rejection = undefined;
-    nextId += 1;
     simulation.submitCommand({ kind: "place-actor", ...candidate });
     update();
   };
@@ -325,7 +315,11 @@ export function createBuildingPlacement(
     else return;
     event.preventDefault();
   };
-  controls.build?.addEventListener("click", start);
+  const starters = buildings.map((building) => {
+    const startBuilding = () => start(building);
+    building.build?.addEventListener("click", startBuilding);
+    return () => building.build?.removeEventListener("click", startBuilding);
+  });
   controls.rotate?.addEventListener("click", rotate);
   controls.confirm?.addEventListener("click", confirm);
   controls.cancel?.addEventListener("click", cancel);
@@ -338,7 +332,7 @@ export function createBuildingPlacement(
     if (active) overlayOffset = footprintOverlayOffset(map);
   });
   update();
-  message("Instant placement sandbox · Select a building to inspect it.");
+  message("Choose a building, then place it on clear terrain.");
   return {
     get active() {
       return active;
@@ -357,7 +351,7 @@ export function createBuildingPlacement(
         origin = undefined;
         pointer = undefined;
         clearOverlay();
-        message(`${name} placed. Select it to inspect or remove it.`);
+        message(`${name} placed.`);
         onPlaced(command.actorId);
       } else {
         rejection = {
@@ -382,7 +376,7 @@ export function createBuildingPlacement(
       click.dispose();
       clearOverlay();
       map.onChangedObservable.remove(terrainObserver);
-      controls.build?.removeEventListener("click", start);
+      for (const remove of starters) remove();
       controls.rotate?.removeEventListener("click", rotate);
       controls.confirm?.removeEventListener("click", confirm);
       controls.cancel?.removeEventListener("click", cancel);

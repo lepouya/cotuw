@@ -8,6 +8,13 @@ import {
   Vector3,
 } from "@babylonjs/core";
 
+import {
+  PROTOTYPE_ACTOR_DEFINITIONS,
+  PROTOTYPE_ACTOR_NAMES,
+  PROTOTYPE_ACTOR_GRAPHICS,
+  PROTOTYPE_TILE_PLACED_APPEARANCES,
+  PROTOTYPE_MOVEMENT_PROFILES,
+} from "./prototype-content";
 import { TerrainMap } from "./map";
 import {
   createCommandInput,
@@ -20,23 +27,18 @@ import {
   createTerrainMeshes,
   DEFAULT_ACTOR_COLOR,
 } from "./render";
-import { createActor } from "./simulation/actor";
 import { OccupancyGrid } from "./simulation/occupancy";
-import {
-  createTilePlacedActor,
-  isTilePlacedActor,
-  occupiedTilesFor,
-} from "./simulation/placement";
+import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
 import {
   loadSkinnedActorAppearance,
   validateActorGraphics,
 } from "./render/skinned-actor-appearance";
 import { startSimulationLoop } from "./simulation/loop";
-import {
-  createBuildingPlacement,
-  footprintSize,
-} from "./render/building-placement";
-import { createCommandCenterDetails } from "./render/command-center";
+import { createBuildingPlacement } from "./render/building-placement";
+import { createUnitTraining } from "./ui/unit-training";
+import type { UnitTrainingControls } from "./ui/unit-training";
+import type { DefinitionButton, SidebarState } from "./ui/sidebar";
+import type { MissionSimulation } from "./simulation/mission";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import {
   createMissionSimulation,
@@ -46,15 +48,7 @@ import {
 import type { Scene } from "@babylonjs/core";
 import type { TileLayer, TileType } from "./map";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
-import type {
-  Actor,
-  ActorDefinition,
-  ActorRenderState,
-} from "./simulation/actor";
-import type { MovementProfile } from "./simulation/navigation";
-import type { ActorGraphics } from "./render/skinned-actor-appearance";
-import type { TilePlacedActorAppearance } from "./render";
-import type { ActorPlacement } from "./simulation/placement";
+import type { ActorRenderState } from "./simulation/actor";
 import type { BuildingPlacementControls } from "./render/building-placement";
 
 const TILE_COUNT = 100;
@@ -71,106 +65,24 @@ const SIMULATION_TICK_SECONDS = 1 / 60;
 const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Covers background-tab throttling to one timer callback per second. */
 const MAX_CATCH_UP_SECONDS = 5;
-const PROTOTYPE_BLOCKER_ORIGIN = { x: 49, z: 39 };
 
-export type TerrainPrototypeControls = BuildingPlacementControls & {
-  remove?: HTMLButtonElement;
-  selection?: HTMLElement;
-  animate?: HTMLInputElement;
+export type TerrainPrototype = GameView & {
+  simulation: MissionSimulation;
+  selectActor: (actorId: string | undefined) => void;
 };
 
-export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
-  {
-    id: "surface-ground",
-    maxSlope: 0.75,
-    slopeCostAtLimit: 2,
-    terrainCosts: { plain: 1, path: 0.8, rough: 2.25, water: null },
-  },
-];
-
-export const PROTOTYPE_ACTOR_DEFINITIONS = [
-  {
-    id: "arc-trooper",
-    behaviorId: "terrain-move",
-    movement: { speed: 4, profileId: "surface-ground" },
-  },
-  {
-    id: "arc-scout",
-    behaviorId: "terrain-move",
-    movement: { speed: 7, profileId: "surface-ground" },
-  },
-  {
-    id: "arc-command-center-prototype",
-    behaviorId: "idle",
-    footprint: {
-      layer: "surface",
-      occupiedTiles: [
-        { x: 0, z: 0 },
-        { x: 1, z: 0 },
-        { x: 0, z: 1 },
-        { x: 1, z: 1 },
-      ],
-      blocksMovement: true,
-    },
-    placement: {
-      terrainTypeIds: ["plain", "path", "rough"],
-      maxSlope: 0.75,
-    },
-  },
-] satisfies readonly ActorDefinition[];
-
-/** Display names for the selection panel and placement status. */
-export const PROTOTYPE_ACTOR_NAMES = new Map([
-  ["arc-trooper", "Trooper"],
-  ["arc-scout", "Scout"],
-  ["arc-command-center-prototype", "Command Center"],
-]);
-
-export const PROTOTYPE_ACTOR_GRAPHICS = new Map<string, ActorGraphics>([
-  [
-    "arc-trooper",
-    {
-      url: "/assets/actors/arc-trooper.glb",
-      minimapColor: [0.82, 0.28, 0.1],
-      bounds: { radius: 0.45, height: 1.95 },
-      clips: {
-        idle: "idle",
-        locomotion: "walk",
-        turn: { left: "turn-left", right: "turn-right" },
-      },
-      cycleDistance: 2.1,
-    },
-  ],
-  [
-    "arc-scout",
-    {
-      url: "/assets/actors/arc-scout.glb",
-      minimapColor: [0.12, 0.62, 0.82],
-      bounds: { radius: 0.4, height: 1.65 },
-      clips: {
-        idle: "idle",
-        locomotion: "walk",
-        turn: { left: "turn-left", right: "turn-right" },
-      },
-      cycleDistance: 1.5,
-    },
-  ],
-]);
-
-export const PROTOTYPE_TILE_PLACED_APPEARANCES = new Map<
-  string,
-  TilePlacedActorAppearance
->([
-  [
-    "arc-command-center-prototype",
-    {
-      height: 0.3,
-      color: [0.28, 0.38, 0.42],
-      minimapColor: [0.36, 0.7, 0.76],
-      createDetails: createCommandCenterDetails,
-    },
-  ],
-]);
+export type TerrainPrototypeControls = BuildingPlacementControls &
+  UnitTrainingControls & {
+    buildings?: readonly DefinitionButton[];
+    onReady?: (session: TerrainPrototype) => void;
+    onDispose?: () => void;
+    /** Updates after simulation ticks or changes to controls and selection. */
+    onStateChanged?: (state: SidebarState) => void;
+    /** Reveals details for an actor the player selected or placed. */
+    showActor?: (definitionId: string) => void;
+    remove?: HTMLButtonElement;
+    animate?: HTMLInputElement;
+  };
 
 /**
  * Water, ripples and clutter are each optional, so every type pins its slot.
@@ -239,14 +151,14 @@ export async function createTerrainPrototype(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
   controls: TerrainPrototypeControls = {},
-): Promise<GameView> {
+): Promise<TerrainPrototype> {
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
   createTerrainMeshes(view.scene, map);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
-    state: createMissionState(createPrototypeActors(map)),
+    state: createMissionState([]),
     behaviorRegistry: new Map([
       [
         "terrain-move",
@@ -291,16 +203,24 @@ export async function createTerrainPrototype(
   actorViews.update(actorsByKind().mobile, 1);
   tilePlacedViews.update(actorsByKind().placed);
   let simulationFaulted = false;
+  let controlsDirty = true;
+  const showActor = (actorId: string) => {
+    const actor = simulation.actorById(actorId);
+    if (actor) controls.showActor?.(actor.definitionId);
+  };
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: (mesh) =>
       actorViews.actorIdForMesh(mesh) ?? tilePlacedViews.actorIdForMesh(mesh),
-    enabled: () => !placement.active,
+    enabled: () => !placement.active && !simulationFaulted,
     canMove: (actorId) => {
       const actor = simulation.actorById(actorId);
       return !!actor && !isTilePlacedActor(actor);
     },
     submitCommand: (command) => {
       if (!simulationFaulted) simulation.submitCommand(command);
+    },
+    onWorldSelectionChanged: (actorId) => {
+      if (actorId) showActor(actorId);
     },
     onSelectionChanged: (actorId) => {
       actorViews.setSelectedActor(actorId);
@@ -309,7 +229,7 @@ export async function createTerrainPrototype(
       minimap.refreshActors();
       canvas.dataset.actorSelected = String(actorId !== undefined);
       canvas.dataset.selectedActor = actorId ?? "";
-      refreshSelectionControls(actorId);
+      controlsDirty = true;
     },
   });
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
@@ -335,47 +255,56 @@ export async function createTerrainPrototype(
     ],
   });
   let pendingRemovalId: string | undefined;
-  const refreshSelectionControls = (actorId = input.selectedActorId) => {
-    const actor = actorId ? simulation.actorById(actorId) : undefined;
-    const building = !!actor && isTilePlacedActor(actor);
-    if (controls.remove) {
-      controls.remove.disabled =
-        !building ||
-        pendingRemovalId !== undefined ||
-        simulationFaulted ||
-        placement.active;
-    }
-    if (controls.selection) {
-      const name = actor
-        ? (PROTOTYPE_ACTOR_NAMES.get(actor.definitionId) ?? actor.definitionId)
-        : "Nothing selected";
-      controls.selection.textContent = building
-        ? [
-            name,
-            footprintSize(
-              occupiedTilesFor(actor, definitionsById.get(actor.definitionId)!),
-            ),
-            `${actor.tilePlacement.quarterTurns * 90}°`,
-          ].join(" · ")
-        : name;
-    }
+  let knownControlsTick = -1;
+  let knownPlacementActive = false;
+  const refreshControls = () => {
+    const actor = simulation.actors.find(
+      ({ id }) => id === input.selectedActorId,
+    );
+    const canRemove =
+      !!actor &&
+      isTilePlacedActor(actor) &&
+      !pendingRemovalId &&
+      !simulationFaulted &&
+      !placement.active;
+    if (controls.remove) controls.remove.disabled = !canRemove;
+    training.refresh();
+    controls.onStateChanged?.({
+      actors: simulation.actors,
+      actorVersion: simulation.actorVersion,
+      selectedActorId: input.selectedActorId,
+      placementActive: placement.active,
+      faulted: simulationFaulted,
+      canRemove,
+    });
+    knownControlsTick = simulation.completedTicks;
+    knownPlacementActive = placement.active;
+    controlsDirty = false;
   };
-  const placedDefinitionId = "arc-command-center-prototype";
   const placement = createBuildingPlacement(
     canvas,
     view.scene,
     map,
     simulation,
     {
-      definition: definitionsById.get(placedDefinitionId)!,
-      appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(placedDefinitionId)!,
-      name: PROTOTYPE_ACTOR_NAMES.get(placedDefinitionId)!,
+      buildings: PROTOTYPE_ACTOR_DEFINITIONS.filter(
+        (definition) => definition.footprint,
+      ).map((definition) => ({
+        definition,
+        appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(definition.id)!,
+        name: PROTOTYPE_ACTOR_NAMES.get(definition.id)!,
+        build: controls.buildings?.find(
+          ({ definitionId }) => definitionId === definition.id,
+        )?.button,
+      })),
       controls,
-      onPlaced: (actorId) => input.select(actorId),
+      onPlaced: (actorId) => {
+        input.select(actorId);
+        showActor(actorId);
+      },
       onStart: () => input.select(undefined),
     },
   );
-  input.select(undefined);
   const removeSelected = () => {
     const actorId = input.selectedActorId;
     const actor = actorId ? simulation.actorById(actorId) : undefined;
@@ -389,9 +318,16 @@ export async function createTerrainPrototype(
       return;
     pendingRemovalId = actor.id;
     simulation.submitCommand({ kind: "remove-actor", actorId: actor.id });
-    refreshSelectionControls();
+    controlsDirty = true;
+    if (controls.remove) controls.remove.disabled = true;
   };
   controls.remove?.addEventListener("click", removeSelected);
+  const training = createUnitTraining(simulation, controls, {
+    names: PROTOTYPE_ACTOR_NAMES,
+    selectedActorId: () => input.selectedActorId,
+    enabled: () => !simulationFaulted && !placement.active,
+  });
+  input.select(undefined);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   if (controls.animate) controls.animate.checked = !reducedMotion.matches;
   let idleSeconds = 0;
@@ -405,14 +341,18 @@ export async function createTerrainPrototype(
     onFault: () => {
       simulationFaulted = true;
       placement.fault();
-      refreshSelectionControls();
+      training.fault();
+      controlsDirty = true;
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
       minimap.refreshActors();
       for (const outcome of outcomes) {
         placement.onOutcome(outcome);
+        training.onOutcome(outcome);
         const { command, accepted } = outcome;
+        if (command.kind === "train-unit")
+          canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
         if (command.kind === "move") {
           canvas.dataset.moveStatus = accepted ? "accepted" : "unreachable";
           if (!accepted) {
@@ -431,7 +371,6 @@ export async function createTerrainPrototype(
           canvas.dataset.tilePlacedActorCommand = accepted
             ? "accepted"
             : "rejected";
-          refreshSelectionControls();
         }
       }
     },
@@ -440,6 +379,7 @@ export async function createTerrainPrototype(
     loop.advance();
     if (simulation.actorVersion !== knownActorVersion) {
       knownActorVersion = simulation.actorVersion;
+      controlsDirty = true;
       if (
         input.selectedActorId &&
         !simulation.actorById(input.selectedActorId)
@@ -449,10 +389,15 @@ export async function createTerrainPrototype(
       const { placed } = actorsByKind();
       tilePlacedViews.update(placed);
       canvas.dataset.tilePlacedActorCount = String(placed.length);
-      refreshSelectionControls();
       minimap.refreshActors();
     }
-    placement.update();
+    if (placement.active) placement.update();
+    if (
+      controlsDirty ||
+      simulation.completedTicks !== knownControlsTick ||
+      placement.active !== knownPlacementActive
+    )
+      refreshControls();
     const frameTime = performance.now();
     if (controls.animate?.checked ?? !reducedMotion.matches) {
       idleSeconds += (frameTime - previousFrameTime) / 1000;
@@ -469,6 +414,8 @@ export async function createTerrainPrototype(
     input.dispose();
     placement.dispose();
     controls.remove?.removeEventListener("click", removeSelected);
+    training.dispose();
+    controls.onDispose?.();
     view.scene.onBeforeRenderObservable.remove(renderObserver);
     actorViews.dispose();
     tilePlacedViews.dispose();
@@ -483,6 +430,17 @@ export async function createTerrainPrototype(
     canvas.dataset.tilePlacedActorCount = String(actorsByKind().placed.length);
   });
 
+  const session: TerrainPrototype = {
+    ...view,
+    simulation,
+    selectActor: (actorId) => {
+      if (simulationFaulted || placement.active) return;
+      input.select(
+        actorId && simulation.actorById(actorId) ? actorId : undefined,
+      );
+    },
+  };
+  controls.onReady?.(session);
   await Promise.all(
     [...PROTOTYPE_ACTOR_GRAPHICS].map(async ([id, graphics]) => {
       let appearance: ActorAppearance;
@@ -502,7 +460,7 @@ export async function createTerrainPrototype(
       previous?.dispose();
     }),
   );
-  return view;
+  return session;
 }
 
 function createPrototypeStandInAppearances(
@@ -533,38 +491,6 @@ function createPrototypeStandInAppearances(
       ];
     }),
   );
-}
-
-function createPrototypeActors(map: TerrainMap): Actor[] {
-  return [
-    createActor({
-      id: "prototype-trooper",
-      definitionId: "arc-trooper",
-      worldPosition: map.tileCenter(46, 40),
-    }),
-    createActor({
-      id: "prototype-scout",
-      definitionId: "arc-scout",
-      worldPosition: map.tileCenter(55, 45),
-    }),
-    createPrototypeBlocker(map, "arc-command-center-prototype-0"),
-  ];
-}
-
-function blockerPlacement(actorId: string): ActorPlacement {
-  return {
-    actorId,
-    definitionId: "arc-command-center-prototype",
-    origin: { ...PROTOTYPE_BLOCKER_ORIGIN },
-  };
-}
-
-function createPrototypeBlocker(map: TerrainMap, actorId: string): Actor {
-  const placement = blockerPlacement(actorId);
-  const definition = PROTOTYPE_ACTOR_DEFINITIONS.find(
-    ({ id }) => id === placement.definitionId,
-  )!;
-  return createTilePlacedActor(map, definition, placement);
 }
 
 export function createPrototypeMap(): TerrainMap {

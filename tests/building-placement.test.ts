@@ -12,6 +12,7 @@ import { createTilePlacedActor } from "../src/simulation/placement";
 
 import type { PickingInfo } from "@babylonjs/core";
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
+import type { MissionState } from "../src/simulation/mission";
 
 const definition: ActorDefinition = {
   id: "store",
@@ -51,14 +52,18 @@ function pointer(target: EventTarget, type: string) {
   target.dispatchEvent(event);
 }
 
-function fixture(actors: Actor[] = [], retiredIds: string[] = []) {
+function fixture(
+  actors: Actor[] = [],
+  retiredIds: string[] = [],
+  saved?: MissionState,
+) {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
   const state = createMissionState(actors);
   state.retiredActorIds = retiredIds;
   const simulation = createMissionSimulation({
-    state,
+    state: saved ?? state,
     map,
     occupancy: new OccupancyGrid(map),
     bounds: map.worldBounds,
@@ -92,9 +97,14 @@ function fixture(actors: Actor[] = [], retiredIds: string[] = []) {
     map,
     simulation,
     {
-      definition,
-      appearance: { height: 0.3, color: [0.2, 0.4, 0.6] },
-      name: "Store",
+      buildings: [
+        {
+          definition,
+          appearance: { height: 0.3, color: [0.2, 0.4, 0.6] },
+          name: "Store",
+          build: controls.build as unknown as HTMLButtonElement,
+        },
+      ],
       controls: controls as unknown as Parameters<
         typeof createBuildingPlacement
       >[4]["controls"],
@@ -174,7 +184,29 @@ test("tick-time rejection survives a later valid evaluation until placement chan
   expect(current.canvas.dataset.placementStatus).toBe("valid");
   expect(current.controls.status.textContent).toContain("Another structure");
   current.controls.rotate.click();
-  expect(current.controls.status.textContent).toContain("Ready");
+  expect(current.controls.status.textContent).toContain("Store ready");
+});
+
+test("placement avoids IDs held by restored pending placement commands", () => {
+  const original = fixture();
+  original.simulation.submitCommand({
+    kind: "place-actor",
+    actorId: "store-1",
+    definitionId: definition.id,
+    origin: { x: 4, z: 4 },
+  });
+  const saved = original.simulation.snapshot();
+  original.dispose();
+  current = fixture([], [], saved);
+  current.begin();
+  current.controls.confirm.click();
+  const outcomes = current.simulation.tick();
+  expect(outcomes.map(({ accepted }) => accepted)).toEqual([true, true]);
+  current.placement.onOutcome(outcomes[0]);
+  expect(current.onPlaced).not.toHaveBeenCalled();
+  current.placement.onOutcome(outcomes[1]);
+  expect(current.onPlaced).toHaveBeenCalledWith("store-2");
+  expect(current.simulation.actors).toHaveLength(2);
 });
 
 test("terrain changes repick a stationary pointer without redundant picking", () => {

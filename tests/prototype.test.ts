@@ -1,10 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import { TerrainGrid } from "../src/simulation/terrain";
-import {
-  createPrototypeMap,
-  PROTOTYPE_MOVEMENT_PROFILES,
-} from "../src/prototype";
+import { createPrototypeMap } from "../src/prototype";
+import { PROTOTYPE_MOVEMENT_PROFILES } from "../src/prototype-content";
 import { createActor } from "../src/simulation/actor";
 import {
   createMissionSimulation,

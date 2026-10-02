@@ -6,149 +6,275 @@
   text-rendering: optimizeLegibility;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
-  min-height: 100dvh;
   overflow: hidden;
-}
-
-.game-shell,
-#game-canvas {
-  width: 100%;
-  height: 100vh;
-  height: 100dvh;
 }
 
 .game-shell {
-  position: relative;
+  display: grid;
+  grid-template-columns: clamp(15rem, 25vw, 20rem) minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
-#game-canvas {
-  display: block;
-  touch-action: none;
+.game-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid #5e654e;
+  background: linear-gradient(160deg, #142729, #091719);
+  box-shadow: 0.3rem 0 1rem rgb(0 0 0 / 20%);
+  z-index: 1;
 }
 
-.terrain-hud {
-  position: absolute;
-  top: clamp(1rem, 3vw, 2.5rem);
-  left: clamp(1rem, 3vw, 2.5rem);
-  max-width: 15rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid rgb(179 157 98 / 55%);
-  border-radius: 0.25rem;
-  background: rgb(6 18 20 / 82%);
-  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
-  pointer-events: none;
+.sidebar-header {
+  padding: 1.3rem 1rem 1rem;
 }
-
-.terrain-hud p {
-  margin: 0.45rem 0 0;
-  color: #c5d0c5;
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
 .eyebrow {
   margin: 0;
   color: #cfac62;
-  font-size: 0.64rem;
+  font-size: 0.63rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-
 h1 {
-  margin: 0.35rem 0 0;
+  margin: 0.45rem 0;
   color: #f4f0df;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.6rem, 3vw, 2rem);
+  font-size: 1.8rem;
   font-weight: 400;
-  line-height: 1;
 }
-
-.terrain-hud .controls {
+h2 {
+  margin: 0.55rem 0;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+h3 {
+  margin: 1.2rem 0 0.6rem;
+  font-size: 0.85rem;
+}
+.muted,
+.controls {
+  margin: 0.5rem 0;
+  color: #b7c8c2;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.controls {
   color: #d8bd79;
+  font-size: 0.7rem;
 }
-
-.terrain-hud button {
-  margin-top: 0.75rem;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid rgb(216 189 121 / 70%);
+.sidebar-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-block: 1px solid #354c48;
+}
+button {
+  min-height: 2.75rem;
+  padding: 0.65rem;
+  border: 1px solid #607161;
   border-radius: 0.2rem;
   color: #f4f0df;
-  background: rgb(34 57 59 / 92%);
+  background: #223b3c;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
   cursor: pointer;
-  pointer-events: auto;
 }
-
-.terrain-hud button:hover,
-.terrain-hud button:focus-visible {
-  background: rgb(49 77 78 / 96%);
+button:hover {
+  background: #304e4d;
 }
-
-.terrain-hud button:disabled {
+button:focus-visible {
+  outline: 2px solid #eac97f;
+  outline-offset: -3px;
+}
+button:disabled {
   cursor: default;
   opacity: 0.45;
 }
-
+[hidden] {
+  display: none !important;
+}
+.sidebar-tabs button {
+  border: 0;
+  border-radius: 0;
+  padding: 0.5rem 0.2rem;
+  text-align: center;
+  background: transparent;
+  font-size: 0.72rem;
+}
+.sidebar-tabs button[aria-selected="true"] {
+  color: #eac97f;
+  background: #233a37;
+  box-shadow: inset 0 -2px #d8bd79;
+}
+.sidebar-content {
+  flex: 1;
+  min-height: 0;
+  padding: 1.1rem 1rem;
+  overflow-y: auto;
+}
+.build-option {
+  display: block;
+  width: 100%;
+  margin: 0.65rem 0;
+  padding: 0.8rem;
+}
+.build-option strong,
+.build-option span {
+  display: block;
+}
+.build-option span {
+  margin-top: 0.4rem;
+  color: #b7c8c2;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+#open-training,
+#remove-building {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+}
+.actor-list {
+  display: grid;
+  gap: 0.4rem;
+}
+.roster-item[aria-pressed="true"] {
+  border-color: #d8bd79;
+  color: #eac97f;
+}
+.placement-panel {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid #354c48;
+}
 .building-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.75rem;
 }
-
 .building-controls button {
-  margin-top: 0;
-  min-height: 2.5rem;
+  flex: 1 1 auto;
+  padding: 0.45rem;
+  text-align: center;
+  font-size: 0.7rem;
 }
-
+.sidebar-footer {
+  padding: 0.3rem 1rem 0.7rem;
+  border-top: 1px solid #354c48;
+}
+.sidebar-footer .muted {
+  font-size: 0.68rem;
+}
 .animation-control {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  margin-top: 0.8rem;
-  font-size: 0.78rem;
-  pointer-events: auto;
+  min-height: 2.75rem;
+  margin-top: 1rem;
+  font-size: 0.75rem;
   cursor: pointer;
 }
-
 .animation-control input {
   width: 1.1rem;
   height: 1.1rem;
   accent-color: #d8bd79;
 }
-
-@media (max-height: 600px) {
-  .terrain-hud {
-    top: 0.5rem;
-    left: 0.5rem;
-    max-width: 14rem;
-    max-height: calc(100dvh - 3rem);
-    overflow-y: auto;
-    padding: 0.6rem;
-    pointer-events: auto;
-  }
-
-  .terrain-hud h1,
-  .terrain-hud .controls {
-    display: none;
-  }
+.scenario-goals {
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  line-height: 2.2;
 }
-
+.goal-complete {
+  color: #98d5b0;
+}
+.game-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
 .minimap {
   position: absolute;
   top: clamp(1rem, 3vw, 2.5rem);
   right: clamp(1rem, 3vw, 2.5rem);
-  width: clamp(9rem, 22vw, 14rem);
+  width: clamp(7rem, 17vw, 12rem);
   aspect-ratio: 1;
   border: 1px solid rgb(179 157 98 / 55%);
   border-radius: 0.25rem;
   box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
   cursor: pointer;
-  /* Drags pan the camera, never the page. */
   touch-action: none;
+}
+
+@media (max-height: 600px) {
+  .game-shell {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+  .sidebar-header {
+    padding: 0.6rem 0.75rem;
+  }
+  .sidebar-header h1,
+  .sidebar-header .muted,
+  .sidebar-footer .controls {
+    display: none;
+  }
+  .sidebar-content {
+    padding: 0.75rem;
+  }
+  .placement-panel {
+    padding: 0.4rem 0.75rem;
+  }
+  .placement-panel p {
+    margin-bottom: 0;
+    font-size: 0.7rem;
+  }
+  .sidebar-footer {
+    padding: 0.2rem 0.75rem;
+  }
+  .minimap {
+    width: 7rem;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .game-shell {
+    grid-template-columns: 10rem minmax(0, 1fr);
+  }
+  .sidebar-header,
+  .sidebar-content,
+  .placement-panel,
+  .sidebar-footer {
+    padding-inline: 0.5rem;
+  }
+  .sidebar-header h1 {
+    font-size: 1.25rem;
+  }
+  .sidebar-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sidebar-footer .controls {
+    display: none;
+  }
+  .minimap {
+    width: 5rem;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
 }

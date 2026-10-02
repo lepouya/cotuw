@@ -285,8 +285,9 @@ story.
 - Camera zoom is measured in visible tile rows so framing is independent of map
   and tile size. New views show roughly 24 rows or fit a smaller map; resizing
   preserves the player's zoom. Direct panning has no momentum.
-- The sidebar owns selection details, contextual actions, construction and
-  production, queues, and a keyboard-free Cancel action.
+- The left sidebar uses Selection, Buildings, Units, and Goals tabs. It owns
+  selection details, contextual actions, construction and production, queues,
+  and a keyboard-free Cancel action.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed mission
   time, and single-player pause and speed controls.
 - The minimap is north-up, distinguishes explored terrain from current vision,
@@ -485,6 +486,38 @@ story.
   overrides the hard leash.
 - Opposing-faction base planning, economy, production, expansion, defense, and
   attack planning require a later strategic-AI design pass.
+
+## Construction and training sandbox
+
+- The browser sandbox starts with no actors. Players place **Command Centers**
+  and **Field Barracks** from the Buildings tab, then train **Troopers** and
+  **Scouts** through a selected barracks in the Units tab.
+- Construction and training are instant, with no resource cost, build time,
+  production queue, or construction-support requirement in this sandbox.
+- The Command Center has a 2 × 2 footprint; the Field Barracks has a 3 × 2
+  footprint. Both support quarter-turn rotation and terrain placement previews.
+- Training is a serializable command applied at the start of a simulation tick.
+  Building definitions list their trainable unit definitions. A unit spawns on
+  a free orthogonally adjacent surface tile within mission bounds that its
+  movement behavior permits.
+  Spawn selection prefers the entrance side, then distance to the building
+  center, then tile order. Rotation turns the entrance side.
+- Training rejects missing producers, unsupported units, reused actor IDs, and
+  blocked exits. Requests in the same tick use separate available tiles.
+  Clearing an exit lets the player retry; there is no waiting production job.
+- Construction and training choose actor IDs that exclude active actors,
+  retired actors, and queued creations, including restored pending commands.
+  Previewing does not reserve IDs; rejected requests leave theirs available.
+- Selection shows the actor's type, building footprint and orientation, or unit
+  movement speed. Sidebar options and details derive from content definitions
+  and presentation data. The Units tab lists production buildings and field
+  units for selection. Selecting or placing a production building opens the
+  Units tab; selecting any other actor opens Selection.
+- Goals show current building and unit counts for construction and training
+  practice. The sandbox has no victory or defeat condition.
+- The sidebar reserves screen width beside the world canvas. Its content
+  scrolls independently in compact landscape layouts. Placement controls stay
+  available across tabs, and touch placement uses explicit confirmation.
 
 ## Milestone 0 playable slice
 

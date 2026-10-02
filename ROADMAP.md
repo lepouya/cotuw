@@ -87,6 +87,9 @@ base-building RTS loop, its technical architecture, and its player interface.
       footprints, actors, current selection, and the camera viewport.
 - [x] 0.31 Support minimap navigation while keeping it independent of simulation
       state.
+- [x] 0.52 Add a left sidebar with selection, construction, units, and goals
+      tabs; start the sandbox empty and train Troopers and Scouts through Field
+      Barracks with deterministic, blocked-exit-aware spawning.
 
 ### Verification
 

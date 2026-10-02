@@ -1,7 +1,9 @@
+import { trainTestUnits } from "./prototype-helpers";
 import { expect, test } from "@playwright/test";
 
 import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
+import type { TerrainPrototype } from "../src/prototype";
 import type { GameView } from "../src/render";
 
 type ActorInteractionTest = {
@@ -48,13 +50,14 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await expect(canvas).toHaveAttribute("data-actor-ready", "true");
   await expect.poll(() => actorRequests).toBeGreaterThan(0);
+  await trainTestUnits(page, ["trooper"]);
   expect(
     await page.evaluate(async () => {
       const harnessPath: string = "/e2e/harness.ts";
       const { EngineStore } = await import(harnessPath);
       const scene = EngineStore.Instances[0].scenes[0];
       return scene
-        .getTransformNodeByName("actor-prototype-trooper-root")!
+        .getTransformNodeByName("actor-trained-unit-1-root")!
         .getChildMeshes()
         .every((mesh: AbstractMesh) => mesh.skeleton === null);
     }),
@@ -69,7 +72,7 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
           const { EngineStore } = await import(harnessPath);
           const scene = EngineStore.Instances[0].scenes[0];
           return scene
-            .getTransformNodeByName("actor-prototype-trooper-root")!
+            .getTransformNodeByName("actor-trained-unit-1-root")!
             .getChildMeshes()
             .some((mesh: AbstractMesh) => mesh.skeleton !== null);
         }),
@@ -93,6 +96,7 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
     "data-actor-ready",
     "true",
   );
+  await trainTestUnits(page);
   const hasSkin = (actorId: string) =>
     page.evaluate(async (id) => {
       const harnessPath: string = "/e2e/harness.ts";
@@ -105,13 +109,13 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
     }, actorId);
 
   await expect
-    .poll(() => hasSkin("prototype-trooper"), { timeout: 15_000 })
+    .poll(() => hasSkin("trained-unit-1"), { timeout: 15_000 })
     .toBe(true);
-  expect(await hasSkin("prototype-scout")).toBe(false);
+  expect(await hasSkin("trained-unit-2")).toBe(false);
 
   releaseScout();
   await expect
-    .poll(() => hasSkin("prototype-scout"), { timeout: 15_000 })
+    .poll(() => hasSkin("trained-unit-2"), { timeout: 15_000 })
     .toBe(true);
 });
 
@@ -123,7 +127,11 @@ test("clicking a selected actor issues terrain-aware movement", async ({
   const targets = await page.evaluate(async () => {
     const { Vector3, frames, projectToCanvas } = harness;
     const prototypePath: string = "/src/prototype.ts";
-    const { createTerrainPrototype } = await import(prototypePath);
+    const { createTerrainPrototype, createPrototypeMap } = await import(
+      prototypePath
+    );
+    const actorPath: string = "/src/simulation/actor.ts";
+    const { createActor } = await import(actorPath);
     const canvas = document.createElement("canvas");
     const minimap = document.createElement("canvas");
     Object.assign(canvas.style, {
@@ -135,7 +143,25 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       height: "480px",
     });
     document.body.append(canvas, minimap);
-    const view = (await createTerrainPrototype(canvas, minimap)) as GameView;
+    const view: TerrainPrototype = await createTerrainPrototype(
+      canvas,
+      minimap,
+    );
+    const map = createPrototypeMap();
+    view.simulation.spawnActor(
+      createActor({
+        id: "prototype-trooper",
+        definitionId: "arc-trooper",
+        worldPosition: map.tileCenter(46, 40),
+      }),
+    );
+    view.simulation.spawnActor(
+      createActor({
+        id: "prototype-scout",
+        definitionId: "arc-scout",
+        worldPosition: map.tileCenter(55, 45),
+      }),
+    );
     await frames(2);
 
     const trooper = view.scene.getTransformNodeByName(
