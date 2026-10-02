@@ -41,6 +41,17 @@ export function tileBounds(tiles: readonly TileCoord[]): TerrainBounds {
   );
 }
 
+/** A tile's identity for sets and maps. */
+export function tileKey({ x, z }: TileCoord): string {
+  return `${x},${z}`;
+}
+
+/** Width × depth of the tiles' bounding box, for display. */
+export function footprintSize(tiles: readonly TileCoord[]): string {
+  const { minX, minZ, maxX, maxZ } = tileBounds(tiles);
+  return `${maxX - minX + 1} × ${maxZ - minZ + 1}`;
+}
+
 export function unionBounds(
   left: TerrainBounds,
   right: TerrainBounds,

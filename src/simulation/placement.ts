@@ -1,10 +1,14 @@
 import { isValidFootprint } from "./occupancy";
-import { isTileCoord, tileBounds } from "./grid";
+import { isTileCoord, tileBounds, tileKey } from "./grid";
 import { withinBounds } from "./world";
 
 import type { TerrainView, TileCoord } from "./terrain";
 import type { Actor, ActorDefinition } from "./actor";
-import type { FootprintPlacement, OccupancyView } from "./occupancy";
+import type {
+  FootprintPlacement,
+  OccupancyLayer,
+  OccupancyView,
+} from "./occupancy";
 import type { WorldPosition } from "./world";
 
 export const PLACEMENT_REASONS = [
@@ -156,29 +160,37 @@ export function evaluateFootprint(
       return reject("excessive-slope");
     }
   }
-  const tileKeys = new Set(tiles.map(({ x, z }) => `${x},${z}`));
-  for (const other of actors ?? []) {
-    if (
-      other.id === actor.id ||
-      isTilePlacedActor(other) ||
-      other.occupancyLayer !== layout!.layer ||
-      !withinBounds(other.worldPosition, map.worldBounds)
-    ) {
-      continue;
-    }
-    const { x, z } = map.tileAtWorldPosition(
-      other.worldPosition.x,
-      other.worldPosition.z,
-    );
-    if (tileKeys.has(`${x},${z}`)) {
-      return reject("actor-conflict");
-    }
+  const unitTiles = mobileActorTiles(map, actors ?? [], layout!.layer);
+  if (tiles.some((tile) => unitTiles.has(tileKey(tile)))) {
+    return reject("actor-conflict");
   }
   const footprint = footprintPlacementFor(actor, definition);
   if (!occupancy.canPlace(footprint)) {
     return reject("occupancy-conflict");
   }
   return { accepted: true, tiles, footprint, actor };
+}
+
+/** Keys of tiles under mobile actors on a layer, ignoring actors off the map. */
+export function mobileActorTiles(
+  map: TerrainView,
+  actors: Iterable<Readonly<Actor>>,
+  layer: OccupancyLayer,
+): Set<string> {
+  const tiles = new Set<string>();
+  for (const actor of actors) {
+    const { worldPosition } = actor;
+    if (
+      !isTilePlacedActor(actor) &&
+      actor.occupancyLayer === layer &&
+      withinBounds(worldPosition, map.worldBounds)
+    ) {
+      tiles.add(
+        tileKey(map.tileAtWorldPosition(worldPosition.x, worldPosition.z)),
+      );
+    }
+  }
+  return tiles;
 }
 
 export function footprintPlacementFor(

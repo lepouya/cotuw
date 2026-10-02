@@ -1,3 +1,9 @@
+import {
+  evaluateTraining as evaluateUnitTraining,
+  validateProductionDefinitions,
+} from "./production";
+import type { TrainingEvaluation } from "./production";
+import type { TrainUnitCommand } from "./command";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
 import { TerrainGrid } from "./terrain";
@@ -18,6 +24,7 @@ import type {
   ActorRenderState,
 } from "./actor";
 import type {
+  ActorCommand,
   CommandOutcome,
   MissionCommand,
   ScheduledCommand,
@@ -120,6 +127,10 @@ export type MissionSimulation = {
   actorById: (id: string) => Actor | undefined;
   /** Checks the same placement constraints used when commands are applied. */
   evaluatePlacement: (placement: ActorPlacement) => PlacementEvaluation;
+  /** Checks production and free exits against the current committed state. */
+  evaluateTraining: (command: TrainUnitCommand) => TrainingEvaluation;
+  /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
+  unusedActorId: (prefix: string) => string;
   /** Queues a command for the next tick and returns that tick's number. */
   submitCommand: (command: MissionCommand) => number;
   /** Adds a copy of the actor, validated like the initial state. */
@@ -177,8 +188,19 @@ export function createMissionSimulation({
     map,
     occupancy,
   );
+  validateProductionDefinitions(definitionsById, behaviorsById, map);
   let actorsById = new Map<string, Actor>();
   let usedActorIds = new Set(state.retiredActorIds);
+  const queuedCreationIds = () =>
+    new Set(
+      state.commands.flatMap(({ command }) =>
+        command.kind === "place-actor" || command.kind === "train-unit"
+          ? [command.actorId]
+          : [],
+      ),
+    );
+  let queuedActorIds = queuedCreationIds();
+  const nextActorNumbers = new Map<string, number>();
   let actorVersion = 0;
   let faulted = false;
   let disposed = false;
@@ -336,6 +358,37 @@ export function createMissionSimulation({
     return evaluation;
   };
 
+  const evaluateTraining = (
+    command: TrainUnitCommand,
+    actors: readonly Actor[],
+    usedIds: ReadonlySet<string>,
+  ): TrainingEvaluation => {
+    const evaluation = evaluateUnitTraining(command, {
+      actors,
+      usedIds,
+      definitions: definitionsById,
+      canStandAt: (unit, tile) =>
+        behaviorsById.get(unit.behaviorId)!.canStandAt!(unit, tile),
+      map,
+      occupancy,
+      bounds: worldBounds,
+    });
+    if (evaluation.accepted) {
+      try {
+        ensureValidActor(evaluation.actor);
+      } catch {
+        return { accepted: false, reason: "invalid-actor" };
+      }
+    }
+    return evaluation;
+  };
+  const stageActor = (working: WorkingActors, actor: Actor) => {
+    working.actors.push(actor);
+    working.actorsById.set(actor.id, actor);
+    working.usedIds.add(actor.id);
+    working.lifecycleChanges += 1;
+  };
+
   // Validate the whole candidate world without publishing edits or losing the
   // live world's navigation history when initialization fails.
   const initialFootprints: FootprintPlacement[] = [];
@@ -423,10 +476,25 @@ export function createMissionSimulation({
         };
       }
       occupancy!.place(evaluation.footprint);
-      working.actors.push(evaluation.actor);
-      working.actorsById.set(evaluation.actor.id, evaluation.actor);
-      working.usedIds.add(evaluation.actor.id);
-      working.lifecycleChanges += 1;
+      stageActor(working, evaluation.actor);
+      return { tick, command: applied, accepted: true };
+    }
+    if (command.kind === "train-unit") {
+      const applied = structuredClone(command);
+      const evaluation = evaluateTraining(
+        applied,
+        working.actors,
+        working.usedIds,
+      );
+      if (!evaluation.accepted) {
+        return {
+          tick,
+          command: applied,
+          accepted: false,
+          reason: evaluation.reason,
+        };
+      }
+      stageActor(working, evaluation.actor);
       return { tick, command: applied, accepted: true };
     }
     if (command.kind === "remove-actor") {
@@ -444,34 +512,29 @@ export function createMissionSimulation({
       working.lifecycleChanges += 1;
       return { tick, command: applied, accepted: true };
     }
-    let appliedCommand = structuredClone(command);
-    const outcome: CommandOutcome = {
-      tick,
-      command: appliedCommand,
-      accepted: false,
+    const handle = (applied: ActorCommand) => {
+      const actor = working.actorsById.get(applied.actorId);
+      if (!actor) return false;
+      const before = actorIdentity(actor);
+      const accepted = behaviorFor(actor).handleCommand(
+        actor,
+        definitionFor(actor),
+        applied,
+      );
+      validateUpdate(actor, before);
+      return accepted;
     };
-    const actor = working.actorsById.get(command.actorId);
-    if (!actor) {
-      return outcome;
-    }
     if (command.kind === "move") {
-      if (!isFinitePosition(command.target)) {
-        return outcome;
-      }
-      appliedCommand = {
+      if (!isFinitePosition(command.target))
+        return { tick, command: structuredClone(command), accepted: false };
+      const applied = {
         ...command,
         target: clampToBounds(command.target, worldBounds),
       };
-      outcome.command = appliedCommand;
+      return { tick, command: applied, accepted: handle(applied) };
     }
-    const before = actorIdentity(actor);
-    outcome.accepted = behaviorFor(actor).handleCommand(
-      actor,
-      definitionFor(actor),
-      appliedCommand,
-    );
-    validateUpdate(actor, before);
-    return outcome;
+    const applied = structuredClone(command);
+    return { tick, command: applied, accepted: handle(applied) };
   };
 
   return {
@@ -491,12 +554,28 @@ export function createMissionSimulation({
     },
     evaluatePlacement: (placement) =>
       evaluatePlacement(structuredClone(placement), state.actors, usedActorIds),
+    evaluateTraining: (command) =>
+      evaluateTraining(structuredClone(command), state.actors, usedActorIds),
+    unusedActorId: (prefix) => {
+      let number = nextActorNumbers.get(prefix) ?? 1;
+      while (usedActorIds.has(`${prefix}${number}`)) number += 1;
+      // Only committed IDs are permanent; rejected queued requests free theirs.
+      nextActorNumbers.set(prefix, number);
+      while (
+        usedActorIds.has(`${prefix}${number}`) ||
+        queuedActorIds.has(`${prefix}${number}`)
+      )
+        number += 1;
+      return `${prefix}${number}`;
+    },
     submitCommand: (command) => {
       ensureRunning();
       state.commands.push({
         tick: state.tick,
         command: structuredClone(command),
       });
+      if (command.kind === "place-actor" || command.kind === "train-unit")
+        queuedActorIds.add(command.actorId);
       return state.tick;
     },
     spawnActor: (actor) => {
@@ -608,6 +687,7 @@ export function createMissionSimulation({
         };
         actorsById = new Map(committedActors.map((actor) => [actor.id, actor]));
         usedActorIds = working.usedIds;
+        if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
         return outcomes;
       } catch (error) {

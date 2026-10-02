@@ -1,5 +1,6 @@
 import type { TerrainEdit } from "./terrain";
 import type { ActorPlacement, PlacementReason } from "./placement";
+import type { TrainingReason } from "./production";
 import type { WorldPosition } from "./world";
 
 /** Orders an actor to approach a target using its movement rules. */
@@ -36,7 +37,16 @@ export type RemoveActorCommand = {
   actorId: string;
 };
 
-export type ActorLifecycleCommand = PlaceActorCommand | RemoveActorCommand;
+/** Trains one unit beside its producer at the start of a tick. */
+export type TrainUnitCommand = {
+  kind: "train-unit";
+  producerId: string;
+  actorId: string;
+  definitionId: string;
+};
+
+export type ActorLifecycleCommand =
+  PlaceActorCommand | RemoveActorCommand | TrainUnitCommand;
 
 export type MissionCommand =
   ActorCommand | TerrainCommand | ActorLifecycleCommand;
@@ -47,11 +57,28 @@ export type ScheduledCommand = {
   command: MissionCommand;
 };
 
+type RejectionReason<C extends MissionCommand> = C extends PlaceActorCommand
+  ? PlacementReason
+  : C extends TrainUnitCommand
+    ? TrainingReason
+    : never;
+
 /** Whether the mission accepted a command at the start of `tick`. */
-export type CommandOutcome = {
-  tick: number;
-  command: MissionCommand;
-  accepted: boolean;
-  /** Placement failures as evaluated against the world at command application. */
-  reason?: PlacementReason;
-};
+export type CommandOutcome<C extends MissionCommand = MissionCommand> =
+  C extends MissionCommand
+    ? {
+        tick: number;
+        command: C;
+        accepted: boolean;
+        /** Why the command was rejected, as evaluated at command application. */
+        reason?: RejectionReason<C>;
+      }
+    : never;
+
+/** Narrows an outcome, and its rejection reason, to one command kind. */
+export function isOutcomeOf<K extends MissionCommand["kind"]>(
+  outcome: CommandOutcome,
+  kind: K,
+): outcome is CommandOutcome<Extract<MissionCommand, { kind: K }>> {
+  return outcome.command.kind === kind;
+}

@@ -4,6 +4,7 @@ import {
   NavigationGrid,
   occupiedTile,
   segmentCost,
+  traversalCostAt,
 } from "./navigation";
 import { isOccupancyLayer } from "./occupancy";
 import { isFinitePosition, withinBounds } from "./world";
@@ -85,6 +86,12 @@ export function createTerrainMoveBehavior(
   };
 
   return {
+    canStandAt: (definition, { x, z }) => {
+      const { profile } = grids
+        .get(definition.movement!.profileId!)!
+        .get("surface")!;
+      return traversalCostAt(map, profile, x, z) !== undefined;
+    },
     validateDefinition: (definition) => {
       const movement = definition.movement;
       if (!movement || !(movement.speed > 0)) {

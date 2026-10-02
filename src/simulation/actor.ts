@@ -12,6 +12,8 @@ export type ActorDefinition = {
     /** Resolves terrain rules outside actor state. */
     profileId?: string;
   };
+  /** Mobile actor definitions this building can train. */
+  production?: { unitDefinitionIds: string[] };
   /** Present when this actor type can occupy a tile-aligned footprint. */
   footprint?: Footprint;
   /** Terrain constraints used when placing its footprint. */
@@ -120,4 +122,9 @@ export type ActorBehavior = {
   validateDefinition?: (definition: ActorDefinition) => void;
   /** Throws when behavior-owned actor state is invalid. */
   validateActor?: (actor: Actor, definition: ActorDefinition) => void;
+  /**
+   * Whether this definition's actors may stand on a tile's terrain, ignoring
+   * actors and footprints. Production definitions require it of their units.
+   */
+  canStandAt?: (definition: ActorDefinition, tile: TileCoord) => boolean;
 };

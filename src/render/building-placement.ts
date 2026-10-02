@@ -7,6 +7,7 @@ import {
 import { isTerrainPickMesh } from "./terrain-mesh";
 import { createTilePlacedActor } from "../simulation/placement";
 import { tileBounds } from "../simulation/grid";
+import { isOutcomeOf } from "../simulation/command";
 import { createTilePlacedActorViewRegistry } from "./tile-placed-actor-view";
 import { createPrimaryClick } from "./primary-click";
 
@@ -343,9 +344,13 @@ export function createBuildingPlacement(
       return active;
     },
     update,
-    onOutcome: ({ command, accepted, reason }: CommandOutcome) => {
-      if (command.kind !== "place-actor" || command.actorId !== pendingId)
+    onOutcome: (outcome: CommandOutcome) => {
+      if (
+        !isOutcomeOf(outcome, "place-actor") ||
+        outcome.command.actorId !== pendingId
+      )
         return;
+      const { command, accepted, reason } = outcome;
       pendingId = undefined;
       if (accepted) {
         active = false;

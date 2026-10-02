@@ -1,0 +1,154 @@
+import { withinBounds } from "./world";
+import type { WorldBounds } from "./world";
+import { createActor } from "./actor";
+import { tileKey } from "./grid";
+import {
+  isTilePlacedActor,
+  mobileActorTiles,
+  occupiedTilesFor,
+} from "./placement";
+
+import type { Actor, ActorBehavior, ActorDefinition } from "./actor";
+import type { TrainUnitCommand } from "./command";
+import type { TileCoord } from "./grid";
+import type { OccupancyView } from "./occupancy";
+import type { TerrainView } from "./terrain";
+
+export type TrainingReason =
+  | "invalid-actor"
+  | "used-id"
+  | "missing-producer"
+  | "unsupported-unit"
+  | "exit-blocked";
+
+export type TrainingEvaluation =
+  | { accepted: true; actor: Actor }
+  | { accepted: false; reason: TrainingReason };
+
+export function validateProductionDefinitions(
+  definitions: ReadonlyMap<string, ActorDefinition>,
+  behaviors: ReadonlyMap<string, ActorBehavior>,
+  map?: TerrainView,
+): void {
+  for (const definition of definitions.values()) {
+    if (!definition.production) continue;
+    const units = definition.production.unitDefinitionIds;
+    if (
+      !map ||
+      definition.footprint?.layer !== "surface" ||
+      units.length === 0 ||
+      new Set(units).size !== units.length
+    ) {
+      throw new RangeError(`Invalid production definition: ${definition.id}.`);
+    }
+    for (const id of units) {
+      const unit = definitions.get(id);
+      if (
+        !unit?.movement ||
+        unit.footprint ||
+        !behaviors.get(unit.behaviorId)?.canStandAt
+      ) {
+        throw new RangeError(`Invalid production unit: ${id}.`);
+      }
+    }
+  }
+}
+
+export type ProductionWorld = {
+  actors: readonly Actor[];
+  usedIds: ReadonlySet<string>;
+  definitions: ReadonlyMap<string, ActorDefinition>;
+  canStandAt: (unit: ActorDefinition, tile: TileCoord) => boolean;
+  map?: TerrainView;
+  occupancy?: OccupancyView;
+  bounds: WorldBounds;
+};
+
+/** Checks the staged tick's world, including units trained earlier that tick. */
+export function evaluateTraining(
+  command: TrainUnitCommand,
+  {
+    actors,
+    usedIds,
+    definitions,
+    canStandAt,
+    map,
+    occupancy,
+    bounds,
+  }: ProductionWorld,
+): TrainingEvaluation {
+  const reject = (reason: TrainingReason): TrainingEvaluation => ({
+    accepted: false,
+    reason,
+  });
+  if (typeof command.actorId !== "string" || command.actorId.length === 0)
+    return reject("invalid-actor");
+  if (usedIds.has(command.actorId)) return reject("used-id");
+  const producer = actors.find(({ id }) => id === command.producerId);
+  if (!producer || !isTilePlacedActor(producer))
+    return reject("missing-producer");
+  const definition = definitions.get(producer.definitionId)!;
+  const unit = definitions.get(command.definitionId);
+  if (
+    !map ||
+    !occupancy ||
+    !definition.production?.unitDefinitionIds.includes(command.definitionId) ||
+    !unit
+  )
+    return reject("unsupported-unit");
+
+  const footprint = occupiedTilesFor(producer, definition);
+  const occupied = new Set(footprint.map(tileKey));
+  const candidates = new Map<string, TileCoord>();
+  for (const tile of footprint) {
+    for (const offset of [
+      { x: 0, z: 1 },
+      { x: 1, z: 0 },
+      { x: 0, z: -1 },
+      { x: -1, z: 0 },
+    ]) {
+      const next = { x: tile.x + offset.x, z: tile.z + offset.z };
+      if (map.containsTile(next.x, next.z) && !occupied.has(tileKey(next)))
+        candidates.set(tileKey(next), next);
+    }
+  }
+  const unitTiles = mobileActorTiles(map, actors, "surface");
+  const frontX = Math.round(Math.sin(producer.facing));
+  const frontZ = Math.round(Math.cos(producer.facing));
+  // Prefer the entrance side, then distance to the center, then tile order.
+  const front = (tile: TileCoord) => tile.x * frontX + tile.z * frontZ;
+  const distance = (tile: TileCoord) => {
+    const position = map.tileCenter(tile.x, tile.z);
+    return (
+      (position.x - producer.worldPosition.x) ** 2 +
+      (position.z - producer.worldPosition.z) ** 2
+    );
+  };
+  const tiles = [...candidates.values()].sort(
+    (a, b) =>
+      front(b) - front(a) ||
+      distance(a) - distance(b) ||
+      a.z - b.z ||
+      a.x - b.x,
+  );
+  for (const tile of tiles) {
+    const position = map.tileCenter(tile.x, tile.z);
+    if (
+      !withinBounds(position, bounds) ||
+      !canStandAt(unit, tile) ||
+      occupancy.ownerAt(tile.x, tile.z, "surface") !== undefined ||
+      unitTiles.has(tileKey(tile))
+    )
+      continue;
+    return {
+      accepted: true,
+      actor: createActor({
+        id: command.actorId,
+        definitionId: unit.id,
+        worldPosition: position,
+        facing: producer.facing,
+      }),
+    };
+  }
+  return reject("exit-blocked");
+}
