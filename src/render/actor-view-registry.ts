@@ -39,7 +39,11 @@ export type ActorViewRegistry = {
    * Creates and removes views to match `actors`, then draws each one
    * `tickProgress` of the way from its previous pose to its current one.
    */
-  update: (actors: readonly ActorRenderState[], tickProgress: number) => void;
+  update: (
+    actors: readonly ActorRenderState[],
+    tickProgress: number,
+    workingActorIds?: ReadonlySet<string>,
+  ) => void;
 };
 
 /**
@@ -157,11 +161,11 @@ export function createActorViewRegistry(
       }
       return ids;
     },
-    update: (actors, tickProgress) => {
+    update: (actors, tickProgress, workingActorIds) => {
       renderers.sync(actors);
       for (const actor of actors) {
         interpolatePose(previousPoses.get(actor.id), actor, tickProgress, pose);
-        renderers.get(actor.id)!.update(pose);
+        renderers.get(actor.id)!.update(pose, workingActorIds?.has(actor.id));
       }
     },
   };

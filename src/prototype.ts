@@ -203,9 +203,13 @@ export async function createTerrainPrototype(
     map,
     occupancy,
   });
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const appearances = createPrototypeStandInAppearances(view.scene);
   if (simulation.economy)
-    appearances.set("arc-harvester", createHarvesterAppearance(view.scene));
+    appearances.set(
+      "arc-harvester",
+      createHarvesterAppearance(view.scene, () => reducedMotion.matches),
+    );
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(view.scene, map, simulation.economy);
@@ -448,9 +452,9 @@ export async function createTerrainPrototype(
     controls.cameraControls &&
     bindCameraControls(controls.cameraControls, view.camera);
   input.select(undefined);
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   if (controls.animate) controls.animate.checked = !reducedMotion.matches;
   let idleSeconds = 0;
+  let pickupSeconds = 0;
   let previousFrameTime = performance.now();
   let knownActorVersion = simulation.actorVersion;
 
@@ -529,10 +533,21 @@ export async function createTerrainPrototype(
     if (controls.animate?.checked ?? !reducedMotion.matches) {
       idleSeconds += (frameTime - previousFrameTime) / 1000;
     }
+    if (!reducedMotion.matches)
+      pickupSeconds += (frameTime - previousFrameTime) / 1000;
     previousFrameTime = frameTime;
     tilePlacedViews.animate(idleSeconds);
+    materialsView?.animate(pickupSeconds);
     const { mobile } = actorsByKind();
-    actorViews.update(mobile, loop.tickProgress());
+    actorViews.update(
+      mobile,
+      loop.tickProgress(),
+      new Set(
+        simulation.economy?.harvesters
+          .filter((worker) => worker.phase === "gathering")
+          .map((worker) => worker.actorId),
+      ),
+    );
     movementPath.update(mobile);
   });
   view.scene.onDisposeObservable.add(() => {

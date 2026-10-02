@@ -41,7 +41,7 @@ cargo counts separately.
 **Selection** provides Return cargo and Refinery assignment. Move and Stop
 interrupt gathering and keep cargo. Exhausted patches prompt reassignment.
 **Units** lists resource sites and salvage: select a mobile unit, then use
-**Collect salvage** to gather it without a delivery. Paid
+**Collect salvage** to gather a hovering gift box without a delivery. Paid
 production orders show remaining time and a Cancel action with a full refund. A
 Refinery has one Harvester slot; a Barracks has five outstanding orders. Blocked
 exits hold finished production until a tile is cleared. Buildings sell for half
@@ -51,7 +51,8 @@ has no combat, victory, or defeat condition.
 
 Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
-rotate and **Cancel** or `Esc` to exit placement. Touch uses a
+rotate and **Cancel** or `Esc` to exit placement. A yellow preview arrow marks
+the preferred unit exit; blocked exits can use another side. Touch uses a
 terrain tap followed by **Place building**. Construction and training in this
 sandbox are instant and have no resource or power requirements.
 
@@ -68,7 +69,9 @@ rotation, zoom, and reset buttons.
 **Selection** shows the selected actor or group and building actions.
 **Units** also lists buildings that train units and the units in the field.
 **Goals** shows construction and training goals and current counts.
-**Building idle animation** controls rooftop equipment.
+**Building idle animation** controls rooftop equipment. A gathering Harvester
+lowers and spins its drill with a green light; idle Harvesters raise it and
+show amber. Reduced motion keeps these status cues without animated motion.
 
 The visual tests start the Vite app in headless Chromium. They check the
 camera, terrain rendering, terrain editing, and texture behavior, some through

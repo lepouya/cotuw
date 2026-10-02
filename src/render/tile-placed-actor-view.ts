@@ -6,6 +6,7 @@ import {
   Vector3,
 } from "@babylonjs/core";
 
+import { createProductionExitMarker } from "./production-exit";
 import { occupiedTilesFor, tilePlacedPose } from "../simulation/placement";
 import { createViewRegistry } from "./view-registry";
 import { isRgb } from "./color";
@@ -239,6 +240,10 @@ export function createTilePlacedActorViewRegistry(
         if (mesh.material) mesh.material.alpha = 0.42;
       }
     }
+    const exit =
+      preview && definition.production
+        ? createProductionExitMarker(scene, map, root, tiles, facing)
+        : undefined;
     const progressMeshes =
       !preview && actor.construction
         ? ["background", "fill"].map((part) => {
@@ -290,6 +295,7 @@ export function createTilePlacedActorViewRegistry(
       animate: (seconds: number) => details?.update(constructing ? 0 : seconds),
       dispose: () => {
         details?.dispose();
+        exit?.dispose();
         root.dispose();
       },
     };

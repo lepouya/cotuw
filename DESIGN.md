@@ -558,7 +558,9 @@ story.
 - A Refinery has one paid production or assigned Harvester slot. Barracks
   queues hold up to five paid orders and train one unit at a time. Cancelling
   an unfinished order refunds its full cost. Completed production waits for
-  a free, passable adjacent exit; the paid order remains cancellable.
+  a free, passable adjacent exit; the paid order remains cancellable. A yellow
+  placement-preview arrow marks the preferred exit side and follows rotation;
+  blocked exits may send units to another adjacent side.
 - A Harvester carries 100 Materials and takes 60 seconds to gather a full
   load, plus travel. It gathers the assigned tile, then resource tiles within
   two tiles on each axis. Candidates use distance from the assigned tile,
@@ -580,10 +582,14 @@ story.
 - The sidebar provides cargo, phase, Gather, Return cargo, Refinery assignment,
   paid-order cancellation, patch totals, and salvage commands. The top bar
   shows available Materials. Blue resource markers shrink in four stages and
-  disappear at depletion; gold salvage disappears on collection. Both appear
+  disappear at depletion; salvage uses hovering, rotating gold gift boxes
+  with red ribbons and disappears on collection. Both appear
   on the minimap. Exhaustion, missing assignments, blocked routes, and an
   unaffordable harvesting recovery have explanatory feedback. Building timers
   show in Units and Selection, with a progress bar over translucent blueprints.
+  Gathering Harvesters lower and spin a drill with a green light; idle workers
+  raise the drill and show amber. Refineries animate a rooftop fan and pump
+  when complete. Reduced motion retains static activity cues.
 - Mission snapshots include stockpiles, tile yields, collected salvage,
   Harvester assignments, cargo, gathering progress, phases, routes, paid
   production, blueprint progress and queue order, pending commands, and

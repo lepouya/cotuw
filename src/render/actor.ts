@@ -46,6 +46,7 @@ export type ActorInstance = {
   root: TransformNode;
   /** Present when the appearance animates. */
   animate?: (motion: Readonly<ActorMotion>) => void;
+  setWorking?: (working: boolean) => void;
   dispose: () => void;
 };
 
@@ -59,7 +60,7 @@ export type ActorRenderer = {
   actorId: string;
   selectionPoint: () => Vector3;
   setSelected: (selected: boolean) => void;
-  update: (pose: ActorPose) => void;
+  update: (pose: ActorPose, working?: boolean) => void;
   dispose: () => void;
 };
 
@@ -122,7 +123,8 @@ export function createActorRenderer(
 
   const motion: ActorMotion = { distance: 0, turn: 0, seconds: 0 };
   let last: ActorPose | undefined;
-  const update = ({ worldPosition, facing }: ActorPose) => {
+  const update = ({ worldPosition, facing }: ActorPose, working = false) => {
+    instance.setWorking?.(working);
     if (instance.animate) {
       if (last) {
         motion.distance = Math.hypot(
