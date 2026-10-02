@@ -33,7 +33,8 @@ export type StrategyCamera = {
   rotateView: (radians: number) => void;
   tiltView: (radians: number) => void;
   zoomBy: (factor: number) => void;
-  setTouchPanEnabled: (enabled: (event: PointerEvent) => boolean) => void;
+  /** Decides whether a one-finger touch press pans the view. */
+  setTouchPanFilter: (canPan: (event: PointerEvent) => boolean) => void;
   fitToMap: () => void;
   /** Centers the view on a tile without changing the zoom. */
   focusOnTile: (x: number, z: number) => void;
@@ -69,19 +70,12 @@ export function createStrategyCamera(
   camera.upperRadiusLimit = MINIMUM_CAMERA_DISTANCE;
   camera.minZ = NEAR_CLIP;
   camera.maxZ = INITIAL_FAR_CLIP;
-  // Panning must stick to the pointer, so it cannot glide after release.
-  camera.panningInertia = 0;
-  camera.attachControl(canvas, true);
-  // Pointer gestures are shared with unit selection and explicit touch modes.
-  camera.inputs.removeByType("ArcRotateCameraPointersInput");
-  camera.inputs.removeByType("ArcRotateCameraMouseWheelInput");
+  // Every camera input is handled here, sharing gestures with unit selection.
+  camera.inputs.clear();
 
   let viewHeight = INITIAL_VIEW_TILES * map.tileSize;
-  const syncViewBounds = () => {
+  const syncViewBounds = () =>
     syncOrthographicBounds(camera, canvas, viewHeight);
-    // Panning moves the target in world units, so sensibility tracks the zoom.
-    camera.panningSensibility = Math.max(canvas.clientHeight, 1) / viewHeight;
-  };
   const setViewHeight = (height: number) => {
     // Zooming out stops at the whole map, zooming in a couple of tiles short.
     const minimumViewHeight = MINIMUM_VIEW_TILES * map.tileSize;
@@ -151,8 +145,12 @@ export function createStrategyCamera(
       glide = undefined;
     }
   };
-  let touchPanEnabled = (_event: PointerEvent) => true;
+  const setBeta = (beta: number) => {
+    camera.beta = Math.max(LOWER_BETA_LIMIT, Math.min(UPPER_BETA_LIMIT, beta));
+  };
+  let canTouchPan = (_event: PointerEvent) => true;
   const pointAt = (x: number, y: number) => {
+    // Refreshes the camera position after alpha, beta or target changes.
     camera.getViewMatrix();
     const bounds = canvas.getBoundingClientRect();
     return projectOntoPlane(
@@ -169,23 +167,16 @@ export function createStrategyCamera(
       const touch = event.pointerType === "touch";
       if (!(
         event.button === 2 ||
-        (touch && event.button === 0 && touchPanEnabled(event))
+        (touch && event.button === 0 && canTouchPan(event))
       ))
         return undefined;
       glide = undefined;
       return { rotate: !touch && event.shiftKey };
     },
     move: (event, gesture) => {
-      if (!gesture.dragged) return;
       if (gesture.data.rotate) {
         camera.alpha -= (event.clientX - gesture.last.clientX) * 0.005;
-        camera.beta = Math.max(
-          LOWER_BETA_LIMIT,
-          Math.min(
-            UPPER_BETA_LIMIT,
-            camera.beta - (event.clientY - gesture.last.clientY) * 0.005,
-          ),
-        );
+        setBeta(camera.beta - (event.clientY - gesture.last.clientY) * 0.005);
       } else {
         const from = pointAt(gesture.last.clientX, gesture.last.clientY);
         const to = pointAt(event.clientX, event.clientY);
@@ -203,10 +194,6 @@ export function createStrategyCamera(
       centerY + vertical * bounds.height * 0.18,
     );
     moveTo(camera.target.add(to.subtract(from)));
-  };
-  const rotateView = (radians: number) => {
-    glide = undefined;
-    camera.alpha += radians;
   };
   const viewFootprint = (height = 0) =>
     orthographicViewFootprint(
@@ -252,18 +239,14 @@ export function createStrategyCamera(
   return {
     resetView,
     panView,
-    rotateView,
-    tiltView: (radians) => {
-      glide = undefined;
-      camera.beta = Math.max(
-        LOWER_BETA_LIMIT,
-        Math.min(UPPER_BETA_LIMIT, camera.beta + radians),
-      );
+    rotateView: (radians) => {
+      camera.alpha += radians;
     },
+    tiltView: (radians) => setBeta(camera.beta + radians),
     zoomBy: (factor) => setViewHeight(viewHeight * factor),
-    setTouchPanEnabled: (enabled) => {
+    setTouchPanFilter: (canPan) => {
       pointer.cancel();
-      touchPanEnabled = enabled;
+      canTouchPan = canPan;
     },
     fitToMap,
     focusOnTile,

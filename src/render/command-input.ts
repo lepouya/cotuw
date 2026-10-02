@@ -1,16 +1,10 @@
 import { isTerrainPickMesh } from "./terrain-mesh";
-import { createSelection } from "../ui/selection";
+import { createSelection } from "./selection";
 import { createPointerGesture } from "./pointer-gesture";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { ActorCommand, GroupMoveCommand } from "../simulation/command";
-
-export type SelectionRect = {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-};
+import type { SelectionRect } from "./selection";
 export type CommandInputOptions = {
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   actorIdsInRect: (rect: SelectionRect) => string[];
@@ -31,8 +25,12 @@ export type CommandInput = {
   select: (actorId: string | undefined, additive?: boolean) => void;
   selectMany: (actorIds: readonly string[], additive?: boolean) => void;
   retainSelection: (exists: (id: string) => boolean) => void;
-  stop: () => void;
-  cancelGesture: () => void;
+  /** The actor under a viewport point, ignoring terrain. */
+  actorIdAt: (clientX: number, clientY: number) => string | undefined;
+  /** Stops selected mobile actors. Returns how many stop orders it sent. */
+  stop: () => number;
+  /** Abandons an in-progress gesture; returns whether there was one. */
+  cancelGesture: () => boolean;
   dispose: () => void;
 };
 
@@ -67,6 +65,20 @@ export function createCommandInput(
     selection.selectMany(ids, additive);
     changed();
   };
+  const pickAt = (
+    clientX: number,
+    clientY: number,
+    predicate: (mesh: AbstractMesh) => boolean,
+  ) => {
+    const bounds = canvas.getBoundingClientRect();
+    // Babylon picking uses CSS pixels even on HiDPI displays.
+    return scene.pick(clientX - bounds.left, clientY - bounds.top, predicate);
+  };
+  const actorIdAt = (clientX: number, clientY: number) =>
+    actorIdForMesh(
+      pickAt(clientX, clientY, (mesh) => actorIdForMesh(mesh) !== undefined)
+        ?.pickedMesh ?? null,
+    );
   const rectAt = (start: PointerEvent, event: PointerEvent): SelectionRect => {
     const bounds = canvas.getBoundingClientRect();
     const x = Math.max(bounds.left, Math.min(bounds.right, event.clientX));
@@ -88,11 +100,11 @@ export function createCommandInput(
         additive: event.shiftKey || additiveMode,
       };
     },
-    cancel: () => {
+    release: () => {
       box.hidden = true;
     },
     move: (event, gesture) => {
-      if (!gesture.dragged || !gesture.data.box) return;
+      if (!gesture.data.box) return;
       const rect = rectAt(gesture.start, event);
       box.hidden = false;
       Object.assign(box.style, {
@@ -111,11 +123,9 @@ export function createCommandInput(
         }
         return;
       }
-      const bounds = canvas.getBoundingClientRect();
-      // Babylon picking uses CSS pixels even on HiDPI displays.
-      const pick = scene.pick(
-        event.clientX - bounds.left,
-        event.clientY - bounds.top,
+      const pick = pickAt(
+        event.clientX,
+        event.clientY,
         (mesh) => actorIdForMesh(mesh) !== undefined || isTerrainPickMesh(mesh),
       );
       const picked = actorIdForMesh(pick?.pickedMesh ?? null);
@@ -143,9 +153,10 @@ export function createCommandInput(
   });
   const cancelGesture = pointer.cancel;
   const stop = () => {
-    if (!enabled()) return;
-    for (const actorId of selection.ids.filter(canMove))
-      submitCommand({ kind: "stop", actorId });
+    if (!enabled()) return 0;
+    const ids = selection.ids.filter(canMove);
+    for (const actorId of ids) submitCommand({ kind: "stop", actorId });
+    return ids.length;
   };
   const key = (event: KeyboardEvent) => {
     if (!enabled() || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -156,14 +167,13 @@ export function createCommandInput(
     )
       return;
     if (event.key === "Escape") {
-      cancelGesture();
-      select(undefined);
-      event.preventDefault();
-    }
-    if (event.key.toLowerCase() === "s") {
-      stop();
-      event.preventDefault();
-    }
+      const hadSelection = selection.ids.length > 0;
+      if (!cancelGesture() && !hadSelection) return;
+      if (hadSelection) select(undefined);
+    } else if (event.key.toLowerCase() === "s") {
+      if (stop() === 0) return;
+    } else return;
+    event.preventDefault();
   };
   window.addEventListener("keydown", key);
   return {
@@ -194,6 +204,7 @@ export function createCommandInput(
         changed();
       }
     },
+    actorIdAt,
     stop,
     cancelGesture,
     dispose: () => {

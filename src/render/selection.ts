@@ -1,3 +1,10 @@
+export type SelectionRect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
 /** Buildings stay individual; additive and box selection contain mobile units. */
 export function createSelection(isMobile: (id: string) => boolean) {
   let ids: readonly string[] = [];

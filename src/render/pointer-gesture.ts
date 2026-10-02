@@ -13,9 +13,11 @@ export function createPointerGesture<T>(
   target: HTMLElement,
   options: {
     start: (event: PointerEvent) => T | undefined;
+    /** Runs only once the press has become a drag. */
     move?: (event: PointerEvent, gesture: PointerGesture<T>) => void;
     end?: (event: PointerEvent, gesture: PointerGesture<T>) => void;
-    cancel?: () => void;
+    /** Runs whenever a gesture ends, before `end` if it completed. */
+    release?: () => void;
     enabled?: () => boolean;
     capture?: boolean;
   },
@@ -26,13 +28,13 @@ export function createPointerGesture<T>(
   const host = target.ownerDocument?.defaultView;
   const pointers = new Set<number>();
   let gesture: PointerGesture<T> | undefined;
+  // Capture stays until the pointer is released: other gestures on the same
+  // target share it, and releasing it early would cancel them too.
   const cancel = () => {
-    const active = gesture;
+    if (!gesture) return false;
     gesture = undefined;
-    if (!active) return;
-    options.cancel?.();
-    if (capture && target.hasPointerCapture(active.start.pointerId))
-      target.releasePointerCapture(active.start.pointerId);
+    options.release?.();
+    return true;
   };
   const down = (event: PointerEvent) => {
     pointers.add(event.pointerId);
@@ -59,7 +61,7 @@ export function createPointerGesture<T>(
       ) > DRAG_SLOP_PIXELS
     )
       gesture.dragged = true;
-    options.move?.(event, gesture);
+    if (gesture.dragged) options.move?.(event, gesture);
     if (gesture) gesture.last = event;
   };
   const up = (event: PointerEvent) => {
@@ -101,6 +103,7 @@ export function createPointerGesture<T>(
   host?.addEventListener("pointercancel", cancelled, { signal });
   host?.addEventListener("blur", blur, { signal });
   return {
+    /** Abandons the active gesture; returns whether there was one. */
     cancel,
     dispose: () => {
       blur();

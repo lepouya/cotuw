@@ -19,7 +19,7 @@ import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
 import type { ActorAppearance, ActorPose } from "./actor";
-import type { SelectionRect } from "./command-input";
+import type { SelectionRect } from "./selection";
 
 const SELECTION_COLOR = new Color3(1, 0.86, 0.44);
 /** Edge length of the stand-in cube for actors without an appearance. */

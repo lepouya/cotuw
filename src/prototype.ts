@@ -318,7 +318,6 @@ export async function createTerrainPrototype(
         showActor(actorId);
       },
       onStart: () => {
-        input.cancelGesture();
         input.setBoxMode(false);
         input.setAdditiveMode(false);
         input.select(undefined);
@@ -347,18 +346,13 @@ export async function createTerrainPrototype(
     selectedActorId: () => input.selectedActorId,
     enabled: () => !simulationFaulted && !placement.active,
   });
-  view.camera.setTouchPanEnabled((event) => {
-    if (placement.active || simulationFaulted || input.boxMode) return false;
-    const bounds = canvas.getBoundingClientRect();
-    const pick = view.scene.pick(
-      event.clientX - bounds.left,
-      event.clientY - bounds.top,
-      (mesh) =>
-        actorViews.actorIdForMesh(mesh) !== undefined ||
-        tilePlacedViews.actorIdForMesh(mesh) !== undefined,
-    );
-    return !pick?.hit;
-  });
+  view.camera.setTouchPanFilter(
+    (event) =>
+      !placement.active &&
+      !simulationFaulted &&
+      !input.boxMode &&
+      input.actorIdAt(event.clientX, event.clientY) === undefined,
+  );
   const unitControls = createUnitControls(input, simulation, controls, {
     enabled: () => !placement.active && !simulationFaulted,
     changed: () => {
