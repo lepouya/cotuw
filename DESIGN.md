@@ -288,6 +288,7 @@ story.
   rejected move order briefly shows the same marker at its target.
 - The camera provides orthographic Isometric, Top-down, Grid, and Reset View
   presets. Preset and focus changes ease unless reduced motion is enabled.
+- Initial and reset views look 22.5 degrees east of north (NNE).
 - Camera zoom is measured in visible tile rows so framing is independent of map
   and tile size. New views show roughly 24 rows or fit a smaller map; resizing
   preserves the player's zoom. Direct panning has no momentum.

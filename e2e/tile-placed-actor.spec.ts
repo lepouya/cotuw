@@ -246,12 +246,19 @@ test("previews reject water, cliffs, and the playable-map boundary", async ({
         const map = createPrototypeMap();
         const point = map.tileCenter(x, z);
         const scene = EngineStore.Instances[0].scenes[0];
-        scene.activeCamera!.setTarget(
+        // View the cliff from its exposed side.
+        const camera =
+          scene.activeCamera as import("@babylonjs/core").ArcRotateCamera;
+        camera.alpha = -Math.PI / 4;
+        camera.setTarget(
           new Vector3(
             point.x,
             map.heightAtWorldPosition(point.x, point.z),
             point.z,
           ),
+          false,
+          false,
+          true,
         );
         await frames(2);
       },

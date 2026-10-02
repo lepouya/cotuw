@@ -83,24 +83,44 @@ test("zoom limits span a handful of tiles to the whole map", async ({
   await openHarness(page);
 
   const zoom = await page.evaluate(() => {
-    const { createTestView, viewHeight, wheel } = harness;
-    const { canvas, camera, dispose } = createTestView();
+    const { createTestView, viewHeight, wheel, projectToCanvas } = harness;
+    const { canvas, camera, map, scene, dispose } = createTestView();
 
     const initial = viewHeight(camera);
     wheel(canvas, -10_000);
     const closest = viewHeight(camera);
     wheel(canvas, 20_000);
     const furthest = viewHeight(camera);
+    scene.render();
+    const bounds = canvas.getBoundingClientRect();
+    const corners = [
+      map.worldPoint(0, 0, 0),
+      map.worldPoint(map.width, 0, 0),
+      map.worldPoint(0, map.height, 0),
+      map.worldPoint(map.width, map.height, 0),
+    ].map((point) => {
+      const projected = projectToCanvas(scene, canvas, point);
+      return {
+        x: (projected.x - bounds.left) / bounds.width,
+        y: (projected.y - bounds.top) / bounds.height,
+      };
+    });
 
     dispose();
-    return { initial, closest, furthest };
+    return { initial, closest, furthest, corners };
   });
 
   expect(zoom.initial).toBeCloseTo(24);
   expect(zoom.closest).toBeCloseTo(2);
-  // Far enough out for the whole 100 tile map, without a sea of empty space.
-  expect(zoom.furthest).toBeGreaterThan(100);
+  // The projected map size depends on the camera heading.
+  expect(zoom.furthest).toBeGreaterThan(zoom.initial);
   expect(zoom.furthest).toBeLessThan(140);
+  for (const corner of zoom.corners) {
+    expect(corner.x).toBeGreaterThan(0);
+    expect(corner.x).toBeLessThan(1);
+    expect(corner.y).toBeGreaterThan(0);
+    expect(corner.y).toBeLessThan(1);
+  }
 });
 
 test("wheel zoom normalizes line and page deltas to pixels", async ({

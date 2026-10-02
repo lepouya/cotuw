@@ -236,7 +236,8 @@ test("compact touch controls support additive and box selection, movement, and c
     await expect.poll(async () => (await selected(page)).length).toBe(3);
     expect(await cameraPose(page)).toEqual(before);
     await page.locator("#box-select").tap();
-    const destination = await terrainPoint(page, 52, 44);
+    // Keep the destination clear of the units' projected silhouettes.
+    const destination = await terrainPoint(page, 54, 49);
     await page.touchscreen.tap(destination.x, destination.y);
     await expect(page.locator("#movement-status")).toHaveText(
       "3 move orders accepted.",

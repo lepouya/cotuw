@@ -14,7 +14,8 @@ const INITIAL_VIEW_TILES = 24;
 const ZOOM_SENSITIVITY = 0.0015;
 /** Pixels per wheel line, for line-based deltas. */
 const WHEEL_LINE_PIXELS = 16;
-const INITIAL_ALPHA = -Math.PI / 4;
+// Look 22.5° east of north (+z).
+const INITIAL_ALPHA = (-5 * Math.PI) / 8;
 const INITIAL_BETA = Math.PI / 3.2;
 const LOWER_BETA_LIMIT = Math.PI / 7;
 const UPPER_BETA_LIMIT = Math.PI / 2.15;
