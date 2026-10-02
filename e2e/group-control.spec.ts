@@ -95,7 +95,7 @@ test.use({ deviceScaleFactor: 2 });
 test("box and additive selection control a mixed group with routes, separate destinations, Stop, and Clear", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   await trainTestUnits(page, [
     "trooper",
     "scout",
@@ -184,7 +184,7 @@ test("box and additive selection control a mixed group with routes, separate des
 });
 
 test("cancelled drags never select or move units", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   await trainTestUnits(page);
   await page.locator("#unit-roster button").first().click();
   const bounds = await groupBounds(page);
@@ -210,7 +210,7 @@ test("compact touch controls support additive and box selection, movement, and c
   });
   const page = await context.newPage();
   try {
-    await page.goto("/");
+    await page.goto("/?sandbox");
     // Use the same on-screen production controls without secondary clicks.
     await page.locator("#build-barracks").tap();
     const building = await terrainPoint(page, 49, 39);

@@ -886,20 +886,21 @@ export function createMissionSimulation({
       const economy = state.economy && structuredClone(state.economy);
       const retiredActorIds = [...state.retiredActorIds, id];
       if (economy) {
+        const interrupted = new Set(
+          economy.harvesters
+            .filter(
+              (worker) => worker.refineryId === id && worker.phase !== "idle",
+            )
+            .map((worker) => worker.actorId),
+        );
         removeEconomyActor(economy, id, (retiredId) =>
           retiredActorIds.push(retiredId),
         );
         const actors = state.actors.map((candidate) =>
           structuredClone(candidate),
         );
-        for (const worker of economy.harvesters) {
-          if (worker.phase === "unassigned") {
-            const candidate = actors.find(
-              (actor) => actor.id === worker.actorId,
-            );
-            if (candidate) delete candidate.movement;
-          }
-        }
+        for (const candidate of actors)
+          if (interrupted.has(candidate.id)) delete candidate.movement;
         state = {
           ...state,
           actors: freezeActors(actors.map((actor) => deepFreeze(actor))),

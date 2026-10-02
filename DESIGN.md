@@ -539,6 +539,53 @@ story.
   scrolls independently in compact landscape layouts. Placement controls stay
   available across tabs, and touch placement uses explicit confirmation.
 
+## Materials economy prototype
+
+- The default browser opening uses immutable, renderer-independent scenario
+  content with a fixed Command Center in the map-edge pocket. `/?sandbox`
+  selects the free construction and training sandbox.
+- The opening starts with 150 Materials. Prototype costs are 300 for a Command
+  Center, 100 for a Materials Refinery, 50 for a Harvester, 100 for a Field
+  Barracks, 25 for a Trooper, and 20 for a Scout. Unit training takes six, four,
+  and three seconds for Harvesters, Troopers, and Scouts respectively.
+- Buildings are placed instantly for their full cost. Construction timing,
+  infrastructure slots, support coverage, and disconnection remain pending.
+  The opening has no combat or mission result.
+- A Refinery has one paid production or assigned Harvester slot. Barracks
+  queues hold up to five paid orders and train one unit at a time. Cancelling
+  an unfinished order refunds its full cost. Completed production waits for
+  a free, passable adjacent exit; the paid order remains cancellable.
+- A Harvester carries 100 Materials and takes 60 seconds to gather a full
+  load, plus travel. It gathers the assigned tile, then resource tiles within
+  two tiles on each axis. Candidates use distance from the assigned tile,
+  then row and column order; Harvesters resolve shared yields in actor-ID
+  order. Resources enter the global stockpile only on delivery.
+- Move and Stop interrupt collection while preserving cargo. A new patch
+  order with cargo returns it first. Return cargo also works after Stop.
+  Exhaustion delivers any partial final load, then waits for a new patch.
+  Blocked routes wait for navigation changes or a new order.
+- A lost Refinery interrupts automation and frees its surviving Harvester for
+  assignment to an empty slot. The unit remains movable and keeps its cargo.
+  Producer loss discards paid production; cancelled identities remain retired.
+  Undamaged completed buildings sell for half their prototype cost; mobile
+  units cannot be sold. Health-scaled resale requires the combat system.
+- The near patch contains four 200-Materials tiles; the north patch contains
+  two. Three ordinary salvage tiles each grant 25 Materials to the first
+  mobile unit reaching them, without a delivery. Resource tiles and uncollected
+  salvage prevent placement. Depleted tiles become buildable.
+- The sidebar provides cargo, phase, Gather, Return cargo, Refinery assignment,
+  paid-order cancellation, patch totals, and salvage commands. The top bar
+  shows available Materials. Blue resource markers shrink in four stages and
+  disappear at depletion; gold salvage disappears on collection. Both appear
+  on the minimap. Exhaustion, missing assignments, blocked routes, and an
+  unaffordable harvesting recovery have explanatory feedback.
+- Mission snapshots include stockpiles, tile yields, collected salvage,
+  Harvester assignments, cargo, gathering progress, phases, routes, paid
+  production, pending commands, and reserved or retired actor identities.
+  Versioned JSON envelopes check scenario, tick rate, map dimensions, and
+  resource content before simulation validation. Manual save/load UI remains
+  pending.
+
 ## Milestone 0 playable slice
 
 M0 is a canon-compatible standalone ARC prototype, not the canonical first

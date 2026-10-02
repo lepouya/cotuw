@@ -26,7 +26,7 @@ test.use({ deviceScaleFactor: 2 });
 declare const harness: typeof import("./harness");
 
 async function openHarness(page: Page): Promise<void> {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
     Object.assign(window, { harness: await import(harnessPath) });
@@ -45,7 +45,7 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
     await route.continue();
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/?sandbox", { waitUntil: "domcontentloaded" });
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await expect(canvas).toHaveAttribute("data-actor-ready", "true");
@@ -91,7 +91,7 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
     await route.continue();
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/?sandbox", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-actor-ready",
     "true",

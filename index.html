@@ -16,7 +16,9 @@
         <header class="sidebar-header">
           <p class="eyebrow">Anomaly Response Command</p>
           <h1>Unquiet World</h1>
-          <p class="muted">Base &amp; infantry sandbox</p>
+          <p class="muted">
+            <span id="scenario-label">Base &amp; infantry sandbox</span>
+          </p>
         </header>
         <div class="sidebar-tabs" role="tablist" aria-label="Command panels">
           <button
@@ -69,6 +71,19 @@
             <p class="eyebrow">Current selection</p>
             <h2 id="selection-details">Nothing selected</h2>
             <p id="selection-info" class="muted"></p>
+            <section
+              id="harvester-actions"
+              hidden
+              aria-label="Harvesting controls"
+            >
+              <h3>Materials gathering</h3>
+              <p id="harvester-details" class="muted"></p>
+              <div id="gather-sites" class="actor-list"></div>
+              <h3>Assigned Refinery</h3>
+              <div id="refinery-assignments" class="actor-list"></div>
+              <div id="return-cargo-actions" class="actor-list"></div>
+              <p id="harvester-status" class="muted" role="status"></p>
+            </section>
             <button id="open-training" type="button" hidden>Train units</button>
             <button id="remove-building" type="button" disabled>
               Remove selected building
@@ -113,6 +128,16 @@
               aria-label="Unit training"
             ></div>
             <p id="production-status" class="muted" role="status"></p>
+            <div
+              id="production-queue"
+              class="actor-list"
+              aria-label="Paid production orders"
+            ></div>
+            <section id="economy-overview" hidden>
+              <h3>Materials sites &amp; salvage</h3>
+              <p id="economy-alert" class="muted" role="status"></p>
+              <div id="resource-overview" class="actor-list"></div>
+            </section>
             <h3>Field units</h3>
             <div
               id="unit-roster"
@@ -129,8 +154,10 @@
             <p class="eyebrow">Scenario goals</p>
             <h2>Build &amp; explore</h2>
             <p class="muted">
-              Practice construction and training. This sandbox has no victory or
-              defeat condition.
+              <span id="scenario-description"
+                >Practice construction and training. This sandbox has no victory
+                or defeat condition.</span
+              >
             </p>
             <ul id="scenario-goals" class="scenario-goals"></ul>
             <p class="muted">
@@ -176,7 +203,7 @@
           <p id="placement-status" class="muted" role="status"></p>
         </section>
         <footer class="sidebar-footer">
-          <p class="muted">
+          <p id="scenario-rules" class="muted">
             Instant construction &amp; training · No resource or power
             requirements
           </p>
@@ -187,6 +214,9 @@
         </footer>
       </aside>
       <div class="game-viewport">
+        <div id="resource-bar" class="resource-bar" hidden>
+          <strong>Materials <span id="materials-counter">0</span></strong>
+        </div>
         <canvas id="game-canvas" aria-label="Game world" tabindex="0"></canvas>
         <div
           id="camera-controls"

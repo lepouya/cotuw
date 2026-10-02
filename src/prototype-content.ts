@@ -1,7 +1,7 @@
+import { createRefineryDetails } from "./render/refinery";
 import { createBarracksDetails } from "./render/barracks";
 import { createCommandCenterDetails } from "./render/command-center";
 
-import type { ActorDefinition } from "./simulation/actor";
 import type { MovementProfile } from "./simulation/navigation";
 import type { ActorGraphics } from "./render/skinned-actor-appearance";
 import type { TilePlacedActorAppearance } from "./render";
@@ -16,54 +16,13 @@ export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
   },
 ];
 
-export const PROTOTYPE_ACTOR_DEFINITIONS = [
-  {
-    id: "arc-trooper",
-    behaviorId: "terrain-move",
-    movement: { speed: 4, profileId: "surface-ground", radius: 0.3 },
-  },
-  {
-    id: "arc-scout",
-    behaviorId: "terrain-move",
-    movement: { speed: 7, profileId: "surface-ground", radius: 0.28 },
-  },
-  {
-    id: "arc-command-center-prototype",
-    behaviorId: "idle",
-    footprint: {
-      layer: "surface",
-      occupiedTiles: [
-        { x: 0, z: 0 },
-        { x: 1, z: 0 },
-        { x: 0, z: 1 },
-        { x: 1, z: 1 },
-      ],
-      blocksMovement: true,
-    },
-    placement: {
-      terrainTypeIds: ["plain", "path", "rough"],
-      maxSlope: 0.75,
-    },
-  },
-  {
-    id: "arc-field-barracks",
-    behaviorId: "idle",
-    production: { unitDefinitionIds: ["arc-trooper", "arc-scout"] },
-    footprint: {
-      layer: "surface",
-      occupiedTiles: [
-        { x: 0, z: 0 },
-        { x: 1, z: 0 },
-        { x: 2, z: 0 },
-        { x: 0, z: 1 },
-        { x: 1, z: 1 },
-        { x: 2, z: 1 },
-      ],
-      blocksMovement: true,
-    },
-    placement: { terrainTypeIds: ["plain", "path", "rough"], maxSlope: 0.75 },
-  },
-] satisfies readonly ActorDefinition[];
+export { ARC_ACTOR_DEFINITIONS } from "./content/arc";
+import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
+
+export const PROTOTYPE_ACTOR_DEFINITIONS = ARC_ACTOR_DEFINITIONS.filter(
+  (definition) =>
+    !["arc-harvester", "arc-materials-refinery"].includes(definition.id),
+);
 
 /** Display names for the selection panel and placement status. */
 export const PROTOTYPE_ACTOR_PRESENTATIONS = new Map<string, ActorPresentation>(
@@ -102,6 +61,17 @@ export const PROTOTYPE_ACTOR_PRESENTATIONS = new Map<string, ActorPresentation>(
     ],
   ],
 );
+
+PROTOTYPE_ACTOR_PRESENTATIONS.set("arc-materials-refinery", {
+  name: "Materials Refinery",
+  description: "One assigned Harvester",
+  build: { id: "build-refinery", label: "Build Materials Refinery" },
+});
+PROTOTYPE_ACTOR_PRESENTATIONS.set("arc-harvester", {
+  name: "Harvester",
+  description: "Collects and delivers Materials",
+  train: { id: "train-harvester", label: "Produce Harvester" },
+});
 
 export const PROTOTYPE_ACTOR_NAMES = new Map(
   [...PROTOTYPE_ACTOR_PRESENTATIONS].map(([id, { name }]) => [id, name]),
@@ -171,3 +141,10 @@ export const PROTOTYPE_TILE_PLACED_APPEARANCES = new Map<
     },
   ],
 ]);
+
+PROTOTYPE_TILE_PLACED_APPEARANCES.set("arc-materials-refinery", {
+  height: 0.45,
+  color: [0.45, 0.38, 0.22],
+  minimapColor: [0.85, 0.65, 0.2],
+  createDetails: createRefineryDetails,
+});

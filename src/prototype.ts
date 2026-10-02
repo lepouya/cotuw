@@ -1,3 +1,17 @@
+import { createScenarioState } from "./simulation/scenario";
+import { createEconomyControls } from "./ui/economy-controls";
+import { createMaterialsSitesView } from "./render/materials-sites";
+import { createHarvesterAppearance } from "./render/harvester";
+import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
+import type { ScenarioDefinition } from "./simulation/scenario";
+import type { MissionState } from "./simulation/mission";
+import {
+  PROTOTYPE_MAP_SIZE,
+  WATER_HALF_WIDTH,
+  WATER_CENTER,
+  prototypeTerrainAt,
+  prototypeHeightAt,
+} from "./content/prototype-terrain";
 // Throwaway prototype code: a sample map and the scene that shows it.
 // Replace this with real game setup once the prototype has served its purpose.
 import {
@@ -58,11 +72,8 @@ import type { ActorAppearance, GameView, GameViewOptions } from "./render";
 import type { ActorRenderState } from "./simulation/actor";
 import type { BuildingPlacementControls } from "./render/building-placement";
 
-const TILE_COUNT = 100;
+const TILE_COUNT = PROTOTYPE_MAP_SIZE;
 const TILE_SIZE = 1;
-/** Tiles from the pond's midline to its bank. */
-const WATER_HALF_WIDTH = 10;
-const WATER_CENTER = { x: 42, z: 58 };
 /** Water opacity at the midline and at the last tile before the bank. */
 const WATER_DEEP_ALPHA = 0.98;
 const WATER_SHORE_ALPHA = 0.06;
@@ -83,6 +94,9 @@ export type TerrainPrototypeControls = BuildingPlacementControls &
   UnitTrainingControls &
   UnitControls & {
     buildings?: readonly DefinitionButton[];
+    scenario?: ScenarioDefinition;
+    economyRoot?: HTMLElement;
+    state?: MissionState;
     onReady?: (session: TerrainPrototype) => void;
     onDispose?: () => void;
     /** Updates after simulation ticks or changes to controls and selection. */
@@ -165,10 +179,17 @@ export async function createTerrainPrototype(
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
+  const definitions = controls.scenario
+    ? ARC_ACTOR_DEFINITIONS
+    : PROTOTYPE_ACTOR_DEFINITIONS;
   createTerrainMeshes(view.scene, map);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
-    state: createMissionState([]),
+    state:
+      controls.state ??
+      (controls.scenario
+        ? createScenarioState(controls.scenario, definitions)
+        : createMissionState([])),
     behaviorRegistry: new Map([
       [
         "terrain-move",
@@ -177,17 +198,23 @@ export async function createTerrainPrototype(
       ["idle", { handleCommand: () => false, update: () => {} }],
     ]),
     bounds: map.worldBounds,
-    definitions: PROTOTYPE_ACTOR_DEFINITIONS,
+    definitions,
     tickSeconds: SIMULATION_TICK_SECONDS,
     map,
     occupancy,
   });
   const appearances = createPrototypeStandInAppearances(view.scene);
+  if (simulation.economy)
+    appearances.set("arc-harvester", createHarvesterAppearance(view.scene));
+  const materialsView =
+    simulation.economy &&
+    createMaterialsSitesView(view.scene, map, simulation.economy);
+  if (controls.scenario) view.camera.focusOnTile(15, 50);
   const actorViews = createActorViewRegistry(view.scene, map, appearances);
   const tilePlacedViews = createTilePlacedActorViewRegistry(
     view.scene,
     map,
-    PROTOTYPE_ACTOR_DEFINITIONS,
+    definitions,
     PROTOTYPE_TILE_PLACED_APPEARANCES,
   );
   const movementPath = createMovementPathView(view.scene, map);
@@ -205,10 +232,7 @@ export async function createTerrainPrototype(
     return partitioned;
   };
   const definitionsById = new Map(
-    PROTOTYPE_ACTOR_DEFINITIONS.map((definition) => [
-      definition.id,
-      definition,
-    ]),
+    definitions.map((definition) => [definition.id, definition]),
   );
   actorViews.update(actorsByKind().mobile, 1);
   tilePlacedViews.update(actorsByKind().placed);
@@ -230,7 +254,30 @@ export async function createTerrainPrototype(
       );
     },
     submitCommand: (command) => {
-      if (!simulationFaulted) simulation.submitCommand(command);
+      if (simulationFaulted) return;
+      if (
+        command.kind === "move" &&
+        simulation.economy?.harvesters.some(
+          (worker) => worker.actorId === command.actorId,
+        )
+      ) {
+        const tile = map.tileAtWorldPosition(
+          command.target.x,
+          command.target.z,
+        );
+        const site = simulation.economy.sites.find(
+          (site) => site.tile.x === tile.x && site.tile.z === tile.z,
+        );
+        if (site) {
+          simulation.submitCommand({
+            kind: "gather",
+            actorId: command.actorId,
+            siteId: site.id,
+          });
+          return;
+        }
+      }
+      simulation.submitCommand(command);
     },
     onWorldSelectionChanged: (ids) => {
       if (ids[0]) showActor(ids[0]);
@@ -250,6 +297,21 @@ export async function createTerrainPrototype(
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
     // Structures first, so unit markers draw over them.
     actors: () => [
+      ...(simulation.economy?.sites
+        .filter((site) => site.remainingMaterials > 0)
+        .map((site) => ({
+          id: `materials-${site.id}`,
+          worldPosition: map.tileCenter(site.tile.x, site.tile.z),
+          tiles: [site.tile],
+          color: [0.3, 0.66, 0.75] as [number, number, number],
+        })) ?? []),
+      ...(simulation.economy?.loot
+        .filter((loot) => !loot.collected)
+        .map((loot) => ({
+          id: `materials-${loot.id}`,
+          worldPosition: map.tileCenter(loot.tile.x, loot.tile.z),
+          color: [0.88, 0.65, 0.2] as [number, number, number],
+        })) ?? []),
       ...actorsByKind().placed.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
@@ -284,6 +346,7 @@ export async function createTerrainPrototype(
       !placement.active;
     if (controls.remove) controls.remove.disabled = !canRemove;
     training.refresh();
+    economyControls?.refresh();
     controls.onStateChanged?.({
       actors: simulation.actors,
       actorVersion: simulation.actorVersion,
@@ -293,6 +356,7 @@ export async function createTerrainPrototype(
       placementActive: placement.active,
       faulted: simulationFaulted,
       canRemove,
+      materials: simulation.economy?.materials,
     });
     knownControlsTick = simulation.completedTicks;
     knownPlacementActive = placement.active;
@@ -304,16 +368,16 @@ export async function createTerrainPrototype(
     map,
     simulation,
     {
-      buildings: PROTOTYPE_ACTOR_DEFINITIONS.filter(
-        (definition) => definition.footprint,
-      ).map((definition) => ({
-        definition,
-        appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(definition.id)!,
-        name: PROTOTYPE_ACTOR_NAMES.get(definition.id)!,
-        build: controls.buildings?.find(
-          ({ definitionId }) => definitionId === definition.id,
-        )?.button,
-      })),
+      buildings: definitions
+        .filter((definition) => definition.footprint)
+        .map((definition) => ({
+          definition,
+          appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(definition.id)!,
+          name: PROTOTYPE_ACTOR_NAMES.get(definition.id)!,
+          build: controls.buildings?.find(
+            ({ definitionId }) => definitionId === definition.id,
+          )?.button,
+        })),
       controls,
       onPlaced: (actorId) => {
         input.select(actorId);
@@ -338,7 +402,10 @@ export async function createTerrainPrototype(
     )
       return;
     pendingRemovalId = actor.id;
-    simulation.submitCommand({ kind: "remove-actor", actorId: actor.id });
+    simulation.submitCommand({
+      kind: simulation.economy ? "sell-actor" : "remove-actor",
+      actorId: actor.id,
+    });
     controlsDirty = true;
     if (controls.remove) controls.remove.disabled = true;
   };
@@ -348,6 +415,18 @@ export async function createTerrainPrototype(
     selectedActorId: () => input.selectedActorId,
     enabled: () => !simulationFaulted && !placement.active,
   });
+  const economyRoot = controls.economyRoot;
+  const economyControls =
+    simulation.economy && economyRoot
+      ? createEconomyControls(economyRoot, simulation, {
+          definitions,
+          names: PROTOTYPE_ACTOR_NAMES,
+          selectedActorId: () => input.selectedActorId,
+          enabled: () => !simulationFaulted && !placement.active,
+          focus: (tile) => view.camera.focusOnTile(tile.x, tile.z),
+          positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
+        })
+      : undefined;
   view.camera.setTouchPanFilter(
     (event) =>
       !placement.active &&
@@ -390,6 +469,7 @@ export async function createTerrainPrototype(
       for (const outcome of outcomes) {
         placement.onOutcome(outcome);
         training.onOutcome(outcome);
+        economyControls?.onOutcome(outcome);
         const { command, accepted } = outcome;
         if (command.kind === "train-unit")
           canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
@@ -399,11 +479,15 @@ export async function createTerrainPrototype(
           else movementPath.showRejectedTarget(command.actorId, command.target);
         }
         if (
-          command.kind === "remove-actor" &&
+          (command.kind === "remove-actor" || command.kind === "sell-actor") &&
           command.actorId === pendingRemovalId
         )
           pendingRemovalId = undefined;
-        if (command.kind === "place-actor" || command.kind === "remove-actor") {
+        if (
+          command.kind === "place-actor" ||
+          command.kind === "remove-actor" ||
+          command.kind === "sell-actor"
+        ) {
           canvas.dataset.tilePlacedActorCommand = accepted
             ? "accepted"
             : "rejected";
@@ -423,6 +507,7 @@ export async function createTerrainPrototype(
       minimap.refreshActors();
     }
     if (placement.active) placement.update();
+    if (simulation.economy) materialsView?.update(simulation.economy);
     if (
       controlsDirty ||
       simulation.completedTicks !== knownControlsTick ||
@@ -448,6 +533,8 @@ export async function createTerrainPrototype(
     placement.dispose();
     controls.remove?.removeEventListener("click", removeSelected);
     training.dispose();
+    economyControls?.dispose();
+    materialsView?.dispose();
     controls.onDispose?.();
     view.scene.onBeforeRenderObservable.remove(renderObserver);
     actorViews.dispose();
@@ -586,35 +673,6 @@ export function createPrototypeMap(): TerrainMap {
       return layers;
     },
   });
-}
-
-/** Authored semantics stay independent of Babylon terrain layers. */
-function prototypeTerrainAt(x: number, z: number) {
-  const border = x < 3 || z < 3 || x >= TILE_COUNT - 3 || z >= TILE_COUNT - 3;
-  const pond =
-    Math.hypot(x + 0.5 - WATER_CENTER.x, z + 0.5 - WATER_CENTER.z) <
-    WATER_HALF_WIDTH;
-  const path =
-    (z >= 31 && z <= 34 && x >= 8 && x <= 91) ||
-    (z >= 67 && z <= 70 && x >= 20 && x <= 91) ||
-    (x >= 82 && x <= 85 && z >= 32 && z <= 69);
-  const rough = x >= 40 && x <= 57 && z >= 45 && z <= 61;
-
-  return {
-    typeId: pond ? "water" : path ? "path" : rough ? "rough" : "plain",
-    outOfBounds: border || undefined,
-  };
-}
-
-/** A gentle hill plus a high ridge with two deliberately legible crossings. */
-function prototypeHeightAt(x: number, z: number): number {
-  const hillDistance = Math.hypot(x - 39, z - 47);
-  const hill = Math.max(0, 1 - hillDistance / 18) ** 2 * 3.5;
-  const inRidge = x >= 61 && x <= 65 && z >= 12 && z <= 88;
-  const inCrossing = (z >= 30 && z <= 36) || (z >= 66 && z <= 72);
-  const ridge = inRidge && !inCrossing ? 6 : 0;
-  const rolling = Math.sin(x * 0.13) * 0.08 + Math.cos(z * 0.11) * 0.07;
-  return hill + ridge + rolling;
 }
 
 /**

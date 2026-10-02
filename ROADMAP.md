@@ -100,7 +100,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Playable-slice integration
 
-- [ ] 0.34 Define immutable scenario content and mutable, stable-ID runtime
+- [x] 0.34 Define immutable scenario content and mutable, stable-ID runtime
       state that can round-trip through serialization before mission content is
       locked.
 - [ ] 0.35 Add the fixed Command Center, Materials Refinery, Harvester, Field
@@ -136,6 +136,12 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [ ] 0.47 Replace the prototype bindings with the locked mouse, keyboard, and
       touch controls; camera presets; smooth Focus and Follow; and
       reduced-motion behavior.
+
+- [x] 0.53 Add a paid Materials economy opening with a fixed Command Center,
+      Refinery, Harvester, global stockpile, finite patches, automated delivery,
+      depletion feedback, reassignment, ordinary salvage, and building resale.
+      Include timed five-item production, cancellation refunds, blocked-exit
+      waiting, serializable economy state, and mouse and compact touch checks.
 
 ### Playable-slice verification
 

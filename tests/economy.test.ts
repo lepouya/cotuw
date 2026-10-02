@@ -327,6 +327,25 @@ describe("Materials economy", () => {
     expect(worker(restored).cargo).toBe(0);
   });
 
+  test("scripted removal preserves unrelated unassigned movement", () => {
+    const { simulation, map } = workerFixture();
+    simulation.removeActor("refinery");
+    command(simulation, {
+      kind: "move",
+      actorId: "worker",
+      target: map.tileCenter(20, 10),
+    });
+    const route = simulation.actorById("worker")!.movement;
+    expect(route).toBeDefined();
+    simulation.removeActor("cc");
+    expect(simulation.actorById("worker")!.movement).toEqual(route);
+    const restored = fixture(simulation.snapshot()).simulation;
+    until(restored, () => !restored.actorById("worker")!.movement);
+    expect(restored.actorById("worker")!.worldPosition).toEqual(
+      map.tileCenter(20, 10),
+    );
+  });
+
   test("manual Return cargo works after stopping and sale excludes mobile actors", () => {
     const { simulation } = workerFixture();
     command(simulation, gather());

@@ -29,13 +29,29 @@ npm run test:visual # browser screenshot checks
 npm run check      # required before completing a coding task
 ```
 
-The browser sandbox starts empty. Use **Buildings** in the left sidebar to
-place a **Command Center** or **Field Barracks** on clear terrain. Use
-**Rotate** or `R` to rotate and **Cancel** or `Esc` to exit placement. Touch
-uses a terrain tap followed by **Place building**. Select a barracks, open
-**Units**, and train **Troopers** or **Scouts**; they appear on free, passable
-tiles beside it. Move units away if the exits become blocked. Construction and
-training are instant and have no resource or power requirements.
+The default browser opening starts with a fixed **Command Center** and 150
+**Materials**. Build a **Materials Refinery** for 100, select it, and produce
+its **Harvester** for 50. Select the Harvester in **Units**, then use **Gather
+Near Materials** in **Selection** or click a blue resource tile. It gathers
+100 Materials in 60 seconds, returns to its Refinery, deposits, and repeats.
+Build a **Field Barracks** for 100, then train **Troopers** for 25 or **Scouts**
+for 20. The top bar shows available Materials; cargo counts separately.
+
+**Selection** provides Return cargo and Refinery assignment. Move and Stop
+interrupt gathering and keep cargo. Exhausted patches prompt reassignment.
+**Units** lists resource sites and salvage: select a mobile unit, then use
+**Collect salvage** to gather it without a delivery. Paid production orders
+show remaining time and a Cancel action with a full refund. A Refinery has
+one Harvester slot; a Barracks has five outstanding orders. Blocked exits
+hold finished production until a tile is cleared. Buildings sell for half
+cost. Construction is instant; support coverage and construction timers are
+still pending. This opening has no combat, victory, or defeat condition.
+
+Open `/?sandbox` for the empty, free construction and infantry sandbox.
+Use **Buildings** to place structures on clear terrain. Use **Rotate** or `R`
+to rotate and **Cancel** or `Esc` to exit placement. Touch uses a terrain tap
+followed by **Place building**. Construction and training in this sandbox are
+instant and have no resource or power requirements.
 
 Click or tap to select an actor. Shift-click or **Add units** toggles units in
 and out of the selection. Primary drag selects mobile units; touch uses **Box
@@ -47,9 +63,9 @@ Secondary drag pans the camera; Shift-secondary drag rotates. Touch drags on
 empty terrain pan when Box select is off. The world also provides camera pan,
 rotation, zoom, and reset buttons.
 
-**Selection** shows the selected actor or group and lets you remove buildings.
+**Selection** shows the selected actor or group and building actions.
 **Units** also lists buildings that train units and the units in the field.
-**Goals** shows sandbox practice goals and current counts.
+**Goals** shows construction and training goals and current counts.
 **Building idle animation** controls rooftop equipment.
 
 The visual tests start the Vite app in headless Chromium. They check the

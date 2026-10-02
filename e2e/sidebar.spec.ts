@@ -10,7 +10,7 @@ import type {
 test("starts empty with a reserved sidebar and builds and trains through its tabs", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
   await expect(page.locator("#tab-buildings")).toHaveAttribute(
@@ -104,7 +104,7 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
 test("blocked exits disable training until a unit moves away", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
@@ -141,7 +141,7 @@ test("compact touch layout can build a barracks and train both unit types", asyn
   });
   const page = await context.newPage();
   try {
-    await page.goto("/");
+    await page.goto("/?sandbox");
     await expect(page.locator("#game-canvas")).toHaveAttribute(
       "data-terrain-ready",
       "true",
@@ -177,7 +177,7 @@ test("compact touch layout can build a barracks and train both unit types", asyn
 test("sidebar derives custom content and can be disposed and recreated", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   const result = await page.evaluate(async () => {
     const path: string = "/src/ui/sidebar.ts";
     const { createSidebar } = await import(path);
@@ -325,7 +325,7 @@ test("sidebar derives custom content and can be disposed and recreated", async (
 test("prototype controls skip unchanged frames and removal works without a sidebar", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   const result = await page.evaluate(async () => {
     const prototypePath: string = "/src/prototype.ts";
     const placementPath: string = "/src/simulation/placement.ts";

@@ -1,3 +1,5 @@
+import { ECONOMY_SCENARIO } from "./content/economy-scenario";
+import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
 import "./styles.css";
 import { createTerrainPrototype } from "./prototype";
 import {
@@ -12,17 +14,46 @@ import type { TerrainPrototype } from "./prototype";
 const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
 const minimap = document.querySelector<HTMLCanvasElement>("#minimap")!;
 let session: TerrainPrototype | undefined;
+const sandbox = new URLSearchParams(location.search).has("sandbox");
+const scenario = sandbox ? undefined : ECONOMY_SCENARIO;
+const definitions = sandbox
+  ? PROTOTYPE_ACTOR_DEFINITIONS
+  : ARC_ACTOR_DEFINITIONS;
 const sidebar = createSidebar(
   document.querySelector<HTMLElement>("#game-sidebar")!,
   {
-    definitions: PROTOTYPE_ACTOR_DEFINITIONS,
+    definitions,
+    economy: !sandbox,
     presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
-    goals: PROTOTYPE_GOALS,
+    goals: sandbox
+      ? PROTOTYPE_GOALS
+      : [
+          {
+            definitionId: "arc-materials-refinery",
+            label: "Build a Materials Refinery",
+          },
+          { definitionId: "arc-harvester", label: "Produce a Harvester" },
+          {
+            definitionId: "arc-field-barracks",
+            label: "Build a Field Barracks",
+          },
+          { definitionId: "arc-trooper", label: "Train a Trooper" },
+        ],
     selectActor: (id, additive) => session?.selectActor(id, additive),
   },
 );
+if (!sandbox) {
+  document.querySelector("#resource-bar")!.removeAttribute("hidden");
+  document.querySelector("#economy-overview")!.removeAttribute("hidden");
+  document.querySelector("#scenario-label")!.textContent = "Materials economy";
+  document.querySelector("#scenario-description")!.textContent =
+    "Build a Refinery, produce its Harvester, gather Materials, then fund a Barracks and Troopers. No victory or defeat condition.";
+  document.querySelector("#scenario-rules")!.textContent =
+    "Paid construction · Timed production · Sell buildings for half their cost";
+}
 createTerrainPrototype(canvas, minimap, {
   ...sidebar.controls,
+  scenario,
   cameraControls: document.querySelector<HTMLElement>("#camera-controls")!,
   onStateChanged: sidebar.update,
   showActor: sidebar.showActor,

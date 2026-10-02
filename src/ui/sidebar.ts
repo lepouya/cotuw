@@ -28,6 +28,7 @@ export type SidebarState = {
   placementActive: boolean;
   faulted: boolean;
   canRemove: boolean;
+  materials?: number;
 };
 
 /** Tabs and actor lists present committed simulation state only. */
@@ -35,6 +36,7 @@ export function createSidebar(
   root: HTMLElement,
   options: {
     definitions: readonly ActorDefinition[];
+    economy?: boolean;
     presentations: ReadonlyMap<string, ActorPresentation>;
     goals: readonly SidebarGoal[];
     selectActor: (id: string, additive?: boolean) => void;
@@ -114,7 +116,7 @@ export function createSidebar(
         button: optionButton(
           element("building-options"),
           presentation.build,
-          `${description} · ${footprintSize(definition.footprint.occupiedTiles)} tiles`,
+          `${description} · ${footprintSize(definition.footprint.occupiedTiles)} tiles${options.economy ? ` · ${definition.materialsCost ?? 0} Materials` : ""}`,
         ),
       });
     }
@@ -122,7 +124,7 @@ export function createSidebar(
       const button = optionButton(
         element("training-options"),
         presentation.train,
-        `${presentation.description} · Speed ${definition.movement.speed}`,
+        `${presentation.description} · Speed ${definition.movement.speed}${options.economy ? ` · ${definition.materialsCost ?? 0} Materials · ${definition.trainingSeconds ?? 0}s` : ""}`,
       );
       button.disabled = true;
       train.push({ definitionId: definition.id, button });
@@ -242,6 +244,7 @@ export function createSidebar(
   );
   return {
     controls: {
+      economyRoot: options.economy ? root : undefined,
       buildings,
       train,
       remove,
@@ -261,6 +264,20 @@ export function createSidebar(
     update: (state: SidebarState) => {
       placementActions.hidden = !state.placementActive;
       remove.disabled = !state.canRemove;
+      if (state.materials !== undefined) {
+        const counter = document.querySelector("#materials-counter");
+        if (counter && counter.textContent !== String(state.materials))
+          counter.textContent = String(state.materials);
+        for (const { definitionId, button } of buildings) {
+          const cost = definitionById.get(definitionId)?.materialsCost ?? 0;
+          button.disabled =
+            state.placementActive || state.faulted || state.materials < cost;
+          button.title =
+            state.materials < cost
+              ? `Need ${cost} Materials; available ${state.materials}.`
+              : "";
+        }
+      }
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
       remove.hidden = !state.actors.some(

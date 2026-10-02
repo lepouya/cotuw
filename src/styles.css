@@ -325,3 +325,21 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.resource-bar {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #d8bd79;
+  border-radius: 0.25rem;
+  color: #eac97f;
+  background: rgb(20 39 41 / 95%);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+#production-queue:not(:empty),
+#return-cargo-actions {
+  margin-block: 0.75rem;
+}

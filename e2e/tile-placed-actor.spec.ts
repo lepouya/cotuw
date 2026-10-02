@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
 
 async function ready(page: Page) {
-  await page.goto("/");
+  await page.goto("/?sandbox");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-tile-placed-actor-ready",
     "true",
