@@ -10,14 +10,40 @@
     <main class="game-shell">
       <canvas id="game-canvas"></canvas>
       <section class="terrain-hud">
-        <p class="eyebrow">Terrain prototype</p>
+        <p class="eyebrow">ARC placement sandbox</p>
         <h1>Unquiet World</h1>
         <p>100 * 100 tiles · shared corner heights</p>
         <p class="controls">
-          Click the trooper to select · Click terrain to move · Drag to pan ·
-          Right-drag to orbit · Scroll to zoom
+          Click units or buildings to select · Click terrain to move a unit ·
+          Drag to pan · Right-drag to orbit · Scroll to zoom
         </p>
-        <button id="toggle-blocker" type="button">Remove 2×2 blocker</button>
+        <div
+          class="building-controls"
+          role="group"
+          aria-label="Building placement"
+        >
+          <button id="build-command-center" type="button">
+            Place Command Center
+          </button>
+          <button id="rotate-building" type="button" disabled>
+            Rotate 90° (R)
+          </button>
+          <button id="confirm-building" type="button" disabled>
+            Place building
+          </button>
+          <button id="cancel-building" type="button" disabled>
+            Cancel (Esc)
+          </button>
+        </div>
+        <p id="placement-status" role="status"></p>
+        <p id="selection-details">Nothing selected</p>
+        <button id="remove-building" type="button" disabled>
+          Remove selected building
+        </button>
+        <label class="animation-control">
+          <input id="animate-building" type="checkbox" checked /> Building idle
+          animation
+        </label>
       </section>
       <canvas id="minimap" class="minimap"></canvas>
     </main>

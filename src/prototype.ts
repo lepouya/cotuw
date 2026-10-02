@@ -32,6 +32,11 @@ import {
   validateActorGraphics,
 } from "./render/skinned-actor-appearance";
 import { startSimulationLoop } from "./simulation/loop";
+import {
+  createBuildingPlacement,
+  footprintSize,
+} from "./render/building-placement";
+import { createCommandCenterDetails } from "./render/command-center";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import {
   createMissionSimulation,
@@ -50,6 +55,7 @@ import type { MovementProfile } from "./simulation/navigation";
 import type { ActorGraphics } from "./render/skinned-actor-appearance";
 import type { TilePlacedActorAppearance } from "./render";
 import type { ActorPlacement } from "./simulation/placement";
+import type { BuildingPlacementControls } from "./render/building-placement";
 
 const TILE_COUNT = 100;
 const TILE_SIZE = 1;
@@ -67,8 +73,10 @@ const SIMULATION_PUMP_MILLISECONDS = 4;
 const MAX_CATCH_UP_SECONDS = 5;
 const PROTOTYPE_BLOCKER_ORIGIN = { x: 49, z: 39 };
 
-export type TerrainPrototypeControls = {
-  blockerToggle?: HTMLButtonElement;
+export type TerrainPrototypeControls = BuildingPlacementControls & {
+  remove?: HTMLButtonElement;
+  selection?: HTMLElement;
+  animate?: HTMLInputElement;
 };
 
 export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
@@ -111,6 +119,13 @@ export const PROTOTYPE_ACTOR_DEFINITIONS = [
   },
 ] satisfies readonly ActorDefinition[];
 
+/** Display names for the selection panel and placement status. */
+export const PROTOTYPE_ACTOR_NAMES = new Map([
+  ["arc-trooper", "Trooper"],
+  ["arc-scout", "Scout"],
+  ["arc-command-center-prototype", "Command Center"],
+]);
+
 export const PROTOTYPE_ACTOR_GRAPHICS = new Map<string, ActorGraphics>([
   [
     "arc-trooper",
@@ -149,9 +164,10 @@ export const PROTOTYPE_TILE_PLACED_APPEARANCES = new Map<
   [
     "arc-command-center-prototype",
     {
-      height: 2.4,
+      height: 0.3,
       color: [0.28, 0.38, 0.42],
       minimapColor: [0.36, 0.7, 0.76],
+      createDetails: createCommandCenterDetails,
     },
   ],
 ]);
@@ -222,7 +238,7 @@ export const PROTOTYPE_VIEW_OPTIONS = {
 export async function createTerrainPrototype(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
-  { blockerToggle }: TerrainPrototypeControls = {},
+  controls: TerrainPrototypeControls = {},
 ): Promise<GameView> {
   const map = createPrototypeMap();
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
@@ -276,16 +292,24 @@ export async function createTerrainPrototype(
   tilePlacedViews.update(actorsByKind().placed);
   let simulationFaulted = false;
   const input = createCommandInput(canvas, view.scene, {
-    actorIdForMesh: actorViews.actorIdForMesh,
+    actorIdForMesh: (mesh) =>
+      actorViews.actorIdForMesh(mesh) ?? tilePlacedViews.actorIdForMesh(mesh),
+    enabled: () => !placement.active,
+    canMove: (actorId) => {
+      const actor = simulation.actorById(actorId);
+      return !!actor && !isTilePlacedActor(actor);
+    },
     submitCommand: (command) => {
       if (!simulationFaulted) simulation.submitCommand(command);
     },
     onSelectionChanged: (actorId) => {
       actorViews.setSelectedActor(actorId);
+      tilePlacedViews.setSelectedActor(actorId);
       movementPath.setSelectedActor(actorId);
       minimap.refreshActors();
       canvas.dataset.actorSelected = String(actorId !== undefined);
       canvas.dataset.selectedActor = actorId ?? "";
+      refreshSelectionControls(actorId);
     },
   });
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
@@ -300,6 +324,7 @@ export async function createTerrainPrototype(
         ),
         color: PROTOTYPE_TILE_PLACED_APPEARANCES.get(actor.definitionId)
           ?.minimapColor,
+        selected: actor.id === input.selectedActorId,
       })),
       ...actorsByKind().mobile.map((actor) => ({
         id: actor.id,
@@ -309,42 +334,68 @@ export async function createTerrainPrototype(
       })),
     ],
   });
+  let pendingRemovalId: string | undefined;
+  const refreshSelectionControls = (actorId = input.selectedActorId) => {
+    const actor = actorId ? simulation.actorById(actorId) : undefined;
+    const building = !!actor && isTilePlacedActor(actor);
+    if (controls.remove) {
+      controls.remove.disabled =
+        !building ||
+        pendingRemovalId !== undefined ||
+        simulationFaulted ||
+        placement.active;
+    }
+    if (controls.selection) {
+      const name = actor
+        ? (PROTOTYPE_ACTOR_NAMES.get(actor.definitionId) ?? actor.definitionId)
+        : "Nothing selected";
+      controls.selection.textContent = building
+        ? [
+            name,
+            footprintSize(
+              occupiedTilesFor(actor, definitionsById.get(actor.definitionId)!),
+            ),
+            `${actor.tilePlacement.quarterTurns * 90}°`,
+          ].join(" · ")
+        : name;
+    }
+  };
+  const placedDefinitionId = "arc-command-center-prototype";
+  const placement = createBuildingPlacement(
+    canvas,
+    view.scene,
+    map,
+    simulation,
+    {
+      definition: definitionsById.get(placedDefinitionId)!,
+      appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(placedDefinitionId)!,
+      name: PROTOTYPE_ACTOR_NAMES.get(placedDefinitionId)!,
+      controls,
+      onPlaced: (actorId) => input.select(actorId),
+      onStart: () => input.select(undefined),
+    },
+  );
   input.select(undefined);
-  let nextBlockerId = 1;
-  let activeBlockerId = "prototype-command-center-0";
-  let blockerCommandPending = false;
-  const updateBlockerToggle = () => {
-    if (!blockerToggle) {
+  const removeSelected = () => {
+    const actorId = input.selectedActorId;
+    const actor = actorId ? simulation.actorById(actorId) : undefined;
+    if (
+      !actor ||
+      !isTilePlacedActor(actor) ||
+      pendingRemovalId !== undefined ||
+      simulationFaulted ||
+      placement.active
+    )
       return;
-    }
-    blockerToggle.textContent =
-      simulation.actorById(activeBlockerId) !== undefined
-        ? "Remove 2×2 blocker"
-        : "Place 2×2 blocker";
-    blockerToggle.disabled = blockerCommandPending || simulationFaulted;
+    pendingRemovalId = actor.id;
+    simulation.submitCommand({ kind: "remove-actor", actorId: actor.id });
+    refreshSelectionControls();
   };
-  const toggleBlocker = () => {
-    if (blockerCommandPending || simulationFaulted) {
-      return;
-    }
-    blockerCommandPending = true;
-    const current = simulation.actorById(activeBlockerId);
-    if (current) {
-      simulation.submitCommand({
-        kind: "remove-actor",
-        actorId: current.id,
-      });
-    } else {
-      activeBlockerId = `prototype-command-center-${nextBlockerId++}`;
-      simulation.submitCommand({
-        kind: "place-actor",
-        ...blockerPlacement(activeBlockerId),
-      });
-    }
-    updateBlockerToggle();
-  };
-  blockerToggle?.addEventListener("click", toggleBlocker);
-  updateBlockerToggle();
+  controls.remove?.addEventListener("click", removeSelected);
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  if (controls.animate) controls.animate.checked = !reducedMotion.matches;
+  let idleSeconds = 0;
+  let previousFrameTime = performance.now();
   let knownActorVersion = simulation.actorVersion;
 
   const loop = startSimulationLoop(simulation, {
@@ -353,13 +404,15 @@ export async function createTerrainPrototype(
     beforeTick: () => actorViews.capturePreviousPoses(actorsByKind().mobile),
     onFault: () => {
       simulationFaulted = true;
-      blockerCommandPending = false;
-      updateBlockerToggle();
+      placement.fault();
+      refreshSelectionControls();
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
       minimap.refreshActors();
-      for (const { command, accepted } of outcomes) {
+      for (const outcome of outcomes) {
+        placement.onOutcome(outcome);
+        const { command, accepted } = outcome;
         if (command.kind === "move") {
           canvas.dataset.moveStatus = accepted ? "accepted" : "unreachable";
           if (!accepted) {
@@ -369,12 +422,16 @@ export async function createTerrainPrototype(
         if (accepted && command.kind === "move") {
           canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
         }
+        if (
+          command.kind === "remove-actor" &&
+          command.actorId === pendingRemovalId
+        )
+          pendingRemovalId = undefined;
         if (command.kind === "place-actor" || command.kind === "remove-actor") {
-          blockerCommandPending = false;
           canvas.dataset.tilePlacedActorCommand = accepted
             ? "accepted"
             : "rejected";
-          updateBlockerToggle();
+          refreshSelectionControls();
         }
       }
     },
@@ -392,9 +449,16 @@ export async function createTerrainPrototype(
       const { placed } = actorsByKind();
       tilePlacedViews.update(placed);
       canvas.dataset.tilePlacedActorCount = String(placed.length);
-      updateBlockerToggle();
+      refreshSelectionControls();
       minimap.refreshActors();
     }
+    placement.update();
+    const frameTime = performance.now();
+    if (controls.animate?.checked ?? !reducedMotion.matches) {
+      idleSeconds += (frameTime - previousFrameTime) / 1000;
+    }
+    previousFrameTime = frameTime;
+    tilePlacedViews.animate(idleSeconds);
     const { mobile } = actorsByKind();
     actorViews.update(mobile, loop.tickProgress());
     movementPath.update(mobile);
@@ -403,7 +467,8 @@ export async function createTerrainPrototype(
     loop.stop();
     simulation.dispose();
     input.dispose();
-    blockerToggle?.removeEventListener("click", toggleBlocker);
+    placement.dispose();
+    controls.remove?.removeEventListener("click", removeSelected);
     view.scene.onBeforeRenderObservable.remove(renderObserver);
     actorViews.dispose();
     tilePlacedViews.dispose();
@@ -482,7 +547,7 @@ function createPrototypeActors(map: TerrainMap): Actor[] {
       definitionId: "arc-scout",
       worldPosition: map.tileCenter(55, 45),
     }),
-    createPrototypeBlocker(map, "prototype-command-center-0"),
+    createPrototypeBlocker(map, "arc-command-center-prototype-0"),
   ];
 }
 

@@ -69,6 +69,9 @@ base-building RTS loop, its technical architecture, and its player interface.
       footprint and terrain.
 - [x] 0.25 Include occupied structure tiles in placement and path-finding
       constraints.
+- [x] 0.51 Add a placement sandbox with rotated terrain previews, rejection
+      feedback, building selection and removal, and an articulated prototype
+      Command Center with renderer-owned idle animation.
 - [ ] 0.26 Replace the selection spike with persistent individual-selection
       state and production visual feedback.
 - [ ] 0.27 Support selecting multiple actors by additive selection and drag-box

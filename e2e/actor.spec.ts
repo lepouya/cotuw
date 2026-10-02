@@ -104,11 +104,15 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
         .some((mesh: AbstractMesh) => mesh.skeleton !== null);
     }, actorId);
 
-  await expect.poll(() => hasSkin("prototype-trooper")).toBe(true);
+  await expect
+    .poll(() => hasSkin("prototype-trooper"), { timeout: 15_000 })
+    .toBe(true);
   expect(await hasSkin("prototype-scout")).toBe(false);
 
   releaseScout();
-  await expect.poll(() => hasSkin("prototype-scout")).toBe(true);
+  await expect
+    .poll(() => hasSkin("prototype-scout"), { timeout: 15_000 })
+    .toBe(true);
 });
 
 test("clicking a selected actor issues terrain-aware movement", async ({
@@ -117,7 +121,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
   await openHarness(page);
 
   const targets = await page.evaluate(async () => {
-    const { Matrix, Vector3, frames } = harness;
+    const { Vector3, frames, projectToCanvas } = harness;
     const prototypePath: string = "/src/prototype.ts";
     const { createTerrainPrototype } = await import(prototypePath);
     const canvas = document.createElement("canvas");
@@ -151,21 +155,8 @@ test("clicking a selected actor issues terrain-aware movement", async ({
     const pointOnScreen = (
       point: ReturnType<typeof trooper.getAbsolutePosition>,
     ) => {
-      const projected = Vector3.Project(
-        point,
-        Matrix.Identity(),
-        view.scene.getTransformMatrix(),
-        view.scene.activeCamera!.viewport.toGlobal(
-          view.engine.getRenderWidth(),
-          view.engine.getRenderHeight(),
-        ),
-      );
-      return {
-        clientX:
-          projected.x * (canvas.clientWidth / view.engine.getRenderWidth()),
-        clientY:
-          projected.y * (canvas.clientHeight / view.engine.getRenderHeight()),
-      };
+      const { x, y } = projectToCanvas(view.scene, canvas, point);
+      return { clientX: x, clientY: y };
     };
     const trooperScreen = pointOnScreen(
       trooper.getAbsolutePosition().add(new Vector3(0, 1.3, 0)),

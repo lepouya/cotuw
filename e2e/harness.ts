@@ -1,6 +1,6 @@
 // Runs inside the page under test: the specs load it through the Vite dev
 // server, so its imports resolve to the same module instances as the app's.
-import { Color3, Color4, Vector3 } from "@babylonjs/core";
+import { Color3, Color4, Matrix, Vector3 } from "@babylonjs/core";
 
 import { TerrainMap } from "../src/map";
 import {
@@ -9,7 +9,7 @@ import {
   createTerrainMeshes,
 } from "../src/render";
 
-import type { ArcRotateCamera } from "@babylonjs/core";
+import type { ArcRotateCamera, Scene } from "@babylonjs/core";
 import type { TerrainMapOptions, TileType } from "../src/map";
 import type { GameViewOptions } from "../src/render";
 
@@ -152,6 +152,29 @@ export async function frames(count = 2): Promise<void> {
       requestAnimationFrame(() => resolve()),
     );
   }
+}
+
+/** World point in page CSS pixels, including the canvas's position. */
+export function projectToCanvas(
+  scene: Scene,
+  canvas: HTMLCanvasElement,
+  point: Vector3,
+) {
+  const engine = scene.getEngine();
+  const projected = Vector3.Project(
+    point,
+    Matrix.Identity(),
+    scene.getTransformMatrix(),
+    scene.activeCamera!.viewport.toGlobal(
+      engine.getRenderWidth(),
+      engine.getRenderHeight(),
+    ),
+  );
+  const bounds = canvas.getBoundingClientRect();
+  return {
+    x: bounds.left + (projected.x * bounds.width) / engine.getRenderWidth(),
+    y: bounds.top + (projected.y * bounds.height) / engine.getRenderHeight(),
+  };
 }
 
 /** Tiles visible across the viewport's height. */

@@ -272,6 +272,8 @@ story.
   secondary drag rotates. Every secondary action has an on-screen alternative.
 - Touch uses taps, one-finger empty-world panning, explicit box-selection and
   queued-order modes, and on-screen camera controls.
+- Building placement shows a semi-transparent model at its proposed position
+  and orientation alongside the terrain footprint and placement validity.
 - Move, Attack, Attack Move, Clear, Gather, Collect, Board, Unload, Focus, and
   Follow appear only where applicable and use shape as well as color.
 - A selected mobile actor with an active route shows a ground-hugging dotted

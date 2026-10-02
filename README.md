@@ -29,6 +29,14 @@ npm run test:visual # browser screenshot checks
 npm run check      # required before completing a coding task
 ```
 
+The browser prototype includes a building-placement sandbox. Choose **Place
+Command Center**, point at terrain to preview its semi-transparent model and
+footprint, and click to place.
+Use **Rotate** or `R` to rotate and **Cancel** or `Esc` to exit placement. Touch
+uses a terrain tap followed by **Place building**. Select a building to see its
+footprint and orientation or remove it. **Building idle animation** controls the
+prototype's rooftop equipment. Placement is instant and has no resource cost.
+
 The visual tests start the Vite app in headless Chromium. They check the
 camera, terrain rendering, terrain editing, and texture behavior, some through
 canvas screenshots and some through in-page helpers in `e2e/harness.ts`. They
