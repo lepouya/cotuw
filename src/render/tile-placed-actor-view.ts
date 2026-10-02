@@ -3,13 +3,15 @@ import {
   MeshBuilder,
   StandardMaterial,
   TransformNode,
+  Vector3,
 } from "@babylonjs/core";
 
-import { occupiedTilesFor } from "../simulation/placement";
+import { occupiedTilesFor, tilePlacedPose } from "../simulation/placement";
 import { createViewRegistry } from "./view-registry";
 import { isRgb } from "./color";
+import { createFootprintOverlay } from "./footprint-overlay";
 
-import type { Scene } from "@babylonjs/core";
+import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
@@ -20,11 +22,33 @@ const EDGE_INSET_TILES = 0.06;
 const DEFAULT_HEIGHT = 1.5;
 const DEFAULT_COLOR: Rgb = [0.35, 0.42, 0.46];
 
+/**
+ * Returns the registry's material for this definition and name, calling
+ * `configure` only when first creating it. The registry disposes it.
+ */
+export type SharedMaterial = (
+  name: string,
+  configure: (material: StandardMaterial) => void,
+) => StandardMaterial;
+
+/** The root is untransformed; center and roof use world coordinates. */
+export type TilePlacedActorDetailsFactory = (
+  root: TransformNode,
+  placement: {
+    center: Vector3;
+    roof: number;
+    tileSize: number;
+    facing: number;
+  },
+  material: SharedMaterial,
+) => { update: (elapsedSeconds: number) => void; dispose: () => void };
+
 /** Renderer-owned presentation for one tile-placed actor definition. */
 export type TilePlacedActorAppearance = {
   height: number;
   color: Rgb;
   minimapColor?: Rgb;
+  createDetails?: TilePlacedActorDetailsFactory;
 };
 
 export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
@@ -34,6 +58,9 @@ export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
 
 export type TilePlacedActorViewRegistry = {
   update: (actors: readonly TilePlacedActorState[]) => void;
+  animate: (elapsedSeconds: number) => void;
+  actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
+  setSelectedActor: (actorId: string | undefined) => void;
   dispose: () => void;
 };
 
@@ -46,6 +73,7 @@ export function createTilePlacedActorViewRegistry(
   map: TerrainMap,
   definitions: readonly ActorDefinition[],
   appearances: TilePlacedActorAppearanceCatalog,
+  { preview = false }: { preview?: boolean } = {},
 ): TilePlacedActorViewRegistry {
   for (const [definitionId, appearance] of appearances) {
     if (
@@ -63,27 +91,83 @@ export function createTilePlacedActorViewRegistry(
     definitions.map((definition) => [definition.id, definition]),
   );
   const materials = new Map<string, StandardMaterial>();
-
-  const materialFor = (definitionId: string) => {
-    let material = materials.get(definitionId);
-    if (!material) {
-      material = new StandardMaterial(
-        `tile-placed-actor-${definitionId}-material`,
-        scene,
+  const actorIds = new WeakMap<TransformNode, string>();
+  let actors: readonly TilePlacedActorState[] = [];
+  let selectedActorId: string | undefined;
+  let selection: ReturnType<typeof createFootprintOverlay> | undefined;
+  let selectionKey = "";
+  const terrainRevisions = new Map<string, number>();
+  let terrainRevision = 0;
+  let terrainDirty = false;
+  const terrainObserver = map.onChangedObservable.add((bounds) => {
+    terrainRevision += 1;
+    for (const actor of actors) {
+      const tiles = occupiedTilesFor(
+        actor,
+        definitionsById.get(actor.definitionId)!,
       );
-      material.diffuseColor = new Color3(
-        ...(appearances.get(definitionId)?.color ?? DEFAULT_COLOR),
-      );
-      material.specularColor = new Color3(0.16, 0.18, 0.19);
-      materials.set(definitionId, material);
+      if (
+        tiles.some(
+          ({ x, z }) =>
+            x >= bounds.minX &&
+            x <= bounds.maxX &&
+            z >= bounds.minZ &&
+            z <= bounds.maxZ,
+        )
+      ) {
+        terrainRevisions.set(actor.id, terrainRevision);
+        terrainDirty = true;
+      }
     }
-    return material;
+  });
+  const refreshSelection = () => {
+    const actor = actors.find(({ id }) => id === selectedActorId);
+    const key = actor
+      ? JSON.stringify([
+          actor,
+          map.navigationChanges.generation,
+          terrainRevisions.get(actor.id),
+        ])
+      : "";
+    if (key === selectionKey) return;
+    selection?.dispose();
+    selection = actor
+      ? createFootprintOverlay(
+          scene,
+          map,
+          occupiedTilesFor(actor, definitionsById.get(actor.definitionId)!),
+          { name: "building-selection", color: new Color3(1, 0.78, 0.24) },
+        )
+      : undefined;
+    selectionKey = key;
   };
+
+  const materialFor =
+    (definitionId: string): SharedMaterial =>
+    (name, configure) => {
+      const key = JSON.stringify([definitionId, name]);
+      let material = materials.get(key);
+      if (!material) {
+        material = new StandardMaterial(
+          `tile-placed-actor-${definitionId}-${name}`,
+          scene,
+        );
+        configure(material);
+        materials.set(key, material);
+      }
+      return material;
+    };
+  // Extend edge heights so rejected off-map previews can still be drawn.
+  const heightAt = (x: number, z: number) =>
+    map.heightAt(
+      preview ? Math.max(0, Math.min(map.width, x)) : x,
+      preview ? Math.max(0, Math.min(map.height, z)) : z,
+    );
   const cornerHeights = ({ x, z }: TileCoord) => [
-    map.heightAt(x, z),
-    map.heightAt(x + 1, z),
-    map.heightAt(x, z + 1),
-    map.heightAt(x + 1, z + 1),
+    heightAt(x, z),
+    heightAt(x + 1, z),
+    heightAt(x, z + 1),
+    heightAt(x + 1, z + 1),
   ];
 
   // One column per occupied tile, from its lowest corner to a shared roof, so
@@ -96,7 +180,14 @@ export function createTilePlacedActorViewRegistry(
       );
     }
     const root = new TransformNode(`tile-placed-actor-${actor.id}-root`, scene);
-    const material = materialFor(definition.id);
+    if (!preview) actorIds.set(root, actor.id);
+    const shared = materialFor(definition.id);
+    const body = shared("material", (material) => {
+      material.diffuseColor = new Color3(
+        ...(appearances.get(definition.id)?.color ?? DEFAULT_COLOR),
+      );
+      material.specularColor = new Color3(0.16, 0.18, 0.19);
+    });
     const tiles = occupiedTilesFor(actor, definition);
     const occupied = new Set(tiles.map(({ x, z }) => `${x},${z}`));
     const roof =
@@ -127,24 +218,80 @@ export function createTilePlacedActorViewRegistry(
         (low.y + roof) / 2,
         (minZ + maxZ) / 2,
       );
-      column.material = material;
+      column.material = body;
     }
-    return root;
+    const { worldPosition, facing } = tilePlacedPose(map, actor, definition);
+    const details = appearances.get(definition.id)?.createDetails?.(
+      root,
+      {
+        center: new Vector3(worldPosition.x, roof, worldPosition.z),
+        roof,
+        tileSize: map.tileSize,
+        facing,
+      },
+      shared,
+    );
+    if (preview) {
+      for (const mesh of root.getChildMeshes()) {
+        mesh.isPickable = false;
+        if (mesh.material) mesh.material.alpha = 0.42;
+      }
+    }
+    return {
+      root,
+      details,
+      dispose: () => {
+        details?.dispose();
+        root.dispose();
+      },
+    };
   };
   // Restoration can reuse an ID at another placement or change its terrain.
   const roots = createViewRegistry({
-    keyFor: ({ definitionId, tilePlacement }: TilePlacedActorState) =>
+    keyFor: ({ id, definitionId, tilePlacement }: TilePlacedActorState) =>
       JSON.stringify([
         definitionId,
         tilePlacement,
         map.navigationChanges.generation,
+        terrainRevisions.get(id),
       ]),
     create,
   });
 
+  const update = (nextActors: readonly TilePlacedActorState[]) => {
+    actors = nextActors;
+    roots.sync(actors);
+    for (const id of terrainRevisions.keys()) {
+      if (!roots.has(id)) terrainRevisions.delete(id);
+    }
+    refreshSelection();
+    terrainDirty = false;
+  };
   return {
-    update: roots.sync,
+    update,
+    animate: (seconds) => {
+      if (terrainDirty) update(actors);
+      for (const view of roots.values()) view.details?.update(seconds);
+    },
+    actorIdForMesh: (mesh) => {
+      for (
+        let node = mesh as TransformNode | null;
+        node;
+        node = node.parent as TransformNode | null
+      ) {
+        const id = actorIds.get(node);
+        if (id && roots.get(id)?.root === node) return id;
+      }
+      return undefined;
+    },
+    setSelectedActor: (actorId) => {
+      selectedActorId = actorId;
+      refreshSelection();
+    },
     dispose: () => {
+      map.onChangedObservable.remove(terrainObserver);
+      terrainRevisions.clear();
+      selection?.dispose();
       roots.dispose();
       for (const material of materials.values()) {
         material.dispose();
