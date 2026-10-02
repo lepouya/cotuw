@@ -1,4 +1,8 @@
-import { isTilePlacedActor, occupiedTilesFor } from "../simulation/placement";
+import {
+  isMobileActor,
+  isTilePlacedActor,
+  occupiedTilesFor,
+} from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
@@ -262,7 +266,8 @@ export function createSidebar(
       remove.hidden = !state.actors.some(
         (actor) => selected.has(actor.id) && isTilePlacedActor(actor),
       );
-      const nextSelectionKey = JSON.stringify(ids);
+      // Box mode changes how terrain taps behave, so it changes the hint.
+      const nextSelectionKey = JSON.stringify([ids, state.boxMode ?? false]);
       const unavailable = state.placementActive || state.faulted;
       boxSelect.disabled = unavailable;
       addSelection.disabled = unavailable;
@@ -276,7 +281,7 @@ export function createSidebar(
         !state.actors.some(
           (actor) =>
             selected.has(actor.id) &&
-            definitionById.get(actor.definitionId)?.movement,
+            isMobileActor(actor, definitionById.get(actor.definitionId)),
         );
       clearSelection.disabled = unavailable || ids.length === 0;
       const membershipChanged = state.actorVersion !== actorVersion;
@@ -318,6 +323,10 @@ export function createSidebar(
         const definition = actor && definitionById.get(actor.definitionId)!;
         const presentation = actor && presentations.get(actor.definitionId);
         trainingLink.hidden = !definition?.production;
+        const moveSubject = ids.length > 1 ? "the group" : "this unit";
+        const moveHint = state.boxMode
+          ? `Turn off Box select to move ${moveSubject}.`
+          : `Tap or click terrain to move ${moveSubject}.`;
         if (ids.length > 1) {
           const counts = new Map<string, number>();
           for (const id of ids) {
@@ -329,7 +338,7 @@ export function createSidebar(
               );
           }
           selectionDetails.textContent = `${ids.length} units selected`;
-          selectionInfo.textContent = `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. Tap or click terrain to move the group.`;
+          selectionInfo.textContent = `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. ${moveHint}`;
           return;
         }
         selectionDetails.textContent = actor
@@ -343,7 +352,7 @@ export function createSidebar(
             ? `${presentation?.description ?? "Unit production"} · Trains ${namesFor(definition).join(" and ")}.`
             : isTilePlacedActor(actor)
               ? `${presentation?.description ?? "Building"} · Select Buildings to expand your base.`
-              : `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · Click terrain to move.`;
+              : `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · ${moveHint}`;
       }
     },
     dispose: () => controller.abort(),

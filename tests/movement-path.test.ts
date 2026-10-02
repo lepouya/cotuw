@@ -232,6 +232,53 @@ describe("movement path view", () => {
     engine.dispose();
   });
 
+  test("selected actors sharing a blocked group click share one marker", () => {
+    const { engine, scene, view } = setup();
+    const actor = movingActor();
+    const requested = {
+      ...actor,
+      movement: { ...actor.movement!, requestedTarget: { x: 3, z: 3 } },
+    };
+    view.setSelectedActors(["trooper", "scout"]);
+    view.showRejectedTarget("scout", { x: 3, z: 3 });
+    view.update([requested, { ...requested, id: "scout" }]);
+    expect(
+      scene.meshes.filter(({ name }) => name === "movement-path-unreachable"),
+    ).toHaveLength(1);
+    const marker = scene.getMeshByName("movement-path-unreachable")!;
+    view.setSelectedActors(["trooper"]);
+    expect(scene.getMeshByName("movement-path-unreachable")).toBe(marker);
+    view.setSelectedActors([]);
+    expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
+    expect(scene.getMeshByName("movement-path-unreachable-cross")).toBeNull();
+    view.dispose();
+    engine.dispose();
+  });
+
+  test("changing a blocked group click preserves the resolved route geometry", () => {
+    const { engine, scene, view } = setup();
+    const actor = movingActor();
+    view.update([
+      {
+        ...actor,
+        movement: { ...actor.movement!, requestedTarget: { x: 3, z: 3 } },
+      },
+    ]);
+    const route = scene.getMeshByName("movement-path-route")!;
+    const marker = scene.getMeshByName("movement-path-unreachable")!;
+    view.update([
+      {
+        ...actor,
+        movement: { ...actor.movement!, requestedTarget: { x: 4, z: 3 } },
+      },
+    ]);
+    expect(scene.getMeshByName("movement-path-route")).toBe(route);
+    expect(marker.isDisposed()).toBe(true);
+    expect(scene.getMeshByName("movement-path-unreachable")).not.toBeNull();
+    view.dispose();
+    engine.dispose();
+  });
+
   test("clears the tracker when selection or movement ends", () => {
     const { engine, scene, view } = setup();
     view.update([movingActor()]);

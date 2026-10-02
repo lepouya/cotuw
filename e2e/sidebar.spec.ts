@@ -51,6 +51,14 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
   await expect(page.locator("#selection-info")).toContainText(
     "Movement speed 7",
   );
+  await page.locator("#box-select").click();
+  await expect(page.locator("#selection-info")).toContainText(
+    "Turn off Box select to move this unit.",
+  );
+  await page.locator("#box-select").click();
+  await expect(page.locator("#selection-info")).toContainText(
+    "Tap or click terrain to move this unit.",
+  );
   await expect(page.locator("#remove-building")).toBeDisabled();
   await expect(page.locator("#unit-roster button")).toHaveText([
     "Trooper · 1",

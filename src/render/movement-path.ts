@@ -33,7 +33,7 @@ type ActiveMovement = NonNullable<ActorRenderState["movement"]>;
 type Route = {
   actorId: string;
   movement: ActiveMovement;
-  markers: LinesMesh[];
+  destinationMarker?: LinesMesh;
   line?: LinesMesh;
   /** Dashes from the destination back towards where the route was drawn. */
   dashes: Vector3[][];
@@ -46,7 +46,8 @@ type Route = {
 
 /**
  * Draws selected actors' remaining routes and resolved destinations. Dashes
- * stay fixed on the ground and disappear as the actor passes them.
+ * stay fixed on the ground and disappear as the actor passes them. Actors
+ * sharing a blocked target share one marker.
  */
 export function createMovementPathView(
   scene: Scene,
@@ -56,41 +57,58 @@ export function createMovementPathView(
   const routes = new Map<string, Route>();
   const rejected = new Map<
     string,
-    { target: WorldPosition; seconds: number; markers: LinesMesh[] }
+    { target: WorldPosition; seconds: number }
   >();
+  const blockedMarkers = new Map<string, LinesMesh[]>();
   let disposed = false;
   const clearRoute = (id: string) => {
     const route = routes.get(id);
     route?.line?.dispose();
-    for (const marker of route?.markers ?? []) marker.dispose();
+    route?.destinationMarker?.dispose();
     routes.delete(id);
   };
-  const clearRejected = (id: string) => {
-    for (const marker of rejected.get(id)?.markers ?? []) marker.dispose();
-    rejected.delete(id);
+  const clearBlockedMarker = (key: string) => {
+    for (const marker of blockedMarkers.get(key) ?? []) marker.dispose();
+    blockedMarkers.delete(key);
+  };
+  const syncBlockedMarkers = () => {
+    const targets = new Map<string, WorldPosition>();
+    const mark = (target: WorldPosition) =>
+      targets.set(`${target.x},${target.z}`, target);
+    for (const { movement } of routes.values())
+      if (
+        movement.blocked ||
+        movement.reachedTarget === false ||
+        movement.requestedTarget
+      )
+        mark(movement.requestedTarget ?? movement.target);
+    for (const { target } of rejected.values()) mark(target);
+    for (const key of blockedMarkers.keys())
+      if (!targets.has(key)) clearBlockedMarker(key);
+    for (const [key, target] of targets)
+      if (!blockedMarkers.has(key))
+        blockedMarkers.set(
+          key,
+          createBlockedMarker(scene, map, target, groundOffset(map)),
+        );
   };
   const setSelectedActors = (ids: readonly string[]) => {
     selected = new Set(ids);
     for (const id of routes.keys()) if (!selected.has(id)) clearRoute(id);
-    for (const id of rejected.keys()) if (!selected.has(id)) clearRejected(id);
+    for (const id of rejected.keys())
+      if (!selected.has(id)) rejected.delete(id);
+    syncBlockedMarkers();
   };
+  // Markers are recreated on the next update.
   const refreshGroundGeometry = () => {
     for (const id of routes.keys()) clearRoute(id);
-    for (const entry of rejected.values()) {
-      for (const marker of entry.markers) marker.dispose();
-      entry.markers = createBlockedMarker(
-        scene,
-        map,
-        entry.target,
-        groundOffset(map),
-      );
-    }
+    for (const key of blockedMarkers.keys()) clearBlockedMarker(key);
   };
   const update = (actors: readonly ActorRenderState[]) => {
     const present = new Set(actors.map(({ id }) => id));
     for (const [id, entry] of rejected) {
       entry.seconds -= scene.getEngine().getDeltaTime() / 1000;
-      if (entry.seconds <= 0 || !present.has(id)) clearRejected(id);
+      if (entry.seconds <= 0 || !present.has(id)) rejected.delete(id);
     }
     for (const id of routes.keys()) if (!present.has(id)) clearRoute(id);
     for (const actor of actors) {
@@ -110,14 +128,17 @@ export function createMovementPathView(
         route = createRoute(scene, map, actor, movement);
         routes.set(actor.id, route);
       }
+      route.movement = movement;
       trimRoute(scene, route, actor, movement);
     }
+    syncBlockedMarkers();
   };
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     for (const id of routes.keys()) clearRoute(id);
-    for (const id of rejected.keys()) clearRejected(id);
+    for (const key of blockedMarkers.keys()) clearBlockedMarker(key);
+    rejected.clear();
     map.onChangedObservable.remove(terrainChangeObserver);
     scene.onDisposeObservable.remove(sceneDisposeObserver);
   };
@@ -131,12 +152,11 @@ export function createMovementPathView(
     setSelectedActors,
     showRejectedTarget: (id, target) => {
       if (!selected.has(id)) return;
-      clearRejected(id);
       rejected.set(id, {
         target: { ...target },
         seconds: REJECTED_MARKER_SECONDS,
-        markers: createBlockedMarker(scene, map, target, groundOffset(map)),
       });
+      syncBlockedMarkers();
     },
     update,
   };
@@ -153,10 +173,6 @@ function isSameRoute(
   return (
     route.actorId === actorId &&
     samePoint(previous.target, movement.target) &&
-    (previous.requestedTarget === undefined
-      ? movement.requestedTarget === undefined
-      : movement.requestedTarget !== undefined &&
-        samePoint(previous.requestedTarget, movement.requestedTarget)) &&
     samePoint(previous.destination!, movement.destination!) &&
     previous.reachedTarget === movement.reachedTarget &&
     previous.blocked === movement.blocked &&
@@ -178,41 +194,21 @@ function createRoute(
   const route: Route = {
     actorId: actor.id,
     movement,
-    markers: [],
     dashes: [],
     dashEnds: [],
     waypointDistances: [],
     visibleDashes: 0,
   };
-  if (movement.blocked) {
-    route.markers = createBlockedMarker(
-      scene,
-      map,
-      movement.requestedTarget ?? movement.target,
-      offset,
-    );
-    return route;
-  }
-  route.markers.push(
-    createGroundRing(
-      scene,
-      map,
-      "movement-path-destination",
-      movement.destination!,
-      PATH_COLOR,
-      offset,
-    ),
+  // The view draws the blocked marker, which actors may share.
+  if (movement.blocked) return route;
+  route.destinationMarker = createGroundRing(
+    scene,
+    map,
+    "movement-path-destination",
+    movement.destination!,
+    PATH_COLOR,
+    offset,
   );
-  if (movement.reachedTarget === false || movement.requestedTarget) {
-    route.markers.push(
-      ...createBlockedMarker(
-        scene,
-        map,
-        movement.requestedTarget ?? movement.target,
-        offset,
-      ),
-    );
-  }
 
   const distances = Array.from({ length: waypoints.length }, () => 0);
   for (let index = waypoints.length - 2; index >= 0; index -= 1) {
