@@ -78,6 +78,12 @@ export const trainingTicks = (
   tickSeconds: number,
 ) => Math.max(1, Math.ceil((definition.trainingSeconds ?? 0) / tickSeconds));
 
+export const constructionTicks = (
+  definition: ActorDefinition,
+  tickSeconds: number,
+) =>
+  Math.max(1, Math.ceil((definition.constructionSeconds ?? 0) / tickSeconds));
+
 export function validateEconomyDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,
 ): void {
@@ -90,6 +96,15 @@ export function validateEconomyDefinitions(
           definition.trainingSeconds < 0))
     )
       throw new RangeError(`Invalid economy definition: ${definition.id}.`);
+    if (
+      definition.constructionSeconds !== undefined &&
+      (!definition.footprint ||
+        !Number.isFinite(definition.constructionSeconds) ||
+        definition.constructionSeconds < 0)
+    )
+      throw new RangeError(
+        `Invalid construction definition: ${definition.id}.`,
+      );
     for (const id of definition.production?.unitDefinitionIds ?? []) {
       if (
         definitions.get(id)?.harvesting &&
@@ -216,6 +231,7 @@ export function validateEconomyState(
       if (
         !refinery ||
         !isTilePlacedActor(refinery) ||
+        refinery.construction !== undefined ||
         definitions.get(refinery.definitionId)?.refinery
           ?.harvesterDefinitionId !== actor!.definitionId ||
         assigned.has(worker.refineryId)
@@ -239,6 +255,7 @@ export function validateEconomyState(
     const unit = job && definitions.get(job.definitionId);
     if (
       !producer ||
+      producer.construction !== undefined ||
       !unit ||
       typeof job.actorId !== "string" ||
       !job.actorId ||
@@ -316,6 +333,7 @@ export function applyEconomyCommand(
     const refinery = actors.find((actor) => actor.id === command.refineryId);
     if (
       !refinery ||
+      refinery.construction !== undefined ||
       definitions.get(refinery.definitionId)?.refinery
         ?.harvesterDefinitionId !== actor.definitionId
     )
@@ -377,6 +395,15 @@ export function updateEconomy(
   world: EconomyWorld,
 ): void {
   const { actors, definitions, map, tickSeconds, move } = world;
+  // Actor insertion order is the paid blueprint queue order.
+  const building = actors.find((actor) => actor.construction);
+  if (building?.construction) {
+    building.construction.completedTicks += 1;
+    if (
+      building.construction.completedTicks === building.construction.totalTicks
+    )
+      delete building.construction;
+  }
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const producers = [
     ...new Set(economy.production.map((job) => job.producerId)),

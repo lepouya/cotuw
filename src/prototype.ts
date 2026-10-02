@@ -403,7 +403,11 @@ export async function createTerrainPrototype(
       return;
     pendingRemovalId = actor.id;
     simulation.submitCommand({
-      kind: simulation.economy ? "sell-actor" : "remove-actor",
+      kind: actor.construction
+        ? "cancel-construction"
+        : simulation.economy
+          ? "sell-actor"
+          : "remove-actor",
       actorId: actor.id,
     });
     controlsDirty = true;
@@ -479,14 +483,17 @@ export async function createTerrainPrototype(
           else movementPath.showRejectedTarget(command.actorId, command.target);
         }
         if (
-          (command.kind === "remove-actor" || command.kind === "sell-actor") &&
+          (command.kind === "remove-actor" ||
+            command.kind === "sell-actor" ||
+            command.kind === "cancel-construction") &&
           command.actorId === pendingRemovalId
         )
           pendingRemovalId = undefined;
         if (
           command.kind === "place-actor" ||
           command.kind === "remove-actor" ||
-          command.kind === "sell-actor"
+          command.kind === "sell-actor" ||
+          command.kind === "cancel-construction"
         ) {
           canvas.dataset.tilePlacedActorCommand = accepted
             ? "accepted"
@@ -507,7 +514,11 @@ export async function createTerrainPrototype(
       minimap.refreshActors();
     }
     if (placement.active) placement.update();
-    if (simulation.economy) materialsView?.update(simulation.economy);
+    if (simulation.economy) {
+      materialsView?.update(simulation.economy);
+      if (simulation.completedTicks !== knownControlsTick)
+        tilePlacedViews.update(actorsByKind().placed);
+    }
     if (
       controlsDirty ||
       simulation.completedTicks !== knownControlsTick ||

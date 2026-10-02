@@ -112,7 +112,9 @@ export function createEconomyControls(
         element("harvester-details").textContent =
           `Cargo ${worker.cargo}/${capacity} · ${phases[worker.phase]}`;
         const refineries = simulation.actors.filter(
-          (actor) => definitions.get(actor.definitionId)?.refinery,
+          (actor) =>
+            !actor.construction &&
+            definitions.get(actor.definitionId)?.refinery,
         );
         sync(
           element("refinery-assignments"),
@@ -160,6 +162,32 @@ export function createEconomyControls(
           },
         ]);
       }
+      const construction = simulation.actors.filter(
+        (actor) => actor.construction,
+      );
+      const remaining = (actor: (typeof construction)[number]) =>
+        Math.ceil(
+          (actor.construction!.totalTicks -
+            actor.construction!.completedTicks) *
+            simulation.tickSeconds,
+        );
+      sync(
+        element("construction-queue"),
+        construction.map((actor, index) => ({
+          key: `construction:${actor.id}`,
+          text: `${options.names.get(actor.definitionId)} · ${index ? "Queued · " : "Building · "}${remaining(actor)}s remaining · Cancel (+${actor.construction!.paidMaterials})`,
+          disabled: !enabled,
+          action: () =>
+            submit({ kind: "cancel-construction", actorId: actor.id }),
+        })),
+      );
+      const selectedConstruction = construction.find(
+        (actor) => actor.id === id,
+      );
+      const constructionDetails = element("construction-details");
+      constructionDetails.hidden = !selectedConstruction;
+      if (selectedConstruction)
+        constructionDetails.textContent = `${construction[0] === selectedConstruction ? "Building" : "Queued for construction"} · ${remaining(selectedConstruction)}s remaining`;
       const jobs = economy.production.filter((job) => job.producerId === id);
       const mobile = simulation.actors.find(
         (actor) =>
@@ -238,26 +266,32 @@ export function createEconomyControls(
           : warning.phase === "unassigned"
             ? "Unassigned Harvester: select it and choose an empty Refinery."
             : "Harvesting route blocked: clear the route or reassign the Harvester."
-        : idleWorker
-          ? idleWorker.cargo
-            ? "Idle Harvester: return its cargo or assign a Materials patch."
-            : "Select the idle Harvester and choose Gather in Selection."
-          : economy.harvesters.length ||
-              economy.production.some(
-                (job) => definitions.get(job.definitionId)?.harvesting,
-              )
-            ? "A full load takes 60 seconds, plus travel. Materials arrive on delivery."
-            : affordable
-              ? emptyRefinery
-                ? "Select an empty Refinery and produce its Harvester."
-                : "Build a Refinery, then produce its Harvester."
-              : "Economy stalled: find Materials salvage or sell a building to recover.";
+        : construction.some(
+              (actor) => definitions.get(actor.definitionId)?.refinery,
+            )
+          ? "Refinery under construction. Produce its Harvester when it finishes."
+          : idleWorker
+            ? idleWorker.cargo
+              ? "Idle Harvester: return its cargo or assign a Materials patch."
+              : "Select the idle Harvester and choose Gather in Selection."
+            : economy.harvesters.length ||
+                economy.production.some(
+                  (job) => definitions.get(job.definitionId)?.harvesting,
+                )
+              ? "A full load takes 60 seconds, plus travel. Materials arrive on delivery."
+              : affordable
+                ? emptyRefinery
+                  ? "Select an empty Refinery and produce its Harvester."
+                  : "Build a Refinery, then produce its Harvester."
+                : "Economy stalled: find Materials salvage or sell a building to recover.";
       const actor = simulation.actors.find((actor) => actor.id === id);
       const definition = actor && definitions.get(actor.definitionId);
       const remove = element("remove-building");
-      remove.textContent = definition
-        ? `Sell building (+${Math.floor(materialsCost(definition) / 2)} Materials)`
-        : "Sell selected building";
+      remove.textContent = actor?.construction
+        ? `Cancel construction (+${actor.construction.paidMaterials} Materials)`
+        : definition
+          ? `Sell building (+${Math.floor(materialsCost(definition) / 2)} Materials)`
+          : "Sell selected building";
       if (lastResult) element("harvester-status").textContent = lastResult;
     },
     onOutcome: (outcome: CommandOutcome) => {

@@ -127,10 +127,14 @@ const build = (id = "refinery", x = 6, z = 6): MissionCommand => ({
   definitionId: "arc-materials-refinery",
   origin: { x, z },
 });
+function finishBuilding(simulation: MissionSimulation, id = "refinery") {
+  until(simulation, () => !simulation.actorById(id)?.construction);
+}
 function workerFixture(tickSeconds = 1) {
   const context = fixture(undefined, tickSeconds);
   const { simulation } = context;
   expect(command(simulation, build()).accepted).toBe(true);
+  finishBuilding(simulation);
   expect(
     command(simulation, {
       kind: "train-unit",
@@ -167,6 +171,122 @@ describe("Materials economy", () => {
     expect(independent.economy!.sites[0].remainingMaterials).toBe(200);
   });
 
+  test("paid blueprints reserve footprints and one construction slot before becoming operational", () => {
+    const state = createScenarioState(scenario, definitions);
+    state.economy!.materials = 300;
+    const { simulation, occupancy } = fixture(state);
+    simulation.submitCommand(build());
+    simulation.submitCommand({
+      kind: "place-actor",
+      actorId: "barracks",
+      definitionId: "arc-field-barracks",
+      origin: { x: 9, z: 10 },
+    });
+    expect(simulation.tick().every((outcome) => outcome.accepted)).toBe(true);
+    expect(simulation.economy!.materials).toBe(100);
+    expect(occupancy.ownerAt(6, 6, "surface")).toBe("refinery");
+    expect(simulation.actorById("refinery")!.construction).toMatchObject({
+      completedTicks: 1,
+      totalTicks: 8,
+    });
+    expect(simulation.actorById("barracks")!.construction!.completedTicks).toBe(
+      0,
+    );
+    expect(
+      command(simulation, {
+        kind: "train-unit",
+        producerId: "refinery",
+        actorId: "worker",
+        definitionId: "arc-harvester",
+      }),
+    ).toMatchObject({ accepted: false, reason: "under-construction" });
+    expect(simulation.economy!.materials).toBe(100);
+    advance(simulation, 5);
+    expect(simulation.actorById("refinery")!.construction!.completedTicks).toBe(
+      7,
+    );
+    simulation.tick();
+    expect(simulation.actorById("refinery")!.construction).toBeUndefined();
+    expect(simulation.actorById("barracks")!.construction!.completedTicks).toBe(
+      0,
+    );
+    expect(
+      simulation.evaluateTraining({
+        kind: "train-unit",
+        producerId: "refinery",
+        actorId: "worker",
+        definitionId: "arc-harvester",
+      }).accepted,
+    ).toBe(true);
+    advance(simulation, 8);
+    expect(simulation.actorById("barracks")!.construction).toBeUndefined();
+    expect(
+      command(simulation, { kind: "cancel-construction", actorId: "barracks" })
+        .accepted,
+    ).toBe(false);
+  });
+
+  test("cancelling a blueprint refunds all spending, frees its footprint and advances the queue", () => {
+    const state = createScenarioState(scenario, definitions);
+    state.economy!.materials = 300;
+    const { simulation, occupancy } = fixture(state);
+    command(simulation, build());
+    command(simulation, build("next", 9, 9));
+    expect(
+      command(simulation, { kind: "sell-actor", actorId: "refinery" }).accepted,
+    ).toBe(false);
+    expect(
+      command(simulation, { kind: "cancel-construction", actorId: "refinery" })
+        .accepted,
+    ).toBe(true);
+    expect(simulation.economy!.materials).toBe(200);
+    expect(simulation.actorById("refinery")).toBeUndefined();
+    expect(occupancy.ownerAt(6, 6, "surface")).toBeUndefined();
+    expect(simulation.actorById("next")!.construction!.completedTicks).toBe(1);
+    expect(simulation.unusedActorId("refinery")).toBe("refinery1");
+    expect(
+      command(simulation, { kind: "cancel-construction", actorId: "refinery" })
+        .accepted,
+    ).toBe(false);
+    expect(simulation.economy!.materials).toBe(200);
+    simulation.removeActor("next");
+    expect(simulation.economy!.materials).toBe(200);
+  });
+
+  test("unfinished Refineries reject assignments without interrupting a worker", () => {
+    const { simulation } = workerFixture();
+    const state = simulation.snapshot();
+    state.economy!.materials = 100;
+    const restored = fixture(state).simulation;
+    command(restored, build("next", 9, 9));
+    expect(
+      command(restored, {
+        kind: "assign-refinery",
+        actorId: "worker",
+        refineryId: "next",
+      }),
+    ).toMatchObject({ accepted: false, reason: "missing-refinery" });
+    expect(worker(restored).refineryId).toBe("refinery");
+  });
+
+  test("restoration rejects invalid blueprint progress and investment", () => {
+    const { simulation } = fixture();
+    command(simulation, build());
+    for (const patch of [
+      { completedTicks: -1 },
+      { completedTicks: 8 },
+      { totalTicks: 9 },
+      { paidMaterials: 99 },
+    ]) {
+      const saved = simulation.snapshot();
+      Object.assign(
+        saved.actors.find((actor) => actor.id === "refinery")!.construction!,
+        patch,
+      );
+      expect(() => fixture(saved)).toThrow("invalid construction");
+    }
+  });
+
   test("same-tick placement spends against staged funds and rejects resources", () => {
     const { simulation, occupancy } = fixture();
     simulation.submitCommand(build());
@@ -200,6 +320,7 @@ describe("Materials economy", () => {
   test("one paid Harvester slot stays occupied through production and assignment", () => {
     const { simulation } = fixture();
     command(simulation, build());
+    finishBuilding(simulation);
     const state = simulation.snapshot();
     state.economy!.materials = 100;
     const restored = fixture(state).simulation;
@@ -316,6 +437,7 @@ describe("Materials economy", () => {
     state.economy!.materials = 200;
     const restored = fixture(state).simulation;
     command(restored, build("new-refinery", 6, 6));
+    finishBuilding(restored, "new-refinery");
     expect(
       command(restored, {
         kind: "assign-refinery",
@@ -388,6 +510,7 @@ describe("Materials economy", () => {
       definitionId: "arc-field-barracks",
       origin: { x: 6, z: 6 },
     });
+    finishBuilding(simulation, "barracks");
     for (let i = 1; i <= 6; i++)
       simulation.submitCommand({
         kind: "train-unit",
@@ -425,6 +548,7 @@ describe("Materials economy", () => {
     state.economy!.materials = 1000;
     const { simulation } = fixture(state);
     command(simulation, build());
+    finishBuilding(simulation);
     // A terrain edit blocks every adjacent tile after the paid request.
     command(simulation, {
       kind: "train-unit",
@@ -517,6 +641,7 @@ describe("economy persistence", () => {
       if (phase === "training") {
         simulation = fixture(undefined, 0.1).simulation;
         command(simulation, build());
+        finishBuilding(simulation);
         command(simulation, {
           kind: "train-unit",
           actorId: "worker",
@@ -547,6 +672,30 @@ describe("economy persistence", () => {
       expect(restored.snapshot()).toEqual(simulation.snapshot());
     },
   );
+
+  test("JSON preserves active and queued construction and resumes the same ticks", () => {
+    const state = createScenarioState(scenario, definitions);
+    state.economy!.materials = 300;
+    const { simulation } = fixture(state, 0.1);
+    command(simulation, build());
+    command(simulation, build("next", 9, 9));
+    advance(simulation, 15);
+    simulation.submitCommand({
+      kind: "cancel-construction",
+      actorId: "refinery",
+    });
+    const saved = deserializeMission(
+      serializeMission(simulation.snapshot(), 0.1),
+      scenario,
+      0.1,
+    );
+    const restored = fixture(saved, 0.1).simulation;
+    for (let tick = 0; tick < 100; tick++)
+      expect(restored.tick()).toEqual(simulation.tick());
+    expect(restored.snapshot()).toEqual(simulation.snapshot());
+    expect(restored.actorById("next")!.construction).toBeUndefined();
+    expect(restored.economy!.materials).toBe(200);
+  });
 
   test("rejects incompatible versions, scenario content, and tick rates", () => {
     const { simulation } = fixture();

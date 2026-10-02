@@ -30,28 +30,30 @@ npm run check      # required before completing a coding task
 ```
 
 The default browser opening starts with a fixed **Command Center** and 150
-**Materials**. Build a **Materials Refinery** for 100, select it, and produce
-its **Harvester** for 50. Select the Harvester in **Units**, then use **Gather
-Near Materials** in **Selection** or click a blue resource tile. It gathers
-100 Materials in 60 seconds, returns to its Refinery, deposits, and repeats.
-Build a **Field Barracks** for 100, then train **Troopers** for 25 or **Scouts**
-for 20. The top bar shows available Materials; cargo counts separately.
+**Materials**. Build a **Materials Refinery** for 100, wait eight seconds, then
+select it and produce its **Harvester** for 50. Select the Harvester in
+**Units**, then use **Gather Near Materials** in **Selection** or click a blue
+resource tile. It gathers 100 Materials in 60 seconds, returns to its Refinery,
+deposits, and repeats. Build a **Field Barracks** for 100, then train
+**Troopers** for 25 or **Scouts** for 20. The top bar shows available Materials;
+cargo counts separately.
 
 **Selection** provides Return cargo and Refinery assignment. Move and Stop
 interrupt gathering and keep cargo. Exhausted patches prompt reassignment.
 **Units** lists resource sites and salvage: select a mobile unit, then use
-**Collect salvage** to gather it without a delivery. Paid production orders
-show remaining time and a Cancel action with a full refund. A Refinery has
-one Harvester slot; a Barracks has five outstanding orders. Blocked exits
-hold finished production until a tile is cleared. Buildings sell for half
-cost. Construction is instant; support coverage and construction timers are
-still pending. This opening has no combat, victory, or defeat condition.
+**Collect salvage** to gather it without a delivery. Paid
+production orders show remaining time and a Cancel action with a full refund. A
+Refinery has one Harvester slot; a Barracks has five outstanding orders. Blocked
+exits hold finished production until a tile is cleared. Buildings sell for half
+cost. Buildings share one construction slot; **Units** shows building timers and
+cancellation for a full refund. Support coverage remains pending. This opening
+has no combat, victory, or defeat condition.
 
-Open `/?sandbox` for the empty, free construction and infantry sandbox.
-Use **Buildings** to place structures on clear terrain. Use **Rotate** or `R`
-to rotate and **Cancel** or `Esc` to exit placement. Touch uses a terrain tap
-followed by **Place building**. Construction and training in this sandbox are
-instant and have no resource or power requirements.
+Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
+**Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
+rotate and **Cancel** or `Esc` to exit placement. Touch uses a
+terrain tap followed by **Place building**. Construction and training in this
+sandbox are instant and have no resource or power requirements.
 
 Click or tap to select an actor. Shift-click or **Add units** toggles units in
 and out of the selection. Primary drag selects mobile units; touch uses **Box

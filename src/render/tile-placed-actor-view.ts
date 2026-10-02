@@ -124,7 +124,9 @@ export function createTilePlacedActorViewRegistry(
     const actor = actors.find(({ id }) => id === selectedActorId);
     const key = actor
       ? JSON.stringify([
-          actor,
+          actor.id,
+          actor.definitionId,
+          actor.tilePlacement,
           map.navigationChanges.generation,
           terrainRevisions.get(actor.id),
         ])
@@ -237,9 +239,55 @@ export function createTilePlacedActorViewRegistry(
         if (mesh.material) mesh.material.alpha = 0.42;
       }
     }
+    const progressMeshes =
+      !preview && actor.construction
+        ? ["background", "fill"].map((part) => {
+            const mesh = MeshBuilder.CreateBox(
+              `${root.name}-construction-${part}`,
+              {
+                width: 2 * map.tileSize,
+                height: 0.1,
+                depth: 0.16,
+              },
+              scene,
+            );
+            mesh.parent = root;
+            mesh.position.set(
+              worldPosition.x,
+              roof + 1.9 + (part === "fill" ? 0.06 : 0),
+              worldPosition.z,
+            );
+            mesh.isPickable = false;
+            mesh.material = shared(`construction-${part}`, (material) => {
+              material.emissiveColor =
+                part === "fill"
+                  ? new Color3(1, 0.78, 0.24)
+                  : new Color3(0.12, 0.16, 0.18);
+              material.disableLighting = true;
+            });
+            return mesh;
+          })
+        : [];
+    const bodyMeshes = root
+      .getChildMeshes()
+      .filter((mesh) => !progressMeshes.some((progress) => progress === mesh));
+    let constructing = false;
     return {
       root,
-      details,
+      update: (state: TilePlacedActorState) => {
+        constructing = !!state.construction;
+        for (const mesh of bodyMeshes)
+          mesh.visibility = constructing ? 0.45 : 1;
+        for (const mesh of progressMeshes) mesh.setEnabled(constructing);
+        if (state.construction && progressMeshes.length) {
+          const progress =
+            state.construction.completedTicks / state.construction.totalTicks;
+          progressMeshes[1]!.scaling.x = Math.max(0.01, progress);
+          progressMeshes[1]!.position.x =
+            worldPosition.x - map.tileSize * (1 - progress);
+        }
+      },
+      animate: (seconds: number) => details?.update(constructing ? 0 : seconds),
       dispose: () => {
         details?.dispose();
         root.dispose();
@@ -248,10 +296,16 @@ export function createTilePlacedActorViewRegistry(
   };
   // Restoration can reuse an ID at another placement or change its terrain.
   const roots = createViewRegistry({
-    keyFor: ({ id, definitionId, tilePlacement }: TilePlacedActorState) =>
+    keyFor: ({
+      id,
+      definitionId,
+      tilePlacement,
+      construction,
+    }: TilePlacedActorState) =>
       JSON.stringify([
         definitionId,
         tilePlacement,
+        !!construction,
         map.navigationChanges.generation,
         terrainRevisions.get(id),
       ]),
@@ -261,6 +315,7 @@ export function createTilePlacedActorViewRegistry(
   const update = (nextActors: readonly TilePlacedActorState[]) => {
     actors = nextActors;
     roots.sync(actors);
+    for (const actor of actors) roots.get(actor.id)!.update(actor);
     for (const id of terrainRevisions.keys()) {
       if (!roots.has(id)) terrainRevisions.delete(id);
     }
@@ -271,7 +326,7 @@ export function createTilePlacedActorViewRegistry(
     update,
     animate: (seconds) => {
       if (terrainDirty) update(actors);
-      for (const view of roots.values()) view.details?.update(seconds);
+      for (const view of roots.values()) view.animate(seconds);
     },
     actorIdForMesh: (mesh) => {
       for (

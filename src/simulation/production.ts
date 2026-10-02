@@ -22,7 +22,8 @@ export type TrainingReason =
   | "exit-blocked"
   | "insufficient-materials"
   | "refinery-occupied"
-  | "queue-full";
+  | "queue-full"
+  | "under-construction";
 
 export type TrainingEvaluation =
   | { accepted: true; actor: Actor }
@@ -91,6 +92,7 @@ export function evaluateTraining(
   const producer = actors.find(({ id }) => id === command.producerId);
   if (!producer || !isTilePlacedActor(producer))
     return reject("missing-producer");
+  if (producer.construction) return reject("under-construction");
   const definition = definitions.get(producer.definitionId)!;
   const unit = definitions.get(command.definitionId);
   if (

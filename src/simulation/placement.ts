@@ -53,6 +53,7 @@ export type TilePlacedActor = Actor & { tilePlacement: TilePlacement };
 
 export type TilePlacedActorState = Readonly<
   Pick<Actor, "id" | "definitionId"> & {
+    construction?: Readonly<NonNullable<Actor["construction"]>>;
     tilePlacement: Readonly<TilePlacement>;
   }
 >;

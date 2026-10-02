@@ -19,6 +19,7 @@ export type ActorDefinition = {
   production?: { unitDefinitionIds: string[] };
   materialsCost?: number;
   trainingSeconds?: number;
+  constructionSeconds?: number;
   refinery?: { harvesterDefinitionId: string };
   harvesting?: {
     capacity: number;
@@ -50,6 +51,12 @@ export type Actor = {
     origin: TileCoord;
     /** Clockwise quarter turns around the placement origin. */
     quarterTurns: number;
+  };
+  /** Paid blueprint progress; absent once the building is operational. */
+  construction?: {
+    paidMaterials: number;
+    completedTicks: number;
+    totalTicks: number;
   };
   /** Present only while a movement-capable actor has an active move order. */
   movement?: MovementOrder;
@@ -91,6 +98,7 @@ export type ActorRenderState = DeepReadonly<
     | "occupancyLayer"
     | "tilePlacement"
     | "movement"
+    | "construction"
   >
 >;
 

@@ -13,6 +13,7 @@ import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
 import { TerrainGrid } from "./terrain";
 import {
   applyEconomyCommand,
+  constructionTicks,
   materialsCost,
   refineryOccupied,
   removeEconomyActor,
@@ -48,6 +49,7 @@ import type {
   EconomyCommand,
   RemoveActorCommand,
   SellActorCommand,
+  CancelConstructionCommand,
   ScheduledCommand,
 } from "./command";
 import type { NavigatingActor } from "./group-movement";
@@ -301,6 +303,20 @@ export function createMissionSimulation({
         throw new RangeError(`Actor ${actor.id} changed its tile-placed pose.`);
       }
     }
+    const construction = actor.construction;
+    if (
+      construction !== undefined &&
+      (!construction ||
+        !state.economy ||
+        !isTilePlacedActor(actor) ||
+        construction.paidMaterials !== materialsCost(definition) ||
+        !Number.isSafeInteger(construction.completedTicks) ||
+        construction.completedTicks < 0 ||
+        construction.totalTicks !==
+          constructionTicks(definition, tickSeconds) ||
+        construction.completedTicks >= construction.totalTicks)
+    )
+      throw new RangeError(`Actor ${actor.id} has invalid construction state.`);
     const target = actor.movement?.target;
     if (
       target &&
@@ -650,10 +666,16 @@ export function createMissionSimulation({
         };
       }
       occupancy!.place(evaluation.footprint);
-      if (working.economy)
-        working.economy.materials -= materialsCost(
-          definitionFor(evaluation.actor),
-        );
+      if (working.economy) {
+        const definition = definitionFor(evaluation.actor);
+        const cost = materialsCost(definition);
+        working.economy.materials -= cost;
+        evaluation.actor.construction = {
+          paidMaterials: cost,
+          completedTicks: 0,
+          totalTicks: constructionTicks(definition, tickSeconds),
+        };
+      }
       stageActor(working, evaluation.actor);
       return { tick, command: applied, accepted: true };
     }
@@ -717,11 +739,15 @@ export function createMissionSimulation({
         ...(reason && { reason }),
       } as CommandOutcome<EconomyCommand>;
     }
-    if (command.kind === "remove-actor" || command.kind === "sell-actor") {
+    if (
+      command.kind === "remove-actor" ||
+      command.kind === "sell-actor" ||
+      command.kind === "cancel-construction"
+    ) {
       const applied = structuredClone(command);
       const outcome = (accepted: boolean) =>
         ({ tick, command: applied, accepted }) as CommandOutcome<
-          RemoveActorCommand | SellActorCommand
+          RemoveActorCommand | SellActorCommand | CancelConstructionCommand
         >;
       const actor = working.actorsById.get(applied.actorId);
       if (!actor) {
@@ -729,10 +755,17 @@ export function createMissionSimulation({
       }
       if (
         command.kind === "sell-actor" &&
-        (!working.economy || !isTilePlacedActor(actor))
+        (!working.economy || !isTilePlacedActor(actor) || actor.construction)
+      )
+        return outcome(false);
+      if (
+        command.kind === "cancel-construction" &&
+        (!working.economy || !actor.construction)
       )
         return outcome(false);
       if (working.economy) {
+        if (command.kind === "cancel-construction")
+          working.economy.materials += actor.construction!.paidMaterials;
         if (command.kind === "sell-actor")
           working.economy.materials += Math.floor(
             materialsCost(definitionFor(actor)) / 2,

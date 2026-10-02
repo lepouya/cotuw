@@ -548,8 +548,12 @@ story.
   Center, 100 for a Materials Refinery, 50 for a Harvester, 100 for a Field
   Barracks, 25 for a Trooper, and 20 for a Scout. Unit training takes six, four,
   and three seconds for Harvesters, Troopers, and Scouts respectively.
-- Buildings are placed instantly for their full cost. Construction timing,
-  infrastructure slots, support coverage, and disconnection remain pending.
+- Building blueprints reserve their footprint and pay their full cost at
+  placement. One baseline construction slot processes them in placement order:
+  twelve seconds for a Command Center, eight for a Refinery or Barracks.
+  Unfinished buildings cannot produce units or receive Harvester assignments.
+  Cancelling a blueprint refunds its full cost and releases the footprint;
+  losing it gives no refund. Support coverage and disconnection remain pending.
   The opening has no combat or mission result.
 - A Refinery has one paid production or assigned Harvester slot. Barracks
   queues hold up to five paid orders and train one unit at a time. Cancelling
@@ -578,10 +582,12 @@ story.
   shows available Materials. Blue resource markers shrink in four stages and
   disappear at depletion; gold salvage disappears on collection. Both appear
   on the minimap. Exhaustion, missing assignments, blocked routes, and an
-  unaffordable harvesting recovery have explanatory feedback.
+  unaffordable harvesting recovery have explanatory feedback. Building timers
+  show in Units and Selection, with a progress bar over translucent blueprints.
 - Mission snapshots include stockpiles, tile yields, collected salvage,
   Harvester assignments, cargo, gathering progress, phases, routes, paid
-  production, pending commands, and reserved or retired actor identities.
+  production, blueprint progress and queue order, pending commands, and
+  reserved or retired actor identities.
   Versioned JSON envelopes check scenario, tick rate, map dimensions, and
   resource content before simulation validation. Manual save/load UI remains
   pending.

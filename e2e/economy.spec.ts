@@ -90,6 +90,7 @@ async function place(
   x: number,
   z: number,
   touch = false,
+  complete = true,
 ) {
   await action(page, "#tab-buildings", touch);
   await action(page, button, touch);
@@ -111,6 +112,13 @@ async function place(
     "data-placement-active",
     "false",
   );
+  await expect(page.locator("#construction-queue button")).toContainText(
+    "8s remaining",
+  );
+  if (complete) {
+    await advance(page, 8);
+    await expect(page.locator("#construction-queue button")).toHaveCount(0);
+  }
 }
 
 test("default opening shows the Command Center, starting Materials, and paid content", async ({
@@ -132,6 +140,36 @@ test("default opening shows the Command Center, starting Materials, and paid con
   await page.locator("#tab-units").click();
   await expect(page.locator("#economy-alert")).toContainText(
     "Build a Refinery",
+  );
+});
+
+test("building timers disable production, and cancelling a blueprint fully refunds its cost", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  await place(page, "#build-refinery", 12, 49, false, false);
+  await expect(page.locator("#train-harvester")).toBeDisabled();
+  await expect(page.locator("#production-status")).toContainText(
+    "finish construction",
+  );
+  await advance(page, 3);
+  await expect(page.locator("#construction-queue button")).toContainText(
+    "5s remaining",
+  );
+  await page.locator("#tab-selection").click();
+  await expect(page.locator("#construction-details")).toContainText(
+    "5s remaining",
+  );
+  await expect(page.locator("#remove-building")).toContainText(
+    "Cancel construction (+100 Materials)",
+  );
+  await page.locator("#remove-building").click();
+  await advance(page, 0.1);
+  await expect(page.locator("#materials-counter")).toHaveText("150");
+  await expect(page.locator("#construction-details")).toBeHidden();
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-tile-placed-actor-count",
+    "1",
   );
 });
 

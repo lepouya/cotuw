@@ -18,6 +18,7 @@ export const ARC_ACTOR_DEFINITIONS = [
   {
     id: "arc-command-center-prototype",
     materialsCost: 300,
+    constructionSeconds: 12,
     behaviorId: "idle",
     footprint: {
       layer: "surface",
@@ -37,6 +38,7 @@ export const ARC_ACTOR_DEFINITIONS = [
   {
     id: "arc-field-barracks",
     materialsCost: 100,
+    constructionSeconds: 8,
     behaviorId: "idle",
     production: { unitDefinitionIds: ["arc-trooper", "arc-scout"] },
     footprint: {
@@ -57,6 +59,7 @@ export const ARC_ACTOR_DEFINITIONS = [
     id: "arc-materials-refinery",
     behaviorId: "idle",
     materialsCost: 100,
+    constructionSeconds: 8,
     refinery: { harvesterDefinitionId: "arc-harvester" },
     production: { unitDefinitionIds: ["arc-harvester"] },
     footprint: {

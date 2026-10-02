@@ -19,6 +19,7 @@ const REASONS: Record<TrainingReason, string> = {
     "Exit blocked. Move units or clear ground beside the building.",
   "insufficient-materials": "Not enough Materials for this unit.",
   "refinery-occupied": "This Refinery already has a Harvester or a paid order.",
+  "under-construction": "Wait for this building to finish construction.",
   "queue-full": "Production queue full (5 orders).",
 };
 

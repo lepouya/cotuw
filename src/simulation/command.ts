@@ -69,6 +69,11 @@ export type EconomyCommand =
   | { kind: "return-cargo"; actorId: string }
   | { kind: "cancel-production"; actorId: string };
 
+export type CancelConstructionCommand = {
+  kind: "cancel-construction";
+  actorId: string;
+};
+
 export type SellActorCommand = { kind: "sell-actor"; actorId: string };
 
 export type MissionCommand =
@@ -77,7 +82,8 @@ export type MissionCommand =
   | TerrainCommand
   | ActorLifecycleCommand
   | EconomyCommand
-  | SellActorCommand;
+  | SellActorCommand
+  | CancelConstructionCommand;
 
 /** A command waiting for the start of the tick numbered `tick`. */
 export type ScheduledCommand = {
