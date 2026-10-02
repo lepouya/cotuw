@@ -246,6 +246,10 @@ export async function createTerrainPrototype(
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: (mesh) =>
       actorViews.actorIdForMesh(mesh) ?? tilePlacedViews.actorIdForMesh(mesh),
+    movementTargetForMesh: (mesh) => {
+      const tile = materialsView?.lootTileForMesh(mesh);
+      return tile && map.tileCenter(tile.x, tile.z);
+    },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
     enabled: () => !placement.active && !simulationFaulted,
     canMove: (actorId) => {

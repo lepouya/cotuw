@@ -41,13 +41,14 @@ cargo counts separately.
 **Selection** provides Return cargo and Refinery assignment. Move and Stop
 interrupt gathering and keep cargo. Exhausted patches prompt reassignment.
 **Units** lists resource sites and salvage: select a mobile unit, then use
-**Collect salvage** to gather a hovering gift box without a delivery. Paid
-production orders show remaining time and a Cancel action with a full refund. A
-Refinery has one Harvester slot; a Barracks has five outstanding orders. Blocked
-exits hold finished production until a tile is cleared. Buildings sell for half
-cost. Buildings share one construction slot; **Units** shows building timers and
-cancellation for a full refund. Support coverage remains pending. This opening
-has no combat, victory, or defeat condition.
+**Collect salvage** or click the hovering gift box to collect it without a
+delivery. Paid production orders show remaining time and a Cancel action with
+a full refund. A Refinery has one Harvester slot; a Barracks has five
+outstanding orders. Blocked exits hold finished production until a tile is
+cleared. Buildings sell for half cost. Buildings share one construction slot;
+**Units** shows building timers and cancellation for a full refund. Support
+coverage remains pending. This opening has no combat, victory, or defeat
+condition.
 
 Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to

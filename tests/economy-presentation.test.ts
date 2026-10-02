@@ -274,7 +274,7 @@ test("resource and gift markers follow edited terrain and release their observer
   }
 });
 
-test("gift salvage hovers, rotates, leaves terrain pickable and disappears on collection", () => {
+test("gift salvage hovers, rotates, targets its tile and disappears on collection", () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   try {
@@ -310,11 +310,17 @@ test("gift salvage hovers, rotates, leaves terrain pickable and disappears on co
     view.animate(1);
     expect(gift.position.y).not.toBe(height);
     expect(gift.rotation.y).not.toBe(rotation);
-    expect(gift.getChildMeshes().every((mesh) => !mesh.isPickable)).toBe(true);
+    for (const mesh of gift.getChildMeshes()) {
+      expect(mesh.isPickable).toBe(true);
+      expect(view.lootTileForMesh(mesh)).toEqual({ x: 5, z: 5 });
+    }
+    expect(view.lootTileForMesh(null)).toBeUndefined();
     economy.loot[0].collected = true;
     view.update(economy);
     expect(gift.isEnabled()).toBe(false);
     expect(gift.getChildMeshes().every((mesh) => !mesh.isEnabled())).toBe(true);
+    for (const mesh of gift.getChildMeshes())
+      expect(view.lootTileForMesh(mesh)).toBeUndefined();
     view.dispose();
     expect(scene.meshes).toHaveLength(0);
     expect(scene.materials).toHaveLength(0);

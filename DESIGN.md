@@ -583,8 +583,9 @@ story.
   paid-order cancellation, patch totals, and salvage commands. The top bar
   shows available Materials. Blue resource markers shrink in four stages and
   disappear at depletion; salvage uses hovering, rotating gold gift boxes
-  with red ribbons and disappears on collection. Both marker types follow
-  terrain edits and appear on the minimap. Exhaustion, missing assignments,
+  with red ribbons and disappears on collection. Clicking a gift box sends
+  selected mobile units to its tile. Both marker types follow terrain edits
+  and appear on the minimap. Exhaustion, missing assignments,
   blocked routes, and unaffordable harvesting recovery have explanatory
   feedback. Building timers show in Units and Selection, with a progress bar
   over translucent blueprints.

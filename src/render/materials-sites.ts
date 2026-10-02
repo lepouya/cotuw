@@ -6,7 +6,7 @@ import {
 } from "@babylonjs/core";
 import { stableUnit } from "./actor";
 import type { AbstractMesh, Scene } from "@babylonjs/core";
-import type { TerrainMap } from "../map";
+import type { TerrainMap, TileCoord } from "../map";
 import type { EconomyView } from "../simulation/economy";
 
 /** Depletion changes presentation without changing terrain or navigation. */
@@ -49,6 +49,7 @@ export function createMaterialsSitesView(
       return [site.id, mesh] as const;
     }),
   );
+  const lootTiles = new WeakMap<AbstractMesh, TileCoord>();
   const loot = new Map(
     initial.loot.map((cache) => {
       const root = new TransformNode(`materials-${cache.id}-gift`, scene);
@@ -91,8 +92,7 @@ export function createMaterialsSitesView(
         bow.rotation.z = (side * Math.PI) / 4;
         bow.material = ribbonMaterial;
       }
-      // Terrain under the gift receives contextual commands.
-      for (const mesh of root.getChildMeshes()) mesh.isPickable = false;
+      for (const mesh of root.getChildMeshes()) lootTiles.set(mesh, cache.tile);
       const gift = { root, ground, phase: stableUnit(cache.id) * Math.PI * 2 };
       return [cache.id, gift] as const;
     }),
@@ -103,6 +103,8 @@ export function createMaterialsSitesView(
     for (const gift of loot.values()) gift.ground = groundAt(gift.root);
   });
   return {
+    lootTileForMesh: (mesh: AbstractMesh | null) =>
+      mesh?.isEnabled() ? lootTiles.get(mesh) : undefined,
     update: (economy: EconomyView) => {
       for (const site of economy.sites) {
         const mesh = sites.get(site.id)!;

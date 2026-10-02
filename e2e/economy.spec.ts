@@ -195,6 +195,79 @@ test("spending the bootstrap funds shows a stalled-economy recovery hint", async
   await expect(page.locator("#economy-alert")).toContainText("Economy stalled");
 });
 
+test.describe("hovering salvage", () => {
+  test.use({ hasTouch: true });
+  for (const touch of [false, true]) {
+    test(`${touch ? "tapping" : "clicking"} at an oblique angle collects the box's tile`, async ({
+      page,
+    }) => {
+      await controlledOpening(page);
+      await place(page, "#build-barracks", 16, 54);
+      await page.locator("#train-trooper").click();
+      await advance(page, 5);
+      await page.locator("#unit-roster button").click();
+      const point = await page.evaluate(async () => {
+        const harnessPath: string = "/e2e/harness.ts";
+        const terrainPath: string = "/src/render/terrain-mesh.ts";
+        const prototypePath: string = "/src/prototype.ts";
+        const { projectToCanvas } = await import(harnessPath);
+        const { isTerrainPickMesh } = await import(terrainPath);
+        const { createPrototypeMap } = await import(prototypePath);
+        const map = createPrototypeMap();
+        const view = window.economyHarness.view;
+        view.engine.stopRenderLoop();
+        view.camera.focusOnTile(25, 52);
+        const camera = view.scene
+          .activeCamera as import("@babylonjs/core").ArcRotateCamera;
+        camera.beta = 1.2;
+        camera.alpha = -Math.PI / 2;
+        view.scene.render();
+        const gift = view.scene.getTransformNodeByName(
+          "materials-salvage-1-gift",
+        )!;
+        gift.computeWorldMatrix(true);
+        const canvas =
+          document.querySelector<HTMLCanvasElement>("#game-canvas")!;
+        const point = projectToCanvas(
+          view.scene,
+          canvas,
+          gift.getAbsolutePosition(),
+        );
+        const bounds = canvas.getBoundingClientRect();
+        const ground = view.scene.pick(
+          point.x - bounds.left,
+          point.y - bounds.top,
+          isTerrainPickMesh,
+        )!.pickedPoint!;
+        return {
+          ...point,
+          target: map.tileCenter(25, 52),
+          terrainBehind: map.tileAtWorldPosition(ground.x, ground.z),
+        };
+      });
+      expect(point.terrainBehind).not.toEqual({ x: 25, z: 52 });
+      if (touch) await page.touchscreen.tap(point.x, point.y);
+      else await page.mouse.click(point.x, point.y);
+      await advance(page, 0.1);
+      const target = await page.evaluate(() => {
+        const simulation = window.economyHarness.view.simulation;
+        return simulation.actors.find(
+          (actor) => actor.definitionId === "arc-trooper",
+        )!.movement!.target;
+      });
+      expect(target).toEqual(point.target);
+      await advance(page, 15);
+      await expect(page.locator("#materials-counter")).toHaveText("50");
+      expect(
+        await page.evaluate(
+          () =>
+            window.economyHarness.view.simulation.economy!.loot[0].collected,
+        ),
+      ).toBe(true);
+    });
+  }
+});
+
 test("Harvester controls use matching Refineries and type-specific load timing", async ({
   page,
 }) => {

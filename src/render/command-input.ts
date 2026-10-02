@@ -5,8 +5,13 @@ import { createPointerGesture } from "./pointer-gesture";
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { ActorCommand, GroupMoveCommand } from "../simulation/command";
 import type { SelectionRect } from "./selection";
+import type { WorldPosition } from "../simulation/world";
 export type CommandInputOptions = {
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
+  /** Maps clickable world objects to ground destinations. */
+  movementTargetForMesh?: (
+    mesh: AbstractMesh | null,
+  ) => WorldPosition | undefined;
   actorIdsInRect: (rect: SelectionRect) => string[];
   submitCommand: (command: ActorCommand | GroupMoveCommand) => void;
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
@@ -40,6 +45,7 @@ export function createCommandInput(
   scene: Scene,
   {
     actorIdForMesh,
+    movementTargetForMesh = () => undefined,
     actorIdsInRect,
     submitCommand,
     onSelectionChanged,
@@ -126,23 +132,26 @@ export function createCommandInput(
       const pick = pickAt(
         event.clientX,
         event.clientY,
-        (mesh) => actorIdForMesh(mesh) !== undefined || isTerrainPickMesh(mesh),
+        (mesh) =>
+          actorIdForMesh(mesh) !== undefined ||
+          movementTargetForMesh(mesh) !== undefined ||
+          isTerrainPickMesh(mesh),
       );
       const picked = actorIdForMesh(pick?.pickedMesh ?? null);
+      const target =
+        movementTargetForMesh(pick?.pickedMesh ?? null) ??
+        (pick?.hit && pick.pickedPoint && isTerrainPickMesh(pick.pickedMesh)
+          ? { x: pick.pickedPoint.x, z: pick.pickedPoint.z }
+          : undefined);
       if (picked) {
         select(picked, additive);
         onWorldSelectionChanged?.(selection.ids);
-      } else if (
-        pick?.hit &&
-        pick.pickedPoint &&
-        isTerrainPickMesh(pick.pickedMesh)
-      ) {
+      } else if (target) {
         const ids = selection.ids.filter(canMove);
         if (boxMode || ids.length === 0) {
           if (!additive) select(undefined);
           onWorldSelectionChanged?.(selection.ids);
         } else {
-          const target = { x: pick.pickedPoint.x, z: pick.pickedPoint.z };
           if (ids.length === 1)
             submitCommand({ kind: "move", actorId: ids[0]!, target });
           else
