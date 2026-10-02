@@ -37,6 +37,8 @@ const REASONS: Record<PlacementReason, string> = {
   "excessive-slope": "This slope is too steep for a building.",
   "actor-conflict": "A unit is standing in the footprint.",
   "occupancy-conflict": "Another structure occupies this footprint.",
+  "insufficient-materials": "Not enough Materials for this building.",
+  "resource-site": "Keep Materials sites and salvage clear of buildings.",
 };
 
 export type BuildingPlacementChoice = {

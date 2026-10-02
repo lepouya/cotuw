@@ -12,6 +12,17 @@ import { clampToBounds, isFinitePosition, withinBounds } from "./world";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
 import { TerrainGrid } from "./terrain";
 import {
+  applyEconomyCommand,
+  materialsCost,
+  refineryOccupied,
+  removeEconomyActor,
+  trainingTicks,
+  updateEconomy,
+  validateEconomyDefinitions,
+  validateEconomyState,
+} from "./economy";
+import type { EconomyState, EconomyView } from "./economy";
+import {
   createTilePlacedActor,
   evaluateFootprint,
   footprintPlacementFor,
@@ -34,6 +45,9 @@ import type {
   GroupMoveCommand,
   MissionCommand,
   MoveCommand,
+  EconomyCommand,
+  RemoveActorCommand,
+  SellActorCommand,
   ScheduledCommand,
 } from "./command";
 import type { NavigatingActor } from "./group-movement";
@@ -78,6 +92,7 @@ type WorkingActors = {
   usedIds: Set<string>;
   retiredIds: string[];
   lifecycleChanges: number;
+  economy?: EconomyState;
 };
 
 /** The authoritative, serializable state of one playable mission. */
@@ -91,6 +106,8 @@ export type MissionState = {
   retiredActorIds: string[];
   /** The mission's simulation terrain; absent until the first snapshot. */
   terrain?: TerrainState;
+  economy?: EconomyState;
+  scenarioId?: string;
 };
 
 export function createMissionState(actors: readonly Actor[]): MissionState {
@@ -131,11 +148,12 @@ export type MissionSimulation = {
   readonly actorVersion: number;
   readonly completedTicks: number;
   readonly tickSeconds: number;
+  readonly economy: EconomyView | undefined;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /** Checks the same placement constraints used when commands are applied. */
   evaluatePlacement: (placement: ActorPlacement) => PlacementEvaluation;
-  /** Checks production and free exits against the current committed state. */
+  /** Checks paid queue capacity, or free exits in the construction sandbox. */
   evaluateTraining: (command: TrainUnitCommand) => TrainingEvaluation;
   /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
   unusedActorId: (prefix: string) => string;
@@ -198,8 +216,21 @@ export function createMissionSimulation({
     occupancy,
   );
   validateProductionDefinitions(definitionsById, behaviorsById, map);
+  validateEconomyDefinitions(definitionsById);
+  if (state.economy)
+    validateEconomyState(
+      state.economy,
+      state.actors,
+      definitionsById,
+      map,
+      tickSeconds,
+      state.retiredActorIds,
+    );
+  if (state.economy) deepFreeze(state.economy);
   let actorsById = new Map<string, Actor>();
   let usedActorIds = new Set(state.retiredActorIds);
+  for (const job of state.economy?.production ?? [])
+    usedActorIds.add(job.actorId);
   const queuedCreationIds = () =>
     new Set(
       state.commands.flatMap(({ command }) =>
@@ -323,6 +354,7 @@ export function createMissionSimulation({
     placement: ActorPlacement,
     actors: Iterable<Actor>,
     usedIds: ReadonlySet<string>,
+    economy?: EconomyState,
   ): PlacementEvaluation => {
     const reject = (reason: PlacementReason): PlacementEvaluation => ({
       accepted: false,
@@ -357,6 +389,23 @@ export function createMissionSimulation({
       definition,
       actors,
     );
+    if (evaluation.accepted && economy) {
+      if (economy.materials < materialsCost(definition))
+        return { ...reject("insufficient-materials"), tiles: evaluation.tiles };
+      const resources = [
+        ...economy.sites.filter((site) => site.remainingMaterials > 0),
+        ...economy.loot.filter((loot) => !loot.collected),
+      ];
+      if (
+        evaluation.tiles.some((tile) =>
+          resources.some(
+            (resource) =>
+              resource.tile.x === tile.x && resource.tile.z === tile.z,
+          ),
+        )
+      )
+        return { ...reject("resource-site"), tiles: evaluation.tiles };
+    }
     if (evaluation.accepted) {
       try {
         ensureValidActor(actor);
@@ -371,6 +420,7 @@ export function createMissionSimulation({
     command: TrainUnitCommand,
     actors: readonly Actor[],
     usedIds: ReadonlySet<string>,
+    economy?: EconomyState,
   ): TrainingEvaluation => {
     const evaluation = evaluateUnitTraining(command, {
       actors,
@@ -382,7 +432,27 @@ export function createMissionSimulation({
       occupancy,
       bounds: worldBounds,
     });
-    if (evaluation.accepted) {
+    if (
+      economy &&
+      (evaluation.accepted || evaluation.reason === "exit-blocked")
+    ) {
+      const definition = definitionsById.get(command.definitionId)!;
+      if (economy.materials < materialsCost(definition))
+        return { accepted: false, reason: "insufficient-materials" };
+      if (
+        economy.production.filter(
+          (job) => job.producerId === command.producerId,
+        ).length >= 5
+      )
+        return { accepted: false, reason: "queue-full" };
+      if (
+        definition.harvesting &&
+        refineryOccupied(economy, command.producerId)
+      )
+        return { accepted: false, reason: "refinery-occupied" };
+      return { accepted: true, queued: true };
+    }
+    if (evaluation.accepted && "actor" in evaluation) {
       try {
         ensureValidActor(evaluation.actor);
       } catch {
@@ -472,6 +542,17 @@ export function createMissionSimulation({
       definitionFor(actor),
       applied,
     );
+    if (accepted && working.economy) {
+      const worker = working.economy.harvesters.find(
+        (worker) => worker.actorId === actor.id,
+      );
+      if (worker) {
+        worker.phase = worker.refineryId ? "idle" : "unassigned";
+        delete worker.targetSiteId;
+        delete worker.activeSiteId;
+        delete worker.retryNavigationVersion;
+      }
+    }
     validateUpdate(actor, before);
     return accepted;
   };
@@ -558,6 +639,7 @@ export function createMissionSimulation({
         applied,
         working.actors,
         working.usedIds,
+        working.economy,
       );
       if (!evaluation.accepted) {
         return {
@@ -568,6 +650,10 @@ export function createMissionSimulation({
         };
       }
       occupancy!.place(evaluation.footprint);
+      if (working.economy)
+        working.economy.materials -= materialsCost(
+          definitionFor(evaluation.actor),
+        );
       stageActor(working, evaluation.actor);
       return { tick, command: applied, accepted: true };
     }
@@ -577,6 +663,7 @@ export function createMissionSimulation({
         applied,
         working.actors,
         working.usedIds,
+        working.economy,
       );
       if (!evaluation.accepted) {
         return {
@@ -586,14 +673,79 @@ export function createMissionSimulation({
           reason: evaluation.reason,
         };
       }
-      stageActor(working, evaluation.actor);
+      if (working.economy) {
+        const definition = definitionsById.get(applied.definitionId)!;
+        const cost = materialsCost(definition);
+        working.economy.materials -= cost;
+        working.economy.production.push({
+          actorId: applied.actorId,
+          producerId: applied.producerId,
+          definitionId: applied.definitionId,
+          paidMaterials: cost,
+          completedTicks: 0,
+          totalTicks: trainingTicks(definition, tickSeconds),
+          exitBlocked: false,
+        });
+        working.usedIds.add(applied.actorId);
+      } else if ("actor" in evaluation) stageActor(working, evaluation.actor);
       return { tick, command: applied, accepted: true };
     }
-    if (command.kind === "remove-actor") {
+    if (
+      command.kind === "gather" ||
+      command.kind === "assign-refinery" ||
+      command.kind === "return-cargo" ||
+      command.kind === "cancel-production"
+    ) {
       const applied = structuredClone(command);
+      if (!working.economy)
+        return {
+          tick,
+          command: applied,
+          accepted: false,
+        } as CommandOutcome<EconomyCommand>;
+      const reason = applyEconomyCommand(
+        applied,
+        working.economy,
+        working.actors,
+        definitionsById,
+        (id) => working.retiredIds.push(id),
+      );
+      return {
+        tick,
+        command: applied,
+        accepted: !reason,
+        ...(reason && { reason }),
+      } as CommandOutcome<EconomyCommand>;
+    }
+    if (command.kind === "remove-actor" || command.kind === "sell-actor") {
+      const applied = structuredClone(command);
+      const outcome = (accepted: boolean) =>
+        ({ tick, command: applied, accepted }) as CommandOutcome<
+          RemoveActorCommand | SellActorCommand
+        >;
       const actor = working.actorsById.get(applied.actorId);
       if (!actor) {
-        return { tick, command: applied, accepted: false };
+        return outcome(false);
+      }
+      if (
+        command.kind === "sell-actor" &&
+        (!working.economy || !isTilePlacedActor(actor))
+      )
+        return outcome(false);
+      if (working.economy) {
+        if (command.kind === "sell-actor")
+          working.economy.materials += Math.floor(
+            materialsCost(definitionFor(actor)) / 2,
+          );
+        for (const worker of working.economy.harvesters) {
+          if (worker.refineryId === actor.id && worker.phase !== "idle") {
+            const harvester = working.actorsById.get(worker.actorId);
+            if (harvester) delete harvester.movement;
+          }
+        }
+        removeEconomyActor(working.economy, actor.id, (id) =>
+          working.retiredIds.push(id),
+        );
       }
       if (isTilePlacedActor(actor)) {
         occupancy!.remove(actor.id);
@@ -602,7 +754,7 @@ export function createMissionSimulation({
       working.actors.splice(working.actors.indexOf(actor), 1);
       working.retiredIds.push(actor.id);
       working.lifecycleChanges += 1;
-      return { tick, command: applied, accepted: true };
+      return outcome(true);
     }
     if (command.kind === "move") {
       if (!isFinitePosition(command.target))
@@ -630,14 +782,27 @@ export function createMissionSimulation({
       return state.tick;
     },
     tickSeconds,
+    get economy() {
+      return state.economy;
+    },
     actorById: (id) => {
       const actor = actorsById.get(id);
       return actor && structuredClone(actor);
     },
     evaluatePlacement: (placement) =>
-      evaluatePlacement(structuredClone(placement), state.actors, usedActorIds),
+      evaluatePlacement(
+        structuredClone(placement),
+        state.actors,
+        usedActorIds,
+        state.economy,
+      ),
     evaluateTraining: (command) =>
-      evaluateTraining(structuredClone(command), state.actors, usedActorIds),
+      evaluateTraining(
+        structuredClone(command),
+        state.actors,
+        usedActorIds,
+        state.economy,
+      ),
     unusedActorId: (prefix) => {
       let number = nextActorNumbers.get(prefix) ?? 1;
       while (usedActorIds.has(`${prefix}${number}`)) number += 1;
@@ -685,6 +850,23 @@ export function createMissionSimulation({
         ...state,
         actors: freezeActors([...state.actors, register(copy)]),
       };
+      if (state.economy && definitionFor(copy).harvesting) {
+        state = {
+          ...state,
+          economy: deepFreeze({
+            ...structuredClone(state.economy),
+            harvesters: [
+              ...state.economy.harvesters,
+              {
+                actorId: copy.id,
+                cargo: 0,
+                gatherProgress: 0,
+                phase: "unassigned",
+              },
+            ],
+          }),
+        };
+      }
       // Registered first, so a rejected actor never leaves occupancy behind.
       if (footprint) {
         occupancy!.place(footprint);
@@ -701,13 +883,37 @@ export function createMissionSimulation({
         occupancy!.remove(id);
       }
       actorsById.delete(id);
+      const economy = state.economy && structuredClone(state.economy);
+      const retiredActorIds = [...state.retiredActorIds, id];
+      if (economy) {
+        removeEconomyActor(economy, id, (retiredId) =>
+          retiredActorIds.push(retiredId),
+        );
+        const actors = state.actors.map((candidate) =>
+          structuredClone(candidate),
+        );
+        for (const worker of economy.harvesters) {
+          if (worker.phase === "unassigned") {
+            const candidate = actors.find(
+              (actor) => actor.id === worker.actorId,
+            );
+            if (candidate) delete candidate.movement;
+          }
+        }
+        state = {
+          ...state,
+          actors: freezeActors(actors.map((actor) => deepFreeze(actor))),
+        };
+      }
       state = {
         ...state,
         actors: freezeActors(
-          state.actors.filter((candidate) => candidate !== actor),
+          state.actors.filter((candidate) => candidate.id !== id),
         ),
-        retiredActorIds: [...state.retiredActorIds, id],
+        retiredActorIds,
+        ...(economy && { economy: deepFreeze(economy) }),
       };
+      actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
       actorVersion += 1;
       return true;
     },
@@ -739,6 +945,7 @@ export function createMissionSimulation({
           usedIds: new Set(usedActorIds),
           retiredIds: [...state.retiredActorIds],
           lifecycleChanges: 0,
+          economy: state.economy && structuredClone(state.economy),
         };
         const outcomes = due.flatMap(({ command }) =>
           command.kind === "group-move"
@@ -762,6 +969,30 @@ export function createMissionSimulation({
           validateUpdate(actor, before);
         }
 
+        if (working.economy)
+          updateEconomy(working.economy, {
+            actors: working.actors,
+            definitions: definitionsById,
+            behaviors: behaviorsById,
+            map: map!,
+            tickSeconds,
+            move: (actor, target) =>
+              behaviorFor(actor).handleCommand(actor, definitionFor(actor), {
+                kind: "move",
+                actorId: actor.id,
+                target,
+              }),
+            evaluateSpawn: (job) =>
+              evaluateTraining(
+                { kind: "train-unit", ...job },
+                working.actors,
+                new Set(
+                  [...working.usedIds].filter((id) => id !== job.actorId),
+                ),
+              ),
+            spawn: (actor) => stageActor(working, actor),
+          });
+
         separateMobileActors(
           working.actors.flatMap((actor) => {
             const mover = navigatingActor(actor);
@@ -775,6 +1006,15 @@ export function createMissionSimulation({
             actor,
             actorIdentity(actorsById.get(actor.id) ?? actor),
           );
+        if (working.economy)
+          validateEconomyState(
+            working.economy,
+            working.actors,
+            definitionsById,
+            map,
+            tickSeconds,
+            working.retiredIds,
+          );
 
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
@@ -785,6 +1025,7 @@ export function createMissionSimulation({
           actors: committedActors,
           retiredActorIds: working.retiredIds,
           commands: state.commands.filter(({ tick }) => tick > state.tick),
+          ...(working.economy && { economy: deepFreeze(working.economy) }),
         };
         actorsById = new Map(committedActors.map((actor) => [actor.id, actor]));
         usedActorIds = working.usedIds;

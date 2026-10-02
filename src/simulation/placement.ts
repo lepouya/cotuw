@@ -22,6 +22,8 @@ export const PLACEMENT_REASONS = [
   "excessive-slope",
   "actor-conflict",
   "occupancy-conflict",
+  "insufficient-materials",
+  "resource-site",
 ] as const;
 
 export type PlacementReason = (typeof PLACEMENT_REASONS)[number];

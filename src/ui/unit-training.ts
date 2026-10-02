@@ -17,6 +17,9 @@ const REASONS: Record<TrainingReason, string> = {
   "unsupported-unit": "This building cannot train these units.",
   "exit-blocked":
     "Exit blocked. Move units or clear ground beside the building.",
+  "insufficient-materials": "Not enough Materials for this unit.",
+  "refinery-occupied": "This Refinery already has a Harvester or a paid order.",
+  "queue-full": "Production queue full (5 orders).",
 };
 
 /** Local pending feedback; the simulation rechecks every submitted request. */
@@ -69,6 +72,9 @@ export function createUnitTraining(
       values.find(
         (value) => !value.accepted && value.reason === "exit-blocked",
       ) ??
+      values.find(
+        (value) => !value.accepted && value.reason !== "unsupported-unit",
+      ) ??
       values[0];
     const currentResult =
       result && result.producerId === options.selectedActorId()
@@ -80,7 +86,9 @@ export function createUnitTraining(
         : availability && !availability.accepted
           ? REASONS[availability.reason]
           : (currentResult ??
-            "Train a unit. It will appear beside this building."),
+            (simulation.economy
+              ? "Queue a unit. Materials are paid now; cancel for a full refund."
+              : "Train a unit. It will appear beside this building.")),
     );
   };
   const listeners = buttons.map(({ definitionId, button }) => {
@@ -115,7 +123,9 @@ export function createUnitTraining(
       result = {
         producerId: command.producerId,
         text: accepted
-          ? `${options.names.get(command.definitionId) ?? command.definitionId} ready beside the building.`
+          ? simulation.economy
+            ? `${options.names.get(command.definitionId) ?? command.definitionId} queued. Select this building to view or cancel production.`
+            : `${options.names.get(command.definitionId) ?? command.definitionId} ready beside the building.`
           : REASONS[reason ?? "invalid-actor"],
       };
     },

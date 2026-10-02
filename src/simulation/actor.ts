@@ -17,6 +17,14 @@ export type ActorDefinition = {
   };
   /** Mobile actor definitions this building can train. */
   production?: { unitDefinitionIds: string[] };
+  materialsCost?: number;
+  trainingSeconds?: number;
+  refinery?: { harvesterDefinitionId: string };
+  harvesting?: {
+    capacity: number;
+    loadSeconds: number;
+    patchRadius: number;
+  };
   /** Present when this actor type can occupy a tile-aligned footprint. */
   footprint?: Footprint;
   /** Terrain constraints used when placing its footprint. */
@@ -66,7 +74,7 @@ export type MovementOrder = {
   occupancyLayer?: OccupancyLayer;
 };
 
-type DeepReadonly<T> = T extends readonly (infer Item)[]
+export type DeepReadonly<T> = T extends readonly (infer Item)[]
   ? readonly DeepReadonly<Item>[]
   : T extends object
     ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }

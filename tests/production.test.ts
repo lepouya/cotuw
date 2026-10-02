@@ -242,7 +242,8 @@ describe("unit production", () => {
     const command = order("custom-unit", "scout");
     const preview = simulation.evaluateTraining(command);
     expect(preview.accepted).toBe(true);
-    if (!preview.accepted) throw new Error("Expected a valid custom exit.");
+    if (!preview.accepted || !("actor" in preview))
+      throw new Error("Expected a valid custom exit.");
     expect(preview.actor.worldPosition).toEqual(map.tileCenter(4, 5));
     simulation.submitCommand(command);
     expect(simulation.tick()[0].accepted).toBe(true);

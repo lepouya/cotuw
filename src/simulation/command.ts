@@ -2,6 +2,7 @@ import type { TerrainEdit } from "./terrain";
 import type { ActorPlacement, PlacementReason } from "./placement";
 import type { TrainingReason } from "./production";
 import type { WorldPosition } from "./world";
+import type { EconomyReason } from "./economy";
 
 /** Orders an actor to approach a target using its movement rules. */
 export type MoveCommand = {
@@ -62,8 +63,21 @@ export type TrainUnitCommand = {
 export type ActorLifecycleCommand =
   PlaceActorCommand | RemoveActorCommand | TrainUnitCommand;
 
+export type EconomyCommand =
+  | { kind: "gather"; actorId: string; siteId: string }
+  | { kind: "assign-refinery"; actorId: string; refineryId: string }
+  | { kind: "return-cargo"; actorId: string }
+  | { kind: "cancel-production"; actorId: string };
+
+export type SellActorCommand = { kind: "sell-actor"; actorId: string };
+
 export type MissionCommand =
-  ActorCommand | GroupMoveCommand | TerrainCommand | ActorLifecycleCommand;
+  | ActorCommand
+  | GroupMoveCommand
+  | TerrainCommand
+  | ActorLifecycleCommand
+  | EconomyCommand
+  | SellActorCommand;
 
 /** A command waiting for the start of the tick numbered `tick`. */
 export type ScheduledCommand = {
@@ -75,7 +89,9 @@ type RejectionReason<C extends MissionCommand> = C extends PlaceActorCommand
   ? PlacementReason
   : C extends TrainUnitCommand
     ? TrainingReason
-    : never;
+    : C extends EconomyCommand
+      ? EconomyReason
+      : never;
 
 /** Whether the mission accepted a command at the start of `tick`. */
 export type CommandOutcome<C extends MissionCommand = MissionCommand> =
@@ -95,6 +111,6 @@ export type CommandOutcome<C extends MissionCommand = MissionCommand> =
 export function isOutcomeOf<K extends MissionCommand["kind"]>(
   outcome: CommandOutcome,
   kind: K,
-): outcome is CommandOutcome<Extract<MissionCommand, { kind: K }>> {
+): outcome is Extract<CommandOutcome, { command: { kind: K } }> {
   return outcome.command.kind === kind;
 }

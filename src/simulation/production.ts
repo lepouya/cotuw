@@ -19,10 +19,14 @@ export type TrainingReason =
   | "used-id"
   | "missing-producer"
   | "unsupported-unit"
-  | "exit-blocked";
+  | "exit-blocked"
+  | "insufficient-materials"
+  | "refinery-occupied"
+  | "queue-full";
 
 export type TrainingEvaluation =
   | { accepted: true; actor: Actor }
+  | { accepted: true; queued: true }
   | { accepted: false; reason: TrainingReason };
 
 export function validateProductionDefinitions(
