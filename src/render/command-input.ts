@@ -1,15 +1,15 @@
 import { isTerrainPickMesh } from "./terrain-mesh";
+import { createPrimaryClick } from "./primary-click";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { ActorCommand } from "../simulation/command";
-
-/** CSS pixels a press may wander and still count as a click, not a pan. */
-const CLICK_SLOP_PIXELS = 5;
 
 export type CommandInputOptions = {
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   submitCommand: (command: ActorCommand) => void;
   onSelectionChanged?: (actorId: string | undefined) => void;
+  enabled?: () => boolean;
+  canMove?: (actorId: string) => boolean;
 };
 
 export type CommandInput = {
@@ -26,7 +26,13 @@ export type CommandInput = {
 export function createCommandInput(
   canvas: HTMLCanvasElement,
   scene: Scene,
-  { actorIdForMesh, submitCommand, onSelectionChanged }: CommandInputOptions,
+  {
+    actorIdForMesh,
+    submitCommand,
+    onSelectionChanged,
+    enabled = () => true,
+    canMove = () => true,
+  }: CommandInputOptions,
 ): CommandInput {
   let selectedActorId: string | undefined;
   const select = (actorId: string | undefined) => {
@@ -34,70 +40,46 @@ export function createCommandInput(
     onSelectionChanged?.(actorId);
   };
 
-  let pointerDown:
-    { pointerId: number; clientX: number; clientY: number } | undefined;
-  const handlePointerDown = (event: PointerEvent) => {
-    if (event.button === 0) {
-      pointerDown = event;
-    }
-  };
-  const clearPointerDown = () => {
-    pointerDown = undefined;
-  };
-  const handlePointerUp = (event: PointerEvent) => {
-    const press = pointerDown;
-    clearPointerDown();
-    if (
-      event.button !== 0 ||
-      !press ||
-      event.pointerId !== press.pointerId ||
-      Math.hypot(event.clientX - press.clientX, event.clientY - press.clientY) >
-        CLICK_SLOP_PIXELS
-    ) {
-      return;
-    }
+  const click = createPrimaryClick(
+    canvas,
+    (event) => {
+      const bounds = canvas.getBoundingClientRect();
+      // Babylon's pointer input also passes CSS-pixel coordinates to scene.pick.
+      // Scaling to the render buffer would miss on a HiDPI display.
+      const pick = scene.pick(
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+        // Other scene meshes, such as overlays, must not swallow the click.
+        (mesh) => actorIdForMesh(mesh) !== undefined || isTerrainPickMesh(mesh),
+      );
+      if (!pick?.hit) {
+        return;
+      }
 
-    const bounds = canvas.getBoundingClientRect();
-    // Babylon's pointer input also passes CSS-pixel coordinates to scene.pick.
-    // Scaling to the render buffer would miss on a HiDPI display.
-    const pick = scene.pick(
-      event.clientX - bounds.left,
-      event.clientY - bounds.top,
-      // Other scene meshes, such as overlays, must not swallow the click.
-      (mesh) => actorIdForMesh(mesh) !== undefined || isTerrainPickMesh(mesh),
-    );
-    if (!pick?.hit) {
-      return;
-    }
-
-    const pickedActorId = actorIdForMesh(pick.pickedMesh);
-    if (pickedActorId) {
-      select(pickedActorId === selectedActorId ? undefined : pickedActorId);
-    } else if (
-      selectedActorId &&
-      pick.pickedPoint &&
-      isTerrainPickMesh(pick.pickedMesh)
-    ) {
-      submitCommand({
-        kind: "move",
-        actorId: selectedActorId,
-        target: { x: pick.pickedPoint.x, z: pick.pickedPoint.z },
-      });
-    }
-  };
-  canvas.addEventListener("pointerdown", handlePointerDown);
-  canvas.addEventListener("pointerup", handlePointerUp);
-  canvas.addEventListener("pointercancel", clearPointerDown);
+      const pickedActorId = actorIdForMesh(pick.pickedMesh);
+      if (pickedActorId) {
+        select(pickedActorId === selectedActorId ? undefined : pickedActorId);
+      } else if (
+        selectedActorId &&
+        canMove(selectedActorId) &&
+        pick.pickedPoint &&
+        isTerrainPickMesh(pick.pickedMesh)
+      ) {
+        submitCommand({
+          kind: "move",
+          actorId: selectedActorId,
+          target: { x: pick.pickedPoint.x, z: pick.pickedPoint.z },
+        });
+      }
+    },
+    enabled,
+  );
 
   return {
     get selectedActorId() {
       return selectedActorId;
     },
     select,
-    dispose: () => {
-      canvas.removeEventListener("pointerdown", handlePointerDown);
-      canvas.removeEventListener("pointerup", handlePointerUp);
-      canvas.removeEventListener("pointercancel", clearPointerDown);
-    },
+    dispose: click.dispose,
   };
 }
