@@ -1,6 +1,7 @@
 import { Color3, MeshBuilder, StandardMaterial } from "@babylonjs/core";
 
 import { shortestTurn } from "../simulation/world";
+import { createViewRegistry } from "./view-registry";
 import {
   actorIdForPickMesh,
   createActorRenderer,
@@ -11,7 +12,7 @@ import {
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
-import type { ActorAppearance, ActorPose, ActorRenderer } from "./actor";
+import type { ActorAppearance, ActorPose } from "./actor";
 
 const SELECTION_COLOR = new Color3(1, 0.86, 0.44);
 /** Edge length of the stand-in cube for actors without an appearance. */
@@ -54,59 +55,33 @@ export function createActorViewRegistry(
     appearances.get(definitionId) ??
     (fallback ??= createFallbackAppearance(scene));
 
-  const renderers = new Map<
-    string,
-    {
-      renderer: ActorRenderer;
-      definitionId: string;
-      appearance: ActorAppearance;
-    }
-  >();
   const previousPoses = new Map<string, ActorPose>();
   const pose: ActorPose = { worldPosition: { x: 0, z: 0 }, facing: 0 };
   let selectedActorId: string | undefined;
 
-  const sync = (actors: readonly ActorRenderState[]) => {
-    const present = new Set<string>();
-    for (const actor of actors) {
-      present.add(actor.id);
-      const view = renderers.get(actor.id);
-      const appearance = appearanceFor(actor.definitionId);
-      // A changed kind or appearance needs a fresh set of render resources.
-      if (
-        view &&
-        (view.definitionId !== actor.definitionId ||
-          view.appearance !== appearance)
-      ) {
-        remove(actor.id);
-      }
-      if (!renderers.has(actor.id)) {
-        const renderer = createActorRenderer(
-          scene,
-          map,
-          actor,
-          appearance,
-          selectionMaterial,
-        );
-        renderer.setSelected(actor.id === selectedActorId);
-        renderers.set(actor.id, {
-          renderer,
-          definitionId: actor.definitionId,
-          appearance,
-        });
-      }
-    }
-    for (const id of renderers.keys()) {
-      if (!present.has(id)) {
-        remove(id);
-      }
-    }
-  };
-  const remove = (id: string) => {
-    renderers.get(id)?.renderer.dispose();
-    renderers.delete(id);
-    previousPoses.delete(id);
-  };
+  const renderers = createViewRegistry({
+    keyFor: (actor: ActorRenderState) => ({
+      definitionId: actor.definitionId,
+      appearance: appearanceFor(actor.definitionId),
+    }),
+    sameKey: (left, right) =>
+      left.definitionId === right.definitionId &&
+      left.appearance === right.appearance,
+    onRemove: (id) => {
+      previousPoses.delete(id);
+    },
+    create: (actor, { appearance }) => {
+      const renderer = createActorRenderer(
+        scene,
+        map,
+        actor,
+        appearance,
+        selectionMaterial,
+      );
+      renderer.setSelected(actor.id === selectedActorId);
+      return renderer;
+    },
+  });
 
   return {
     actorIdForMesh: (mesh) => {
@@ -131,25 +106,22 @@ export function createActorViewRegistry(
       }
     },
     dispose: () => {
-      for (const { renderer } of renderers.values()) {
-        renderer.dispose();
-      }
-      renderers.clear();
+      renderers.dispose();
       previousPoses.clear();
       selectionMaterial.dispose();
       fallback?.dispose();
     },
     setSelectedActor: (actorId) => {
       selectedActorId = actorId;
-      for (const [id, { renderer }] of renderers) {
-        renderer.setSelected(id === actorId);
+      for (const renderer of renderers.values()) {
+        renderer.setSelected(renderer.actorId === actorId);
       }
     },
     update: (actors, tickProgress) => {
-      sync(actors);
+      renderers.sync(actors);
       for (const actor of actors) {
         interpolatePose(previousPoses.get(actor.id), actor, tickProgress, pose);
-        renderers.get(actor.id)!.renderer.update(pose);
+        renderers.get(actor.id)!.update(pose);
       }
     },
   };

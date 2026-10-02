@@ -6,6 +6,7 @@ import type { Material, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
 import type { ActorMotion } from "./actor-gait";
+import type { Rgb } from "./color";
 
 // Keep the actor visibly above the terrain's thin visual-layer offsets.
 const GROUND_CLEARANCE = 0.04;
@@ -18,9 +19,7 @@ const PICK_TESSELLATION = 12;
 const MAX_ANIMATION_SECONDS = 0.1;
 export const ACTOR_PICK_KIND = "actor";
 /** Shared by the minimap and fallback model when an actor names no color. */
-export const DEFAULT_ACTOR_COLOR: [number, number, number] = [
-  0.871, 0.345, 0.122,
-];
+export const DEFAULT_ACTOR_COLOR: Rgb = [0.871, 0.345, 0.122];
 
 /** How one kind of actor looks. */
 export type ActorAppearance = {
