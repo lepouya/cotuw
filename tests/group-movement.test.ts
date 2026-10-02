@@ -9,6 +9,7 @@ import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { startSimulationLoop } from "../src/simulation/loop";
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
+import type { MissionCommand } from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
 
 const definitions: ActorDefinition[] = [
@@ -93,6 +94,47 @@ const sortedActors = (state: MissionState) =>
   state.actors.sort((a, b) => (a.id < b.id ? -1 : 1));
 
 describe("group movement", () => {
+  test("blocked move receipts survive arrival in the command's tick", () => {
+    const { simulation, map } = fixture([]);
+    const start = map.tileCenter(9, 4);
+    simulation.spawnActor(
+      createActor({
+        id: "near",
+        definitionId: "trooper",
+        worldPosition: { ...start, x: start.x - 0.01 },
+      }),
+    );
+    simulation.submitCommand({
+      kind: "group-move",
+      actorIds: ["near"],
+      target: map.tileCenter(10, 4),
+    });
+    const [outcome] = simulation.tick();
+    expect(simulation.actorById("near")!.movement).toBeUndefined();
+    expect(outcome).toMatchObject({ accepted: true, reachedTarget: false });
+    simulation.dispose();
+  });
+
+  test("move receipts preserve reachability when a later order replaces the route", () => {
+    const { simulation, map } = fixture();
+    simulation.submitCommand({
+      kind: "move",
+      actorId: "unit-0",
+      target: map.tileCenter(10, 4),
+    });
+    simulation.submitCommand({
+      kind: "move",
+      actorId: "unit-0",
+      target: map.tileCenter(7, 4),
+    });
+    const outcomes = simulation.tick();
+    expect(outcomes).toMatchObject([
+      { accepted: true, reachedTarget: false },
+      { accepted: true, reachedTarget: true },
+    ]);
+    simulation.dispose();
+  });
+
   test("destinations respect unselected units' authored radii on the same layer", () => {
     const { simulation, map } = fixture([]);
     const target = map.tileCenter(6, 6);
@@ -306,6 +348,54 @@ describe("group movement", () => {
     expect(simulation.actorById("trooper")!.movement!.target).not.toEqual(
       previous,
     );
+    simulation.dispose();
+  });
+
+  test("an approach slot never moves a stranded unit further from the click", () => {
+    const { simulation, map } = fixture([]);
+    for (let x = 1; x <= 5; x += 1) map.setTerrain(x, 1, { typeId: "water" });
+    // The unselected swimmer holds the water tile nearest the click.
+    for (const [id, x] of [
+      ["a", 3],
+      ["b", 4],
+      ["c", 5],
+    ] as const)
+      simulation.spawnActor(
+        createActor({
+          id,
+          definitionId: "swimmer",
+          worldPosition: map.tileCenter(x, 1),
+        }),
+      );
+    simulation.submitCommand({
+      kind: "group-move",
+      actorIds: ["a", "b"],
+      target: map.tileCenter(7, 3),
+    });
+    expect(simulation.tick().map(({ accepted }) => accepted)).toEqual([
+      true,
+      false,
+    ]);
+    const slot = simulation.actorById("a")!.movement!.target;
+    expect(map.tileAtWorldPosition(slot.x, slot.z)).toEqual({ x: 4, z: 1 });
+    expect(simulation.actorById("b")!.movement).toBeUndefined();
+    simulation.dispose();
+  });
+
+  test("submitted moves cannot carry a requested group target", () => {
+    const { simulation, map } = fixture();
+    simulation.submitCommand({
+      kind: "move",
+      actorId: "unit-0",
+      target: map.tileCenter(6, 3),
+      requestedTarget: map.tileCenter(10, 4),
+    } as MissionCommand);
+    const [outcome] = simulation.tick();
+    expect(outcome!.accepted).toBe(true);
+    expect(outcome!.command).not.toHaveProperty("requestedTarget");
+    expect(
+      simulation.actorById("unit-0")!.movement!.requestedTarget,
+    ).toBeUndefined();
     simulation.dispose();
   });
 

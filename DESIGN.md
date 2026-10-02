@@ -352,7 +352,7 @@ story.
   Destinations avoid unselected units and assigned same-layer destinations.
   An actor without an available destination keeps its current order. An
   unreachable click uses separate approach positions and blocked-target
-  feedback.
+  feedback; an approach position must be nearer the click than the unit is.
 - Movement definitions author a separation radius independently of visual
   bounds.
   Friendly contact correction runs after movement, cannot cross blocked terrain,

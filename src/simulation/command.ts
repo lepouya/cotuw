@@ -8,8 +8,6 @@ export type MoveCommand = {
   kind: "move";
   actorId: string;
   target: WorldPosition;
-  /** Unreachable group click retained for destination feedback. */
-  requestedTarget?: WorldPosition;
 };
 
 /** Assigns distinct reachable destinations at the start of the tick. */
@@ -30,6 +28,13 @@ export type StopCommand = {
  * change they make to actors happens at the start of a tick.
  */
 export type ActorCommand = MoveCommand | StopCommand;
+
+/**
+ * An actor command as its behavior receives it. Only the mission adds
+ * `requestedTarget`, when a group member can only approach the group's click.
+ */
+export type AppliedActorCommand =
+  (MoveCommand & { requestedTarget?: WorldPosition }) | StopCommand;
 
 /**
  * Changes a mission's simulation terrain at the start of a tick, so saves and
@@ -81,6 +86,8 @@ export type CommandOutcome<C extends MissionCommand = MissionCommand> =
         accepted: boolean;
         /** Why the command was rejected, as evaluated at command application. */
         reason?: RejectionReason<C>;
+        /** Whether the move's requested point was reachable at application. */
+        reachedTarget?: C extends MoveCommand ? boolean : never;
       }
     : never;
 

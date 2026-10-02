@@ -78,6 +78,14 @@ export function isTilePlacedActor<
   return actor.tilePlacement !== undefined;
 }
 
+/** Whether an actor follows move orders rather than holding a footprint. */
+export function isMobileActor(
+  actor: { readonly tilePlacement?: unknown },
+  definition: Readonly<ActorDefinition> | undefined,
+): boolean {
+  return !!definition?.movement && !isTilePlacedActor(actor);
+}
+
 export function validatePlacementDefinition(
   definition: Readonly<ActorDefinition>,
   map: TerrainView,

@@ -1,4 +1,4 @@
-import type { ActorCommand } from "./command";
+import type { AppliedActorCommand } from "./command";
 import type { Footprint, OccupancyLayer } from "./occupancy";
 import type { TileCoord } from "./grid";
 import type { NavigationGrid } from "./navigation";
@@ -125,7 +125,7 @@ export type ActorBehavior = {
   handleCommand: (
     actor: Actor,
     definition: ActorDefinition,
-    command: ActorCommand,
+    command: AppliedActorCommand,
   ) => boolean;
   update: (actor: Actor, definition: ActorDefinition, seconds: number) => void;
   /** Throws when a definition cannot run this behavior. */

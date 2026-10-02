@@ -15,6 +15,7 @@ import {
   createTilePlacedActor,
   evaluateFootprint,
   footprintPlacementFor,
+  isMobileActor,
   isTilePlacedActor,
   isValidTilePlacement,
   tilePlacedPose,
@@ -28,11 +29,14 @@ import type {
   ActorRenderState,
 } from "./actor";
 import type {
-  ActorCommand,
+  AppliedActorCommand,
   CommandOutcome,
+  GroupMoveCommand,
   MissionCommand,
+  MoveCommand,
   ScheduledCommand,
 } from "./command";
+import type { NavigatingActor } from "./group-movement";
 import type { FootprintPlacement } from "./occupancy";
 import type {
   ActorPlacement,
@@ -40,7 +44,7 @@ import type {
   PlacementReason,
 } from "./placement";
 import type { TerrainState } from "./terrain";
-import type { WorldBounds } from "./world";
+import type { WorldBounds, WorldPosition } from "./world";
 
 /** Actor state that behaviors must leave unchanged. */
 type ActorIdentity = Pick<Actor, "id" | "definitionId" | "tilePlacement">;
@@ -148,7 +152,7 @@ export type MissionSimulation = {
   /**
    * Applies queued commands, then advances every actor by one tick. Outcomes
    * carry each command as applied, with move targets clamped to the bounds.
-   * Group moves report one move outcome per unique actor ID.
+   * Group moves report one move outcome per unique actor ID, in ID order.
    */
   tick: () => CommandOutcome[];
 };
@@ -452,56 +456,94 @@ export function createMissionSimulation({
       ? map.addEditRule((edit) => occupancy.allowsTerrainEdit(edit))
       : undefined;
 
-  const applyCommand = (
-    command: MissionCommand,
+  /** Mobile actors whose behavior exposes navigation queries. */
+  const navigatingActor = (actor: Actor): NavigatingActor | undefined => {
+    const definition = definitionFor(actor);
+    if (!isMobileActor(actor, definition)) return undefined;
+    const grid = behaviorFor(actor).navigationGrid?.(actor, definition);
+    return grid && { actor, definition, grid };
+  };
+  const handle = (working: WorkingActors, applied: AppliedActorCommand) => {
+    const actor = working.actorsById.get(applied.actorId);
+    if (!actor) return false;
+    const before = actorIdentity(actor);
+    const accepted = behaviorFor(actor).handleCommand(
+      actor,
+      definitionFor(actor),
+      applied,
+    );
+    validateUpdate(actor, before);
+    return accepted;
+  };
+  const applyMove = (
+    command: MoveCommand,
     tick: number,
     working: WorkingActors,
-  ): CommandOutcome | CommandOutcome[] => {
-    if (command.kind === "group-move") {
-      if (
-        !isFinitePosition(command.target) ||
-        !Array.isArray(command.actorIds) ||
-        !command.actorIds.every(
-          (id) => typeof id === "string" && id.length > 0,
-        ) ||
-        command.actorIds.length === 0
-      ) {
-        return { tick, command: structuredClone(command), accepted: false };
-      }
-      const target = clampToBounds(command.target, worldBounds);
-      const ids = [...new Set(command.actorIds)].sort();
-      const movers = ids.flatMap((id) => {
-        const actor = working.actorsById.get(id);
-        if (!actor || !definitionFor(actor).movement) return [];
-        const grid = behaviorFor(actor).navigationGrid?.(
-          actor,
-          definitionFor(actor),
-        );
-        return grid ? [{ actor, definition: definitionFor(actor), grid }] : [];
-      });
-      const assignments = new Map(
-        assignGroupDestinations(
-          movers,
-          working.actors.map((actor) => ({
-            actor,
-            definition: definitionFor(actor),
-          })),
-          target,
-        ).map((assignment) => [assignment.command.actorId, assignment]),
-      );
-      return ids.flatMap((actorId) => {
-        const assignment = assignments.get(actorId);
-        if (!assignment?.assigned)
-          return [
-            {
-              tick,
-              command: { kind: "move" as const, actorId, target },
-              accepted: false,
-            },
-          ];
-        return applyCommand(assignment.command, tick, working);
-      });
+    requestedTarget?: WorldPosition,
+  ): CommandOutcome<MoveCommand> => {
+    const accepted = handle(working, {
+      ...command,
+      ...(requestedTarget && { requestedTarget }),
+    });
+    return {
+      tick,
+      command,
+      accepted,
+      reachedTarget: accepted
+        ? requestedTarget
+          ? false
+          : working.actorsById.get(command.actorId)?.movement?.reachedTarget
+        : undefined,
+    };
+  };
+  /** Reports one move outcome per unique actor ID, in ID order. */
+  const applyGroupMove = (
+    command: GroupMoveCommand,
+    tick: number,
+    working: WorkingActors,
+  ): CommandOutcome[] => {
+    if (
+      !isFinitePosition(command.target) ||
+      !Array.isArray(command.actorIds) ||
+      command.actorIds.length === 0 ||
+      !command.actorIds.every((id) => typeof id === "string" && id.length > 0)
+    ) {
+      return [{ tick, command: structuredClone(command), accepted: false }];
     }
+    const target = clampToBounds(command.target, worldBounds);
+    const ids = [...new Set(command.actorIds)].sort();
+    const movers = ids.flatMap((id) => {
+      const actor = working.actorsById.get(id);
+      const mover = actor && navigatingActor(actor);
+      return mover ? [mover] : [];
+    });
+    const destinations = new Map(
+      assignGroupDestinations(
+        movers,
+        working.actors.map((actor) => ({
+          actor,
+          definition: definitionFor(actor),
+        })),
+        target,
+      ).map((destination) => [destination.actorId, destination]),
+    );
+    return ids.map((actorId) => {
+      const destination = destinations.get(actorId);
+      const move: MoveCommand = {
+        kind: "move",
+        actorId,
+        target: destination?.target ?? target,
+      };
+      return destination
+        ? applyMove(move, tick, working, destination.requestedTarget)
+        : { tick, command: move, accepted: false };
+    });
+  };
+  const applyCommand = (
+    command: Exclude<MissionCommand, GroupMoveCommand>,
+    tick: number,
+    working: WorkingActors,
+  ): CommandOutcome => {
     if (command.kind === "terrain") {
       const edit = structuredClone(command);
       if (!map || !map.isValidTerrainEdit(edit)) {
@@ -562,36 +604,19 @@ export function createMissionSimulation({
       working.lifecycleChanges += 1;
       return { tick, command: applied, accepted: true };
     }
-    const handle = (applied: ActorCommand) => {
-      const actor = working.actorsById.get(applied.actorId);
-      if (!actor) return false;
-      const before = actorIdentity(actor);
-      const accepted = behaviorFor(actor).handleCommand(
-        actor,
-        definitionFor(actor),
-        applied,
-      );
-      validateUpdate(actor, before);
-      return accepted;
-    };
     if (command.kind === "move") {
-      if (
-        !isFinitePosition(command.target) ||
-        (command.requestedTarget !== undefined &&
-          !isFinitePosition(command.requestedTarget))
-      )
+      if (!isFinitePosition(command.target))
         return { tick, command: structuredClone(command), accepted: false };
-      const applied = {
-        ...command,
+      // Rebuilt so a submitted move cannot carry mission-only fields.
+      const applied: MoveCommand = {
+        kind: "move",
+        actorId: command.actorId,
         target: clampToBounds(command.target, worldBounds),
-        ...(command.requestedTarget && {
-          requestedTarget: clampToBounds(command.requestedTarget, worldBounds),
-        }),
       };
-      return { tick, command: applied, accepted: handle(applied) };
+      return applyMove(applied, tick, working);
     }
     const applied = structuredClone(command);
-    return { tick, command: applied, accepted: handle(applied) };
+    return { tick, command: applied, accepted: handle(working, applied) };
   };
 
   return {
@@ -716,7 +741,9 @@ export function createMissionSimulation({
           lifecycleChanges: 0,
         };
         const outcomes = due.flatMap(({ command }) =>
-          applyCommand(command, state.tick, working),
+          command.kind === "group-move"
+            ? applyGroupMove(command, state.tick, working)
+            : [applyCommand(command, state.tick, working)],
         );
 
         const previousPositions = new Map(
@@ -737,10 +764,8 @@ export function createMissionSimulation({
 
         separateMobileActors(
           working.actors.flatMap((actor) => {
-            const definition = definitionFor(actor);
-            if (!definition.movement?.radius) return [];
-            const grid = behaviorFor(actor).navigationGrid?.(actor, definition);
-            return grid ? [{ actor, definition, grid }] : [];
+            const mover = navigatingActor(actor);
+            return mover ? [mover] : [];
           }),
           tickSeconds,
           previousPositions,

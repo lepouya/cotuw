@@ -1,8 +1,8 @@
 import { resolveNavigationDestination, segmentCost } from "./navigation";
+import { isTilePlacedActor } from "./placement";
 
 import type { Actor, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
-import type { MoveCommand } from "./command";
 import type { WorldPosition } from "./world";
 
 export type DefinedActor = {
@@ -13,89 +13,109 @@ export type NavigatingActor = DefinedActor & {
   grid: NavigationGrid;
 };
 
-/** Stable IDs and tile order break ties; selection order has no effect. */
+export type GroupDestination = {
+  actorId: string;
+  target: WorldPosition;
+  /** The group click when `target` only approaches it. */
+  requestedTarget?: WorldPosition;
+};
+
+/** World-space radius for friendly separation; zero opts out. */
+export function separationRadius(definition: ActorDefinition): number {
+  return definition.movement?.radius ?? 0;
+}
+
+type Slot = { point: WorldPosition; nearTarget: number };
+
+/**
+ * Assigns distinct tile-center destinations near `target`, in `movers` order.
+ * Pass movers sorted by stable actor ID so selection order has no effect.
+ * Movers without an available destination are left out.
+ */
 export function assignGroupDestinations(
   movers: readonly NavigatingActor[],
   actors: readonly DefinedActor[],
   target: WorldPosition,
-): { command: MoveCommand; assigned: boolean }[] {
+): GroupDestination[] {
   const selected = new Set(movers.map(({ actor }) => actor.id));
   const reserved = actors
-    .filter(({ actor }) => !actor.tilePlacement && !selected.has(actor.id))
+    .filter(({ actor }) => !isTilePlacedActor(actor) && !selected.has(actor.id))
     .map(({ actor, definition }) => ({
       point: actor.worldPosition,
       layer: actor.occupancyLayer,
-      radius: definition.movement?.radius ?? 0,
+      radius: separationRadius(definition),
     }));
-  const results = [];
-  for (const { actor, definition, grid } of [...movers].sort((a, b) =>
-    a.actor.id < b.actor.id ? -1 : a.actor.id > b.actor.id ? 1 : 0,
-  )) {
-    const { map } = grid;
-    const radius = definition.movement?.radius ?? map.tileSize * 0.3;
+  // Each region's tiles, nearest the click first, shared by movers on a grid.
+  const slotsByGrid = new Map<NavigationGrid, Map<number, Slot[]>>();
+  const slotsIn = (grid: NavigationGrid, region: number) => {
+    const byRegion = slotsByGrid.get(grid) ?? new Map<number, Slot[]>();
+    slotsByGrid.set(grid, byRegion);
+    let slots = byRegion.get(region);
+    if (!slots) {
+      slots = [];
+      const { map } = grid;
+      for (let z = 0; z < map.height; z += 1) {
+        for (let x = 0; x < map.width; x += 1) {
+          if (grid.regionAt(x, z) !== region) continue;
+          const point = map.tileCenter(x, z);
+          slots.push({ point, nearTarget: squaredDistance(point, target) });
+        }
+      }
+      // The stable sort keeps tile order among equally near tiles.
+      slots.sort((a, b) => a.nearTarget - b.nearTarget);
+      byRegion.set(region, slots);
+    }
+    return slots;
+  };
+  const destinations: GroupDestination[] = [];
+  for (const { actor, definition, grid } of movers) {
     const base = resolveNavigationDestination(
       grid,
       actor.worldPosition,
       target,
     );
-    const goal = map.tileAtWorldPosition(target.x, target.z);
-    const command: MoveCommand = { kind: "move", actorId: actor.id, target };
-    // A group order must not drag a stranded unit away from its current order.
-    if (
-      !base ||
-      (!base.reachedTarget &&
-        squaredDistance(base.start, goal) <= squaredDistance(base.end, goal))
-    ) {
-      results.push({ command, assigned: false });
-      continue;
-    }
-    const { end } = base;
-    const region = grid.regionAt(end.x, end.z);
-    let slot:
-      | {
-          point: WorldPosition;
-          nearTarget: number;
-          nearActor: number;
-          index: number;
-        }
-      | undefined;
-    for (let z = 0; z < map.height; z += 1) {
-      for (let x = 0; x < map.width; x += 1) {
-        if (grid.regionAt(x, z) !== region) continue;
-        const point = map.tileCenter(x, z);
-        const candidate = {
-          point,
-          nearTarget: squaredDistance(point, target),
-          nearActor: squaredDistance(point, actor.worldPosition),
-          index: map.tileIndex(x, z),
-        };
-        if (
-          slot &&
-          (candidate.nearTarget - slot.nearTarget ||
-            candidate.nearActor - slot.nearActor ||
-            candidate.index - slot.index) >= 0
+    if (!base) continue;
+    const radius = separationRadius(definition);
+    const minimumSpacing = grid.map.tileSize * 0.8;
+    // An approach must get closer, so a stranded unit keeps its current order.
+    const limit = base.reachedTarget
+      ? Number.POSITIVE_INFINITY
+      : squaredDistance(actor.worldPosition, target);
+    let slot: Slot | undefined;
+    let slotNearActor = Number.POSITIVE_INFINITY;
+    for (const candidate of slotsIn(
+      grid,
+      grid.regionAt(base.end.x, base.end.z),
+    )) {
+      if (
+        candidate.nearTarget >= limit ||
+        (slot && candidate.nearTarget > slot.nearTarget)
+      )
+        break;
+      // Equally near tiles prefer the one closest to the unit.
+      const nearActor = squaredDistance(candidate.point, actor.worldPosition);
+      if (nearActor >= slotNearActor) continue;
+      if (
+        reserved.some(
+          (other) =>
+            other.layer === actor.occupancyLayer &&
+            distance(other.point, candidate.point) <
+              Math.max(minimumSpacing, radius + other.radius),
         )
-          continue;
-        if (
-          reserved.some(
-            (other) =>
-              other.layer === actor.occupancyLayer &&
-              distance(other.point, point) <
-                Math.max(map.tileSize * 0.8, radius + other.radius),
-          )
-        )
-          continue;
-        slot = candidate;
-      }
+      )
+        continue;
+      slot = candidate;
+      slotNearActor = nearActor;
     }
-    if (slot) {
-      command.target = slot.point;
-      if (!base.reachedTarget) command.requestedTarget = { ...target };
-      reserved.push({ point: slot.point, layer: actor.occupancyLayer, radius });
-    }
-    results.push({ command, assigned: slot !== undefined });
+    if (!slot) continue;
+    reserved.push({ point: slot.point, layer: actor.occupancyLayer, radius });
+    destinations.push({
+      actorId: actor.id,
+      target: { ...slot.point },
+      ...(!base.reachedTarget && { requestedTarget: { ...target } }),
+    });
   }
-  return results;
+  return destinations;
 }
 
 function distance(a: WorldPosition, b: WorldPosition): number {
@@ -113,7 +133,7 @@ export function separateMobileActors(
   previousPositions: ReadonlyMap<string, WorldPosition>,
 ): void {
   const sorted = [...movers]
-    .filter(({ definition }) => definition.movement?.radius)
+    .filter(({ definition }) => separationRadius(definition) > 0)
     .sort((a, b) =>
       a.actor.id < b.actor.id ? -1 : a.actor.id > b.actor.id ? 1 : 0,
     );
@@ -151,7 +171,7 @@ export function separateMobileActors(
   };
   // Spatial buckets keep local contact work independent of total map area.
   const cellSize = sorted.reduce(
-    (size, { definition }) => Math.max(size, definition.movement!.radius! * 2),
+    (size, { definition }) => Math.max(size, separationRadius(definition) * 2),
     0.01,
   );
   const buckets = new Map<string, NavigatingActor[]>();
@@ -180,8 +200,8 @@ export function separateMobileActors(
           const b = right.actor.worldPosition;
           const length = distance(a, b);
           const overlap =
-            left.definition.movement!.radius! +
-            right.definition.movement!.radius! -
+            separationRadius(left.definition) +
+            separationRadius(right.definition) -
             length;
           if (overlap <= 1e-6) continue;
           // Coincident centers get a stable diagonal instead of a random impulse.

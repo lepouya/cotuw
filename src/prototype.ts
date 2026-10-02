@@ -28,7 +28,11 @@ import {
   DEFAULT_ACTOR_COLOR,
 } from "./render";
 import { OccupancyGrid } from "./simulation/occupancy";
-import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
+import {
+  isMobileActor,
+  isTilePlacedActor,
+  occupiedTilesFor,
+} from "./simulation/placement";
 import {
   loadSkinnedActorAppearance,
   validateActorGraphics,
@@ -222,9 +226,7 @@ export async function createTerrainPrototype(
     canMove: (actorId) => {
       const actor = simulation.actorById(actorId);
       return (
-        !!actor &&
-        !!definitionsById.get(actor.definitionId)?.movement &&
-        !isTilePlacedActor(actor)
+        !!actor && isMobileActor(actor, definitionsById.get(actor.definitionId))
       );
     },
     submitCommand: (command) => {
@@ -353,7 +355,7 @@ export async function createTerrainPrototype(
       !input.boxMode &&
       input.actorIdAt(event.clientX, event.clientY) === undefined,
   );
-  const unitControls = createUnitControls(input, simulation, controls, {
+  const unitControls = createUnitControls(input, controls, {
     enabled: () => !placement.active && !simulationFaulted,
     changed: () => {
       controlsDirty = true;
@@ -383,17 +385,8 @@ export async function createTerrainPrototype(
     },
     afterTick: (outcomes) => {
       minimap.refreshActors();
-      unitControls.onOutcomes(outcomes);
-      const moves = outcomes.filter(({ command }) => command.kind === "move");
-      if (moves.length) {
-        const accepted = moves.filter((outcome) => outcome.accepted).length;
-        canvas.dataset.moveStatus =
-          accepted === 0
-            ? "unreachable"
-            : accepted === moves.length
-              ? "accepted"
-              : "partial";
-      }
+      const moveStatus = unitControls.onOutcomes(outcomes);
+      if (moveStatus) canvas.dataset.moveStatus = moveStatus;
       for (const outcome of outcomes) {
         placement.onOutcome(outcome);
         training.onOutcome(outcome);
@@ -401,15 +394,9 @@ export async function createTerrainPrototype(
         if (command.kind === "train-unit")
           canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
         if (command.kind === "move") {
-          if (!accepted) {
-            movementPath.showRejectedTarget(
-              command.actorId,
-              command.requestedTarget ?? command.target,
-            );
-          }
-        }
-        if (accepted && command.kind === "move") {
-          canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
+          if (accepted)
+            canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
+          else movementPath.showRejectedTarget(command.actorId, command.target);
         }
         if (
           command.kind === "remove-actor" &&

@@ -1,6 +1,7 @@
+import { isOutcomeOf } from "../simulation/command";
+
 import type { CommandInput } from "../render/command-input";
 import type { CommandOutcome } from "../simulation/command";
-import type { MissionSimulation } from "../simulation/mission";
 
 export type UnitControls = {
   boxSelect?: HTMLButtonElement;
@@ -10,10 +11,19 @@ export type UnitControls = {
   movementStatus?: HTMLElement;
 };
 
+export type MoveStatus = "accepted" | "partial" | "unreachable";
+
 /** Binds selection actions and reports receipts for committed move orders. */
 export function createUnitControls(
-  input: CommandInput,
-  simulation: MissionSimulation,
+  input: Pick<
+    CommandInput,
+    | "boxMode"
+    | "additiveMode"
+    | "setBoxMode"
+    | "setAdditiveMode"
+    | "stop"
+    | "select"
+  >,
   controls: UnitControls,
   options: { enabled: () => boolean; changed: () => void },
 ) {
@@ -45,37 +55,42 @@ export function createUnitControls(
   listen(controls.stop, input.stop);
   listen(controls.clearSelection, () => input.select(undefined));
   return {
-    onOutcomes: (outcomes: readonly CommandOutcome[]) => {
-      const moves = outcomes.filter(
-        (outcome) => outcome.command.kind === "move",
-      );
+    /** Reports this tick's move receipts and returns their overall status. */
+    onOutcomes: (
+      outcomes: readonly CommandOutcome[],
+    ): MoveStatus | undefined => {
+      const moves = outcomes.filter((outcome) => isOutcomeOf(outcome, "move"));
+      const stops = outcomes.filter(
+        ({ command, accepted }) => command.kind === "stop" && accepted,
+      ).length;
+      let status: MoveStatus | undefined;
       if (moves.length) {
-        const accepted = moves.filter((outcome) => outcome.accepted).length;
-        const blocked = moves.filter(
-          ({ command, accepted }) =>
-            command.kind === "move" &&
-            accepted &&
-            (command.requestedTarget ||
-              simulation.actorById(command.actorId)?.movement?.reachedTarget ===
-                false),
+        const accepted = moves.filter((outcome) => outcome.accepted);
+        const blocked = accepted.filter(
+          ({ reachedTarget }) => reachedTarget === false,
         ).length;
+        const rejected = moves.length - accepted.length;
         message(
           [
-            `${accepted} move orders accepted`,
-            ...(blocked ? [`${blocked} blocked destinations`] : []),
-            ...(accepted < moves.length
-              ? [`${moves.length - accepted} unable to move`]
-              : []),
+            `${count(accepted.length, "move order")} accepted`,
+            ...(blocked ? [count(blocked, "blocked destination")] : []),
+            ...(rejected ? [`${count(rejected, "unit")} unable to move`] : []),
+            ...(stops ? [`${count(stops, "stop order")} accepted`] : []),
           ].join(" · ") + ".",
         );
-      }
-      if (
-        outcomes.some(
-          ({ command, accepted }) => command.kind === "stop" && accepted,
-        )
-      )
-        message("Selected units stopped.");
+        status =
+          accepted.length === 0
+            ? "unreachable"
+            : rejected === 0
+              ? "accepted"
+              : "partial";
+      } else if (stops) message("Selected units stopped.");
+      return status;
     },
     dispose: () => controller.abort(),
   };
+}
+
+function count(amount: number, noun: string): string {
+  return `${amount} ${noun}${amount === 1 ? "" : "s"}`;
 }
