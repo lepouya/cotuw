@@ -125,7 +125,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [ ] 0.41 Build the compact branching M0 map with weighted rough terrain, an
       isolated lone-wolf approach, a mountain-enclosed five-wolf den and
       chokepoint entrance, landmarks, and recovery Materials loot.
-- [ ] 0.42 Implement the deterministic, serializable wolf state machine:
+- [x] 0.42 Implement the deterministic, serializable wolf state machine:
       personal sight and stable target selection, visible-wolf alert
       propagation, pursuit, hard leash, alert investigation, return on lost
       detection, and regeneration.

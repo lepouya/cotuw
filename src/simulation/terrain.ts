@@ -78,6 +78,16 @@ export type TerrainView = Pick<
   | "tilesAroundCorner"
 > & { readonly navigationChanges: NavigationChangeView };
 
+/** The world area a rectangle of tiles covers. */
+export function tileAreaBounds(
+  map: Pick<TerrainView, "worldPositionAt">,
+  area: TerrainBounds,
+): WorldBounds {
+  const low = map.worldPositionAt(area.minX, area.minZ);
+  const high = map.worldPositionAt(area.maxX + 1, area.maxZ + 1);
+  return { minX: low.x, minZ: low.z, maxX: high.x, maxZ: high.z };
+}
+
 /** A constraint every terrain edit must satisfy. */
 export type TerrainEditRule = (edit: TerrainEdit) => boolean;
 

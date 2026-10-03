@@ -4246,7 +4246,7 @@ stalled-time limits are tunable.
 
 #### Q29 M0 implementation contract
 
-M0 gameplay decisions are resolved and ready for task 0.42 planning. The
+M0 gameplay decisions are resolved. The
 [implementation contract](../DESIGN.md#m0-wolf-implementation-contract) owns
 the tunable content fields, authoritative save state, and deterministic
 acceptance checks. Exact balance values remain implementation and playtest

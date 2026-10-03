@@ -2,6 +2,8 @@ import type { AppliedActorCommand } from "./command";
 import type { Footprint, OccupancyLayer } from "./occupancy";
 import type { TileCoord } from "./grid";
 import type { NavigationGrid } from "./navigation";
+import { distance } from "./world";
+
 import type { WorldPosition } from "./world";
 
 /** Immutable, data-driven capabilities shared by a type of actor. */
@@ -23,9 +25,14 @@ export type ActorDefinition = {
   };
   /** An NPC that defends a home area and recovers there. */
   territory?: {
-    /** Detected hostiles within this radius of the actor provoke it. */
-    aggressionRadius: number;
-    /** Targets and pursuit never go beyond this radius of home. */
+    /** Alert lifetime and route recovery tuning, in simulation seconds. */
+    alertLifetimeSeconds: number;
+    investigationSeconds: number;
+    blockedRetrySeconds: number;
+    stalledSeconds: number;
+    /** Distance within which it has reached home or an alert origin. */
+    arrivalTolerance: number;
+    /** Default hard leash radius around the encounter center. */
     leashRadius: number;
     /** Out-of-combat time at home before health recovers. */
     regenerationDelaySeconds: number;
@@ -119,8 +126,8 @@ export type CombatState = {
   /** Present while an armed actor pursues or attacks a target. */
   attack?: AttackOrder;
   /**
-   * Present while an automatic engagement or territory heads back. It ignores
-   * hostiles while the route proceeds; a blocked route keeps it for retries.
+   * Present while an automatic engagement or territory heads back. A blocked
+   * route keeps its goal for retries.
    */
   returning?: ReturnRoute;
   /** A building's weapon aim, independent of its placement facing. */
@@ -143,7 +150,52 @@ export type AttackOrder = RouteRetryState & {
 
 export type ReturnRoute = RouteRetryState & { point: WorldPosition };
 
-export type TerritoryState = { home: WorldPosition };
+export type WolfMode =
+  | "idle-at-home"
+  | "alerted"
+  | "pursuing"
+  | "attacking"
+  | "investigating"
+  | "returning-home"
+  | "regenerating";
+
+export type TerritoryState = {
+  home: WorldPosition;
+  /** Shared encounter center; absent uses home for a lone wolf. */
+  center?: WorldPosition;
+  /** Hard leash radius; absent uses the definition's. */
+  radius?: number;
+  /** Actors in one encounter must share its center and radius. */
+  encounterId?: string;
+  mode?: WolfMode;
+  /** The latest tick it pursued or fought, which delays regeneration. */
+  lastCombatTick?: number;
+  /** Hostiles it saw last tick; any newcomer raises an alert. */
+  seenTargets?: string[];
+  investigation?: {
+    alertId: number;
+    origin: WorldPosition;
+    arrivedTick?: number;
+  };
+  /** Where and when an approach last moved, and when it may replan. */
+  progress?: RouteProgress;
+  /** Stalled targets, skipped until they move or navigation changes. */
+  failedTargets?: {
+    targetId: string;
+    position: WorldPosition;
+    navigationVersion: number;
+  }[];
+};
+
+/** Serializable progress and retry timing for a route watchdog. */
+export type RouteProgress = {
+  position: WorldPosition;
+  tick: number;
+  retryTick: number;
+  goal?: WorldPosition;
+  navigationVersion?: number;
+  remainingDistance?: number;
+};
 
 /** An automatic route that retries a blocked point only after changes. */
 export type RouteRetryState = {
@@ -163,6 +215,21 @@ export function clearCombatOrders(actor: Actor): void {
 
 /** Keeps routes, and contact correction, inside a circle. */
 export type RouteBounds = { center: WorldPosition; radius: number };
+
+export function insideRouteBounds(
+  bounds: RouteBounds,
+  point: WorldPosition,
+): boolean {
+  return distance(bounds.center, point) <= bounds.radius;
+}
+
+/** Straight segments between points inside a circle stay inside it. */
+export function withinRouteBounds(
+  bounds: RouteBounds | undefined,
+  points: readonly WorldPosition[],
+): boolean {
+  return !bounds || points.every((point) => insideRouteBounds(bounds, point));
+}
 
 /** A move order and the route its behavior is following. */
 export type MovementOrder = {
@@ -260,6 +327,7 @@ export type ActorBehavior = {
   navigationGrid?: (
     actor: Readonly<Actor>,
     definition: ActorDefinition,
+    bounds?: RouteBounds,
   ) => NavigationGrid;
   /**
    * Applies a validated command addressed to this actor. Move targets are

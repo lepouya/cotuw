@@ -7,7 +7,14 @@ import {
   traversalCostAt,
 } from "./navigation";
 import { isOccupancyLayer } from "./occupancy";
-import { distance, isFinitePosition, withinBounds } from "./world";
+import {
+  POSITION_EPSILON,
+  distanceToBounds,
+  isFinitePosition,
+  withinBounds,
+} from "./world";
+import { tileAreaBounds } from "./terrain";
+import { withinRouteBounds } from "./actor";
 
 import type { TerrainBounds, TerrainView } from "./terrain";
 import type { OccupancyLayer, OccupancyView } from "./occupancy";
@@ -20,8 +27,6 @@ import type {
 } from "./actor";
 import type { MovementProfile, NavigationPath } from "./navigation";
 import type { WorldPosition } from "./world";
-
-const POSITION_EPSILON = 1e-9;
 
 /** Creates deterministic continuous movement over weighted terrain routes. */
 export function createTerrainMoveBehavior(
@@ -60,11 +65,32 @@ export function createTerrainMoveBehavior(
     }
     return grid;
   };
+  const boundedGrids = new Map<string, NavigationGrid>();
+  const routeGrid = (grid: NavigationGrid, bounds?: RouteBounds) => {
+    if (!bounds) return grid;
+    const key = `${grid.profile.id}:${grid.occupancyLayer}:${bounds.center.x}:${bounds.center.z}:${bounds.radius}`;
+    let bounded = boundedGrids.get(key);
+    if (!bounded) {
+      bounded = new NavigationGrid(
+        map,
+        occupancy,
+        grid.profile,
+        grid.occupancyLayer,
+        bounds,
+      );
+      boundedGrids.set(key, bounded);
+    }
+    return bounded;
+  };
   const changes = map.navigationChanges;
 
   const replan = (actor: Actor, order: MovementOrder, grid: NavigationGrid) => {
     order.occupancyLayer = grid.occupancyLayer;
-    const path = findNavigationPath(grid, actor.worldPosition, order.target);
+    const path = findNavigationPath(
+      routeGrid(grid, order.bounds),
+      actor.worldPosition,
+      order.target,
+    );
     // An order may end on the actor's own tile only if that was already its
     // destination.
     const keepsDestination =
@@ -91,7 +117,8 @@ export function createTerrainMoveBehavior(
   };
 
   return {
-    navigationGrid: gridFor,
+    navigationGrid: (actor, definition, bounds) =>
+      routeGrid(gridFor(actor, definition), bounds),
     canStandAt: (definition, { x, z }) => {
       const { profile } = grids
         .get(definition.movement!.profileId!)!
@@ -169,7 +196,7 @@ export function createTerrainMoveBehavior(
         case "move": {
           const grid = gridFor(actor, definition);
           const path = findNavigationPath(
-            grid,
+            routeGrid(grid, command.bounds),
             actor.worldPosition,
             command.target,
           );
@@ -436,16 +463,11 @@ function changesCouldShortenRoute(
     }
     routeCost += cost;
   }
-  return changes.some((bounds) => {
-    const low = map.worldPositionAt(bounds.minX, bounds.minZ);
-    const high = map.worldPositionAt(bounds.maxX + 1, bounds.maxZ + 1);
-    const distanceToBounds = (point: WorldPosition) =>
-      Math.hypot(
-        point.x - Math.min(Math.max(point.x, low.x), high.x),
-        point.z - Math.min(Math.max(point.z, low.z), high.z),
-      );
+  return changes.some((tiles) => {
+    const area = tileAreaBounds(map, tiles);
     const shortcutCost =
-      (distanceToBounds(actor.worldPosition) + distanceToBounds(order.target)) *
+      (distanceToBounds(actor.worldPosition, area) +
+        distanceToBounds(order.target, area)) *
       grid.minimumCost;
     return shortcutCost + POSITION_EPSILON < routeCost;
   });
@@ -503,17 +525,6 @@ function escapeCostFor(
     return undefined;
   }
   return grid.costAt(next.x, next.z);
-}
-
-/** Straight segments between points inside a circle stay inside it. */
-function withinRouteBounds(
-  bounds: RouteBounds | undefined,
-  waypoints: readonly WorldPosition[],
-): boolean {
-  return (
-    !bounds ||
-    waypoints.every((point) => distance(bounds.center, point) <= bounds.radius)
-  );
 }
 
 function markBlocked(

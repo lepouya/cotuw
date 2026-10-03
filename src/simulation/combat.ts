@@ -1,15 +1,19 @@
+import { personallyDetects } from "./vision";
 import { forEachTileOnSegment } from "./navigation";
 import { isTilePlacedActor, occupiedTilesFor } from "./placement";
-import { distance, isFinitePosition, withinBounds } from "./world";
-import { secondsToTicks } from "./clock";
+import {
+  distance,
+  distanceToBounds,
+  isFinitePosition,
+  withinBounds,
+} from "./world";
+import { isTick, secondsToTicks } from "./clock";
 import { followRoute } from "./automatic-movement";
 import { terrainSightlineClear } from "./terrain-sightline";
+import { tileAreaBounds } from "./terrain";
 import { areHostile } from "./faction";
 import { clearCombatOrders, compareIds, healthOf } from "./actor";
 import {
-  leashBounds,
-  planTerritory,
-  regenerate,
   validateTerritoryActor,
   validateTerritoryDefinition,
 } from "./territory";
@@ -59,10 +63,49 @@ const TARGET_HEIGHT = 0.5;
 /** An actor has reached a point within this distance of it. */
 const ARRIVAL_RADIUS = 1;
 
-/** What targeting rules such as guards and territories may do each tick. */
+/**
+ * Automatic targeting for armed actors whose definitions opt in, such as
+ * guards and territories. Hooks run for each actor in stable ID order.
+ */
+export type CombatController = {
+  applies: (definition: ActorDefinition) => boolean;
+  /** Personal sight replaces faction detection. */
+  personalSight?: boolean;
+  /** Keeps automatic routes inside a circle. */
+  bounds?: (actor: Actor, definition: ActorDefinition) => RouteBounds;
+  /** Distance within which the actor has reached a point. */
+  arrivalRadius?: (definition: ActorDefinition) => number;
+  /** Receives its assigned actors in stable ID order, before any actor plans. */
+  prepare?: (actors: readonly Actor[], context: CombatContext) => void;
+  /** Chooses or ends orders; returns whether the actor may fight this tick. */
+  plan: (actor: Actor, context: CombatContext) => boolean;
+  /** Runs after a pursuit route is attempted, including blocked attempts. */
+  chased?: (actor: Actor, context: CombatContext) => void;
+  /** The actor is in range and aiming at its target this tick. */
+  firing?: (actor: Actor, context: CombatContext) => void;
+  /** Runs for each surviving actor after the tick's damage lands. */
+  settle?: (actor: Actor, context: CombatContext) => void;
+};
+
+/** What combat controllers may do each tick. */
 export type CombatContext = {
   readonly tick: number;
   readonly tickSeconds: number;
+  readonly navigationVersion: number;
+  definition: (actor: Actor) => ActorDefinition;
+  actorById: (id: string) => Actor | undefined;
+  /** Whether navigation changed since `version` within the actor's bounds. */
+  navigationChanged: (actor: Actor, version: number) => boolean;
+  bounds: (actor: Actor) => RouteBounds | undefined;
+  move: CombatWorld["move"];
+  /** Personal sight, sharing fog's tile centers and terrain rays. */
+  sees: (actor: Actor, target: Actor) => boolean;
+  /** Detected valid targets in stable ID order. */
+  visibleTargets: (actor: Actor) => Actor[];
+  /** Whether a bounded route gets within weapon range of the target. */
+  reachableTarget: (actor: Actor, target: Actor) => boolean;
+  /** Whether a bounded route arrives at the point. */
+  reachablePoint: (actor: Actor, point: WorldPosition) => boolean;
   /** The actor's order target, while it remains a detected valid target. */
   currentTarget: (actor: Actor) => Actor | undefined;
   /** The nearest detected valid target within `radius`, by stable ID on ties. */
@@ -95,6 +138,14 @@ export type CombatWorld = {
   tickSeconds: number;
   navigationVersion: number;
   actors: Actor[];
+  /** The first controller that applies to an actor's definition drives it. */
+  controllers: readonly CombatController[];
+  /** Closest reachable destination inside the actor's route bounds. */
+  destination: (
+    actor: Actor,
+    point: WorldPosition,
+    bounds?: RouteBounds,
+  ) => WorldPosition | undefined;
   wrecks: readonly Wreck[];
   definitions: ReadonlyMap<string, ActorDefinition>;
   map?: TerrainGrid;
@@ -112,8 +163,6 @@ export type CombatWorld = {
 
 const positive = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
-const isTick = (value: unknown) =>
-  Number.isSafeInteger(value) && (value as number) >= 0;
 const isId = (value: unknown) => typeof value === "string" && value.length > 0;
 
 export function validateCombatDefinition(definition: ActorDefinition): void {
@@ -284,12 +333,54 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   const definitionOf = (actor: Actor) => definitions.get(actor.definitionId)!;
   const targetable = (actor: Actor, target: Actor | undefined) =>
     !!target && canTarget(actor, target, definitions);
+  const controllers = new Map(
+    [...definitions].map(([id, definition]) => [
+      id,
+      world.controllers.find((controller) => controller.applies(definition)),
+    ]),
+  );
+  const controllerOf = (actor: Actor) => controllers.get(actor.definitionId);
+  const boundsOf = (actor: Actor) =>
+    controllerOf(actor)?.bounds?.(actor, definitionOf(actor));
+  const arrivalRadius = (actor: Actor) =>
+    controllerOf(actor)?.arrivalRadius?.(definitionOf(actor)) ?? ARRIVAL_RADIUS;
+  const navigationChanged = (actor: Actor, version: number) => {
+    const map = world.map;
+    const entries = map?.navigationChanges.entriesSince(
+      version,
+      actor.occupancyLayer,
+    );
+    if (!entries) return version !== world.navigationVersion;
+    const bounds = boundsOf(actor);
+    return entries.some(
+      (entry) =>
+        entry.effect !== "none" &&
+        (!bounds ||
+          distanceToBounds(bounds.center, tileAreaBounds(map!, entry.bounds)) <=
+            bounds.radius),
+    );
+  };
+  const personal = new Map<string, boolean>();
+  const sees = (actor: Actor, target: Actor) => {
+    const key = JSON.stringify([actor.id, target.id]);
+    if (!personal.has(key))
+      personal.set(
+        key,
+        personallyDetects(actor, target, definitions, world.map),
+      );
+    return personal.get(key)!;
+  };
   const detected = (actor: Actor, target: Actor) =>
-    world.detects(definitionOf(actor).faction, target);
+    controllerOf(actor)?.personalSight
+      ? sees(actor, target)
+      : world.detects(definitionOf(actor).faction, target);
   const engageable = (actor: Actor, target: Actor | undefined) =>
     targetable(actor, target) && detected(actor, target!);
   const arrived = (actor: Actor, point: WorldPosition) =>
-    distance(actor.worldPosition, point) <= ARRIVAL_RADIUS;
+    distance(actor.worldPosition, point) <= arrivalRadius(actor);
+  /** Where a route inside the actor's bounds towards `point` ends, if any. */
+  const destination = (actor: Actor, point: WorldPosition) =>
+    world.destination(actor, point, boundsOf(actor));
   const continueReturn = (actor: Actor) => {
     const returning = actor.combat?.returning;
     if (!returning) return false;
@@ -298,7 +389,18 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       delete actor.movement;
       return false;
     }
-    return followRoute(actor, returning.point, returning, world);
+    const bounds = boundsOf(actor);
+    // Bounded returns ignore navigation changes beyond their bounds.
+    if (
+      bounds &&
+      returning.blocked &&
+      !navigationChanged(actor, returning.blocked.navigationVersion)
+    )
+      returning.blocked.navigationVersion = world.navigationVersion;
+    return followRoute(actor, returning.point, returning, {
+      navigationVersion: world.navigationVersion,
+      move: (mover, point) => world.move(mover, point, bounds),
+    });
   };
   const startReturn = (actor: Actor, point: WorldPosition) => {
     // A territory heading home abandons any Attack Move.
@@ -327,6 +429,31 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   const context: CombatContext = {
     tick,
     tickSeconds: world.tickSeconds,
+    navigationVersion: world.navigationVersion,
+    definition: definitionOf,
+    actorById: (id) => byId.get(id),
+    navigationChanged,
+    bounds: boundsOf,
+    move: world.move,
+    sees,
+    visibleTargets: (actor) =>
+      sorted.filter((target) => engageable(actor, target)),
+    reachableTarget: (actor, target) => {
+      const end = destination(actor, target.worldPosition);
+      return (
+        !!end &&
+        reach(
+          { ...actor, worldPosition: end },
+          target,
+          definitions,
+          world.map,
+        ) <= definitionOf(actor).weapon!.range
+      );
+    },
+    reachablePoint: (actor, point) => {
+      const end = destination(actor, point);
+      return !!end && distance(end, point) <= arrivalRadius(actor);
+    },
     currentTarget: (actor) => {
       const order = actor.combat?.attack;
       const target = order && byId.get(order.targetId);
@@ -364,13 +491,14 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     arrived,
   };
 
-  /** Territorial chases stay inside the leash. */
+  /** Chases stay inside the actor's bounds. */
   const chase = (actor: Actor, point: WorldPosition) => {
-    const bounds = leashBounds(actor, definitionOf(actor));
+    const bounds = boundsOf(actor);
     followRoute(actor, point, actor.combat!.attack!, {
       navigationVersion: world.navigationVersion,
       move: (mover, target) => world.move(mover, target, bounds),
     });
+    controllerOf(actor)?.chased?.(actor, context);
   };
   const movable = (actor: Actor) => !!definitionOf(actor).movement;
 
@@ -396,6 +524,11 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     return target;
   };
 
+  for (const controller of world.controllers)
+    controller.prepare?.(
+      sorted.filter((actor) => controllerOf(actor) === controller),
+      context,
+    );
   const hits: AttackEvent[] = [];
   for (const actor of sorted) {
     const definition = definitionOf(actor);
@@ -413,13 +546,8 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       }
     }
     if (!weapon) continue;
-    if (
-      definition.territory &&
-      !planTerritory(actor, definition.territory, context)
-    )
-      continue;
-    if (definition.guard && !actor.attackMove)
-      planGuard(actor, definition.guard, context);
+    const controller = controllerOf(actor);
+    if (controller && !controller.plan(actor, context)) continue;
     const ordered = !!actor.combat?.attack;
     const target = ordered ? followOrder(actor) : context.recentAttacker(actor);
     if (!target) continue;
@@ -434,6 +562,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       continue;
     }
     if (ordered) delete actor.movement;
+    controller?.firing?.(actor, context);
     const combat = (actor.combat ??= {});
     const aim = Math.atan2(
       target.worldPosition.x - actor.worldPosition.x,
@@ -464,13 +593,19 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   }
   for (const actor of sorted)
     if (actor.health !== undefined && actor.health <= 0) world.destroy(actor);
-    else {
-      const definition = definitionOf(actor);
-      if (definition.territory)
-        regenerate(actor, definition.territory, definition.health!, context);
-    }
+    else controllerOf(actor)?.settle?.(actor, context);
   return hits;
 }
+
+/** Guards defend a post unless an Attack Move drives them. */
+export const guardController: CombatController = {
+  applies: (definition) => !!definition.guard,
+  plan: (actor, context) => {
+    if (!actor.attackMove)
+      planGuard(actor, context.definition(actor).guard!, context);
+    return true;
+  },
+};
 
 /**
  * An idle guard engages the nearest detected hostile near it that its chase
@@ -527,17 +662,14 @@ function reach(
   map: TerrainGrid | undefined,
 ): number {
   const definition = definitions.get(target.definitionId)!;
-  const { x, z } = attacker.worldPosition;
   if (map && isTilePlacedActor(target)) {
     return Math.min(
-      ...occupiedTilesFor(target, definition).map((tile) => {
-        const low = map.worldPositionAt(tile.x, tile.z);
-        const high = map.worldPositionAt(tile.x + 1, tile.z + 1);
-        return distance(attacker.worldPosition, {
-          x: Math.min(Math.max(x, low.x), high.x),
-          z: Math.min(Math.max(z, low.z), high.z),
-        });
-      }),
+      ...occupiedTilesFor(target, definition).map(({ x, z }) =>
+        distanceToBounds(
+          attacker.worldPosition,
+          tileAreaBounds(map, { minX: x, minZ: z, maxX: x, maxZ: z }),
+        ),
+      ),
     );
   }
   return Math.max(

@@ -1,3 +1,5 @@
+export const POSITION_EPSILON = 1e-9;
+
 /** A renderer-neutral horizontal position in continuous world units. */
 export type WorldPosition = {
   x: number;
@@ -41,6 +43,22 @@ export function clampToBounds(
     x: Math.min(Math.max(x, minX), maxX),
     z: Math.min(Math.max(z, minZ), maxZ),
   };
+}
+
+/** Distance from a point to the nearest point of an area; zero inside it. */
+export function distanceToBounds(
+  point: WorldPosition,
+  bounds: WorldBounds,
+): number {
+  return distance(point, clampToBounds(point, bounds));
+}
+
+/** Position equality allows movement's floating-point rounding error. */
+export function samePosition(
+  left: WorldPosition,
+  right: WorldPosition,
+): boolean {
+  return distance(left, right) <= POSITION_EPSILON;
 }
 
 /** Signed radians from one facing to another, turning the short way round. */

@@ -78,6 +78,7 @@ export const PROTOTYPE_ACTOR_PRESENTATIONS = new Map<string, ActorPresentation>(
       },
     ],
     ["wolf", { name: "Wolf", description: "Hostile wildlife" }],
+    ["alpha-wolf", { name: "Alpha wolf", description: "Pack leader" }],
   ],
 );
 
@@ -85,6 +86,7 @@ export const PROTOTYPE_ACTOR_PRESENTATIONS = new Map<string, ActorPresentation>(
 export const PROTOTYPE_ATTACK_EFFECTS = new Map<string, AttackEffectStyle>([
   ["arc-trooper", "tracer"],
   ["wolf", "bite"],
+  ["alpha-wolf", "bite"],
 ]);
 
 export const PROTOTYPE_ACTOR_NAMES = new Map(

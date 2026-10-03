@@ -1,4 +1,7 @@
-import { clampToBounds } from "./world";
+import { clampToBounds, isFinitePosition } from "./world";
+import { deepFreeze, insideRouteBounds } from "./actor";
+
+import type { DeepReadonly, RouteBounds } from "./actor";
 
 import type { TerrainView, TileCoord } from "./terrain";
 import type { OccupancyLayer, OccupancyView } from "./occupancy";
@@ -111,20 +114,31 @@ export class NavigationGrid {
   readonly occupancy: OccupancyView;
   readonly profile: MovementProfile;
   readonly occupancyLayer: OccupancyLayer;
+  readonly bounds: DeepReadonly<RouteBounds> | undefined;
   /** Lowest cost per world unit, which keeps the A* estimate admissible. */
   readonly minimumCost: number;
   private readonly costs: Float64Array;
   private regions: Int32Array | undefined;
   private version: number;
   private generation: number;
+  private physicalGrid: NavigationGrid | undefined;
 
   constructor(
     map: TerrainView,
     occupancy: OccupancyView,
     profile: MovementProfile,
     occupancyLayer: OccupancyLayer = "surface",
+    bounds?: RouteBounds,
   ) {
     validateMovementProfile(profile);
+    if (
+      bounds !== undefined &&
+      (!bounds ||
+        !isFinitePosition(bounds.center) ||
+        !(Number.isFinite(bounds.radius) && bounds.radius > 0))
+    )
+      throw new RangeError("Invalid navigation route bounds.");
+    this.bounds = bounds && deepFreeze(structuredClone(bounds));
     for (const typeId of map.terrainTypeIds) {
       if (!Object.prototype.hasOwnProperty.call(profile.terrainCosts, typeId)) {
         throw new RangeError(
@@ -146,10 +160,26 @@ export class NavigationGrid {
     this.generation = map.navigationChanges.generation;
   }
 
+  /** Terrain costs without the route's circular waypoint restriction. */
+  unbounded(): NavigationGrid {
+    if (!this.bounds) return this;
+    return (this.physicalGrid ??= new NavigationGrid(
+      this.map,
+      this.occupancy,
+      this.profile,
+      this.occupancyLayer,
+    ));
+  }
+
   costAt(x: number, z: number): number | undefined {
     if (!this.map.containsTile(x, z)) {
       return undefined;
     }
+    if (
+      this.bounds &&
+      !insideRouteBounds(this.bounds, this.map.tileCenter(x, z))
+    )
+      return undefined;
     this.sync();
     const index = this.map.tileIndex(x, z);
     let cost = this.costs[index]!;
@@ -266,7 +296,7 @@ export function findNavigationPath(
   if (!resolved) return undefined;
   const { start, end, reachedTarget } = resolved;
   const { map } = grid;
-  const route = searchTiles(grid, start, end)
+  const route = (resolved.direct ? [] : searchTiles(grid, start, end))
     .slice(1)
     .map(({ x, z }) => map.tileCenter(x, z));
   const destination = reachedTarget
@@ -278,10 +308,10 @@ export function findNavigationPath(
   }
   return {
     waypoints: straightenRoute(
-      grid,
+      grid.unbounded(),
       from,
       route,
-      grid.costAt(start.x, start.z) !== undefined,
+      grid.unbounded().costAt(start.x, start.z) !== undefined,
     ),
     destination,
     reachedTarget,
@@ -293,10 +323,25 @@ export function resolveNavigationDestination(
   grid: NavigationGrid,
   from: WorldPosition,
   target: WorldPosition,
-): { start: TileCoord; end: TileCoord; reachedTarget: boolean } | undefined {
+):
+  | { start: TileCoord; end: TileCoord; reachedTarget: boolean; direct?: true }
+  | undefined {
   const { map } = grid;
   const start = occupiedTile(grid, from);
   const goal = map.tileAtWorldPosition(target.x, target.z);
+  const boundaryTarget =
+    grid.bounds &&
+    insideRouteBounds(grid.bounds, from) &&
+    insideRouteBounds(grid.bounds, target) &&
+    !insideRouteBounds(grid.bounds, map.tileCenter(goal.x, goal.z));
+  // A circular leash contains every segment between two points inside it.
+  if (
+    boundaryTarget &&
+    start.x === goal.x &&
+    start.z === goal.z &&
+    segmentCost(grid.unbounded(), from, target) !== undefined
+  )
+    return { start, end: start, reachedTarget: true, direct: true };
   const startPassable = grid.costAt(start.x, start.z) !== undefined;
   const regions = new Set<number>();
   if (startPassable) {
@@ -312,6 +357,32 @@ export function resolveNavigationDestination(
   }
   if (regions.size === 0) {
     return undefined;
+  }
+
+  if (boundaryTarget) {
+    const connectors = NEIGHBORS.map(({ x, z }) => ({
+      x: goal.x + x,
+      z: goal.z + z,
+    })).filter(
+      (tile) =>
+        map.containsTile(tile.x, tile.z) &&
+        regions.has(grid.regionAt(tile.x, tile.z)) &&
+        segmentCost(
+          grid.unbounded(),
+          map.tileCenter(tile.x, tile.z),
+          target,
+        ) !== undefined,
+    );
+    connectors.sort(
+      (a, b) =>
+        squaredDistance(a.x - goal.x, a.z - goal.z) -
+          squaredDistance(b.x - goal.x, b.z - goal.z) ||
+        squaredDistance(a.x - start.x, a.z - start.z) -
+          squaredDistance(b.x - start.x, b.z - start.z) ||
+        map.tileIndex(a.x, a.z) - map.tileIndex(b.x, b.z),
+    );
+    if (connectors[0])
+      return { start, end: connectors[0], reachedTarget: true };
   }
 
   const reachedTarget = regions.has(grid.regionAt(goal.x, goal.z));

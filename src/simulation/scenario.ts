@@ -4,7 +4,9 @@ import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
 import { createFogState } from "./vision";
 import { createHarvesterState } from "./economy";
+import { createTerritoryState } from "./territory";
 
+import type { TerritoryAssignment } from "./territory";
 import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
 import type { EconomyState, MaterialsSite, MaterialsLoot } from "./economy";
@@ -18,6 +20,7 @@ export type ScenarioUnit = {
   definitionId: string;
   tile: TileCoord;
   facing?: number;
+  territory?: TerritoryAssignment;
 };
 
 export type ScenarioDefinition = {
@@ -29,7 +32,7 @@ export type ScenarioDefinition = {
   readonly playerFaction: string;
   readonly defeatOnDestruction?: readonly string[];
   readonly buildings: readonly ActorPlacement[];
-  /** Territorial units make their starting position home. */
+  /** Territorial units default to their starting position as home. */
   readonly units?: readonly ScenarioUnit[];
   readonly materials: number;
   readonly sites: readonly MaterialsSite[];
@@ -76,7 +79,7 @@ export function createScenarioState(
       facing: unit.facing,
     });
     if (definitionFor(unit.definitionId).territory)
-      actor.territory = { home: { ...worldPosition } };
+      actor.territory = createTerritoryState(worldPosition, unit.territory);
     return actor;
   });
   const actors = [...buildings, ...units];
@@ -100,7 +103,7 @@ export function createScenarioState(
   };
 }
 
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 export function serializeMission(
   state: MissionState,

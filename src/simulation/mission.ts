@@ -27,6 +27,7 @@ import {
 import { TerrainGrid } from "./terrain";
 import {
   attackRejection,
+  guardController,
   startAttack,
   wreckTiles,
   noteAttackMoveRoute,
@@ -37,7 +38,14 @@ import {
 } from "./combat";
 import type { AttackEvent, Wreck } from "./combat";
 import { secondsToTicks } from "./clock";
-import { leashAllows } from "./territory";
+import {
+  leashAllows,
+  createTerritoryController,
+  createWildlifeState,
+  validateWildlife,
+} from "./territory";
+import type { WildlifeState } from "./territory";
+import { resolveNavigationDestination } from "./navigation";
 import {
   createFog,
   createVision,
@@ -135,6 +143,7 @@ type WorkingActors = {
   retiredIds: string[];
   lifecycleChanges: number;
   economy?: EconomyState;
+  wildlife: WildlifeState;
   wrecks: Wreck[];
 };
 
@@ -157,6 +166,8 @@ export type MissionState = {
   playerFaction?: string;
   /** Remains of destroyed actors, oldest first. */
   wrecks: Wreck[];
+  /** Wolf alerts; each wolf's own state lives on its actor. */
+  wildlife: WildlifeState;
   result?: { kind: "defeat"; actorId: string; tick: number };
 };
 
@@ -167,6 +178,7 @@ export function createMissionState(actors: readonly Actor[]): MissionState {
     commands: [],
     retiredActorIds: [],
     wrecks: [],
+    wildlife: createWildlifeState(),
   };
 }
 
@@ -483,7 +495,7 @@ export function createMissionSimulation({
     }
     ensureValidActor(actor);
   };
-  const register = (actor: Actor): Actor => {
+  const register = (actor: Actor, peers?: readonly Actor[]): Actor => {
     if (usedActorIds.has(actor.id)) {
       throw new Error(`Duplicate or retired actor ID: ${actor.id}.`);
     }
@@ -504,12 +516,30 @@ export function createMissionSimulation({
       Object.assign(actor, tilePlacedPose(map!, actor, definition));
     }
     ensureValidActor(actor);
+    if (peers)
+      validateWildlife(
+        state.wildlife,
+        [...peers, actor],
+        definitionsById,
+        state.retiredActorIds,
+        worldBounds,
+        state.tick,
+      );
     const committed = deepFreeze(actor);
     actorsById.set(committed.id, committed);
     usedActorIds.add(committed.id);
     return committed;
   };
-  state.actors = freezeActors(state.actors.map(register));
+  state.actors = freezeActors(state.actors.map((actor) => register(actor)));
+  validateWildlife(
+    state.wildlife,
+    state.actors,
+    definitionsById,
+    state.retiredActorIds,
+    worldBounds,
+    state.tick,
+  );
+  deepFreeze(state.wildlife);
 
   const evaluatePlacement = (
     placement: ActorPlacement,
@@ -722,6 +752,7 @@ export function createMissionSimulation({
       lifecycleChanges: 0,
       economy: state.economy && structuredClone(state.economy),
       wrecks: [...state.wrecks],
+      wildlife: structuredClone(state.wildlife),
     };
   };
 
@@ -1260,7 +1291,7 @@ export function createMissionSimulation({
       }
       state = {
         ...state,
-        actors: freezeActors([...state.actors, register(copy)]),
+        actors: freezeActors([...state.actors, register(copy, state.actors)]),
       };
       if (state.economy && definitionFor(copy).harvesting) {
         state = {
@@ -1338,6 +1369,29 @@ export function createMissionSimulation({
           tickSeconds,
           navigationVersion,
           actors: working.actors,
+          controllers: [
+            createTerritoryController(working.wildlife),
+            guardController,
+          ],
+          destination: (actor, point, routeBounds) => {
+            const grid = behaviorFor(actor).navigationGrid?.(
+              actor,
+              definitionFor(actor),
+              routeBounds,
+            );
+            if (!grid) return point;
+            const resolved = resolveNavigationDestination(
+              grid,
+              actor.worldPosition,
+              point,
+            );
+            return (
+              resolved &&
+              (resolved.reachedTarget
+                ? point
+                : grid.map.tileCenter(resolved.end.x, resolved.end.z))
+            );
+          },
           wrecks: working.wrecks,
           definitions: definitionsById,
           map,
@@ -1430,6 +1484,14 @@ export function createMissionSimulation({
             tickSeconds,
             working.retiredIds,
           );
+        validateWildlife(
+          working.wildlife,
+          working.actors,
+          definitionsById,
+          working.retiredIds,
+          worldBounds,
+          state.tick + 1,
+        );
         const previousWrecks = state.wrecks;
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
@@ -1444,6 +1506,7 @@ export function createMissionSimulation({
             ? []
             : state.commands.filter(({ tick }) => tick > state.tick),
           ...(working.economy && { economy: deepFreeze(working.economy) }),
+          wildlife: deepFreeze(working.wildlife),
           // Expiring here keeps previews and the next tick in agreement.
           wrecks: deepFreeze(
             working.wrecks.filter(

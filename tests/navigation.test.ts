@@ -38,6 +38,101 @@ function center(map: TerrainGrid, x: number, z: number) {
 }
 
 describe("terrain traversal", () => {
+  test("prefers cheaper terrain when the exact destination is on the leash boundary", () => {
+    const map = new TerrainGrid({
+      width: 8,
+      height: 5,
+      tileSize: 1,
+      createTerrain: (x, z) => ({
+        typeId: z === 2 && x > 0 && x < 7 ? "rough" : "plain",
+      }),
+    });
+    const from = center(map, 0, 2);
+    const target = { ...center(map, 7, 2), x: center(map, 7, 2).x - 0.2 };
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      ground,
+      "surface",
+      { center: center(map, 3, 2), radius: 3.9 },
+    );
+    const path = findNavigationPath(grid, from, target)!;
+    expect(path.reachedTarget).toBe(true);
+    let cost = 0;
+    let previous = from;
+    for (const point of path.waypoints) {
+      cost += segmentCost(grid.unbounded(), previous, point)!;
+      previous = point;
+    }
+    expect(cost).toBeLessThan(segmentCost(grid.unbounded(), from, target)!);
+  });
+  test("detours to a boundary point without crossing blocked terrain or the leash", () => {
+    const map = new TerrainGrid({
+      width: 7,
+      height: 7,
+      tileSize: 1,
+      terrainTypeIds: ["plain", "water"],
+    });
+    map.setTerrain(4, 3, { typeId: "water" });
+    const bounds = { center: center(map, 3, 3), radius: 2.9 };
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      ground,
+      "surface",
+      bounds,
+    );
+    const from = center(map, 1, 3);
+    const target = { ...center(map, 6, 3), x: center(map, 6, 3).x - 0.2 };
+    const path = findNavigationPath(grid, from, target)!;
+    expect(path.reachedTarget).toBe(true);
+    expect(path.destination).toEqual(target);
+    let previous = from;
+    for (const point of path.waypoints) {
+      expect(
+        Math.hypot(point.x - bounds.center.x, point.z - bounds.center.z),
+      ).toBeLessThanOrEqual(bounds.radius);
+      expect(segmentCost(grid.unbounded(), previous, point)).toBeDefined();
+      previous = point;
+    }
+    map.setTerrain(6, 3, { typeId: "water" });
+    expect(findNavigationPath(grid, from, target)?.reachedTarget).toBe(false);
+  });
+  test("routes inside a small leash without any tile centers inside it", () => {
+    const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
+    const from = { ...center(map, 2, 2), x: 0.3 };
+    const target = { ...from, x: 0.4 };
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      ground,
+      "surface",
+      { center: from, radius: 0.15 },
+    );
+    expect(findNavigationPath(grid, from, target)).toEqual({
+      destination: target,
+      reachedTarget: true,
+      waypoints: [target],
+    });
+  });
+  test("bounded grids own immutable bounds so cached regions cannot change", () => {
+    const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
+    const bounds = { center: center(map, 1, 1), radius: 1 };
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      ground,
+      "surface",
+      bounds,
+    );
+    expect(grid.regionAt(1, 1)).toBeGreaterThanOrEqual(0);
+    expect(grid.costAt(3, 1)).toBeUndefined();
+    bounds.radius = 4;
+    bounds.center.x = center(map, 3, 1).x;
+    expect(grid.costAt(3, 1)).toBeUndefined();
+    expect(grid.bounds!.center).toEqual(center(map, 1, 1));
+    expect(Object.isFrozen(grid.bounds!.center)).toBe(true);
+  });
   test("combines terrain type, authored overrides, and slope", () => {
     const tiles: TerrainTile[] = [
       { typeId: "plain" },

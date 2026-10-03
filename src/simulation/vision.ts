@@ -1,7 +1,8 @@
+import { occupiedTilesFor } from "./placement";
 import { disconnectedBuildings } from "./support";
 import { terrainSightlineClear } from "./terrain-sightline";
 
-import type { ActorDefinition, ActorRenderState } from "./actor";
+import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
 import type { SupportView } from "./support";
 import type { TerrainGrid } from "./terrain";
 import { distance } from "./world";
@@ -81,15 +82,43 @@ export function visionSources(
   return actors.flatMap((actor) => {
     const vision = definitions.get(actor.definitionId)?.vision;
     if (!vision || actor.construction || disconnected.has(actor.id)) return [];
-    const { x, z } = actor.worldPosition;
-    const tile = map.tileAtWorldPosition(x, z);
-    return [
-      {
-        origin: actor.tilePlacement ? { x, z } : map.tileCenter(tile.x, tile.z),
-        radius: vision.radius,
-      },
-    ];
+    return [{ origin: visionOrigin(actor, map), radius: vision.radius }];
   });
+}
+
+function visionOrigin(
+  actor: Pick<ActorRenderState, "worldPosition" | "tilePlacement">,
+  map: TerrainGrid,
+): WorldPosition {
+  const { x, z } = actor.worldPosition;
+  if (actor.tilePlacement) return { x, z };
+  const tile = map.tileAtWorldPosition(x, z);
+  return map.tileCenter(tile.x, tile.z);
+}
+
+function eye(map: TerrainGrid, origin: WorldPosition) {
+  return {
+    ...origin,
+    height: map.heightAtWorldPosition(origin.x, origin.z) + EYE_HEIGHT,
+  };
+}
+
+/** Whether the tile's center is within `radius` and its sightline is clear. */
+function seesTile(
+  map: TerrainGrid,
+  observer: ReturnType<typeof eye>,
+  radius: number,
+  x: number,
+  z: number,
+): boolean {
+  const target = map.tileCenter(x, z);
+  return (
+    distance(target, observer) <= radius &&
+    terrainSightlineClear(map, observer, {
+      ...target,
+      height: map.heightAtWorldPosition(target.x, target.z) + TARGET_HEIGHT,
+    })
+  );
 }
 
 export function createVision(map: TerrainGrid): Vision {
@@ -165,26 +194,42 @@ export function visibleTiles(
   origin: WorldPosition,
   radius: number,
 ): number[] {
-  const observer = {
-    ...origin,
-    height: map.heightAtWorldPosition(origin.x, origin.z) + EYE_HEIGHT,
-  };
+  const observer = eye(map, origin);
   const center = map.tileAtWorldPosition(origin.x, origin.z);
   const reach = Math.ceil(radius / map.tileSize);
   const tiles: number[] = [];
   for (let z = center.z - reach; z <= center.z + reach; z += 1) {
     for (let x = center.x - reach; x <= center.x + reach; x += 1) {
-      if (!map.containsTile(x, z)) continue;
-      const target = map.tileCenter(x, z);
-      if (distance(target, origin) > radius) continue;
-      if (
-        terrainSightlineClear(map, observer, {
-          ...target,
-          height: map.heightAtWorldPosition(target.x, target.z) + TARGET_HEIGHT,
-        })
-      )
+      if (map.containsTile(x, z) && seesTile(map, observer, radius, x, z))
         tiles.push(z * map.width + x);
     }
   }
   return tiles;
+}
+
+/** Personal perception uses the same viewpoints and terrain rays as fog. */
+export function personallyDetects(
+  actor: Actor,
+  target: Actor,
+  definitions: ReadonlyMap<string, ActorDefinition>,
+  map?: TerrainGrid,
+): boolean {
+  const radius = definitions.get(actor.definitionId)?.vision?.radius ?? 0;
+  if (!map)
+    return distance(actor.worldPosition, target.worldPosition) <= radius;
+  const observer = eye(map, visionOrigin(actor, map));
+  const definition = definitions.get(target.definitionId)!;
+  const tiles =
+    target.tilePlacement && definition.footprint
+      ? occupiedTilesFor(
+          { ...target, tilePlacement: target.tilePlacement },
+          definition,
+        )
+      : [
+          map.tileAtWorldPosition(
+            target.worldPosition.x,
+            target.worldPosition.z,
+          ),
+        ];
+  return tiles.some(({ x, z }) => seesTile(map, observer, radius, x, z));
 }

@@ -56,6 +56,14 @@ the requirements.
   the starting Command Center freezes the mission and saves its defeat result.
   [Browser checks](../e2e/economy.spec.ts) cover mouse, phone and tablet touch,
   destination feedback, defeat, file loading, restart, and exit.
+- **0.42, wolf AI:** [territorial simulation](../src/simulation/territory.ts)
+  implements personal sight, shared territory centers and individual homes,
+  visible-wolf alerts, investigation, hard leashes, route recovery, and delayed
+  regeneration. [Wolf tests](../tests/wildlife.test.ts) cover all seven states,
+  relay chains, expiry, stable choices, blocked homes, actor order, and saved
+  continuation. [Combat tests](../tests/combat.test.ts) cover blocked pursuit
+  and terrain retries. Normal and alpha content and appearances are available;
+  the authored den and lone-wolf sight isolation belong to **0.41**.
 
 ## Remaining scope
 
@@ -77,14 +85,6 @@ the requirements.
 - **0.41, M0 map:** the movement map has slopes, cliffs, paths, rough ground,
   one wolf, and salvage. The compact mission layout, five-wolf den and alpha,
   mission landmarks, and recovery loot placement still need integration.
-- **0.42, wolf AI:** baseline target retention, stable choices, pursuit, hard
-  leash, return, regeneration, and saved combat continuation work.
-  Personal perception, shared den territories, visible-wolf alert propagation,
-  investigation, return interruptions, blocked-route policies, and the complete
-  serializable state machine remain. Q29's M0 gameplay decisions are
-  resolved; the [wolf implementation contract](
-    ../DESIGN.md#m0-wolf-implementation-contract) defines content, saves, and
-  acceptance checks.
 - **0.43, mission interface:** sidebar tabs, resource display, count-based
   practice goals, status feedback, and network alerts work. Mission objectives,
   victory results, the radial menu, general notifications, explanatory
@@ -108,7 +108,7 @@ the requirements.
   behavior work. Queued orders, camera presets, actor Focus/Follow, keyboard
   and edge panning, and the remaining locked bindings are incomplete.
 - **0.48, slice unit tests:** economy, support, production, fog, combat, and
-  save continuation have focused coverage. Complete wolf AI, objectives,
+  wolf AI and save continuation have focused coverage. Objectives,
   victory and complete mission reconstruction still need coverage. Defeat and
   opening restart have focused simulation and browser checks.
 - **0.49, complete mission browser flow:** absent. The tested opening ends
@@ -122,10 +122,11 @@ the requirements.
 
 ## Recommended next task
 
-Plan and implement **0.42** using the locked wolf rules and the
-[wolf contract](../DESIGN.md#m0-wolf-implementation-contract). Scope includes
-personal perception, visible-wolf alert propagation, alert investigation, and
-the complete serializable state machine. These support the den encounter in
-**0.41**, followed by mission objectives and victory in **0.43**.
+Implement **0.41** using the locked M0 layout and the
+[wolf contract](../DESIGN.md#m0-wolf-implementation-contract). Author the shared
+five-wolf den territory and separate homes, alpha, mountain enclosure and
+chokepoint, isolated lone-wolf approach, landmarks, and recovery loot. Verify
+sight isolation against normal and alpha ranges and all permitted wolf travel.
+Then integrate mission objectives and victory in **0.43**.
 
 Animation and the remaining persistence controls retain their own open scope.

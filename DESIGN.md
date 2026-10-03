@@ -868,20 +868,13 @@ Deterministic acceptance checks cover:
   route counts as idle. Any armed actor without an order fires at a detected
   attacker that hit it in the previous tick and is in range, without leaving
   its route.
-- In this prototype, guards and territorial NPCs ignore hostiles while the
-  route back proceeds. A blocked return keeps its point and retries after
-  navigation changes, and the actor may fight meanwhile. Move, Stop, and Attack
-  replace a guard's return.
-- This prototype's territorial NPCs engage the nearest detected hostile within
-  their aggression radius, or whoever damaged them in the previous tick. They
-  keep a valid target inside the leash around home; otherwise they return home.
-  Pursuit routes carry the leash as route bounds, so planning stays inside it.
-  Contact correction cannot push a fighting NPC beyond it. Blocked pursuit
-  waits for target movement or navigation changes. Beyond the leash an NPC
-  drops its target and heads home; stranded there, it answers attackers in
-  range but pursues nothing. At home and out of combat for their regeneration
-  delay, they recover health at a fixed rate. The full M0 mission uses the
-  [wolf behavior requirements](#m0-wolves).
+- Guards ignore hostiles while their route back proceeds. A blocked return
+  keeps its point and retries after navigation changes; the guard may fight
+  meanwhile. Move, Stop, and Attack replace a guard's return.
+- Territorial NPCs use the [wolf state machine](#m0-wolves), personal sight,
+  shared encounter territories, and visible-wolf alert propagation. All routes
+  and contact correction respect the hard leash. Blocked homes keep their
+  authored goal and approach a reachable waiting point without regenerating.
 - Destruction gives no refund and leaves remains for 60 seconds: a fallen unit
   or corpse, or building debris that blocks placement on its footprint until it
   clears. Remains never block movement or shots and cannot be selected.
@@ -903,9 +896,12 @@ Deterministic acceptance checks cover:
   from post. Scouts have 40 health, Harvesters 150, Barracks and Refineries 800,
   and Command Centers 2000. Wolves have 100 health, speed 5, vision 8, and an
   8-damage kinetic bite with range 0.6 and a 1.2-second cooldown. Their
-  aggression radius is 6, their leash 14, and they regenerate 5 health per
-  second after 5 seconds. One Trooper beats one wolf with roughly 40 health
-  left.
+  default leash is 14. Alpha wolves have 150 health, vision 10, and 125% normal
+  size. Wolves regenerate 5 health per second after 5 seconds out of combat at
+  home. Alerts last 8 seconds, investigation waits 1.5 seconds, blocked retries
+  wait 0.5 seconds, and 3 seconds without progress abandons an approach. Arrival
+  tolerance is 0.15 world units. Content can tune these values per encounter.
+  One Trooper can defeat one normal wolf.
 - The Materials opening places one lone wolf on the southern path at tile
   (46, 32), out of sight of the base.
 - Combat destruction of the opening's authored starting Command Center records
@@ -917,7 +913,8 @@ Deterministic acceptance checks cover:
   begins paused, with Inspect and Resume actions. A loaded defeat stays ended.
   Economic stalls and ordinary unit or building losses do not declare defeat.
 - Saves preserve health, weapon cooldowns, building aim, attack destinations,
-  returns and their retry state, route bounds, territory homes, and remains.
+  returns and their retry state, route bounds, remains, and the complete
+  [wolf and alert state](#m0-wolf-implementation-contract).
   Combat destinations and remains must lie within mission bounds.
 
 ## Milestone 0 playable slice

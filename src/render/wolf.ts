@@ -17,8 +17,10 @@ const LEG_SWING = 0.55;
 export function createWolfAppearance(
   scene: Scene,
   reducedMotion: () => boolean = () => false,
+  scale = 1,
 ): ActorAppearance {
   const root = new TransformNode("wolf-template", scene);
+  root.scaling.setAll(scale);
   const fur = new StandardMaterial("wolf-fur", scene);
   fur.diffuseColor = new Color3(0.42, 0.4, 0.37);
   fur.specularColor = Color3.Black();
@@ -72,7 +74,7 @@ export function createWolfAppearance(
 
   const body = createMeshAppearance(
     root,
-    { radius: 0.5, height: 0.95 },
+    { radius: 0.5 * scale, height: 0.95 * scale },
     [0.86, 0.22, 0.2],
   );
   return {

@@ -280,6 +280,10 @@ export async function createTerrainPrototype(
     "wolf",
     createWolfAppearance(view.scene, () => reducedMotion.matches),
   );
+  appearances.set(
+    "alpha-wolf",
+    createWolfAppearance(view.scene, () => reducedMotion.matches, 1.25),
+  );
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(view.scene, map, simulation.economy);

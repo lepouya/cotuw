@@ -22,6 +22,7 @@ import type { ScenarioUnit } from "../src/simulation/scenario";
 
 const TICK_SECONDS = 0.1;
 const definitions = ECONOMY_ACTOR_DEFINITIONS;
+const wolfTerritory = definitions.find(({ id }) => id === "wolf")!.territory!;
 const mapOptions = {
   width: 40,
   height: 20,
@@ -120,7 +121,7 @@ describe("combat", () => {
       definitions
         .filter((definition) => definition.weapon)
         .map((definition) => definition.id),
-    ).toEqual(["arc-trooper", "wolf"]);
+    ).toEqual(["arc-trooper", "wolf", "alpha-wolf"]);
   });
 
   test("one idle Trooper engages and defeats a lone wolf deterministically", () => {
@@ -226,7 +227,9 @@ describe("combat", () => {
     );
     const healed = simulation.actorById("wolf")!;
     expect(healed.health).toBeUndefined();
-    expect(healed.territory).toEqual({ home: at(29, 10) });
+    expect(healed.territory).toEqual(
+      expect.objectContaining({ home: at(29, 10) }),
+    );
     expect(
       Math.hypot(
         healed.worldPosition.x - at(29, 10).x,
@@ -288,9 +291,9 @@ describe("combat", () => {
     expect(simulation.economy!.materials).toBe(123);
   });
 
-  test("only a hit in the previous tick provokes; older attackers do not", () => {
+  test("an old hit does not reveal an attacker outside personal sight", () => {
     const { simulation } = fixture(
-      [unit("trooper", "arc-trooper", 21, 10), unit("wolf", "wolf", 29, 10)],
+      [unit("trooper", "arc-trooper", 20, 10), unit("wolf", "wolf", 29, 10)],
       (state) => {
         state.tick = 100;
         const wolf = state.actors.find(({ id }) => id === "wolf")!;
@@ -571,12 +574,7 @@ describe("combat edge cases", () => {
 
   test("wolf pursuit cannot use detours beyond the leash, including after terrain edits", () => {
     const content = withChanges("wolf", {
-      territory: {
-        aggressionRadius: 6,
-        leashRadius: 6,
-        regenerationDelaySeconds: 5,
-        regenerationPerSecond: 5,
-      },
+      territory: { ...wolfTerritory, leashRadius: 6 },
     });
     const { simulation } = fixture(
       [unit("scout", "arc-scout", 24, 10), unit("wolf", "wolf", 29, 10)],
@@ -601,7 +599,10 @@ describe("combat edge cases", () => {
         distance(wolf.worldPosition, wolf.territory!.home),
       ).toBeLessThanOrEqual(6);
     }
-    expect(simulation.actorById("wolf")!.combat?.attack?.blocked).toBeDefined();
+    expect(simulation.actorById("wolf")!.combat?.attack).toBeUndefined();
+    expect(simulation.actorById("wolf")!.territory?.failedTargets).toEqual([
+      expect.objectContaining({ targetId: "scout" }),
+    ]);
     simulation.submitCommand({
       kind: "terrain",
       tiles: [{ x: 27, z: 10, terrain: { typeId: "plain" } }],
@@ -1052,12 +1053,7 @@ test("contact correction cannot push a fighting wolf beyond its leash", () => {
     },
     undefined,
     withChanges("wolf", {
-      territory: {
-        aggressionRadius: 6,
-        leashRadius: 6,
-        regenerationDelaySeconds: 5,
-        regenerationPerSecond: 5,
-      },
+      territory: { ...wolfTerritory, leashRadius: 6 },
     }),
   );
   for (let tick = 0; tick < 4; tick++) {
@@ -1116,7 +1112,7 @@ describe("combat retries and immobile attackers", () => {
       state.terrain!.tiles[z * mapOptions.width + x]!.typeId = "water";
   };
 
-  test("a wolf stranded beyond its leash still answers an attacker in range", () => {
+  test("a wolf stranded beyond its leash cannot attack outside its territory", () => {
     const { simulation } = fixture(
       [unit("trooper", "arc-trooper", 11, 10), unit("wolf", "wolf", 11, 10)],
       (state) => {
@@ -1137,7 +1133,7 @@ describe("combat retries and immobile attackers", () => {
       },
       3,
     );
-    expect(attackers.has("wolf")).toBe(true);
+    expect(attackers.has("wolf")).toBe(false);
     expect(simulation.actorById("wolf")!.combat?.returning?.blocked).toEqual(
       expect.objectContaining({ at: at(29, 10) }),
     );

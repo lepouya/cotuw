@@ -931,7 +931,7 @@ describe("economy persistence", () => {
     const source = serializeMission(simulation.snapshot(), 1);
     expect(() =>
       deserializeMission(
-        source.replace('"version":4', '"version":2'),
+        source.replace(/"version":\d+/, '"version":2'),
         scenario,
         1,
       ),
