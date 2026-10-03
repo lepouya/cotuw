@@ -85,6 +85,23 @@ export function createUnitControls(
               ? "accepted"
               : "partial";
       } else if (stops) message("Selected units stopped.");
+      const attacks = outcomes.filter((outcome) =>
+        isOutcomeOf(outcome, "attack"),
+      );
+      if (attacks.length) {
+        const accepted = attacks.filter((outcome) => outcome.accepted).length;
+        const unarmed = attacks.filter(
+          ({ reason }) => reason === "unarmed",
+        ).length;
+        const other = attacks.length - accepted - unarmed;
+        message(
+          [
+            ...(accepted ? [`${count(accepted, "unit")} attacking`] : []),
+            ...(unarmed ? [`${count(unarmed, "unit")} cannot attack`] : []),
+            ...(other ? ["The target cannot be attacked"] : []),
+          ].join(" · ") + ".",
+        );
+      }
       return status;
     },
     dispose: () => controller.abort(),

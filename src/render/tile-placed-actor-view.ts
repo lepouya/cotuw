@@ -11,6 +11,7 @@ import { occupiedTilesFor, tilePlacedPose } from "../simulation/placement";
 import { createViewRegistry } from "./view-registry";
 import { isRgb } from "./color";
 import { createFootprintOverlay } from "./footprint-overlay";
+import { createScreenBar } from "./screen-bar";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
@@ -21,6 +22,8 @@ import type { Rgb } from "./color";
 /** Gap left on footprint sides that face unoccupied tiles. */
 const EDGE_INSET_TILES = 0.06;
 const DEFAULT_HEIGHT = 1.5;
+/** Below the building health bar, which sits higher above the ground. */
+const CONSTRUCTION_BAR_HEIGHT = 1.9;
 const DEFAULT_COLOR: Rgb = [0.35, 0.42, 0.46];
 
 /**
@@ -292,42 +295,37 @@ export function createTilePlacedActorViewRegistry(
       badge.color = new Color3(1, 0.7, 0.15);
       badge.isPickable = false;
     }
-    const [, progressFill] = constructing
-      ? ["background", "fill"].map((part) => {
-          const mesh = MeshBuilder.CreateBox(
-            `${root.name}-construction-${part}`,
-            {
-              width: 2 * map.tileSize,
-              height: 0.1,
-              depth: 0.16,
-            },
-            scene,
-          );
-          mesh.parent = root;
-          mesh.position.set(
-            worldPosition.x,
-            roof + 1.9 + (part === "fill" ? 0.06 : 0),
-            worldPosition.z,
-          );
-          mesh.isPickable = false;
-          mesh.material = shared(`construction-${part}`, (material) => {
-            material.emissiveColor =
-              part === "fill"
-                ? new Color3(1, 0.78, 0.24)
-                : new Color3(0.12, 0.16, 0.18);
-            material.disableLighting = true;
-          });
-          return mesh;
-        })
-      : [];
+    let progress:
+      | { bar: ReturnType<typeof createScreenBar>; fill: StandardMaterial }
+      | undefined;
+    if (constructing) {
+      const bar = createScreenBar(scene, `${root.name}-construction`, {
+        width: 2 * map.tileSize,
+        frame: shared("construction-background", (material) => {
+          material.emissiveColor = new Color3(0.12, 0.16, 0.18);
+          material.disableLighting = true;
+        }),
+      });
+      bar.root.parent = root;
+      bar.root.position.set(
+        worldPosition.x,
+        roof + CONSTRUCTION_BAR_HEIGHT,
+        worldPosition.z,
+      );
+      const fill = shared("construction-fill", (material) => {
+        material.emissiveColor = new Color3(1, 0.78, 0.24);
+        material.disableLighting = true;
+      });
+      progress = { bar, fill };
+    }
     return {
       root,
       update: ({ construction }: TilePlacedActorState) => {
-        if (!progressFill || !construction) return;
-        const progress = construction.completedTicks / construction.totalTicks;
-        progressFill.scaling.x = Math.max(0.01, progress);
-        progressFill.position.x =
-          worldPosition.x - map.tileSize * (1 - progress);
+        if (!progress || !construction) return;
+        progress.bar.setFill(
+          construction.completedTicks / construction.totalTicks,
+          progress.fill,
+        );
       },
       animate: (seconds: number) =>
         details?.update(constructing || disconnected ? 0 : seconds),

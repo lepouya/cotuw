@@ -3,7 +3,11 @@ import { createSelection } from "./selection";
 import { createPointerGesture } from "./pointer-gesture";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
-import type { ActorCommand, GroupMoveCommand } from "../simulation/command";
+import type {
+  ActorCommand,
+  AttackCommand,
+  GroupMoveCommand,
+} from "../simulation/command";
 import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 export type CommandInputOptions = {
@@ -13,7 +17,11 @@ export type CommandInputOptions = {
     mesh: AbstractMesh | null,
   ) => WorldPosition | undefined;
   actorIdsInRect: (rect: SelectionRect) => string[];
-  submitCommand: (command: ActorCommand | GroupMoveCommand) => void;
+  submitCommand: (
+    command: ActorCommand | GroupMoveCommand | AttackCommand,
+  ) => void;
+  /** Whether clicking this actor attacks it instead of selecting it. */
+  canAttack?: (actorId: string) => boolean;
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
   onSelectionChanged?: (actorIds: readonly string[]) => void;
   enabled?: () => boolean;
@@ -55,6 +63,7 @@ export function createCommandInput(
     onWorldSelectionChanged,
     enabled = () => true,
     canMove = () => true,
+    canAttack = () => false,
     groundTargetMode = () => false,
     onGroundTarget,
     cancelGroundTarget,
@@ -154,11 +163,14 @@ export function createCommandInput(
         if (target) onGroundTarget?.(target);
         return;
       }
-      if (picked) {
+      const ids = selection.ids.filter(canMove);
+      if (picked && !boxMode && ids.length > 0 && canAttack(picked)) {
+        for (const actorId of ids)
+          submitCommand({ kind: "attack", actorId, targetId: picked });
+      } else if (picked) {
         select(picked, additive);
         onWorldSelectionChanged?.(selection.ids);
       } else if (target) {
-        const ids = selection.ids.filter(canMove);
         if (boxMode || ids.length === 0) {
           if (!additive) select(undefined);
           onWorldSelectionChanged?.(selection.ids);

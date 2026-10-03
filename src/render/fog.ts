@@ -6,7 +6,7 @@ import {
   VertexData,
 } from "@babylonjs/core";
 
-import { clampToBounds } from "../simulation/world";
+import { clampToBounds, distance } from "../simulation/world";
 import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
 
 import type { Scene } from "@babylonjs/core";
@@ -141,10 +141,7 @@ export function limitToExplored(
   const ground = clampToBounds(point, map.worldBounds);
   const tile = map.tileAtWorldPosition(ground.x, ground.z);
   const center = map.tileCenter(tile.x, tile.z);
-  if (
-    fog.isExplored(tile.x, tile.z) &&
-    Math.hypot(point.x - center.x, point.z - center.z) <= margin
-  )
+  if (fog.isExplored(tile.x, tile.z) && distance(point, center) <= margin)
     return point;
   let nearest: { x: number; z: number } | undefined;
   let nearestDistance = Number.POSITIVE_INFINITY;
@@ -152,10 +149,10 @@ export function limitToExplored(
     for (let x = 0; x < map.width; x += 1) {
       if (!fog.isExplored(x, z)) continue;
       const center = map.tileCenter(x, z);
-      const distance = Math.hypot(point.x - center.x, point.z - center.z);
-      if (distance < nearestDistance) {
+      const gap = distance(point, center);
+      if (gap < nearestDistance) {
         nearest = center;
-        nearestDistance = distance;
+        nearestDistance = gap;
       }
     }
   if (!nearest || nearestDistance <= margin) return point;

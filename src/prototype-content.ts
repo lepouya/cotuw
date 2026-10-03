@@ -7,6 +7,7 @@ import type { MovementProfile } from "./simulation/navigation";
 import type { ActorGraphics } from "./render/skinned-actor-appearance";
 import type { TilePlacedActorAppearance } from "./render";
 import type { ActorPresentation, SidebarGoal } from "./ui/sidebar";
+import type { AttackEffectStyle } from "./render/combat-effects";
 
 export const PROTOTYPE_MOVEMENT_PROFILES: readonly MovementProfile[] = [
   {
@@ -76,8 +77,15 @@ export const PROTOTYPE_ACTOR_PRESENTATIONS = new Map<string, ActorPresentation>(
         train: { id: "train-harvester", label: "Produce Harvester" },
       },
     ],
+    ["wolf", { name: "Wolf", description: "Hostile wildlife" }],
   ],
 );
+
+/** How each armed actor's hits are drawn. */
+export const PROTOTYPE_ATTACK_EFFECTS = new Map<string, AttackEffectStyle>([
+  ["arc-trooper", "tracer"],
+  ["wolf", "bite"],
+]);
 
 export const PROTOTYPE_ACTOR_NAMES = new Map(
   [...PROTOTYPE_ACTOR_PRESENTATIONS].map(([id, { name }]) => [id, name]),

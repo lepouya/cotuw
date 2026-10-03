@@ -596,8 +596,8 @@ story.
   connections are dashed with gap crosses. Offline buildings dim, stop animated
   machinery, turn off emissive lights, and show a crossed power badge.
   Sidebar states explain paused work. Grouped disconnection and restoration
-  alerts focus the camera on affected buildings. The opening has no combat or
-  mission result.
+  alerts focus the camera on affected buildings. The opening has no mission
+  result.
 - Prototype vision radii are 14 world units for Command Centers and Scouts,
   8 for Refineries and Barracks, 7 for Troopers, and 5 for Harvesters. A
   building's vision covers its own support radius, so connected coverage is
@@ -632,8 +632,8 @@ story.
 - A lost Refinery interrupts automation and frees its surviving Harvester for
   assignment to an empty slot. The unit remains movable and keeps its cargo.
   Producer loss discards paid production; cancelled identities remain retired.
-  Undamaged completed buildings sell for half their prototype cost; mobile
-  units cannot be sold. Health-scaled resale requires the combat system.
+  Completed buildings sell for half their prototype cost multiplied by their
+  health fraction, rounded down; mobile units cannot be sold.
 - The near patch contains four 200-Materials tiles; the north patch contains
   two. Three ordinary salvage tiles each grant 25 Materials to the first
   mobile unit reaching them, without a delivery. Resource tiles and uncollected
@@ -656,8 +656,93 @@ story.
   production, rally points, blueprint progress and queue order, explored
   terrain, pending commands, and reserved or retired actor identities.
   Scenario saves require explored terrain. Versioned JSON envelopes check
-  scenario, tick rate, map dimensions, and authored resource names, coordinates,
-  and yields before simulation validation. Manual save/load UI remains pending.
+  scenario, player faction, tick rate, map dimensions, and authored resource
+  names, coordinates, and yields before simulation validation. Manual save/load
+  UI remains pending.
+
+## Combat prototype
+
+- Every unit and building definition authors maximum health. Current health is
+  saved actor state and is absent while undamaged. Only actors with health can
+  be targeted, damaged, or destroyed.
+- Definitions name a faction; actors of different factions are hostile, and an
+  actor without a faction is neutral. The scenario names the player's faction.
+  The fog records only that faction's vision; other factions derive current
+  vision each tick without exploration memory. A faction detects an actor
+  when it currently sees the unit's tile or any of a building's footprint
+  tiles. Without a player faction, as in the sandbox, or without fog, every
+  faction detects everything.
+- A weapon authors fixed damage, a damage type, a range, and a cooldown. Range
+  runs from the attacker's center to the target's footprint or body edge.
+  Weapons hit hostile actors on their own occupancy layer. Damage types are
+  reserved for armor matchups such as kinetic versus energy; every type
+  currently deals full damage. Scouts, Harvesters, and current buildings are
+  unarmed; a future armed building such as a turret uses the same weapon data.
+- A tick applies commands, then resolves combat in actor-ID order, then moves
+  actors, updates the economy, and separates units. Every hit in a tick applies
+  together, so simultaneous attackers both land; actors left at zero health are
+  destroyed before movement. A shot needs range and line of fire: the terrain
+  sightline from 1.2 units above the attacker to 0.5 above the target, and no
+  blocking footprint other than the attacker's or target's. Units do not block
+  shots. Armed buildings aim without changing their placement facing and do not
+  chase targets; they give up an order whose target is out of range, out of
+  line of fire, or hidden.
+- **Attack** targets a detected hostile. Move and Stop cancel it. Attackers
+  stop, face the target, and fire whenever the weapon is ready; out of range or
+  line of fire they chase, replanning once the target moves a tile from the
+  route's end. A point no route approaches is retried only after the target
+  moves away from it or navigation changes. A lost target is chased to its
+  last-known position; an explicit attack then ends there, while automatic
+  engagements end at once.
+- Idle armed units with a guard rule engage the nearest detected hostile
+  within their acquisition radius and their post's chase radius, stable ID
+  breaking ties. They return to their post when it dies, hides, or was last
+  seen beyond the chase radius from that post. A unit waiting on a blocked
+  route counts as idle. Any armed actor without an order fires at a detected
+  attacker that hit it in the previous tick and is in range, without leaving
+  its route.
+- Guards and territorial NPCs share one return rule: they ignore hostiles while
+  the route back proceeds. A blocked return keeps its point and retries after
+  navigation changes, and the actor may fight meanwhile. Move, Stop, and Attack
+  replace a guard's return.
+- Territorial NPCs engage the nearest detected hostile within their aggression
+  radius, or whoever damaged them in the previous tick. They keep a valid target
+  inside the leash around home; otherwise they return home. Pursuit routes
+  carry the leash as route bounds, so planning never leaves it, and contact
+  correction cannot push a fighting NPC beyond it. Blocked pursuit waits for
+  target movement or navigation changes. Beyond the leash an NPC drops its
+  target and heads home; stranded there, it answers attackers in range but
+  pursues nothing. At home and out of combat for their regeneration delay,
+  they recover health at a fixed rate. Pack alerts and last-known
+  investigation follow with the den encounter.
+- Destruction gives no refund and leaves remains for 60 seconds: a fallen unit
+  or corpse, or building debris that blocks placement on its footprint until it
+  clears. Remains never block movement or shots and cannot be selected.
+- Clicking or tapping a visible hostile with friendly units selected orders
+  each to attack it; unarmed units keep their orders and the receipt reports
+  them. Otherwise the click selects the hostile for inspection with a red
+  segmented ring. Undetected hostiles are not drawn, listed, or selectable.
+  Visible hostile buildings allow inspection; building actions, queues, and
+  support overlays belong to the player's faction.
+- Five-segment health bars show above selected actors and above actors that
+  dealt or took damage in the last three seconds, then fade over one second.
+  The fill drains continuously and turns amber at 60% and red at 30%. The
+  sidebar shows exact health for one selected actor. Rifle hits draw a brief
+  tracer, wolf bites draw claw marks on the target, and accepted attack orders
+  flash a red target marker.
+- Prototype values: Troopers have 100 health and a 10-damage kinetic rifle with
+  range 6 and a one-second cooldown, acquiring within 7 and chasing up to 10
+  from post. Scouts have 40 health, Harvesters 150, Barracks and Refineries 800,
+  and Command Centers 2000. Wolves have 100 health, speed 5, vision 8, and an
+  8-damage kinetic bite with range 0.6 and a 1.2-second cooldown. Their
+  aggression radius is 6, their leash 14, and they regenerate 5 health per
+  second after 5 seconds. One Trooper beats one wolf with roughly 40 health
+  left.
+- The Materials opening places one lone wolf on the southern path at tile
+  (46, 32), out of sight of the base.
+- Saves preserve health, weapon cooldowns, building aim, attack destinations,
+  returns and their retry state, route bounds, territory homes, and remains.
+  Combat destinations and remains must lie within mission bounds.
 
 ## Milestone 0 playable slice
 

@@ -71,9 +71,8 @@ export function createBuildingPlacement(
   simulation: MissionSimulation,
   { buildings, controls, onPlaced, onStart }: BuildingPlacementOptions,
 ) {
-  if (buildings.length === 0)
-    throw new RangeError("Building placement needs at least one building.");
-  let { definition, name } = buildings[0]!;
+  let definition = buildings[0]?.definition;
+  let name = buildings[0]?.name ?? "";
   const preview = createTilePlacedActorViewRegistry(
     scene,
     map,
@@ -101,13 +100,13 @@ export function createBuildingPlacement(
   let overlayKey = "";
   let uiKey = "";
   let terrainRevision = 0;
-  const size = () => footprintSize(definition.footprint!.occupiedTiles);
+  const size = () => footprintSize(definition!.footprint!.occupiedTiles);
   const message = (text: string) => {
     if (controls.status && controls.status.textContent !== text)
       controls.status.textContent = text;
   };
   const placement = (): ActorPlacement | undefined =>
-    origin
+    origin && definition
       ? {
           actorId: simulation.unusedActorId(`${definition.id}-`),
           definitionId: definition.id,
@@ -171,7 +170,7 @@ export function createBuildingPlacement(
     preview.update(
       candidate
         ? [
-            createTilePlacedActor(map, definition, {
+            createTilePlacedActor(map, definition!, {
               ...candidate,
               actorId: "building-preview",
             }),
@@ -338,7 +337,11 @@ export function createBuildingPlacement(
     if (active) overlayOffset = footprintOverlayOffset(map);
   });
   update();
-  message("Choose a building, then place it on clear terrain.");
+  message(
+    buildings.length
+      ? "Choose a building, then place it on clear terrain."
+      : "No buildings available.",
+  );
   return {
     get active() {
       return active;

@@ -1,7 +1,7 @@
 import { disconnectedBuildings } from "../simulation/support";
 import {
   harvestingRecoveryCost,
-  materialsCost,
+  saleMaterialsRefund,
   refineryOccupied,
 } from "../simulation/economy";
 import { ECONOMY_COMMAND_KINDS, isOutcomeOf } from "../simulation/command";
@@ -11,7 +11,7 @@ import type {
   HarvesterState,
 } from "../simulation/economy";
 import type { MissionSimulation } from "../simulation/mission";
-import type { ActorDefinition } from "../simulation/actor";
+import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { CommandOutcome, MissionCommand } from "../simulation/command";
 import type { TileCoord } from "../simulation/grid";
 import type { WorldPosition } from "../simulation/world";
@@ -63,6 +63,7 @@ export function createEconomyControls(
     names: ReadonlyMap<string, string>;
     selectedActorId: () => string | undefined;
     enabled: () => boolean;
+    canControl?: (actor: ActorRenderState) => boolean;
     focus: (tile: TileCoord) => void;
     /** Undiscovered sites and salvage stay unlisted. */
     explored: (tile: TileCoord) => boolean;
@@ -74,6 +75,7 @@ export function createEconomyControls(
   const definitions = new Map(
     options.definitions.map((definition) => [definition.id, definition]),
   );
+  const canControl = options.canControl ?? (() => true);
   const actions = new Map<string, () => void>();
   const buttons = new Map<string, HTMLButtonElement>();
   const sync = (
@@ -135,14 +137,18 @@ export function createEconomyControls(
       const actors = new Map(
         simulation.actors.map((actor) => [actor.id, actor]),
       );
-      const actor = id ? actors.get(id) : undefined;
+      const selected = id ? actors.get(id) : undefined;
+      const actor = selected && canControl(selected) ? selected : undefined;
       const resourcePatches = patches(economy, options.explored);
       const definition = actor && definitions.get(actor.definitionId);
-      const worker = economy.harvesters.find((worker) => worker.actorId === id);
+      const worker =
+        actor &&
+        economy.harvesters.find((worker) => worker.actorId === actor.id);
       const enabled = options.enabled();
       const disconnected = disconnectedBuildings(simulation.support);
       const refineries = simulation.actors.filter(
-        (actor) => definitions.get(actor.definitionId)?.refinery,
+        (actor) =>
+          canControl(actor) && definitions.get(actor.definitionId)?.refinery,
       );
       const details = element("harvester-actions");
       details.hidden = !worker;
@@ -198,7 +204,7 @@ export function createEconomyControls(
         ]);
       }
       const construction = simulation.actors.filter(
-        (actor) => actor.construction,
+        (actor) => canControl(actor) && actor.construction,
       );
       const activeConstruction = construction.find(
         (actor) => !disconnected.has(actor.id),
@@ -220,7 +226,9 @@ export function createEconomyControls(
       constructionDetails.hidden = !selectedConstruction;
       if (selectedConstruction)
         constructionDetails.textContent = `${disconnected.has(selectedConstruction.id) ? "Disconnected · Construction paused" : activeConstruction === selectedConstruction ? "Building" : "Queued for construction"} · ${secondsLeft(selectedConstruction.construction!)}s remaining`;
-      const jobs = economy.production.filter((job) => job.producerId === id);
+      const jobs = economy.production.filter(
+        (job) => job.producerId === actor?.id,
+      );
       const mobile = definition?.movement ? actor : undefined;
       sync(element("resource-overview"), [
         ...resourcePatches.map(({ site, remaining }) => ({
@@ -317,7 +325,7 @@ export function createEconomyControls(
       remove.textContent = actor?.construction
         ? `Cancel construction (+${actor.construction.paidMaterials} Materials)`
         : definition
-          ? `Sell building (+${Math.floor(materialsCost(definition) / 2)} Materials)`
+          ? `Sell building (+${saleMaterialsRefund(actor!, definition)} Materials)`
           : "Sell selected building";
       if (lastResult) element("harvester-status").textContent = lastResult;
     },

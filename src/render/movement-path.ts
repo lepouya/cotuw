@@ -6,6 +6,7 @@ import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
 import type { Observer, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
+import { distance } from "../simulation/world";
 import type { WorldPosition } from "../simulation/world";
 
 const PATH_COLOR = new Color3(1, 0.78, 0.24);
@@ -306,13 +307,6 @@ function pointAlong(
     remaining -= segment;
   }
   return { ...points[points.length - 1]! };
-}
-
-function distance(
-  from: Readonly<WorldPosition>,
-  to: Readonly<WorldPosition>,
-): number {
-  return Math.hypot(to.x - from.x, to.z - from.z);
 }
 
 function samePoint(

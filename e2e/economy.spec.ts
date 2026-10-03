@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { terrainPoint } from "./prototype-helpers";
 import type { Page } from "@playwright/test";
 import type { TerrainPrototype } from "../src/prototype";
+import type { ActorPlacement } from "../src/simulation/placement";
 
 type EconomyHarness = { view: TerrainPrototype; now: number };
 declare global {
@@ -11,60 +12,84 @@ declare global {
 }
 
 /** Uses real tick callbacks with a controlled clock, so 60 seconds need no wall-time wait. */
-async function controlledOpening(page: Page, materials = 150) {
+async function controlledOpening(
+  page: Page,
+  materials = 150,
+  playerFaction = "arc",
+  extraBuildings: ActorPlacement[] = [],
+) {
   await page.goto("/");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
   );
-  await page.evaluate(async (materials) => {
-    const harnessPath: string = "/e2e/harness.ts";
-    const prototypePath: string = "/src/prototype.ts";
-    const sidebarPath: string = "/src/ui/sidebar.ts";
-    const contentPath: string = "/src/prototype-content.ts";
-    const scenarioPath: string = "/src/content/economy-scenario.ts";
-    const { EngineStore } = await import(harnessPath);
-    const engines = [...EngineStore.Instances];
-    for (const engine of engines) engine.dispose();
-    const { createTerrainPrototype } = (await import(
-      prototypePath
-    )) as typeof import("../src/prototype");
-    const { createSidebar } = (await import(
-      sidebarPath
-    )) as typeof import("../src/ui/sidebar");
-    const { ARC_ACTOR_DEFINITIONS, PROTOTYPE_ACTOR_PRESENTATIONS } =
-      (await import(contentPath)) as typeof import("../src/prototype-content");
-    const { ECONOMY_SCENARIO } = (await import(
-      scenarioPath
-    )) as typeof import("../src/content/economy-scenario");
-    let view: TerrainPrototype;
-    const sidebar = createSidebar(
-      document.querySelector<HTMLElement>("#game-sidebar")!,
-      {
-        definitions: ARC_ACTOR_DEFINITIONS,
-        presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
-        economy: true,
-        goals: [{ definitionId: "arc-trooper", label: "Train a Trooper" }],
-        selectActor: (id, additive) => view.selectActor(id, additive),
-      },
-    );
-    view = await createTerrainPrototype(
-      document.querySelector<HTMLCanvasElement>("#game-canvas")!,
-      document.querySelector<HTMLCanvasElement>("#minimap")!,
-      {
-        ...sidebar.controls,
-        scenario: { ...ECONOMY_SCENARIO, materials },
-        onStateChanged: sidebar.update,
-        showActor: sidebar.showActor,
-        onDispose: sidebar.dispose,
-      },
-    );
-    window.economyHarness = { view, now: performance.now() };
-    Object.defineProperty(performance, "now", {
-      configurable: true,
-      value: () => window.economyHarness.now,
-    });
-  }, materials);
+  const hiddenUnitsAtLoad = await page.evaluate(
+    async ({ materials, playerFaction, extraBuildings }) => {
+      const harnessPath: string = "/e2e/harness.ts";
+      const prototypePath: string = "/src/prototype.ts";
+      const sidebarPath: string = "/src/ui/sidebar.ts";
+      const contentPath: string = "/src/prototype-content.ts";
+      const scenarioPath: string = "/src/content/economy-scenario.ts";
+      const { EngineStore } = await import(harnessPath);
+      const engines = [...EngineStore.Instances];
+      for (const engine of engines) engine.dispose();
+      const { createTerrainPrototype } = (await import(
+        prototypePath
+      )) as typeof import("../src/prototype");
+      const { createSidebar } = (await import(
+        sidebarPath
+      )) as typeof import("../src/ui/sidebar");
+      const { PROTOTYPE_ACTOR_PRESENTATIONS } = (await import(
+        contentPath
+      )) as typeof import("../src/prototype-content");
+      const { ECONOMY_ACTOR_DEFINITIONS, ECONOMY_SCENARIO } = (await import(
+        scenarioPath
+      )) as typeof import("../src/content/economy-scenario");
+      let view: TerrainPrototype;
+      const sidebar = createSidebar(
+        document.querySelector<HTMLElement>("#game-sidebar")!,
+        {
+          definitions: ECONOMY_ACTOR_DEFINITIONS,
+          presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
+          economy: true,
+          playerFaction,
+          goals: [{ definitionId: "arc-trooper", label: "Train a Trooper" }],
+          selectActor: (id, additive) => view.selectActor(id, additive),
+        },
+      );
+      view = await createTerrainPrototype(
+        document.querySelector<HTMLCanvasElement>("#game-canvas")!,
+        document.querySelector<HTMLCanvasElement>("#minimap")!,
+        {
+          ...sidebar.controls,
+          scenario: {
+            ...ECONOMY_SCENARIO,
+            materials,
+            playerFaction,
+            buildings: [...ECONOMY_SCENARIO.buildings, ...extraBuildings],
+          },
+          onStateChanged: sidebar.update,
+          showActor: sidebar.showActor,
+          onDispose: sidebar.dispose,
+        },
+      );
+      window.economyHarness = { view, now: performance.now() };
+      Object.defineProperty(performance, "now", {
+        configurable: true,
+        value: () => window.economyHarness.now,
+      });
+      return view.simulation.actors
+        .filter(
+          (actor) =>
+            !actor.tilePlacement &&
+            !view.simulation.detects(playerFaction, actor) &&
+            !!view.scene.getTransformNodeByName(`actor-${actor.id}-root`),
+        )
+        .map((actor) => actor.id);
+    },
+    { materials, playerFaction, extraBuildings },
+  );
+  expect(hiddenUnitsAtLoad).toEqual([]);
 }
 async function advance(page: Page, seconds: number) {
   await page.evaluate((seconds) => {
@@ -658,4 +683,165 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     "data-simulation-fault",
     "true",
   );
+});
+
+test("a Trooper defeats the lone wolf with health and combat feedback", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  const wolfHidden = await page.evaluate(() => {
+    const { view } = window.economyHarness;
+    const wolf = view.simulation.actorById("lone-wolf")!;
+    const hidden = !view.simulation.detects("arc", wolf);
+    view.simulation.spawnActor({
+      id: "duelist",
+      definitionId: "arc-trooper",
+      worldPosition: { x: 40.5 - 50, z: 32.5 - 50 },
+      facing: Math.PI / 2,
+      occupancyLayer: "surface",
+    });
+    view.camera.focusOnTile(43, 32);
+    return hidden;
+  });
+  expect(wolfHidden).toBe(true);
+  await advance(page, 2);
+  const engaged = await page.evaluate(() => {
+    const { simulation } = window.economyHarness.view;
+    return {
+      trooper: simulation.actorById("duelist")!.combat?.attack?.targetId,
+      wolf: simulation.actorById("lone-wolf")!.combat?.attack?.targetId,
+    };
+  });
+  expect(engaged).toEqual({ trooper: "lone-wolf", wolf: "duelist" });
+  await advance(page, 12);
+  const result = await page.evaluate(() => {
+    const { simulation } = window.economyHarness.view;
+    return {
+      wolf: simulation.actorById("lone-wolf"),
+      health: simulation.actorById("duelist")!.health,
+      wrecks: simulation.wrecks.map(({ actorId }) => actorId),
+    };
+  });
+  expect(result.wolf).toBeUndefined();
+  expect(result.wrecks).toEqual(["lone-wolf"]);
+  expect(result.health).toBeGreaterThan(0);
+  expect(result.health).toBeLessThan(100);
+  await page.evaluate(() => window.economyHarness.view.selectActor("duelist"));
+  await page.locator("#tab-selection").click();
+  await expect(page.locator("#selection-health")).toHaveText(
+    `Health ${result.health} / 100`,
+  );
+});
+
+test("hostile buildings require detection and expose inspection without player controls", async ({
+  page,
+}) => {
+  await controlledOpening(page, 150, "wildlife", [
+    {
+      actorId: "enemy-barracks",
+      definitionId: "arc-field-barracks",
+      origin: { x: 12, z: 49 },
+    },
+  ]);
+  await advance(page, 0.1);
+  const initiallyHidden = await page.evaluate(() => {
+    const { view } = window.economyHarness;
+    view.selectActor("starting-command-center");
+    return {
+      rendered: !!view.scene.getTransformNodeByName(
+        "tile-placed-actor-starting-command-center-root",
+      ),
+      selected:
+        document.querySelector<HTMLCanvasElement>("#game-canvas")!.dataset
+          .selectedActors,
+    };
+  });
+  expect(initiallyHidden).toEqual({ rendered: false, selected: "[]" });
+  await advance(page, 0.1);
+  await expect(page.locator("#producer-roster button")).toHaveCount(0);
+  await expect(page.locator("#building-options button")).toHaveCount(0);
+  await expect(page.locator("#training-options button")).toHaveCount(0);
+  await page.evaluate(() => {
+    const { view } = window.economyHarness;
+    const position = { x: 10.5 - 50, z: 50.5 - 50 };
+    view.simulation.spawnActor({
+      id: "observer",
+      definitionId: "wolf",
+      worldPosition: position,
+      facing: 0,
+      occupancyLayer: "surface",
+      territory: { home: position },
+    });
+    view.selectActor("enemy-barracks");
+  });
+  await advance(page, 0.1);
+  await page.locator("#tab-selection").click();
+  await expect(page.locator("#selection-details")).toContainText(
+    "Field Barracks",
+  );
+  await expect(page.locator("#selection-health")).toBeVisible();
+  await expect(page.locator("#remove-building")).toBeHidden();
+  await expect(page.locator("#remove-building")).toBeDisabled();
+  await expect(page.locator("#open-training")).toBeHidden();
+  await expect(page.locator("[data-rally-controls]").first()).toBeHidden();
+  await expect(page.locator("#producer-roster button")).toHaveCount(0);
+  await expect(page.locator("#construction-queue button")).toHaveCount(0);
+  await expect(page.locator("#production-queue button")).toHaveCount(0);
+  const rendered = await page.evaluate(() => {
+    const { view } = window.economyHarness;
+    document
+      .querySelector<HTMLButtonElement>("#remove-building")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    return !!view.scene.getTransformNodeByName(
+      "tile-placed-actor-starting-command-center-root",
+    );
+  });
+  expect(rendered).toBe(true);
+  await advance(page, 0.1);
+  expect(
+    await page.evaluate(
+      () => !!window.economyHarness.view.simulation.actorById("enemy-barracks"),
+    ),
+  ).toBe(true);
+  await page.evaluate(() =>
+    window.economyHarness.view.simulation.removeActor("observer"),
+  );
+  await advance(page, 0.1);
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-selected-actors",
+    "[]",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        !!window.economyHarness.view.scene.getTransformNodeByName(
+          "tile-placed-actor-starting-command-center-root",
+        ),
+    ),
+  ).toBe(false);
+});
+
+test("damaged building sale feedback matches the credited refund", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  await page.evaluate(() => {
+    const { simulation } = window.economyHarness.view;
+    const cc = simulation.actorById("starting-command-center")!;
+    simulation.removeActor(cc.id);
+    simulation.spawnActor({
+      ...cc,
+      id: "damaged-command-center",
+      health: 1640,
+    });
+    window.economyHarness.view.selectActor("damaged-command-center");
+  });
+  await advance(page, 0.1);
+  await page.locator("#tab-selection").click();
+  await expect(page.locator("#remove-building")).toHaveText(
+    "Sell building (+123 Materials)",
+  );
+  await page.locator("#remove-building").click();
+  await advance(page, 0.1);
+  await expect(page.locator("#materials-counter")).toHaveText("273");
 });

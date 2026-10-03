@@ -222,6 +222,9 @@ function instantiate(
         seek(turn.right, 1);
       }
     },
+    freeze: () => {
+      for (const group of [idle, ...posed]) group.pause();
+    },
     dispose: () => {
       entries.dispose();
       root.dispose();

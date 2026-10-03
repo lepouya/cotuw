@@ -5,6 +5,7 @@ import {
 } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
 import { materialsCost } from "../simulation/economy";
+import { createPlayerAccess } from "../simulation/faction";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 
@@ -41,6 +42,8 @@ export function createSidebar(
     presentations: ReadonlyMap<string, ActorPresentation>;
     goals: readonly SidebarGoal[];
     selectActor: (id: string, additive?: boolean) => void;
+    /** The player's faction; rosters list only its actors. */
+    playerFaction?: string;
   },
 ) {
   const { definitions, presentations, goals, selectActor } = options;
@@ -62,10 +65,13 @@ export function createSidebar(
     definitions.map((definition) => [definition.id, definition]),
   );
   const nameFor = (id: string) => presentations.get(id)?.name ?? id;
+  const player = createPlayerAccess(options.playerFaction, definitionById);
+  const friendly = player.owns;
   const namesFor = (definition: ActorDefinition) =>
     definition.production!.unitDefinitionIds.map(nameFor);
   const selectionDetails = element("selection-details");
   const selectionInfo = element("selection-info");
+  const selectionHealth = element("selection-health");
   const trainingLink = element<HTMLButtonElement>("open-training");
   const placementActions = element("placement-actions");
   const remove = element<HTMLButtonElement>("remove-building");
@@ -107,6 +113,7 @@ export function createSidebar(
   const buildings: DefinitionButton[] = [];
   const train: DefinitionButton[] = [];
   for (const definition of definitions) {
+    if (!friendly({ definitionId: definition.id })) continue;
     const presentation = presentations.get(definition.id);
     if (presentation?.build && definition.footprint) {
       const description = definition.production
@@ -284,7 +291,8 @@ export function createSidebar(
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
       remove.hidden = !state.actors.some(
-        (actor) => selected.has(actor.id) && isTilePlacedActor(actor),
+        (actor) =>
+          selected.has(actor.id) && friendly(actor) && isTilePlacedActor(actor),
       );
       // Box mode changes how terrain taps behave, so it changes the hint.
       const nextSelectionKey = JSON.stringify([ids, state.boxMode ?? false]);
@@ -301,21 +309,40 @@ export function createSidebar(
         !state.actors.some(
           (actor) =>
             selected.has(actor.id) &&
+            friendly(actor) &&
             isMobileActor(actor, definitionById.get(actor.definitionId)),
         );
+      const inspected =
+        ids.length === 1
+          ? state.actors.find((actor) => actor.id === ids[0])
+          : undefined;
+      const maximum =
+        inspected && definitionById.get(inspected.definitionId)?.health;
+      selectionHealth.hidden = !maximum;
+      if (inspected && maximum) {
+        const text = `Health ${Math.ceil(inspected.health ?? maximum)} / ${maximum}`;
+        if (selectionHealth.textContent !== text)
+          selectionHealth.textContent = text;
+      }
       clearSelection.disabled = unavailable || ids.length === 0;
       const membershipChanged = state.actorVersion !== actorVersion;
       if (membershipChanged) {
         actorVersion = state.actorVersion;
         actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
-        roster.sync(state.actors.filter((actor) => !isTilePlacedActor(actor)));
+        roster.sync(
+          state.actors.filter(
+            (actor) => !isTilePlacedActor(actor) && friendly(actor),
+          ),
+        );
         producers.sync(
           state.actors.filter(
-            (actor) => definitionById.get(actor.definitionId)?.production,
+            (actor) =>
+              friendly(actor) &&
+              definitionById.get(actor.definitionId)?.production,
           ),
         );
         const counts = new Map<string, number>();
-        for (const actor of state.actors)
+        for (const actor of state.actors.filter(friendly))
           counts.set(
             actor.definitionId,
             (counts.get(actor.definitionId) ?? 0) + 1,
@@ -342,7 +369,8 @@ export function createSidebar(
           : undefined;
         const definition = actor && definitionById.get(actor.definitionId)!;
         const presentation = actor && presentations.get(actor.definitionId);
-        trainingLink.hidden = !definition?.production;
+        trainingLink.hidden =
+          !actor || !friendly(actor) || !definition?.production;
         const moveSubject = ids.length > 1 ? "the group" : "this unit";
         const moveHint = state.boxMode
           ? `Turn off Box select to move ${moveSubject}.`
@@ -368,11 +396,15 @@ export function createSidebar(
           : "Nothing selected";
         selectionInfo.textContent = !actor
           ? "Choose a unit or building on the map or in the Units tab."
-          : definition?.production
-            ? `${presentation?.description ?? "Unit production"} · Trains ${namesFor(definition).join(" and ")}.`
-            : isTilePlacedActor(actor)
-              ? `${presentation?.description ?? "Building"} · Select Buildings to expand your base.`
-              : `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · ${moveHint}`;
+          : player.relationTo(actor.definitionId) === "hostile"
+            ? `${presentation?.description ?? "Hostile"} · Select your units, then click or tap it to attack.`
+            : !friendly(actor)
+              ? `${presentation?.description ?? "Neutral"} · Not under your command.`
+              : definition?.production
+                ? `${presentation?.description ?? "Unit production"} · Trains ${namesFor(definition).join(" and ")}.`
+                : isTilePlacedActor(actor)
+                  ? `${presentation?.description ?? "Building"} · Select Buildings to expand your base.`
+                  : `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · ${moveHint}`;
       }
     },
     dispose: () => controller.abort(),

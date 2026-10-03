@@ -200,6 +200,12 @@ test("Refinery animation freezes during construction and progresses when operati
       "tile-placed-actor-building-root-construction-fill",
     )!;
     expect(fill.scaling.x).toBe(0.5);
+    // Faces the camera like health bars, so the two stay aligned.
+    expect(
+      scene.getTransformNodeByName(
+        "tile-placed-actor-building-root-construction",
+      )!.billboardMode,
+    ).toBe(TransformNode.BILLBOARDMODE_ALL);
     delete actor.construction;
     views.update([actor]);
     views.animate(2);

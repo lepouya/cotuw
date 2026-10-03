@@ -11,9 +11,12 @@ export function createNetworkControls(
   options: {
     selectedActorId: () => string | undefined;
     focus: (point: Readonly<WorldPosition>) => void;
+    /** Whether the player controls the actor with this ID. */
+    canControl?: (actorId: string) => boolean;
   },
 ) {
   const root = controls.networkRoot;
+  const canControl = options.canControl ?? (() => true);
   const toggle = root?.querySelector<HTMLInputElement>("#network-view");
   const controller = new AbortController();
   let previousNetwork = simulation.support;
@@ -28,6 +31,7 @@ export function createNetworkControls(
     const lost: string[] = [],
       restored: string[] = [];
     for (const node of network?.nodes ?? []) {
+      if (!canControl(node.actorId)) continue;
       const before = previous.get(node.actorId);
       if (before === true && !node.connected) lost.push(node.actorId);
       if (before === false && node.connected) restored.push(node.actorId);
@@ -68,7 +72,9 @@ export function createNetworkControls(
       capture();
       const network = simulation.support;
       const node = network?.nodes.find(
-        (node) => node.actorId === options.selectedActorId(),
+        (node) =>
+          node.actorId === options.selectedActorId() &&
+          canControl(node.actorId),
       );
       for (const status of root?.querySelectorAll<HTMLElement>(
         "[data-network-status]",

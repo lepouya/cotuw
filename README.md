@@ -65,7 +65,13 @@ Construction and production pause without losing progress; paused construction
 releases the slot for connected work. Offline Refineries hold cargo delivery
 until reconnection. Broken links use dashed lines, and grouped alerts focus the
 camera on affected buildings. Cancellation and sale remain available offline.
-This opening has no combat, victory, or defeat condition.
+
+A lone wolf guards the southern path. Idle Troopers engage hostiles that come
+near; to attack directly, select units and click or tap a visible wolf. Scouts
+cannot attack. Health bars appear on selected and fighting actors, and
+**Selection** shows exact health. Destroyed actors leave remains that clear
+after a minute; building debris blocks construction until then. Damaged
+buildings sell for less. This opening has no victory or defeat condition.
 
 Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to

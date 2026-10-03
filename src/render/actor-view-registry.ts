@@ -20,8 +20,10 @@ import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
 import type { ActorAppearance, ActorPose } from "./actor";
 import type { SelectionRect } from "./selection";
+import type { WorldPosition } from "../simulation/world";
 
 const SELECTION_COLOR = new Color3(1, 0.86, 0.44);
+const HOSTILE_SELECTION_COLOR = new Color3(0.95, 0.22, 0.18);
 /** Edge length of the stand-in cube for actors without an appearance. */
 const FALLBACK_ACTOR_SIZE = 0.6;
 
@@ -34,6 +36,8 @@ export type ActorViewRegistry = {
   capturePreviousPoses: (actors: readonly ActorRenderState[]) => void;
   dispose: () => void;
   setSelectedActors: (actorIds: readonly string[]) => void;
+  /** Where an actor was last drawn, between ticks. */
+  groundPosition: (actorId: string) => WorldPosition | undefined;
   actorIdsInRect: (canvas: HTMLCanvasElement, rect: SelectionRect) => string[];
   /**
    * Creates and removes views to match `actors`, then draws each one
@@ -54,6 +58,7 @@ export function createActorViewRegistry(
   scene: Scene,
   map: TerrainMap,
   appearances: ActorAppearanceCatalog,
+  isHostile: (definitionId: string) => boolean = () => false,
 ): ActorViewRegistry {
   const selectionMaterial = new StandardMaterial(
     "actor-selection-material",
@@ -61,6 +66,12 @@ export function createActorViewRegistry(
   );
   selectionMaterial.emissiveColor = SELECTION_COLOR;
   selectionMaterial.disableLighting = true;
+  const hostileSelectionMaterial = new StandardMaterial(
+    "actor-hostile-selection-material",
+    scene,
+  );
+  hostileSelectionMaterial.emissiveColor = HOSTILE_SELECTION_COLOR;
+  hostileSelectionMaterial.disableLighting = true;
   let fallback: ActorAppearance | undefined;
   // A visible stand-in beats a crash in the render loop for unknown kinds.
   const appearanceFor = (definitionId: string) =>
@@ -83,12 +94,14 @@ export function createActorViewRegistry(
       previousPoses.delete(id);
     },
     create: (actor, { appearance }) => {
+      const hostile = isHostile(actor.definitionId);
       const renderer = createActorRenderer(
         scene,
         map,
         actor,
         appearance,
-        selectionMaterial,
+        hostile ? hostileSelectionMaterial : selectionMaterial,
+        hostile,
       );
       renderer.setSelected(selectedActorIds.has(actor.id));
       return renderer;
@@ -126,9 +139,14 @@ export function createActorViewRegistry(
       renderers.dispose();
       previousPoses.clear();
       selectionMaterial.dispose();
+      hostileSelectionMaterial.dispose();
       fallback?.dispose();
     },
     setSelectedActors,
+    groundPosition: (actorId) => {
+      const point = renderers.get(actorId)?.selectionPoint();
+      return point && { x: point.x, z: point.z };
+    },
     actorIdsInRect: (canvas, rect) => {
       if (!scene.activeCamera) return [];
       const engine = scene.getEngine();

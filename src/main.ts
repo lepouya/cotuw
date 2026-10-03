@@ -1,8 +1,10 @@
 import "./styles.css";
-import { ECONOMY_SCENARIO } from "./content/economy-scenario";
+import {
+  ECONOMY_ACTOR_DEFINITIONS,
+  ECONOMY_SCENARIO,
+} from "./content/economy-scenario";
 import { createTerrainPrototype } from "./prototype";
 import {
-  ARC_ACTOR_DEFINITIONS,
   PROTOTYPE_ACTOR_DEFINITIONS,
   PROTOTYPE_ACTOR_PRESENTATIONS,
   PROTOTYPE_GOALS,
@@ -19,7 +21,7 @@ const sandbox = new URLSearchParams(location.search).has("sandbox");
 const scenario = sandbox ? undefined : ECONOMY_SCENARIO;
 const definitions = sandbox
   ? PROTOTYPE_ACTOR_DEFINITIONS
-  : ARC_ACTOR_DEFINITIONS;
+  : ECONOMY_ACTOR_DEFINITIONS;
 const sidebar = createSidebar(
   document.querySelector<HTMLElement>("#game-sidebar")!,
   {
@@ -27,6 +29,7 @@ const sidebar = createSidebar(
     economy: !sandbox,
     presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
     goals: sandbox ? PROTOTYPE_GOALS : ECONOMY_GOALS,
+    playerFaction: scenario?.playerFaction,
     selectActor: (id, additive) => session?.selectActor(id, additive),
   },
 );
@@ -36,7 +39,7 @@ if (!sandbox) {
   document.querySelector("#economy-overview")!.removeAttribute("hidden");
   document.querySelector("#scenario-label")!.textContent = "Materials economy";
   document.querySelector("#scenario-description")!.textContent =
-    "Build a Refinery, produce its Harvester, gather Materials, then fund a Barracks and Troopers. No victory or defeat condition.";
+    "Build a Refinery, produce its Harvester, gather Materials, then fund a Barracks and Troopers. A lone wolf roams the southern path. No victory or defeat condition.";
   document.querySelector("#scenario-rules")!.textContent =
     "Paid construction · Timed production · Sell buildings for half their cost";
 }

@@ -10,7 +10,12 @@ import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
 import { createMaterialsSitesView } from "./render/materials-sites";
 import { createHarvesterAppearance } from "./render/harvester";
-import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
+import { createWolfAppearance } from "./render/wolf";
+import { createHealthBarView } from "./render/health-bars";
+import { createCombatEffectsView } from "./render/combat-effects";
+import { createWreckView } from "./render/wrecks";
+import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
+import { ECONOMY_ACTOR_DEFINITIONS } from "./content/economy-scenario";
 import type { ScenarioDefinition } from "./simulation/scenario";
 import {
   PROTOTYPE_MAP_SIZE,
@@ -30,6 +35,7 @@ import {
 import {
   PROTOTYPE_ACTOR_DEFINITIONS,
   PROTOTYPE_ACTOR_NAMES,
+  PROTOTYPE_ATTACK_EFFECTS,
   PROTOTYPE_ACTOR_GRAPHICS,
   PROTOTYPE_TILE_PLACED_APPEARANCES,
   PROTOTYPE_MOVEMENT_PROFILES,
@@ -80,6 +86,9 @@ import type { ActorAppearance, GameView, GameViewOptions } from "./render";
 import type { ActorRenderState } from "./simulation/actor";
 import type { TileCoord } from "./simulation/grid";
 import type { BuildingPlacementControls } from "./render/building-placement";
+import type { HealthBar } from "./render/health-bars";
+import { healthBarOpacity } from "./render/health-bars";
+import { createPlayerAccess } from "./simulation/faction";
 
 const TILE_COUNT = PROTOTYPE_MAP_SIZE;
 const TILE_SIZE = 1;
@@ -94,6 +103,10 @@ const SIMULATION_PUMP_MILLISECONDS = 4;
 const MAX_CATCH_UP_SECONDS = 5;
 /** How far past explored tile centers the camera may look, in world units. */
 const CAMERA_FRONTIER_MARGIN = 4;
+/** Health bars sit this far above unit models and over buildings. */
+const UNIT_BAR_CLEARANCE = 0.3;
+/** Clears a construction progress bar below it. */
+const BUILDING_BAR_HEIGHT = 2.9;
 
 export type TerrainPrototype = GameView & {
   simulation: MissionSimulation;
@@ -192,7 +205,7 @@ export async function createTerrainPrototype(
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
   const definitions = controls.scenario
-    ? ARC_ACTOR_DEFINITIONS
+    ? ECONOMY_ACTOR_DEFINITIONS
     : PROTOTYPE_ACTOR_DEFINITIONS;
   createTerrainMeshes(view.scene, map);
   const occupancy = new OccupancyGrid(map);
@@ -220,6 +233,10 @@ export async function createTerrainPrototype(
       "arc-harvester",
       createHarvesterAppearance(view.scene, () => reducedMotion.matches),
     );
+  appearances.set(
+    "wolf",
+    createWolfAppearance(view.scene, () => reducedMotion.matches),
+  );
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(view.scene, map, simulation.economy);
@@ -236,7 +253,21 @@ export async function createTerrainPrototype(
       limitToExplored(map, fog, point, CAMERA_FRONTIER_MARGIN),
     );
   if (controls.scenario) view.camera.focusOnTile(15, 50);
-  const actorViews = createActorViewRegistry(view.scene, map, appearances);
+  const definitionsById = new Map(
+    definitions.map((definition) => [definition.id, definition]),
+  );
+  const playerFaction = simulation.playerFaction;
+  const player = createPlayerAccess(
+    playerFaction,
+    definitionsById,
+    simulation.detects,
+  );
+  const actorViews = createActorViewRegistry(
+    view.scene,
+    map,
+    appearances,
+    (definitionId) => player.relationTo(definitionId) === "hostile",
+  );
   const tilePlacedViews = createTilePlacedActorViewRegistry(
     view.scene,
     map,
@@ -247,11 +278,25 @@ export async function createTerrainPrototype(
   const disconnected = () => disconnectedBuildings(simulation.support);
   const rallyView = createRallyPointView(view.scene, map);
   const movementPath = createMovementPathView(view.scene, map);
-  const partition = (actors: readonly ActorRenderState[]) => ({
-    actors,
-    mobile: actors.filter((actor) => !isTilePlacedActor(actor)),
-    placed: actors.filter(isTilePlacedActor),
+  const healthBars = createHealthBarView(view.scene, map);
+  const combatEffects = createCombatEffectsView(view.scene, map);
+  const wreckView = createWreckView(view.scene, map, {
+    appearanceFor: (id) => appearances.get(id),
+    tilesFor: (wreck) =>
+      wreckTiles(wreck, definitionsById.get(wreck.definitionId)!),
   });
+  const partition = (actors: readonly ActorRenderState[]) => {
+    const mobile = actors.filter((actor) => !isTilePlacedActor(actor));
+    return {
+      actors,
+      byId: new Map(actors.map((actor) => [actor.id, actor])),
+      ownIds: new Set(actors.filter(player.owns).map((actor) => actor.id)),
+      mobile,
+      placed: actors.filter(isTilePlacedActor).filter(player.shows),
+      // Fog changes only when a tick commits, so this stays current.
+      shownMobile: mobile.filter(player.shows),
+    };
+  };
   // Split once per committed tick; the simulation replaces its array each tick.
   let partitioned = partition(simulation.actors);
   const actorsByKind = () => {
@@ -260,10 +305,7 @@ export async function createTerrainPrototype(
     }
     return partitioned;
   };
-  const definitionsById = new Map(
-    definitions.map((definition) => [definition.id, definition]),
-  );
-  actorViews.update(actorsByKind().mobile, 1);
+  actorViews.update(actorsByKind().shownMobile, 1);
   tilePlacedViews.update(actorsByKind().placed, disconnected());
   let simulationFaulted = false;
   let controlsDirty = true;
@@ -272,8 +314,13 @@ export async function createTerrainPrototype(
     if (actor) controls.showActor?.(actor.definitionId);
   };
   const input = createCommandInput(canvas, view.scene, {
-    actorIdForMesh: (mesh) =>
-      actorViews.actorIdForMesh(mesh) ?? tilePlacedViews.actorIdForMesh(mesh),
+    actorIdForMesh: (mesh) => {
+      const id =
+        actorViews.actorIdForMesh(mesh) ?? tilePlacedViews.actorIdForMesh(mesh);
+      // Committed state, since picking asks about every mesh.
+      const actor = id && actorsByKind().byId.get(id);
+      return actor && player.shows(actor) ? id : undefined;
+    },
     movementTargetForMesh: (mesh) => {
       const tile = materialsView?.lootTileForMesh(mesh);
       return tile && map.tileCenter(tile.x, tile.z);
@@ -284,9 +331,19 @@ export async function createTerrainPrototype(
     onGroundTarget: (target) => rally.choose(target),
     cancelGroundTarget: () => rally.cancel(),
     canMove: (actorId) => {
-      const actor = simulation.actorById(actorId);
+      const actor = actorsByKind().byId.get(actorId);
       return (
-        !!actor && isMobileActor(actor, definitionsById.get(actor.definitionId))
+        !!actor &&
+        player.owns(actor) &&
+        isMobileActor(actor, definitionsById.get(actor.definitionId))
+      );
+    },
+    canAttack: (actorId) => {
+      const actor = actorsByKind().byId.get(actorId);
+      return (
+        !!actor &&
+        player.relationTo(actor.definitionId) === "hostile" &&
+        player.shows(actor)
       );
     },
     submitCommand: (command) => {
@@ -326,7 +383,10 @@ export async function createTerrainPrototype(
       const actorId = ids.length === 1 ? ids[0] : undefined;
       actorViews.setSelectedActors(ids);
       tilePlacedViews.setSelectedActor(actorId);
-      movementPath.setSelectedActors(ids);
+      // Other factions' routes would reveal their intent.
+      movementPath.setSelectedActors(
+        ids.filter((id) => actorsByKind().ownIds.has(id)),
+      );
       minimap.refreshActors();
       canvas.dataset.actorSelected = String(ids.length > 0);
       canvas.dataset.selectedActors = JSON.stringify(ids);
@@ -364,7 +424,7 @@ export async function createTerrainPrototype(
           ?.minimapColor,
         selected: input.selectedActorIds.includes(actor.id),
       })),
-      ...actorsByKind().mobile.map((actor) => ({
+      ...actorsByKind().shownMobile.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
         color: appearances.get(actor.definitionId)?.minimapColor,
@@ -381,6 +441,7 @@ export async function createTerrainPrototype(
     );
     const canRemove =
       !!actor &&
+      player.owns(actor) &&
       isTilePlacedActor(actor) &&
       !pendingRemovalId &&
       !simulationFaulted &&
@@ -412,7 +473,11 @@ export async function createTerrainPrototype(
     simulation,
     {
       buildings: definitions
-        .filter((definition) => definition.footprint)
+        .filter(
+          (definition) =>
+            definition.footprint &&
+            player.owns({ definitionId: definition.id }),
+        )
         .map((definition) => ({
           definition,
           appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(definition.id)!,
@@ -439,6 +504,7 @@ export async function createTerrainPrototype(
     const actor = actorId ? simulation.actorById(actorId) : undefined;
     if (
       !actor ||
+      !player.owns(actor) ||
       !isTilePlacedActor(actor) ||
       pendingRemovalId !== undefined ||
       simulationFaulted ||
@@ -458,16 +524,20 @@ export async function createTerrainPrototype(
     if (controls.remove) controls.remove.disabled = true;
   };
   controls.remove?.addEventListener("click", removeSelected);
+  const selectedOwnActorId = () => {
+    const id = input.selectedActorId;
+    return id && actorsByKind().ownIds.has(id) ? id : undefined;
+  };
   const training = createUnitTraining(simulation, controls, {
     names: PROTOTYPE_ACTOR_NAMES,
-    selectedActorId: () => input.selectedActorId,
+    selectedActorId: selectedOwnActorId,
     enabled: () => !simulationFaulted && !placement.active,
   });
   const rally = createRallyControls(simulation, controls, {
     changed: () => {
       controlsDirty = true;
     },
-    selectedActorId: () => input.selectedActorId,
+    selectedActorId: selectedOwnActorId,
     isProducer: (id) => !!definitionsById.get(id)?.production,
     enabled: () => !simulationFaulted && !placement.active,
     onStart: () => {
@@ -476,7 +546,8 @@ export async function createTerrainPrototype(
     },
   });
   const network = createNetworkControls(simulation, controls, {
-    selectedActorId: () => input.selectedActorId,
+    selectedActorId: selectedOwnActorId,
+    canControl: (id) => actorsByKind().ownIds.has(id),
     focus: (point) => {
       const tile = map.tileAtWorldPosition(point.x, point.z);
       view.camera.focusOnTile(tile.x, tile.z);
@@ -488,7 +559,8 @@ export async function createTerrainPrototype(
       ? createEconomyControls(economyRoot, simulation, {
           definitions,
           names: PROTOTYPE_ACTOR_NAMES,
-          selectedActorId: () => input.selectedActorId,
+          selectedActorId: selectedOwnActorId,
+          canControl: player.owns,
           enabled: () => !simulationFaulted && !placement.active,
           focus: (tile) => view.camera.focusOnTile(tile.x, tile.z),
           explored,
@@ -519,6 +591,39 @@ export async function createTerrainPrototype(
   let pickupSeconds = 0;
   let previousFrameTime = performance.now();
   let knownActorVersion = simulation.actorVersion;
+  /** Selected actors and those in recent combat show health bars. */
+  const updateHealthBars = () => {
+    const selected = new Set(input.selectedActorIds);
+    const bars: HealthBar[] = [];
+    for (const actor of simulation.actors) {
+      const maximum = definitionsById.get(actor.definitionId)?.health;
+      if (!maximum || !player.shows(actor)) continue;
+      const activeTick = actor.combat?.activeTick;
+      const opacity = healthBarOpacity(
+        selected.has(actor.id),
+        activeTick === undefined
+          ? Infinity
+          : (simulation.completedTicks - activeTick) * simulation.tickSeconds,
+      );
+      if (opacity === 0) continue;
+      const placed = isTilePlacedActor(actor);
+      bars.push({
+        actorId: actor.id,
+        worldPosition: placed
+          ? actor.worldPosition
+          : (actorViews.groundPosition(actor.id) ?? actor.worldPosition),
+        height: placed
+          ? BUILDING_BAR_HEIGHT
+          : (appearances.get(actor.definitionId)?.bounds.height ?? 1) +
+            UNIT_BAR_CLEARANCE,
+        width: placed ? 2 : 0.9,
+        fraction: (actor.health ?? maximum) / maximum,
+        opacity,
+      });
+    }
+    healthBars.update(bars);
+  };
+  let knownSelectionTick = simulation.completedTicks;
 
   const loop = startSimulationLoop(simulation, {
     pumpMilliseconds: SIMULATION_PUMP_MILLISECONDS,
@@ -533,6 +638,16 @@ export async function createTerrainPrototype(
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
+      const markedTargets = new Set<string>();
+      for (const hit of simulation.attacks) {
+        const style = PROTOTYPE_ATTACK_EFFECTS.get(hit.attackerDefinitionId);
+        if (
+          style &&
+          (simulation.sees(playerFaction, hit.from) ||
+            simulation.sees(playerFaction, hit.to))
+        )
+          combatEffects.hit(hit, style);
+      }
       network.capture();
       minimap.refreshActors();
       const moveStatus = unitControls.onOutcomes(outcomes);
@@ -545,6 +660,14 @@ export async function createTerrainPrototype(
         const { command, accepted } = outcome;
         if (command.kind === "train-unit")
           canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
+        if (command.kind === "attack") {
+          canvas.dataset.attackStatus = accepted ? "accepted" : "rejected";
+          const target = simulation.actorById(command.targetId);
+          if (accepted && target && !markedTargets.has(target.id)) {
+            markedTargets.add(target.id);
+            combatEffects.markTarget(target.worldPosition);
+          }
+        }
         if (command.kind === "move") {
           if (accepted)
             canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
@@ -563,10 +686,23 @@ export async function createTerrainPrototype(
   });
   const renderObserver = view.scene.onBeforeRenderObservable.add(() => {
     loop.advance();
+    // Hostiles can leave vision without any fog change, so check every tick.
+    if (
+      simulation.actorVersion !== knownActorVersion ||
+      simulation.completedTicks !== knownSelectionTick
+    ) {
+      knownSelectionTick = simulation.completedTicks;
+      const actors = new Map(
+        simulation.actors.map((actor) => [actor.id, actor]),
+      );
+      input.retainSelection((id) => {
+        const actor = actors.get(id);
+        return !!actor && player.shows(actor);
+      });
+    }
     if (simulation.actorVersion !== knownActorVersion) {
       knownActorVersion = simulation.actorVersion;
       controlsDirty = true;
-      input.retainSelection((id) => !!simulation.actorById(id));
       const { placed } = actorsByKind();
       tilePlacedViews.update(placed, disconnected());
       canvas.dataset.tilePlacedActorCount = String(placed.length);
@@ -588,17 +724,31 @@ export async function createTerrainPrototype(
     )
       refreshControls();
     const frameTime = performance.now();
-    if (controls.animate?.checked ?? !reducedMotion.matches) {
-      idleSeconds += (frameTime - previousFrameTime) / 1000;
-    }
-    if (!reducedMotion.matches)
-      pickupSeconds += (frameTime - previousFrameTime) / 1000;
+    const frameSeconds = (frameTime - previousFrameTime) / 1000;
     previousFrameTime = frameTime;
+    if (controls.animate?.checked ?? !reducedMotion.matches) {
+      idleSeconds += frameSeconds;
+    }
+    if (!reducedMotion.matches) pickupSeconds += frameSeconds;
     tilePlacedViews.animate(idleSeconds);
     materialsView?.animate(pickupSeconds);
-    const { mobile } = actorsByKind();
+    const { shownMobile } = actorsByKind();
+    combatEffects.update(frameSeconds);
+    wreckView.update(
+      simulation.wrecks,
+      (wreck) =>
+        (simulation.completedTicks - wreck.tick) * simulation.tickSeconds,
+      WRECK_SECONDS,
+      (wreck) => {
+        const tile = map.tileAtWorldPosition(
+          wreck.worldPosition.x,
+          wreck.worldPosition.z,
+        );
+        return explored(tile);
+      },
+    );
     actorViews.update(
-      mobile,
+      shownMobile,
       loop.tickProgress(),
       new Set(
         simulation.economy?.harvesters
@@ -606,9 +756,18 @@ export async function createTerrainPrototype(
           .map((worker) => worker.actorId),
       ),
     );
-    movementPath.update(mobile);
+    movementPath.update(shownMobile);
+    updateHealthBars();
+    const ownIds = actorsByKind().ownIds;
     networkView.update(
-      simulation.support,
+      simulation.support && {
+        nodes: simulation.support.nodes.filter((node) =>
+          ownIds.has(node.actorId),
+        ),
+        links: simulation.support.links.filter((link) =>
+          [link.from, link.to].every((id) => ownIds.has(id)),
+        ),
+      },
       placement.active ||
         network.visible ||
         !!simulation.support?.nodes.some(
@@ -616,7 +775,7 @@ export async function createTerrainPrototype(
         ),
     );
     rallyView.update(
-      simulation.actors.find((actor) => actor.id === input.selectedActorId)
+      simulation.actors.find((actor) => actor.id === selectedOwnActorId())
         ?.rallyPoint,
     );
   });
@@ -634,6 +793,9 @@ export async function createTerrainPrototype(
     networkView.dispose();
     rallyView.dispose();
     fogOverlay.dispose();
+    healthBars.dispose();
+    combatEffects.dispose();
+    wreckView.dispose();
     economyControls?.dispose();
     materialsView?.dispose();
     controls.onDispose?.();
@@ -656,8 +818,9 @@ export async function createTerrainPrototype(
     simulation,
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;
+      const actor = actorId && simulation.actorById(actorId);
       input.select(
-        actorId && simulation.actorById(actorId) ? actorId : undefined,
+        actor && player.shows(actor) ? actorId : undefined,
         additive || input.additiveMode,
       );
     },
@@ -682,7 +845,7 @@ export async function createTerrainPrototype(
       }
       const previous = appearances.get(id);
       appearances.set(id, appearance);
-      actorViews.update(actorsByKind().mobile, loop.tickProgress());
+      actorViews.update(actorsByKind().shownMobile, loop.tickProgress());
       previous?.dispose();
     }),
   );

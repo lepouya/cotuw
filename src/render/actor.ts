@@ -20,6 +20,8 @@ const SELECTION_RING_TESSELLATION = 48;
 /** Gap between an actor's bounds and its selection ring. */
 const SELECTION_RING_MARGIN = 0.15;
 const PICK_TESSELLATION = 12;
+/** Hostile inspection uses a broken ring, so shape as well as color differs. */
+const HOSTILE_MARKER_SEGMENTS = 8;
 /** Caps the frame time animation sees, so a stalled frame cannot overshoot. */
 const MAX_ANIMATION_SECONDS = 0.1;
 export const ACTOR_PICK_KIND = "actor";
@@ -47,6 +49,8 @@ export type ActorInstance = {
   /** Present when the appearance animates. */
   animate?: (motion: Readonly<ActorMotion>) => void;
   setWorking?: (working: boolean) => void;
+  /** Stops any playing clips, as for remains. */
+  freeze?: () => void;
   dispose: () => void;
 };
 
@@ -67,6 +71,7 @@ export type ActorRenderer = {
 /**
  * Renders one actor from simulation-owned state with an instance of its
  * appearance. Visual meshes and an invisible cylinder can both be picked.
+ * Hostile actors use a segmented selection marker.
  */
 export function createActorRenderer(
   scene: Scene,
@@ -74,6 +79,7 @@ export function createActorRenderer(
   initialState: ActorRenderState,
   appearance: ActorAppearance,
   selectionMaterial: Material,
+  hostile = false,
 ): ActorRenderer {
   const { id } = initialState;
   const { radius, height } = appearance.bounds;
@@ -102,21 +108,49 @@ export function createActorRenderer(
   pick.isVisible = false;
   pick.metadata = { pickKind: ACTOR_PICK_KIND, actorId: id };
 
-  let ring: AbstractMesh | undefined;
+  let ring: TransformNode | undefined;
   const setSelected = (selected: boolean) => {
     if (selected && !ring) {
-      ring = MeshBuilder.CreateTorus(
-        `actor-${id}-selection`,
-        {
-          diameter: (radius + SELECTION_RING_MARGIN) * 2,
-          thickness: SELECTION_RING_THICKNESS,
-          tessellation: SELECTION_RING_TESSELLATION,
-        },
-        scene,
-      );
+      const ringRadius = radius + SELECTION_RING_MARGIN;
+      if (hostile) {
+        ring = new TransformNode(`actor-${id}-selection`, scene);
+        const arc = (Math.PI * ringRadius) / HOSTILE_MARKER_SEGMENTS;
+        for (let index = 0; index < HOSTILE_MARKER_SEGMENTS; index += 1) {
+          const angle = (index * Math.PI * 2) / HOSTILE_MARKER_SEGMENTS;
+          const segment = MeshBuilder.CreateBox(
+            `actor-${id}-selection-${index}`,
+            {
+              width: arc,
+              height: SELECTION_RING_THICKNESS,
+              depth: SELECTION_RING_THICKNESS,
+            },
+            scene,
+          );
+          segment.parent = ring;
+          segment.position.set(
+            Math.cos(angle) * ringRadius,
+            0,
+            Math.sin(angle) * ringRadius,
+          );
+          segment.rotation.y = Math.PI / 2 - angle;
+          segment.material = selectionMaterial;
+          segment.isPickable = false;
+        }
+      } else {
+        const torus = MeshBuilder.CreateTorus(
+          `actor-${id}-selection`,
+          {
+            diameter: ringRadius * 2,
+            thickness: SELECTION_RING_THICKNESS,
+            tessellation: SELECTION_RING_TESSELLATION,
+          },
+          scene,
+        );
+        torus.material = selectionMaterial;
+        torus.isPickable = false;
+        ring = torus;
+      }
       ring.parent = root;
-      ring.material = selectionMaterial;
-      ring.isPickable = false;
     }
     ring?.setEnabled(selected);
   };
