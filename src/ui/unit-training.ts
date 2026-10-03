@@ -12,6 +12,7 @@ export type UnitTrainingControls = {
 };
 
 const REASONS: Record<TrainingReason, string> = {
+  disconnected: "Disconnected. Restore a support path to the Command Center.",
   "invalid-actor": "Invalid unit request.",
   "used-id": "Unit request changed. Try again.",
   "missing-producer": "Select a production building to train units.",

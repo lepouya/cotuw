@@ -17,6 +17,12 @@ import {
 } from "./command";
 import { tileKey } from "./grid";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
+import {
+  createSupportResolver,
+  disconnectedBuildings,
+  supportsPosition,
+  validateSupportDefinition,
+} from "./support";
 import { TerrainGrid } from "./terrain";
 import {
   applyEconomyCommand,
@@ -64,6 +70,7 @@ import type {
   PlacementEvaluation,
   PlacementReason,
 } from "./placement";
+import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import type { WorldBounds, WorldPosition } from "./world";
 
@@ -156,12 +163,14 @@ export type MissionSimulation = {
   readonly completedTicks: number;
   readonly tickSeconds: number;
   readonly economy: EconomyView | undefined;
+  readonly support: SupportView | undefined;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /** Checks the same placement constraints used when commands are applied. */
   evaluatePlacement: (placement: ActorPlacement) => PlacementEvaluation;
   /** Checks paid queue capacity, or free exits in the construction sandbox. */
   evaluateTraining: (command: TrainUnitCommand) => TrainingEvaluation;
+  evaluateRallyPoint: (actorId: string, target: WorldPosition) => boolean;
   /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
   unusedActorId: (prefix: string) => string;
   /** Queues a command for the next tick and returns that tick's number. */
@@ -234,6 +243,7 @@ export function createMissionSimulation({
       state.retiredActorIds,
     );
   if (state.economy) deepFreeze(state.economy);
+  const supportFor = createSupportResolver(definitionsById);
   let actorsById = new Map<string, Actor>();
   let usedActorIds = new Set(state.retiredActorIds);
   for (const job of state.economy?.production ?? [])
@@ -322,6 +332,15 @@ export function createMissionSimulation({
         construction.completedTicks >= construction.totalTicks)
     )
       throw new RangeError(`Actor ${actor.id} has invalid construction state.`);
+    if (
+      actor.rallyPoint !== undefined &&
+      (!isTilePlacedActor(actor) ||
+        !definition.production ||
+        !actor.rallyPoint ||
+        !isFinitePosition(actor.rallyPoint) ||
+        !withinBounds(actor.rallyPoint, worldBounds))
+    )
+      throw new RangeError(`Actor ${actor.id} has an invalid rally point.`);
     const target = actor.movement?.target;
     if (
       target &&
@@ -373,7 +392,7 @@ export function createMissionSimulation({
 
   const evaluatePlacement = (
     placement: ActorPlacement,
-    actors: Iterable<Actor>,
+    actors: readonly Actor[],
     usedIds: ReadonlySet<string>,
     economy?: EconomyState,
   ): PlacementEvaluation => {
@@ -421,6 +440,11 @@ export function createMissionSimulation({
       );
       if (evaluation.tiles.some((tile) => resources.has(tileKey(tile))))
         return { ...reject("resource-site"), tiles: evaluation.tiles };
+      if (
+        definition.support &&
+        !supportsPosition(supportFor(actors), actor.worldPosition)
+      )
+        return { ...reject("outside-support"), tiles: evaluation.tiles };
     }
     if (evaluation.accepted) {
       try {
@@ -438,6 +462,11 @@ export function createMissionSimulation({
     usedIds: ReadonlySet<string>,
     economy?: EconomyState,
   ): TrainingEvaluation => {
+    if (
+      economy &&
+      disconnectedBuildings(supportFor(actors)).has(command.producerId)
+    )
+      return { accepted: false, reason: "disconnected" };
     const evaluation = evaluateUnitTraining(command, {
       actors,
       usedIds,
@@ -477,11 +506,52 @@ export function createMissionSimulation({
     }
     return evaluation;
   };
+  const rallyUnitIds = (actor: Actor | undefined) =>
+    actor && isTilePlacedActor(actor)
+      ? definitionFor(actor).production?.unitDefinitionIds
+      : undefined;
+  const evaluateRallyPoint = (
+    producer: Actor | undefined,
+    target: WorldPosition,
+  ) => {
+    const unitIds = rallyUnitIds(producer);
+    if (
+      !map ||
+      !occupancy ||
+      !unitIds ||
+      !target ||
+      !isFinitePosition(target) ||
+      !withinBounds(target, worldBounds)
+    )
+      return false;
+    const tile = map.tileAtWorldPosition(target.x, target.z);
+    return (
+      occupancy.ownerAt(tile.x, tile.z, "surface") === undefined &&
+      unitIds.every((id) => {
+        const unit = definitionsById.get(id)!;
+        return behaviorsById.get(unit.behaviorId)!.canStandAt!(unit, tile);
+      })
+    );
+  };
   const stageActor = (working: WorkingActors, actor: Actor) => {
     working.actors.push(actor);
     working.actorsById.set(actor.id, actor);
     working.usedIds.add(actor.id);
     working.lifecycleChanges += 1;
+  };
+  const stageProducedActor = (
+    working: WorkingActors,
+    actor: Actor,
+    producerId: string,
+  ) => {
+    const rally = working.actorsById.get(producerId)?.rallyPoint;
+    if (rally)
+      behaviorFor(actor).handleCommand(actor, definitionFor(actor), {
+        kind: "move",
+        actorId: actor.id,
+        target: { ...rally },
+      });
+    stageActor(working, actor);
   };
 
   // Validate the whole candidate world without publishing edits or losing the
@@ -641,6 +711,19 @@ export function createMissionSimulation({
     tick: number,
     working: WorkingActors,
   ): CommandOutcome => {
+    if (command.kind === "set-rally-point") {
+      const applied = structuredClone(command);
+      const actor = working.actorsById.get(applied.actorId);
+      const accepted =
+        applied.target === undefined
+          ? !!rallyUnitIds(actor)
+          : evaluateRallyPoint(actor, applied.target);
+      if (accepted) {
+        if (applied.target) actor!.rallyPoint = { ...applied.target };
+        else delete actor!.rallyPoint;
+      }
+      return { tick, command: applied, accepted };
+    }
     if (command.kind === "terrain") {
       const edit = structuredClone(command);
       if (!map || !map.isValidTerrainEdit(edit)) {
@@ -712,7 +795,9 @@ export function createMissionSimulation({
           exitBlocked: false,
         });
         working.usedIds.add(applied.actorId);
-      } else if ("actor" in evaluation) stageActor(working, evaluation.actor);
+      } else if ("actor" in evaluation) {
+        stageProducedActor(working, evaluation.actor, applied.producerId);
+      }
       return { tick, command: applied, accepted: true };
     }
     if (isCommandOf(command, ECONOMY_COMMAND_KINDS)) {
@@ -809,6 +894,9 @@ export function createMissionSimulation({
       return state.tick;
     },
     tickSeconds,
+    get support() {
+      return state.economy ? supportFor(state.actors) : undefined;
+    },
     get economy() {
       return state.economy;
     },
@@ -830,6 +918,8 @@ export function createMissionSimulation({
         usedActorIds,
         state.economy,
       ),
+    evaluateRallyPoint: (id, target) =>
+      evaluateRallyPoint(actorsById.get(id), target),
     unusedActorId: (prefix) => {
       let number = nextActorNumbers.get(prefix) ?? 1;
       while (usedActorIds.has(`${prefix}${number}`)) number += 1;
@@ -1007,7 +1097,9 @@ export function createMissionSimulation({
                 working.actors,
                 new Set([...working.usedIds].filter((id) => id !== actorId)),
               ),
-            spawn: (actor) => stageActor(working, actor),
+            support: () => supportFor(working.actors),
+            spawn: (actor, producerId) =>
+              stageProducedActor(working, actor, producerId),
           });
 
         separateMobileActors(
@@ -1111,6 +1203,7 @@ function indexDefinitions(
     if (map) {
       validatePlacementDefinition(definition, map);
     }
+    validateSupportDefinition(definition);
     deepFreeze(definition);
     behaviorRegistry
       .get(definition.behaviorId)!

@@ -439,3 +439,57 @@ describe("unit production", () => {
     ).toThrow("Invalid production unit");
   });
 });
+
+test("rally points are persistent ground orders, clearable, and used after exiting", () => {
+  const { simulation, map } = fixture();
+  const target = map.tileCenter(9, 9);
+  simulation.submitCommand({
+    kind: "set-rally-point",
+    actorId: "barracks-1",
+    target,
+  });
+  expect(simulation.actorById("barracks-1")!.rallyPoint).toBeUndefined();
+  expect(simulation.tick()[0].accepted).toBe(true);
+  const saved = JSON.parse(JSON.stringify(simulation.snapshot()));
+  const restored = fixture({ state: saved }).simulation;
+  expect(restored.actorById("barracks-1")!.rallyPoint).toEqual(target);
+  restored.submitCommand(order());
+  expect(restored.tick()[0].accepted).toBe(true);
+  expect(restored.actorById("unit-1")!.movement?.target).toEqual(target);
+  for (let i = 0; i < 300; i++) restored.tick();
+  expect(restored.actorById("unit-1")!.worldPosition).toEqual(target);
+  restored.submitCommand({ kind: "set-rally-point", actorId: "barracks-1" });
+  restored.tick();
+  restored.submitCommand(order("unit-2"));
+  restored.tick();
+  expect(restored.actorById("unit-2")!.movement).toBeUndefined();
+});
+
+test("rally points reject water, occupied footprints, invalid positions, and non-producers", () => {
+  const { simulation, map } = fixture();
+  simulation.submitCommand({
+    kind: "terrain",
+    tiles: [{ x: 8, z: 8, terrain: { typeId: "water" } }],
+  });
+  simulation.tick();
+  for (const target of [
+    map.tileCenter(8, 8),
+    map.tileCenter(5, 5),
+    { x: NaN, z: 0 },
+    { x: 999, z: 0 },
+  ]) {
+    expect(simulation.evaluateRallyPoint("barracks-1", target)).toBe(false);
+    simulation.submitCommand({
+      kind: "set-rally-point",
+      actorId: "barracks-1",
+      target,
+    });
+    expect(simulation.tick()[0].accepted).toBe(false);
+  }
+  simulation.submitCommand({
+    kind: "set-rally-point",
+    actorId: "missing",
+    target: map.tileCenter(9, 9),
+  });
+  expect(simulation.tick()[0].accepted).toBe(false);
+});

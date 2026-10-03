@@ -27,6 +27,8 @@ export type BuildingPlacementControls = {
 };
 
 const REASONS: Record<PlacementReason, string> = {
+  "outside-support":
+    "Place the building center inside connected support coverage.",
   "invalid-actor": "Invalid building placement.",
   "used-id": "Placement changed before confirmation. Try again.",
   "unknown-definition": "Unknown building type.",

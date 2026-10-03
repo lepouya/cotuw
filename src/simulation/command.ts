@@ -60,6 +60,13 @@ export type TrainUnitCommand = {
   definitionId: string;
 };
 
+export type SetRallyPointCommand = {
+  kind: "set-rally-point";
+  actorId: string;
+  /** Omitted to restore exit-and-idle behavior. */
+  target?: WorldPosition;
+};
+
 export type ActorLifecycleCommand =
   PlaceActorCommand | RemoveActorCommand | TrainUnitCommand;
 
@@ -96,6 +103,7 @@ export type ActorRemovalCommand = Extract<
 
 export type MissionCommand =
   | ActorCommand
+  | SetRallyPointCommand
   | GroupMoveCommand
   | TerrainCommand
   | ActorLifecycleCommand

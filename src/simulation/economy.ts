@@ -5,6 +5,7 @@ import {
   occupiedTilesFor,
 } from "./placement";
 import { findNavigationPath } from "./navigation";
+import { disconnectedBuildings } from "./support";
 
 import type {
   Actor,
@@ -18,6 +19,7 @@ import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 import type { TrainingEvaluation } from "./production";
 import type { EconomyCommand } from "./command";
+import type { SupportView } from "./support";
 
 export type MaterialsSite = {
   id: string;
@@ -327,7 +329,8 @@ export type EconomyWorld = {
   tickSeconds: number;
   move: (actor: Actor, target: WorldPosition) => boolean;
   evaluateSpawn: (job: ProductionJob) => TrainingEvaluation;
-  spawn: (actor: Actor) => void;
+  support: () => SupportView;
+  spawn: (actor: Actor, producerId: string) => void;
 };
 
 export function applyEconomyCommand(
@@ -423,20 +426,26 @@ export function updateEconomy(
   world: EconomyWorld,
 ): void {
   const { actors, definitions, map, tickSeconds, move } = world;
-  // Actor insertion order is the paid blueprint queue order.
-  const building = actors.find((actor) => actor.construction);
+  let disconnected = disconnectedBuildings(world.support());
+  // Paused blueprints yield the slot without losing their queue priority.
+  const building = actors.find(
+    (actor) => actor.construction && !disconnected.has(actor.id),
+  );
   if (building?.construction) {
     building.construction.completedTicks += 1;
     if (
       building.construction.completedTicks === building.construction.totalTicks
-    )
+    ) {
       delete building.construction;
+      disconnected = disconnectedBuildings(world.support());
+    }
   }
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const producers = [
     ...new Set(economy.production.map((job) => job.producerId)),
   ].sort();
   for (const id of producers) {
+    if (disconnected.has(id)) continue;
     const job = economy.production.find((job) => job.producerId === id)!;
     if (job.completedTicks < job.totalTicks) job.completedTicks += 1;
     if (job.completedTicks < job.totalTicks) continue;
@@ -453,7 +462,7 @@ export function updateEconomy(
         phase: "idle",
       });
     }
-    world.spawn(result.actor);
+    world.spawn(result.actor, id);
     byId.set(result.actor.id, result.actor);
   }
   const distance = (actor: Actor, point: WorldPosition) =>
@@ -535,6 +544,7 @@ export function updateEconomy(
       if (!destination) {
         block(worker);
       } else if (routeTo(actor, worker, destination)) {
+        if (disconnected.has(worker.refineryId)) continue;
         economy.materials += worker.cargo;
         economy.depositedMaterials += worker.cargo;
         worker.cargo = 0;

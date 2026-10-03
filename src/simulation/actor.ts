@@ -17,6 +17,8 @@ export type ActorDefinition = {
   };
   /** Mobile actor definitions this building can train. */
   production?: { unitDefinitionIds: string[] };
+  /** World-space coverage radius; completed roots start support networks. */
+  support?: { radius: number; root?: boolean };
   materialsCost?: number;
   trainingSeconds?: number;
   constructionSeconds?: number;
@@ -58,6 +60,8 @@ export type Actor = {
     completedTicks: number;
     totalTicks: number;
   };
+  /** Ground destination used by newly produced units. */
+  rallyPoint?: WorldPosition;
   /** Present only while a movement-capable actor has an active move order. */
   movement?: MovementOrder;
 };
@@ -108,6 +112,7 @@ export type ActorRenderState = DeepReadonly<
     | "tilePlacement"
     | "movement"
     | "construction"
+    | "rallyPoint"
   >
 >;
 

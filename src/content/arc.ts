@@ -17,6 +17,7 @@ export const ARC_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-command-center-prototype",
+    support: { radius: 12, root: true },
     materialsCost: 300,
     constructionSeconds: 12,
     behaviorId: "idle",
@@ -37,6 +38,7 @@ export const ARC_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-field-barracks",
+    support: { radius: 6 },
     materialsCost: 100,
     constructionSeconds: 8,
     behaviorId: "idle",
@@ -58,6 +60,7 @@ export const ARC_ACTOR_DEFINITIONS = [
   {
     id: "arc-materials-refinery",
     behaviorId: "idle",
+    support: { radius: 6 },
     materialsCost: 100,
     constructionSeconds: 8,
     refinery: { harvesterDefinitionId: "arc-harvester" },

@@ -24,7 +24,8 @@ export type TrainingReason =
   | "insufficient-materials"
   | "refinery-occupied"
   | "queue-full"
-  | "under-construction";
+  | "under-construction"
+  | "disconnected";
 
 export type TrainingEvaluation =
   | { accepted: true; actor: Actor }

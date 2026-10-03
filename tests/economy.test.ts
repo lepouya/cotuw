@@ -844,3 +844,28 @@ describe("economy persistence", () => {
     );
   });
 });
+
+test("paid production uses the current rally point when it completes", () => {
+  const { simulation, map } = fixture();
+  command(simulation, build());
+  finishBuilding(simulation);
+  command(simulation, {
+    kind: "train-unit",
+    actorId: "worker",
+    producerId: "refinery",
+    definitionId: "arc-harvester",
+  });
+  const target = map.tileCenter(10, 12);
+  command(simulation, { kind: "set-rally-point", actorId: "refinery", target });
+  const restored = fixture(
+    JSON.parse(JSON.stringify(simulation.snapshot())),
+  ).simulation;
+  until(restored, () => !!restored.actorById("worker"));
+  expect(restored.actorById("worker")!.movement?.target).toEqual(target);
+  expect(worker(restored)).toMatchObject({
+    refineryId: "refinery",
+    phase: "idle",
+  });
+  until(restored, () => !restored.actorById("worker")!.movement);
+  expect(restored.actorById("worker")!.worldPosition).toEqual(target);
+});
