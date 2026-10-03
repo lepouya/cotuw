@@ -49,6 +49,13 @@ the requirements.
   and one-time salvage. [Browser checks](../e2e/economy.spec.ts) exercise the
   controls through both mouse and compact touch input. This scope also has
   integration coverage under completed task 0.53.
+- **0.40, combat:** rifles, wolf bites, detection, pursuit, health, hit effects,
+  destruction, and remains cleanup have [combat tests](../tests/combat.test.ts).
+  Attack Move preserves destinations, investigates detection loss, and resumes
+  after encounters, including saved fights and blocked routes. Combat loss of
+  the starting Command Center freezes the mission and saves its defeat result.
+  [Browser checks](../e2e/economy.spec.ts) cover mouse, phone and tablet touch,
+  destination feedback, defeat, file loading, restart, and exit.
 
 ## Remaining scope
 
@@ -67,10 +74,6 @@ the requirements.
 - **0.32, prototype unit tests:** movement, navigation, multi-tile occupancy,
   and group destinations have focused tests. Terrain-animation data tests
   depend on the missing frame-animation pipeline.
-- **0.40, combat:** rifles, wolf bites, detection, pursuit, health, hit effects,
-  destruction, and remains cleanup work and have
-  [combat tests](../tests/combat.test.ts). Attack Move and Command Center defeat
-  remain absent.
 - **0.41, M0 map:** the movement map has slopes, cliffs, paths, rough ground,
   one wolf, and salvage. The compact mission layout, five-wolf den and alpha,
   mission landmarks, and recovery loot placement still need integration.
@@ -81,15 +84,17 @@ the requirements.
   [the questionnaire](design-questionnaire.md#remaining-q29-m0-follow-ups).
 - **0.43, mission interface:** sidebar tabs, resource display, count-based
   practice goals, status feedback, and network alerts work. Mission objectives,
-  victory/defeat results, the radial menu, general notifications, explanatory
+  victory results, the radial menu, general notifications, explanatory
   popups, and top-bar time/menu controls remain.
 - **0.44, persistence:**
   [versioned serialization](../src/simulation/scenario.ts) and saved-state
-  validation work. Save/load controls and storage, restart, rolling quicksave
-  and autosave, and paused loading remain.
+  validation work. Defeat results provide file loading, paused inspection, and
+  restart. Manual saving, general save/load controls and storage, rolling
+  quicksave, and autosave remain.
 - **0.45, on-screen actions:** construction, production, economy, rally points,
   selection, movement, and camera actions have on-screen controls. Missing M0
-  actions still need controls, including Attack Move and persistence.
+  actions still need controls, including general persistence. Attack Move
+  targeting works with mouse and compact touch input.
 - **0.46, presentation:** skeletal infantry, articulated machinery, tracers,
   bite effects, health bars, remains, blueprint progress, and staged resource
   markers work. Frame animation, the complete actor combat/death clips,
@@ -101,33 +106,23 @@ the requirements.
   and edge panning, and the remaining locked bindings are incomplete.
 - **0.48, slice unit tests:** economy, support, production, fog, combat, and
   save continuation have focused coverage. Complete wolf AI, objectives,
-  mission results, and restart reconstruction still need coverage.
+  victory and complete mission reconstruction still need coverage. Defeat and
+  opening restart have focused simulation and browser checks.
 - **0.49, complete mission browser flow:** absent. The tested opening ends
   with economy and lone-wolf combat; six-wolf victory and post-victory free
   play require the mission systems and den.
 - **0.50, compact interaction checks:** phone landscape checks exercise
   construction, production, economy, rally points, selection, movement, and
-  camera controls without a keyboard or secondary button. Full mission actions
-  and a tablet landscape profile remain unverified.
+  camera controls without a keyboard or secondary button. Attack Move also has
+  phone and tablet checks. Full mission actions and the remaining tablet
+  interactions remain unverified.
 
 ## Recommended next task
 
-Implement **Attack Move**, the command portion remaining in **0.40**. It uses
-the existing pathfinding, group destinations, detection, and combat systems and
-provides a useful exploration-and-combat interaction before den integration.
+Complete the remaining
+[Q29 wolf rules](design-questionnaire.md#remaining-q29-m0-follow-ups),
+then implement **0.42**'s pack alerts, last-known-position investigation, and
+complete serializable state machine. These support the den encounter in
+**0.41**, followed by mission objectives and victory in **0.43**.
 
-- Store the original destination and interrupted combat state in serializable
-  simulation state.
-- Engage detected compatible hostiles along the route, investigate the
-  last-known position after detection loss, and resume the destination when
-  the encounter ends.
-- Provide an explicit on-screen targeting action, cancellation, and feedback
-  usable with mouse and compact touch input.
-- Verify order replacement, route resumption, fog behavior, dynamic blockers,
-  save continuation, and independence from rendering cadence.
-
-Completing Attack Move alone does not complete 0.40. Command Center defeat
-belongs with mission objectives and results in 0.43. The next mission work is
-to complete Q29's wolf rules, implement 0.42, and integrate the M0 map and den
-in 0.41 with objectives and results. Animation and persistence retain their
-own open scope.
+Animation and the remaining persistence controls retain their own open scope.

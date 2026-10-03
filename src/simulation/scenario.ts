@@ -3,6 +3,7 @@ import { createMissionState } from "./mission";
 import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
 import { createFogState } from "./vision";
+import { createHarvesterState } from "./economy";
 
 import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
@@ -26,6 +27,7 @@ export type ScenarioDefinition = {
   readonly terrain: TerrainState;
   /** The faction the player controls and whose vision the fog records. */
   readonly playerFaction: string;
+  readonly defeatOnDestruction?: readonly string[];
   readonly buildings: readonly ActorPlacement[];
   /** Territorial units make their starting position home. */
   readonly units?: readonly ScenarioUnit[];
@@ -83,7 +85,9 @@ export function createScenarioState(
     depositedMaterials: 0,
     sites: structuredClone([...scenario.sites]),
     loot: structuredClone([...scenario.loot]),
-    harvesters: [],
+    harvesters: units
+      .filter((actor) => definitionFor(actor.definitionId).harvesting)
+      .map((actor) => createHarvesterState(actor.id)),
     production: [],
   };
   return {
@@ -96,7 +100,7 @@ export function createScenarioState(
   };
 }
 
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 export function serializeMission(
   state: MissionState,

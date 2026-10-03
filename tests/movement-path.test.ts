@@ -296,3 +296,46 @@ describe("movement path view", () => {
     engine.dispose();
   });
 });
+
+test("an aggressive order keeps its diamond destination during an engagement", () => {
+  const { engine, scene, view } = setup();
+  const actor = { ...movingActor(), attackMove: { target: { x: 2, z: 0 } } };
+  view.update([actor]);
+  expect(scene.getMeshByName("attack-move-destination")).not.toBeNull();
+  expect(scene.getMeshByName("movement-path-destination")).toBeNull();
+  view.update([
+    {
+      ...actor,
+      movement: undefined,
+      combat: { attack: { targetId: "wolf", lastKnown: { x: 0, z: 0 } } },
+    },
+  ]);
+  expect(scene.getMeshByName("attack-move-destination")).not.toBeNull();
+  expect(scene.getMeshByName("movement-path-route")).toBeNull();
+  view.update([{ ...movingActor(), movement: undefined }]);
+  expect(scene.getMeshByName("attack-move-destination")).toBeNull();
+  view.dispose();
+  engine.dispose();
+});
+
+test("a blocked Attack Move marker clears as soon as the order resumes or stops", () => {
+  const { engine, scene, view } = setup();
+  const actor: ActorRenderState = {
+    ...movingActor(),
+    movement: undefined,
+    attackMove: {
+      target: { x: 2, z: 0 },
+      blocked: { at: { x: 2, z: 0 }, navigationVersion: 1 },
+    },
+  };
+  view.update([actor]);
+  expect(scene.getMeshByName("movement-path-unreachable")).not.toBeNull();
+  view.update([{ ...movingActor(), attackMove: { target: { x: 2, z: 0 } } }]);
+  expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
+  view.update([actor]);
+  expect(scene.getMeshByName("movement-path-unreachable")).not.toBeNull();
+  view.update([{ ...actor, attackMove: undefined }]);
+  expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
+  view.dispose();
+  engine.dispose();
+});

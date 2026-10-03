@@ -58,9 +58,11 @@ export function createUnitTraining(
     if (faulted || !options.enabled()) {
       for (const { button } of buttons) button.disabled = true;
       message(
-        faulted
-          ? "Simulation stopped. Reload to continue."
-          : "Finish or cancel building placement to train units.",
+        simulation.result
+          ? "Mission ended in defeat."
+          : faulted
+            ? "Simulation stopped. Reload to continue."
+            : "Finish or cancel building placement to train units.",
       );
       return;
     }

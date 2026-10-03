@@ -261,6 +261,8 @@ export function createSidebar(
       boxSelect,
       addSelection,
       stop,
+      attackMove: element<HTMLButtonElement>("attack-move"),
+      cancelAttackMove: element<HTMLButtonElement>("cancel-attack-move"),
       clearSelection,
       movementStatus: element("movement-status"),
       rotate: element<HTMLButtonElement>("rotate-building"),

@@ -186,6 +186,7 @@ export function createCommandInput(
   const cancelGesture = pointer.cancel;
   const stop = () => {
     if (!enabled()) return 0;
+    cancelGroundTarget?.();
     const ids = selection.ids.filter(canMove);
     for (const actorId of ids) submitCommand({ kind: "stop", actorId });
     return ids.length;
@@ -227,6 +228,7 @@ export function createCommandInput(
       return additiveMode;
     },
     setBoxMode: (active) => {
+      if (active) cancelGroundTarget?.();
       cancelGesture();
       boxMode = active;
     },

@@ -59,7 +59,9 @@ export function createUnitControls(
     onOutcomes: (
       outcomes: readonly CommandOutcome[],
     ): MoveStatus | undefined => {
-      const moves = outcomes.filter((outcome) => isOutcomeOf(outcome, "move"));
+      const moves = outcomes.filter((outcome) =>
+        isOutcomeOf(outcome, "move", "attack-move"),
+      );
       const stops = outcomes.filter(
         ({ command, accepted }) => command.kind === "stop" && accepted,
       ).length;
@@ -70,9 +72,12 @@ export function createUnitControls(
           ({ reachedTarget }) => reachedTarget === false,
         ).length;
         const rejected = moves.length - accepted.length;
+        const order = isOutcomeOf(moves[0]!, "attack-move")
+          ? "Attack Move order"
+          : "move order";
         message(
           [
-            `${count(accepted.length, "move order")} accepted`,
+            `${count(accepted.length, order)} accepted`,
             ...(blocked ? [count(blocked, "blocked destination")] : []),
             ...(rejected ? [`${count(rejected, "unit")} unable to move`] : []),
             ...(stops ? [`${count(stops, "stop order")} accepted`] : []),

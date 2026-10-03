@@ -265,3 +265,53 @@ test("actor markers redraw at their current world positions", async ({
   expect(pixels.oldPosition).not.toEqual([222, 88, 31, 255]);
   expect(pixels.second).toEqual([222, 88, 31, 255]);
 });
+
+test("minimap commands wait for a click and ignore drags and cancelled capture", async ({
+  page,
+}) => {
+  await page.goto("/?sandbox");
+  await page.evaluate(async () => {
+    const harnessPath: string = "/e2e/harness.ts";
+    const loaded: typeof harness = await import(harnessPath);
+    const view = loaded.createTestView({ size: { width: 200, height: 200 } });
+    const canvas = document.createElement("canvas");
+    canvas.id = "command-minimap";
+    canvas.style.cssText =
+      "position:fixed;top:0;left:0;width:200px;height:200px;z-index:20;touch-action:none";
+    document.body.append(canvas);
+    const targets: { x: number; z: number }[] = [];
+    loaded.createMinimap(view.scene, view.map, view.view.camera, canvas, {
+      commandMode: () => true,
+      onCommand: (target: { x: number; z: number }) => {
+        targets.push(target);
+        return true;
+      },
+    });
+    Object.assign(window, { commandTargets: targets });
+    await loaded.frames(2);
+  });
+  const count = () =>
+    page.evaluate(() => Reflect.get(window, "commandTargets").length);
+  await page.mouse.move(150, 60);
+  await page.mouse.down();
+  expect(await count()).toBe(0);
+  await page.mouse.up();
+  expect(await count()).toBe(1);
+
+  await page.mouse.down();
+  await page.mouse.move(170, 80, { steps: 4 });
+  await page.mouse.move(150, 60, { steps: 4 });
+  await page.mouse.up();
+  expect(await count()).toBe(1);
+
+  await page.mouse.down();
+  await page.evaluate(() => {
+    document
+      .querySelector("#command-minimap")!
+      .dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 }));
+  });
+  await page.mouse.up();
+  expect(await count()).toBe(1);
+  await page.mouse.click(150, 60);
+  expect(await count()).toBe(2);
+});

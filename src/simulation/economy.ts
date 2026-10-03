@@ -17,7 +17,8 @@ import type {
 } from "./actor";
 import type { TileCoord } from "./grid";
 import type { TerrainView } from "./terrain";
-import { compareIds, healthOf } from "./actor";
+import { clearCombatOrders, compareIds, healthOf } from "./actor";
+import { playerRelation } from "./faction";
 import { distance } from "./world";
 import type { WorldPosition } from "./world";
 import type { TrainingEvaluation } from "./production";
@@ -58,6 +59,19 @@ export type HarvesterState = {
   /** Navigation version a blocked Harvester waits to change before retrying. */
   retryNavigationVersion?: number;
 };
+
+export function createHarvesterState(
+  actorId: string,
+  refineryId?: string,
+): HarvesterState {
+  return {
+    actorId,
+    ...(refineryId !== undefined && { refineryId }),
+    cargo: 0,
+    gatherProgress: 0,
+    phase: refineryId === undefined ? "unassigned" : "idle",
+  };
+}
 export type ProductionJob = {
   actorId: string;
   producerId: string;
@@ -333,6 +347,7 @@ export function harvestingRecoveryCost(
 
 export type EconomyWorld = {
   actors: Actor[];
+  playerFaction?: string;
   explored: (tile: TileCoord) => boolean;
   definitions: ReadonlyMap<string, ActorDefinition>;
   behaviors: ReadonlyMap<string, ActorBehavior>;
@@ -398,6 +413,7 @@ export function applyEconomyCommand(
     worker.phase = "returning";
   }
   delete actor.movement;
+  clearCombatOrders(actor);
   delete worker.activeSiteId;
   delete worker.retryNavigationVersion;
   return;
@@ -465,13 +481,7 @@ export function updateEconomy(
     if (!("actor" in result)) continue;
     economy.production.splice(economy.production.indexOf(job), 1);
     if (definitions.get(job.definitionId)?.harvesting) {
-      economy.harvesters.push({
-        actorId: job.actorId,
-        refineryId: id,
-        cargo: 0,
-        gatherProgress: 0,
-        phase: "idle",
-      });
+      economy.harvesters.push(createHarvesterState(job.actorId, id));
     }
     world.spawn(result.actor, id);
     byId.set(result.actor.id, result.actor);
@@ -630,7 +640,12 @@ export function updateEconomy(
     if (
       !actors.some(
         (actor) =>
-          definitions.get(actor.definitionId)?.movement && near(actor, point),
+          definitions.get(actor.definitionId)?.movement &&
+          playerRelation(
+            world.playerFaction,
+            definitions.get(actor.definitionId)?.faction,
+          ) === "own" &&
+          near(actor, point),
       )
     )
       continue;

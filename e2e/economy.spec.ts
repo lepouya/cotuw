@@ -18,6 +18,13 @@ async function controlledOpening(
   playerFaction = "arc",
   extraBuildings: ActorPlacement[] = [],
 ) {
+  await page.addInitScript(() => {
+    const errors: string[] = [];
+    Reflect.set(window, "startupErrors", errors);
+    window.addEventListener("unhandledrejection", (event) =>
+      errors.push(String(event.reason)),
+    );
+  });
   await page.goto("/");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
@@ -30,9 +37,19 @@ async function controlledOpening(
       const sidebarPath: string = "/src/ui/sidebar.ts";
       const contentPath: string = "/src/prototype-content.ts";
       const scenarioPath: string = "/src/content/economy-scenario.ts";
-      const { EngineStore } = await import(harnessPath);
+      const { EngineStore, frames } = (await import(
+        harnessPath
+      )) as typeof import("./harness");
       const engines = [...EngineStore.Instances];
-      for (const engine of engines) engine.dispose();
+      for (const engine of engines) {
+        for (const scene of engine.scenes) {
+          await scene.whenReadyAsync();
+          // Babylon's deferred RGBD decode must finish before engine teardown.
+          while (scene.textures.some((texture) => !texture.isReady()))
+            await frames(1);
+        }
+        engine.dispose();
+      }
       const { createTerrainPrototype } = (await import(
         prototypePath
       )) as typeof import("../src/prototype");
@@ -90,6 +107,9 @@ async function controlledOpening(
     { materials, playerFaction, extraBuildings },
   );
   expect(hiddenUnitsAtLoad).toEqual([]);
+  expect(
+    await page.evaluate(() => Reflect.get(window, "startupErrors")),
+  ).toEqual([]);
 }
 async function advance(page: Page, seconds: number) {
   await page.evaluate((seconds) => {
@@ -731,6 +751,16 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   await expect(page.locator("#selection-health")).toHaveText(
     `Health ${result.health} / 100`,
   );
+  await page.evaluate(() =>
+    window.economyHarness.view.simulation.removeActor("duelist"),
+  );
+  await advance(page, 0.1);
+  expect(
+    await page.evaluate(() => {
+      const { view } = window.economyHarness;
+      return view.scene.getTransformNodeByName("wreck-lone-wolf")!.isEnabled();
+    }),
+  ).toBe(false);
 });
 
 test("hostile buildings require detection and expose inspection without player controls", async ({
@@ -844,4 +874,197 @@ test("damaged building sale feedback matches the credited refund", async ({
   await page.locator("#remove-building").click();
   await advance(page, 0.1);
   await expect(page.locator("#materials-counter")).toHaveText("273");
+});
+
+for (const profile of [
+  { name: "mouse", viewport: { width: 1280, height: 720 }, touch: false },
+  { name: "phone touch", viewport: { width: 844, height: 390 }, touch: true },
+  { name: "tablet touch", viewport: { width: 1024, height: 768 }, touch: true },
+]) {
+  test(`Attack Move supports ${profile.name} cancellation, combat, and resumption`, async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      viewport: profile.viewport,
+      hasTouch: profile.touch,
+    });
+    const page = await context.newPage();
+    try {
+      await controlledOpening(page);
+      await page.evaluate(() => {
+        const { view } = window.economyHarness;
+        view.simulation.spawnActor({
+          id: "advance-trooper",
+          definitionId: "arc-trooper",
+          worldPosition: { x: -11.5, z: -17.5 },
+          facing: 0,
+          occupancyLayer: "surface",
+        });
+        view.camera.focusOnTile(43, 32);
+        view.selectActor("advance-trooper");
+      });
+      await advance(page, 0.1);
+      await action(page, "#attack-move", profile.touch);
+      await expect(page.locator("#cancel-attack-move")).toBeVisible();
+      await action(page, "#cancel-attack-move", profile.touch);
+      expect(
+        await page.evaluate(
+          () =>
+            window.economyHarness.view.simulation.actorById("advance-trooper")!
+              .attackMove,
+        ),
+      ).toBeUndefined();
+      await action(page, "#attack-move", profile.touch);
+      if (!profile.touch) {
+        await page.keyboard.press("Escape");
+        await expect(page.locator("#cancel-attack-move")).toBeHidden();
+        await action(page, "#attack-move");
+      }
+      const point = await terrainPoint(page, 52, 32);
+      if (profile.touch) await page.touchscreen.tap(point.x, point.y);
+      else await page.mouse.click(point.x, point.y);
+      await advance(page, 1);
+      await expect(page.locator("#movement-status")).toContainText(
+        "Attack Move order",
+      );
+      await expect(page.locator("#cancel-attack-move")).toBeHidden();
+      expect(
+        await page.evaluate(
+          () =>
+            window.economyHarness.view.scene.getMeshByName(
+              "attack-move-destination",
+            ) !== null,
+        ),
+      ).toBe(true);
+      await advance(page, 20);
+      const result = await page.evaluate(() => {
+        const { simulation } = window.economyHarness.view;
+        const trooper = simulation.actorById("advance-trooper")!;
+        return {
+          wolf: simulation.actorById("lone-wolf"),
+          point: trooper.worldPosition,
+          aggressive: trooper.attackMove,
+          health: trooper.health,
+        };
+      });
+      expect(result.wolf).toBeUndefined();
+      expect(result.aggressive).toBeUndefined();
+      expect(result.point.x).toBeCloseTo(2.5, 1);
+      expect(result.point.z).toBeCloseTo(-17.5, 1);
+      expect(result.health).toBeGreaterThan(0);
+      await testInfo.attach(`attack-move-${profile.name}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("Command Center defeat pauses, rejects bad loads, restores, restarts, and exits", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-terrain-ready",
+    "true",
+  );
+  const saves = await page.evaluate(async () => {
+    const scenarioPath: string = "/src/content/economy-scenario.ts";
+    const simulationPath: string = "/src/simulation/scenario.ts";
+    const prototypePath: string = "/src/prototype.ts";
+    const { ECONOMY_SCENARIO, ECONOMY_ACTOR_DEFINITIONS } = await import(
+      scenarioPath
+    );
+    const { createScenarioState, serializeMission } = await import(
+      simulationPath
+    );
+    const { createPrototypeSimulation, createPrototypeMap } = await import(
+      prototypePath
+    );
+    const state = createScenarioState(
+      ECONOMY_SCENARIO,
+      ECONOMY_ACTOR_DEFINITIONS,
+    );
+    state.actors.find(
+      (actor: { id: string }) => actor.id === "starting-command-center",
+    )!.health = 1;
+    const wolf = state.actors.find(
+      (actor: { id: string }) => actor.id === "lone-wolf",
+    )!;
+    wolf.worldPosition = { x: -39.5, z: 0.5 };
+    wolf.territory = { home: { ...wolf.worldPosition } };
+    const pending = serializeMission(state, 1 / 60);
+    const simulation = createPrototypeSimulation(
+      createPrototypeMap(),
+      ECONOMY_SCENARIO,
+      state,
+    );
+    simulation.tick();
+    const defeated = serializeMission(simulation.snapshot(), 1 / 60);
+    simulation.dispose();
+    return { pending, defeated };
+  });
+  const upload = async (source: string) => {
+    await expect(page.locator("#load-mission")).toBeEnabled();
+    await page.locator("#mission-save-file").setInputFiles({
+      name: "mission.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(source),
+    });
+    await expect(page.locator("#mission-result")).toBeVisible();
+  };
+  await upload(saves.pending);
+  await expect(page.locator("#mission-result-title")).toHaveText(
+    "Mission loaded",
+  );
+  await page.locator("#inspect-loaded-mission").click();
+  await expect(page.locator("#resume-loaded-mission")).toBeVisible();
+  await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+    "data-mission-result",
+    "defeat",
+  );
+  await page.locator("#resume-loaded-mission").click();
+  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-mission-result",
+    "defeat",
+  );
+  await expect(page.locator("#placement-status")).toContainText(
+    "Mission ended in defeat",
+  );
+  await expect(page.locator("#production-status")).toContainText(
+    "Mission ended in defeat",
+  );
+  await expect(page.locator("#restart-mission")).toBeVisible();
+  await expect(page.locator("#load-mission")).toBeVisible();
+  await testInfo.attach("defeat", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await upload('{"version":0}');
+  await expect(page.locator("#mission-result-status")).toContainText(
+    "unsupported version",
+  );
+  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await upload(saves.defeated);
+  await expect(page.locator("#mission-result-status")).toHaveText("");
+  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await expect(page.locator("#resume-mission")).toBeHidden();
+  await page.locator("#restart-mission").click();
+  await expect(page.locator("#mission-result")).not.toBeVisible();
+  await expect(page.locator("#materials-counter")).toHaveText("150");
+  await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+    "data-mission-result",
+    "defeat",
+  );
+  await upload(saves.defeated);
+  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await page.locator("#exit-mission").click();
+  await expect(page.locator("#mission-result-title")).toHaveText(
+    "Mission ended",
+  );
+  await page.locator("#restart-mission").click();
+  await expect(page.locator("#materials-counter")).toHaveText("150");
 });

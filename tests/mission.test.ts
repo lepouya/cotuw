@@ -11,7 +11,8 @@ import type {
   ActorBehavior,
   ActorDefinition,
 } from "../src/simulation/actor";
-import type { ActorCommand } from "../src/simulation/command";
+import type { ActorCommand, MissionCommand } from "../src/simulation/command";
+import type { ScheduledCommand } from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
 import type { WorldBounds } from "../src/simulation/world";
 
@@ -77,6 +78,73 @@ function mission(actors: Actor[], tickSeconds = 0.5) {
 function move(actorId: string, x: number, z: number): ActorCommand {
   return { kind: "move", actorId, target: { x, z } };
 }
+
+test.each(["move", "attack-move", "group-move", "group-attack-move"] as const)(
+  "%s rejects missing targets without faulting the mission",
+  (kind) => {
+    const simulation = mission([actor()]);
+    for (const target of [null, undefined]) {
+      simulation.submitCommand({
+        kind,
+        actorId: "trooper",
+        actorIds: ["trooper"],
+        target,
+      } as unknown as MissionCommand);
+      expect(simulation.tick()[0]!.accepted).toBe(false);
+    }
+    simulation.submitCommand(move("trooper", 4, 0));
+    expect(simulation.tick()[0]!.accepted).toBe(true);
+  },
+);
+
+test.each([null, {}, { target: null }])(
+  "rejects malformed saved movement %j before starting",
+  (movement) => {
+    expect(() =>
+      mission([{ ...actor(), movement } as unknown as Actor]),
+    ).toThrow("move target");
+  },
+);
+
+test.each([
+  null,
+  { tick: -1, command: { kind: "stop", actorId: "trooper" } },
+  { tick: 0.5, command: { kind: "stop", actorId: "trooper" } },
+  { tick: 0, command: null },
+  { tick: 0, command: { kind: "unknown", actorId: "trooper" } },
+  { tick: 0, command: { kind: "move", actorId: "trooper", target: null } },
+  {
+    tick: 0,
+    command: { kind: "group-move", actorIds: null, target: { x: 0, z: 0 } },
+  },
+  { tick: 0, command: { kind: "terrain", heights: [null] } },
+])("rejects malformed saved queued command %j before starting", (scheduled) => {
+  const state = createMissionState([actor()]);
+  state.commands.push(scheduled as unknown as ScheduledCommand);
+  expect(() =>
+    createMissionSimulation({
+      state,
+      behaviorRegistry,
+      bounds,
+      definitions,
+      tickSeconds: 0.5,
+    }),
+  ).toThrow("queued commands");
+});
+
+test("saved commands recheck gameplay legality at their scheduled tick", () => {
+  const state = createMissionState([actor()]);
+  state.commands.push({ tick: 1, command: move("missing", 4, 0) });
+  const simulation = createMissionSimulation({
+    state,
+    behaviorRegistry,
+    bounds,
+    definitions,
+    tickSeconds: 0.5,
+  });
+  expect(simulation.tick()).toEqual([]);
+  expect(simulation.tick()[0]!.accepted).toBe(false);
+});
 
 describe("mission definitions", () => {
   test("resolves behavior IDs through the registry", () => {

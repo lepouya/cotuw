@@ -102,6 +102,11 @@ export type Actor = {
   rallyPoint?: WorldPosition;
   /** Present only while a movement-capable actor has an active move order. */
   movement?: MovementOrder;
+  /** Original destination retained while an aggressive move engages targets. */
+  attackMove?: RouteRetryState & {
+    target: WorldPosition;
+    requestedTarget?: WorldPosition;
+  };
   /** Current health; absent while undamaged. */
   health?: number;
   /** Present once the actor has fought, been hit, or received an attack. */
@@ -148,6 +153,13 @@ export type RouteRetryState = {
    */
   blocked?: { at: WorldPosition; navigationVersion: number };
 };
+
+/** Cancels combat and aggressive movement without changing a new route. */
+export function clearCombatOrders(actor: Actor): void {
+  delete actor.attackMove;
+  delete actor.combat?.attack;
+  delete actor.combat?.returning;
+}
 
 /** Keeps routes, and contact correction, inside a circle. */
 export type RouteBounds = { center: WorldPosition; radius: number };
@@ -209,6 +221,7 @@ export type ActorRenderState = DeepReadonly<
     | "occupancyLayer"
     | "tilePlacement"
     | "movement"
+    | "attackMove"
     | "construction"
     | "rallyPoint"
     | "health"

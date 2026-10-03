@@ -1,3 +1,4 @@
+import { startSimulationLoop } from "../src/simulation/loop";
 import { describe, expect, test, vi } from "vitest";
 import { ECONOMY_ACTOR_DEFINITIONS } from "../src/content/economy-scenario";
 import { createActor } from "../src/simulation/actor";
@@ -64,6 +65,7 @@ function fixture(
   state?: MissionState,
   content: readonly ActorDefinition[] = definitions,
   idleUpdate = () => {},
+  defeatOnDestruction: string[] = [],
 ) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
@@ -71,6 +73,7 @@ function fixture(
   edit?.(initial);
   const simulation = createMissionSimulation({
     state: initial,
+    defeatOnDestruction,
     definitions: content,
     map,
     occupancy,
@@ -422,6 +425,85 @@ describe("combat", () => {
 });
 
 describe("combat edge cases", () => {
+  test("guards stop an engagement at the target's current chase boundary", () => {
+    const content = withChanges("arc-trooper", {
+      guard: { acquisitionRadius: 7, chaseRadius: 3 },
+    }).map((definition) =>
+      definition.id === "wolf"
+        ? { ...definition, weapon: undefined, territory: undefined }
+        : definition,
+    );
+    const { simulation } = fixture(
+      [unit("trooper", "arc-trooper", 12, 10), unit("wolf", "wolf", 16, 10)],
+      (state) => {
+        state.actors.find(({ id }) => id === "trooper")!.combat = {
+          attack: { targetId: "wolf", lastKnown: at(14, 10), post: at(12, 10) },
+        };
+      },
+      undefined,
+      content,
+    );
+    simulation.tick();
+    expect(simulation.actorById("trooper")!.combat?.attack).toBeUndefined();
+    expect(simulation.attacks).toEqual([]);
+  });
+
+  test.each([false, true])(
+    "hidden destruction preserves the last-known search, Attack Move=%s",
+    (aggressive) => {
+      const content = withChanges("arc-trooper", {
+        guard: undefined,
+        vision: undefined,
+      }).map((definition) =>
+        definition.id === "wolf"
+          ? { ...definition, territory: undefined }
+          : definition,
+      );
+      const units = [
+        unit("trooper", "arc-trooper", 12, 10),
+        unit("scout", "arc-scout", 30, 10),
+        unit("wolf", "wolf", 30, 14),
+      ];
+      const { simulation } = fixture(units, undefined, undefined, content);
+      simulation.submitCommand({
+        kind: "attack",
+        actorId: "trooper",
+        targetId: "wolf",
+      });
+      simulation.tick();
+      const lastKnown =
+        simulation.actorById("trooper")!.combat!.attack!.lastKnown;
+      simulation.removeActor("scout");
+      const state = simulation.snapshot();
+      state.actors = state.actors.filter(({ id }) => id !== "wolf");
+      state.retiredActorIds.push("wolf");
+      state.wrecks.push({
+        actorId: "wolf",
+        definitionId: "wolf",
+        worldPosition: at(35, 14),
+        facing: 0,
+        tick: state.tick - 1,
+      });
+      if (aggressive)
+        state.actors.find(({ id }) => id === "trooper")!.attackMove = {
+          target: at(32, 4),
+        };
+      const restored = fixture(units, undefined, state, content).simulation;
+      restored.tick();
+      expect(restored.actorById("trooper")!.combat?.attack?.targetId).toBe(
+        "wolf",
+      );
+      runUntil(restored, () => !restored.actorById("trooper")!.combat?.attack);
+      expect(
+        distance(restored.actorById("trooper")!.worldPosition, lastKnown),
+      ).toBeLessThanOrEqual(1.5);
+      if (aggressive) {
+        runUntil(restored, () => !restored.actorById("trooper")!.attackMove);
+        expect(restored.actorById("trooper")!.worldPosition).toEqual(at(32, 4));
+      }
+    },
+  );
+
   test("blocked guard returns survive saves and retry after navigation changes", () => {
     const units = [unit("trooper", "arc-trooper", 12, 10)];
     const { simulation } = fixture(units, (state) => {
@@ -1116,4 +1198,332 @@ describe("combat retries and immobile attackers", () => {
     expect(simulation.actorById("cc")!.combat?.attack).toBeUndefined();
     expect(simulation.attacks).toEqual([]);
   });
+});
+
+describe("Attack Move", () => {
+  test("engages along the route, resumes, and continues identically after saving", () => {
+    const units = [
+      unit("trooper", "arc-trooper", 12, 10),
+      unit("wolf", "wolf", 23, 10),
+    ];
+    const { simulation } = fixture(units);
+    simulation.submitCommand({
+      kind: "attack-move",
+      actorId: "trooper",
+      target: at(32, 10),
+    });
+    runUntil(
+      simulation,
+      () => !!simulation.actorById("trooper")!.combat?.attack,
+    );
+    const trooper = simulation.actorById("trooper")!;
+    expect(trooper.attackMove?.target).toEqual(at(32, 10));
+    expect(trooper.combat?.attack?.post).toBeUndefined();
+    const saved = deserializeMission(
+      serializeMission(simulation.snapshot(), TICK_SECONDS),
+      scenario(units),
+      TICK_SECONDS,
+    );
+    const { simulation: restored } = fixture(units, undefined, saved);
+    for (let i = 0; i < 300; i++) {
+      simulation.tick();
+      restored.tick();
+      expect(restored.snapshot()).toEqual(simulation.snapshot());
+    }
+    expect(simulation.actorById("wolf")).toBeUndefined();
+    expect(simulation.actorById("trooper")!.worldPosition).toEqual(at(32, 10));
+    expect(simulation.actorById("trooper")!.attackMove).toBeUndefined();
+  });
+
+  test("groups assign distinct destinations to armed and unarmed units", () => {
+    const { simulation } = fixture([
+      unit("trooper", "arc-trooper", 12, 10),
+      unit("scout", "arc-scout", 12, 12),
+    ]);
+    simulation.submitCommand({
+      kind: "group-attack-move",
+      actorIds: ["trooper", "scout", "trooper"],
+      target: at(28, 10),
+    });
+    const outcomes = simulation.tick();
+    expect(
+      outcomes.map(({ command, accepted }) => [command.kind, accepted]),
+    ).toEqual([
+      ["attack-move", true],
+      ["attack-move", true],
+    ]);
+    const targets = simulation.actors
+      .filter((actor) => actor.attackMove)
+      .map((actor) => actor.attackMove!.target);
+    expect(targets).toHaveLength(2);
+    expect(targets[0]).not.toEqual(targets[1]);
+    runUntil(simulation, () =>
+      simulation.actors.every((actor) => !actor.attackMove),
+    );
+    expect(simulation.actors.filter((actor) => actor.movement)).toEqual([]);
+  });
+
+  test.each(["move", "stop", "attack"] as const)(
+    "%s replaces an interrupted Attack Move",
+    (kind) => {
+      const { simulation } = fixture([
+        unit("trooper", "arc-trooper", 12, 10),
+        unit("wolf", "wolf", 18, 10),
+      ]);
+      simulation.submitCommand({
+        kind: "attack-move",
+        actorId: "trooper",
+        target: at(32, 10),
+      });
+      simulation.tick();
+      expect(simulation.actorById("trooper")!.combat?.attack).toBeDefined();
+      simulation.submitCommand(
+        kind === "move"
+          ? { kind, actorId: "trooper", target: at(5, 10) }
+          : kind === "attack"
+            ? { kind, actorId: "trooper", targetId: "wolf" }
+            : { kind, actorId: "trooper" },
+      );
+      expect(simulation.tick()[0]!.accepted).toBe(true);
+      expect(simulation.actorById("trooper")!.attackMove).toBeUndefined();
+    },
+  );
+
+  test("a rejected replacement preserves the current aggressive order", () => {
+    const { simulation } = fixture([unit("trooper", "arc-trooper", 12, 10)]);
+    simulation.submitCommand({
+      kind: "attack-move",
+      actorId: "trooper",
+      target: at(32, 10),
+    });
+    simulation.tick();
+    simulation.submitCommand({
+      kind: "attack-move",
+      actorId: "trooper",
+      target: { x: NaN, z: 0 },
+    });
+    expect(simulation.tick()[0]!.accepted).toBe(false);
+    expect(simulation.actorById("trooper")!.attackMove?.target).toEqual(
+      at(32, 10),
+    );
+  });
+
+  test("detection loss searches only the last-known position and then resumes", () => {
+    const content = withChanges("arc-trooper", { vision: undefined }).map(
+      (definition) =>
+        definition.id === "wolf"
+          ? { ...definition, territory: undefined }
+          : definition,
+    );
+    const units = [
+      unit("trooper", "arc-trooper", 12, 10),
+      unit("scout", "arc-scout", 18, 10),
+      unit("wolf", "wolf", 18, 13),
+    ];
+    const { simulation } = fixture(units, undefined, undefined, content);
+    simulation.submitCommand({
+      kind: "attack-move",
+      actorId: "trooper",
+      target: at(30, 5),
+    });
+    simulation.tick();
+    const lastKnown =
+      simulation.actorById("trooper")!.combat!.attack!.lastKnown;
+    simulation.removeActor("scout");
+    simulation.submitCommand({
+      kind: "move",
+      actorId: "wolf",
+      target: at(35, 14),
+    });
+    runUntil(
+      simulation,
+      () => !simulation.actorById("trooper")!.combat?.attack,
+    );
+    expect(
+      distance(simulation.actorById("trooper")!.worldPosition, lastKnown),
+    ).toBeLessThanOrEqual(1.5);
+    expect(simulation.actorById("trooper")!.movement?.target).toEqual(
+      at(30, 5),
+    );
+    runUntil(simulation, () => !simulation.actorById("trooper")!.attackMove);
+    expect(simulation.actorById("trooper")!.worldPosition).toEqual(at(30, 5));
+    expect(simulation.actorById("wolf")!.health).toBeUndefined();
+  });
+
+  test("blocked resumption waits for navigation changes and survives a save", () => {
+    const units = [unit("trooper", "arc-trooper", 12, 10)];
+    const { simulation } = fixture(units, (state) => {
+      for (let z = 0; z < 20; z++)
+        state.terrain!.tiles[z * 40 + 10].typeId = "water";
+      const trooper = state.actors.find(({ id }) => id === "trooper")!;
+      trooper.attackMove = { target: at(5, 10) };
+      trooper.combat = { attack: { targetId: "dead", lastKnown: at(12, 10) } };
+    });
+    runUntil(
+      simulation,
+      () => !!simulation.actorById("trooper")!.attackMove?.blocked,
+    );
+    expect(simulation.actorById("trooper")!.attackMove?.blocked).toBeDefined();
+    const saved = deserializeMission(
+      serializeMission(simulation.snapshot(), TICK_SECONDS),
+      scenario(units),
+      TICK_SECONDS,
+    );
+    const { simulation: restored } = fixture(units, undefined, saved);
+    for (const sim of [simulation, restored]) {
+      sim.submitCommand({
+        kind: "terrain",
+        tiles: [{ x: 10, z: 10, terrain: { typeId: "plain" } }],
+      });
+      runUntil(sim, () => !sim.actorById("trooper")!.attackMove);
+      expect(sim.actorById("trooper")!.worldPosition).toEqual(at(5, 10));
+    }
+    expect(restored.snapshot()).toEqual(simulation.snapshot());
+  });
+
+  test("a territory heading home abandons its Attack Move", () => {
+    const { simulation } = fixture([unit("wolf", "wolf", 20, 10)], (state) => {
+      state.actors.find(({ id }) => id === "wolf")!.territory = {
+        home: at(16, 10),
+      };
+    });
+    simulation.submitCommand({
+      kind: "attack-move",
+      actorId: "wolf",
+      target: at(35, 10),
+    });
+    simulation.tick();
+    const wolf = simulation.actorById("wolf")!;
+    expect(wolf.attackMove).toBeUndefined();
+    expect(wolf.combat?.returning?.point).toEqual(at(16, 10));
+  });
+
+  test.each([
+    null,
+    { target: { x: Infinity, z: 0 } },
+    { target: at(5, 10), blocked: { at: at(5, 10), navigationVersion: -1 } },
+  ])("rejects malformed aggressive state %j", (attackMove) => {
+    expect(() =>
+      fixture([unit("trooper", "arc-trooper", 12, 10)], (state) => {
+        Object.assign(
+          state.actors.find(({ id }) => id === "trooper")!,
+          { attackMove },
+        );
+      }),
+    ).toThrow("invalid combat state");
+  });
+});
+
+describe("Command Center defeat", () => {
+  test("combat destruction ends the mission before movement or economy and restores frozen", () => {
+    const units = [
+      unit("wolf", "wolf", 4, 3),
+      unit("scout", "arc-scout", 12, 10),
+    ];
+    const { simulation } = fixture(
+      units,
+      (state) => {
+        state.actors.find(({ id }) => id === "cc")!.health = 1;
+      },
+      undefined,
+      definitions,
+      () => {},
+      ["cc"],
+    );
+    simulation.submitCommand({
+      kind: "move",
+      actorId: "scout",
+      target: at(30, 10),
+    });
+    simulation.tick();
+    expect(simulation.result).toEqual({
+      kind: "defeat",
+      actorId: "cc",
+      tick: 0,
+    });
+    expect(simulation.actorById("scout")!.worldPosition).toEqual(at(12, 10));
+    const saved = deserializeMission(
+      serializeMission(simulation.snapshot(), TICK_SECONDS),
+      scenario(units),
+      TICK_SECONDS,
+    );
+    const { simulation: restored } = fixture(
+      units,
+      undefined,
+      saved,
+      definitions,
+      () => {},
+      ["cc"],
+    );
+    for (let i = 0; i < 10; i++) {
+      simulation.tick();
+      restored.tick();
+    }
+    expect(restored.snapshot()).toEqual(saved);
+    expect(simulation.snapshot()).toEqual(saved);
+    expect(() =>
+      restored.submitCommand({ kind: "stop", actorId: "scout" }),
+    ).toThrow("ended");
+    for (const sim of [simulation, restored]) {
+      expect(() => sim.removeActor("scout")).toThrow("ended");
+      expect(() =>
+        sim.spawnActor(
+          createActor({
+            id: "new-scout",
+            definitionId: "arc-scout",
+            worldPosition: at(15, 10),
+          }),
+        ),
+      ).toThrow("ended");
+      expect(sim.snapshot()).toEqual(saved);
+    }
+    const restarted = fixture(
+      units,
+      undefined,
+      undefined,
+      definitions,
+      () => {},
+      ["cc"],
+    ).simulation;
+    expect(restarted.result).toBeUndefined();
+    expect(restarted.actorById("cc")!.health).toBeUndefined();
+    expect(restarted.completedTicks).toBe(0);
+  });
+
+  test("ordinary missions retain combat without a defeat rule", () => {
+    const { simulation } = fixture([unit("wolf", "wolf", 4, 3)], (state) => {
+      state.actors.find(({ id }) => id === "cc")!.health = 1;
+    });
+    simulation.tick();
+    expect(simulation.actorById("cc")).toBeUndefined();
+    expect(simulation.result).toBeUndefined();
+    simulation.tick();
+    expect(simulation.completedTicks).toBe(2);
+  });
+});
+
+test("aggressive combat is identical with frequent or sparse clock pumps", () => {
+  const run = (pumpMilliseconds: number) => {
+    const { simulation } = fixture([
+      unit("trooper", "arc-trooper", 12, 10),
+      unit("wolf", "wolf", 23, 10),
+    ]);
+    simulation.submitCommand({
+      kind: "attack-move",
+      actorId: "trooper",
+      target: at(32, 10),
+    });
+    let now = 0;
+    const loop = startSimulationLoop(simulation, {
+      pumpMilliseconds: 60_000,
+      maxCatchUpSeconds: 5,
+      now: () => now,
+    });
+    for (; now < 20_000; now += pumpMilliseconds) loop.advance();
+    now = 20_000;
+    loop.advance();
+    loop.stop();
+    return simulation.snapshot();
+  };
+  expect(run(233)).toEqual(run(5));
 });

@@ -120,7 +120,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.39 Implement unexplored, explored, and visible terrain; actor
       visibility; camera bounds based on exploration; and the north-up minimap
       rules.
-- [ ] 0.40 Implement deterministic rifle and wolf combat, Attack Move, health,
+- [x] 0.40 Implement deterministic rifle and wolf combat, Attack Move, health,
       damage feedback, destruction, corpse cleanup, and Command Center defeat.
 - [ ] 0.41 Build the compact branching M0 map with weighted rough terrain, one
       lone wolf, the five-wolf den, landmarks, and recovery Materials loot.

@@ -30,6 +30,7 @@ export const ECONOMY_SCENARIO = defineScenario({
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),
   playerFaction: "arc",
+  defeatOnDestruction: ["starting-command-center"],
   buildings: [
     {
       actorId: "starting-command-center",

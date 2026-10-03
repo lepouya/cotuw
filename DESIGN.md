@@ -583,8 +583,9 @@ story.
   while their center lies in connected coverage. Rootless clusters stay
   disconnected. Redundant paths remain live when another path is lost.
   Connectivity is derived from authoritative actors and definitions, and is
-  rebuilt after loading. Losing every completed Command Center is a loss state
-  with no placement recovery; it is reserved for a future defeat condition.
+  rebuilt after loading. Losing every completed Command Center removes support
+  coverage and prevents placement recovery. Combat destruction of the starting
+  Command Center ends the opening in defeat.
 - Disconnection pauses construction and production without losing payment,
   progress, or queue order. Paused blueprints yield the shared construction
   slot; the oldest connected blueprint advances. Restoring coverage resumes
@@ -596,8 +597,7 @@ story.
   connections are dashed with gap crosses. Offline buildings dim, stop animated
   machinery, turn off emissive lights, and show a crossed power badge.
   Sidebar states explain paused work. Grouped disconnection and restoration
-  alerts focus the camera on affected buildings. The opening has no mission
-  result.
+  alerts focus the camera on affected buildings.
 - Prototype vision radii are 14 world units for Command Centers and Scouts,
   8 for Refineries and Barracks, 7 for Troopers, and 5 for Harvesters. A
   building's vision covers its own support radius, so connected coverage is
@@ -636,8 +636,8 @@ story.
   health fraction, rounded down; mobile units cannot be sold.
 - The near patch contains four 200-Materials tiles; the north patch contains
   two. Three ordinary salvage tiles each grant 25 Materials to the first
-  mobile unit reaching them, without a delivery. Resource tiles and uncollected
-  salvage prevent placement. Depleted tiles become buildable.
+  player-owned mobile unit reaching them, without a delivery. Resource tiles
+  and uncollected salvage prevent placement. Depleted tiles become buildable.
 - The sidebar provides cargo, phase, Gather, Return cargo, Refinery assignment,
   paid-order cancellation, patch totals, and salvage commands. The top bar
   shows available Materials. Blue resource markers shrink in four stages and
@@ -693,7 +693,23 @@ story.
   route's end. A point no route approaches is retried only after the target
   moves away from it or navigation changes. A lost target is chased to its
   last-known position; an explicit attack then ends there, while automatic
-  engagements end at once.
+  engagements end at once. Destruction outside vision does not end a
+  last-known search; visible remains confirm the target's destruction.
+- **Attack Move** keeps each mobile unit's resolved destination while it engages
+  the nearest detected compatible hostile. It uses the guard's acquisition
+  radius, or weapon range without a guard rule, and stable ID breaks ties.
+  Unarmed group members move without engaging. Lost targets are investigated
+  at their last-known position; combat ending resumes the destination without
+  returning to a guard post. Move, Stop, and direct Attack replace the order,
+  as does a territory heading home. A blocked destination keeps its retry state
+  until navigation changes or a new command. Harvester automation replaces
+  Attack Move. Destinations, investigations, and retries survive saving.
+- **Attack Move** has an on-screen targeting action and Cancel; Esc exits
+  targeting. A terrain click or tap submits the order. The minimap submits it
+  only on explored ground while targeting; otherwise it navigates the camera.
+  Minimap drags pan without submitting an order.
+  Orange dashes and a diamond distinguish aggressive routes and destinations;
+  the diamond remains during combat. No keyboard binding is assigned yet.
 - Idle armed units with a guard rule engage the nearest detected hostile
   within their acquisition radius and their post's chase radius, stable ID
   breaking ties. They return to their post when it dies, hides, or was last
@@ -718,6 +734,7 @@ story.
 - Destruction gives no refund and leaves remains for 60 seconds: a fallen unit
   or corpse, or building debris that blocks placement on its footprint until it
   clears. Remains never block movement or shots and cannot be selected.
+  Hostile and neutral remains are shown only within current vision.
 - Clicking or tapping a visible hostile with friendly units selected orders
   each to attack it; unarmed units keep their orders and the receipt reports
   them. Otherwise the click selects the hostile for inspection with a red
@@ -740,6 +757,14 @@ story.
   left.
 - The Materials opening places one lone wolf on the southern path at tile
   (46, 32), out of sight of the base.
+- Combat destruction of the opening's authored starting Command Center records
+  a defeat at that tick. All simultaneous hits resolve, then movement and
+  economy stop. Further ticks leave the state unchanged. The result survives
+  saving, and the results panel offers Restart, Load, and Exit. Restart rebuilds
+  the authored opening; Exit releases the session and offers a new mission.
+  Load validates a mission JSON file before releasing the current session and
+  begins paused, with Inspect and Resume actions. A loaded defeat stays ended.
+  Economic stalls and ordinary unit or building losses do not declare defeat.
 - Saves preserve health, weapon cooldowns, building aim, attack destinations,
   returns and their retry state, route bounds, territory homes, and remains.
   Combat destinations and remains must lie within mission bounds.

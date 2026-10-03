@@ -339,7 +339,25 @@ button:disabled {
   font-size: 0.85rem;
   pointer-events: none;
 }
+.resource-bar button {
+  pointer-events: auto;
+}
+
 #production-queue:not(:empty),
 #return-cargo-actions {
   margin-block: 0.75rem;
+}
+
+#mission-result {
+  max-width: min(28rem, 90vw);
+  max-height: 90dvh;
+  overflow: auto;
+  border: 1px solid #cfac62;
+  border-radius: 0.3rem;
+  color: #e8ecdf;
+  background: #142729;
+}
+
+#mission-result::backdrop {
+  background: rgb(0 0 0 / 65%);
 }

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { startSimulationLoop } from "../src/simulation/loop";
 
+import type { SimulationLoop } from "../src/simulation/loop";
 import type { CommandOutcome } from "../src/simulation/command";
 
 describe("simulation loop", () => {
@@ -79,4 +80,85 @@ describe("simulation loop", () => {
     expect(loop.tickProgress()).toBe(1);
     expect(faults).toEqual([error]);
   });
+});
+
+test("stopping in a tick callback discards the remaining clock backlog", () => {
+  let now = 0;
+  let ticks = 0;
+  let loop: SimulationLoop;
+  loop = startSimulationLoop(
+    {
+      tickSeconds: 0.01,
+      tick: () => {
+        ticks++;
+        return [];
+      },
+    },
+    {
+      pumpMilliseconds: 60_000,
+      maxCatchUpSeconds: 1,
+      now: () => now,
+      afterTick: () => loop.stop(),
+    },
+  );
+  now = 1000;
+  loop.advance();
+  expect(ticks).toBe(1);
+  expect(loop.tickProgress()).toBe(1);
+  loop.advance();
+  expect(ticks).toBe(1);
+});
+
+test("loading paused owes no ticks until resumed and drops inspection time", () => {
+  let now = 0;
+  let ticks = 0;
+  const loop = startSimulationLoop(
+    {
+      tickSeconds: 0.01,
+      tick: () => {
+        ticks++;
+        return [];
+      },
+    },
+    {
+      pumpMilliseconds: 60_000,
+      maxCatchUpSeconds: 1,
+      now: () => now,
+      paused: true,
+    },
+  );
+  now = 1000;
+  loop.advance();
+  expect(ticks).toBe(0);
+  loop.resume();
+  loop.advance();
+  expect(ticks).toBe(0);
+  now += 20;
+  loop.advance();
+  expect(ticks).toBe(2);
+  loop.stop();
+});
+
+test("stopping before a tick prevents it from running", () => {
+  let now = 0;
+  let ticks = 0;
+  let loop: SimulationLoop;
+  loop = startSimulationLoop(
+    {
+      tickSeconds: 0.01,
+      tick: () => {
+        ticks++;
+        return [];
+      },
+    },
+    {
+      pumpMilliseconds: 60_000,
+      maxCatchUpSeconds: 1,
+      now: () => now,
+      beforeTick: () => loop.stop(),
+    },
+  );
+  now = 1000;
+  loop.advance();
+  expect(ticks).toBe(0);
 });

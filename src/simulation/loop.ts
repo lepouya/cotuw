@@ -15,6 +15,7 @@ export type SimulationLoopOptions = {
   onFault?: (error: unknown) => void;
   /** A monotonic millisecond clock. */
   now?: () => number;
+  paused?: boolean;
 };
 
 export type SimulationLoop = {
@@ -27,6 +28,7 @@ export type SimulationLoop = {
   /** How far real time is into the next tick, from 0 to 1. */
   tickProgress: () => number;
   stop: () => void;
+  resume: () => void;
 };
 
 /**
@@ -42,16 +44,19 @@ export function startSimulationLoop(
     afterTick,
     onFault,
     now = () => performance.now(),
+    paused = false,
   }: SimulationLoopOptions,
 ): SimulationLoop {
-  const clock = createFixedStepClock({
-    tickSeconds: simulation.tickSeconds,
-    startMilliseconds: now(),
-    maxCatchUpTicks: Math.max(
-      Math.ceil(maxCatchUpSeconds / simulation.tickSeconds),
-      1,
-    ),
-  });
+  const newClock = () =>
+    createFixedStepClock({
+      tickSeconds: simulation.tickSeconds,
+      startMilliseconds: now(),
+      maxCatchUpTicks: Math.max(
+        Math.ceil(maxCatchUpSeconds / simulation.tickSeconds),
+        1,
+      ),
+    });
+  let clock = newClock();
   let fault: unknown;
   let faulted = false;
   let stopped = false;
@@ -63,12 +68,14 @@ export function startSimulationLoop(
     }
   };
   const advance = () => {
-    if (stopped) {
+    if (stopped || paused) {
       return;
     }
     try {
       for (let ticks = clock.ticksDue(now()); ticks > 0; ticks -= 1) {
+        if (stopped || paused) break;
         beforeTick?.();
+        if (stopped || paused) break;
         const outcomes = simulation.tick();
         afterTick?.(outcomes);
       }
@@ -89,7 +96,12 @@ export function startSimulationLoop(
       return fault;
     },
     advance,
-    tickProgress: () => (faulted ? 1 : clock.tickProgress(now())),
+    tickProgress: () => (stopped || paused ? 1 : clock.tickProgress(now())),
+    resume: () => {
+      if (!paused || stopped) return;
+      clock = newClock();
+      paused = false;
+    },
     stop,
   };
 }

@@ -1,6 +1,10 @@
 // Throwaway prototype code: a sample map and the scene that shows it.
 // Replace this with real game setup once the prototype has served its purpose.
-import { createScenarioState } from "./simulation/scenario";
+import { createAttackMoveControls } from "./ui/attack-move-controls";
+import type { AttackMoveControls } from "./ui/attack-move-controls";
+import { TerrainGrid } from "./simulation/terrain";
+import type { MissionState } from "./simulation/mission";
+import { createScenarioState, deserializeMission } from "./simulation/scenario";
 import { disconnectedBuildings } from "./simulation/support";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
@@ -110,6 +114,7 @@ const BUILDING_BAR_HEIGHT = 2.9;
 
 export type TerrainPrototype = GameView & {
   simulation: MissionSimulation;
+  resume: () => void;
   selectActor: (actorId: string | undefined, additive?: boolean) => void;
   selectActors: (actorIds: readonly string[]) => void;
 };
@@ -118,7 +123,11 @@ export type TerrainPrototypeControls = BuildingPlacementControls &
   UnitTrainingControls &
   RallyControls &
   NetworkControls &
-  UnitControls & {
+  UnitControls &
+  AttackMoveControls & {
+    initialState?: MissionState;
+    startPaused?: boolean;
+    onDefeat?: () => void;
     buildings?: readonly DefinitionButton[];
     scenario?: ScenarioDefinition;
     economyRoot?: HTMLElement;
@@ -196,6 +205,53 @@ export const PROTOTYPE_VIEW_OPTIONS = {
   },
 } satisfies GameViewOptions;
 
+export function createPrototypeSimulation(
+  map: TerrainGrid,
+  scenario?: ScenarioDefinition,
+  initialState?: MissionState,
+): MissionSimulation {
+  const occupancy = new OccupancyGrid(map);
+  const simulation = createMissionSimulation({
+    state:
+      initialState ??
+      (scenario
+        ? createScenarioState(scenario, ECONOMY_ACTOR_DEFINITIONS)
+        : createMissionState([])),
+    defeatOnDestruction: scenario?.defeatOnDestruction,
+    behaviorRegistry: new Map([
+      [
+        "terrain-move",
+        createTerrainMoveBehavior(map, occupancy, PROTOTYPE_MOVEMENT_PROFILES),
+      ],
+      ["idle", { handleCommand: () => false, update: () => {} }],
+    ]),
+    bounds: map.worldBounds,
+    definitions: scenario
+      ? ECONOMY_ACTOR_DEFINITIONS
+      : PROTOTYPE_ACTOR_DEFINITIONS,
+    tickSeconds: SIMULATION_TICK_SECONDS,
+    map,
+    occupancy,
+  });
+  return simulation;
+}
+
+/** Parses a mission save, rejecting state the simulation would refuse. */
+export function loadMissionSave(
+  source: string,
+  scenario: ScenarioDefinition,
+): MissionState {
+  const state = deserializeMission(source, scenario, SIMULATION_TICK_SECONDS);
+  const map = new TerrainGrid({
+    width: scenario.terrain.width,
+    height: scenario.terrain.height,
+    tileSize: scenario.tileSize,
+    terrainTypeIds: scenario.terrainTypeIds,
+  });
+  createPrototypeSimulation(map, scenario, state).dispose();
+  return state;
+}
+
 export async function createTerrainPrototype(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
@@ -208,24 +264,11 @@ export async function createTerrainPrototype(
     ? ECONOMY_ACTOR_DEFINITIONS
     : PROTOTYPE_ACTOR_DEFINITIONS;
   createTerrainMeshes(view.scene, map);
-  const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
-    state: controls.scenario
-      ? createScenarioState(controls.scenario, definitions)
-      : createMissionState([]),
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, PROTOTYPE_MOVEMENT_PROFILES),
-      ],
-      ["idle", { handleCommand: () => false, update: () => {} }],
-    ]),
-    bounds: map.worldBounds,
-    definitions,
-    tickSeconds: SIMULATION_TICK_SECONDS,
+  const simulation = createPrototypeSimulation(
     map,
-    occupancy,
-  });
+    controls.scenario,
+    controls.initialState,
+  );
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const appearances = createPrototypeStandInAppearances(view.scene);
   if (simulation.economy)
@@ -308,6 +351,8 @@ export async function createTerrainPrototype(
   actorViews.update(actorsByKind().shownMobile, 1);
   tilePlacedViews.update(actorsByKind().placed, disconnected());
   let simulationFaulted = false;
+  /** A fault or mission result leaves the session for inspection only. */
+  const halted = () => simulationFaulted || !!simulation.result;
   let controlsDirty = true;
   const showActor = (actorId: string) => {
     const actor = simulation.actorById(actorId);
@@ -326,10 +371,11 @@ export async function createTerrainPrototype(
       return tile && map.tileCenter(tile.x, tile.z);
     },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
-    enabled: () => !placement.active && !simulationFaulted,
-    groundTargetMode: () => rally.active,
-    onGroundTarget: (target) => rally.choose(target),
-    cancelGroundTarget: () => rally.cancel(),
+    enabled: () => !placement.active && !halted(),
+    groundTargetMode: () => rally.active || attackMove.active,
+    onGroundTarget: (target) =>
+      attackMove.active ? attackMove.choose(target) : rally.choose(target),
+    cancelGroundTarget: () => attackMove.cancel() || rally.cancel(),
     canMove: (actorId) => {
       const actor = actorsByKind().byId.get(actorId);
       return (
@@ -347,7 +393,7 @@ export async function createTerrainPrototype(
       );
     },
     submitCommand: (command) => {
-      if (simulationFaulted) return;
+      if (halted()) return;
       if (
         command.kind === "move" &&
         simulation.economy?.harvesters.some(
@@ -396,6 +442,12 @@ export async function createTerrainPrototype(
   });
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
     fog: () => simulation.fog,
+    commandMode: () => attackMove.active,
+    onCommand: (target) => {
+      if (!explored(map.tileAtWorldPosition(target.x, target.z))) return false;
+      attackMove.choose(target);
+      return true;
+    },
     // Structures first, so unit markers draw over them.
     actors: () => [
       ...(simulation.economy?.sites
@@ -444,11 +496,12 @@ export async function createTerrainPrototype(
       player.owns(actor) &&
       isTilePlacedActor(actor) &&
       !pendingRemovalId &&
-      !simulationFaulted &&
+      !halted() &&
       !placement.active;
     if (controls.remove) controls.remove.disabled = !canRemove;
     network.refresh();
     rally.refresh();
+    attackMove.refresh();
     training.refresh();
     economyControls?.refresh();
     controls.onStateChanged?.({
@@ -458,7 +511,7 @@ export async function createTerrainPrototype(
       boxMode: input.boxMode,
       additiveMode: input.additiveMode,
       placementActive: placement.active,
-      faulted: simulationFaulted,
+      faulted: halted(),
       canRemove,
       materials: simulation.economy?.materials,
     });
@@ -493,6 +546,7 @@ export async function createTerrainPrototype(
       },
       onStart: () => {
         rally.cancel();
+        attackMove.cancel();
         input.setBoxMode(false);
         input.setAdditiveMode(false);
         input.select(undefined);
@@ -507,7 +561,7 @@ export async function createTerrainPrototype(
       !player.owns(actor) ||
       !isTilePlacedActor(actor) ||
       pendingRemovalId !== undefined ||
-      simulationFaulted ||
+      halted() ||
       placement.active
     )
       return;
@@ -531,7 +585,28 @@ export async function createTerrainPrototype(
   const training = createUnitTraining(simulation, controls, {
     names: PROTOTYPE_ACTOR_NAMES,
     selectedActorId: selectedOwnActorId,
-    enabled: () => !simulationFaulted && !placement.active,
+    enabled: () => !halted() && !placement.active,
+  });
+  const attackMove = createAttackMoveControls(simulation, controls, {
+    selectedMobileIds: () =>
+      input.selectedActorIds.filter((id) => {
+        const actor = simulation.actors.find((actor) => actor.id === id);
+        return (
+          !!actor &&
+          player.owns(actor) &&
+          isMobileActor(actor, definitionsById.get(actor.definitionId))
+        );
+      }),
+    enabled: () => !halted() && !placement.active,
+    changed: () => {
+      controlsDirty = true;
+    },
+    onStart: () => {
+      rally.cancel();
+      input.setBoxMode(false);
+      input.setAdditiveMode(false);
+      input.cancelGesture();
+    },
   });
   const rally = createRallyControls(simulation, controls, {
     changed: () => {
@@ -539,8 +614,9 @@ export async function createTerrainPrototype(
     },
     selectedActorId: selectedOwnActorId,
     isProducer: (id) => !!definitionsById.get(id)?.production,
-    enabled: () => !simulationFaulted && !placement.active,
+    enabled: () => !halted() && !placement.active,
     onStart: () => {
+      attackMove.cancel();
       input.setBoxMode(false);
       input.setAdditiveMode(false);
     },
@@ -561,7 +637,7 @@ export async function createTerrainPrototype(
           names: PROTOTYPE_ACTOR_NAMES,
           selectedActorId: selectedOwnActorId,
           canControl: player.owns,
-          enabled: () => !simulationFaulted && !placement.active,
+          enabled: () => !halted() && !placement.active,
           focus: (tile) => view.camera.focusOnTile(tile.x, tile.z),
           explored,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
@@ -570,14 +646,15 @@ export async function createTerrainPrototype(
   view.camera.setTouchPanFilter(
     (event) =>
       !placement.active &&
-      !simulationFaulted &&
+      !halted() &&
       !input.boxMode &&
       // Rally targeting ignores actors, so drags from them may pan too.
       (rally.active ||
+        attackMove.active ||
         input.actorIdAt(event.clientX, event.clientY) === undefined),
   );
   const unitControls = createUnitControls(input, controls, {
-    enabled: () => !placement.active && !simulationFaulted,
+    enabled: () => !placement.active && !halted(),
     changed: () => {
       controlsDirty = true;
     },
@@ -625,16 +702,29 @@ export async function createTerrainPrototype(
   };
   let knownSelectionTick = simulation.completedTicks;
 
+  /** Ends active interactions once the session halts. */
+  const haltControls = () => {
+    input.cancelGesture();
+    attackMove.cancel();
+    rally.cancel();
+    placement.fault();
+    training.fault();
+    controlsDirty = true;
+  };
+  const endMission = () => {
+    loop.stop();
+    haltControls();
+    canvas.dataset.missionResult = simulation.result!.kind;
+    controls.onDefeat?.();
+  };
   const loop = startSimulationLoop(simulation, {
+    paused: controls.startPaused,
     pumpMilliseconds: SIMULATION_PUMP_MILLISECONDS,
     maxCatchUpSeconds: MAX_CATCH_UP_SECONDS,
     beforeTick: () => actorViews.capturePreviousPoses(actorsByKind().mobile),
     onFault: () => {
       simulationFaulted = true;
-      input.cancelGesture();
-      placement.fault();
-      training.fault();
-      controlsDirty = true;
+      haltControls();
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
@@ -668,7 +758,7 @@ export async function createTerrainPrototype(
             combatEffects.markTarget(target.worldPosition);
           }
         }
-        if (command.kind === "move") {
+        if (command.kind === "move" || command.kind === "attack-move") {
           if (accepted)
             canvas.dataset.actorTarget = `${command.target.x},${command.target.z}`;
           else movementPath.showRejectedTarget(command.actorId, command.target);
@@ -682,8 +772,10 @@ export async function createTerrainPrototype(
             : "rejected";
         }
       }
+      if (simulation.result) endMission();
     },
   });
+  if (simulation.result) endMission();
   const renderObserver = view.scene.onBeforeRenderObservable.add(() => {
     loop.advance();
     // Hostiles can leave vision without any fog change, so check every tick.
@@ -739,13 +831,7 @@ export async function createTerrainPrototype(
       (wreck) =>
         (simulation.completedTicks - wreck.tick) * simulation.tickSeconds,
       WRECK_SECONDS,
-      (wreck) => {
-        const tile = map.tileAtWorldPosition(
-          wreck.worldPosition.x,
-          wreck.worldPosition.z,
-        );
-        return explored(tile);
-      },
+      (wreck) => player.owns(wreck) || simulation.detects(playerFaction, wreck),
     );
     actorViews.update(
       shownMobile,
@@ -789,6 +875,7 @@ export async function createTerrainPrototype(
     controls.remove?.removeEventListener("click", removeSelected);
     training.dispose();
     rally.dispose();
+    attackMove.dispose();
     network.dispose();
     networkView.dispose();
     rallyView.dispose();
@@ -816,6 +903,7 @@ export async function createTerrainPrototype(
   const session: TerrainPrototype = {
     ...view,
     simulation,
+    resume: () => loop.resume(),
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;
       const actor = actorId && simulation.actorById(actorId);

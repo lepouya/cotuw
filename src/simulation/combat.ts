@@ -5,7 +5,7 @@ import { secondsToTicks } from "./clock";
 import { followRoute } from "./automatic-movement";
 import { terrainSightlineClear } from "./terrain-sightline";
 import { areHostile } from "./faction";
-import { compareIds, healthOf } from "./actor";
+import { clearCombatOrders, compareIds, healthOf } from "./actor";
 import {
   leashBounds,
   planTerritory,
@@ -17,6 +17,7 @@ import {
 import type {
   Actor,
   ActorDefinition,
+  MovementOrder,
   RouteBounds,
   RouteRetryState,
 } from "./actor";
@@ -94,11 +95,15 @@ export type CombatWorld = {
   tickSeconds: number;
   navigationVersion: number;
   actors: Actor[];
+  wrecks: readonly Wreck[];
   definitions: ReadonlyMap<string, ActorDefinition>;
   map?: TerrainGrid;
   occupancy?: OccupancyView;
   /** Whether a faction currently detects the actor. */
-  detects: (faction: string | undefined, target: Actor) => boolean;
+  detects: (
+    faction: string | undefined,
+    target: Pick<Actor, "definitionId" | "worldPosition" | "tilePlacement">,
+  ) => boolean;
   /** Starts a route; returns whether the actor accepted it. */
   move: (actor: Actor, target: WorldPosition, bounds?: RouteBounds) => boolean;
   /** Takes a destroyed actor out of the mission. */
@@ -136,7 +141,7 @@ export function validateCombatActor(
   definition: ActorDefinition,
   bounds: WorldBounds,
 ): void {
-  const { health, combat } = actor;
+  const { health, combat, attackMove } = actor;
   const point = (value: unknown) =>
     !!value &&
     isFinitePosition(value as WorldPosition) &&
@@ -146,6 +151,16 @@ export function validateCombatActor(
     (!!blocked && point(blocked.at) && isTick(blocked.navigationVersion));
   const { attack, returning, aimFacing } = combat ?? {};
   if (
+    (attackMove !== undefined &&
+      (!attackMove ||
+        !definition.movement ||
+        definition.footprint ||
+        !point(attackMove.target) ||
+        !retry(attackMove) ||
+        (attackMove.requestedTarget !== undefined &&
+          !point(attackMove.requestedTarget)) ||
+        returning !== undefined ||
+        attack?.post !== undefined)) ||
     (health !== undefined &&
       !(
         definition.health !== undefined &&
@@ -221,7 +236,9 @@ export function startAttack(
   actor: Actor,
   target: Actor,
   post?: WorldPosition,
+  preserveAttackMove = false,
 ): void {
+  if (!preserveAttackMove) clearCombatOrders(actor);
   delete actor.combat?.returning;
   (actor.combat ??= {}).attack = {
     targetId: target.id,
@@ -229,6 +246,26 @@ export function startAttack(
     ...(post && { post: { ...post } }),
   };
   delete actor.movement;
+}
+
+/**
+ * Marks an Attack Move whose route ended short of its destination as blocked,
+ * so it retries only after navigation changes. `route` is the movement order
+ * from before this tick's motion.
+ */
+export function noteAttackMoveRoute(
+  actor: Actor,
+  route: MovementOrder | undefined,
+  navigationVersion: number,
+): void {
+  const order = actor.attackMove;
+  if (
+    order &&
+    !actor.combat?.attack &&
+    route?.reachedTarget === false &&
+    !actor.movement
+  )
+    order.blocked = { at: { ...order.target }, navigationVersion };
 }
 
 /**
@@ -240,6 +277,9 @@ export function startAttack(
 export function updateCombat(world: CombatWorld): AttackEvent[] {
   const { definitions, tick } = world;
   const byId = new Map(world.actors.map((actor) => [actor.id, actor]));
+  const wreckById = new Map(
+    world.wrecks.map((wreck) => [wreck.actorId, wreck]),
+  );
   const sorted = [...world.actors].sort((a, b) => compareIds(a.id, b.id));
   const definitionOf = (actor: Actor) => definitions.get(actor.definitionId)!;
   const targetable = (actor: Actor, target: Actor | undefined) =>
@@ -261,16 +301,28 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     return followRoute(actor, returning.point, returning, world);
   };
   const startReturn = (actor: Actor, point: WorldPosition) => {
+    // A territory heading home abandons any Attack Move.
+    delete actor.attackMove;
     const combat = (actor.combat ??= {});
     if (!combat.returning || distance(combat.returning.point, point) > 0)
       combat.returning = { point: { ...point } };
     return continueReturn(actor);
+  };
+  /** Heads for the Attack Move destination, or ends the order there. */
+  const resumeAttackMove = (actor: Actor) => {
+    const order = actor.attackMove!;
+    if (distance(actor.worldPosition, order.target) === 0)
+      return void delete actor.attackMove;
+    followRoute(actor, order.target, order, world);
+    if (actor.movement && order.requestedTarget)
+      actor.movement.requestedTarget = { ...order.requestedTarget };
   };
   const endAttack = (actor: Actor) => {
     const post = actor.combat?.attack?.post;
     delete actor.combat?.attack;
     delete actor.movement;
     if (post) startReturn(actor, post);
+    else if (actor.attackMove) resumeAttackMove(actor);
   };
   const context: CombatContext = {
     tick,
@@ -326,16 +378,21 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   const followOrder = (actor: Actor): Actor | undefined => {
     const order = actor.combat!.attack!;
     const target = byId.get(order.targetId);
-    if (!targetable(actor, target)) return void endAttack(actor);
-    if (!detected(actor, target!)) {
-      // Hidden movement is unknown; search where it was last seen.
+    const wreck = wreckById.get(order.targetId);
+    if (
+      (target && !targetable(actor, target)) ||
+      (!target && wreck && world.detects(definitionOf(actor).faction, wreck))
+    )
+      return void endAttack(actor);
+    if (!target || !detected(actor, target)) {
+      // Hidden movement and destruction are unknown; search where last seen.
       if (order.post || !movable(actor) || arrived(actor, order.lastKnown))
         return void endAttack(actor);
       chase(actor, order.lastKnown);
       if (order.blocked) endAttack(actor);
       return undefined;
     }
-    order.lastKnown = { ...target!.worldPosition };
+    order.lastKnown = { ...target.worldPosition };
     return target;
   };
 
@@ -343,13 +400,26 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   for (const actor of sorted) {
     const definition = definitionOf(actor);
     const weapon = definition.weapon;
+    if (actor.attackMove && !actor.combat?.attack) {
+      if (actor.attackMove.blocked) resumeAttackMove(actor);
+      if (!actor.movement && !actor.attackMove?.blocked)
+        delete actor.attackMove;
+      else if (weapon) {
+        const target = context.nearestTarget(
+          actor,
+          definition.guard?.acquisitionRadius ?? weapon.range,
+        );
+        if (target) startAttack(actor, target, undefined, true);
+      }
+    }
     if (!weapon) continue;
     if (
       definition.territory &&
       !planTerritory(actor, definition.territory, context)
     )
       continue;
-    if (definition.guard) planGuard(actor, definition.guard, context);
+    if (definition.guard && !actor.attackMove)
+      planGuard(actor, definition.guard, context);
     const ordered = !!actor.combat?.attack;
     const target = ordered ? followOrder(actor) : context.recentAttacker(actor);
     if (!target) continue;
@@ -414,7 +484,9 @@ function planGuard(
 ): void {
   const order = actor.combat?.attack;
   if (order) {
-    if (order.post && distance(order.post, order.lastKnown) > guard.chaseRadius)
+    const known =
+      context.currentTarget(actor)?.worldPosition ?? order.lastKnown;
+    if (order.post && distance(order.post, known) > guard.chaseRadius)
       context.endAttack(actor);
     return;
   }

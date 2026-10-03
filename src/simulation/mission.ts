@@ -9,11 +9,12 @@ import {
 import type { TrainingEvaluation } from "./production";
 import type { TrainUnitCommand } from "./command";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
-import { deepFreeze } from "./actor";
+import { clearCombatOrders, deepFreeze } from "./actor";
 import {
   ACTOR_REMOVAL_KINDS,
   ECONOMY_COMMAND_KINDS,
   isCommandOf,
+  isMissionCommand,
 } from "./command";
 import { tileKey } from "./grid";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
@@ -28,6 +29,7 @@ import {
   attackRejection,
   startAttack,
   wreckTiles,
+  noteAttackMoveRoute,
   updateCombat,
   validateCombatActor,
   validateCombatDefinition,
@@ -45,6 +47,7 @@ import {
 } from "./vision";
 import {
   applyEconomyCommand,
+  createHarvesterState,
   materialsCost,
   PRODUCTION_QUEUE_LIMIT,
   refineryOccupied,
@@ -75,6 +78,8 @@ import type {
   RouteBounds,
 } from "./actor";
 import type {
+  AttackMoveCommand,
+  GroupAttackMoveCommand,
   ActorRemovalCommand,
   AppliedActorCommand,
   CommandOutcome,
@@ -152,6 +157,7 @@ export type MissionState = {
   playerFaction?: string;
   /** Remains of destroyed actors, oldest first. */
   wrecks: Wreck[];
+  result?: { kind: "defeat"; actorId: string; tick: number };
 };
 
 export function createMissionState(actors: readonly Actor[]): MissionState {
@@ -183,6 +189,8 @@ export type MissionSimulationOptions = {
    * changed only by the mission. Footprint definitions require it.
    */
   occupancy?: OccupancyGrid;
+  /** Combat destruction of these authored actors ends the mission. */
+  defeatOnDestruction?: readonly string[];
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -201,6 +209,7 @@ export type MissionSimulation = {
   /** Hits resolved during the latest tick. */
   readonly attacks: readonly AttackEvent[];
   readonly wrecks: readonly Wreck[];
+  readonly result: Readonly<MissionState["result"]>;
   /** Whether a faction currently sees any tile of the actor. */
   detects: (
     faction: string | undefined,
@@ -244,6 +253,7 @@ export function createMissionSimulation({
   tickSeconds,
   map,
   occupancy,
+  defeatOnDestruction = [],
 }: MissionSimulationOptions): MissionSimulation {
   if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) {
     throw new RangeError(
@@ -254,11 +264,35 @@ export function createMissionSimulation({
   if (occupancy && (!map || !occupancy.isForTerrain(map))) {
     throw new RangeError("Mission occupancy must belong to its terrain map.");
   }
-  if (!Number.isInteger(initialState.tick) || initialState.tick < 0) {
+  if (!Number.isSafeInteger(initialState.tick) || initialState.tick < 0) {
     throw new RangeError("Mission state tick must be a non-negative integer.");
   }
 
   let state = structuredClone(initialState);
+  if (
+    !Array.isArray(state.commands) ||
+    state.commands.some(
+      (scheduled) =>
+        !scheduled ||
+        !Number.isSafeInteger(scheduled.tick) ||
+        scheduled.tick < 0 ||
+        !isMissionCommand(scheduled.command),
+    )
+  )
+    throw new RangeError("Mission state has invalid queued commands.");
+  const criticalIds = new Set(defeatOnDestruction);
+  if (
+    state.result !== undefined &&
+    (!state.result ||
+      state.result.kind !== "defeat" ||
+      !criticalIds.has(state.result.actorId) ||
+      !state.retiredActorIds.includes(state.result.actorId) ||
+      !Number.isSafeInteger(state.result.tick) ||
+      state.result.tick < 0 ||
+      state.result.tick >= state.tick)
+  )
+    throw new RangeError("Mission state has an invalid result.");
+  if (state.result) deepFreeze(state.result);
   if (new Set(state.retiredActorIds).size !== state.retiredActorIds.length) {
     throw new Error("Mission state contains duplicate retired actor IDs.");
   }
@@ -346,6 +380,10 @@ export function createMissionSimulation({
     if (disposed) throw new Error("Mission simulation is disposed.");
     if (faulted) throw new Error("Mission simulation is faulted.");
   };
+  const ensureMutable = () => {
+    ensureRunning();
+    if (state.result) throw new Error("The mission has ended.");
+  };
   const definitionFor = (actor: Actor): ActorDefinition =>
     definitionsById.get(actor.definitionId)!;
   const behaviorFor = (actor: Actor): ActorBehavior =>
@@ -422,10 +460,11 @@ export function createMissionSimulation({
         !withinBounds(actor.rallyPoint, worldBounds))
     )
       throw new RangeError(`Actor ${actor.id} has an invalid rally point.`);
-    const target = actor.movement?.target;
     if (
-      target &&
-      (!isFinitePosition(target) || !withinBounds(target, worldBounds))
+      actor.movement !== undefined &&
+      (!actor.movement ||
+        !isFinitePosition(actor.movement.target) ||
+        !withinBounds(actor.movement.target, worldBounds))
     ) {
       throw new RangeError(`Actor ${actor.id} has an invalid move target.`);
     }
@@ -838,8 +877,7 @@ export function createMissionSimulation({
       applied,
     );
     if (accepted) {
-      delete actor.combat?.attack;
-      delete actor.combat?.returning;
+      clearCombatOrders(actor);
     }
     if (accepted && working.economy) {
       const worker = working.economy.harvesters.find(
@@ -856,15 +894,22 @@ export function createMissionSimulation({
     return accepted;
   };
   const applyMove = (
-    command: MoveCommand,
+    command: MoveCommand | AttackMoveCommand,
     tick: number,
     working: WorkingActors,
     requestedTarget?: WorldPosition,
-  ): CommandOutcome<MoveCommand> => {
+  ): CommandOutcome => {
     const accepted = handle(working, {
       ...command,
+      kind: "move",
       ...(requestedTarget && { requestedTarget }),
     });
+    if (accepted && command.kind === "attack-move") {
+      working.actorsById.get(command.actorId)!.attackMove = {
+        target: { ...command.target },
+        ...(requestedTarget && { requestedTarget: { ...requestedTarget } }),
+      };
+    }
     return {
       tick,
       command,
@@ -874,11 +919,11 @@ export function createMissionSimulation({
           ? false
           : working.actorsById.get(command.actorId)?.movement?.reachedTarget
         : undefined,
-    };
+    } as CommandOutcome;
   };
   /** Reports one move outcome per unique actor ID, in ID order. */
   const applyGroupMove = (
-    command: GroupMoveCommand,
+    command: GroupMoveCommand | GroupAttackMoveCommand,
     tick: number,
     working: WorkingActors,
   ): CommandOutcome[] => {
@@ -888,7 +933,13 @@ export function createMissionSimulation({
       command.actorIds.length === 0 ||
       !command.actorIds.every((id) => typeof id === "string" && id.length > 0)
     ) {
-      return [{ tick, command: structuredClone(command), accepted: false }];
+      return [
+        {
+          tick,
+          command: structuredClone(command),
+          accepted: false,
+        } as CommandOutcome,
+      ];
     }
     const target = clampToBounds(command.target, worldBounds);
     const ids = [...new Set(command.actorIds)].sort();
@@ -909,18 +960,18 @@ export function createMissionSimulation({
     );
     return ids.map((actorId) => {
       const destination = destinations.get(actorId);
-      const move: MoveCommand = {
-        kind: "move",
+      const move: MoveCommand | AttackMoveCommand = {
+        kind: command.kind === "group-attack-move" ? "attack-move" : "move",
         actorId,
         target: destination?.target ?? target,
       };
       return destination
         ? applyMove(move, tick, working, destination.requestedTarget)
-        : { tick, command: move, accepted: false };
+        : ({ tick, command: move, accepted: false } as CommandOutcome);
     });
   };
   const applyCommand = (
-    command: Exclude<MissionCommand, GroupMoveCommand>,
+    command: Exclude<MissionCommand, GroupMoveCommand | GroupAttackMoveCommand>,
     tick: number,
     working: WorkingActors,
   ): CommandOutcome => {
@@ -1092,12 +1143,16 @@ export function createMissionSimulation({
         ...(reason && { reason }),
       };
     }
-    if (command.kind === "move") {
+    if (command.kind === "move" || command.kind === "attack-move") {
       if (!isFinitePosition(command.target))
-        return { tick, command: structuredClone(command), accepted: false };
+        return {
+          tick,
+          command: structuredClone(command),
+          accepted: false,
+        } as CommandOutcome;
       // Rebuilt so a submitted move cannot carry mission-only fields.
-      const applied: MoveCommand = {
-        kind: "move",
+      const applied: MoveCommand | AttackMoveCommand = {
+        kind: command.kind,
         actorId: command.actorId,
         target: clampToBounds(command.target, worldBounds),
       };
@@ -1130,6 +1185,9 @@ export function createMissionSimulation({
     playerFaction,
     get attacks() {
       return attacks;
+    },
+    get result() {
+      return state.result;
     },
     get wrecks() {
       return state.wrecks;
@@ -1170,7 +1228,7 @@ export function createMissionSimulation({
       return `${prefix}${number}`;
     },
     submitCommand: (command) => {
-      ensureRunning();
+      ensureMutable();
       state.commands.push({
         tick: state.tick,
         command: structuredClone(command),
@@ -1180,7 +1238,7 @@ export function createMissionSimulation({
       return state.tick;
     },
     spawnActor: (actor) => {
-      ensureRunning();
+      ensureMutable();
       const copy = structuredClone(actor);
       let footprint: FootprintPlacement | undefined;
       if (copy.tilePlacement !== undefined) {
@@ -1211,12 +1269,7 @@ export function createMissionSimulation({
             ...structuredClone(state.economy),
             harvesters: [
               ...state.economy.harvesters,
-              {
-                actorId: copy.id,
-                cargo: 0,
-                gatherProgress: 0,
-                phase: "unassigned",
-              },
+              createHarvesterState(copy.id),
             ],
           }),
         };
@@ -1229,7 +1282,7 @@ export function createMissionSimulation({
       updateFog();
     },
     removeActor: (id) => {
-      ensureRunning();
+      ensureMutable();
       if (!actorsById.has(id)) {
         return false;
       }
@@ -1263,6 +1316,7 @@ export function createMissionSimulation({
     },
     tick: () => {
       ensureRunning();
+      if (state.result) return [];
       const due = state.commands.filter(({ tick }) => tick <= state.tick);
       const terrainBefore =
         map && due.some(({ command }) => command.kind === "terrain")
@@ -1272,22 +1326,27 @@ export function createMissionSimulation({
       try {
         const working = stageWorking();
         const outcomes = due.flatMap(({ command }) =>
-          command.kind === "group-move"
+          command.kind === "group-move" || command.kind === "group-attack-move"
             ? applyGroupMove(command, state.tick, working)
             : [applyCommand(command, state.tick, working)],
         );
 
+        let result: MissionState["result"];
+        const navigationVersion = map?.navigationChanges.version ?? 0;
         const tickAttacks = updateCombat({
           tick: state.tick,
           tickSeconds,
-          navigationVersion: map?.navigationChanges.version ?? 0,
+          navigationVersion,
           actors: working.actors,
+          wrecks: working.wrecks,
           definitions: definitionsById,
           map,
           occupancy,
           detects,
           move: moveActor,
           destroy: (actor) => {
+            if (criticalIds.has(actor.id) && !result)
+              result = { kind: "defeat", actorId: actor.id, tick: state.tick };
             working.wrecks.push({
               actorId: actor.id,
               definitionId: actor.definitionId,
@@ -1302,52 +1361,61 @@ export function createMissionSimulation({
           },
         });
 
-        const previousPositions = new Map(
-          working.actors.map((actor) => [actor.id, { ...actor.worldPosition }]),
-        );
-        for (const actor of working.actors) {
-          const before = actorIdentity(actor);
-          behaviorFor(actor).update(actor, definitionFor(actor), tickSeconds);
-          // Rounding in a behavior's motion must not carry an actor off the map.
-          if (isFinitePosition(actor.worldPosition)) {
-            actor.worldPosition = clampToBounds(
-              actor.worldPosition,
-              worldBounds,
-            );
+        // A defeat freezes motion and the economy where combat left them.
+        if (!result) {
+          const previousPositions = new Map(
+            working.actors.map((actor) => [
+              actor.id,
+              { ...actor.worldPosition },
+            ]),
+          );
+          for (const actor of working.actors) {
+            const before = actorIdentity(actor);
+            const route = actor.movement;
+            behaviorFor(actor).update(actor, definitionFor(actor), tickSeconds);
+            noteAttackMoveRoute(actor, route, navigationVersion);
+            // Rounding in a behavior's motion must not carry an actor off the map.
+            if (isFinitePosition(actor.worldPosition)) {
+              actor.worldPosition = clampToBounds(
+                actor.worldPosition,
+                worldBounds,
+              );
+            }
+            validateUpdate(actor, before);
           }
-          validateUpdate(actor, before);
-        }
 
-        if (working.economy)
-          updateEconomy(working.economy, {
-            actors: working.actors,
-            explored: ({ x, z }) => fog?.isExplored(x, z) ?? true,
-            definitions: definitionsById,
-            behaviors: behaviorsById,
-            map: map!,
+          if (working.economy)
+            updateEconomy(working.economy, {
+              actors: working.actors,
+              playerFaction,
+              explored: ({ x, z }) => fog?.isExplored(x, z) ?? true,
+              definitions: definitionsById,
+              behaviors: behaviorsById,
+              map: map!,
+              tickSeconds,
+              move: moveActor,
+              evaluateSpawn: ({ actorId, producerId, definitionId }) =>
+                evaluateTraining(
+                  { kind: "train-unit", actorId, producerId, definitionId },
+                  working.actors,
+                  new Set([...working.usedIds].filter((id) => id !== actorId)),
+                ),
+              support: () => supportFor(working.actors),
+              spawn: (actor, producerId) =>
+                stageProducedActor(working, actor, producerId),
+            });
+
+          separateMobileActors(
+            working.actors.flatMap((actor) => {
+              const mover = navigatingActor(actor);
+              return mover ? [mover] : [];
+            }),
             tickSeconds,
-            move: moveActor,
-            evaluateSpawn: ({ actorId, producerId, definitionId }) =>
-              evaluateTraining(
-                { kind: "train-unit", actorId, producerId, definitionId },
-                working.actors,
-                new Set([...working.usedIds].filter((id) => id !== actorId)),
-              ),
-            support: () => supportFor(working.actors),
-            spawn: (actor, producerId) =>
-              stageProducedActor(working, actor, producerId),
-          });
-
-        separateMobileActors(
-          working.actors.flatMap((actor) => {
-            const mover = navigatingActor(actor);
-            return mover ? [mover] : [];
-          }),
-          tickSeconds,
-          previousPositions,
-          ({ actor, definition }, point) =>
-            leashAllows(actor, definition, point),
-        );
+            previousPositions,
+            ({ actor, definition }, point) =>
+              leashAllows(actor, definition, point),
+          );
+        }
         for (const actor of working.actors)
           validateUpdate(
             actor,
@@ -1362,7 +1430,6 @@ export function createMissionSimulation({
             tickSeconds,
             working.retiredIds,
           );
-
         const previousWrecks = state.wrecks;
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
@@ -1370,9 +1437,12 @@ export function createMissionSimulation({
         state = {
           ...state,
           tick: state.tick + 1,
+          ...(result && { result: deepFreeze(result) }),
           actors: committedActors,
           retiredActorIds: working.retiredIds,
-          commands: state.commands.filter(({ tick }) => tick > state.tick),
+          commands: result
+            ? []
+            : state.commands.filter(({ tick }) => tick > state.tick),
           ...(working.economy && { economy: deepFreeze(working.economy) }),
           // Expiring here keeps previews and the next tick in agreement.
           wrecks: deepFreeze(

@@ -12,8 +12,14 @@ export type WorldBounds = {
   maxZ: number;
 };
 
-export function isFinitePosition({ x, z }: WorldPosition): boolean {
-  return Number.isFinite(x) && Number.isFinite(z);
+export function isFinitePosition(value: unknown): value is WorldPosition {
+  const point = value as WorldPosition | null | undefined;
+  return (
+    !!point &&
+    typeof point === "object" &&
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.z)
+  );
 }
 
 export function withinBounds(

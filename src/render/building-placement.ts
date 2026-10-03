@@ -378,7 +378,11 @@ export function createBuildingPlacement(
       pendingId = undefined;
       clearOverlay();
       update();
-      message("Simulation stopped. Reload to continue.");
+      message(
+        simulation.result
+          ? "Mission ended in defeat. Restart or load a saved mission."
+          : "Simulation stopped. Reload to continue.",
+      );
     },
     dispose: () => {
       preview.dispose();

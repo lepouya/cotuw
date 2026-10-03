@@ -219,6 +219,12 @@
             <button id="add-selection" type="button" aria-pressed="false">
               Add units
             </button>
+            <button id="attack-move" type="button" aria-pressed="false" hidden>
+              ⚔ Attack Move
+            </button>
+            <button id="cancel-attack-move" type="button" hidden>
+              Cancel Attack Move
+            </button>
             <button id="stop-units" type="button" disabled>Stop (S)</button>
             <button id="clear-selection" type="button" disabled>Clear</button>
           </div>
@@ -258,6 +264,9 @@
       <div class="game-viewport">
         <div id="resource-bar" class="resource-bar" hidden>
           <strong>Materials <span id="materials-counter">0</span></strong>
+          <button id="resume-loaded-mission" type="button" hidden>
+            Resume mission
+          </button>
         </div>
         <canvas id="game-canvas" aria-label="Game world" tabindex="0"></canvas>
         <div
@@ -347,5 +356,25 @@
         <canvas id="minimap" class="minimap" aria-label="Map overview"></canvas>
       </div>
     </main>
+    <dialog id="mission-result" aria-labelledby="mission-result-title">
+      <h2 id="mission-result-title">Defeat</h2>
+      <p id="mission-result-description"></p>
+      <div class="building-controls">
+        <button id="inspect-loaded-mission" type="button" hidden>
+          Inspect
+        </button>
+        <button id="resume-mission" type="button" hidden>Resume</button>
+        <button id="restart-mission" type="button">Restart</button>
+        <button id="load-mission" type="button">Load</button>
+        <button id="exit-mission" type="button">Exit</button>
+      </div>
+      <p id="mission-result-status" class="muted" role="status"></p>
+      <input
+        id="mission-save-file"
+        type="file"
+        accept=".json,application/json"
+        hidden
+      />
+    </dialog>
   </body>
 </html>

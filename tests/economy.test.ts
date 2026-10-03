@@ -1,4 +1,5 @@
 import { harvestingRecoveryCost } from "../src/simulation/economy";
+import { createActor } from "../src/simulation/actor";
 import type { ActorDefinition } from "../src/simulation/actor";
 import { describe, expect, test } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
@@ -81,6 +82,7 @@ function fixture(
   state?: MissionState,
   tickSeconds = 1,
   fault: boolean | "move" = false,
+  content: readonly ActorDefinition[] = definitions,
 ) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
@@ -98,7 +100,7 @@ function fixture(
     };
   const simulation = createMissionSimulation({
     state: state ?? exploredScenarioState(scenario, definitions),
-    definitions,
+    definitions: content,
     map,
     occupancy,
     tickSeconds,
@@ -171,6 +173,41 @@ const gather = (siteId = "site"): MissionCommand => ({
 });
 
 describe("Materials economy", () => {
+  test("authored Harvesters start unassigned and can join a Refinery", () => {
+    const content = defineScenario({
+      ...scenario,
+      units: [
+        {
+          actorId: "worker",
+          definitionId: "arc-harvester",
+          tile: { x: 12, z: 8 },
+        },
+      ],
+    });
+    const state = exploredScenarioState(content, definitions);
+    const { simulation } = fixture(state);
+    expect(worker(simulation)).toEqual({
+      actorId: "worker",
+      cargo: 0,
+      gatherProgress: 0,
+      phase: "unassigned",
+    });
+    command(simulation, build());
+    finishBuilding(simulation);
+    expect(
+      command(simulation, {
+        kind: "assign-refinery",
+        actorId: "worker",
+        refineryId: "refinery",
+      }).accepted,
+    ).toBe(true);
+    expect(worker(simulation).phase).toBe("idle");
+    expect(worker(simulation).refineryId).toBe("refinery");
+    expect(fixture(simulation.snapshot()).simulation.snapshot()).toEqual(
+      simulation.snapshot(),
+    );
+  });
+
   test("starts with a fixed Command Center and exactly enough for the first economic pair", () => {
     const state = exploredScenarioState(
       ECONOMY_SCENARIO,
@@ -558,6 +595,63 @@ describe("Materials economy", () => {
     expect(simulation.economy!.materials).toBe(25);
   });
 
+  test.each(["wildlife", undefined])(
+    "salvage ignores mobile actors of faction %s",
+    (faction) => {
+      const content = definitions.map((definition) =>
+        definition.id === "arc-scout" ? { ...definition, faction } : definition,
+      );
+      const { simulation, map } = fixture(undefined, 1, false, content);
+      const worldPosition = map.tileCenter(22, 10);
+      simulation.spawnActor(
+        createActor({
+          id: "visitor",
+          definitionId: "arc-scout",
+          worldPosition,
+        }),
+      );
+      simulation.tick();
+      expect(simulation.economy!.loot[0].collected).toBe(false);
+      expect(simulation.economy!.materials).toBe(150);
+      simulation.removeActor("visitor");
+      simulation.spawnActor(
+        createActor({
+          id: "collector",
+          definitionId: "arc-trooper",
+          worldPosition,
+        }),
+      );
+      simulation.tick();
+      expect(simulation.economy!.loot[0].collected).toBe(true);
+      expect(simulation.economy!.materials).toBe(175);
+    },
+  );
+
+  test.each<MissionCommand>([
+    gather(),
+    { kind: "return-cargo", actorId: "worker" },
+    { kind: "assign-refinery", actorId: "worker", refineryId: "refinery" },
+  ])("%j replaces a blocked Attack Move before delivering cargo", (order) => {
+    const { simulation, map } = workerFixture(0.1);
+    command(simulation, gather());
+    until(simulation, () => worker(simulation).cargo >= 10, 300);
+    command(simulation, { kind: "stop", actorId: "worker" });
+    const state = simulation.snapshot();
+    const target = map.tileCenter(22, 2);
+    state.actors.find(({ id }) => id === "worker")!.attackMove = {
+      target,
+      blocked: { at: target, navigationVersion: 0 },
+    };
+    const restored = fixture(state, 0.1).simulation;
+    const cargo = worker(restored).cargo;
+    expect(command(restored, order).accepted).toBe(true);
+    expect(restored.actorById("worker")!.attackMove).toBeUndefined();
+    expect(restored.actorById("worker")!.movement?.target).not.toEqual(target);
+    until(restored, () => restored.economy!.depositedMaterials === cargo);
+    const position = restored.actorById("worker")!.worldPosition;
+    expect(position.x).toBeLessThan(map.tileCenter(10, 6).x);
+  });
+
   test("five paid unit orders train in sequence; cancellation fully refunds and retires reserved identity", () => {
     const state = exploredScenarioState(scenario, definitions);
     state.economy!.materials = 250;
@@ -837,7 +931,7 @@ describe("economy persistence", () => {
     const source = serializeMission(simulation.snapshot(), 1);
     expect(() =>
       deserializeMission(
-        source.replace('"version":3', '"version":2'),
+        source.replace('"version":4', '"version":2'),
         scenario,
         1,
       ),

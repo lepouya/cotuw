@@ -68,10 +68,20 @@ camera on affected buildings. Cancellation and sale remain available offline.
 
 A lone wolf guards the southern path. Idle Troopers engage hostiles that come
 near; to attack directly, select units and click or tap a visible wolf. Scouts
-cannot attack. Health bars appear on selected and fighting actors, and
-**Selection** shows exact health. Destroyed actors leave remains that clear
-after a minute; building debris blocks construction until then. Damaged
-buildings sell for less. This opening has no victory or defeat condition.
+cannot attack. **Attack Move** in the unit controls enters destination
+targeting; click or tap terrain to advance and engage along the way. Cancel or
+`Esc` exits targeting. Groups spread their destinations; unarmed units keep
+moving. Orange dashes and a diamond mark the order. Units search a lost target's
+last-known position, then resume their destination. Health bars appear on
+selected and fighting actors, and **Selection** shows exact health. Destroyed
+actors leave remains that clear after a minute; building debris blocks
+construction until then. Damaged buildings sell for less.
+
+Combat destruction of the starting Command Center ends this opening in defeat
+and pauses immediately. The results panel provides Restart, Load, and Exit. Load
+accepts a compatible mission JSON file and begins paused; Inspect allows
+selection and camera inspection, and Resume mission starts the clock. Invalid
+files leave the current session intact. This opening has no victory condition.
 
 Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to

@@ -3,6 +3,7 @@ import { Vector3 } from "@babylonjs/core";
 import { layerSlot } from "../map";
 import { DEFAULT_ACTOR_COLOR } from "./actor";
 import { watchCanvasSize } from "./canvas-size";
+import { createPointerGesture } from "./pointer-gesture";
 import { fogAlpha } from "./fog";
 import type { Rgb } from "./color";
 export type { Rgb } from "./color";
@@ -24,8 +25,6 @@ const HEADING_LENGTH = 6;
 const HEADING_HALF_WIDTH = 4;
 /** Breathing room beyond the map edge so it doesn't touch the frame. */
 const MAP_FIT_MARGIN = 1.08;
-/** CSS pixels a press may wander and still count as a click. */
-const DRAG_THRESHOLD = 4;
 /** Brightness change per unit of slope, lit from the northwest. */
 const HILLSHADE_STRENGTH = 1.2;
 const HILLSHADE_LIMIT = 0.3;
@@ -57,6 +56,10 @@ export type MinimapOptions = {
   actors?: () => readonly MinimapActor[];
   /** Read every frame; terrain repaints when its version changes. */
   fog?: () => FogView | undefined;
+  /** While true, presses offer their ground point to `onCommand` first. */
+  commandMode?: () => boolean;
+  /** Returns whether it used the point; otherwise the camera navigates. */
+  onCommand?: (target: { x: number; z: number }) => boolean;
 };
 
 /**
@@ -69,7 +72,12 @@ export function createMinimap(
   map: TerrainMap,
   camera: StrategyCamera,
   canvas: HTMLCanvasElement,
-  { actors = () => [], fog = () => undefined }: MinimapOptions = {},
+  {
+    actors = () => [],
+    fog = () => undefined,
+    commandMode = () => false,
+    onCommand,
+  }: MinimapOptions = {},
 ): Minimap {
   const context = canvas.getContext("2d");
   const terrain = document.createElement("canvas");
@@ -183,18 +191,6 @@ export function createMinimap(
   };
   const renderObserver = scene.onAfterRenderObservable.add(draw);
 
-  let drag:
-    | {
-        pointerId: number;
-        start: ScreenPoint;
-        /** Whether the press landed on the footprint outline. */
-        grabbed: boolean;
-        /** From the pressed world point to the view center. */
-        offset: Vector3;
-        /** Whether the pointer has left the click threshold. */
-        moved: boolean;
-      }
-    | undefined;
   const localPoint = (event: PointerEvent): ScreenPoint => {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -204,79 +200,55 @@ export function createMinimap(
   };
   const glideTo = (point: ScreenPoint) =>
     camera.glideToPoint(clampToMap(projection.toWorld(point), map));
-  const handlePointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 || drag) {
-      return;
-    }
-    event.preventDefault();
-    // Keeps move/up coming here even once the pointer leaves the minimap.
-    canvas.setPointerCapture(event.pointerId);
-
-    const point = localPoint(event);
-    const grabbed = pointNearPolygon(point, outline, OUTLINE_GRAB_RADIUS);
-    drag = {
-      pointerId: event.pointerId,
-      start: point,
-      grabbed,
-      offset: centroid(camera.viewFootprint()).subtract(
-        projection.toWorld(point),
-      ),
-      moved: false,
-    };
-    if (grabbed) {
-      canvas.style.cursor = "grabbing";
-    } else {
-      // Answers the press at once; a drag that follows then takes over.
-      glideTo(point);
-    }
-  };
-  const handlePointerMove = (event: PointerEvent) => {
-    const point = localPoint(event);
-    if (drag?.pointerId !== event.pointerId) {
-      canvas.style.cursor = pointNearPolygon(
+  const pointer = createPointerGesture(canvas, {
+    start: (event) => {
+      if (event.button !== 0) return undefined;
+      event.preventDefault();
+      const point = localPoint(event);
+      const command = commandMode();
+      const grabbed = pointNearPolygon(point, outline, OUTLINE_GRAB_RADIUS);
+      if (grabbed) canvas.style.cursor = "grabbing";
+      else if (!command) glideTo(point);
+      return {
         point,
-        outline,
-        OUTLINE_GRAB_RADIUS,
-      )
-        ? "grab"
-        : "";
-      return;
-    }
-
-    drag.moved ||=
-      Math.hypot(point.x - drag.start.x, point.y - drag.start.y) >=
-      DRAG_THRESHOLD;
-    if (drag.grabbed) {
-      // The grip point stays under the pointer, however far it strays.
+        command,
+        grabbed,
+        offset: centroid(camera.viewFootprint()).subtract(
+          projection.toWorld(point),
+        ),
+      };
+    },
+    move: (event, { data }) => {
+      const point = projection.toWorld(localPoint(event));
       camera.focusOnPoint(
-        clampToMap(projection.toWorld(point).add(drag.offset), map),
+        clampToMap(data.grabbed ? point.add(data.offset) : point, map),
       );
-    } else if (drag.moved) {
-      camera.focusOnPoint(clampToMap(projection.toWorld(point), map));
-    }
-  };
-  const handlePointerUp = (event: PointerEvent) => {
-    if (drag?.pointerId !== event.pointerId) {
-      return;
-    }
-    // A click inside the outline still centers there, like anywhere else.
-    if (drag.grabbed && !drag.moved) {
-      glideTo(drag.start);
-    }
-    endDrag(event);
-  };
-  const endDrag = (event: PointerEvent) => {
-    if (drag?.pointerId === event.pointerId) {
-      drag = undefined;
+    },
+    end: (event, { data, dragged }) => {
+      if (dragged) return;
+      if (data.command && commandMode()) {
+        const point = clampToMap(projection.toWorld(localPoint(event)), map);
+        if (onCommand?.({ x: point.x, z: point.z })) return;
+      }
+      if (data.grabbed || data.command) glideTo(data.point);
+    },
+    release: () => {
       canvas.style.cursor = "";
-    }
+    },
+  });
+  const hover = (event: PointerEvent) => {
+    if (event.buttons) return;
+    canvas.style.cursor = pointNearPolygon(
+      localPoint(event),
+      outline,
+      OUTLINE_GRAB_RADIUS,
+    )
+      ? "grab"
+      : "";
   };
   // Right-press is reserved for minimap commands later.
   const suppressContextMenu = (event: Event) => event.preventDefault();
-  canvas.addEventListener("pointerdown", handlePointerDown);
-  canvas.addEventListener("pointermove", handlePointerMove);
-  canvas.addEventListener("pointerup", handlePointerUp);
-  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("pointermove", hover);
   canvas.addEventListener("contextmenu", suppressContextMenu);
 
   let disposed = false;
@@ -290,10 +262,8 @@ export function createMinimap(
     scene.onAfterRenderObservable.remove(renderObserver);
     scene.onDisposeObservable.remove(sceneDisposeObserver);
     canvasSize.dispose();
-    canvas.removeEventListener("pointerdown", handlePointerDown);
-    canvas.removeEventListener("pointermove", handlePointerMove);
-    canvas.removeEventListener("pointerup", handlePointerUp);
-    canvas.removeEventListener("pointercancel", endDrag);
+    pointer.dispose();
+    canvas.removeEventListener("pointermove", hover);
     canvas.removeEventListener("contextmenu", suppressContextMenu);
   };
   const sceneDisposeObserver = scene.onDisposeObservable.add(dispose);

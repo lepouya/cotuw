@@ -10,10 +10,13 @@ import { distance } from "../simulation/world";
 import type { WorldPosition } from "../simulation/world";
 
 const PATH_COLOR = new Color3(1, 0.78, 0.24);
+const ATTACK_MOVE_COLOR = new Color3(1, 0.42, 0.12);
 const BLOCKED_COLOR = new Color3(1, 0.25, 0.17);
 const PATH_ALPHA = 0.95;
 const DOT_PERIOD = 0.36;
 const DOT_LENGTH = 0.08;
+/** Aggressive routes draw dashes rather than dots. */
+const ATTACK_MOVE_DASH_LENGTH = 0.22;
 const MARKER_RADIUS = 0.48;
 const MARKER_SEGMENTS = 32;
 const MARKER_OFFSET = 0.035;
@@ -33,6 +36,7 @@ type ActiveMovement = NonNullable<ActorRenderState["movement"]>;
 
 type Route = {
   actorId: string;
+  aggressive: boolean;
   movement: ActiveMovement;
   destinationMarker?: LinesMesh;
   line?: LinesMesh;
@@ -56,6 +60,18 @@ export function createMovementPathView(
 ): MovementPathView {
   let selected = new Set<string>();
   const routes = new Map<string, Route>();
+  const aggressiveMarkers = new Map<
+    string,
+    {
+      point: Readonly<WorldPosition>;
+      mesh: LinesMesh;
+      blockedTarget?: Readonly<WorldPosition>;
+    }
+  >();
+  const clearAggressive = (id: string) => {
+    aggressiveMarkers.get(id)?.mesh.dispose();
+    aggressiveMarkers.delete(id);
+  };
   const rejected = new Map<
     string,
     { target: WorldPosition; seconds: number }
@@ -84,6 +100,8 @@ export function createMovementPathView(
       )
         mark(movement.requestedTarget ?? movement.target);
     for (const { target } of rejected.values()) mark(target);
+    for (const { blockedTarget } of aggressiveMarkers.values())
+      if (blockedTarget) mark(blockedTarget);
     for (const key of blockedMarkers.keys())
       if (!targets.has(key)) clearBlockedMarker(key);
     for (const [key, target] of targets)
@@ -96,6 +114,8 @@ export function createMovementPathView(
   const setSelectedActors = (ids: readonly string[]) => {
     selected = new Set(ids);
     for (const id of routes.keys()) if (!selected.has(id)) clearRoute(id);
+    for (const id of aggressiveMarkers.keys())
+      if (!selected.has(id)) clearAggressive(id);
     for (const id of rejected.keys())
       if (!selected.has(id)) rejected.delete(id);
     syncBlockedMarkers();
@@ -103,6 +123,7 @@ export function createMovementPathView(
   // Markers are recreated on the next update.
   const refreshGroundGeometry = () => {
     for (const id of routes.keys()) clearRoute(id);
+    for (const id of aggressiveMarkers.keys()) clearAggressive(id);
     for (const key of blockedMarkers.keys()) clearBlockedMarker(key);
   };
   const update = (actors: readonly ActorRenderState[]) => {
@@ -112,8 +133,31 @@ export function createMovementPathView(
       if (entry.seconds <= 0 || !present.has(id)) rejected.delete(id);
     }
     for (const id of routes.keys()) if (!present.has(id)) clearRoute(id);
+    for (const id of aggressiveMarkers.keys())
+      if (!present.has(id)) clearAggressive(id);
     for (const actor of actors) {
       if (!selected.has(actor.id)) continue;
+      const point = actor.attackMove?.target;
+      const existing = aggressiveMarkers.get(actor.id);
+      if (!point || (existing && !samePoint(existing.point, point)))
+        clearAggressive(actor.id);
+      if (point && !aggressiveMarkers.has(actor.id)) {
+        const mesh = createGroundRing(
+          scene,
+          map,
+          "attack-move-destination",
+          point,
+          ATTACK_MOVE_COLOR,
+          groundOffset(map),
+          { radius: MARKER_RADIUS * 1.25, segments: 4 },
+        );
+        aggressiveMarkers.set(actor.id, { point, mesh });
+      }
+      const marker = aggressiveMarkers.get(actor.id);
+      if (marker)
+        marker.blockedTarget = actor.attackMove?.blocked
+          ? (actor.attackMove.requestedTarget ?? actor.attackMove.target)
+          : undefined;
       const movement = actor.movement;
       if (
         !movement?.waypoints ||
@@ -124,7 +168,11 @@ export function createMovementPathView(
         continue;
       }
       let route = routes.get(actor.id);
-      if (!route || !isSameRoute(route, actor.id, movement)) {
+      if (
+        !route ||
+        !isSameRoute(route, actor.id, movement) ||
+        route.aggressive !== !!actor.attackMove
+      ) {
         clearRoute(actor.id);
         route = createRoute(scene, map, actor, movement);
         routes.set(actor.id, route);
@@ -139,6 +187,7 @@ export function createMovementPathView(
     disposed = true;
     for (const id of routes.keys()) clearRoute(id);
     for (const key of blockedMarkers.keys()) clearBlockedMarker(key);
+    for (const id of aggressiveMarkers.keys()) clearAggressive(id);
     rejected.clear();
     map.onChangedObservable.remove(terrainChangeObserver);
     scene.onDisposeObservable.remove(sceneDisposeObserver);
@@ -194,6 +243,7 @@ function createRoute(
   const waypoints = movement.waypoints!;
   const route: Route = {
     actorId: actor.id,
+    aggressive: !!actor.attackMove,
     movement,
     dashes: [],
     dashEnds: [],
@@ -202,14 +252,15 @@ function createRoute(
   };
   // The view draws the blocked marker, which actors may share.
   if (movement.blocked) return route;
-  route.destinationMarker = createGroundRing(
-    scene,
-    map,
-    "movement-path-destination",
-    movement.destination!,
-    PATH_COLOR,
-    offset,
-  );
+  if (!actor.attackMove)
+    route.destinationMarker = createGroundRing(
+      scene,
+      map,
+      "movement-path-destination",
+      movement.destination!,
+      PATH_COLOR,
+      offset,
+    );
 
   const distances = Array.from({ length: waypoints.length }, () => 0);
   for (let index = waypoints.length - 2; index >= 0; index -= 1) {
@@ -226,7 +277,10 @@ function createRoute(
   ];
   const length = remainingDistance(route, actor, movement);
   for (let near = 0; near < length; near += DOT_PERIOD) {
-    const far = Math.min(near + DOT_LENGTH, length);
+    const far = Math.min(
+      near + (actor.attackMove ? ATTACK_MOVE_DASH_LENGTH : DOT_LENGTH),
+      length,
+    );
     route.dashes.push([
       groundPoint(map, pointAlong(backwards, near), offset),
       groundPoint(map, pointAlong(backwards, far), offset),
@@ -240,7 +294,7 @@ function createRoute(
       { lines: route.dashes, updatable: true },
       scene,
     );
-    route.line.color = PATH_COLOR;
+    route.line.color = actor.attackMove ? ATTACK_MOVE_COLOR : PATH_COLOR;
     route.line.alpha = PATH_ALPHA;
     route.line.isPickable = false;
   }
@@ -342,8 +396,9 @@ function createGroundRing(
   center: Readonly<WorldPosition>,
   color: Color3,
   offset: number,
+  { radius = MARKER_RADIUS, segments = MARKER_SEGMENTS } = {},
 ): LinesMesh {
-  const points = groundRing(center, MARKER_RADIUS, MARKER_SEGMENTS, (point) =>
+  const points = groundRing(center, radius, segments, (point) =>
     groundPoint(map, point, offset),
   );
   const ring = MeshBuilder.CreateLines(name, { points }, scene);

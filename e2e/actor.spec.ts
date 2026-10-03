@@ -51,6 +51,8 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
   await expect(canvas).toHaveAttribute("data-actor-ready", "true");
   await expect.poll(() => actorRequests).toBeGreaterThan(0);
   await trainTestUnits(page, ["trooper"]);
+  await page.locator("#unit-roster button").click();
+  await expect(canvas).toHaveAttribute("data-selected-actor", "trained-unit-1");
   expect(
     await page.evaluate(async () => {
       const harnessPath: string = "/e2e/harness.ts";
