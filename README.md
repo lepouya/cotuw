@@ -100,10 +100,11 @@ show amber. Reduced motion keeps these status cues without animated motion.
 The visual tests start the Vite app in headless Chromium. They check the
 camera, terrain rendering, terrain editing, and texture behavior, some through
 canvas screenshots and some through in-page helpers in `e2e/harness.ts`. They
-write an HTML report to `playwright-report/`; CI uploads that report after a
-failed check. Install the browsers locally once with
-`npx playwright install chromium`, plus `webkit` on macOS, where the tests also
-run against WebKit to match the Tauri webview.
+write an HTML report to `playwright-report/`. CI runs them only on macOS,
+whose runners have a GPU, and uploads that report after a failed check.
+Install the browsers locally once with `npx playwright install chromium`, plus
+`webkit` on macOS, where the tests also run against WebKit to match the Tauri
+webview.
 Set `COTUW_TEST_PORT=1421` to run checks beside a server using the default port.
 
 Terrain textures repeat by wrapping, so they must tile without a seam. After

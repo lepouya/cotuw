@@ -26,9 +26,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - run: npx playwright install chromium ${{ runner.os == 'macOS' && 'webkit' || '' }}
-      - run: npm run check
-      - if: failure()
+      # Browser tests need a GPU. Software WebGL on the Windows and Linux
+      # runners is too slow for them, so only macOS runs the full check.
+      - if: runner.os == 'macOS'
+        run: npx playwright install chromium webkit
+      - if: runner.os == 'macOS'
+        run: npm run check
+      - if: runner.os != 'macOS'
+        run: npm run format:check && npm run lint && npm run typecheck && npm run test:ts && npm run test:rs
+      - if: failure() && runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ matrix.os }}
@@ -36,7 +42,7 @@ jobs:
           if-no-files-found: ignore
 
   # Desktop packaging is Windows and macOS first, but the core stays
-  # browser-runnable, so Linux checks the web build without the Tauri crate.
+  # browser-runnable, so Linux checks the web code without the Tauri crate.
   web:
     name: ubuntu-latest (browser)
     runs-on: ubuntu-latest
@@ -47,15 +53,7 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run format:check:ts
       - run: npm run lint:ts
       - run: npm run typecheck:ts
       - run: npm run test:ts
-      - run: npm run test:visual
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-ubuntu-latest
-          path: playwright-report/
-          if-no-files-found: ignore
