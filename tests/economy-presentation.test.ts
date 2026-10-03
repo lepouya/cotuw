@@ -264,7 +264,7 @@ test("resource and gift markers follow edited terrain and release their observer
     expect(site.position.y).toBeCloseTo(siteHeight + 2);
     expect(gift.position.y).toBeCloseTo(giftHeight + 2);
     economy.sites[0].remainingMaterials = 25;
-    view.update(economy);
+    view.update(economy, () => true);
     site.computeWorldMatrix(true);
     expect(site.getBoundingInfo().boundingBox.minimumWorld.y).toBeCloseTo(2);
     view.dispose();
@@ -316,7 +316,7 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
     }
     expect(view.lootTileForMesh(null)).toBeUndefined();
     economy.loot[0].collected = true;
-    view.update(economy);
+    view.update(economy, () => true);
     expect(gift.isEnabled()).toBe(false);
     expect(gift.getChildMeshes().every((mesh) => !mesh.isEnabled())).toBe(true);
     for (const mesh of gift.getChildMeshes())

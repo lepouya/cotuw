@@ -25,6 +25,12 @@ import {
 } from "./support";
 import { TerrainGrid } from "./terrain";
 import {
+  createFog,
+  isValidFogState,
+  validateVisionDefinition,
+  visionSources,
+} from "./vision";
+import {
   applyEconomyCommand,
   materialsCost,
   PRODUCTION_QUEUE_LIMIT,
@@ -72,6 +78,7 @@ import type {
 } from "./placement";
 import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
+import type { FogState, FogView } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
 /** Actor state that behaviors must leave unchanged. */
@@ -121,6 +128,8 @@ export type MissionState = {
   /** The mission's simulation terrain; absent until the first snapshot. */
   terrain?: TerrainState;
   economy?: EconomyState;
+  /** Explored terrain; absent when the whole map is known. */
+  fog?: FogState;
   scenarioId?: string;
 };
 
@@ -164,6 +173,8 @@ export type MissionSimulation = {
   readonly tickSeconds: number;
   readonly economy: EconomyView | undefined;
   readonly support: SupportView | undefined;
+  /** Explored and visible terrain; absent when the whole map is known. */
+  readonly fog: FogView | undefined;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /** Checks the same placement constraints used when commands are applied. */
@@ -223,6 +234,13 @@ export function createMissionSimulation({
     throw new Error("Mission state has terrain but no map to restore.");
   }
   delete state.terrain;
+  const savedFog = state.fog;
+  delete state.fog;
+  if (
+    (state.scenarioId !== undefined && savedFog === undefined) ||
+    (savedFog !== undefined && (!map || !isValidFogState(savedFog, map)))
+  )
+    throw new RangeError("Mission state has invalid fog.");
   const worldBounds = { ...bounds };
   const behaviorsById = new Map(behaviorRegistry);
   const definitionsById = indexDefinitions(
@@ -429,6 +447,12 @@ export function createMissionSimulation({
       definition,
       actors,
     );
+    if (
+      evaluation.accepted &&
+      fog &&
+      evaluation.tiles.some(({ x, z }) => !fog.isExplored(x, z))
+    )
+      return { ...reject("unexplored"), tiles: evaluation.tiles };
     if (evaluation.accepted && economy) {
       if (economy.materials < materialsCost(definition))
         return { ...reject("insufficient-materials"), tiles: evaluation.tiles };
@@ -526,6 +550,7 @@ export function createMissionSimulation({
       return false;
     const tile = map.tileAtWorldPosition(target.x, target.z);
     return (
+      (!fog || fog.isExplored(tile.x, tile.z)) &&
       occupancy.ownerAt(tile.x, tile.z, "surface") === undefined &&
       unitIds.every((id) => {
         const unit = definitionsById.get(id)!;
@@ -611,6 +636,18 @@ export function createMissionSimulation({
     map && occupancy
       ? map.addEditRule((edit) => occupancy.allowsTerrainEdit(edit))
       : undefined;
+  // Fog requires a map, which the saved-fog check above ensures.
+  const fog = savedFog && createFog(map!, savedFog);
+  const updateFog = () =>
+    fog?.update(
+      visionSources(
+        state.actors,
+        definitionsById,
+        state.economy && supportFor(state.actors),
+        map!,
+      ),
+    );
+  updateFog();
 
   /** Mobile actors whose behavior exposes navigation queries. */
   const navigatingActor = (actor: Actor): NavigatingActor | undefined => {
@@ -808,13 +845,20 @@ export function createMissionSimulation({
           command: applied,
           accepted: false,
         } as CommandOutcome<EconomyCommand>;
-      const reason = applyEconomyCommand(
-        applied,
-        working.economy,
-        working.actors,
-        definitionsById,
-        (id) => working.retiredIds.push(id),
-      );
+      const site =
+        applied.kind === "gather" &&
+        working.economy.sites.find((site) => site.id === applied.siteId);
+      // Undiscovered sites are unknown to the player.
+      const reason =
+        site && fog && !fog.isExplored(site.tile.x, site.tile.z)
+          ? "missing-site"
+          : applyEconomyCommand(
+              applied,
+              working.economy,
+              working.actors,
+              definitionsById,
+              (id) => working.retiredIds.push(id),
+            );
       return {
         tick,
         command: applied,
@@ -899,6 +943,9 @@ export function createMissionSimulation({
     },
     get economy() {
       return state.economy;
+    },
+    get fog() {
+      return fog;
     },
     actorById: (id) => {
       const actor = actorsById.get(id);
@@ -989,6 +1036,7 @@ export function createMissionSimulation({
         occupancy!.place(footprint);
       }
       actorVersion += 1;
+      updateFog();
     },
     removeActor: (id) => {
       ensureRunning();
@@ -1024,6 +1072,7 @@ export function createMissionSimulation({
       };
       actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
       actorVersion += 1;
+      updateFog();
       return true;
     },
     snapshot: () => {
@@ -1031,12 +1080,14 @@ export function createMissionSimulation({
       if (map) {
         snapshot.terrain = map.terrainState();
       }
+      if (fog) snapshot.fog = fog.state();
       return snapshot;
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
       releaseTerrainRule?.();
+      fog?.dispose();
     },
     tick: () => {
       ensureRunning();
@@ -1081,6 +1132,7 @@ export function createMissionSimulation({
         if (working.economy)
           updateEconomy(working.economy, {
             actors: working.actors,
+            explored: ({ x, z }) => fog?.isExplored(x, z) ?? true,
             definitions: definitionsById,
             behaviors: behaviorsById,
             map: map!,
@@ -1140,6 +1192,7 @@ export function createMissionSimulation({
         usedActorIds = working.usedIds;
         if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
+        updateFog();
         return outcomes;
       } catch (error) {
         faulted = true;
@@ -1204,6 +1257,7 @@ function indexDefinitions(
       validatePlacementDefinition(definition, map);
     }
     validateSupportDefinition(definition);
+    validateVisionDefinition(definition);
     deepFreeze(definition);
     behaviorRegistry
       .get(definition.behaviorId)!

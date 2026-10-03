@@ -98,7 +98,7 @@ export function createRallyControls(
         status.textContent =
           result ||
           (choosingFor
-            ? "Click or tap passable ground. Cancel or Esc exits."
+            ? "Click or tap explored, passable ground. Cancel or Esc exits."
             : actor && actor.rallyPoint
               ? "New units move to the marked rally point."
               : "New units exit and idle beside this building.");
@@ -111,7 +111,7 @@ export function createRallyControls(
       )
         result = outcome.accepted
           ? ""
-          : "Rally point rejected. Choose clear, passable ground.";
+          : "Rally point rejected. Choose explored, clear, passable ground.";
     },
     dispose: () => controller.abort(),
   };

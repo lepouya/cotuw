@@ -2,6 +2,7 @@ import { deepFreeze } from "./actor";
 import { createMissionState } from "./mission";
 import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
+import { createFogState } from "./vision";
 
 import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
@@ -62,10 +63,11 @@ export function createScenarioState(
     scenarioId: scenario.id,
     terrain: structuredClone(terrain),
     economy,
+    fog: createFogState(terrain.width, terrain.height),
   };
 }
 
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 export function serializeMission(
   state: MissionState,
@@ -73,6 +75,8 @@ export function serializeMission(
 ): string {
   if (!state.scenarioId || !state.terrain)
     throw new RangeError("A mission save requires its scenario and terrain.");
+  if (state.fog === undefined)
+    throw new RangeError("A mission save requires explored terrain.");
   return JSON.stringify({
     version: SAVE_VERSION,
     scenarioId: state.scenarioId,
@@ -92,6 +96,8 @@ export function deserializeMission(
     throw new RangeError("This mission save uses an unsupported version.");
   if (save.scenarioId !== scenario.id || save.state?.scenarioId !== scenario.id)
     throw new RangeError("This mission save belongs to a different scenario.");
+  if (save.state.fog === undefined)
+    throw new RangeError("A mission save requires explored terrain.");
   if (
     save.tickSeconds !== tickSeconds ||
     !save.state.terrain ||

@@ -5,7 +5,6 @@ import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
 import { ECONOMY_SCENARIO } from "../src/content/economy-scenario";
 import { createMissionSimulation } from "../src/simulation/mission";
 import {
-  createScenarioState,
   defineScenario,
   serializeMission,
   deserializeMission,
@@ -18,6 +17,7 @@ import type {
   MissionSimulation,
 } from "../src/simulation/mission";
 import type { MissionCommand } from "../src/simulation/command";
+import { exploredScenarioState } from "./helpers/scenario";
 
 const definitions = ARC_ACTOR_DEFINITIONS;
 const mapOptions = {
@@ -93,7 +93,7 @@ function fixture(
       throw new Error("test move fault");
     };
   const simulation = createMissionSimulation({
-    state: state ?? createScenarioState(scenario, definitions),
+    state: state ?? exploredScenarioState(scenario, definitions),
     definitions,
     map,
     occupancy,
@@ -168,19 +168,19 @@ const gather = (siteId = "site"): MissionCommand => ({
 
 describe("Materials economy", () => {
   test("starts with a fixed Command Center and exactly enough for the first economic pair", () => {
-    const state = createScenarioState(ECONOMY_SCENARIO, definitions);
+    const state = exploredScenarioState(ECONOMY_SCENARIO, definitions);
     expect(state.actors.map((actor) => actor.definitionId)).toEqual([
       "arc-command-center-prototype",
     ]);
     expect(state.economy!.materials).toBe(150);
     expect(Object.isFrozen(ECONOMY_SCENARIO.terrain.tiles)).toBe(true);
-    const independent = createScenarioState(ECONOMY_SCENARIO, definitions);
+    const independent = exploredScenarioState(ECONOMY_SCENARIO, definitions);
     state.economy!.sites[0].remainingMaterials = 0;
     expect(independent.economy!.sites[0].remainingMaterials).toBe(200);
   });
 
   test("paid blueprints reserve footprints and one construction slot before becoming operational", () => {
-    const state = createScenarioState(scenario, definitions);
+    const state = exploredScenarioState(scenario, definitions);
     state.economy!.materials = 300;
     const { simulation, occupancy } = fixture(state);
     simulation.submitCommand(build());
@@ -235,7 +235,7 @@ describe("Materials economy", () => {
   });
 
   test("cancelling a blueprint refunds all spending, frees its footprint and advances the queue", () => {
-    const state = createScenarioState(scenario, definitions);
+    const state = exploredScenarioState(scenario, definitions);
     state.economy!.materials = 300;
     const { simulation, occupancy } = fixture(state);
     command(simulation, build());
@@ -548,7 +548,7 @@ describe("Materials economy", () => {
   });
 
   test("five paid unit orders train in sequence; cancellation fully refunds and retires reserved identity", () => {
-    const state = createScenarioState(scenario, definitions);
+    const state = exploredScenarioState(scenario, definitions);
     state.economy!.materials = 250;
     const { simulation } = fixture(state);
     command(simulation, {
@@ -591,7 +591,7 @@ describe("Materials economy", () => {
   });
 
   test("completed training waits for a free exit and cancellation refunds that waiting order", () => {
-    const state = createScenarioState(scenario, definitions);
+    const state = exploredScenarioState(scenario, definitions);
     state.economy!.materials = 1000;
     const { simulation } = fixture(state);
     command(simulation, build());
@@ -781,7 +781,7 @@ describe("economy persistence", () => {
   );
 
   test("JSON preserves active and queued construction and resumes the same ticks", () => {
-    const state = createScenarioState(scenario, definitions);
+    const state = exploredScenarioState(scenario, definitions);
     state.economy!.materials = 300;
     const { simulation } = fixture(state, 0.1);
     command(simulation, build());
@@ -826,7 +826,7 @@ describe("economy persistence", () => {
     const source = serializeMission(simulation.snapshot(), 1);
     expect(() =>
       deserializeMission(
-        source.replace('"version":1', '"version":2'),
+        source.replace('"version":2', '"version":1'),
         scenario,
         1,
       ),

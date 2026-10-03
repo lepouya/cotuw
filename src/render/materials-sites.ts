@@ -105,10 +105,11 @@ export function createMaterialsSitesView(
   return {
     lootTileForMesh: (mesh: AbstractMesh | null) =>
       mesh?.isEnabled() ? lootTiles.get(mesh) : undefined,
-    update: (economy: EconomyView) => {
+    /** Hides resources on tiles the player has not explored. */
+    update: (economy: EconomyView, explored: (tile: TileCoord) => boolean) => {
       for (const site of economy.sites) {
         const mesh = sites.get(site.id)!;
-        mesh.setEnabled(site.remainingMaterials > 0);
+        mesh.setEnabled(site.remainingMaterials > 0 && explored(site.tile));
         const stage =
           Math.ceil((4 * site.remainingMaterials) / site.initialMaterials) / 4;
         const scale = 0.35 + 0.65 * stage;
@@ -118,7 +119,9 @@ export function createMaterialsSitesView(
         }
       }
       for (const cache of economy.loot)
-        loot.get(cache.id)!.root.setEnabled(!cache.collected);
+        loot
+          .get(cache.id)!
+          .root.setEnabled(!cache.collected && explored(cache.tile));
     },
     animate: (seconds: number) => {
       for (const { root, ground, phase } of loot.values()) {

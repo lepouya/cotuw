@@ -114,7 +114,7 @@ base-building RTS loop, its technical architecture, and its player interface.
       depletion, reassignment, and loot.
 - [x] 0.38 Implement five-item production queues, full unfinished-order refunds,
       rally points, and paused progress while disconnected.
-- [ ] 0.39 Implement unexplored, explored, and visible terrain; actor
+- [x] 0.39 Implement unexplored, explored, and visible terrain; actor
       visibility; camera bounds based on exploration; and the north-up minimap
       rules.
 - [ ] 0.40 Implement deterministic rifle and wolf combat, Attack Move, health,
@@ -137,7 +137,6 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [ ] 0.47 Replace the prototype bindings with the locked mouse, keyboard, and
       touch controls; camera presets; smooth Focus and Follow; and
       reduced-motion behavior.
-
 - [x] 0.53 Add a paid Materials economy opening with a fixed Command Center,
       Refinery, Harvester, global stockpile, finite patches, automated delivery,
       depletion feedback, reassignment, ordinary salvage, and building resale.

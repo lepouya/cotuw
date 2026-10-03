@@ -143,11 +143,32 @@ test("default opening shows the Command Center, starting Materials, and paid con
   );
 });
 
-test("recreating economy controls does not duplicate resource actions", async ({
+test("recreating economy controls lists only discovered resources once", async ({
   page,
 }) => {
   await controlledOpening(page);
-  await expect(page.locator("#resource-overview button")).toHaveCount(5);
+  await expect(page.locator("#resource-overview button")).toHaveCount(1);
+  await expect(page.locator("#resource-overview button")).toContainText(
+    "Near Materials",
+  );
+});
+
+test("fog keeps the camera near explored terrain", async ({ page }) => {
+  await controlledOpening(page);
+  const target = await page.evaluate(() => {
+    const view = window.economyHarness.view;
+    view.camera.focusOnTile(90, 90);
+    const camera = view.scene
+      .activeCamera as import("@babylonjs/core").ArcRotateCamera;
+    return { x: camera.target.x, z: camera.target.z };
+  });
+  // The Command Center sees about 14 tiles east of the west map edge.
+  expect(target.x).toBeLessThan(-20);
+  expect(target.z).toBeLessThan(25);
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-explored-tiles",
+    /^[1-9]\d*$/,
+  );
 });
 
 test("building timers disable production, and cancelling a blueprint fully refunds its cost", async ({
@@ -206,6 +227,25 @@ test.describe("hovering salvage", () => {
       await page.locator("#train-trooper").click();
       await advance(page, 5);
       await page.locator("#unit-roster button").click();
+      await expect(
+        page.locator('[data-economy-action="loot:salvage-1"]'),
+      ).toHaveCount(0);
+      // The salvage starts in unexplored terrain, so scout it first.
+      await page.evaluate(() => {
+        const { simulation } = window.economyHarness.view;
+        const trooper = simulation.actors.find(
+          (actor) => actor.definitionId === "arc-trooper",
+        )!;
+        simulation.submitCommand({
+          kind: "move",
+          actorId: trooper.id,
+          target: { x: -28.5, z: 2.5 },
+        });
+      });
+      await advance(page, 4);
+      await expect(
+        page.locator('[data-economy-action="loot:salvage-1"]'),
+      ).toContainText("Collect salvage");
       const point = await page.evaluate(async () => {
         const harnessPath: string = "/e2e/harness.ts";
         const terrainPath: string = "/src/render/terrain-mesh.ts";
@@ -333,6 +373,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
         selectedActorId: () => worker.actorId,
         enabled: () => true,
         focus: () => {},
+        explored: () => true,
         positionForTile: () => ({ x: 0, z: 0 }),
       },
     );
@@ -429,7 +470,7 @@ for (const touch of [false, true]) {
       if (touch) await page.touchscreen.tap(occupied.x, occupied.y);
       else await page.mouse.click(occupied.x, occupied.y);
       await expect(panel.locator("[data-rally-status]")).toContainText(
-        "Choose passable ground",
+        "passable ground",
       );
       await action(page, '#panel-units [data-rally-action="cancel"]', touch);
       await expect(panel.locator('[data-rally-action="cancel"]')).toBeHidden();

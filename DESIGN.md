@@ -434,6 +434,25 @@ story.
 
 - Terrain is **Unexplored**, **Explored**, or currently **Visible**. Actor
   detection is a separate per-faction state.
+- Missions begin unexplored except for what starting actors see. Explored
+  terrain is saved mission state; current vision is derived from actors after
+  every tick and after loading.
+- Actor definitions author a vision radius. A tile is visible when its center
+  is within the radius and the sightline from 1.5 units above the observer's
+  ground to 0.5 units above the tile's ground clears the terrain heightfield.
+  Ridges and cliffs therefore hide what lies behind them, while high ground
+  near its rim sees over lower obstructions. Units and buildings do not
+  occlude vision.
+- Mobile units see from their tile's center; buildings see from their
+  footprint center. Blueprints and disconnected buildings provide no vision.
+- Unexplored terrain is covered in the background color on the main view and
+  minimap; explored terrain outside current vision is dimmed. Fog edges soften
+  inward, so known ground never reveals unexplored tiles.
+- The camera's focal point stays within four world units of an explored tile
+  center; panning, focus, minimap navigation, and Reset View clamp to that
+  frontier. Zooming out still shows only darkness beyond explored terrain.
+- Move orders may enter unexplored terrain. Building footprints and rally
+  points must be explored.
 - Concealment categories are **Exposed**, **Camouflaged**, **Cloaked**, and the
   layer-derived **Subterranean** category.
 - Detection has no levels. It matches authored signature type, concealment
@@ -577,8 +596,15 @@ story.
   connections are dashed with gap crosses. Offline buildings dim, stop animated
   machinery, turn off emissive lights, and show a crossed power badge.
   Sidebar states explain paused work. Grouped disconnection and restoration
-  alerts focus the camera on affected buildings. Active vision awaits fog.
-  The opening has no combat or mission result.
+  alerts focus the camera on affected buildings. The opening has no combat or
+  mission result.
+- Prototype vision radii are 14 world units for Command Centers and Scouts,
+  8 for Refineries and Barracks, 7 for Troopers, and 5 for Harvesters. A
+  building's vision covers its own support radius, so connected coverage is
+  explored once the building completes. The Command Center reveals the near
+  patch; the north patch and every salvage box start unexplored. Undiscovered
+  resources stay hidden from the world, minimap, and sidebar, and harvesters
+  cannot be sent to them. The construction sandbox has no fog.
 - A Refinery has one paid production or assigned Harvester slot. Barracks
   queues hold up to five paid orders and train one unit at a time. Cancelling
   an unfinished order refunds its full cost. Completed production waits for
@@ -587,17 +613,18 @@ story.
   blocked exits may send units to another adjacent side.
 - Each production building retains one optional ground rally point in its
   mission state. Set Rally Point in Selection or Units enters click-or-tap
-  targeting; Cancel or Esc exits. The location must be passable for every unit
-  the producer trains and clear of building footprints. All prototype terrain
-  is currently explored. Clear Rally Point restores exit-and-idle behavior.
+  targeting; Cancel or Esc exits. The location must be explored, passable for
+  every unit the producer trains, and clear of building footprints. Clear Rally
+  Point restores exit-and-idle behavior.
   A flag appears only while the producer is selected. Newly completed units
   exit first, then use ordinary movement toward the current rally point.
   Later blockers use the normal pathfinding and unreachable-target rules.
 - A Harvester carries 100 Materials and takes 60 seconds to gather a full
   load, plus travel. It gathers the assigned tile, then resource tiles within
-  two tiles on each axis. Candidates use distance from the assigned tile,
-  then row and column order; Harvesters resolve shared yields in actor-ID
-  order. Resources enter the global stockpile only on delivery.
+  two tiles on each axis. Only explored tiles are candidates. Candidates use
+  distance from the assigned tile, then row and column order; Harvesters resolve
+  shared yields in actor-ID order. Resources enter the global stockpile only on
+  delivery.
 - Move and Stop interrupt collection while preserving cargo. A new patch
   order with cargo returns it first. Return cargo also works after Stop.
   Exhaustion delivers any partial final load, then waits for a new patch.
@@ -626,11 +653,11 @@ story.
   when complete. Reduced motion retains static activity cues.
 - Mission snapshots include stockpiles, tile yields, collected salvage,
   Harvester assignments, cargo, gathering progress, phases, routes, paid
-  production, rally points, blueprint progress and queue order, pending
-  commands, and reserved or retired actor identities.
-  Versioned JSON envelopes check scenario, tick rate, map dimensions, and
-  authored resource names, coordinates, and yields before simulation
-  validation. Manual save/load UI remains pending.
+  production, rally points, blueprint progress and queue order, explored
+  terrain, pending commands, and reserved or retired actor identities.
+  Scenario saves require explored terrain. Versioned JSON envelopes check
+  scenario, tick rate, map dimensions, and authored resource names, coordinates,
+  and yields before simulation validation. Manual save/load UI remains pending.
 
 ## Milestone 0 playable slice
 

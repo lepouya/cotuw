@@ -34,8 +34,11 @@ export type StrategyCamera = {
   rotateView: (radians: number) => void;
   tiltView: (radians: number) => void;
   zoomBy: (factor: number) => void;
+  /** Constrains every new focal point, such as to explored terrain. */
+  setFocusLimit: (limit: (point: Vector3) => Vector3) => void;
   /** Decides whether a one-finger touch press pans the view. */
   setTouchPanFilter: (canPan: (event: PointerEvent) => boolean) => void;
+  /** Developer framing of the whole grid; ignores the focus limit. */
   fitToMap: () => void;
   /** Centers the view on a tile without changing the zoom. */
   focusOnTile: (x: number, z: number) => void;
@@ -100,6 +103,7 @@ export function createStrategyCamera(
     camera.maxZ = safeDistance * 2 + FAR_CLIP_MARGIN;
   };
   let glide: { from: Vector3; to: Vector3; elapsed: number } | undefined;
+  let limitFocus = (point: Vector3) => point;
   // Babylon would otherwise re-derive alpha, beta and radius from the
   // unchanged position and tilt the fixed isometric view.
   const retarget = (target: Vector3) =>
@@ -107,10 +111,11 @@ export function createStrategyCamera(
   // Every deliberate move replaces a glide instead of fighting it.
   const moveTo = (target: Vector3) => {
     glide = undefined;
-    retarget(target);
+    retarget(limitFocus(target));
   };
   const fitToMap = () => {
-    moveTo(Vector3.Zero());
+    glide = undefined;
+    retarget(Vector3.Zero());
     setDistance(cameraDistanceForMap(map));
     setViewHeight(viewHeightToFitMap(camera, canvas, map));
   };
@@ -132,7 +137,11 @@ export function createStrategyCamera(
     focusOnPoint(map.worldPoint(x + 0.5, z + 0.5, 0));
   };
   const glideToPoint = (point: Vector3) => {
-    glide = { from: camera.target.clone(), to: groundPoint(point), elapsed: 0 };
+    glide = {
+      from: camera.target.clone(),
+      to: limitFocus(groundPoint(point)),
+      elapsed: 0,
+    };
   };
   const advanceGlide = () => {
     if (!glide) {
@@ -141,7 +150,9 @@ export function createStrategyCamera(
 
     glide.elapsed += scene.getEngine().getDeltaTime() / 1000;
     const progress = Math.min(glide.elapsed / GLIDE_SECONDS, 1);
-    retarget(Vector3.Lerp(glide.from, glide.to, easeOutCubic(progress)));
+    retarget(
+      limitFocus(Vector3.Lerp(glide.from, glide.to, easeOutCubic(progress))),
+    );
     if (progress === 1) {
       glide = undefined;
     }
@@ -245,6 +256,10 @@ export function createStrategyCamera(
     },
     tiltView: (radians) => setBeta(camera.beta + radians),
     zoomBy: (factor) => setViewHeight(viewHeight * factor),
+    setFocusLimit: (limit) => {
+      limitFocus = limit;
+      moveTo(camera.target.clone());
+    },
     setTouchPanFilter: (canPan) => {
       pointer.cancel();
       canTouchPan = canPan;

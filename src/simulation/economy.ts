@@ -323,6 +323,7 @@ export function harvestingRecoveryCost(
 
 export type EconomyWorld = {
   actors: Actor[];
+  explored: (tile: TileCoord) => boolean;
   definitions: ReadonlyMap<string, ActorDefinition>;
   behaviors: ReadonlyMap<string, ActorBehavior>;
   map: TerrainView;
@@ -561,13 +562,17 @@ export function updateEconomy(
       continue;
     }
     let site = economy.sites.find(
-      (site) => site.id === worker.activeSiteId && site.remainingMaterials > 0,
+      (site) =>
+        site.id === worker.activeSiteId &&
+        site.remainingMaterials > 0 &&
+        world.explored(site.tile),
     );
     if (!site) {
       const candidates = economy.sites
         .filter(
           (site) =>
             site.remainingMaterials > 0 &&
+            world.explored(site.tile) &&
             Math.abs(site.tile.x - target.tile.x) <= gathering.patchRadius &&
             Math.abs(site.tile.z - target.tile.z) <= gathering.patchRadius,
         )

@@ -41,6 +41,7 @@ const REASONS: Record<PlacementReason, string> = {
   "occupancy-conflict": "Another structure occupies this footprint.",
   "insufficient-materials": "Not enough Materials for this building.",
   "resource-site": "Keep Materials sites and salvage clear of buildings.",
+  unexplored: "Explore the whole footprint before building there.",
 };
 
 export type BuildingPlacementChoice = {

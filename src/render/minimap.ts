@@ -3,12 +3,14 @@ import { Vector3 } from "@babylonjs/core";
 import { layerSlot } from "../map";
 import { DEFAULT_ACTOR_COLOR } from "./actor";
 import { watchCanvasSize } from "./canvas-size";
+import { fogAlpha } from "./fog";
 import type { Rgb } from "./color";
 export type { Rgb } from "./color";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainBounds, TerrainMap, TileCoord } from "../map";
 import type { StrategyCamera } from "./camera";
+import type { FogView } from "../simulation/vision";
 
 type ScreenPoint = { x: number; y: number };
 
@@ -53,6 +55,8 @@ export type MinimapActor = {
 export type MinimapOptions = {
   /** Read on creation, on resize, and after each `refreshActors` call. */
   actors?: () => readonly MinimapActor[];
+  /** Read every frame; terrain repaints when its version changes. */
+  fog?: () => FogView | undefined;
 };
 
 /**
@@ -65,7 +69,7 @@ export function createMinimap(
   map: TerrainMap,
   camera: StrategyCamera,
   canvas: HTMLCanvasElement,
-  { actors = () => [] }: MinimapOptions = {},
+  { actors = () => [], fog = () => undefined }: MinimapOptions = {},
 ): Minimap {
   const context = canvas.getContext("2d");
   const terrain = document.createElement("canvas");
@@ -81,18 +85,18 @@ export function createMinimap(
   const background: Rgb = [r, g, b];
   let needsDraw = true;
   const terrainPixels = terrainContext.createImageData(map.width, map.height);
+  const shownPixels = terrainContext.createImageData(map.width, map.height);
+  let fogVersion: number | undefined;
+  const shade = () => {
+    const current = fog();
+    fogVersion = current?.version;
+    shadeFog(map, terrainPixels.data, shownPixels.data, current, background);
+    terrainContext.putImageData(shownPixels, 0, 0);
+    needsDraw = true;
+  };
   const paint = (bounds: TerrainBounds) => {
     paintTerrain(map, terrainPixels.data, bounds, background);
-    terrainContext.putImageData(
-      terrainPixels,
-      0,
-      0,
-      bounds.minX,
-      map.height - 1 - bounds.maxZ,
-      bounds.maxX - bounds.minX + 1,
-      bounds.maxZ - bounds.minZ + 1,
-    );
-    needsDraw = true;
+    shade();
   };
   paint({ minX: 0, minZ: 0, maxX: map.width - 1, maxZ: map.height - 1 });
   const changeObserver = map.onChangedObservable.add(paint);
@@ -122,6 +126,7 @@ export function createMinimap(
       resize();
       actorsStale = true;
     }
+    if (fog()?.version !== fogVersion) shade();
     if (actorsStale) {
       actorsStale = false;
       const nextActorMarkers = actors().map(
@@ -424,6 +429,31 @@ export function paintTerrain(
       pixels[offset + 1] = green * 255;
       pixels[offset + 2] = blue * 255;
       pixels[offset + 3] = 255;
+    }
+  }
+}
+
+/**
+ * Copies terrain pixels, hiding unexplored tiles in the background color and
+ * dimming explored tiles outside current vision.
+ */
+export function shadeFog(
+  map: TerrainMap,
+  terrain: Uint8ClampedArray,
+  shown: Uint8ClampedArray,
+  fog: FogView | undefined,
+  background: Rgb,
+): void {
+  for (let z = 0; z < map.height; z += 1) {
+    for (let x = 0; x < map.width; x += 1) {
+      const alpha = fog ? fogAlpha(fog, x, z) : 0;
+      const offset = ((map.height - 1 - z) * map.width + x) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const color = terrain[offset + channel];
+        shown[offset + channel] =
+          color + (background[channel] * 255 - color) * alpha;
+      }
+      shown[offset + 3] = 255;
     }
   }
 }

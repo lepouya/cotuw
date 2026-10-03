@@ -37,13 +37,13 @@ const PHASES: Record<HarvesterState["phase"], string> = {
   unassigned: "Unassigned. Choose an empty Refinery",
 };
 
-/** Sites sharing a name form one patch, shown by its first site. */
-function patches(economy: EconomyView) {
+/** Explored sites sharing a name form one patch, shown by its first site. */
+function patches(economy: EconomyView, explored: (tile: TileCoord) => boolean) {
   const byName = new Map<
     string,
     { site: EconomyView["sites"][number]; remaining: number }
   >();
-  for (const site of economy.sites) {
+  for (const site of economy.sites.filter((site) => explored(site.tile))) {
     const patch = byName.get(site.name);
     if (patch) patch.remaining += site.remainingMaterials;
     else byName.set(site.name, { site, remaining: site.remainingMaterials });
@@ -64,6 +64,8 @@ export function createEconomyControls(
     selectedActorId: () => string | undefined;
     enabled: () => boolean;
     focus: (tile: TileCoord) => void;
+    /** Undiscovered sites and salvage stay unlisted. */
+    explored: (tile: TileCoord) => boolean;
     positionForTile: (tile: TileCoord) => WorldPosition;
   },
 ) {
@@ -134,7 +136,7 @@ export function createEconomyControls(
         simulation.actors.map((actor) => [actor.id, actor]),
       );
       const actor = id ? actors.get(id) : undefined;
-      const resourcePatches = patches(economy);
+      const resourcePatches = patches(economy, options.explored);
       const definition = actor && definitions.get(actor.definitionId);
       const worker = economy.harvesters.find((worker) => worker.actorId === id);
       const enabled = options.enabled();
@@ -228,7 +230,7 @@ export function createEconomyControls(
           action: () => options.focus(site.tile),
         })),
         ...economy.loot
-          .filter((cache) => !cache.collected)
+          .filter((cache) => !cache.collected && options.explored(cache.tile))
           .map((cache) => ({
             key: `loot:${cache.id}`,
             text: `${mobile ? "Collect" : "Show"} salvage (+${cache.materials} Materials)`,

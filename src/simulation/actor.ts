@@ -19,6 +19,8 @@ export type ActorDefinition = {
   production?: { unitDefinitionIds: string[] };
   /** World-space coverage radius; completed roots start support networks. */
   support?: { radius: number; root?: boolean };
+  /** World-space sight radius; terrain can still block the sightline. */
+  vision?: { radius: number };
   materialsCost?: number;
   trainingSeconds?: number;
   constructionSeconds?: number;

@@ -3,6 +3,7 @@
 import { createScenarioState } from "./simulation/scenario";
 import { disconnectedBuildings } from "./simulation/support";
 import { createSupportNetworkView } from "./render/support-network";
+import { createFogOverlay, limitToExplored } from "./render/fog";
 import { createNetworkControls } from "./ui/network-controls";
 import type { NetworkControls } from "./ui/network-controls";
 import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
@@ -77,6 +78,7 @@ import type { Scene } from "@babylonjs/core";
 import type { TileLayer, TileType } from "./map";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
 import type { ActorRenderState } from "./simulation/actor";
+import type { TileCoord } from "./simulation/grid";
 import type { BuildingPlacementControls } from "./render/building-placement";
 
 const TILE_COUNT = PROTOTYPE_MAP_SIZE;
@@ -90,6 +92,8 @@ const SIMULATION_TICK_SECONDS = 1 / 60;
 const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Covers background-tab throttling to one timer callback per second. */
 const MAX_CATCH_UP_SECONDS = 5;
+/** How far past explored tile centers the camera may look, in world units. */
+const CAMERA_FRONTIER_MARGIN = 4;
 
 export type TerrainPrototype = GameView & {
   simulation: MissionSimulation;
@@ -219,6 +223,18 @@ export async function createTerrainPrototype(
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(view.scene, map, simulation.economy);
+  const explored = ({ x, z }: TileCoord) =>
+    simulation.fog?.isExplored(x, z) ?? true;
+  const fogOverlay = createFogOverlay(
+    view.scene,
+    map,
+    PROTOTYPE_VIEW_OPTIONS.clearColor,
+  );
+  const fog = simulation.fog;
+  if (fog)
+    view.camera.setFocusLimit((point) =>
+      limitToExplored(map, fog, point, CAMERA_FRONTIER_MARGIN),
+    );
   if (controls.scenario) view.camera.focusOnTile(15, 50);
   const actorViews = createActorViewRegistry(view.scene, map, appearances);
   const tilePlacedViews = createTilePlacedActorViewRegistry(
@@ -289,7 +305,8 @@ export async function createTerrainPrototype(
           (site) =>
             site.remainingMaterials > 0 &&
             site.tile.x === tile.x &&
-            site.tile.z === tile.z,
+            site.tile.z === tile.z &&
+            explored(site.tile),
         );
         if (site) {
           simulation.submitCommand({
@@ -318,10 +335,11 @@ export async function createTerrainPrototype(
     },
   });
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
+    fog: () => simulation.fog,
     // Structures first, so unit markers draw over them.
     actors: () => [
       ...(simulation.economy?.sites
-        .filter((site) => site.remainingMaterials > 0)
+        .filter((site) => site.remainingMaterials > 0 && explored(site.tile))
         .map((site) => ({
           id: `materials-${site.id}`,
           worldPosition: map.tileCenter(site.tile.x, site.tile.z),
@@ -329,7 +347,7 @@ export async function createTerrainPrototype(
           color: [0.3, 0.66, 0.75] as [number, number, number],
         })) ?? []),
       ...(simulation.economy?.loot
-        .filter((loot) => !loot.collected)
+        .filter((loot) => !loot.collected && explored(loot.tile))
         .map((loot) => ({
           id: `materials-${loot.id}`,
           worldPosition: map.tileCenter(loot.tile.x, loot.tile.z),
@@ -473,6 +491,7 @@ export async function createTerrainPrototype(
           selectedActorId: () => input.selectedActorId,
           enabled: () => !simulationFaulted && !placement.active,
           focus: (tile) => view.camera.focusOnTile(tile.x, tile.z),
+          explored,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
         })
       : undefined;
@@ -554,8 +573,11 @@ export async function createTerrainPrototype(
       minimap.refreshActors();
     }
     if (placement.active) placement.update();
+    fogOverlay.update(simulation.fog);
+    if (simulation.fog)
+      canvas.dataset.exploredTiles = String(simulation.fog.exploredCount);
     if (simulation.economy) {
-      materialsView?.update(simulation.economy);
+      materialsView?.update(simulation.economy, explored);
       if (simulation.completedTicks !== knownControlsTick)
         tilePlacedViews.update(actorsByKind().placed, disconnected());
     }
@@ -611,6 +633,7 @@ export async function createTerrainPrototype(
     network.dispose();
     networkView.dispose();
     rallyView.dispose();
+    fogOverlay.dispose();
     economyControls?.dispose();
     materialsView?.dispose();
     controls.onDispose?.();

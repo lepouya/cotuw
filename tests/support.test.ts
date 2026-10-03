@@ -11,7 +11,6 @@ import type {
   MissionSimulation,
 } from "../src/simulation/mission";
 import {
-  createScenarioState,
   defineScenario,
   serializeMission,
   deserializeMission,
@@ -22,6 +21,7 @@ import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import type { Actor } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
+import { exploredScenarioState } from "./helpers/scenario";
 
 const definitions = new Map(
   ARC_ACTOR_DEFINITIONS.map((definition) => [definition.id, definition]),
@@ -59,7 +59,9 @@ const scenario = defineScenario({
     },
   ],
 });
-function fixture(state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS)) {
+function fixture(
+  state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
+) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
@@ -109,7 +111,7 @@ function blueprint(id: string, x: number, z: number): Actor {
 
 describe("construction support", () => {
   test("a legally built branch depends on its bridge and can gain a redundant path", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     state.actors = state.actors.filter((actor) => actor.id === "cc");
     const { simulation } = fixture(state);
     const place = (id: string, x: number, z: number) => {
@@ -168,7 +170,10 @@ describe("construction support", () => {
     ).toBe(true);
 
     const resolve = createSupportResolver(definitions);
-    const actors = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS).actors;
+    const actors = exploredScenarioState(
+      scenario,
+      ARC_ACTOR_DEFINITIONS,
+    ).actors;
     const before = resolve(actors);
     actors.splice(
       actors.findIndex((actor) => actor.id === "bridge"),
@@ -182,7 +187,10 @@ describe("construction support", () => {
   });
 
   test("overlap alone does not connect completed centers", () => {
-    const actors = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS).actors;
+    const actors = exploredScenarioState(
+      scenario,
+      ARC_ACTOR_DEFINITIONS,
+    ).actors;
     actors[1] = building("bridge", 18, 10);
     actors.pop();
     const network = createSupportNetwork(actors, definitions);
@@ -193,7 +201,7 @@ describe("construction support", () => {
   });
 
   test("covered completed centers connect to roots with stable redundant edges", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     const network = createSupportNetwork(state.actors, definitions);
     expect(network.nodes.every((node) => node.connected)).toBe(true);
     expect(supportsPosition(network, contentMap.tileCenter(23, 10))).toBe(true);
@@ -213,7 +221,7 @@ describe("construction support", () => {
   });
 
   test("blueprints never relay and rootless clusters stay disconnected", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     state.actors[1] = blueprint("bridge", 13, 10);
     const network = createSupportNetwork(state.actors, definitions);
     expect(
@@ -305,7 +313,7 @@ describe("construction support", () => {
   });
 
   test("paused blueprints yield the slot, resume automatically, and refund fully", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     state.actors.push(
       blueprint("remote-work", 22, 13),
       blueprint("local-work", 7, 10),
@@ -332,7 +340,7 @@ describe("construction support", () => {
   });
 
   test("a disconnected Refinery holds delivered cargo until reconnection", () => {
-    const state: MissionState = createScenarioState(
+    const state: MissionState = exploredScenarioState(
       scenario,
       ARC_ACTOR_DEFINITIONS,
     );
