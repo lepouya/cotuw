@@ -7,8 +7,9 @@ const testUrl = `http://127.0.0.1:${testPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  // Concurrent WebGL scenes compete for rendering time, including software GPUs.
-  workers: 2,
+  // Concurrent WebGL scenes compete for rendering time, including software
+  // GPUs; CI runners are small enough that two scenes starve each other.
+  workers: process.env.CI ? 1 : 2,
   // Windows WebGL canvas captures can take longer than the default budget.
   timeout: 90_000,
   reporter: [

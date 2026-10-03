@@ -258,7 +258,9 @@ test("compact touch controls support additive and box selection, movement, and c
     }
     await page.getByRole("button", { name: "Reset camera view" }).tap();
     await expect.poll(() => cameraPose(page)).toEqual(before);
-    const empty = await terrainPoint(page, 54, 45);
+    // A press on a unit selects instead of panning, so start in a corner.
+    const canvas = (await page.locator("#game-canvas").boundingBox())!;
+    const empty = { x: canvas.x + 40, y: canvas.y + 40 };
     await touchDrag(page, empty, { x: empty.x + 50, y: empty.y + 15 });
     await expect.poll(() => cameraPose(page)).not.toEqual(before);
     await expect.poll(async () => (await selected(page)).length).toBe(3);
