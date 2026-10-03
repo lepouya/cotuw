@@ -1,8 +1,10 @@
 import { resolveNavigationDestination, segmentCost } from "./navigation";
 import { isTilePlacedActor } from "./placement";
+import { compareIds } from "./actor";
 
 import type { Actor, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
+import { distance } from "./world";
 import type { WorldPosition } from "./world";
 
 export type DefinedActor = {
@@ -118,10 +120,6 @@ export function assignGroupDestinations(
   return destinations;
 }
 
-function distance(a: WorldPosition, b: WorldPosition): number {
-  return Math.hypot(a.x - b.x, a.z - b.z);
-}
-
 function squaredDistance(a: WorldPosition, b: WorldPosition): number {
   return (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
 }
@@ -131,12 +129,13 @@ export function separateMobileActors(
   movers: readonly NavigatingActor[],
   seconds: number,
   previousPositions: ReadonlyMap<string, WorldPosition>,
+  /** Whether contact correction may move an actor to a point. */
+  allows: (mover: NavigatingActor, point: WorldPosition) => boolean = () =>
+    true,
 ): void {
   const sorted = [...movers]
     .filter(({ definition }) => separationRadius(definition) > 0)
-    .sort((a, b) =>
-      a.actor.id < b.actor.id ? -1 : a.actor.id > b.actor.id ? 1 : 0,
-    );
+    .sort((a, b) => compareIds(a.actor.id, b.actor.id));
   // Contact cannot cancel a full tick of travel on expensive terrain.
   const budgets = new Map(
     sorted.map(({ actor, definition }) => {
@@ -163,6 +162,7 @@ export function separateMobileActors(
     if (step <= 0) return;
     const from = actor.worldPosition;
     const to = { x: from.x + dx * step, z: from.z + dz * step };
+    if (!allows(mover, to)) return;
     const { minX, maxX, minZ, maxZ } = grid.map.worldBounds;
     if (to.x < minX || to.x > maxX || to.z < minZ || to.z > maxZ) return;
     if (segmentCost(grid, from, to) === undefined) return;

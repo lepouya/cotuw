@@ -30,6 +30,7 @@ const mapOptions = {
 const contentMap = new TerrainGrid(mapOptions);
 const scenario = defineScenario({
   id: "vision-test",
+  playerFaction: "arc",
   tileSize: 1,
   terrainTypeIds: mapOptions.terrainTypeIds,
   terrain: contentMap.terrainState(),

@@ -8,6 +8,29 @@ import type { WorldPosition } from "./world";
 export type ActorDefinition = {
   id: string;
   behaviorId: string;
+  /** Actors of different factions are hostile; absent means neutral. */
+  faction?: string;
+  /** Maximum health. Only actors with health can be damaged or destroyed. */
+  health?: number;
+  /** Armed actors attack hostile actors that have health. */
+  weapon?: Weapon;
+  /** An idle unit engages detected hostiles near it, then returns to post. */
+  guard?: {
+    /** World-space radius around the unit for automatic engagement. */
+    acquisitionRadius: number;
+    /** How far from its post an automatic engagement may chase. */
+    chaseRadius: number;
+  };
+  /** An NPC that defends a home area and recovers there. */
+  territory?: {
+    /** Detected hostiles within this radius of the actor provoke it. */
+    aggressionRadius: number;
+    /** Targets and pursuit never go beyond this radius of home. */
+    leashRadius: number;
+    /** Out-of-combat time at home before health recovers. */
+    regenerationDelaySeconds: number;
+    regenerationPerSecond: number;
+  };
   movement?: {
     speed: number;
     /** Resolves terrain rules outside actor state. */
@@ -41,6 +64,19 @@ export type ActorDefinition = {
   };
 };
 
+/** Fixed damage dealt at a fixed cadence, without accuracy rolls. */
+export type Weapon = {
+  damage: number;
+  /**
+   * Reserved for future armor matchups such as kinetic versus energy. Every
+   * type currently deals its full damage.
+   */
+  damageType: string;
+  /** World-space reach from the attacker's center to the target's edge. */
+  range: number;
+  cooldownSeconds: number;
+};
+
 /** Mutable, serializable runtime state for one actor. */
 export type Actor = {
   id: string;
@@ -66,7 +102,55 @@ export type Actor = {
   rallyPoint?: WorldPosition;
   /** Present only while a movement-capable actor has an active move order. */
   movement?: MovementOrder;
+  /** Current health; absent while undamaged. */
+  health?: number;
+  /** Present once the actor has fought, been hit, or received an attack. */
+  combat?: CombatState;
+  /** Present for actors whose definition has a territory. */
+  territory?: TerritoryState;
 };
+
+export type CombatState = {
+  /** Present while an armed actor pursues or attacks a target. */
+  attack?: AttackOrder;
+  /**
+   * Present while an automatic engagement or territory heads back. It ignores
+   * hostiles while the route proceeds; a blocked route keeps it for retries.
+   */
+  returning?: ReturnRoute;
+  /** A building's weapon aim, independent of its placement facing. */
+  aimFacing?: number;
+  /** The tick from which its weapon may fire again. */
+  weaponReadyTick?: number;
+  /** The latest tick it dealt or took damage. */
+  activeTick?: number;
+  /** The latest hit it took. */
+  lastHit?: { attackerId: string; tick: number };
+};
+
+export type AttackOrder = RouteRetryState & {
+  targetId: string;
+  /** Where the target was last detected. */
+  lastKnown: WorldPosition;
+  /** Present for automatic engagements; the actor returns here afterward. */
+  post?: WorldPosition;
+};
+
+export type ReturnRoute = RouteRetryState & { point: WorldPosition };
+
+export type TerritoryState = { home: WorldPosition };
+
+/** An automatic route that retries a blocked point only after changes. */
+export type RouteRetryState = {
+  /**
+   * A point no route could approach. It retries once its point moves away or
+   * navigation changes.
+   */
+  blocked?: { at: WorldPosition; navigationVersion: number };
+};
+
+/** Keeps routes, and contact correction, inside a circle. */
+export type RouteBounds = { center: WorldPosition; radius: number };
 
 /** A move order and the route its behavior is following. */
 export type MovementOrder = {
@@ -85,7 +169,19 @@ export type MovementOrder = {
   navigationVersion?: number;
   /** The occupancy layer the route was planned on. */
   occupancyLayer?: OccupancyLayer;
+  /** Plans leaving this circle are blocked rather than followed. */
+  bounds?: RouteBounds;
 };
+
+/** Current health; absent health means undamaged. */
+export function healthOf(actor: Pick<Actor, "health">, max: number): number {
+  return actor.health ?? max;
+}
+
+/** Orders actor IDs for deterministic iteration and tie-breaking. */
+export function compareIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 export type DeepReadonly<T> = T extends readonly (infer Item)[]
   ? readonly DeepReadonly<Item>[]
@@ -115,6 +211,8 @@ export type ActorRenderState = DeepReadonly<
     | "movement"
     | "construction"
     | "rallyPoint"
+    | "health"
+    | "combat"
   >
 >;
 

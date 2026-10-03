@@ -42,6 +42,7 @@ const REASONS: Record<PlacementReason, string> = {
   "insufficient-materials": "Not enough Materials for this building.",
   "resource-site": "Keep Materials sites and salvage clear of buildings.",
   unexplored: "Explore the whole footprint before building there.",
+  debris: "Wait for the debris to clear.",
 };
 
 export type BuildingPlacementChoice = {

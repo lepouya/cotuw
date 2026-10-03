@@ -1,4 +1,7 @@
+import { ARC_ACTOR_DEFINITIONS } from "./arc";
+import { WILDLIFE_ACTOR_DEFINITIONS } from "./wildlife";
 import { TerrainGrid } from "../simulation/terrain";
+import type { ActorDefinition } from "../simulation/actor";
 import { defineScenario } from "../simulation/scenario";
 import {
   PROTOTYPE_MAP_SIZE,
@@ -15,16 +18,32 @@ const map = new TerrainGrid({
   createTerrain: prototypeTerrainAt,
 });
 
+/** Every actor type the opening can contain. */
+export const ECONOMY_ACTOR_DEFINITIONS: readonly ActorDefinition[] = [
+  ...ARC_ACTOR_DEFINITIONS,
+  ...WILDLIFE_ACTOR_DEFINITIONS,
+];
+
 export const ECONOMY_SCENARIO = defineScenario({
   id: "arc-economy-opening",
   tileSize: 1,
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),
+  playerFaction: "arc",
   buildings: [
     {
       actorId: "starting-command-center",
       definitionId: "arc-command-center-prototype",
       origin: { x: 8, z: 50 },
+    },
+  ],
+  // The lone wolf guards the southern path, out of sight of the base.
+  units: [
+    {
+      actorId: "lone-wolf",
+      definitionId: "wolf",
+      tile: { x: 46, z: 32 },
+      facing: -Math.PI / 2,
     },
   ],
   materials: 150,

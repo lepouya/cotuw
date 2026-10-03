@@ -6,6 +6,7 @@ import {
 } from "./placement";
 import { findNavigationPath } from "./navigation";
 import { disconnectedBuildings } from "./support";
+import { secondsToTicks } from "./clock";
 
 import type {
   Actor,
@@ -16,6 +17,8 @@ import type {
 } from "./actor";
 import type { TileCoord } from "./grid";
 import type { TerrainView } from "./terrain";
+import { compareIds, healthOf } from "./actor";
+import { distance } from "./world";
 import type { WorldPosition } from "./world";
 import type { TrainingEvaluation } from "./production";
 import type { EconomyCommand } from "./command";
@@ -87,9 +90,16 @@ export const PRODUCTION_QUEUE_LIMIT = 5;
 export const materialsCost = (definition: ActorDefinition) =>
   definition.materialsCost ?? 0;
 
-/** Timed work takes at least one tick. */
-export const secondsToTicks = (seconds = 0, tickSeconds: number) =>
-  Math.max(1, Math.ceil(seconds / tickSeconds));
+/** Half the construction cost, scaled by remaining health and rounded down. */
+export function saleMaterialsRefund(
+  actor: Pick<ActorRenderState, "health">,
+  definition: ActorDefinition,
+): number {
+  const max = definition.health ?? 1;
+  return Math.floor(
+    (materialsCost(definition) * healthOf(actor, max)) / (2 * max),
+  );
+}
 
 export function validateEconomyDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,
@@ -466,13 +476,8 @@ export function updateEconomy(
     world.spawn(result.actor, id);
     byId.set(result.actor.id, result.actor);
   }
-  const distance = (actor: Actor, point: WorldPosition) =>
-    Math.hypot(
-      actor.worldPosition.x - point.x,
-      actor.worldPosition.z - point.z,
-    );
   const near = (actor: Actor, point: WorldPosition) =>
-    distance(actor, point) < map.tileSize * 0.3;
+    distance(actor.worldPosition, point) < map.tileSize * 0.3;
   const reachable = (actor: Actor, target: WorldPosition) => {
     const definition = definitions.get(actor.definitionId)!;
     const grid = world.behaviors
@@ -515,14 +520,15 @@ export function updateEconomy(
       .map((tile) => ({ tile, point: map.tileCenter(tile.x, tile.z) }))
       .sort(
         (a, b) =>
-          distance(actor, a.point) - distance(actor, b.point) ||
+          distance(actor.worldPosition, a.point) -
+            distance(actor.worldPosition, b.point) ||
           a.tile.z - b.tile.z ||
           a.tile.x - b.tile.x,
       )
       .find(({ point }) => reachable(actor, point))?.point;
   };
   for (const worker of [...economy.harvesters].sort((a, b) =>
-    a.actorId < b.actorId ? -1 : 1,
+    compareIds(a.actorId, b.actorId),
   )) {
     const actor = byId.get(worker.actorId)!;
     const gathering = definitions.get(actor.definitionId)!.harvesting!;

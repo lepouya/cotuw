@@ -2,7 +2,10 @@ import { harvestingRecoveryCost } from "../src/simulation/economy";
 import type { ActorDefinition } from "../src/simulation/actor";
 import { describe, expect, test } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
-import { ECONOMY_SCENARIO } from "../src/content/economy-scenario";
+import {
+  ECONOMY_ACTOR_DEFINITIONS,
+  ECONOMY_SCENARIO,
+} from "../src/content/economy-scenario";
 import { createMissionSimulation } from "../src/simulation/mission";
 import {
   defineScenario,
@@ -29,6 +32,7 @@ const mapOptions = {
 const contentMap = new TerrainGrid(mapOptions);
 const scenario = defineScenario({
   id: "economy-test",
+  playerFaction: "arc",
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
   terrain: contentMap.terrainState(),
@@ -168,13 +172,20 @@ const gather = (siteId = "site"): MissionCommand => ({
 
 describe("Materials economy", () => {
   test("starts with a fixed Command Center and exactly enough for the first economic pair", () => {
-    const state = exploredScenarioState(ECONOMY_SCENARIO, definitions);
+    const state = exploredScenarioState(
+      ECONOMY_SCENARIO,
+      ECONOMY_ACTOR_DEFINITIONS,
+    );
     expect(state.actors.map((actor) => actor.definitionId)).toEqual([
       "arc-command-center-prototype",
+      "wolf",
     ]);
     expect(state.economy!.materials).toBe(150);
     expect(Object.isFrozen(ECONOMY_SCENARIO.terrain.tiles)).toBe(true);
-    const independent = exploredScenarioState(ECONOMY_SCENARIO, definitions);
+    const independent = exploredScenarioState(
+      ECONOMY_SCENARIO,
+      ECONOMY_ACTOR_DEFINITIONS,
+    );
     state.economy!.sites[0].remainingMaterials = 0;
     expect(independent.economy!.sites[0].remainingMaterials).toBe(200);
   });
@@ -826,7 +837,7 @@ describe("economy persistence", () => {
     const source = serializeMission(simulation.snapshot(), 1);
     expect(() =>
       deserializeMission(
-        source.replace('"version":2', '"version":1'),
+        source.replace('"version":3', '"version":2'),
         scenario,
         1,
       ),

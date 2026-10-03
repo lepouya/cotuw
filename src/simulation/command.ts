@@ -2,7 +2,9 @@ import type { TerrainEdit } from "./terrain";
 import type { ActorPlacement, PlacementReason } from "./placement";
 import type { TrainingReason } from "./production";
 import type { WorldPosition } from "./world";
+import type { RouteBounds } from "./actor";
 import type { EconomyReason } from "./economy";
+import type { AttackReason } from "./combat";
 
 /** Orders an actor to approach a target using its movement rules. */
 export type MoveCommand = {
@@ -16,6 +18,13 @@ export type GroupMoveCommand = {
   kind: "group-move";
   actorIds: string[];
   target: WorldPosition;
+};
+
+/** Orders an armed actor to pursue and attack a detected hostile. */
+export type AttackCommand = {
+  kind: "attack";
+  actorId: string;
+  targetId: string;
 };
 
 /** Cancels an actor's current order. */
@@ -32,10 +41,12 @@ export type ActorCommand = MoveCommand | StopCommand;
 
 /**
  * An actor command as its behavior receives it. Only the mission adds
- * `requestedTarget`, when a group member can only approach the group's click.
+ * `requestedTarget`, when a group member can only approach the group's click,
+ * and `bounds`, for automatic routes that must stay inside an area.
  */
 export type AppliedActorCommand =
-  (MoveCommand & { requestedTarget?: WorldPosition }) | StopCommand;
+  | (MoveCommand & { requestedTarget?: WorldPosition; bounds?: RouteBounds })
+  | StopCommand;
 
 /**
  * Changes a mission's simulation terrain at the start of a tick, so saves and
@@ -103,6 +114,7 @@ export type ActorRemovalCommand = Extract<
 
 export type MissionCommand =
   | ActorCommand
+  | AttackCommand
   | SetRallyPointCommand
   | GroupMoveCommand
   | TerrainCommand
@@ -123,7 +135,9 @@ type RejectionReason<C extends MissionCommand> = C extends PlaceActorCommand
     ? TrainingReason
     : C extends EconomyCommand
       ? EconomyReason
-      : never;
+      : C extends AttackCommand
+        ? AttackReason
+        : never;
 
 /** Whether the mission accepted a command at the start of `tick`. */
 export type CommandOutcome<C extends MissionCommand = MissionCommand> =

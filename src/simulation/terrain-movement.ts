@@ -7,7 +7,7 @@ import {
   traversalCostAt,
 } from "./navigation";
 import { isOccupancyLayer } from "./occupancy";
-import { isFinitePosition, withinBounds } from "./world";
+import { distance, isFinitePosition, withinBounds } from "./world";
 
 import type { TerrainBounds, TerrainView } from "./terrain";
 import type { OccupancyLayer, OccupancyView } from "./occupancy";
@@ -16,6 +16,7 @@ import type {
   ActorBehavior,
   ActorDefinition,
   MovementOrder,
+  RouteBounds,
 } from "./actor";
 import type { MovementProfile, NavigationPath } from "./navigation";
 import type { WorldPosition } from "./world";
@@ -73,6 +74,10 @@ export function createTerrainMoveBehavior(
       sameTile(map, order.destination, path.destination);
     if (
       !path ||
+      !withinRouteBounds(order.bounds, [
+        actor.worldPosition,
+        ...path.waypoints,
+      ]) ||
       (!keepsDestination && !getsCloser(grid, actor.worldPosition, path))
     ) {
       markBlocked(order, actor.worldPosition, changes.version);
@@ -143,6 +148,18 @@ export function createTerrainMoveBehavior(
       ) {
         throw new RangeError(`Actor ${actor.id} has an invalid route layer.`);
       }
+      const bounds = order.bounds;
+      if (
+        bounds !== undefined &&
+        (!bounds ||
+          !bounds.center ||
+          !onMap(bounds.center) ||
+          !(bounds.radius > 0) ||
+          !Number.isFinite(bounds.radius) ||
+          !withinRouteBounds(bounds, [actor.worldPosition, ...waypoints]))
+      ) {
+        throw new RangeError(`Actor ${actor.id} has invalid route bounds.`);
+      }
     },
     handleCommand: (actor, definition, command) => {
       switch (command.kind) {
@@ -157,13 +174,26 @@ export function createTerrainMoveBehavior(
             command.target,
           );
           // A rejected order leaves the current one running.
-          if (!path || !getsCloser(grid, actor.worldPosition, path)) {
+          if (
+            !path ||
+            !withinRouteBounds(command.bounds, [
+              actor.worldPosition,
+              ...path.waypoints,
+            ]) ||
+            !getsCloser(grid, actor.worldPosition, path)
+          ) {
             return false;
           }
           actor.movement = {
             target: { ...command.target },
             ...(command.requestedTarget && {
               requestedTarget: { ...command.requestedTarget },
+            }),
+            ...(command.bounds && {
+              bounds: {
+                center: { ...command.bounds.center },
+                radius: command.bounds.radius,
+              },
             }),
             ...path,
             waypointIndex: 0,
@@ -473,6 +503,17 @@ function escapeCostFor(
     return undefined;
   }
   return grid.costAt(next.x, next.z);
+}
+
+/** Straight segments between points inside a circle stay inside it. */
+function withinRouteBounds(
+  bounds: RouteBounds | undefined,
+  waypoints: readonly WorldPosition[],
+): boolean {
+  return (
+    !bounds ||
+    waypoints.every((point) => distance(bounds.center, point) <= bounds.radius)
+  );
 }
 
 function markBlocked(

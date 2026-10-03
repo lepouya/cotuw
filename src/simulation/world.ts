@@ -23,6 +23,10 @@ export function withinBounds(
   return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
 }
 
+export function distance(left: WorldPosition, right: WorldPosition): number {
+  return Math.hypot(left.x - right.x, left.z - right.z);
+}
+
 export function clampToBounds(
   { x, z }: WorldPosition,
   { minX, maxX, minZ, maxZ }: WorldBounds,

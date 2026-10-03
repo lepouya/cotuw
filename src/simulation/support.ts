@@ -1,5 +1,7 @@
 import { deepFreeze } from "./actor";
 import type { ActorDefinition, ActorRenderState, DeepReadonly } from "./actor";
+import { compareIds } from "./actor";
+import { distance } from "./world";
 import type { WorldPosition } from "./world";
 
 export type SupportNode = {
@@ -82,11 +84,7 @@ export function createSupportNetwork(
           ]
         : [];
     })
-    .sort((a, b) =>
-      a.actorId < b.actorId ? -1 : a.actorId > b.actorId ? 1 : 0,
-    );
-  const distance = (a: SupportNode, b: SupportNode) =>
-    Math.hypot(a.center.x - b.center.x, a.center.z - b.center.z);
+    .sort((a, b) => compareIds(a.actorId, b.actorId));
   const edges: [SupportNode, SupportNode][] = [];
   for (let i = 0; i < nodes.length; i++)
     for (let j = i + 1; j < nodes.length; j++) {
@@ -95,7 +93,7 @@ export function createSupportNetwork(
       if (
         a.complete &&
         b.complete &&
-        distance(a, b) <= Math.max(a.radius, b.radius)
+        distance(a.center, b.center) <= Math.max(a.radius, b.radius)
       )
         edges.push([a, b]);
     }
@@ -130,8 +128,7 @@ export function supportsPosition(
     (node) =>
       node.complete &&
       node.connected &&
-      Math.hypot(node.center.x - point.x, node.center.z - point.z) <=
-        node.radius,
+      distance(node.center, point) <= node.radius,
   );
 }
 

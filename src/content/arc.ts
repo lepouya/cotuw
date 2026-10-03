@@ -4,6 +4,15 @@ export const ARC_ACTOR_DEFINITIONS = [
   {
     id: "arc-trooper",
     behaviorId: "terrain-move",
+    faction: "arc",
+    health: 100,
+    weapon: {
+      damage: 10,
+      damageType: "kinetic",
+      range: 6,
+      cooldownSeconds: 1,
+    },
+    guard: { acquisitionRadius: 7, chaseRadius: 10 },
     movement: { speed: 4, profileId: "surface-ground", radius: 0.3 },
     vision: { radius: 7 },
     materialsCost: 25,
@@ -12,6 +21,8 @@ export const ARC_ACTOR_DEFINITIONS = [
   {
     id: "arc-scout",
     behaviorId: "terrain-move",
+    faction: "arc",
+    health: 40,
     movement: { speed: 7, profileId: "surface-ground", radius: 0.28 },
     vision: { radius: 14 },
     materialsCost: 20,
@@ -19,6 +30,8 @@ export const ARC_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-command-center-prototype",
+    faction: "arc",
+    health: 2000,
     support: { radius: 12, root: true },
     vision: { radius: 14 },
     materialsCost: 300,
@@ -41,6 +54,8 @@ export const ARC_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-field-barracks",
+    faction: "arc",
+    health: 800,
     support: { radius: 6 },
     vision: { radius: 8 },
     materialsCost: 100,
@@ -63,6 +78,8 @@ export const ARC_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-materials-refinery",
+    faction: "arc",
+    health: 800,
     behaviorId: "idle",
     support: { radius: 6 },
     vision: { radius: 8 },
@@ -86,6 +103,8 @@ export const ARC_ACTOR_DEFINITIONS = [
   },
   {
     id: "arc-harvester",
+    faction: "arc",
+    health: 150,
     behaviorId: "terrain-move",
     materialsCost: 50,
     trainingSeconds: 6,

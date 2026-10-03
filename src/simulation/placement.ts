@@ -26,6 +26,7 @@ export const PLACEMENT_REASONS = [
   "resource-site",
   "outside-support",
   "unexplored",
+  "debris",
 ] as const;
 
 export type PlacementReason = (typeof PLACEMENT_REASONS)[number];

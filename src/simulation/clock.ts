@@ -1,5 +1,9 @@
 const BOUNDARY_TOLERANCE_TICKS = 1e-9;
 
+/** Timed work takes at least one tick. */
+export const secondsToTicks = (seconds = 0, tickSeconds: number) =>
+  Math.max(1, Math.ceil(seconds / tickSeconds));
+
 export type FixedStepClockOptions = {
   tickSeconds: number;
   /** A monotonic timestamp, such as `performance.now()`, when ticking starts. */

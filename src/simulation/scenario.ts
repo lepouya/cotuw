@@ -1,4 +1,4 @@
-import { deepFreeze } from "./actor";
+import { createActor, deepFreeze } from "./actor";
 import { createMissionState } from "./mission";
 import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
@@ -9,13 +9,26 @@ import type { ActorPlacement } from "./placement";
 import type { EconomyState, MaterialsSite, MaterialsLoot } from "./economy";
 import type { MissionState } from "./mission";
 import type { TerrainState } from "./terrain";
+import type { TileCoord } from "./grid";
+
+/** A mobile actor that starts at a tile's center. */
+export type ScenarioUnit = {
+  actorId: string;
+  definitionId: string;
+  tile: TileCoord;
+  facing?: number;
+};
 
 export type ScenarioDefinition = {
   readonly id: string;
   readonly tileSize: number;
   readonly terrainTypeIds: readonly string[];
   readonly terrain: TerrainState;
+  /** The faction the player controls and whose vision the fog records. */
+  readonly playerFaction: string;
   readonly buildings: readonly ActorPlacement[];
+  /** Territorial units make their starting position home. */
+  readonly units?: readonly ScenarioUnit[];
   readonly materials: number;
   readonly sites: readonly MaterialsSite[];
   readonly loot: readonly MaterialsLoot[];
@@ -40,16 +53,31 @@ export function createScenarioState(
     terrainTypeIds: scenario.terrainTypeIds,
   });
   map.restoreTerrainState(terrain);
-  const actors = scenario.buildings.map((placement) => {
-    const definition = definitions.find(
-      (definition) => definition.id === placement.definitionId,
-    );
-    if (!definition)
-      throw new RangeError(
-        `Unknown scenario building: ${placement.definitionId}.`,
-      );
-    return createTilePlacedActor(map, definition, placement);
+  const definitionFor = (id: string) => {
+    const definition = definitions.find((definition) => definition.id === id);
+    if (!definition) throw new RangeError(`Unknown scenario actor: ${id}.`);
+    return definition;
+  };
+  const buildings = scenario.buildings.map((placement) =>
+    createTilePlacedActor(
+      map,
+      definitionFor(placement.definitionId),
+      placement,
+    ),
+  );
+  const units = (scenario.units ?? []).map((unit) => {
+    const worldPosition = map.tileCenter(unit.tile.x, unit.tile.z);
+    const actor = createActor({
+      id: unit.actorId,
+      definitionId: unit.definitionId,
+      worldPosition,
+      facing: unit.facing,
+    });
+    if (definitionFor(unit.definitionId).territory)
+      actor.territory = { home: { ...worldPosition } };
+    return actor;
   });
+  const actors = [...buildings, ...units];
   const economy: EconomyState = {
     materials: scenario.materials,
     depositedMaterials: 0,
@@ -61,13 +89,14 @@ export function createScenarioState(
   return {
     ...createMissionState(actors),
     scenarioId: scenario.id,
+    playerFaction: scenario.playerFaction,
     terrain: structuredClone(terrain),
     economy,
     fog: createFogState(terrain.width, terrain.height),
   };
 }
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 export function serializeMission(
   state: MissionState,
@@ -96,6 +125,10 @@ export function deserializeMission(
     throw new RangeError("This mission save uses an unsupported version.");
   if (save.scenarioId !== scenario.id || save.state?.scenarioId !== scenario.id)
     throw new RangeError("This mission save belongs to a different scenario.");
+  if (save.state.playerFaction !== scenario.playerFaction)
+    throw new RangeError(
+      "This mission save has an incompatible player faction.",
+    );
   if (save.state.fog === undefined)
     throw new RangeError("A mission save requires explored terrain.");
   if (

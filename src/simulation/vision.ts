@@ -4,6 +4,7 @@ import { terrainSightlineClear } from "./terrain-sightline";
 import type { ActorDefinition, ActorRenderState } from "./actor";
 import type { SupportView } from "./support";
 import type { TerrainGrid } from "./terrain";
+import { distance } from "./world";
 import type { WorldPosition } from "./world";
 
 /** Sightline heights above the ground, in world units. */
@@ -18,13 +19,23 @@ export type FogState = {
   explored: string;
 };
 
-export type FogView = {
-  /** Changes whenever explored or visible tiles change. */
+/** Tiles a faction currently sees, without memory. */
+export type VisionView = {
+  /** Changes whenever visible tiles change. */
   readonly version: number;
+  isVisible: (x: number, z: number) => boolean;
+};
+
+export type Vision = VisionView & {
+  /** Replaces current vision; returns one `0` or `1` per tile. */
+  update: (sources: readonly VisionSource[]) => Readonly<Uint8Array>;
+  dispose: () => void;
+};
+
+export type FogView = VisionView & {
   /** Count of explored tiles, for exploration progress. */
   readonly exploredCount: number;
   isExplored: (x: number, z: number) => boolean;
-  isVisible: (x: number, z: number) => boolean;
 };
 
 export type Fog = FogView & {
@@ -81,10 +92,8 @@ export function visionSources(
   });
 }
 
-export function createFog(map: TerrainGrid, state: FogState): Fog {
-  const explored = Uint8Array.from(state.explored, (bit) => Number(bit));
-  let visible = new Uint8Array(explored.length);
-  let exploredCount = explored.reduce((sum, bit) => sum + bit, 0);
+export function createVision(map: TerrainGrid): Vision {
+  let visible = new Uint8Array(map.width * map.height);
   let version = 0;
   const viewpoints = new Map<string, readonly number[]>();
   const releaseTerrain = map.onChanged(() => viewpoints.clear());
@@ -98,34 +107,52 @@ export function createFog(map: TerrainGrid, state: FogState): Fog {
     }
     return tiles;
   };
-  const index = (x: number, z: number) =>
-    map.containsTile(x, z) ? z * map.width + x : -1;
   return {
     get version() {
       return version;
     },
+    isVisible: (x, z) =>
+      map.containsTile(x, z) && visible[z * map.width + x] === 1,
+    update: (sources) => {
+      const next = new Uint8Array(visible.length);
+      for (const source of sources)
+        for (const tile of tilesSeenFrom(source)) next[tile] = 1;
+      if (next.some((bit, tile) => bit !== visible[tile])) version += 1;
+      visible = next;
+      return visible;
+    },
+    dispose: releaseTerrain,
+  };
+}
+
+/** Current vision plus the terrain it has ever revealed. */
+export function createFog(map: TerrainGrid, state: FogState): Fog {
+  const explored = Uint8Array.from(state.explored, (bit) => Number(bit));
+  let exploredCount = explored.reduce((sum, bit) => sum + bit, 0);
+  const vision = createVision(map);
+  return {
+    // New explored tiles are always newly visible, so vision's version covers
+    // both.
+    get version() {
+      return vision.version;
+    },
     get exploredCount() {
       return exploredCount;
     },
-    isExplored: (x, z) => explored[index(x, z)] === 1,
-    isVisible: (x, z) => visible[index(x, z)] === 1,
+    isExplored: (x, z) =>
+      map.containsTile(x, z) && explored[z * map.width + x] === 1,
+    isVisible: vision.isVisible,
     update: (sources) => {
-      const next = new Uint8Array(explored.length);
-      for (const source of sources)
-        for (const tile of tilesSeenFrom(source)) next[tile] = 1;
-      let changed = false;
-      for (let tile = 0; tile < next.length; tile += 1) {
-        if (next[tile] !== visible[tile]) changed = true;
-        if (next[tile] && !explored[tile]) {
+      const visible = vision.update(sources);
+      for (let tile = 0; tile < visible.length; tile += 1) {
+        if (visible[tile] && !explored[tile]) {
           explored[tile] = 1;
           exploredCount += 1;
         }
       }
-      visible = next;
-      if (changed) version += 1;
     },
     state: () => ({ explored: explored.join("") }),
-    dispose: releaseTerrain,
+    dispose: vision.dispose,
   };
 }
 
@@ -149,8 +176,7 @@ export function visibleTiles(
     for (let x = center.x - reach; x <= center.x + reach; x += 1) {
       if (!map.containsTile(x, z)) continue;
       const target = map.tileCenter(x, z);
-      const distance = Math.hypot(target.x - origin.x, target.z - origin.z);
-      if (distance > radius) continue;
+      if (distance(target, origin) > radius) continue;
       if (
         terrainSightlineClear(map, observer, {
           ...target,
