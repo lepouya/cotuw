@@ -36,9 +36,10 @@ the crisis their conflict helped release.
    infrastructure, mobility, defense, and battlefield tools.
 3. **A living hostile world** — ancient sites, unstable wards, corruption, and
    world events create strategic decisions beyond attacking the opponent.
-4. **Approachable strategic depth** — scouting, planning, and map control matter
-   more than extreme actions-per-minute.
-5. **Small playable core first** — expand only after the basic RTS loop is fun.
+4. **Approachable strategic depth** — scouting, planning, and map control
+   matter more than extreme actions-per-minute.
+5. **Small playable core first** — expand only after the basic RTS loop is
+   fun.
 
 ## Requirements and scope
 
@@ -91,6 +92,11 @@ The traditional RTS loop is to establish a base, gather resources, construct
 production, train forces, scout, expand, and defeat mission opposition. The
 world may also contain neutral or local forces, unknown structures, objectives,
 and environmental pressure rather than only conventional faction bases.
+
+Resource denial is a strategy for both players and faction AI: disrupting
+gatherers, delivery buildings, or resource access reduces future spending and
+reinforcements. Existing stockpiles and forces remain available, so income loss
+does not automatically end an offensive.
 
 ## Factions
 
@@ -237,9 +243,10 @@ story.
   factions, balance, maps, campaigns, objectives, visual assets, audio, and
   localization. Base-game content uses the same public schemas wherever
   practical.
-- Mission behavior uses deterministic, sandboxed events and actions. Mods cannot
-  run arbitrary JavaScript or native code, access unrestricted platform
-  services, or initially provide unrestricted interface extensions.
+- Mods author mission behavior through deterministic, sandboxed events and
+  actions. They cannot run arbitrary JavaScript or native code, access
+  unrestricted platform services, or initially provide unrestricted interface
+  extensions.
 - The public mod schema is a living compatibility contract that must be
   revisited as game data evolves without weakening deterministic simulation,
   save compatibility, browser portability, or security.
@@ -504,28 +511,172 @@ story.
 - Five purpose-made SVG badges appear on promoted actors. New actors begin at
   zero unless a mission script explicitly specifies otherwise.
 
+## Mission behavior
+
+- Common mission logic uses data-driven triggers and actions. Complex campaign
+  missions and story sequences may use mission-specific TypeScript modules in
+  the codebase, independent of rendering and platform services.
+- Mission code reads deterministic simulation state and uses the shared event,
+  action, and command boundaries. Player choices enter through serializable
+  commands; persistent story state is explicit simulation data.
+- Events can change AI behavior profiles, posture permissions, and priorities,
+  assign goals, and issue ordinary commands. Negotiation outcomes can enable
+  offensive pressure. Actors obey shared movement, perception, and combat rules.
+- Ordinary scripted goals express intent; the AI chooses forces, routes,
+  timing, and tactics and responds to threats or infeasible goals. Mandatory
+  story goals may override normal strategic priorities, with authored
+  completion, failure, and cancellation conditions. They respect mission
+  permissions and shared simulation rules.
+
 ## NPC AI
 
-- NPC actors use the same movement, pathfinding, targeting, visibility, damage,
-  and command systems as player-controlled actors.
-- Each actor uses deterministic, serializable state for immediate behavior, with
-  stable identifiers resolving equal choices. Encounter coordinators may share
-  goals or alerts, while actors still execute their own actions.
-- Future faction AI layers a strategic director and group controllers above the
-  same actor controllers. Mission scripts assign goals or ordinary commands
-  rather than replacing core simulation logic.
-- M0 wolves use idle-at-home, alerted, pursuing, attacking, investigating,
-  returning-home, and regenerating states. They have no economy, base-building
-  logic, or strategic director.
-- A wolf retains a valid current target. Otherwise it selects the nearest
-  detected, reachable hostile within its leash, using stable actor ID to break
-  ties, without value targeting or coordinated focus fire.
-- A den alert shares an attacker's last-known position but not continuing hidden
-  knowledge. Each wolf chooses its own target after detection. Lost or
-  unreachable targets are investigated before returning home, and no alert
-  overrides the hard leash.
-- Opposing-faction base planning, economy, production, expansion, defense, and
-  attack planning require a later strategic-AI design pass.
+- NPCs use the same movement, pathfinding, targeting, visibility, damage, and
+  command systems as player-controlled actors.
+- Actor behavior is deterministic and serializable. Stable identifiers resolve
+  equal choices. Encounter coordinators share goals or alerts while individual
+  actors execute movement and combat.
+- Faction AI adds a strategic director and group controllers above actor
+  behavior. The director assigns priorities, budgets, and forces; groups
+  execute operations. M0 wolves use only actor and encounter control.
+
+### Faction strategy
+
+Building, economy, scouting, defense, military production, aggression,
+expansion, technology, and recovery run concurrently. Strategic postures change
+priorities and allocations:
+
+- **Establishing:** secure basic income, support, production, and protection.
+- **Developing:** grow income, production, technology, and map access.
+- **Pressuring:** pursue opportunities through probes, raids, or attacks.
+- **Defending:** reinforce threatened assets or mandatory objectives.
+- **Recovering:** regroup survivors and restore essential capacity after losses.
+
+Posture selection and spending follow these rules:
+
+- Choose posture from observed conditions, mission goals, and available
+  capacity. Urgent threats can trigger defense immediately; other changes need
+  sustained conditions. Defense ends after threats stay low for a tunable
+  interval.
+- Each AI faction uses a data-driven mission profile controlling posture
+  permissions and emphasis. Missions may disable offensive pressure; earlier
+  missions use gentler behavior. Profiles are independent of Easy, Normal, and
+  Hard combat scaling.
+- Protect essential income and immediate defense, then allocate remaining
+  resources and units through the profile. Crises reduce optional commitments,
+  use reserves, and prompt reassessment of active attacks.
+- A faction with offensive pressure disabled defends locally when attacked.
+  Wider retaliation requires an explicit mission rule or event.
+- Resource-denial operations target known economic opportunities when the
+  profile permits aggression. Income loss prompts protection and recovery.
+- Remember observed enemies, economic sites, and threats with last-seen
+  positions and observation ticks. Older reports become uncertain and prompt
+  fresh scouting. Hidden positions, enemy stockpiles, production queues, and
+  unobserved destruction stay unknown. Operations can investigate remembered
+  locations; attacks require current detection.
+
+### Faction operations
+
+- Operations have objectives, assigned forces, and completion, failure, and
+  cancellation conditions. Confirmed completion releases survivors for new
+  assignments; loss of detection alone does not confirm success.
+- Lost contact prompts investigation of the last-known location. End or
+  redirect an optional operation if the search finds no viable objective.
+- Blocked routes prompt replanning with bounded retries or waiting. Losses and
+  newly observed threats prompt a viability check and retreat, regrouping, or
+  permitted reinforcement.
+- Profile or relationship changes trigger reassessment. Cancel operations no
+  longer permitted and give survivors valid follow-up assignments.
+- Mandatory operations follow authored failure and cancellation rules and
+  report when they cannot proceed. Search limits, retry limits, retreat
+  thresholds, reinforcement budgets, and follow-up destinations are tunable or
+  mission-authored.
+
+### M0 wolves
+
+- Wolves use idle-at-home, alerted, pursuing, attacking, investigating,
+  returning-home, and regenerating states, with no economy or strategic
+  director.
+- Each encounter has a fixed circular territory with an authored center and
+  tunable hard leash radius. The lone wolf has its own territory; the five den
+  wolves share one. Each wolf returns to its own authored home inside it.
+- Wolves engage personally detected hostiles within their own sight and leash.
+  Terrain obstructs sight under the shared visibility rules. The alpha detects
+  farther than normal wolves; exact ranges remain tunable.
+- Retain a valid target. Otherwise choose the nearest personally detected,
+  reachable hostile within the leash, using stable actor ID for equal choices.
+  Wolves do not prioritize valuable or injured targets or coordinate focus fire.
+- Losing personal detection ends pursuit and starts return home. A confirmed
+  destroyed or invalid target ends the attack; engage another detected,
+  reachable hostile if available, otherwise return. Unobserved destruction
+  grants no knowledge. Temporary route blockage uses the movement rules below.
+- Fresh detection of a reachable hostile inside the leash interrupts return,
+  investigation, or regeneration and starts combat.
+- Damage stops regeneration and raises an alert at the wounded wolf's position
+  without revealing an unseen attacker. Damage alone does not divert return
+  or move a wolf from home.
+- Regenerate only at authored home after the out-of-combat delay. Wolves retain
+  damage during combat and pursuit. Dead wolves remain dead and do not respawn.
+
+### M0 wolf alerts
+
+- Fresh personal enemy sightings and incoming damage can originate alerts.
+  Each alert has a stable ID and a fixed snapshot of its originating wolf's
+  position. Observing another wolf's alert prompts investigation of that origin.
+- Alerts propagate through individual wolf sight and terrain sightlines. Relays
+  preserve the original ID and position. Each wolf responds at most once per
+  alert; observing or relaying it again cannot restart investigation.
+- Personal enemy detection takes priority. Otherwise retain an active
+  investigation. With no target or investigation, choose the nearest observed,
+  unhandled, unexpired alert reachable inside the leash, using stable alert ID
+  for equal choices. A new eligible alert can interrupt return or regeneration.
+- Alert lifetime runs from creation; relays do not refresh it. Expiry prevents
+  new responses without cancelling an investigation already underway.
+- At the origin, check for enemies for a short interval, then return home if
+  none are personally detected. The encounter rests when survivors are home
+  with no targets, investigations, or pending eligible alerts.
+- Alert investigation and combat never override the hard leash. Alert lifetime
+  and investigation duration remain tunable.
+
+### M0 wolf movement
+
+- Temporarily blocked pursuit or investigation permits a short wait and
+  replanning inside the leash. After a tunable interval without progress,
+  abandon the approach and return home.
+- Remember failed approaches until target movement or relevant navigation
+  changes permit another attempt. Handled alerts remain handled.
+- If home is blocked, approach the closest reachable waiting point inside the
+  territory with deterministic tie-breaking. Keep authored home as the goal
+  and retry when conditions change. Waiting wolves cannot regenerate short of
+  home, but can respond to fresh threats and eligible alerts.
+
+### M0 wolf implementation contract
+
+- Content supplies normal and alpha detection ranges, homes and territories,
+  leash radii, alert lifetime, investigation wait, blocked retry and
+  stalled-time limits, arrival tolerance, combat values, and regeneration delay
+  and rate.
+- Saves preserve wolf state and assignments, targets, home and territory
+  references, health, combat and regeneration timing, active routes and bounds,
+  investigation progress, failed approaches, and retry timing.
+- Saved alerts retain IDs, creation and expiry ticks, origins, propagation
+  state, response history, and the next alert ID. Loading preserves
+  continuation and cannot duplicate an alert or restart a handled response.
+  Personal vision and derived encounter-rest status are reconstructed.
+
+Deterministic acceptance checks cover:
+
+- Personal detection, terrain occlusion, alpha range, and lone-wolf isolation
+  from den alerts in the authored M0 map.
+- Relay chains, fixed origins, one response per alert, stable simultaneous
+  choices, expiry, and investigation completion.
+- Detection loss, fresh threats and alerts, unseen incoming hits, and target
+  retention during combat or temporary blockage.
+- Hard leashes, failed-route suppression, blocked homes, retries, and delayed
+  regeneration only at home.
+- Save continuation in every wolf state, including blocked routes and active
+  relay chains, matching uninterrupted state tick for tick.
+- Identical results across actor iteration order and render or fixed-tick
+  scheduling batches, without render or platform state entering wolf logic.
 
 ## Construction and training sandbox
 
@@ -717,20 +868,20 @@ story.
   route counts as idle. Any armed actor without an order fires at a detected
   attacker that hit it in the previous tick and is in range, without leaving
   its route.
-- Guards and territorial NPCs share one return rule: they ignore hostiles while
-  the route back proceeds. A blocked return keeps its point and retries after
+- In this prototype, guards and territorial NPCs ignore hostiles while the
+  route back proceeds. A blocked return keeps its point and retries after
   navigation changes, and the actor may fight meanwhile. Move, Stop, and Attack
   replace a guard's return.
-- Territorial NPCs engage the nearest detected hostile within their aggression
-  radius, or whoever damaged them in the previous tick. They keep a valid target
-  inside the leash around home; otherwise they return home. Pursuit routes
-  carry the leash as route bounds, so planning never leaves it, and contact
-  correction cannot push a fighting NPC beyond it. Blocked pursuit waits for
-  target movement or navigation changes. Beyond the leash an NPC drops its
-  target and heads home; stranded there, it answers attackers in range but
-  pursues nothing. At home and out of combat for their regeneration delay,
-  they recover health at a fixed rate. Pack alerts and last-known
-  investigation follow with the den encounter.
+- This prototype's territorial NPCs engage the nearest detected hostile within
+  their aggression radius, or whoever damaged them in the previous tick. They
+  keep a valid target inside the leash around home; otherwise they return home.
+  Pursuit routes carry the leash as route bounds, so planning stays inside it.
+  Contact correction cannot push a fighting NPC beyond it. Blocked pursuit
+  waits for target movement or navigation changes. Beyond the leash an NPC
+  drops its target and heads home; stranded there, it answers attackers in
+  range but pursues nothing. At home and out of combat for their regeneration
+  delay, they recover health at a fixed rate. The full M0 mission uses the
+  [wolf behavior requirements](#m0-wolves).
 - Destruction gives no refund and leaves remains for 60 seconds: a fallen unit
   or corpse, or building debris that blocks placement on its footprint until it
   clears. Remains never block movement or shots and cannot be selected.
@@ -788,6 +939,10 @@ a later tutorial could be made.
   defeat the lone wolf.
 - One Trooper can defeat the first lone wolf. Four normal wolves and one
   125%-scale alpha occupy a den and require multiple Troopers.
+- The den occupies a secluded mountain enclosure using the existing ranges,
+  with a chokepoint entrance. The lone wolf guards the outside approach.
+  Layout, sightlines, and encounter ranges keep den wolves, including the
+  alpha, from observing the lone wolf's alerts.
 - Defeating all six wolves completes the objective. The player may continue in
   free play afterward.
 - Command Center destruction or a failed mandatory objective causes hard defeat.
@@ -812,6 +967,12 @@ a later tutorial could be made.
   mission snapshot; a campaign save owns longer-lived choices and progression.
 - Authoritative simulation state is serialized. Rendering objects, navigation
   caches, effects, and platform handles are reconstructed.
+- Mission and AI state includes goals, assignments, observations, plans,
+  cooldowns, deterministic random state when used, and persistent story flags,
+  timers, and branches. Events retain progress, completed one-time triggers,
+  pending actions, and effective behavior profiles. Loading resumes without
+  repeating completed events. Executable code and content definitions come
+  from the game build.
 - A mission snapshot includes simulation terrain and its navigation version.
   An actor's active route is simulation state, so a loaded mission continues
   every move exactly as an uninterrupted one would, without recalculating.
@@ -837,8 +998,12 @@ a later tutorial could be made.
     approach.
 - **Future systems**
   - Technology-tree and permanent-research design.
-  - Opposing-faction and allied strategic AI behavior, including economy, base
-    planning, production, expansion, defense, and attacks.
+  - Script conflict precedence, missing-target policies, and mission-driven
+    changes to hostile, neutral, or allied relationships.
+  - Historical strategic intelligence sharing and uncertainty tuning beyond
+    the locked allied vision and detection rules.
+  - Faction build plans, force composition, budgets, and behavior-profile
+    schemas and tuning for concrete missions.
   - Deterministic mod dependency and load-order resolution, overrides, save
     compatibility across mod changes, trust and signing, and exact console APIs.
   - Multiplayer session rules, lobby flow, networking, and replay requirements.

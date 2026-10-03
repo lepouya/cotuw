@@ -77,11 +77,14 @@ the requirements.
 - **0.41, M0 map:** the movement map has slopes, cliffs, paths, rough ground,
   one wolf, and salvage. The compact mission layout, five-wolf den and alpha,
   mission landmarks, and recovery loot placement still need integration.
-- **0.42, wolf AI:** target retention, stable choices, pursuit, hard leash,
-  return, regeneration, and saved combat continuation work. Pack alerts,
-  last-known-position investigation, and the complete serializable state
-  machine remain. Q29's remaining transition and alert rules are in
-  [the questionnaire](design-questionnaire.md#remaining-q29-m0-follow-ups).
+- **0.42, wolf AI:** baseline target retention, stable choices, pursuit, hard
+  leash, return, regeneration, and saved combat continuation work.
+  Personal perception, shared den territories, visible-wolf alert propagation,
+  investigation, return interruptions, blocked-route policies, and the complete
+  serializable state machine remain. Q29's M0 gameplay decisions are
+  resolved; the [wolf implementation contract](
+    ../DESIGN.md#m0-wolf-implementation-contract) defines content, saves, and
+  acceptance checks.
 - **0.43, mission interface:** sidebar tabs, resource display, count-based
   practice goals, status feedback, and network alerts work. Mission objectives,
   victory results, the radial menu, general notifications, explanatory
@@ -119,10 +122,10 @@ the requirements.
 
 ## Recommended next task
 
-Complete the remaining
-[Q29 wolf rules](design-questionnaire.md#remaining-q29-m0-follow-ups),
-then implement **0.42**'s pack alerts, last-known-position investigation, and
-complete serializable state machine. These support the den encounter in
+Plan and implement **0.42** using the locked wolf rules and the
+[wolf contract](../DESIGN.md#m0-wolf-implementation-contract). Scope includes
+personal perception, visible-wolf alert propagation, alert investigation, and
+the complete serializable state machine. These support the den encounter in
 **0.41**, followed by mission objectives and victory in **0.43**.
 
 Animation and the remaining persistence controls retain their own open scope.

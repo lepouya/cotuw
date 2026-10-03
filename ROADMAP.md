@@ -122,11 +122,13 @@ base-building RTS loop, its technical architecture, and its player interface.
       rules.
 - [x] 0.40 Implement deterministic rifle and wolf combat, Attack Move, health,
       damage feedback, destruction, corpse cleanup, and Command Center defeat.
-- [ ] 0.41 Build the compact branching M0 map with weighted rough terrain, one
-      lone wolf, the five-wolf den, landmarks, and recovery Materials loot.
+- [ ] 0.41 Build the compact branching M0 map with weighted rough terrain, an
+      isolated lone-wolf approach, a mountain-enclosed five-wolf den and
+      chokepoint entrance, landmarks, and recovery Materials loot.
 - [ ] 0.42 Implement the deterministic, serializable wolf state machine:
-      persistent and stable target selection, last-known-position pack alerts,
-      pursuit, hard leash, investigation, return, and regeneration.
+      personal sight and stable target selection, visible-wolf alert
+      propagation, pursuit, hard leash, alert investigation, return on lost
+      detection, and regeneration.
 - [ ] 0.43 Implement the sidebar, top bar, radial context menu, objectives,
       alerts, notifications, explanatory popups, and victory or defeat results.
 - [ ] 0.44 Implement manual save/load, restart, rolling quicksave, rolling

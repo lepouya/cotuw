@@ -6,10 +6,9 @@ uncovered while defining the first playable slice. It preserves the discussion,
 alternatives, rejected options, and deferred questions that explain how the
 design developed.
 
-`DESIGN.md` remains the source of truth for locked game specifications. When a
-decision here is ready, summarize it there with its decision date. Keep this
-document afterward as supporting design history and reference rather than
-deleting it.
+`DESIGN.md` remains the source of truth for locked game specifications. Record
+decision dates here and summarize current requirements there without dated
+decision entries. Keep this document as supporting rationale and reference.
 
 ## Table of contents
 
@@ -76,6 +75,7 @@ within their parent question.
   #q27-how-do-building-upgrades-work)
 - **Deferred:** [Q28 — Mod support](#q28-how-does-modding-work)
 - **Current:** [Q29 — NPC AI](#q29-how-should-npc-ai-work)
+  M0 wildlife is resolved; remaining faction foundations are current.
 
 ## How we will use this
 
@@ -1714,6 +1714,10 @@ may provide an emergency recovery path without introducing ancient caches.
   and introductory fight.
 - A den farther into the map contains four normal wolves and one alpha wolf,
   providing the larger final fight.
+- The den sits in a secluded mountain enclosure using the existing ranges,
+  with a chokepoint entrance. The lone wolf guards the outside approach;
+  sightlines and encounter ranges isolate its alerts from the den pack,
+  including the alpha's longer detection range.
 - The alpha is visually 25% larger than a normal wolf and has more health. It
   serves as the boss of the M0 mission; its exact health remains a balance
   value.
@@ -1912,7 +1916,7 @@ in hard defeat.
 
 #### Resolved follow-up: What happens when target detection is lost?
 
-- Attackers stop receiving the target's live position and travel toward its
+- ARC attackers stop receiving the target's live position and travel toward its
   last-known location without tracking hidden movement through fog of war.
 - If the target is detected again en route, the attack resumes.
 - If the attackers reach the last-known position without reacquiring the
@@ -1926,17 +1930,19 @@ in hard defeat.
 #### Resolved follow-up: How do wolves acquire and pursue targets?
 
 - Each encounter has a home territory: the lone wolf's path area or the den.
-- A wolf engages when an ARC actor enters its detected aggression radius or
-  attacks it.
-- Alerting any wolf at the den alerts all four normal wolves and the alpha,
-  preserving the intended five-wolf pack encounter.
+- A wolf engages when it personally detects an ARC actor within its own sight
+  range. Damage raises a local alert without revealing an unseen attacker.
+- Wolves that observe another wolf become alerted investigate the position
+  where that wolf stood when the alert began. Alerts propagate through
+  individual sight and terrain sightlines.
+- The alpha has a larger detection range than normal wolves.
 - Wolves choose a nearby detected ARC actor rather than using sophisticated
   focus-fire logic.
 - Wolves may attack any ARC unit or building they encounter but do not
   proactively seek the base beyond their territory.
 - Wolves pursue only within a defined leash around their home territory.
-- If a target escapes, they investigate its last-known position and then
-  return home.
+- If personal detection of the pursued target is lost, pursuit ends and the
+  wolf starts returning to its authored home.
 
 #### Resolved follow-up: What are the M0 attack types?
 
@@ -3777,9 +3783,9 @@ distribution, and how saves identify required mods.
   audio, and localization.
 - Base-game content uses the same public schemas as mods wherever practical so
   the supported format is exercised by the game itself.
-- Mission behavior uses a deterministic, sandboxed event-and-action system.
-  Mods cannot execute arbitrary JavaScript or native code or access platform
-  services outside the approved mod API.
+- Mods define mission behavior through deterministic, sandboxed events and
+  actions. They cannot execute arbitrary JavaScript or native code or access
+  platform services outside the approved mod API.
 - Unrestricted interface extensions are not part of the initial surface.
   Sandboxed scripting and UI-extension capabilities may be considered later.
 - This is a living compatibility contract. The team revisits the exact public
@@ -3837,8 +3843,11 @@ platform services, and the later multiplayer architecture.
 
 ### Q29. How should NPC AI work?
 
-**State:** Current for M0 wildlife behavior; the game-wide architecture is
-resolved and full strategic AI is deferred within Q29.
+**State:** Resolved for M0 wildlife behavior; current for remaining faction
+strategic foundations. Shared control layers, strategic postures, mission
+profiles, priorities, observation and memory, operation rules, and campaign
+scripting support are resolved. Script conflicts and relationship changes
+remain current; detailed faction plans, schemas, and tuning are deferred.
 
 Define the behavior and architecture for non-player-controlled actors. Separate
 local unit behavior, neutral wildlife, scripted mission actors, allied support,
@@ -3851,10 +3860,10 @@ recovery from losses.
 
 #### Existing constraints from resolved decisions
 
-- M0 requires Q15's deterministic wolf territory, pack-alert, pursuit, leash,
-  return, and regeneration behavior. Q29 must complete the architecture and
-  edge cases needed to implement and verify it. M0 has no competing faction
-  economy or strategic opponent.
+- M0 requires the resolved wolf territory, sight-based alerts, pursuit, leash,
+  investigation, return, and regeneration rules below. Q15 summarizes combat;
+  Q29 defines the wildlife transitions and edge cases. M0 has no competing
+  faction economy or strategic opponent.
 - NPC perception must obey Q14 fog and Q23 detection rather than reading hidden
   simulation information unless a scenario explicitly declares and
   communicates an exception.
@@ -3884,46 +3893,364 @@ recovery from losses.
   commands through the simulation boundary. They do not replace movement,
   combat, perception, or actor-state logic.
 - M0 wolves use these actor states: idle at home, alerted, pursuing, attacking,
-  investigating the last-known position, returning home, and regenerating.
+  investigating an observed alert, returning, and regenerating.
 
-#### Deferred Q29 strategic-AI phase
+#### Resolved Q29 foundation: How do faction strategic activities overlap?
 
-- Opposing-faction economy, base layout, construction, production, research,
-  expansion, defense, force composition, scouting, and attack planning require
-  a dedicated later design pass.
-- Allied strategy, adaptation, recovery after losses, and campaign-specific
-  personalities belong to that later phase as well.
-- M0 has no strategic director, base-building opponent, or AI economy and does
-  not need these decisions before its wildlife behavior can be implemented.
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
+Faction strategic AI remains outside M0 and task 0.42.
+
+- Strategic activities run concurrently. A faction can build and scout while
+  defending or attacking; its current posture changes priorities and resource
+  allocations rather than enabling only one activity at a time.
+- Establishment and building provide the economy, support connections,
+  production capacity, and base layout needed for current goals.
+- Economy maintains collection and replaces lost workers or resource access.
+- Scouting discovers routes, resources, enemies, and objectives, and refreshes
+  stale observations through ordinary vision and detection.
+- Defence assesses known threats and allocates units to protect important
+  assets, reinforce threatened locations, or intercept attackers.
+- Military production maintains a desired force and replaces losses, using
+  available technology and observed opposition to inform composition.
+- Aggression includes probing, harassment, raids, and committed attacks. Each
+  operation has an objective, assigned forces, and retreat conditions.
+- Expansion and technology invest in future income, access, production,
+  upgrades, or research when immediate needs allow.
+- Recovery regroups surviving forces and rebuilds essential capacity after
+  losses; it can reduce offensive commitment while other work continues.
+- The strategic director assigns priorities, budgets, and forces. Group
+  controllers execute operations; actor controllers handle local behavior.
+
+**Remaining strategic foundation follow-ups:**
+
+- How do simultaneous scripted actions resolve conflicts, and how do mission
+  events change faction relationships?
+- How are historical strategic reports shared beyond the locked allied vision
+  and detection rules, and how are uncertainty and verification tuned?
+
+Authoritative AI state must survive saving and loading. Exact faction schemas
+for goals, assignments, reservations, observations, timers, and plans are
+implementation specifications rather than additional gameplay choices.
+
+#### Resolved Q29 follow-up: How do competing goals share resources and units?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
+
+- Protect essential income and immediate defence with resources and forces
+  sufficient to keep the faction functioning.
+- Allocate remaining resources and units through the mission behavior profile.
+  Aggressive missions can favour attacks; cautious missions can favour growth.
+- During crises, postpone optional raids or investments, use available
+  reserves, and reassess whether active attacks should retreat.
+- Explicit mandatory story goals may override normal priorities when the
+  mission deliberately requires that behavior.
+- Exact reserves, allocations, and crisis thresholds remain tunable.
+- Resource denial is a strategy for players and faction AI. Disrupting
+  gatherers, delivery buildings, or resource access reduces future production
+  and replenishment and can divert forces or spending toward defence and
+  recovery. Existing stockpiles and armies can still sustain an offensive.
+- AI resource-denial operations must respect mission aggression permissions
+  and ordinary scouting and detection. Resource target selection and its
+  weighting remain later strategy and content work.
+
+#### Resolved Q29 follow-up: How does strategic AI remember enemy information?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
+
+- Remember observed units, buildings, economic sites, and threats with their
+  last-seen positions and observation ticks.
+- Memory is historical information, not a source of live hidden positions,
+  enemy stockpiles, production queues, or unobserved destruction.
+- Treat older reports as increasingly uncertain and scout to refresh them
+  before commitments that depend on their accuracy.
+- Strategic operations can investigate remembered locations. Actor attacks
+  still require current detection under the shared targeting rules.
+- Preserve authoritative observations and planning memory in saves. Exact
+  report lifetimes and confidence or verification rules remain open.
+
+#### Resolved Q29 follow-up: When should an operation end, replan, or retreat?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide. Applies to faction
+operations, not the M0 wolf state machine.
+
+- Each operation has an objective, assigned forces, and explicit completion,
+  failure, and cancellation conditions.
+- Confirmed objective completion ends the operation and releases surviving
+  forces for new assignments. Loss of detection alone does not confirm success
+  or reveal that a hidden target was destroyed.
+- On lost contact, investigate the last-known location using ordinary movement
+  and perception. If the search provides no viable objective, end or reassign
+  an optional operation rather than track hidden movement.
+- A blocked route triggers replanning within the mission's permissions. Bound
+  retries or stalled time; if no viable route is found, end the optional
+  operation and release or regroup its forces.
+- Significant losses or newly observed threats trigger a viability check.
+  Retreat, regroup, or seek permitted reinforcements when the objective no
+  longer appears achievable with the assigned forces.
+- A profile or relationship change triggers reevaluation of active operations.
+  Cancel operations that are no longer permitted and give surviving forces
+  valid follow-up assignments.
+- Mandatory scripted goals use their authored failure and cancellation rules
+  and report an infeasible objective to the mission logic. They do not silently
+  become optional or retry forever without a defined recovery policy.
+- Retreat conditions, retry limits, search scope, reinforcement budgets, and
+  follow-up destinations remain tunable or mission-authored values.
+
+#### Resolved Q29 follow-up: Which strategic postures guide the faction?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide. Postures express the
+director's current focus; they do not disable concurrent activities or require
+a fixed progression.
+
+- Establishing: secure basic income, support, production, and initial defence
+  when essential capacity has not yet been established.
+- Developing: grow income, production, technology, and map access while
+  scouting and maintaining a defensive reserve.
+- Pressuring: pursue known opportunities through probes, harassment, raids, or
+  committed attacks while maintaining the economy and home protection.
+- Defending: respond to a credible threat to important assets or mandatory
+  objectives by reinforcing them and reassessing offensive commitments.
+- Recovering: regroup survivors and restore essential capacity after losses
+  while maintaining defence and enough scouting to assess further threats.
+- Choose posture from observed conditions, mission goals, and available
+  capacity. Elapsed time alone does not force a transition.
+- Urgent threats can trigger defence immediately. Other changes require a
+  sustained reason, and defence ends only after the threat has stayed low for
+  a tunable interval, avoiding repeated switches from brief fluctuations.
+- Exact condition thresholds and intervals remain content and tuning values.
+
+#### Resolved Q29 follow-up: How does strategic behavior vary by mission?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
+
+- Each AI faction has a data-driven mission behavior profile controlling the
+  permitted postures and their emphasis.
+- A mission may disable pressure entirely, allowing the faction to build,
+  scout, and pursue its own affairs without initiating offensive operations.
+- Earlier missions use gentler behavior to support learning; later missions
+  may increase pressure as their objectives and intended experience require.
+- Mission behavior profiles are independent of Q25's Easy, Normal, and Hard
+  health and damage scaling. Changing difficulty does not change the profile.
+- A faction whose offensive pressure is disabled defends itself locally when
+  attacked. Wider retaliation requires an explicit mission rule or event.
+
+#### Resolved Q29 follow-up: Can mission events change faction behavior?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide. General mission scripting
+and faction strategic AI remain outside task 0.42.
+
+- Mission events can change an AI faction's active behavior profile, permitted
+  postures, and priorities, assign goals, and issue ordinary commands through
+  the simulation boundary.
+- A negotiation outcome, objective state, region entry, or mission timer can
+  trigger a behavior change through deterministic mission events and actions.
+- For example, a faction begins with pressure disabled and pursues its own
+  affairs. Failed negotiations trigger an event that enables pressure and
+  assigns an offensive goal. The AI then plans and executes that goal through
+  the normal director, group, and actor layers.
+- Scripts do not bypass shared movement, targeting, perception, or combat.
+  Any scenario perception exception still requires the existing explicit,
+  communicated declaration.
+- Event timing and ordering use simulation state. Negotiation results enter
+  the mission through serializable commands rather than UI-owned state.
+- Saves preserve event progress, fired one-time triggers, timers, pending
+  actions, and effective AI behavior. Loading resumes the same mission without
+  repeating completed one-time events or restoring an outdated profile.
+- The event schema and conflicting action precedence remain open. Behavior
+  changes reevaluate active operations under the resolved operation rules.
+
+#### Resolved Q29 follow-up: How much authority does a scripted goal have?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
+
+- Ordinary scripted goals express intent. The AI chooses forces, routes,
+  timing, and tactics within the active profile and can respond to urgent
+  threats or infeasible goals.
+- A mission can explicitly mark a goal mandatory when the story requires an
+  operation. Its completion, failure, and cancellation conditions define the
+  obligation; actors still obey normal simulation rules.
+
+**Remaining script follow-ups:**
+
+- Diplomatic relationships and offensive pressure are separate decisions.
+  Define whether an event also changes who is hostile or allied, rather than
+  assuming that a posture change alone changes those relationships.
+- Resolve conflicting simultaneous actions and missing targets
+  deterministically. Exact precedence and failure policies need a further
+  decision.
+
+#### Resolved Q29 follow-up: How do complex campaign missions use code?
+
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
+
+- Common mission behavior uses reusable, data-driven triggers and actions.
+- Complex campaign missions and storyline logic may use mission-specific
+  TypeScript modules maintained in the codebase. The data system does not need
+  to express every unique story sequence.
+- Mission modules consume deterministic simulation state and use the shared
+  event, action, and command boundaries to influence the mission and its AI.
+- Modules remain browser-runnable and independent of rendering, DOM, Tauri,
+  and wall-clock timing. Player choices enter as serializable commands.
+- Persistent story flags, timers, branches, and other mission-specific state
+  are explicit, serializable simulation data. Saves preserve runtime state;
+  executable code is supplied by the game build.
+- This code support applies to built-in campaign modules. Q28's mod support
+  continues to use sandboxed data and events without arbitrary code execution.
+
+#### Draft Q29 follow-up: Which mission behavior settings should be tunable?
+
+**Scope:** Game-wide candidate fields for the future profile schema. General
+posture permissions, priorities, and mission tuning are resolved above; exact
+fields, presets, and values remain deferred content and implementation work.
+
+- Posture permissions and relative priorities, including a distinct setting to
+  disable offensive pressure rather than merely making attacks infrequent.
+- Offensive timing and commitment: an opening grace period, time between
+  operations, concurrent operation limits, and the share of forces committed.
+- Defensive commitment: forces reserved at home, response area, reinforcement
+  priorities, and pursuit limits.
+- Development and exploration: economy, production, expansion, technology,
+  and scouting priorities and limits.
+- Transition stability: condition thresholds and the time they must persist
+  before changing posture or leaving defence.
+- Retaliation and escalation: whether provocation permits only local defence
+  or broader offensive operations, and which mission events change permissions.
+- Gentler early profiles could use longer grace periods, fewer and smaller
+  raids, stronger home reserves, and shorter pursuit. A peaceful profile can
+  prohibit offensive operations entirely.
+
+#### Deferred Q29 strategic-AI details
+
+- Exact build orders, base layouts, force compositions, budgets, attack and
+  retreat thresholds, and planning cadence need concrete rosters and missions.
+- Faction personalities, allied coordination, and campaign-specific strategies
+  need a later content and tuning pass using the agreed strategic foundations.
+- M0 has no strategic director, base-building opponent, or AI economy. These
+  foundations do not block implementation of its wildlife behavior.
 
 #### Resolved Q29 follow-up: How do M0 wolves select and share targets?
 
 - A wolf keeps its current target while that target remains valid, avoiding
   rapid switching between nearby actors.
-- When it needs a target, it chooses the nearest detected, reachable hostile
-  within its leash. A stable actor identifier resolves equal-distance ties.
+- When it needs a target, it chooses the nearest personally detected,
+  reachable hostile within its leash. A stable actor identifier resolves
+  equal-distance ties.
 - Wolves do not prioritize injured or valuable actors and do not coordinate
   focus fire.
-- Being attacked creates an encounter alert containing the attacker's
-  last-known position. A den alert sends every pack member toward that shared
-  position but provides no continuing knowledge of an unseen attacker.
-- Each wolf selects its own target after personally detecting a hostile.
-- A lost or unreachable target leads to investigation of its last-known
-  position and then a return home. Alerts and incoming attacks never override
-  the hard territory leash.
+- Wolves become aggressive on personal detection within their own sight range.
+  The alpha detects farther than normal wolves; exact ranges remain tunable.
+- A wolf that observes another wolf become alerted moves to investigate the
+  position where that wolf stood when the alert began. This fixed snapshot
+  does not follow the alerting wolf's later movement. Each wolf selects its
+  own target after personal detection.
+- Alert propagation uses individual sight and terrain sightlines rather than
+  a global den broadcast, and provides no live knowledge of unseen enemies.
+- Loss of personal detection ends pursuit of that target and starts return to
+  authored home. Investigation is the response to an observed wolf alert.
+- Alerts and incoming attacks never override the hard territory leash.
+- The den occupies a secluded mountain enclosure with a chokepoint entrance.
+  The lone wolf guards the outside approach, with layout, sightlines, and
+  encounter ranges preventing its alerts from reaching the den pack.
 
-#### Remaining Q29 M0 follow-ups
+**Decision date:** 2026-10-03. **Scope:** M0-only.
 
-- Define how home territories, home positions, and hard leash boundaries are
-  represented and how a returning wolf chooses its destination.
-- Complete state-transition edge cases for destroyed, loaded, undetected, or
-  unreachable targets and for wolves that become blocked or stuck.
-- Define pack-alert lifetime, repeated or simultaneous alerts, and when the den
-  encounter returns to its resting state.
-- Identify the tunable perception, pursuit, investigation, return, and
-  regeneration values without prematurely fixing balance numbers.
-- Specify the authoritative state that saves preserve and the deterministic
-  acceptance tests for the complete M0 wolf loop.
+#### Resolved Q29 follow-up: How do wolf alerts avoid repeated circulation?
+
+**Decision date:** 2026-10-03. **Scope:** M0-only.
+
+- Each alert has a stable identity and a fixed origin position, captured where
+  the originating wolf stood when the alert began.
+- A wolf responds at most once to a given alert. Seeing the same alert again
+  does not restart its investigation or create a new copy.
+- Relaying an alert preserves its identity and original position rather than
+  making the relay wolf's position a new destination.
+- A fresh personal enemy sighting can originate a new alert. Relaying or
+  repeatedly observing an existing alert does not count as a fresh sighting.
+- Alert lifetime, selection, and encounter reset follow the resolved lifecycle
+  below.
+
+#### Resolved Q29 follow-up: How do returning wolves react to fresh threats?
+
+**Decision date:** 2026-10-03. **Scope:** M0-only.
+
+- Fresh personal detection of a reachable hostile inside the leash interrupts
+  return or regeneration and begins engagement.
+- Taking damage interrupts regeneration and raises an alert at the wounded
+  wolf's own position. Damage does not reveal an unseen attacker's position.
+- Without a personally detected hostile, damage alone does not divert a
+  returning wolf or move one from home. Nearby wolves can respond to its alert
+  under the ordinary sight and propagation rules.
+- Previously handled alerts do not interrupt return or restart investigation.
+- A different eligible, unhandled alert can interrupt return under the resolved
+  alert lifecycle.
+
+#### Resolved Q29 follow-up: How are alerts selected, expired, and investigated?
+
+**Decision date:** 2026-10-03. **Scope:** M0-only.
+Exact durations remain tunable.
+
+- Personal detection of a reachable hostile takes priority over investigating
+  an alert. Retain a valid current combat target under the existing rules.
+- A wolf already investigating an alert keeps that assignment rather than
+  repeatedly switching to other alerts. Personal enemy detection can interrupt
+  investigation and start engagement.
+- With no target or investigation, choose the nearest visible, unhandled,
+  unexpired alert whose origin can be reached within the leash. A stable alert
+  identifier breaks equal-distance ties.
+- Such a new alert can interrupt return or regeneration. Previously handled
+  alerts remain ineligible.
+- Alerts have a tunable lifetime measured from their creation tick. Relaying
+  does not extend it. Expiration prevents new responses but does not cancel an
+  investigation already underway.
+- At the alert origin, look for a hostile for a short tunable interval, then
+  return home if nothing is personally detected. Failure to reach the origin
+  uses the resolved blocked investigation policy below.
+- The encounter rests when surviving wolves are home with no current targets,
+  investigations, or pending eligible alerts. Regeneration follows each
+  wolf's existing out-of-combat delay; dead wolves do not respawn.
+
+#### Resolved Q29 follow-up: How do wolves handle blocked targets and routes?
+
+**Decision date:** 2026-10-03. **Scope:** M0-only. Retry intervals and
+stalled-time limits are tunable.
+
+- A confirmed destroyed or invalid target ends that attack. Engage another
+  personally detected, reachable hostile if one exists; otherwise return home.
+  Unobserved destruction grants no extra knowledge.
+- Temporary blockage of pursuit or investigation permits a short wait and
+  replanning within the leash. If no viable route is found within the stalled
+  time limit, abandon that target or investigation and start returning.
+- Remember failed approaches so the same unchanged target or alert does not
+  immediately restart a failed route. Target movement or relevant navigation
+  changes can permit another target attempt; handled alerts remain handled.
+- If home is blocked, approach the closest reachable waiting point inside the
+  territory using deterministic tie-breaking. Keep the authored home as the
+  return goal and retry when the blockage or navigation changes.
+- A wolf waiting short of home does not regenerate there. It can respond to
+  personally detected threats or eligible new alerts under the normal rules.
+- Loading restores the active state, routes, failed approaches, timers, and
+  alert response history so it continues exactly as uninterrupted play would.
+
+#### Resolved Q29 follow-up: How are M0 territories and homes represented?
+
+**Decision date:** 2026-10-03. **Scope:** M0-only.
+
+- Each encounter has one fixed circular territory, represented by an authored
+  center and a tunable hard leash radius.
+- The lone wolf has its own territory. All four normal den wolves and the alpha
+  share one territory centered on the den.
+- Each wolf has its own authored home position inside its encounter territory
+  and returns there for resting and regeneration after disengaging.
+- The shared den boundary keeps pursuit consistent across the pack; separate
+  home positions keep the resting wolves spread out.
+
+#### Q29 M0 implementation contract
+
+M0 gameplay decisions are resolved and ready for task 0.42 planning. The
+[implementation contract](../DESIGN.md#m0-wolf-implementation-contract) owns
+the tunable content fields, authoritative save state, and deterministic
+acceptance checks. Exact balance values remain implementation and playtest
+tuning rather than additional questionnaire decisions.
 
 **Depends on:** Q5, Q8-Q15, Q23, Q25, campaign and mission design, and the
 broader faction rosters.
