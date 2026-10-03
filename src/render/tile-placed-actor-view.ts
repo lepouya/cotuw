@@ -58,7 +58,10 @@ export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
 >;
 
 export type TilePlacedActorViewRegistry = {
-  update: (actors: readonly TilePlacedActorState[]) => void;
+  update: (
+    actors: readonly TilePlacedActorState[],
+    disconnected?: ReadonlySet<string>,
+  ) => void;
   animate: (elapsedSeconds: number) => void;
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   setSelectedActor: (actorId: string | undefined) => void;
@@ -94,6 +97,7 @@ export function createTilePlacedActorViewRegistry(
   const materials = new Map<string, StandardMaterial>();
   const actorIds = new WeakMap<TransformNode, string>();
   let actors: readonly TilePlacedActorState[] = [];
+  let disconnectedIds: ReadonlySet<string> = new Set();
   let selectedActorId: string | undefined;
   let selection: ReturnType<typeof createFootprintOverlay> | undefined;
   let selectionKey = "";
@@ -246,9 +250,48 @@ export function createTilePlacedActorViewRegistry(
         ? createProductionExitMarker(scene, map, root, tiles, facing)
         : undefined;
     // The view key includes construction, so completion rebuilds the view.
+    const disconnected = !preview && disconnectedIds.has(actor.id);
     const constructing = !preview && actor.construction !== undefined;
     if (constructing)
       for (const mesh of root.getChildMeshes()) mesh.visibility = 0.45;
+    const offlineMaterials = new Map<StandardMaterial, StandardMaterial>();
+    if (disconnected)
+      for (const mesh of root.getChildMeshes()) {
+        if (!(mesh.material instanceof StandardMaterial)) continue;
+        let dimmed = offlineMaterials.get(mesh.material);
+        if (!dimmed) {
+          dimmed = mesh.material.clone(
+            `${root.name}-offline-${mesh.material.name}`,
+          );
+          dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
+          dimmed.emissiveColor = Color3.Black();
+          offlineMaterials.set(mesh.material, dimmed);
+        }
+        mesh.material = dimmed;
+      }
+    if (disconnected) {
+      const badge = MeshBuilder.CreateLineSystem(
+        `${root.name}-offline`,
+        {
+          lines: [
+            [
+              new Vector3(-0.3, 0.55, 0),
+              new Vector3(0.15, 0, 0),
+              new Vector3(-0.15, 0, 0),
+              new Vector3(0.3, -0.55, 0),
+            ],
+            [new Vector3(-0.55, -0.55, 0), new Vector3(0.55, 0.55, 0)],
+            [new Vector3(-0.55, 0.55, 0), new Vector3(0.55, -0.55, 0)],
+          ],
+        },
+        scene,
+      );
+      badge.parent = root;
+      badge.position.set(worldPosition.x, roof + 1, worldPosition.z);
+      badge.billboardMode = TransformNode.BILLBOARDMODE_ALL;
+      badge.color = new Color3(1, 0.7, 0.15);
+      badge.isPickable = false;
+    }
     const [, progressFill] = constructing
       ? ["background", "fill"].map((part) => {
           const mesh = MeshBuilder.CreateBox(
@@ -286,11 +329,13 @@ export function createTilePlacedActorViewRegistry(
         progressFill.position.x =
           worldPosition.x - map.tileSize * (1 - progress);
       },
-      animate: (seconds: number) => details?.update(constructing ? 0 : seconds),
+      animate: (seconds: number) =>
+        details?.update(constructing || disconnected ? 0 : seconds),
       dispose: () => {
         details?.dispose();
         exit?.dispose();
         root.dispose();
+        for (const material of offlineMaterials.values()) material.dispose();
       },
     };
   };
@@ -306,13 +351,18 @@ export function createTilePlacedActorViewRegistry(
         definitionId,
         tilePlacement,
         !!construction,
+        disconnectedIds.has(id),
         map.navigationChanges.generation,
         terrainRevisions.get(id),
       ]),
     create,
   });
 
-  const update = (nextActors: readonly TilePlacedActorState[]) => {
+  const update = (
+    nextActors: readonly TilePlacedActorState[],
+    disconnected: ReadonlySet<string> = disconnectedIds,
+  ) => {
+    disconnectedIds = disconnected;
     actors = nextActors;
     roots.sync(actors);
     for (const actor of actors) roots.get(actor.id)!.update(actor);

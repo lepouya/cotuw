@@ -11,13 +11,13 @@ declare global {
 }
 
 /** Uses real tick callbacks with a controlled clock, so 60 seconds need no wall-time wait. */
-async function controlledOpening(page: Page) {
+async function controlledOpening(page: Page, materials = 150) {
   await page.goto("/");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
   );
-  await page.evaluate(async () => {
+  await page.evaluate(async (materials) => {
     const harnessPath: string = "/e2e/harness.ts";
     const prototypePath: string = "/src/prototype.ts";
     const sidebarPath: string = "/src/ui/sidebar.ts";
@@ -53,7 +53,7 @@ async function controlledOpening(page: Page) {
       document.querySelector<HTMLCanvasElement>("#minimap")!,
       {
         ...sidebar.controls,
-        scenario: ECONOMY_SCENARIO,
+        scenario: { ...ECONOMY_SCENARIO, materials },
         onStateChanged: sidebar.update,
         showActor: sidebar.showActor,
         onDispose: sidebar.dispose,
@@ -64,7 +64,7 @@ async function controlledOpening(page: Page) {
       configurable: true,
       value: () => window.economyHarness.now,
     });
-  });
+  }, materials);
 }
 async function advance(page: Page, seconds: number) {
   await page.evaluate((seconds) => {
@@ -323,6 +323,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       {
         actors: snapshot.actors,
         economy: snapshot.economy,
+        support: undefined,
         tickSeconds: 1 / 60,
         submitCommand: () => 0,
       },
@@ -407,3 +408,213 @@ for (const touch of [false, true]) {
     }
   });
 }
+
+for (const touch of [false, true]) {
+  test(`rally points support ${touch ? "compact touch" : "mouse"} placement, cancellation, and production`, async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      viewport: touch
+        ? { width: 844, height: 390 }
+        : { width: 1280, height: 720 },
+      hasTouch: touch,
+    });
+    const page = await context.newPage();
+    try {
+      await controlledOpening(page);
+      await place(page, "#build-refinery", 12, 49, touch);
+      const panel = page.locator("#panel-units");
+      await action(page, '#panel-units [data-rally-action="set"]', touch);
+      const occupied = await terrainPoint(page, 8, 50);
+      if (touch) await page.touchscreen.tap(occupied.x, occupied.y);
+      else await page.mouse.click(occupied.x, occupied.y);
+      await expect(panel.locator("[data-rally-status]")).toContainText(
+        "Choose passable ground",
+      );
+      await action(page, '#panel-units [data-rally-action="cancel"]', touch);
+      await expect(panel.locator('[data-rally-action="cancel"]')).toBeHidden();
+      await action(page, '#panel-units [data-rally-action="set"]', touch);
+      const destination = await terrainPoint(page, 17, 52);
+      if (!touch) {
+        const selected = await page
+          .locator("#game-canvas")
+          .getAttribute("data-selected-actor");
+        await page.mouse.move(destination.x, destination.y);
+        await page.mouse.down();
+        await page.keyboard.press("Escape");
+        await page.mouse.up();
+        await advance(page, 0.1);
+        await expect(page.locator("#game-canvas")).toHaveAttribute(
+          "data-selected-actor",
+          selected!,
+        );
+        expect(
+          await page.evaluate(() =>
+            window.economyHarness.view.simulation.actors.some(
+              (actor) => actor.rallyPoint,
+            ),
+          ),
+        ).toBe(false);
+        await expect(
+          panel.locator('[data-rally-action="cancel"]'),
+        ).toBeHidden();
+        await action(page, '#panel-units [data-rally-action="set"]');
+      }
+
+      if (touch) await page.touchscreen.tap(destination.x, destination.y);
+      else await page.mouse.click(destination.x, destination.y);
+      await advance(page, 0.1);
+      await expect(panel.locator("[data-rally-status]")).toContainText(
+        "marked rally point",
+      );
+      expect(
+        await page.evaluate(
+          () => !!window.economyHarness.view.scene.getMeshByName("rally-point"),
+        ),
+      ).toBe(true);
+      await testInfo.attach("rally-point", {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+      await action(page, "#train-harvester", touch);
+      await advance(page, 15);
+      const result = await page.evaluate(() => {
+        const simulation = window.economyHarness.view.simulation;
+        return {
+          position: simulation.actors.find(
+            (actor) => actor.definitionId === "arc-harvester",
+          )!.worldPosition,
+          target: simulation.actors.find(
+            (actor) => actor.definitionId === "arc-materials-refinery",
+          )!.rallyPoint,
+        };
+      });
+      expect(result.position).toEqual(result.target);
+      await action(page, '#panel-units [data-rally-action="clear"]', touch);
+      await advance(page, 0.1);
+      expect(
+        await page.evaluate(
+          () => !!window.economyHarness.view.scene.getMeshByName("rally-point"),
+        ),
+      ).toBe(false);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("selling a support bridge pauses production and rebuilding restores it", async ({
+  page,
+}, testInfo) => {
+  await controlledOpening(page, 500);
+  await place(page, "#build-barracks", 16, 50);
+  await place(page, "#build-barracks", 22, 50);
+  const [bridgeId, remoteId] = await page.evaluate(() =>
+    window.economyHarness.view.simulation.actors
+      .filter((actor) => actor.definitionId === "arc-field-barracks")
+      .map((actor) => actor.id),
+  );
+  await page.evaluate(
+    (id) => window.economyHarness.view.selectActor(id),
+    remoteId,
+  );
+  await advance(page, 0.1);
+  await page.locator("#tab-units").click();
+  await page.locator("#train-trooper").click();
+  await advance(page, 1);
+  await page.evaluate(
+    (id) => window.economyHarness.view.selectActor(id),
+    bridgeId,
+  );
+  await advance(page, 0.1);
+  await page.locator("#tab-selection").click();
+  await page.locator("#remove-building").click();
+  await advance(page, 0.1);
+  await expect(page.locator("#network-alerts button")).toContainText(
+    "1 building disconnected",
+  );
+  await page.locator("#network-alerts button").click();
+  await page.evaluate(
+    (id) => window.economyHarness.view.selectActor(id),
+    remoteId,
+  );
+  await advance(page, 0.1);
+  await page.locator("#tab-units").click();
+  await expect(page.locator("#train-trooper")).toBeDisabled();
+  await expect(
+    page.locator("#panel-units [data-network-status]"),
+  ).toContainText("Disconnected");
+  await expect(page.locator("#production-queue button")).toContainText(
+    "Paused",
+  );
+  const progress = await page.evaluate(
+    () =>
+      window.economyHarness.view.simulation.economy!.production[0]
+        .completedTicks,
+  );
+  await advance(page, 10);
+  expect(
+    await page.evaluate(
+      () =>
+        window.economyHarness.view.simulation.economy!.production[0]
+          .completedTicks,
+    ),
+  ).toBe(progress);
+  expect(
+    await page.evaluate(() =>
+      window.economyHarness.view.scene.meshes.some((mesh) =>
+        mesh.name.endsWith("-offline"),
+      ),
+    ),
+  ).toBe(true);
+  await testInfo.attach("disconnected-network", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await place(page, "#build-barracks", 16, 50);
+  await advance(page, 5);
+  await expect(page.locator("#unit-roster button")).toHaveCount(1);
+  await expect(page.locator("#network-alerts button").first()).toContainText(
+    "1 building reconnected",
+  );
+  await page.evaluate(async () => {
+    const contentPath: string = "/src/content/arc.ts";
+    const prototypePath: string = "/src/prototype.ts";
+    const placementPath: string = "/src/simulation/placement.ts";
+    const { ARC_ACTOR_DEFINITIONS } = await import(contentPath);
+    const { createPrototypeMap } = await import(prototypePath);
+    const { createTilePlacedActor } = await import(placementPath);
+    const simulation = window.economyHarness.view.simulation;
+    const replacement = simulation.actors.find(
+      (actor) =>
+        actor.tilePlacement?.origin.x === 16 &&
+        actor.tilePlacement.origin.z === 50,
+    )!;
+    const backup = createTilePlacedActor(
+      createPrototypeMap(),
+      ARC_ACTOR_DEFINITIONS.find(
+        (definition: { id: string }) => definition.id === "arc-field-barracks",
+      ),
+      { actorId: "test-backup", origin: { x: 17, z: 52 } },
+    );
+    const totalTicks = Math.round(8 / simulation.tickSeconds);
+    backup.construction = {
+      paidMaterials: 100,
+      totalTicks,
+      completedTicks: totalTicks - 2,
+    };
+    simulation.spawnActor(backup);
+    document.querySelector("#network-alerts")!.replaceChildren();
+    simulation.submitCommand({ kind: "sell-actor", actorId: replacement.id });
+  });
+  // One render frame commits both the outage and the backup's completion.
+  await advance(page, 0.1);
+  await expect(page.locator("#network-alerts button")).toHaveText([
+    "1 building reconnected",
+    "1 building disconnected",
+  ]);
+  await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+    "data-simulation-fault",
+    "true",
+  );
+});

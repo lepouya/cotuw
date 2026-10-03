@@ -31,6 +31,7 @@ const sidebar = createSidebar(
   },
 );
 if (!sandbox) {
+  document.querySelector("#network-view-control")!.removeAttribute("hidden");
   document.querySelector("#resource-bar")!.removeAttribute("hidden");
   document.querySelector("#economy-overview")!.removeAttribute("hidden");
   document.querySelector("#scenario-label")!.textContent = "Materials economy";

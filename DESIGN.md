@@ -554,7 +554,30 @@ story.
   twelve seconds for a Command Center, eight for a Refinery or Barracks.
   Unfinished buildings cannot produce units or receive Harvester assignments.
   Cancelling a blueprint refunds its full cost and releases the footprint;
-  losing it gives no refund. Support coverage and disconnection remain pending.
+  losing it gives no refund. Placement requires the blueprint center inside a
+  completed connected building's support radius. Prototype radii are twelve
+  world units for Command Centers and six for Refineries and Barracks; one
+  world unit is one tile. These are data-driven tuning values.
+- Completed buildings link when either center lies within the other's support
+  radius: their center distance is at most the larger radius. Completed Command
+  Centers are network roots. Blueprints never relay support and operate only
+  while their center lies in connected coverage. Rootless clusters stay
+  disconnected. Redundant paths remain live when another path is lost.
+  Connectivity is derived from authoritative actors and definitions, and is
+  rebuilt after loading. Losing every completed Command Center is a loss state
+  with no placement recovery; it is reserved for a future defeat condition.
+- Disconnection pauses construction and production without losing payment,
+  progress, or queue order. Paused blueprints yield the shared construction
+  slot; the oldest connected blueprint advances. Restoring coverage resumes
+  work automatically. Disconnected Refineries retain Harvester assignments but
+  cannot accept cargo; mobile Harvesters keep their cargo and remain
+  controllable. Offline cancellation and sale use the normal refunds.
+- Support coverage appears during placement, building selection, and persistent
+  Network View. Active areas and links are solid; inactive radii and broken
+  connections are dashed with gap crosses. Offline buildings dim, stop animated
+  machinery, turn off emissive lights, and show a crossed power badge.
+  Sidebar states explain paused work. Grouped disconnection and restoration
+  alerts focus the camera on affected buildings. Active vision awaits fog.
   The opening has no combat or mission result.
 - A Refinery has one paid production or assigned Harvester slot. Barracks
   queues hold up to five paid orders and train one unit at a time. Cancelling
@@ -562,6 +585,14 @@ story.
   a free, passable adjacent exit; the paid order remains cancellable. A yellow
   placement-preview arrow marks the preferred exit side and follows rotation;
   blocked exits may send units to another adjacent side.
+- Each production building retains one optional ground rally point in its
+  mission state. Set Rally Point in Selection or Units enters click-or-tap
+  targeting; Cancel or Esc exits. The location must be passable for every unit
+  the producer trains and clear of building footprints. All prototype terrain
+  is currently explored. Clear Rally Point restores exit-and-idle behavior.
+  A flag appears only while the producer is selected. Newly completed units
+  exit first, then use ordinary movement toward the current rally point.
+  Later blockers use the normal pathfinding and unreachable-target rules.
 - A Harvester carries 100 Materials and takes 60 seconds to gather a full
   load, plus travel. It gathers the assigned tile, then resource tiles within
   two tiles on each axis. Candidates use distance from the assigned tile,
@@ -595,8 +626,8 @@ story.
   when complete. Reduced motion retains static activity cues.
 - Mission snapshots include stockpiles, tile yields, collected salvage,
   Harvester assignments, cargo, gathering progress, phases, routes, paid
-  production, blueprint progress and queue order, pending commands, and
-  reserved or retired actor identities.
+  production, rally points, blueprint progress and queue order, pending
+  commands, and reserved or retired actor identities.
   Versioned JSON envelopes check scenario, tick rate, map dimensions, and
   authored resource names, coordinates, and yields before simulation
   validation. Manual save/load UI remains pending.

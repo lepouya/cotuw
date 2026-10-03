@@ -46,9 +46,26 @@ delivery. Paid production orders show remaining time and a Cancel action with
 a full refund. A Refinery has one Harvester slot; a Barracks has five
 outstanding orders. Blocked exits hold finished production until a tile is
 cleared. Buildings sell for half cost. Buildings share one construction slot;
-**Units** shows building timers and cancellation for a full refund. Support
-coverage remains pending. This opening has no combat, victory, or defeat
-condition.
+**Units** shows building timers and cancellation for a full refund.
+
+Select a production building and use **Set Rally Point** in **Units** or
+**Selection**, then click or tap clear, passable ground. New units exit and
+move to its flag, which is visible while the building is selected. **Clear
+Rally Point** restores exit-and-idle behavior; **Cancel rally point** or `Esc`
+exits targeting.
+
+Paid buildings must place their center within connected support coverage.
+Completed Command Centers provide a 12-tile radius; Refineries and Barracks
+provide six. Completed buildings link when one center lies within the other's
+coverage, forming a chain back to a Command Center. Blueprints do not extend
+coverage. Selecting a building, placing one, or enabling **Network View** shows
+coverage and connection paths.
+Disconnected buildings dim, stop machinery, and show a crossed power badge.
+Construction and production pause without losing progress; paused construction
+releases the slot for connected work. Offline Refineries hold cargo delivery
+until reconnection. Broken links use dashed lines, and grouped alerts focus the
+camera on affected buildings. Cancellation and sale remain available offline.
+This opening has no combat, victory, or defeat condition.
 
 Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to

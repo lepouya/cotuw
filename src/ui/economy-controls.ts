@@ -1,3 +1,4 @@
+import { disconnectedBuildings } from "../simulation/support";
 import {
   harvestingRecoveryCost,
   materialsCost,
@@ -55,7 +56,7 @@ export function createEconomyControls(
   root: HTMLElement,
   simulation: Pick<
     MissionSimulation,
-    "actors" | "economy" | "tickSeconds" | "submitCommand"
+    "actors" | "economy" | "tickSeconds" | "submitCommand" | "support"
   >,
   options: {
     definitions: readonly ActorDefinition[];
@@ -137,6 +138,7 @@ export function createEconomyControls(
       const definition = actor && definitions.get(actor.definitionId);
       const worker = economy.harvesters.find((worker) => worker.actorId === id);
       const enabled = options.enabled();
+      const disconnected = disconnectedBuildings(simulation.support);
       const refineries = simulation.actors.filter(
         (actor) => definitions.get(actor.definitionId)?.refinery,
       );
@@ -144,7 +146,7 @@ export function createEconomyControls(
       details.hidden = !worker;
       if (worker) {
         element("harvester-details").textContent =
-          `Cargo ${worker.cargo}/${definition!.harvesting!.capacity} · ${PHASES[worker.phase]}`;
+          `Cargo ${worker.cargo}/${definition!.harvesting!.capacity} · ${PHASES[worker.phase]}${worker.refineryId && disconnected.has(worker.refineryId) ? " · Refinery disconnected; cargo delivery paused" : ""}`;
         sync(
           element("refinery-assignments"),
           refineries
@@ -196,11 +198,14 @@ export function createEconomyControls(
       const construction = simulation.actors.filter(
         (actor) => actor.construction,
       );
+      const activeConstruction = construction.find(
+        (actor) => !disconnected.has(actor.id),
+      );
       sync(
         element("construction-queue"),
-        construction.map((actor, index) => ({
+        construction.map((actor) => ({
           key: `construction:${actor.id}`,
-          text: `${options.names.get(actor.definitionId)} · ${index ? "Queued · " : "Building · "}${secondsLeft(actor.construction!)}s remaining · Cancel (+${actor.construction!.paidMaterials})`,
+          text: `${options.names.get(actor.definitionId)} · ${disconnected.has(actor.id) ? "Disconnected · Paused · " : actor === activeConstruction ? "Building · " : "Queued · "}${secondsLeft(actor.construction!)}s remaining · Cancel (+${actor.construction!.paidMaterials})`,
           disabled: !enabled,
           action: () =>
             submit({ kind: "cancel-construction", actorId: actor.id }),
@@ -212,7 +217,7 @@ export function createEconomyControls(
       const constructionDetails = element("construction-details");
       constructionDetails.hidden = !selectedConstruction;
       if (selectedConstruction)
-        constructionDetails.textContent = `${construction[0] === selectedConstruction ? "Building" : "Queued for construction"} · ${secondsLeft(selectedConstruction.construction!)}s remaining`;
+        constructionDetails.textContent = `${disconnected.has(selectedConstruction.id) ? "Disconnected · Construction paused" : activeConstruction === selectedConstruction ? "Building" : "Queued for construction"} · ${secondsLeft(selectedConstruction.construction!)}s remaining`;
       const jobs = economy.production.filter((job) => job.producerId === id);
       const mobile = definition?.movement ? actor : undefined;
       sync(element("resource-overview"), [
@@ -244,7 +249,7 @@ export function createEconomyControls(
         element("production-queue"),
         jobs.map((job) => ({
           key: `cancel:${job.actorId}`,
-          text: `${options.names.get(job.definitionId)} · ${job.exitBlocked ? "Exit blocked" : `${secondsLeft(job)}s remaining`} · Cancel (+${job.paidMaterials})`,
+          text: `${options.names.get(job.definitionId)} · ${disconnected.has(job.producerId) ? `Disconnected · Paused · ${secondsLeft(job)}s remaining` : job.exitBlocked ? "Exit blocked" : `${secondsLeft(job)}s remaining`} · Cancel (+${job.paidMaterials})`,
           disabled: !enabled,
           action: () =>
             submit({ kind: "cancel-production", actorId: job.actorId }),

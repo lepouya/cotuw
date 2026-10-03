@@ -1,6 +1,6 @@
 import { Color3, LinesMesh, MeshBuilder, Vector3 } from "@babylonjs/core";
 
-import { clampToBounds } from "../simulation/world";
+import { groundPoint, groundRing, groundCross } from "./ground-marker";
 import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
 
 import type { Observer, Scene } from "@babylonjs/core";
@@ -349,20 +349,9 @@ function createGroundRing(
   color: Color3,
   offset: number,
 ): LinesMesh {
-  const points: Vector3[] = [];
-  for (let index = 0; index <= MARKER_SEGMENTS; index += 1) {
-    const angle = (index / MARKER_SEGMENTS) * Math.PI * 2;
-    points.push(
-      groundPoint(
-        map,
-        {
-          x: center.x + Math.cos(angle) * MARKER_RADIUS,
-          z: center.z + Math.sin(angle) * MARKER_RADIUS,
-        },
-        offset,
-      ),
-    );
-  }
+  const points = groundRing(center, MARKER_RADIUS, MARKER_SEGMENTS, (point) =>
+    groundPoint(map, point, offset),
+  );
   const ring = MeshBuilder.CreateLines(name, { points }, scene);
   ring.color = color;
   ring.alpha = PATH_ALPHA;
@@ -377,19 +366,12 @@ function createBlockedCross(
   offset: number,
 ): LinesMesh {
   const diagonal = MARKER_RADIUS * Math.SQRT1_2;
-  const corner = (x: number, z: number) =>
-    groundPoint(
-      map,
-      { x: center.x + x * diagonal, z: center.z + z * diagonal },
-      offset,
-    );
   const cross = MeshBuilder.CreateLineSystem(
     "movement-path-unreachable-cross",
     {
-      lines: [
-        [corner(-1, -1), corner(1, 1)],
-        [corner(-1, 1), corner(1, -1)],
-      ],
+      lines: groundCross(center, diagonal, (point) =>
+        groundPoint(map, point, offset),
+      ),
     },
     scene,
   );
@@ -402,17 +384,4 @@ function createBlockedCross(
 /** Scans every tile, so call it only when geometry is rebuilt. */
 function groundOffset(map: TerrainMap): number {
   return map.layerCount * TERRAIN_LAYER_OFFSET + MARKER_OFFSET;
-}
-
-function groundPoint(
-  map: TerrainMap,
-  point: Readonly<WorldPosition>,
-  offset: number,
-): Vector3 {
-  const sample = clampToBounds(point, map.worldBounds);
-  return new Vector3(
-    point.x,
-    map.heightAtWorldPosition(sample.x, sample.z) + offset,
-    point.z,
-  );
 }

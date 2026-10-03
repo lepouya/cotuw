@@ -245,6 +245,8 @@ export function createSidebar(
   );
   return {
     controls: {
+      rallyRoot: root,
+      networkRoot: options.economy ? root : undefined,
       economyRoot: options.economy ? root : undefined,
       buildings,
       train,

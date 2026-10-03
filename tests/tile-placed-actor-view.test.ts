@@ -409,3 +409,63 @@ test("details share materials per definition until disposal", () => {
     engine.dispose();
   }
 });
+
+test("offline buildings dim locally, stop machinery, and restore shared materials", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
+    const views = createTilePlacedActorViewRegistry(
+      scene,
+      map,
+      [definition],
+      new Map([
+        [
+          definition.id,
+          {
+            height: 0.3,
+            color: [0.2, 0.4, 0.6],
+            createDetails: createCommandCenterDetails,
+          },
+        ],
+      ]),
+    );
+    const actors = [1, 4].map((x, i) =>
+      createTilePlacedActor(map, definition, {
+        actorId: `building-${i}`,
+        origin: { x, z: 2 },
+      }),
+    );
+    views.update(actors);
+    const materialCount = scene.materials.length;
+    views.update(actors, new Set(["building-0"]));
+    const offline = scene.getMeshByName(
+      "tile-placed-actor-building-0-root-front-windows",
+    )!;
+    const live = scene.getMeshByName(
+      "tile-placed-actor-building-1-root-front-windows",
+    )!;
+    expect(offline.material).not.toBe(live.material);
+    expect(
+      scene.getMeshByName("tile-placed-actor-building-0-root-offline"),
+    ).not.toBeNull();
+    views.animate(3);
+    expect(
+      scene.getTransformNodeByName("tile-placed-actor-building-0-root-radar")!
+        .rotation.y,
+    ).toBe(0);
+    expect(
+      scene.getTransformNodeByName("tile-placed-actor-building-1-root-radar")!
+        .rotation.y,
+    ).toBeGreaterThan(0);
+    views.update(actors, new Set());
+    expect(
+      scene.getMeshByName("tile-placed-actor-building-0-root-offline"),
+    ).toBeNull();
+    expect(scene.materials.length).toBe(materialCount);
+    expect(scene.getMeshByName(offline.name)!.material).toBe(live.material);
+    views.dispose();
+  } finally {
+    engine.dispose();
+  }
+});

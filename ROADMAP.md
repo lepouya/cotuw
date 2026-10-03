@@ -105,15 +105,14 @@ base-building RTS loop, its technical architecture, and its player interface.
       locked.
 - [ ] 0.35 Add the fixed Command Center, Materials Refinery, Harvester, Field
       Barracks, Trooper, and Scout with data-driven costs and timing.
-- [ ] 0.36 Implement direct blueprint placement, rotation, the baseline one-slot
+- [x] 0.36 Implement direct blueprint placement, rotation, the baseline one-slot
       infrastructure queue, construction timers, support coverage, disconnection
-      shutdown, cancellation, and resale. The prototype has paid blueprints,
-      rotation, one construction slot, timers, cancellation, and resale;
-      support coverage and disconnection remain pending.
+      shutdown, cancellation, and resale. Include coverage and connection
+      overlays, offline presentation, grouped alerts, and preserved progress.
 - [ ] 0.37 Implement finite Materials sites, paid Harvester production, one
       assigned Harvester per Refinery, automated collection and delivery,
       depletion, reassignment, and loot.
-- [ ] 0.38 Implement five-item production queues, full unfinished-order refunds,
+- [x] 0.38 Implement five-item production queues, full unfinished-order refunds,
       rally points, and paused progress while disconnected.
 - [ ] 0.39 Implement unexplored, explored, and visible terrain; actor
       visibility; camera bounds based on exploration; and the north-up minimap

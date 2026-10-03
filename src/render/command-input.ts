@@ -17,6 +17,9 @@ export type CommandInputOptions = {
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
   onSelectionChanged?: (actorIds: readonly string[]) => void;
   enabled?: () => boolean;
+  groundTargetMode?: () => boolean;
+  onGroundTarget?: (target: WorldPosition) => void;
+  cancelGroundTarget?: () => boolean;
   canMove?: (actorId: string) => boolean;
 };
 
@@ -52,6 +55,9 @@ export function createCommandInput(
     onWorldSelectionChanged,
     enabled = () => true,
     canMove = () => true,
+    groundTargetMode = () => false,
+    onGroundTarget,
+    cancelGroundTarget,
   }: CommandInputOptions,
 ): CommandInput {
   const selection = createSelection(canMove);
@@ -102,7 +108,7 @@ export function createCommandInput(
       if (event.button !== 0) return undefined;
       canvas.focus({ preventScroll: true });
       return {
-        box: event.pointerType !== "touch" || boxMode,
+        box: !groundTargetMode() && (event.pointerType !== "touch" || boxMode),
         additive: event.shiftKey || additiveMode,
       };
     },
@@ -133,9 +139,10 @@ export function createCommandInput(
         event.clientX,
         event.clientY,
         (mesh) =>
-          actorIdForMesh(mesh) !== undefined ||
-          movementTargetForMesh(mesh) !== undefined ||
-          isTerrainPickMesh(mesh),
+          isTerrainPickMesh(mesh) ||
+          (!groundTargetMode() &&
+            (actorIdForMesh(mesh) !== undefined ||
+              movementTargetForMesh(mesh) !== undefined)),
       );
       const picked = actorIdForMesh(pick?.pickedMesh ?? null);
       const target =
@@ -143,6 +150,10 @@ export function createCommandInput(
         (pick?.hit && pick.pickedPoint && isTerrainPickMesh(pick.pickedMesh)
           ? { x: pick.pickedPoint.x, z: pick.pickedPoint.z }
           : undefined);
+      if (groundTargetMode()) {
+        if (target) onGroundTarget?.(target);
+        return;
+      }
       if (picked) {
         select(picked, additive);
         onWorldSelectionChanged?.(selection.ids);
@@ -175,6 +186,11 @@ export function createCommandInput(
         event.target.closest("input, textarea, select"))
     )
       return;
+    if (event.key === "Escape" && cancelGroundTarget?.()) {
+      cancelGesture();
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Escape") {
       const hadSelection = selection.ids.length > 0;
       if (!cancelGesture() && !hadSelection) return;

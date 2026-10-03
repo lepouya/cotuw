@@ -1,6 +1,10 @@
 // Throwaway prototype code: a sample map and the scene that shows it.
 // Replace this with real game setup once the prototype has served its purpose.
 import { createScenarioState } from "./simulation/scenario";
+import { disconnectedBuildings } from "./simulation/support";
+import { createSupportNetworkView } from "./render/support-network";
+import { createNetworkControls } from "./ui/network-controls";
+import type { NetworkControls } from "./ui/network-controls";
 import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
 import { createMaterialsSitesView } from "./render/materials-sites";
@@ -56,6 +60,9 @@ import { createBuildingPlacement } from "./render/building-placement";
 import { createUnitControls } from "./ui/unit-controls";
 import type { UnitControls } from "./ui/unit-controls";
 import { bindCameraControls } from "./ui/camera-controls";
+import { createRallyControls } from "./ui/rally-controls";
+import type { RallyControls } from "./ui/rally-controls";
+import { createRallyPointView } from "./render/rally-point";
 import { createUnitTraining } from "./ui/unit-training";
 import type { UnitTrainingControls } from "./ui/unit-training";
 import type { DefinitionButton, SidebarState } from "./ui/sidebar";
@@ -92,6 +99,8 @@ export type TerrainPrototype = GameView & {
 
 export type TerrainPrototypeControls = BuildingPlacementControls &
   UnitTrainingControls &
+  RallyControls &
+  NetworkControls &
   UnitControls & {
     buildings?: readonly DefinitionButton[];
     scenario?: ScenarioDefinition;
@@ -218,6 +227,9 @@ export async function createTerrainPrototype(
     definitions,
     PROTOTYPE_TILE_PLACED_APPEARANCES,
   );
+  const networkView = createSupportNetworkView(view.scene, map);
+  const disconnected = () => disconnectedBuildings(simulation.support);
+  const rallyView = createRallyPointView(view.scene, map);
   const movementPath = createMovementPathView(view.scene, map);
   const partition = (actors: readonly ActorRenderState[]) => ({
     actors,
@@ -236,7 +248,7 @@ export async function createTerrainPrototype(
     definitions.map((definition) => [definition.id, definition]),
   );
   actorViews.update(actorsByKind().mobile, 1);
-  tilePlacedViews.update(actorsByKind().placed);
+  tilePlacedViews.update(actorsByKind().placed, disconnected());
   let simulationFaulted = false;
   let controlsDirty = true;
   const showActor = (actorId: string) => {
@@ -252,6 +264,9 @@ export async function createTerrainPrototype(
     },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
     enabled: () => !placement.active && !simulationFaulted,
+    groundTargetMode: () => rally.active,
+    onGroundTarget: (target) => rally.choose(target),
+    cancelGroundTarget: () => rally.cancel(),
     canMove: (actorId) => {
       const actor = simulation.actorById(actorId);
       return (
@@ -353,6 +368,8 @@ export async function createTerrainPrototype(
       !simulationFaulted &&
       !placement.active;
     if (controls.remove) controls.remove.disabled = !canRemove;
+    network.refresh();
+    rally.refresh();
     training.refresh();
     economyControls?.refresh();
     controls.onStateChanged?.({
@@ -392,6 +409,7 @@ export async function createTerrainPrototype(
         showActor(actorId);
       },
       onStart: () => {
+        rally.cancel();
         input.setBoxMode(false);
         input.setAdditiveMode(false);
         input.select(undefined);
@@ -427,6 +445,25 @@ export async function createTerrainPrototype(
     selectedActorId: () => input.selectedActorId,
     enabled: () => !simulationFaulted && !placement.active,
   });
+  const rally = createRallyControls(simulation, controls, {
+    changed: () => {
+      controlsDirty = true;
+    },
+    selectedActorId: () => input.selectedActorId,
+    isProducer: (id) => !!definitionsById.get(id)?.production,
+    enabled: () => !simulationFaulted && !placement.active,
+    onStart: () => {
+      input.setBoxMode(false);
+      input.setAdditiveMode(false);
+    },
+  });
+  const network = createNetworkControls(simulation, controls, {
+    selectedActorId: () => input.selectedActorId,
+    focus: (point) => {
+      const tile = map.tileAtWorldPosition(point.x, point.z);
+      view.camera.focusOnTile(tile.x, tile.z);
+    },
+  });
   const economyRoot = controls.economyRoot;
   const economyControls =
     simulation.economy && economyRoot
@@ -444,7 +481,9 @@ export async function createTerrainPrototype(
       !placement.active &&
       !simulationFaulted &&
       !input.boxMode &&
-      input.actorIdAt(event.clientX, event.clientY) === undefined,
+      // Rally targeting ignores actors, so drags from them may pan too.
+      (rally.active ||
+        input.actorIdAt(event.clientX, event.clientY) === undefined),
   );
   const unitControls = createUnitControls(input, controls, {
     enabled: () => !placement.active && !simulationFaulted,
@@ -475,12 +514,14 @@ export async function createTerrainPrototype(
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
+      network.capture();
       minimap.refreshActors();
       const moveStatus = unitControls.onOutcomes(outcomes);
       if (moveStatus) canvas.dataset.moveStatus = moveStatus;
       for (const outcome of outcomes) {
         placement.onOutcome(outcome);
         training.onOutcome(outcome);
+        rally.onOutcome(outcome);
         economyControls?.onOutcome(outcome);
         const { command, accepted } = outcome;
         if (command.kind === "train-unit")
@@ -508,7 +549,7 @@ export async function createTerrainPrototype(
       controlsDirty = true;
       input.retainSelection((id) => !!simulation.actorById(id));
       const { placed } = actorsByKind();
-      tilePlacedViews.update(placed);
+      tilePlacedViews.update(placed, disconnected());
       canvas.dataset.tilePlacedActorCount = String(placed.length);
       minimap.refreshActors();
     }
@@ -516,7 +557,7 @@ export async function createTerrainPrototype(
     if (simulation.economy) {
       materialsView?.update(simulation.economy);
       if (simulation.completedTicks !== knownControlsTick)
-        tilePlacedViews.update(actorsByKind().placed);
+        tilePlacedViews.update(actorsByKind().placed, disconnected());
     }
     if (
       controlsDirty ||
@@ -544,6 +585,18 @@ export async function createTerrainPrototype(
       ),
     );
     movementPath.update(mobile);
+    networkView.update(
+      simulation.support,
+      placement.active ||
+        network.visible ||
+        !!simulation.support?.nodes.some(
+          (node) => node.actorId === input.selectedActorId,
+        ),
+    );
+    rallyView.update(
+      simulation.actors.find((actor) => actor.id === input.selectedActorId)
+        ?.rallyPoint,
+    );
   });
   view.scene.onDisposeObservable.add(() => {
     loop.stop();
@@ -554,6 +607,10 @@ export async function createTerrainPrototype(
     placement.dispose();
     controls.remove?.removeEventListener("click", removeSelected);
     training.dispose();
+    rally.dispose();
+    network.dispose();
+    networkView.dispose();
+    rallyView.dispose();
     economyControls?.dispose();
     materialsView?.dispose();
     controls.onDispose?.();
