@@ -4,6 +4,9 @@ This document tracks milestones and implementation work. Record design decisions
 in [DESIGN.md](DESIGN.md). Task IDs show their milestone and insertion order;
 they do not prescribe completion order.
 
+See [the implementation audit](docs/roadmap-audit.md) for completion evidence,
+remaining scope within open tasks, and the recommended next task.
+
 ## Milestone 0: Foundations
 
 **Goal:** Deliver a small standalone ARC mission that proves the minimum
@@ -44,7 +47,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.14 Create a movement-test map with hills, cliffs, and paths.
 - [x] 0.15 Define which slopes, cliffs, and path surfaces are traversable for
       the prototype actor.
-- [ ] 0.16 Make that map data-driven and loadable without renderer-specific
+- [x] 0.16 Make that map data-driven and loadable without renderer-specific
       state.
 
 ### Actors and movement
@@ -54,7 +57,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.18 Render a visible Trooper actor at its simulated world position.
 - [x] 0.19 Replace the direct-motion spike with data-driven target commands and
       movement along a valid path.
-- [ ] 0.20 Provide path finding that respects terrain and occupancy, replans
+- [x] 0.20 Provide path finding that respects terrain and occupancy, replans
       when blockers change, and reports unreachable targets clearly.
 - [ ] 0.21 Define actor animation clips for skeletal animation and texture-frame
       animation, including their simulation-facing state.
@@ -83,7 +86,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 - [x] 0.29 Define the minimap's information, camera-frustum treatment, and input
       behavior for the prototype.
-- [ ] 0.30 Render a corner minimap showing terrain, stationary-object
+- [x] 0.30 Render a corner minimap showing terrain, stationary-object
       footprints, actors, current selection, and the camera viewport.
 - [x] 0.31 Support minimap navigation while keeping it independent of simulation
       state.
@@ -95,7 +98,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 - [ ] 0.32 Add focused tests for terrain-animation data, path finding, actor
       movement, multi-tile occupancy, and group command destination assignment.
-- [ ] 0.33 Add a browser visual check covering the test map, minimap, selected
+- [x] 0.33 Add a browser visual check covering the test map, minimap, selected
       actors, and a multi-tile stationary object.
 
 ### Playable-slice integration
@@ -103,13 +106,13 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.34 Define immutable scenario content and mutable, stable-ID runtime
       state that can round-trip through serialization before mission content is
       locked.
-- [ ] 0.35 Add the fixed Command Center, Materials Refinery, Harvester, Field
+- [x] 0.35 Add the fixed Command Center, Materials Refinery, Harvester, Field
       Barracks, Trooper, and Scout with data-driven costs and timing.
 - [x] 0.36 Implement direct blueprint placement, rotation, the baseline one-slot
       infrastructure queue, construction timers, support coverage, disconnection
       shutdown, cancellation, and resale. Include coverage and connection
       overlays, offline presentation, grouped alerts, and preserved progress.
-- [ ] 0.37 Implement finite Materials sites, paid Harvester production, one
+- [x] 0.37 Implement finite Materials sites, paid Harvester production, one
       assigned Harvester per Refinery, automated collection and delivery,
       depletion, reassignment, and loot.
 - [x] 0.38 Implement five-item production queues, full unfinished-order refunds,
