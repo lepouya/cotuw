@@ -13,7 +13,10 @@ the requirements.
   [Scenario content](../src/content/economy-scenario.ts) captures that grid as
   immutable terrain data, and
   [scenario initialization](../src/simulation/scenario.ts) loads it without
-  Babylon objects.
+  Babylon objects. Its map factory also supplies presentation with the
+  scenario's dimensions, scale, and saved terrain.
+  [Scenario browser checks](../e2e/scenario.spec.ts) verify restored geometry,
+  water, and base focus.
   [Simulation terrain tests](../tests/simulation-terrain.test.ts)
   verify renderer-free restoration and navigation.
 - **0.20, pathfinding and feedback:**
@@ -64,6 +67,29 @@ the requirements.
   continuation. [Combat tests](../tests/combat.test.ts) cover blocked pursuit
   and terrain retries. Normal and alpha content and appearances are available;
   the authored den and lone-wolf sight isolation belong to **0.41**.
+- **0.41, authored M0 map:**
+  [terrain content](../src/content/prototype-terrain.ts) supplies branching
+  ridge crossings, slow rough ground, a traversable hill, the enclosed den,
+  and distinct mountain landmarks. Two recovery supplies beyond the lone wolf
+  pay for two Troopers. [Scenario tests](../tests/economy-scenario.test.ts)
+  verify reachable homes, the three-tile entrance, weighted detours,
+  reconnecting routes, inaccessible peaks, and hidden recovery supplies.
+  Sight checks cover each wolf's movement profile and territory over a
+  conservative superset of travel tiles, including leash boundary tiles.
+- **0.48, slice unit tests:** economy, construction support, production, fog,
+  combat, wolf state and save continuation have focused tests. The
+  [objective tests](../tests/objectives.test.ts) and
+  [scenario tests](../tests/economy-scenario.test.ts) cover defeat priority,
+  combat-only progress, victory, free play, saved continuation, validation,
+  and fresh opening reconstruction. Browser checks also cover restart.
+- **0.49, complete mission browser flow:**
+  [mission checks](../e2e/mission.spec.ts) exercise the production app from its
+  authored Command Center through gathering, paid buildings and production,
+  Scout exploration, lone-wolf combat, recovery supplies, the den, victory,
+  and post-victory training. Mouse and phone touch pass in Chromium and WebKit.
+  Only time is controlled; resources, actors, health, and objectives use the
+  authored values. [Playthrough notes](m0-playthrough.md) describe the resource
+  budget, measured pacing, and the normal-speed check.
 
 ## Remaining scope
 
@@ -82,18 +108,17 @@ the requirements.
 - **0.32, prototype unit tests:** movement, navigation, multi-tile occupancy,
   and group destinations have focused tests. Terrain-animation data tests
   depend on the missing frame-animation pipeline.
-- **0.41, M0 map:** the movement map has slopes, cliffs, paths, rough ground,
-  one wolf, and salvage. The compact mission layout, five-wolf den and alpha,
-  mission landmarks, and recovery loot placement still need integration.
 - **0.43, mission interface:** sidebar tabs, resource display, count-based
-  practice goals, status feedback, and network alerts work. Mission objectives,
-  victory results, the radial menu, general notifications, explanatory
-  popups, and top-bar time/menu controls remain.
+  practice goals, mission objectives, victory and defeat results, status
+  feedback, and network alerts work. The radial menu, general notifications,
+  explanatory popups, and top-bar time/menu controls remain.
 - **0.44, persistence:**
   [versioned serialization](../src/simulation/scenario.ts) and saved-state
-  validation work. Defeat results provide file loading, paused inspection, and
-  restart. Manual saving, general save/load controls and storage, rolling
-  quicksave, and autosave remain.
+  validation work. Mission results provide file loading, paused inspection,
+  resume, restart, and exit. [Load checks](../e2e/mission-load.spec.ts) verify
+  that pending reads cannot override restart, exit, or a newer load. Manual
+  saving, general save/load controls and storage, rolling quicksave, and
+  autosave remain.
 - **0.45, on-screen actions:** construction, production, economy, rally points,
   selection, movement, and camera actions have on-screen controls. Missing M0
   actions still need controls, including general persistence. Attack Move
@@ -105,28 +130,29 @@ the requirements.
   remaining building activity animations still need integration.
 - **0.47, locked controls:** basic selection, contextual commands, Stop/Clear,
   touch camera controls, smooth minimap navigation, and some reduced-motion
-  behavior work. Queued orders, camera presets, actor Focus/Follow, keyboard
-  and edge panning, and the remaining locked bindings are incomplete.
-- **0.48, slice unit tests:** economy, support, production, fog, combat, and
-  wolf AI and save continuation have focused coverage. Objectives,
-  victory and complete mission reconstruction still need coverage. Defeat and
-  opening restart have focused simulation and browser checks.
-- **0.49, complete mission browser flow:** absent. The tested opening ends
-  with economy and lone-wolf combat; six-wolf victory and post-victory free
-  play require the mission systems and den.
+  behavior work. Pan mode, scrolling in Pan mode, Space-drag, and focused-world
+  arrow keys provide laptop and touch navigation while preserving selection.
+  Mouse edge panning supports corners and an on-screen toggle, with gesture,
+  UI, dialog, and focus safeguards.
+  [Navigation checks](../e2e/camera-navigation.spec.ts) cover mouse, phone, and
+  tablet input, construction previews, interrupted gestures, form fields,
+  dialogs, blur, and restored commands.
+  Queued orders, camera presets, actor Focus/Follow, and other locked bindings
+  are incomplete.
 - **0.50, compact interaction checks:** phone landscape checks exercise
   construction, production, economy, rally points, selection, movement, and
   camera controls without a keyboard or secondary button. Attack Move also has
-  phone and tablet checks. Full mission actions and the remaining tablet
-  interactions remain unverified.
+  phone and tablet checks. The full mission loop has phone coverage; the
+  remaining tablet interactions and future persistence controls remain
+  unverified.
 
 ## Recommended next task
 
-Implement **0.41** using the locked M0 layout and the
-[wolf contract](../DESIGN.md#m0-wolf-implementation-contract). Author the shared
-five-wolf den territory and separate homes, alpha, mountain enclosure and
-chokepoint, isolated lone-wolf approach, landmarks, and recovery loot. Verify
-sight isolation against normal and alpha ranges and all permitted wolf travel.
-Then integrate mission objectives and victory in **0.43**.
+Implement **0.44**: manual saving, general save/load and restart controls,
+rolling quicksave, and autosave. Introduce the browser/native platform-service
+boundary in **0.5** around storage. Preserve paused inspection and validation
+before replacing a running mission.
 
-Animation and the remaining persistence controls retain their own open scope.
+Pacing needs tuning and first-time human playtests: the efficient full-flow
+check completes in about five simulated minutes, below the intended familiar
+replay duration. Animation and the remaining interface retain their open scope.

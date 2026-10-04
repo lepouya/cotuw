@@ -42,7 +42,9 @@ cargo counts separately.
 interrupt gathering and keep cargo. Exhausted patches prompt reassignment.
 **Units** lists resource sites and salvage: select a mobile unit, then use
 **Collect salvage** or click the hovering gift box to collect it without a
-delivery. Paid production orders show remaining time and a Cancel action with
+delivery. Two boxes beyond the lone wolf provide Materials for two more
+Troopers. The ridge's split summit and the den's twin mountain teeth mark the
+route. Paid production orders show remaining time and a Cancel action with
 a full refund. A Refinery has one Harvester slot; a Barracks has five
 outstanding orders. Blocked exits hold finished production until a tile is
 cleared. Buildings sell for half cost. Buildings share one construction slot;
@@ -67,7 +69,7 @@ until reconnection. Broken links use dashed lines, and grouped alerts focus the
 camera on affected buildings. Cancellation and sale remain available offline.
 
 A lone wolf guards the southern path. Four wolves and a larger alpha occupy a
-mountain den beyond the ridge's nearby crossing. Follow the path north through
+mountain den beyond the ridge's nearby crossing. Follow the path south through
 its narrow entrance; the den pack shares a territory with separate homes. Wolves
 attack on personal sight, return home when they lose sight, and heal there after
 combat. Wolves relay alerts through sight and investigate the originating wolf's
@@ -106,9 +108,21 @@ select**, which must be turned off before tapping a movement destination.
 Click or tap terrain to move selected units to separate nearby positions.
 **Stop** or `S` cancels their routes; **Clear** or `Esc` clears selection.
 
-Secondary drag pans the camera; Shift-secondary drag rotates. Touch drags on
-empty terrain pan when Box select is off. The world also provides camera pan,
-rotation, zoom, and reset buttons.
+Turn on **Pan** in the camera controls to drag anywhere with a normal touchpad
+click or one finger, including over troops. Pan mode preserves selection and
+pending commands; turn it off to select or issue orders. Two-finger scrolling
+pans in this mode, while Ctrl-scroll zooms. `Esc` exits Pan mode without
+clearing selection.
+
+With the world focused, hold `Space` and primary-drag to pan temporarily, or
+hold the arrow keys to pan continuously. Secondary drag also pans;
+Shift-secondary drag rotates. Touch drags on empty terrain pan when Box select
+is off. Camera pan, rotation, zoom, and reset also have on-screen buttons.
+
+Rest the mouse cursor near an edge of the world view to pan without clicking;
+corners pan diagonally. This preserves selection and stops while dragging or
+using controls. Turn off **Edge panning** in the camera controls to disable it.
+Touch and pen input do not trigger edge panning.
 
 **Selection** shows the selected actor or group and building actions.
 **Units** also lists buildings that train units and the units in the field.

@@ -283,6 +283,20 @@ story.
   modes. Box select must be disabled before a terrain tap issues movement.
 - Secondary click opens a radial context menu. Secondary drag pans; Shift plus
   secondary drag rotates. Every secondary action has an on-screen alternative.
+- Pan mode reserves primary and one-finger world gestures for navigation,
+  preserving selection and pending commands. In Pan mode, scrolling pans;
+  Ctrl-scroll zooms. Outside Pan mode, scrolling zooms.
+  Pan mode keeps a chosen construction footprint fixed.
+- When the world is focused, Space plus primary drag temporarily pans, and
+  arrow keys pan continuously. Escape exits Pan mode before clearing selection.
+  Keyboard navigation stops on lost focus; direct pans have no momentum.
+  World shortcuts yield to form fields and dialogs. Losing window focus or
+  hiding the page abandons gestures and held navigation keys.
+- Mouse hover pans within 16 pixels of a world-view edge after a short dwell.
+  Corners pan diagonally at the same screen speed. Edge panning is enabled by
+  default and has an on-screen toggle. It stops over controls, outside the
+  world, during pressed-button gestures, in dialogs, and on lost window focus.
+  Touch and pen input never start edge panning.
 - Touch uses taps, one-finger empty-world panning, explicit box-selection and
   queued-order modes, and on-screen camera controls.
 - Building placement shows a semi-transparent model at its proposed position
@@ -298,7 +312,7 @@ story.
 - Initial and reset views look 22.5 degrees east of north (NNE).
 - Camera zoom is measured in visible tile rows so framing is independent of map
   and tile size. New views show roughly 24 rows or fit a smaller map; resizing
-  preserves the player's zoom. Direct panning has no momentum.
+  preserves the player's zoom.
 - The left sidebar uses Selection, Buildings, Units, and Goals tabs. It owns
   selection details, contextual actions, construction and production, queues,
   and a keyboard-free Cancel action.
@@ -753,7 +767,7 @@ Deterministic acceptance checks cover:
   8 for Refineries and Barracks, 7 for Troopers, and 5 for Harvesters. A
   building's vision covers its own support radius, so connected coverage is
   explored once the building completes. The Command Center reveals the near
-  patch; the north patch and every salvage box start unexplored. Undiscovered
+  patch; the south patch and every salvage box start unexplored. Undiscovered
   resources stay hidden from the world, minimap, and sidebar, and harvesters
   cannot be sent to them. The construction sandbox has no fog.
 - A Refinery has one paid production or assigned Harvester slot. Barracks
@@ -785,10 +799,13 @@ Deterministic acceptance checks cover:
   Producer loss discards paid production; cancelled identities remain retired.
   Completed buildings sell for half their prototype cost multiplied by their
   health fraction, rounded down; mobile units cannot be sold.
-- The near patch contains four 200-Materials tiles; the north patch contains
+- The near patch contains four 200-Materials tiles; the south patch contains
   two. Three ordinary salvage tiles each grant 25 Materials to the first
-  player-owned mobile unit reaching them, without a delivery. Resource tiles
-  and uncollected salvage prevent placement. Depleted tiles become buildable.
+  player-owned mobile unit reaching them, without a delivery. One lies near
+  the base at (25, 52). Two lie beyond the lone wolf at (54, 32) and (56, 34),
+  providing 50 Materials for two replacement Troopers before the den.
+  Resource tiles and uncollected salvage prevent placement. Depleted tiles
+  become buildable.
 - The sidebar provides cargo, phase, Gather, Return cargo, Refinery assignment,
   paid-order cancellation, patch totals, and salvage commands. The top bar
   shows available Materials. Blue resource markers shrink in four stages and
@@ -905,11 +922,15 @@ Deterministic acceptance checks cover:
 - The Materials opening places one lone wolf on the southern path at tile
   (46, 32), out of sight of the base, with a 14-tile territory. The den lies
   east of the ridge, enclosed by six-unit mountain walls, with a three-tile
-  southern entrance at x 77–79. Four normal wolves start at (74, 21), (82, 21),
+  northern entrance at x 77–79. Four normal wolves start at (74, 21), (82, 21),
   (75, 24), and (81, 24); the alpha starts at (78, 19). Their shared territory
   centers on (78, 21) with radius 12. Rough ground surrounds the entrance path
-  inside the den. The ridge and encounter spacing isolate the lone wolf's
-  alerts from the pack.
+  inside the den. The nearby ridge crossing uses flat corner rows 32–36;
+  the ridge south of it blocks sight between the encounters even at their
+  leash boundaries. The northern crossing uses rows 66–72. A split summit at
+  (63, 43) marks the ridge, and twin mountain teeth flank the den entrance.
+  These terrain peaks remain inaccessible from the ground routes and persist
+  on explored terrain and the minimap.
 - Combat destruction of the opening's authored starting Command Center records
   a defeat at that tick. All simultaneous hits resolve, then movement and
   economy stop. Further ticks leave the state unchanged. The result survives
