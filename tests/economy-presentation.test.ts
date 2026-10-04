@@ -6,7 +6,7 @@ import {
 } from "@babylonjs/core";
 import { expect, test } from "vitest";
 import { TerrainMap } from "../src/map";
-import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
+import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import {
   createTilePlacedActor,
   occupiedTilesFor,
@@ -331,6 +331,27 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
     expect(scene.meshes).toHaveLength(0);
     expect(scene.materials).toHaveLength(0);
   } finally {
+    engine.dispose();
+  }
+});
+
+test("content scale applies to the entire Harvester and its bounds", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const appearance = createHarvesterAppearance(scene, () => true, 2);
+  const instance = appearance.instantiate("scaled", 0);
+  try {
+    expect(appearance.bounds).toEqual({ radius: 1.44, height: 2.4 });
+    expect(instance.root.scaling.asArray()).toEqual([2, 2, 2]);
+    expect(
+      instance.root
+        .getChildTransformNodes()
+        .some((node) => node.name === "scaled-drill"),
+    ).toBe(true);
+  } finally {
+    instance.dispose();
+    appearance.dispose();
+    scene.dispose();
     engine.dispose();
   }
 });

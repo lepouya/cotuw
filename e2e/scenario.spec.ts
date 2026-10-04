@@ -3,29 +3,34 @@ import { expect, test } from "@playwright/test";
 test("a restored mission renders its own map and saved terrain", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
   );
   const result = await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
-    const prototypePath: string = "/src/prototype.ts";
-    const contentPath: string = "/src/content/economy-scenario.ts";
+    const prototypePath: string = "/src/session.ts";
+    const contentPath: string = "/src/content/packs.ts";
     const scenarioPath: string = "/src/simulation/scenario.ts";
+    const fileFormatPath: string = "/src/simulation/mission-file.ts";
     const terrainPath: string = "/src/simulation/terrain.ts";
     const { frames } = (await import(
       harnessPath
     )) as typeof import("./harness");
-    const { createTerrainPrototype, loadMissionSave } = (await import(
+    const { createGameSession, loadMission } = (await import(
       prototypePath
-    )) as typeof import("../src/prototype");
-    const { ECONOMY_SCENARIO, ECONOMY_ACTOR_DEFINITIONS } = (await import(
+    )) as typeof import("../src/session");
+    const { currentContentPack } = (await import(
       contentPath
-    )) as typeof import("../src/content/economy-scenario");
-    const { createScenarioState, serializeMission } = (await import(
+    )) as typeof import("../src/content/packs");
+    const content = currentContentPack("base");
+    const { createScenarioState } = (await import(
       scenarioPath
     )) as typeof import("../src/simulation/scenario");
+    const { serializeMission } = (await import(
+      fileFormatPath
+    )) as typeof import("../src/simulation/mission-file");
     const { TerrainGrid } = (await import(
       terrainPath
     )) as typeof import("../src/simulation/terrain");
@@ -33,31 +38,37 @@ test("a restored mission renders its own map and saved terrain", async ({
       width: 20,
       height: 12,
       tileSize: 2,
-      terrainTypeIds: ECONOMY_SCENARIO.terrainTypeIds,
+      terrainTypeIds: ["plain", "path", "rough", "water"],
     });
     const scenario = {
-      ...ECONOMY_SCENARIO,
       id: "rendered-scenario-test",
+      content: { id: content.id, version: content.version },
       terrain: map.terrainState(),
       tileSize: map.tileSize,
-      buildings: [{ ...ECONOMY_SCENARIO.buildings[0], origin: { x: 2, z: 4 } }],
-      units: [],
-      objectives: [],
+      terrainTypeIds: [...map.terrainTypeIds],
+      playerFaction: "arc",
+      buildings: [
+        {
+          actorId: "starting-command-center",
+          definitionId: "arc-command-center-prototype",
+          origin: { x: 2, z: 4 },
+        },
+      ],
+      materials: 150,
       sites: [],
       loot: [],
     };
-    const state = createScenarioState(scenario, ECONOMY_ACTOR_DEFINITIONS);
+    const state = createScenarioState(scenario, content.actors);
     state.terrain!.heights.fill(3);
     state.terrain!.tiles[8 * map.width + 10] = { typeId: "water" };
-    const loaded = loadMissionSave(serializeMission(state, 1 / 60), scenario);
+    const mission = loadMission(serializeMission(scenario, state, 1 / 60));
     const canvas = document.createElement("canvas");
     const minimap = document.createElement("canvas");
     Object.assign(canvas.style, { width: "640px", height: "480px" });
     Object.assign(minimap.style, { width: "128px", height: "128px" });
     document.body.append(canvas, minimap);
-    const view = await createTerrainPrototype(canvas, minimap, {
-      scenario,
-      initialState: loaded,
+    const view = await createGameSession(canvas, minimap, {
+      mission,
       startPaused: true,
     });
     try {
@@ -74,7 +85,7 @@ test("a restored mission renders its own map and saved terrain", async ({
         .activeCamera as import("@babylonjs/core").ArcRotateCamera;
       return {
         terrain: view.simulation.snapshot().terrain,
-        expectedTerrain: loaded.terrain,
+        expectedTerrain: mission.state.terrain,
         bounds: {
           min: bounds.minimum.asArray(),
           max: bounds.maximum.asArray(),

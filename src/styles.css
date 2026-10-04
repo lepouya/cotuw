@@ -37,6 +37,18 @@ body {
 .sidebar-header {
   padding: 1.3rem 1rem 1rem;
 }
+#open-menu {
+  width: 100%;
+  text-align: center;
+}
+.save-status {
+  margin: 0.4rem 0 0;
+  color: #a9b7ab;
+  font-size: 0.72rem;
+}
+.save-status:empty {
+  display: none;
+}
 .eyebrow {
   margin: 0;
   color: #cfac62;
@@ -365,11 +377,17 @@ button:disabled {
   }
 }
 
-.resource-bar {
+.mission-status {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.resource-bar {
   padding: 0.65rem 0.9rem;
   border: 1px solid #d8bd79;
   border-radius: 0.25rem;
@@ -378,7 +396,7 @@ button:disabled {
   font-size: 0.85rem;
   pointer-events: none;
 }
-.resource-bar button {
+.mission-status button {
   pointer-events: auto;
 }
 
@@ -387,7 +405,7 @@ button:disabled {
   margin-block: 0.75rem;
 }
 
-#mission-result {
+#game-menu {
   max-width: min(28rem, 90vw);
   max-height: 90dvh;
   overflow: auto;
@@ -397,6 +415,37 @@ button:disabled {
   background: #142729;
 }
 
-#mission-result::backdrop {
+#game-menu::backdrop {
   background: rgb(0 0 0 / 65%);
+}
+
+.save-form {
+  display: grid;
+  gap: 0.5rem;
+}
+.save-form input {
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  border: 1px solid #607161;
+  border-radius: 0.2rem;
+  color: #f4f0df;
+  background: #0f1f20;
+  font: inherit;
+}
+.save-entries {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.save-entries li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+.save-entries small {
+  display: block;
+  color: #a9b7ab;
 }

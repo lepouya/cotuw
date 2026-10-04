@@ -1,17 +1,14 @@
 import { startSimulationLoop } from "../src/simulation/loop";
 import { describe, expect, test, vi } from "vitest";
-import { ECONOMY_ACTOR_DEFINITIONS } from "../src/content/economy-scenario";
+import { ECONOMY_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import { distance } from "../src/simulation/world";
 import { createMissionState } from "../src/simulation/mission";
 import { createMissionSimulation } from "../src/simulation/mission";
 import { OccupancyGrid } from "../src/simulation/occupancy";
-import {
-  defineScenario,
-  deserializeMission,
-  serializeMission,
-} from "../src/simulation/scenario";
+import { defineScenario } from "../src/simulation/scenario";
+import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { exploredScenarioState } from "./helpers/scenario";
@@ -416,11 +413,10 @@ describe("combat", () => {
     ];
     const { simulation } = fixture(units);
     for (let tick = 0; tick < 30; tick++) simulation.tick();
-    const saved = deserializeMission(
-      serializeMission(simulation.snapshot(), TICK_SECONDS),
-      scenario(units),
+    const saved = parseMission(
+      serializeMission(scenario(units), simulation.snapshot(), TICK_SECONDS),
       TICK_SECONDS,
-    );
+    ).state;
     const { simulation: restored } = fixture(units, undefined, saved);
     expect(restored.actorById("wolf")!.combat?.attack?.targetId).toBe(
       "trooper",
@@ -534,11 +530,10 @@ describe("combat edge cases", () => {
       point: at(5, 10),
       blocked: { at: at(5, 10) },
     });
-    const saved = deserializeMission(
-      serializeMission(simulation.snapshot(), TICK_SECONDS),
-      scenario(units),
+    const saved = parseMission(
+      serializeMission(scenario(units), simulation.snapshot(), TICK_SECONDS),
       TICK_SECONDS,
-    );
+    ).state;
     const { simulation: restored } = fixture(units, undefined, saved);
     for (const run of [simulation, restored]) {
       run.submitCommand({
@@ -990,21 +985,15 @@ describe("combat state validation and faction vision", () => {
     ).toThrow("invalid wrecks");
   });
 
-  test.each([undefined, "wildlife", ""])(
-    "rejects scenario saves with player faction %s",
-    (playerFaction) => {
-      const content = scenario([]);
-      const state = exploredScenarioState(content, definitions);
-      state.playerFaction = playerFaction;
-      expect(() =>
-        deserializeMission(
-          serializeMission(state, TICK_SECONDS),
-          content,
-          TICK_SECONDS,
-        ),
-      ).toThrow("player faction");
-    },
-  );
+  test("saves carry their own player faction", () => {
+    const content = scenario([]);
+    const state = exploredScenarioState(content, definitions);
+    state.playerFaction = "wildlife";
+    expect(
+      parseMission(serializeMission(content, state, TICK_SECONDS), TICK_SECONDS)
+        .state.playerFaction,
+    ).toBe("wildlife");
+  });
 
   test("no-fog missions give all factions full visibility", () => {
     const state = exploredScenarioState(
@@ -1221,11 +1210,10 @@ describe("Attack Move", () => {
     const trooper = simulation.actorById("trooper")!;
     expect(trooper.attackMove?.target).toEqual(at(32, 10));
     expect(trooper.combat?.attack?.post).toBeUndefined();
-    const saved = deserializeMission(
-      serializeMission(simulation.snapshot(), TICK_SECONDS),
-      scenario(units),
+    const saved = parseMission(
+      serializeMission(scenario(units), simulation.snapshot(), TICK_SECONDS),
       TICK_SECONDS,
-    );
+    ).state;
     const { simulation: restored } = fixture(units, undefined, saved);
     for (let i = 0; i < 300; i++) {
       simulation.tick();
@@ -1366,11 +1354,10 @@ describe("Attack Move", () => {
       () => !!simulation.actorById("trooper")!.attackMove?.blocked,
     );
     expect(simulation.actorById("trooper")!.attackMove?.blocked).toBeDefined();
-    const saved = deserializeMission(
-      serializeMission(simulation.snapshot(), TICK_SECONDS),
-      scenario(units),
+    const saved = parseMission(
+      serializeMission(scenario(units), simulation.snapshot(), TICK_SECONDS),
       TICK_SECONDS,
-    );
+    ).state;
     const { simulation: restored } = fixture(units, undefined, saved);
     for (const sim of [simulation, restored]) {
       sim.submitCommand({
@@ -1454,11 +1441,10 @@ describe("Command Center defeat", () => {
       tick: 0,
     });
     expect(simulation.actorById("scout")!.worldPosition).toEqual(at(12, 10));
-    const saved = deserializeMission(
-      serializeMission(simulation.snapshot(), TICK_SECONDS),
-      scenario(units),
+    const saved = parseMission(
+      serializeMission(scenario(units), simulation.snapshot(), TICK_SECONDS),
       TICK_SECONDS,
-    );
+    ).state;
     const { simulation: restored } = fixture(
       units,
       undefined,

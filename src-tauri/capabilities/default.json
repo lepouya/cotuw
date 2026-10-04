@@ -3,5 +3,19 @@
   "identifier": "default",
   "description": "Default capability for the main application window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "$APPDATA/saves" }, { "path": "$APPDATA/saves/*" }]
+    }
+  ]
 }

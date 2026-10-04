@@ -1,0 +1,544 @@
+{
+  "format": "cotuw-content",
+  "formatVersion": 1,
+  "id": "base",
+  "version": 1,
+  "name": "Anomaly Response Command and wildlife",
+  "actors": [
+    {
+      "id": "arc-trooper",
+      "behaviorId": "terrain-move",
+      "faction": "arc",
+      "health": 100,
+      "weapon": {
+        "damage": 10,
+        "damageType": "kinetic",
+        "range": 6,
+        "cooldownSeconds": 1
+      },
+      "guard": {
+        "acquisitionRadius": 7,
+        "chaseRadius": 10
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.3
+      },
+      "vision": {
+        "radius": 7
+      },
+      "materialsCost": 25,
+      "trainingSeconds": 4
+    },
+    {
+      "id": "arc-scout",
+      "behaviorId": "terrain-move",
+      "faction": "arc",
+      "health": 40,
+      "movement": {
+        "speed": 7,
+        "profileId": "surface-ground",
+        "radius": 0.28
+      },
+      "vision": {
+        "radius": 14
+      },
+      "materialsCost": 20,
+      "trainingSeconds": 3
+    },
+    {
+      "id": "arc-command-center-prototype",
+      "faction": "arc",
+      "health": 2000,
+      "support": {
+        "radius": 12,
+        "root": true
+      },
+      "vision": {
+        "radius": 14
+      },
+      "materialsCost": 300,
+      "constructionSeconds": 12,
+      "behaviorId": "idle",
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      }
+    },
+    {
+      "id": "arc-field-barracks",
+      "faction": "arc",
+      "health": 800,
+      "support": {
+        "radius": 6
+      },
+      "vision": {
+        "radius": 8
+      },
+      "materialsCost": 100,
+      "constructionSeconds": 8,
+      "behaviorId": "idle",
+      "production": {
+        "unitDefinitionIds": ["arc-trooper", "arc-scout"]
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "z": 1
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      }
+    },
+    {
+      "id": "arc-materials-refinery",
+      "faction": "arc",
+      "health": 800,
+      "behaviorId": "idle",
+      "support": {
+        "radius": 6
+      },
+      "vision": {
+        "radius": 8
+      },
+      "materialsCost": 100,
+      "constructionSeconds": 8,
+      "refinery": {
+        "harvesterDefinitionId": "arc-harvester"
+      },
+      "production": {
+        "unitDefinitionIds": ["arc-harvester"]
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "z": 1
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      }
+    },
+    {
+      "id": "arc-harvester",
+      "faction": "arc",
+      "health": 150,
+      "behaviorId": "terrain-move",
+      "materialsCost": 50,
+      "trainingSeconds": 6,
+      "movement": {
+        "speed": 3,
+        "profileId": "surface-ground",
+        "radius": 0.4
+      },
+      "vision": {
+        "radius": 5
+      },
+      "harvesting": {
+        "capacity": 100,
+        "loadSeconds": 60,
+        "patchRadius": 2
+      }
+    },
+    {
+      "id": "wolf",
+      "behaviorId": "terrain-move",
+      "faction": "wildlife",
+      "health": 100,
+      "movement": {
+        "speed": 5,
+        "profileId": "surface-ground",
+        "radius": 0.35
+      },
+      "vision": {
+        "radius": 8
+      },
+      "weapon": {
+        "damage": 8,
+        "damageType": "kinetic",
+        "range": 0.6,
+        "cooldownSeconds": 1.2
+      },
+      "territory": {
+        "leashRadius": 14,
+        "alertLifetimeSeconds": 8,
+        "investigationSeconds": 1.5,
+        "blockedRetrySeconds": 0.5,
+        "stalledSeconds": 3,
+        "arrivalTolerance": 0.15,
+        "regenerationDelaySeconds": 5,
+        "regenerationPerSecond": 5
+      }
+    },
+    {
+      "id": "alpha-wolf",
+      "behaviorId": "terrain-move",
+      "faction": "wildlife",
+      "health": 150,
+      "movement": {
+        "speed": 5,
+        "profileId": "surface-ground",
+        "radius": 0.4375
+      },
+      "vision": {
+        "radius": 10
+      },
+      "weapon": {
+        "damage": 8,
+        "damageType": "kinetic",
+        "range": 0.6,
+        "cooldownSeconds": 1.2
+      },
+      "territory": {
+        "leashRadius": 14,
+        "alertLifetimeSeconds": 8,
+        "investigationSeconds": 1.5,
+        "blockedRetrySeconds": 0.5,
+        "stalledSeconds": 3,
+        "arrivalTolerance": 0.15,
+        "regenerationDelaySeconds": 5,
+        "regenerationPerSecond": 5
+      }
+    }
+  ],
+  "movementProfiles": [
+    {
+      "id": "surface-ground",
+      "maxSlope": 0.75,
+      "slopeCostAtLimit": 2,
+      "terrainCosts": {
+        "plain": 1,
+        "path": 0.8,
+        "rough": 2.25,
+        "water": null
+      }
+    }
+  ],
+  "presentation": {
+    "arc-trooper": {
+      "name": "Trooper",
+      "description": "Line infantry",
+      "train": {
+        "id": "train-trooper",
+        "label": "Train Trooper"
+      },
+      "attackEffect": "tracer",
+      "model": {
+        "glb": {
+          "url": "/assets/actors/arc-trooper.glb",
+          "minimapColor": [0.82, 0.28, 0.1],
+          "bounds": {
+            "radius": 0.45,
+            "height": 1.95
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            }
+          },
+          "cycleDistance": 2.1
+        }
+      }
+    },
+    "arc-scout": {
+      "name": "Scout",
+      "description": "Fast reconnaissance",
+      "train": {
+        "id": "train-scout",
+        "label": "Train Scout"
+      },
+      "model": {
+        "glb": {
+          "url": "/assets/actors/arc-scout.glb",
+          "minimapColor": [0.12, 0.62, 0.82],
+          "bounds": {
+            "radius": 0.4,
+            "height": 1.65
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            }
+          },
+          "cycleDistance": 1.5
+        }
+      }
+    },
+    "arc-command-center-prototype": {
+      "name": "Command Center",
+      "description": "Base infrastructure",
+      "build": {
+        "id": "build-command-center",
+        "label": "Place Command Center"
+      },
+      "building": {
+        "height": 0.3,
+        "color": [0.28, 0.38, 0.42],
+        "minimapColor": [0.36, 0.7, 0.76],
+        "details": "command-center"
+      }
+    },
+    "arc-field-barracks": {
+      "name": "Field Barracks",
+      "description": "Infantry production",
+      "build": {
+        "id": "build-barracks",
+        "label": "Build Field Barracks"
+      },
+      "building": {
+        "height": 0.25,
+        "color": [0.28, 0.34, 0.26],
+        "minimapColor": [0.65, 0.72, 0.32],
+        "details": "barracks"
+      }
+    },
+    "arc-materials-refinery": {
+      "name": "Materials Refinery",
+      "description": "One assigned Harvester",
+      "build": {
+        "id": "build-refinery",
+        "label": "Build Materials Refinery"
+      },
+      "building": {
+        "height": 0.45,
+        "color": [0.45, 0.38, 0.22],
+        "minimapColor": [0.85, 0.65, 0.2],
+        "details": "refinery"
+      }
+    },
+    "arc-harvester": {
+      "name": "Harvester",
+      "description": "Collects and delivers Materials",
+      "train": {
+        "id": "train-harvester",
+        "label": "Produce Harvester"
+      },
+      "model": {
+        "builtin": "harvester"
+      }
+    },
+    "wolf": {
+      "name": "Wolf",
+      "description": "Hostile wildlife",
+      "attackEffect": "bite",
+      "model": {
+        "builtin": "wolf"
+      }
+    },
+    "alpha-wolf": {
+      "name": "Alpha wolf",
+      "description": "Pack leader",
+      "attackEffect": "bite",
+      "model": {
+        "builtin": "wolf",
+        "scale": 1.25
+      }
+    }
+  },
+  "terrain": {
+    "tileTypes": {
+      "dirt": {
+        "slot": 0,
+        "graphics": {
+          "url": "/assets/terrain/dirt.png",
+          "hasAlpha": false,
+          "minimapColor": [0.472, 0.339, 0.217, 1]
+        }
+      },
+      "water": {
+        "slot": 1,
+        "featherEdges": true,
+        "graphics": {
+          "url": "/assets/terrain/water.png",
+          "hasAlpha": true,
+          "layerAlphaOnly": true,
+          "scrollSpeed": {
+            "u": 0.025,
+            "v": 0.012
+          },
+          "minimapColor": [0.189, 0.497, 0.557, 1]
+        }
+      },
+      "water-ripples": {
+        "slot": 2,
+        "featherEdges": true,
+        "graphics": {
+          "url": "/assets/terrain/water.png",
+          "hasAlpha": true,
+          "scale": {
+            "u": 1.37,
+            "v": 1.37
+          },
+          "scrollSpeed": {
+            "u": -0.018,
+            "v": 0.032
+          },
+          "minimapColor": [0.189, 0.497, 0.557, 0.65]
+        }
+      },
+      "clutter": {
+        "slot": 3,
+        "graphics": {
+          "url": "/assets/terrain/clutter.png",
+          "hasAlpha": true,
+          "minimapColor": [0.409, 0.373, 0.341, 0.05]
+        }
+      }
+    },
+    "shore": {
+      "shoreAlpha": 0.06,
+      "deepAlpha": 0.98,
+      "depthTiles": 10
+    },
+    "layers": {
+      "plain": [
+        {
+          "tileType": "dirt",
+          "color": [0.86, 0.9, 0.88, 1],
+          "variation": true
+        },
+        {
+          "tileType": "clutter",
+          "color": [0.99, 0.66, 0.33, 1],
+          "coverage": 0.19397
+        }
+      ],
+      "path": [
+        {
+          "tileType": "dirt",
+          "color": [1.08, 0.98, 0.78, 1],
+          "variation": true
+        },
+        {
+          "tileType": "clutter",
+          "color": [0.99, 0.66, 0.33, 1],
+          "coverage": 0.19397
+        }
+      ],
+      "rough": [
+        {
+          "tileType": "dirt",
+          "color": [0.68, 0.78, 0.64, 1],
+          "variation": true
+        },
+        {
+          "tileType": "clutter",
+          "color": [0.99, 0.66, 0.33, 1]
+        }
+      ],
+      "water": [
+        {
+          "tileType": "dirt",
+          "color": [0.86, 0.9, 0.88, 1],
+          "variation": true
+        },
+        {
+          "tileType": "water",
+          "color": [0.74, 0.94, 0.98, 1],
+          "shoreFade": true
+        },
+        {
+          "tileType": "water-ripples",
+          "color": [0.82, 0.98, 1, 0.3],
+          "shoreFade": true
+        },
+        {
+          "tileType": "clutter",
+          "color": [0.99, 0.66, 0.33, 1],
+          "coverage": 0.19397
+        }
+      ]
+    }
+  },
+  "view": {
+    "clearColor": [0.035, 0.07, 0.09],
+    "lighting": {
+      "skyColor": [0.6, 0.78, 0.77],
+      "groundColor": [0.08, 0.12, 0.1],
+      "sunColor": [1, 1, 1],
+      "sunDirection": [-0.5, -1, 0.35],
+      "skyIntensity": 1.05,
+      "sunIntensity": 1.3
+    }
+  }
+}

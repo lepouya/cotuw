@@ -8,6 +8,7 @@ import {
 
 import { createProductionExitMarker } from "./production-exit";
 import { occupiedTilesFor, tilePlacedPose } from "../simulation/placement";
+import { tileKey } from "../simulation/grid";
 import { createViewRegistry } from "./view-registry";
 import { isRgb } from "./color";
 import { createFootprintOverlay } from "./footprint-overlay";
@@ -200,13 +201,13 @@ export function createTilePlacedActorViewRegistry(
       material.specularColor = new Color3(0.16, 0.18, 0.19);
     });
     const tiles = occupiedTilesFor(actor, definition);
-    const occupied = new Set(tiles.map(({ x, z }) => `${x},${z}`));
+    const occupied = new Set(tiles.map(tileKey));
     const roof =
       Math.max(...tiles.flatMap(cornerHeights)) +
       (appearances.get(definition.id)?.height ?? DEFAULT_HEIGHT);
     for (const tile of tiles) {
       const inset = (dx: number, dz: number) =>
-        occupied.has(`${tile.x + dx},${tile.z + dz}`)
+        occupied.has(tileKey({ x: tile.x + dx, z: tile.z + dz }))
           ? 0
           : EDGE_INSET_TILES * map.tileSize;
       const low = map.worldPoint(

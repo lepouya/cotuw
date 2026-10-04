@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { terrainPoint } from "./prototype-helpers";
+import { importMission, terrainPoint } from "./prototype-helpers";
 import type { Page } from "@playwright/test";
-import type { TerrainPrototype } from "../src/prototype";
+import type { GameSession } from "../src/session";
 import type { ActorPlacement } from "../src/simulation/placement";
 
-type EconomyHarness = { view: TerrainPrototype; now: number };
+type EconomyHarness = { view: GameSession; now: number };
 declare global {
   interface Window {
     economyHarness: EconomyHarness;
@@ -34,10 +34,9 @@ async function controlledOpening(
   const hiddenUnitsAtLoad = await page.evaluate(
     async ({ materials, playerFaction, extraBuildings, startPaused }) => {
       const harnessPath: string = "/e2e/harness.ts";
-      const prototypePath: string = "/src/prototype.ts";
+      const prototypePath: string = "/src/session.ts";
       const sidebarPath: string = "/src/ui/sidebar.ts";
-      const contentPath: string = "/src/prototype-content.ts";
-      const scenarioPath: string = "/src/content/economy-scenario.ts";
+      const missionsPath: string = "/e2e/missions.ts";
       const { EngineStore, frames } = (await import(
         harnessPath
       )) as typeof import("./harness");
@@ -51,42 +50,38 @@ async function controlledOpening(
         }
         engine.dispose();
       }
-      const { createTerrainPrototype } = (await import(
+      const { createGameSession } = (await import(
         prototypePath
-      )) as typeof import("../src/prototype");
+      )) as typeof import("../src/session");
       const { createSidebar } = (await import(
         sidebarPath
       )) as typeof import("../src/ui/sidebar");
-      const { PROTOTYPE_ACTOR_PRESENTATIONS } = (await import(
-        contentPath
-      )) as typeof import("../src/prototype-content");
-      const { ECONOMY_ACTOR_DEFINITIONS, ECONOMY_SCENARIO } = (await import(
-        scenarioPath
-      )) as typeof import("../src/content/economy-scenario");
-      let view: TerrainPrototype;
+      const { level, placeBuildings } = (await import(
+        missionsPath
+      )) as typeof import("./missions");
+      const mission = level();
+      mission.state.economy!.materials = materials;
+      mission.state.playerFaction = playerFaction;
+      placeBuildings(mission, extraBuildings);
+      let view: GameSession;
       const sidebar = createSidebar(
         document.querySelector<HTMLElement>("#game-sidebar")!,
         {
-          definitions: ECONOMY_ACTOR_DEFINITIONS,
-          presentations: PROTOTYPE_ACTOR_PRESENTATIONS,
+          definitions: mission.definitions,
+          presentations: new Map(Object.entries(mission.content.presentation)),
           economy: true,
           playerFaction,
           goals: [{ definitionId: "arc-trooper", label: "Train a Trooper" }],
           selectActor: (id, additive) => view.selectActor(id, additive),
         },
       );
-      view = await createTerrainPrototype(
+      view = await createGameSession(
         document.querySelector<HTMLCanvasElement>("#game-canvas")!,
         document.querySelector<HTMLCanvasElement>("#minimap")!,
         {
           ...sidebar.controls,
           startPaused,
-          scenario: {
-            ...ECONOMY_SCENARIO,
-            materials,
-            playerFaction,
-            buildings: [...ECONOMY_SCENARIO.buildings, ...extraBuildings],
-          },
+          mission,
           onStateChanged: sidebar.update,
           showActor: sidebar.showActor,
           onDispose: sidebar.dispose,
@@ -400,11 +395,11 @@ test.describe("hovering salvage", () => {
       const point = await page.evaluate(async () => {
         const harnessPath: string = "/e2e/harness.ts";
         const terrainPath: string = "/src/render/terrain-mesh.ts";
-        const prototypePath: string = "/src/prototype.ts";
-        const { projectToCanvas } = await import(harnessPath);
+        const { projectToCanvas, prototypeTerrainMap } = await import(
+          harnessPath
+        );
         const { isTerrainPickMesh } = await import(terrainPath);
-        const { createPrototypeMap } = await import(prototypePath);
-        const map = createPrototypeMap();
+        const map = prototypeTerrainMap();
         const view = window.economyHarness.view;
         view.engine.stopRenderLoop();
         view.camera.focusOnTile(25, 52);
@@ -468,13 +463,14 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   await advance(page, 7);
   await page.evaluate(async () => {
     const controlsPath: string = "/src/ui/economy-controls.ts";
-    const contentPath: string = "/src/content/arc.ts";
+    const contentPath: string = "/src/content/packs.ts";
     const { createEconomyControls } = (await import(
       controlsPath
     )) as typeof import("../src/ui/economy-controls");
-    const { ARC_ACTOR_DEFINITIONS } = (await import(
+    const { currentContentPack } = (await import(
       contentPath
-    )) as typeof import("../src/content/arc");
+    )) as typeof import("../src/content/packs");
+    const ARC_ACTOR_DEFINITIONS = currentContentPack("base").actors;
     const snapshot = window.economyHarness.view.simulation.snapshot();
     window.economyHarness.view.engine.stopRenderLoop();
     const refinery = snapshot.actors.find(
@@ -770,12 +766,18 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     "1 building reconnected",
   );
   await page.evaluate(async () => {
-    const contentPath: string = "/src/content/arc.ts";
-    const prototypePath: string = "/src/prototype.ts";
+    const contentPath: string = "/src/content/packs.ts";
+    const harnessPath: string = "/e2e/harness.ts";
     const placementPath: string = "/src/simulation/placement.ts";
-    const { ARC_ACTOR_DEFINITIONS } = await import(contentPath);
-    const { createPrototypeMap } = await import(prototypePath);
-    const { createTilePlacedActor } = await import(placementPath);
+    const { currentContentPack } = (await import(
+      contentPath
+    )) as typeof import("../src/content/packs");
+    const { prototypeTerrainMap } = (await import(
+      harnessPath
+    )) as typeof import("./harness");
+    const { createTilePlacedActor } = (await import(
+      placementPath
+    )) as typeof import("../src/simulation/placement");
     const simulation = window.economyHarness.view.simulation;
     const replacement = simulation.actors.find(
       (actor) =>
@@ -783,10 +785,10 @@ test("selling a support bridge pauses production and rebuilding restores it", as
         actor.tilePlacement.origin.z === 50,
     )!;
     const backup = createTilePlacedActor(
-      createPrototypeMap(),
-      ARC_ACTOR_DEFINITIONS.find(
-        (definition: { id: string }) => definition.id === "arc-field-barracks",
-      ),
+      prototypeTerrainMap(),
+      currentContentPack("base").actors.find(
+        (definition) => definition.id === "arc-field-barracks",
+      )!,
       { actorId: "test-backup", origin: { x: 17, z: 52 } },
     );
     const totalTicks = Math.round(8 / simulation.tickSeconds);
@@ -1108,26 +1110,16 @@ for (const profile of [
         contentType: "image/png",
       });
       const saves = await page.evaluate(async () => {
-        const scenarioPath: string = "/src/content/economy-scenario.ts";
-        const simulationPath: string = "/src/simulation/scenario.ts";
-        const prototypePath: string = "/src/prototype.ts";
+        const missionsPath: string = "/e2e/missions.ts";
         const actorPath: string = "/src/simulation/actor.ts";
-        const { ECONOMY_SCENARIO, ECONOMY_ACTOR_DEFINITIONS } = (await import(
-          scenarioPath
-        )) as typeof import("../src/content/economy-scenario");
-        const { createScenarioState, serializeMission } = (await import(
-          simulationPath
-        )) as typeof import("../src/simulation/scenario");
-        const { createPrototypeSimulation, createPrototypeMap } = (await import(
-          prototypePath
-        )) as typeof import("../src/prototype");
+        const { level, missionSource, simulateMission } = (await import(
+          missionsPath
+        )) as typeof import("./missions");
         const { createActor } = (await import(
           actorPath
         )) as typeof import("../src/simulation/actor");
-        const state = createScenarioState(
-          ECONOMY_SCENARIO,
-          ECONOMY_ACTOR_DEFINITIONS,
-        );
+        const mission = level();
+        const { state } = mission;
         for (const wolf of state.actors.filter((actor) => actor.territory)) {
           if (wolf.id === "den-alpha-wolf") continue;
           wolf.health = 1;
@@ -1142,28 +1134,20 @@ for (const profile of [
             }),
           );
         }
-        const simulation = createPrototypeSimulation(
-          createPrototypeMap(),
-          ECONOMY_SCENARIO,
-          state,
-        );
+        const simulation = simulateMission(mission);
         simulation.tick();
         const partial = simulation.snapshot();
         simulation.dispose();
         const beforeLast = structuredClone(partial);
         beforeLast.actors.find(({ id }) => id === "den-alpha-wolf")!.health = 1;
-        const pending = serializeMission(beforeLast, 1 / 60);
-        const final = createPrototypeSimulation(
-          createPrototypeMap(),
-          ECONOMY_SCENARIO,
-          beforeLast,
-        );
+        const pending = missionSource(mission, beforeLast);
+        const final = simulateMission(mission, beforeLast);
         for (let tick = 0; tick < 600 && !final.result; tick++) final.tick();
-        const victory = serializeMission(final.snapshot(), 1 / 60);
+        const victory = missionSource(mission, final.snapshot());
         const result = final.result?.kind;
         final.dispose();
         return {
-          partial: serializeMission(partial, 1 / 60),
+          partial: missionSource(mission, partial),
           pending,
           victory,
           result,
@@ -1171,12 +1155,8 @@ for (const profile of [
       });
       expect(saves.result).toBe("victory");
       const upload = async (source: string) => {
-        await page.locator("#mission-save-file").setInputFiles({
-          name: "mission.json",
-          mimeType: "application/json",
-          buffer: Buffer.from(source),
-        });
-        await expect(page.locator("#mission-result")).toBeVisible();
+        await importMission(page, source);
+        await expect(page.locator("#game-menu")).toBeVisible();
       };
       await upload(saves.partial);
       await action(page, "#inspect-loaded-mission", profile.touch);
@@ -1197,10 +1177,9 @@ for (const profile of [
       );
       await upload(saves.pending);
       await action(page, "#resume-mission", profile.touch);
-      await expect(page.locator("#mission-result-title")).toHaveText(
-        "Victory",
-        { timeout: 15_000 },
-      );
+      await expect(page.locator("#game-menu-title")).toHaveText("Victory", {
+        timeout: 15_000,
+      });
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-mission-result",
         "victory",
@@ -1239,9 +1218,9 @@ for (const profile of [
       await expect(page.locator("#unit-roster button")).toHaveCount(6, {
         timeout: 10_000,
       });
-      await expect(page.locator("#mission-result")).not.toBeVisible();
+      await expect(page.locator("#game-menu")).not.toBeVisible();
       await upload(saves.victory);
-      await expect(page.locator("#mission-result-title")).toHaveText("Victory");
+      await expect(page.locator("#game-menu-title")).toHaveText("Victory");
       await action(page, "#restart-mission", profile.touch);
       await action(page, "#tab-goals", profile.touch);
       await expect(
@@ -1259,28 +1238,20 @@ for (const profile of [
 test("Command Center defeat pauses, rejects bad loads, restores, restarts, and exits", async ({
   page,
 }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
   );
   const saves = await page.evaluate(async () => {
-    const scenarioPath: string = "/src/content/economy-scenario.ts";
-    const simulationPath: string = "/src/simulation/scenario.ts";
-    const prototypePath: string = "/src/prototype.ts";
-    const { ECONOMY_SCENARIO, ECONOMY_ACTOR_DEFINITIONS } = await import(
-      scenarioPath
-    );
-    const { createScenarioState, serializeMission } = await import(
-      simulationPath
-    );
-    const { createPrototypeSimulation, createPrototypeMap } = await import(
-      prototypePath
-    );
-    const state = createScenarioState(
-      ECONOMY_SCENARIO,
-      ECONOMY_ACTOR_DEFINITIONS,
-    );
+    const missionsPath: string = "/e2e/missions.ts";
+    const { level, missionSource, simulateMission } = (await import(
+      missionsPath
+    )) as typeof import("./missions");
+    const mission = level();
+    const { state } = mission;
     state.actors.find(
       (actor: { id: string }) => actor.id === "starting-command-center",
     )!.health = 1;
@@ -1289,30 +1260,20 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
     )!;
     wolf.worldPosition = { x: -39.5, z: 0.5 };
     wolf.territory = { home: { ...wolf.worldPosition } };
-    const pending = serializeMission(state, 1 / 60);
-    const simulation = createPrototypeSimulation(
-      createPrototypeMap(),
-      ECONOMY_SCENARIO,
-      state,
-    );
+    const info = { name: "Before defeat", savedAt: new Date().toISOString() };
+    const pending = missionSource(mission, state, info);
+    const simulation = simulateMission(mission);
     simulation.tick();
-    const defeated = serializeMission(simulation.snapshot(), 1 / 60);
+    const defeated = missionSource(mission, simulation.snapshot(), info);
     simulation.dispose();
     return { pending, defeated };
   });
   const upload = async (source: string) => {
-    await expect(page.locator("#load-mission")).toBeEnabled();
-    await page.locator("#mission-save-file").setInputFiles({
-      name: "mission.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(source),
-    });
-    await expect(page.locator("#mission-result")).toBeVisible();
+    await importMission(page, source);
+    await expect(page.locator("#game-menu")).toBeVisible();
   };
   await upload(saves.pending);
-  await expect(page.locator("#mission-result-title")).toHaveText(
-    "Mission loaded",
-  );
+  await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
   await page.locator("#inspect-loaded-mission").click();
   await expect(page.locator("#resume-loaded-mission")).toBeVisible();
   await expect(page.locator("#game-canvas")).not.toHaveAttribute(
@@ -1320,7 +1281,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
     "defeat",
   );
   await page.locator("#resume-loaded-mission").click();
-  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-mission-result",
     "defeat",
@@ -1338,27 +1299,26 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
     contentType: "image/png",
   });
   await upload('{"version":0}');
-  await expect(page.locator("#mission-result-status")).toContainText(
-    "unsupported version",
+  await expect(page.locator("#game-menu-status")).toContainText(
+    "not a mission file",
   );
-  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await upload(saves.defeated);
-  await expect(page.locator("#mission-result-status")).toHaveText("");
-  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await expect(page.locator("#game-menu-status")).toHaveText("");
+  await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await expect(page.locator("#resume-mission")).toBeHidden();
   await page.locator("#restart-mission").click();
-  await expect(page.locator("#mission-result")).not.toBeVisible();
+  await expect(page.locator("#game-menu")).not.toBeVisible();
   await expect(page.locator("#materials-counter")).toHaveText("150");
   await expect(page.locator("#game-canvas")).not.toHaveAttribute(
     "data-mission-result",
     "defeat",
   );
   await upload(saves.defeated);
-  await expect(page.locator("#mission-result-title")).toHaveText("Defeat");
+  await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await page.locator("#exit-mission").click();
-  await expect(page.locator("#mission-result-title")).toHaveText(
-    "Mission ended",
-  );
+  await expect(page.locator("#game-menu-title")).toHaveText("Mission ended");
   await page.locator("#restart-mission").click();
   await expect(page.locator("#materials-counter")).toHaveText("150");
+  expect(errors).toEqual([]);
 });

@@ -1,4 +1,5 @@
 import type { TerrainEdit } from "./terrain";
+import { isTerrainTileShape } from "./terrain";
 import type { ActorPlacement, PlacementReason } from "./placement";
 import type { TrainingReason } from "./production";
 import type { WorldPosition } from "./world";
@@ -7,6 +8,7 @@ import type { EconomyReason } from "./economy";
 import type { AttackReason } from "./combat";
 import { isFinitePosition } from "./world";
 import { isTileCoord } from "./grid";
+import { isId } from "./validation";
 
 /** Orders an actor to approach a target using its movement rules. */
 export type MoveCommand = {
@@ -145,51 +147,50 @@ export type ScheduledCommand = {
 export function isMissionCommand(value: unknown): value is MissionCommand {
   if (!value || typeof value !== "object") return false;
   const command = value as Partial<MissionCommand>;
-  const id = (value: unknown) => typeof value === "string" && value.length > 0;
   switch (command.kind) {
     case "move":
     case "attack-move":
-      return id(command.actorId) && isFinitePosition(command.target);
+      return isId(command.actorId) && isFinitePosition(command.target);
     case "group-move":
     case "group-attack-move":
       return (
         Array.isArray(command.actorIds) &&
         command.actorIds.length > 0 &&
-        command.actorIds.every(id) &&
+        command.actorIds.every(isId) &&
         isFinitePosition(command.target)
       );
     case "attack":
-      return id(command.actorId) && id(command.targetId);
+      return isId(command.actorId) && isId(command.targetId);
     case "set-rally-point":
       return (
-        id(command.actorId) &&
+        isId(command.actorId) &&
         (command.target === undefined || isFinitePosition(command.target))
       );
     case "place-actor":
       return (
-        id(command.actorId) &&
-        id(command.definitionId) &&
+        isId(command.actorId) &&
+        isId(command.definitionId) &&
         isTileCoord(command.origin) &&
         (command.quarterTurns === undefined ||
           Number.isInteger(command.quarterTurns))
       );
     case "train-unit":
       return (
-        id(command.actorId) &&
-        id(command.producerId) &&
-        id(command.definitionId)
+        isId(command.actorId) &&
+        isId(command.producerId) &&
+        isId(command.definitionId)
       );
     case "gather":
-      return id(command.actorId) && id(command.siteId);
+      return isId(command.actorId) && isId(command.siteId);
     case "assign-refinery":
-      return id(command.actorId) && id(command.refineryId);
+      return isId(command.actorId) && isId(command.refineryId);
     case "stop":
     case "remove-actor":
     case "sell-actor":
     case "cancel-construction":
     case "return-cargo":
     case "cancel-production":
-      return id(command.actorId);
+      return isId(command.actorId);
     case "terrain":
       return (
         (command.heights === undefined ||
@@ -200,21 +201,10 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
             ))) &&
         (command.tiles === undefined ||
           (Array.isArray(command.tiles) &&
-            command.tiles.every((change) => {
-              const tile = change?.terrain;
-              return (
-                isTileCoord(change) &&
-                !!tile &&
-                id(tile.typeId) &&
-                [
-                  tile.surfacePassable,
-                  tile.surfaceBuildable,
-                  tile.outOfBounds,
-                ].every(
-                  (flag) => flag === undefined || typeof flag === "boolean",
-                )
-              );
-            })))
+            command.tiles.every(
+              (change) =>
+                isTerrainTileShape(change?.terrain) && isTileCoord(change),
+            )))
       );
     default:
       return false;

@@ -2,15 +2,12 @@ import { expect, test } from "@playwright/test";
 
 import { placeBuilding, terrainPoint } from "./prototype-helpers";
 
-import type {
-  TerrainPrototype,
-  TerrainPrototypeControls,
-} from "../src/prototype";
+import type { GameSession, GameSessionControls } from "../src/session";
 
 test("goal lists reconcile changed content, order, and failure status", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
     const path: string = "/src/ui/goals.ts";
     const { createGoalList } = (await import(
@@ -76,7 +73,7 @@ test("goal lists reconcile changed content, order, and failure status", async ({
 test("starts empty with a reserved sidebar and builds and trains through its tabs", async ({
   page,
 }, testInfo) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
   await expect(page.locator("#tab-buildings")).toHaveAttribute(
@@ -170,7 +167,7 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
 test("blocked exits disable training until a unit moves away", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
@@ -207,7 +204,7 @@ test("compact touch layout can build a barracks and train both unit types", asyn
   });
   const page = await context.newPage();
   try {
-    await page.goto("/?sandbox");
+    await page.goto("/?level=sandbox");
     await expect(page.locator("#game-canvas")).toHaveAttribute(
       "data-terrain-ready",
       "true",
@@ -243,7 +240,7 @@ test("compact touch layout can build a barracks and train both unit types", asyn
 test("sidebar derives custom content and can be disposed and recreated", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
     const path: string = "/src/ui/sidebar.ts";
     const { createSidebar } = await import(path);
@@ -391,20 +388,21 @@ test("sidebar derives custom content and can be disposed and recreated", async (
 test("prototype controls skip unchanged frames and removal works without a sidebar", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
-    const prototypePath: string = "/src/prototype.ts";
+    const prototypePath: string = "/src/session.ts";
     const placementPath: string = "/src/simulation/placement.ts";
-    const contentPath: string = "/src/prototype-content.ts";
-    const { createTerrainPrototype, createPrototypeMap } = (await import(
+    const missionsPath: string = "/e2e/missions.ts";
+    const { createGameSession } = (await import(
       prototypePath
-    )) as typeof import("../src/prototype");
+    )) as typeof import("../src/session");
     const { createTilePlacedActor } = (await import(
       placementPath
     )) as typeof import("../src/simulation/placement");
-    const { PROTOTYPE_ACTOR_DEFINITIONS } = (await import(
-      contentPath
-    )) as typeof import("../src/prototype-content");
+    const { level, missionMap } = (await import(
+      missionsPath
+    )) as typeof import("./missions");
+    const mission = level("sandbox");
     const canvas = document.createElement("canvas");
     const minimap = document.createElement("canvas");
     Object.assign(canvas.style, { width: "640px", height: "480px" });
@@ -415,7 +413,8 @@ test("prototype controls skip unchanged frames and removal works without a sideb
     const train = document.createElement("button");
     const definitionId = "arc-command-center-prototype";
     let updates = 0;
-    const controls: TerrainPrototypeControls = {
+    const controls: GameSessionControls = {
+      mission,
       remove,
       cancel,
       buildings: [{ definitionId, button: build }],
@@ -424,7 +423,7 @@ test("prototype controls skip unchanged frames and removal works without a sideb
         updates += 1;
       },
     };
-    const view: TerrainPrototype = await createTerrainPrototype(
+    const view: GameSession = await createGameSession(
       canvas,
       minimap,
       controls,
@@ -451,8 +450,8 @@ test("prototype controls skip unchanged frames and removal works without a sideb
       for (let i = 0; i < 20; i++) refresh();
       const unchangedFrames =
         updates === baseline && evaluations === baselineEvaluations;
-      const map = createPrototypeMap();
-      const definition = PROTOTYPE_ACTOR_DEFINITIONS.find(
+      const map = missionMap(mission);
+      const definition = mission.definitions.find(
         (definition) => definition.id === definitionId,
       )!;
       view.simulation.spawnActor(

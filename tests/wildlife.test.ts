@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { WILDLIFE_ACTOR_DEFINITIONS } from "../src/content/wildlife";
-import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
+import { WILDLIFE_ACTOR_DEFINITIONS } from "./helpers/content";
+import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { updateCombat } from "../src/simulation/combat";
 import {
   createTerritoryController,
@@ -14,9 +14,8 @@ import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import {
   createScenarioState,
   defineScenario,
-  serializeMission,
-  deserializeMission,
 } from "../src/simulation/scenario";
+import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { createFixedStepClock } from "../src/simulation/clock";
 import { distance } from "../src/simulation/world";
 import type { ActorDefinition } from "../src/simulation/actor";
@@ -143,11 +142,10 @@ function continuation(
     units,
     undefined,
     content,
-    deserializeMission(
-      serializeMission(simulation.snapshot(), seconds),
-      scenario(units),
+    parseMission(
+      serializeMission(scenario(units), simulation.snapshot(), seconds),
       seconds,
-    ),
+    ).state,
   );
   expect(restored.snapshot()).toEqual(simulation.snapshot());
   for (let i = 0; i < ticks; i++) {

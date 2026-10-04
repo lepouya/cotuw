@@ -2,17 +2,12 @@ import { harvestingRecoveryCost } from "../src/simulation/economy";
 import { createActor } from "../src/simulation/actor";
 import type { ActorDefinition } from "../src/simulation/actor";
 import { describe, expect, test } from "vitest";
-import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
-import {
-  ECONOMY_ACTOR_DEFINITIONS,
-  ECONOMY_SCENARIO,
-} from "../src/content/economy-scenario";
+import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
+import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
+import { LEVEL_SOURCES } from "../src/content/levels";
 import { createMissionSimulation } from "../src/simulation/mission";
-import {
-  defineScenario,
-  serializeMission,
-  deserializeMission,
-} from "../src/simulation/scenario";
+import { defineScenario } from "../src/simulation/scenario";
+import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
@@ -209,21 +204,19 @@ describe("Materials economy", () => {
   });
 
   test("starts with a fixed Command Center and exactly enough for the first economic pair", () => {
-    const state = exploredScenarioState(
-      ECONOMY_SCENARIO,
-      ECONOMY_ACTOR_DEFINITIONS,
-    );
+    const level = () =>
+      parseMission(
+        LEVEL_SOURCES.get("arc-economy-opening")!,
+        SIMULATION_TICK_SECONDS,
+      ).state;
+    const state = level();
     expect(
       state.actors
         .filter((actor) => actor.definitionId.startsWith("arc-"))
         .map((actor) => actor.definitionId),
     ).toEqual(["arc-command-center-prototype"]);
     expect(state.economy!.materials).toBe(150);
-    expect(Object.isFrozen(ECONOMY_SCENARIO.terrain.tiles)).toBe(true);
-    const independent = exploredScenarioState(
-      ECONOMY_SCENARIO,
-      ECONOMY_ACTOR_DEFINITIONS,
-    );
+    const independent = level();
     state.economy!.sites[0].remainingMaterials = 0;
     expect(independent.economy!.sites[0].remainingMaterials).toBe(200);
   });
@@ -872,11 +865,10 @@ describe("economy persistence", () => {
         actorId: "cc",
         target: { x: 0, z: 0 },
       });
-      const saved = deserializeMission(
-        serializeMission(simulation.snapshot(), 0.1),
-        scenario,
+      const saved = parseMission(
+        serializeMission(scenario, simulation.snapshot(), 0.1),
         0.1,
-      );
+      ).state;
       const restored = fixture(saved, 0.1).simulation;
       expect(restored.snapshot()).toEqual(simulation.snapshot());
       for (let tick = 0; tick < 1000; tick++) {
@@ -897,11 +889,10 @@ describe("economy persistence", () => {
       kind: "cancel-construction",
       actorId: "refinery",
     });
-    const saved = deserializeMission(
-      serializeMission(simulation.snapshot(), 0.1),
-      scenario,
+    const saved = parseMission(
+      serializeMission(scenario, simulation.snapshot(), 0.1),
       0.1,
-    );
+    ).state;
     const restored = fixture(saved, 0.1).simulation;
     for (let tick = 0; tick < 100; tick++)
       expect(restored.tick()).toEqual(simulation.tick());
@@ -910,44 +901,18 @@ describe("economy persistence", () => {
     expect(restored.economy!.materials).toBe(200);
   });
 
-  test("resource compatibility ignores coordinate key order and checks authored names", () => {
+  test("saves carry their own resource content", () => {
     const { simulation } = fixture();
-    const save = JSON.parse(serializeMission(simulation.snapshot(), 1));
-    for (const resource of [
-      ...save.state.economy.sites,
-      ...save.state.economy.loot,
-    ])
-      resource.tile = { z: resource.tile.z, x: resource.tile.x };
-    expect(deserializeMission(JSON.stringify(save), scenario, 1)).toEqual(
-      simulation.snapshot(),
+    const save = JSON.parse(
+      serializeMission(scenario, simulation.snapshot(), 1),
     );
     save.state.economy.sites[0].name = "Different patch";
-    expect(() => deserializeMission(JSON.stringify(save), scenario, 1)).toThrow(
-      "resource content",
-    );
-  });
-
-  test("rejects incompatible versions, scenario content, and tick rates", () => {
-    const { simulation } = fixture();
-    const source = serializeMission(simulation.snapshot(), 1);
-    expect(() =>
-      deserializeMission(
-        source.replace(/"version":\d+/, '"version":2'),
-        scenario,
-        1,
-      ),
-    ).toThrow("unsupported version");
-    expect(() => deserializeMission(source, ECONOMY_SCENARIO, 1)).toThrow(
-      "different scenario",
-    );
-    expect(() => deserializeMission(source, scenario, 0.1)).toThrow(
-      "simulation settings",
-    );
-    const save = JSON.parse(source);
-    save.state.economy.sites[0].initialMaterials = 999;
-    expect(() => deserializeMission(JSON.stringify(save), scenario, 1)).toThrow(
-      "resource content",
-    );
+    save.state.economy.sites[0].remainingMaterials = 50;
+    const restored = fixture(parseMission(JSON.stringify(save), 1).state);
+    expect(restored.simulation.economy!.sites[0]).toMatchObject({
+      name: "Different patch",
+      remainingMaterials: 50,
+    });
   });
 });
 

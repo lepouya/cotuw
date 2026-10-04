@@ -318,6 +318,9 @@ story.
   and a keyboard-free Cancel action.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed mission
   time, and single-player pause and speed controls.
+- The game menu pauses a single-player mission and offers Save, Quicksave,
+  Load, Restart, and Exit; its Load panel lists saves and imports files. F5
+  quicksaves, F9 loads the quicksave, and F10 opens the menu.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
   an explicit command mode.
@@ -726,9 +729,9 @@ Deterministic acceptance checks cover:
 
 ## Materials economy prototype
 
-- The default browser opening uses immutable, renderer-independent scenario
-  content with a fixed Command Center in the map-edge pocket. `/?sandbox`
-  selects the free construction and training sandbox.
+- The default level file is the Materials opening, with a fixed Command Center
+  in the map-edge pocket. `/?level=sandbox` selects the free construction and
+  training sandbox.
 - The opening starts with 150 Materials. Prototype costs are 300 for a Command
   Center, 100 for a Materials Refinery, 50 for a Harvester, 100 for a Field
   Barracks, 25 for a Trooper, and 20 for a Scout. Unit training takes six, four,
@@ -823,10 +826,6 @@ Deterministic acceptance checks cover:
   Harvester assignments, cargo, gathering progress, phases, routes, paid
   production, rally points, blueprint progress and queue order, explored
   terrain, pending commands, and reserved or retired actor identities.
-  Scenario saves require explored terrain. Versioned JSON envelopes check
-  scenario, player faction, tick rate, map dimensions, and authored resource
-  names, coordinates, and yields before simulation validation. Manual save/load
-  UI remains pending.
 
 ## Combat prototype
 
@@ -934,11 +933,12 @@ Deterministic acceptance checks cover:
 - Combat destruction of the opening's authored starting Command Center records
   a defeat at that tick. All simultaneous hits resolve, then movement and
   economy stop. Further ticks leave the state unchanged. The result survives
-  saving, and the results panel offers Restart, Load, and Exit. Restart rebuilds
-  the authored opening; Exit releases the session and offers a new mission.
-  Load validates a mission JSON file before releasing the current session and
-  begins paused, with Inspect and Resume actions. Inspection allows selection
-  and camera movement; commands require resuming. A loaded defeat stays ended.
+  saving, and the results panel offers Restart, Load, and Exit. Restart reloads
+  the level; Exit releases the session and offers a new mission. Load lists
+  saves and imports files, validates the mission before releasing the current
+  session, and begins paused, with Inspect and Resume actions. Inspection allows
+  selection and camera movement; commands require resuming. A loaded defeat
+  stays ended.
   Economic stalls and ordinary unit or building losses do not declare defeat.
 - Mission objectives are data. A `destroy` objective completes when combat
   destroys all its targets; a `protect` objective fails when combat destroys
@@ -1000,15 +1000,47 @@ a later tutorial could be made.
 
 ## Persistence
 
-- Scenario definitions are immutable content; mission saves are mutable runtime
-  snapshots with stable actor identifiers and versioned envelopes. Actor IDs
-  are never reassigned within a mission, including after saving and loading.
-- Mission saves use version 7 and preserve authored objective IDs, rules,
-  targets, defeated target IDs, and resolution ticks, from which victory or
-  defeat follows. Loading matches objectives by ID and rejects changed rules
-  or target sets.
+- Levels and mission saves share one human-readable JSON format, version 8. A
+  level is a mission file at tick 0. Every mission starts by loading a file,
+  including bundled levels, and [mission files](docs/mission-files.md)
+  documents the layout for hand editing.
+- Mission files carry the scenario's authored data, such as terrain,
+  objectives, briefing, and goals, beside the runtime snapshot. They name a
+  shared content pack and its version, and may list the pack's actors they
+  use. Loading rejects unknown packs, other pack versions, other file
+  versions, and other tick rates, but accepts any content the simulation
+  validates, so hand-edited levels and saves load as written.
+- Content packs hold actor definitions, movement profiles, presentation,
+  terrain styling, and lighting as JSON in the schema mods will use, as
+  [content packs](docs/content-packs.md) documents. Session code holds no
+  mission-specific rules. Behaviors and procedural models that data cannot
+  express are built-in code that packs name by ID.
+- Terrain and fog are stored as text rows from north to south with a tile
+  legend, and heights as one number row per corner row. Missions without fog
+  have the whole map known.
+- Bundled levels are generated from authoring scripts by `npm run levels`,
+  which replaces hand edits to those files.
+- Actor IDs are stable and never reassigned within a mission, including after
+  saving and loading.
+- Mission files preserve objective IDs, rules, targets, defeated target IDs,
+  and resolution ticks, from which victory or defeat follows. Objective
+  progress must match the objective definitions in the same file.
 - Manual save, load, restart, one rolling quicksave, and one rolling autosave
-  are required in M0. Loading begins paused.
+  are required in M0. Loading begins paused. Restart reloads the level with
+  the mission's scenario ID; loading a level file makes it that scenario's
+  restart level for the session. A tick-0 file with save metadata remains a
+  save and does not replace that level.
+- Manual saves form a named list without a count limit. Each entry shows its
+  kind (Manual, Quick, or Auto), name, mission name, elapsed time, and
+  timestamp. The quicksave and autosave replace only themselves.
+- The autosave updates when an objective completes. Saving is unavailable
+  after defeat or a simulation fault, so neither rolling save captures a lost
+  mission.
+- Platform services own storage. Browsers keep saves in local storage and
+  exchange files by download and upload; the desktop build keeps saves as
+  files in its app data folder and uses native file dialogs.
+  Save writes and deletions finish in request order. Desktop library writes
+  replace the previous file only after the new file has been written.
 - Mission and campaign saves are separate schemas. A mission save owns one
   mission snapshot; a campaign save owns longer-lived choices and progression.
 - Authoritative simulation state is serialized. Rendering objects, navigation
@@ -1017,8 +1049,8 @@ a later tutorial could be made.
   cooldowns, deterministic random state when used, and persistent story flags,
   timers, and branches. Events retain progress, completed one-time triggers,
   pending actions, and effective behavior profiles. Loading resumes without
-  repeating completed events. Executable code and content definitions come
-  from the game build.
+  repeating completed events. Executable code comes from the game build;
+  content definitions come from the content pack version the mission names.
 - A mission snapshot includes simulation terrain and its navigation version.
   An actor's active route is simulation state, so a loaded mission continues
   every move exactly as an uninterrupted one would, without recalculating.

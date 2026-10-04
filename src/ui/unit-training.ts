@@ -62,7 +62,7 @@ export function createUnitTraining(
         simulation.result?.kind === "defeat"
           ? "Mission ended in defeat."
           : faulted
-            ? "Simulation stopped. Reload to continue."
+            ? "Simulation stopped. Restart or load a mission from the menu."
             : options.paused?.()
               ? "Resume the mission to train units."
               : "Finish or cancel building placement to train units.",

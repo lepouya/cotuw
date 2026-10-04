@@ -4,7 +4,7 @@ import { compareIds } from "./actor";
 
 import type { Actor, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
-import { distance } from "./world";
+import { distance, withinBounds } from "./world";
 import type { WorldPosition } from "./world";
 
 export type DefinedActor = {
@@ -163,8 +163,7 @@ export function separateMobileActors(
     const from = actor.worldPosition;
     const to = { x: from.x + dx * step, z: from.z + dz * step };
     if (!allows(mover, to)) return;
-    const { minX, maxX, minZ, maxZ } = grid.map.worldBounds;
-    if (to.x < minX || to.x > maxX || to.z < minZ || to.z > maxZ) return;
+    if (!withinBounds(to, grid.map.worldBounds)) return;
     if (segmentCost(grid, from, to) === undefined) return;
     actor.worldPosition = to;
     budgets.set(actor.id, budgets.get(actor.id)! - step);

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("refreshes footprint geometry and in-place color changes at the same center", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const results = await page.evaluate(async () => {
     const minimapPath: string = "/src/render/minimap.ts";
     const mapPath: string = "/src/map.ts";
@@ -93,7 +93,7 @@ declare const testView: ReturnType<typeof harness.createTestView>;
 const MINIMAP_SIZE = 200;
 
 async function openMinimapView(page: Page): Promise<void> {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await page.evaluate(async (minimapSize) => {
     const harnessPath: string = "/e2e/harness.ts";
     const loaded: typeof harness = await import(harnessPath);
@@ -201,7 +201,7 @@ test("scrolling over the minimap never zooms the main view", async ({
 test("actor markers redraw at their current world positions", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const pixels = await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
     const { createMinimap, createTestView, frames, minimapProjection } =
@@ -269,7 +269,7 @@ test("actor markers redraw at their current world positions", async ({
 test("minimap commands wait for a click and ignore drags and cancelled capture", async ({
   page,
 }) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
     const loaded: typeof harness = await import(harnessPath);

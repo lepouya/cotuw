@@ -17,8 +17,12 @@
           <p class="eyebrow">Anomaly Response Command</p>
           <h1>Unquiet World</h1>
           <p class="muted">
-            <span id="scenario-label">Base &amp; infantry sandbox</span>
+            <span id="scenario-label"></span>
           </p>
+          <button id="open-menu" type="button" title="Game menu (F10)">
+            Menu
+          </button>
+          <p id="save-status" class="save-status" role="status"></p>
         </header>
         <div class="sidebar-tabs" role="tablist" aria-label="Command panels">
           <button
@@ -194,20 +198,13 @@
             hidden
           >
             <p class="eyebrow">Scenario goals</p>
-            <h2 id="scenario-title">Build &amp; explore</h2>
-            <p class="muted">
-              <span id="scenario-description"
-                >Practice construction and training. This sandbox has no victory
-                or defeat condition.</span
-              >
-            </p>
+            <h2 id="scenario-title"></h2>
+            <p class="muted"><span id="scenario-description"></span></p>
             <p id="mission-directive" class="muted" role="status" hidden></p>
             <ul id="mission-objectives" class="scenario-goals" hidden></ul>
-            <h3 id="preparation-heading">Construction &amp; training</h3>
+            <h3 id="preparation-heading"></h3>
             <ul id="scenario-goals" class="scenario-goals"></ul>
-            <p id="scenario-goals-note" class="muted">
-              Counts show buildings and units currently in the field.
-            </p>
+            <p id="scenario-goals-note" class="muted"></p>
           </section>
         </div>
         <section class="unit-controls" aria-label="Unit controls">
@@ -254,10 +251,7 @@
           <p id="placement-status" class="muted" role="status"></p>
         </section>
         <footer class="sidebar-footer">
-          <p id="scenario-rules" class="muted">
-            Instant construction &amp; training · No resource or power
-            requirements
-          </p>
+          <p id="scenario-rules" class="muted"></p>
           <p class="controls">
             Click to select or move · Shift-click to add<br />Drag to select ·
             Pan mode: drag or scroll · Space-drag to pan<br />Arrow keys pan the
@@ -266,8 +260,10 @@
         </footer>
       </aside>
       <div class="game-viewport">
-        <div id="resource-bar" class="resource-bar" hidden>
-          <strong>Materials <span id="materials-counter">0</span></strong>
+        <div class="mission-status">
+          <div id="resource-bar" class="resource-bar" hidden>
+            <strong>Materials <span id="materials-counter">0</span></strong>
+          </div>
           <button id="resume-loaded-mission" type="button" hidden>
             Resume mission
           </button>
@@ -372,25 +368,37 @@
         <canvas id="minimap" class="minimap" aria-label="Map overview"></canvas>
       </div>
     </main>
-    <dialog id="mission-result" aria-labelledby="mission-result-title">
-      <h2 id="mission-result-title">Defeat</h2>
-      <p id="mission-result-description"></p>
-      <div class="building-controls">
+    <dialog id="game-menu" aria-labelledby="game-menu-title">
+      <h2 id="game-menu-title">Paused</h2>
+      <p id="game-menu-description"></p>
+      <div id="game-menu-actions" class="building-controls">
         <button id="inspect-loaded-mission" type="button" hidden>
           Inspect
         </button>
         <button id="resume-mission" type="button" hidden>Resume</button>
-        <button id="restart-mission" type="button">Restart</button>
+        <button id="save-mission" type="button">Save</button>
+        <button id="quicksave-mission" type="button">Quicksave</button>
         <button id="load-mission" type="button">Load</button>
+        <button id="restart-mission" type="button">Restart</button>
         <button id="exit-mission" type="button">Exit</button>
       </div>
-      <p id="mission-result-status" class="muted" role="status"></p>
-      <input
-        id="mission-save-file"
-        type="file"
-        accept=".json,application/json"
-        hidden
-      />
+      <form id="save-form" class="save-form" hidden>
+        <label for="save-name">Save name</label>
+        <input id="save-name" type="text" maxlength="80" required />
+        <div class="building-controls">
+          <button id="confirm-save" type="submit">Save</button>
+          <button id="export-mission" type="button">Export file</button>
+          <button id="cancel-save" type="button">Back</button>
+        </div>
+      </form>
+      <section id="load-panel" hidden aria-label="Saved missions">
+        <ul id="save-entries" class="save-entries"></ul>
+        <div class="building-controls">
+          <button id="import-mission" type="button">Import file</button>
+          <button id="cancel-load" type="button">Back</button>
+        </div>
+      </section>
+      <p id="game-menu-status" class="muted" role="status"></p>
     </dialog>
   </body>
 </html>

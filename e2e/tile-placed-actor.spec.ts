@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
 
 async function ready(page: Page) {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-tile-placed-actor-ready",
     "true",
@@ -131,13 +131,11 @@ test("rejects occupied terrain and units without changing the world, and cancels
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "2");
   const unitTile = await page.evaluate(async () => {
     const path: string = "/e2e/harness.ts";
-    const prototypePath: string = "/src/prototype.ts";
-    const { EngineStore } = await import(path);
-    const { createPrototypeMap } = await import(prototypePath);
+    const { EngineStore, prototypeTerrainMap } = await import(path);
     const point = EngineStore.Instances[0].scenes[0]
       .getTransformNodeByName("actor-trained-unit-1-root")!
       .getAbsolutePosition();
-    return createPrototypeMap().tileAtWorldPosition(point.x, point.z);
+    return prototypeTerrainMap().tileAtWorldPosition(point.x, point.z);
   });
   const unit = await terrainPoint(page, unitTile.x, unitTile.z);
   await page.mouse.move(unit.x, unit.y);
@@ -240,10 +238,9 @@ test("previews reject water, cliffs, and the playable-map boundary", async ({
     await page.evaluate(
       async ({ x, z }) => {
         const harnessPath: string = "/e2e/harness.ts";
-        const prototypePath: string = "/src/prototype.ts";
-        const { EngineStore, Vector3, frames } = await import(harnessPath);
-        const { createPrototypeMap } = await import(prototypePath);
-        const map = createPrototypeMap();
+        const { EngineStore, Vector3, frames, prototypeTerrainMap } =
+          await import(harnessPath);
+        const map = prototypeTerrainMap();
         const point = map.tileCenter(x, z);
         const scene = EngineStore.Instances[0].scenes[0];
         // View the cliff from its exposed side.

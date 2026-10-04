@@ -1,6 +1,10 @@
 import { personallyDetects } from "./vision";
 import { forEachTileOnSegment } from "./navigation";
-import { isTilePlacedActor, occupiedTilesFor } from "./placement";
+import {
+  isTilePlacedActor,
+  isValidTilePlacement,
+  occupiedTilesFor,
+} from "./placement";
 import {
   distance,
   distanceToBounds,
@@ -13,6 +17,7 @@ import { terrainSightlineClear } from "./terrain-sightline";
 import { tileAreaBounds } from "./terrain";
 import { areHostile } from "./faction";
 import { clearCombatOrders, compareIds, healthOf } from "./actor";
+import { isId, isPositive } from "./validation";
 import {
   validateTerritoryActor,
   validateTerritoryDefinition,
@@ -27,7 +32,7 @@ import type {
 } from "./actor";
 import type { TileCoord } from "./grid";
 import type { OccupancyView } from "./occupancy";
-import type { TerrainGrid } from "./terrain";
+import type { TerrainGrid, TerrainView } from "./terrain";
 import type { WorldBounds, WorldPosition } from "./world";
 
 export type AttackReason = "unarmed" | "invalid-target" | "undetected";
@@ -161,25 +166,21 @@ export type CombatWorld = {
   destroy: (actor: Actor) => void;
 };
 
-const positive = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) && value > 0;
-const isId = (value: unknown) => typeof value === "string" && value.length > 0;
-
 export function validateCombatDefinition(definition: ActorDefinition): void {
   const { health, weapon, guard, faction } = definition;
   if (
     (faction !== undefined && !isId(faction)) ||
-    (health !== undefined && !positive(health)) ||
+    (health !== undefined && !isPositive(health)) ||
     (weapon &&
-      (!positive(weapon.damage) ||
+      (!isPositive(weapon.damage) ||
         !isId(weapon.damageType) ||
-        !positive(weapon.range) ||
-        !positive(weapon.cooldownSeconds))) ||
+        !isPositive(weapon.range) ||
+        !isPositive(weapon.cooldownSeconds))) ||
     (guard &&
       (!weapon ||
         !definition.movement ||
-        !positive(guard.acquisitionRadius) ||
-        !positive(guard.chaseRadius)))
+        !isPositive(guard.acquisitionRadius) ||
+        !isPositive(guard.chaseRadius)))
   )
     throw new RangeError(`Invalid combat definition: ${definition.id}.`);
   validateTerritoryDefinition(definition);
@@ -247,6 +248,53 @@ export function validateCombatActor(
   )
     throw new RangeError(`Actor ${actor.id} has invalid combat state.`);
   validateTerritoryActor(actor, definition, bounds);
+}
+
+/** Wrecks belong to retired actors, once each, and match their definitions. */
+export function validateWrecks(
+  wrecks: readonly Wreck[],
+  {
+    retiredIds,
+    definitions,
+    bounds,
+    tick,
+    map,
+  }: {
+    retiredIds: ReadonlySet<string>;
+    definitions: ReadonlyMap<string, ActorDefinition>;
+    bounds: WorldBounds;
+    tick: number;
+    map?: TerrainView;
+  },
+): void {
+  const seen = new Set<string>();
+  if (
+    !Array.isArray(wrecks) ||
+    wrecks.some((wreck) => {
+      const definition = wreck && definitions.get(wreck.definitionId);
+      const invalid =
+        !definition ||
+        !retiredIds.has(wreck.actorId) ||
+        seen.has(wreck.actorId) ||
+        !isFinitePosition(wreck.worldPosition) ||
+        !withinBounds(wreck.worldPosition, bounds) ||
+        !Number.isFinite(wreck.facing) ||
+        !isTick(wreck.tick) ||
+        wreck.tick > tick ||
+        (definition.footprint !== undefined) !==
+          (wreck.tilePlacement !== undefined) ||
+        (wreck.tilePlacement !== undefined &&
+          !isValidTilePlacement(wreck.tilePlacement));
+      seen.add(wreck?.actorId);
+      if (invalid) return true;
+      if (wreck.tilePlacement && map)
+        return wreckTiles(wreck, definition!).some(
+          ({ x, z }) => !map.containsTile(x, z),
+        );
+      return false;
+    })
+  )
+    throw new RangeError("Mission state has invalid wrecks.");
 }
 
 /** The footprint tiles building debris covers; none for fallen units. */

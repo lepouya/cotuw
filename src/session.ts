@@ -1,15 +1,13 @@
-// Throwaway prototype code: a sample map and the scene that shows it.
-// Replace this with real game setup once the prototype has served its purpose.
+// A playable session: the mission's simulation, its views, and its controls.
+// Every mission-specific rule and look comes from the mission's content pack.
 import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
 import type { TerrainGrid, TerrainGridOptions } from "./simulation/terrain";
-import type { MissionState } from "./simulation/mission";
 import type { MissionResult } from "./simulation/objectives";
-import {
-  createScenarioMap,
-  createScenarioState,
-  deserializeMission,
-} from "./simulation/scenario";
+import { createScenarioMap } from "./simulation/scenario";
+import type { ScenarioTerrain } from "./simulation/scenario";
+import { parseMission, serializeMission } from "./simulation/mission-file";
+import type { MissionFile, SaveInfo } from "./simulation/mission-file";
 import { disconnectedBuildings } from "./simulation/support";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
@@ -18,35 +16,18 @@ import type { NetworkControls } from "./ui/network-controls";
 import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
 import { createMaterialsSitesView } from "./render/materials-sites";
-import { createHarvesterAppearance } from "./render/harvester";
-import { createWolfAppearance } from "./render/wolf";
 import { createHealthBarView } from "./render/health-bars";
 import { createCombatEffectsView } from "./render/combat-effects";
 import { createWreckView } from "./render/wrecks";
 import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
-import { ECONOMY_ACTOR_DEFINITIONS } from "./content/economy-scenario";
-import type { ScenarioDefinition } from "./simulation/scenario";
-import { ALPHA_WOLF_SCALE } from "./content/wildlife";
-import {
-  PROTOTYPE_TERRAIN,
-  prototypeWaterDepthAt,
-} from "./content/prototype-terrain";
+import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
+import { contentPack } from "./content/packs";
 import {
   Color3,
-  Color4,
   MeshBuilder,
   StandardMaterial,
   Vector3,
 } from "@babylonjs/core";
-
-import {
-  PROTOTYPE_ACTOR_DEFINITIONS,
-  PROTOTYPE_ACTOR_NAMES,
-  PROTOTYPE_ATTACK_EFFECTS,
-  PROTOTYPE_ACTOR_GRAPHICS,
-  PROTOTYPE_TILE_PLACED_APPEARANCES,
-  PROTOTYPE_MOVEMENT_PROFILES,
-} from "./prototype-content";
 import { TerrainMap } from "./map";
 import {
   createCommandInput,
@@ -59,16 +40,18 @@ import {
   createTerrainMeshes,
   DEFAULT_ACTOR_COLOR,
 } from "./render";
+import {
+  BUILTIN_ACTOR_MODELS,
+  BUILTIN_BUILDING_DETAILS,
+} from "./render/builtin-models";
+import { terrainLayers } from "./render/terrain-style";
 import { OccupancyGrid } from "./simulation/occupancy";
 import {
   isMobileActor,
   isTilePlacedActor,
   occupiedTilesFor,
 } from "./simulation/placement";
-import {
-  loadSkinnedActorAppearance,
-  validateActorGraphics,
-} from "./render/skinned-actor-appearance";
+import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
 import { startSimulationLoop } from "./simulation/loop";
 import { createBuildingPlacement } from "./render/building-placement";
 import { createUnitControls } from "./ui/unit-controls";
@@ -82,27 +65,24 @@ import type { UnitTrainingControls } from "./ui/unit-training";
 import type { DefinitionButton, SidebarState } from "./ui/sidebar";
 import type { MissionSimulation } from "./simulation/mission";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
-import {
-  createMissionSimulation,
-  createMissionState,
-} from "./simulation/mission";
+import { createMissionSimulation } from "./simulation/mission";
 
 import type { Scene } from "@babylonjs/core";
-import type { TerrainTile, TileLayer, TileType } from "./map";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
-import type { ActorRenderState } from "./simulation/actor";
+import type { Rgb } from "./render/color";
+import type { ActorDefinition, ActorRenderState } from "./simulation/actor";
 import type { TileCoord } from "./simulation/grid";
 import type { BuildingPlacementControls } from "./render/building-placement";
 import type { HealthBar } from "./render/health-bars";
+import type { TilePlacedActorAppearance } from "./render/tile-placed-actor-view";
+import type { ActorGraphics } from "./render/skinned-actor-appearance";
+import type { TerrainStyle } from "./render/terrain-style";
+import type { ContentPack, ViewStyle } from "./content/content-pack";
 import { healthBarOpacity } from "./render/health-bars";
 import { createPlayerAccess } from "./simulation/faction";
 
-/** Water opacity at the midline and at the last tile before the bank. */
-const WATER_DEEP_ALPHA = 0.98;
-const WATER_SHORE_ALPHA = 0.06;
-/** Ripple opacity, as a fraction of the water beneath it. */
-const WATER_RIPPLE_ALPHA = 0.3;
-const SIMULATION_TICK_SECONDS = 1 / 60;
+const SITE_MINIMAP_COLOR: Rgb = [0.3, 0.66, 0.75];
+const SALVAGE_MINIMAP_COLOR: Rgb = [0.88, 0.65, 0.2];
 const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Covers background-tab throttling to one timer callback per second. */
 const MAX_CATCH_UP_SECONDS = 5;
@@ -113,26 +93,37 @@ const UNIT_BAR_CLEARANCE = 0.3;
 /** Clears a construction progress bar below it. */
 const BUILDING_BAR_HEIGHT = 2.9;
 
-export type TerrainPrototype = GameView & {
+/** A parsed mission file with the content pack and definitions it uses. */
+export type LoadedMission = MissionFile & {
+  content: ContentPack;
+  definitions: readonly ActorDefinition[];
+};
+
+export type GameSession = GameView & {
   simulation: MissionSimulation;
+  playing: () => boolean;
+  pause: () => void;
   resume: () => void;
+  /** Waits for model and texture initialization before releasing the engine. */
+  disposeAsync: () => Promise<void>;
+  /** The current mission as a save file. */
+  save: (info: SaveInfo) => string;
   selectActor: (actorId: string | undefined, additive?: boolean) => void;
   selectActors: (actorIds: readonly string[]) => void;
 };
 
-export type TerrainPrototypeControls = BuildingPlacementControls &
+export type GameSessionControls = BuildingPlacementControls &
   UnitTrainingControls &
   RallyControls &
   NetworkControls &
   UnitControls &
   AttackMoveControls & {
-    initialState?: MissionState;
+    mission: LoadedMission;
     startPaused?: boolean;
     onResult?: (result: MissionResult) => void;
     buildings?: readonly DefinitionButton[];
-    scenario?: ScenarioDefinition;
     economyRoot?: HTMLElement;
-    onReady?: (session: TerrainPrototype) => void;
+    onReady?: (session: GameSession) => void;
     onDispose?: () => void;
     /** Updates after simulation ticks or changes to controls and selection. */
     onStateChanged?: (state: SidebarState) => void;
@@ -143,166 +134,124 @@ export type TerrainPrototypeControls = BuildingPlacementControls &
     cameraControls?: HTMLElement;
   };
 
-/**
- * Water, ripples and clutter are each optional, so every type pins its slot.
- * Minimap colors are each image's mean color and coverage.
- */
-export const PROTOTYPE_TILE_TYPES = {
-  dirt: {
-    id: "dirt",
-    slot: 0,
-    graphics: {
-      url: "/assets/terrain/dirt.png",
-      hasAlpha: false,
-      minimapColor: [0.472, 0.339, 0.217, 1],
-    },
-  },
-  water: {
-    id: "water",
-    slot: 1,
-    featherEdges: true,
-    graphics: {
-      url: "/assets/terrain/water.png",
-      hasAlpha: true,
-      // The image's own alpha caps even the deepest water at about two thirds
-      // opaque, so the tile layer owns transparency and can fade to a shore.
-      layerAlphaOnly: true,
-      scrollSpeed: { u: 0.025, v: 0.012 },
-      minimapColor: [0.189, 0.497, 0.557, 1],
-    },
-  },
-  waterRipples: {
-    id: "water-ripples",
-    slot: 2,
-    featherEdges: true,
-    graphics: {
-      url: "/assets/terrain/water.png",
-      hasAlpha: true,
-      scale: { u: 1.37, v: 1.37 },
-      scrollSpeed: { u: -0.018, v: 0.032 },
-      minimapColor: [0.189, 0.497, 0.557, 0.65],
-    },
-  },
-  clutter: {
-    id: "clutter",
-    slot: 3,
-    graphics: {
-      url: "/assets/terrain/clutter.png",
-      hasAlpha: true,
-      minimapColor: [0.409, 0.373, 0.341, 0.05],
-    },
-  },
-} satisfies Record<string, TileType>;
-
-export const PROTOTYPE_VIEW_OPTIONS = {
-  clearColor: new Color3(0.035, 0.07, 0.09),
-  lighting: {
-    skyColor: new Color3(0.6, 0.78, 0.77),
-    groundColor: new Color3(0.08, 0.12, 0.1),
-    sunColor: Color3.White(),
-    sunDirection: new Vector3(-0.5, -1, 0.35),
-    skyIntensity: 1.05,
-    sunIntensity: 1.3,
-  },
-} satisfies GameViewOptions;
-
-export function createPrototypeSimulation(
+export function createSessionSimulation(
   map: TerrainGrid,
-  scenario?: ScenarioDefinition,
-  initialState?: MissionState,
+  mission: LoadedMission,
 ): MissionSimulation {
   const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
-    state:
-      initialState ??
-      (scenario
-        ? createScenarioState(scenario, ECONOMY_ACTOR_DEFINITIONS)
-        : createMissionState([])),
-    objectives: scenario?.objectives,
+  return createMissionSimulation({
+    state: mission.state,
+    objectives: mission.scenario.objectives,
     behaviorRegistry: new Map([
       [
         "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, PROTOTYPE_MOVEMENT_PROFILES),
+        createTerrainMoveBehavior(
+          map,
+          occupancy,
+          mission.content.movementProfiles,
+        ),
       ],
       ["idle", { handleCommand: () => false, update: () => {} }],
     ]),
     bounds: map.worldBounds,
-    definitions: scenario
-      ? ECONOMY_ACTOR_DEFINITIONS
-      : PROTOTYPE_ACTOR_DEFINITIONS,
+    definitions: mission.definitions,
     tickSeconds: SIMULATION_TICK_SECONDS,
     map,
     occupancy,
   });
-  return simulation;
 }
 
-/** Parses a mission save, rejecting state the simulation would refuse. */
-export function loadMissionSave(
-  source: string,
-  scenario: ScenarioDefinition,
-): MissionState {
-  const state = deserializeMission(source, scenario, SIMULATION_TICK_SECONDS);
-  createPrototypeSimulation(
-    createScenarioMap(scenario),
-    scenario,
-    state,
+/** Parses a level or save, rejecting state the simulation would refuse. */
+export function loadMission(source: string): LoadedMission {
+  const file = parseMission(source, SIMULATION_TICK_SECONDS);
+  if (!file.scenario.content)
+    throw new RangeError("This mission file names no content pack.");
+  const content = contentPack(file.scenario.content);
+  const wanted = file.scenario.actors;
+  const definitions = wanted
+    ? wanted.map((id) => {
+        const definition = content.actors.find((actor) => actor.id === id);
+        if (!definition)
+          throw new RangeError(
+            `Content pack ${content.id} has no actor named "${id}".`,
+          );
+        return definition;
+      })
+    : content.actors;
+  const mission = { ...file, content, definitions };
+  for (const goal of file.scenario.goals ?? [])
+    if (!definitions.some(({ id }) => id === goal.definitionId))
+      throw new RangeError(
+        `Scenario goal uses unknown actor "${goal.definitionId}".`,
+      );
+  createSessionSimulation(
+    createScenarioMap({ ...file.scenario, terrain: file.state.terrain }),
+    mission,
   ).dispose();
-  return state;
+  return mission;
 }
 
-export async function createTerrainPrototype(
+export async function createGameSession(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
-  controls: TerrainPrototypeControls = {},
-): Promise<TerrainPrototype> {
-  const scenario = controls.scenario;
-  const map = createPrototypeMap(
-    scenario && {
-      ...scenario,
-      terrain: controls.initialState?.terrain ?? scenario.terrain,
-    },
+  controls: GameSessionControls,
+): Promise<GameSession> {
+  const { mission } = controls;
+  const { content, definitions } = mission;
+  const map = createSessionMap(
+    { ...mission.scenario, terrain: mission.state.terrain },
+    content.terrain,
   );
-  const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
-
-  const definitions = scenario
-    ? ECONOMY_ACTOR_DEFINITIONS
-    : PROTOTYPE_ACTOR_DEFINITIONS;
+  const options = viewOptions(content.view);
+  const view = createGameView(canvas, map, options);
   createTerrainMeshes(view.scene, map);
-  const simulation = createPrototypeSimulation(
-    map,
-    scenario,
-    controls.initialState,
-  );
+  const simulation = createSessionSimulation(map, mission);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const appearances = createPrototypeStandInAppearances(view.scene);
-  if (simulation.economy)
-    appearances.set(
-      "arc-harvester",
-      createHarvesterAppearance(view.scene, () => reducedMotion.matches),
-    );
-  appearances.set(
-    "wolf",
-    createWolfAppearance(view.scene, () => reducedMotion.matches),
+  const presentationOf = (id: string) => content.presentation[id];
+  const names = new Map(
+    definitions.map(({ id }) => [id, presentationOf(id)?.name ?? id]),
   );
-  appearances.set(
-    "alpha-wolf",
-    createWolfAppearance(
-      view.scene,
-      () => reducedMotion.matches,
-      ALPHA_WOLF_SCALE,
-    ),
+  const buildingAppearances = new Map<string, TilePlacedActorAppearance>(
+    definitions.flatMap(({ id }) => {
+      const building = presentationOf(id)?.building;
+      if (!building) return [];
+      const { details, ...appearance } = building;
+      return [
+        [
+          id,
+          {
+            ...appearance,
+            createDetails: details
+              ? BUILTIN_BUILDING_DETAILS[details]
+              : undefined,
+          },
+        ],
+      ];
+    }),
   );
+  const models = definitions.flatMap(({ id }) => {
+    const model = presentationOf(id)?.model;
+    return model ? [[id, model] as const] : [];
+  });
+  const glbModels = models.flatMap(([id, model]) =>
+    "glb" in model ? [[id, model.glb] as const] : [],
+  );
+  const appearances = standInAppearances(view.scene, glbModels);
+  for (const [id, model] of models)
+    if ("builtin" in model)
+      appearances.set(
+        id,
+        BUILTIN_ACTOR_MODELS[model.builtin](view.scene, {
+          scale: model.scale,
+          reducedMotion: () => reducedMotion.matches,
+        }),
+      );
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(view.scene, map, simulation.economy);
   const explored = ({ x, z }: TileCoord) =>
     simulation.fog?.isExplored(x, z) ?? true;
-  const fogOverlay = createFogOverlay(
-    view.scene,
-    map,
-    PROTOTYPE_VIEW_OPTIONS.clearColor,
-  );
+  const fogOverlay = createFogOverlay(view.scene, map, options.clearColor);
   const fog = simulation.fog;
   if (fog)
     view.camera.setFocusLimit((point) =>
@@ -317,7 +266,7 @@ export async function createTerrainPrototype(
     definitionsById,
     simulation.detects,
   );
-  const startingActor = scenario && simulation.actors.find(player.owns);
+  const startingActor = simulation.actors.find(player.owns);
   if (startingActor) {
     const { x, z } = startingActor.worldPosition;
     view.camera.focusOnPoint(new Vector3(x, 0, z));
@@ -332,7 +281,7 @@ export async function createTerrainPrototype(
     view.scene,
     map,
     definitions,
-    PROTOTYPE_TILE_PLACED_APPEARANCES,
+    buildingAppearances,
   );
   const networkView = createSupportNetworkView(view.scene, map);
   const disconnected = () => disconnectedBuildings(simulation.support);
@@ -478,14 +427,14 @@ export async function createTerrainPrototype(
           id: `materials-${site.id}`,
           worldPosition: map.tileCenter(site.tile.x, site.tile.z),
           tiles: [site.tile],
-          color: [0.3, 0.66, 0.75] as [number, number, number],
+          color: SITE_MINIMAP_COLOR,
         })) ?? []),
       ...(simulation.economy?.loot
         .filter((loot) => !loot.collected && explored(loot.tile))
         .map((loot) => ({
           id: `materials-${loot.id}`,
           worldPosition: map.tileCenter(loot.tile.x, loot.tile.z),
-          color: [0.88, 0.65, 0.2] as [number, number, number],
+          color: SALVAGE_MINIMAP_COLOR,
         })) ?? []),
       ...actorsByKind().placed.map((actor) => ({
         id: actor.id,
@@ -494,8 +443,7 @@ export async function createTerrainPrototype(
           actor,
           definitionsById.get(actor.definitionId)!,
         ),
-        color: PROTOTYPE_TILE_PLACED_APPEARANCES.get(actor.definitionId)
-          ?.minimapColor,
+        color: buildingAppearances.get(actor.definitionId)?.minimapColor,
         selected: input.selectedActorIds.includes(actor.id),
       })),
       ...actorsByKind().shownMobile.map((actor) => ({
@@ -559,8 +507,8 @@ export async function createTerrainPrototype(
         )
         .map((definition) => ({
           definition,
-          appearance: PROTOTYPE_TILE_PLACED_APPEARANCES.get(definition.id)!,
-          name: PROTOTYPE_ACTOR_NAMES.get(definition.id)!,
+          appearance: buildingAppearances.get(definition.id)!,
+          name: names.get(definition.id)!,
           build: controls.buildings?.find(
             ({ definitionId }) => definitionId === definition.id,
           )?.button,
@@ -611,7 +559,7 @@ export async function createTerrainPrototype(
     return id && actorsByKind().ownIds.has(id) ? id : undefined;
   };
   const training = createUnitTraining(simulation, controls, {
-    names: PROTOTYPE_ACTOR_NAMES,
+    names,
     selectedActorId: selectedOwnActorId,
     enabled: () => canCommand() && !placement.active,
     paused: () => !playing,
@@ -663,7 +611,7 @@ export async function createTerrainPrototype(
     simulation.economy && economyRoot
       ? createEconomyControls(economyRoot, simulation, {
           definitions,
-          names: PROTOTYPE_ACTOR_NAMES,
+          names,
           selectedActorId: selectedOwnActorId,
           canControl: player.owns,
           enabled: () => canCommand() && !placement.active,
@@ -778,7 +726,7 @@ export async function createTerrainPrototype(
     afterTick: (outcomes) => {
       const markedTargets = new Set<string>();
       for (const hit of simulation.attacks) {
-        const style = PROTOTYPE_ATTACK_EFFECTS.get(hit.attackerDefinitionId);
+        const style = presentationOf(hit.attackerDefinitionId)?.attackEffect;
         if (
           style &&
           (simulation.sees(playerFaction, hit.from) ||
@@ -948,15 +896,46 @@ export async function createTerrainPrototype(
     canvas.dataset.tilePlacedActorCount = String(actorsByKind().placed.length);
   });
 
-  const session: TerrainPrototype = {
+  let disposal: Promise<void> | undefined;
+  const session: GameSession = {
     ...view,
     simulation,
+    disposeAsync: () =>
+      (disposal ??= (async () => {
+        session.pause();
+        try {
+          await modelsReady;
+          // Babylon's BRDF decode outlives the model load and uses the engine.
+          while (
+            !view.scene.isDisposed &&
+            view.scene.environmentBRDFTexture &&
+            !view.scene.environmentBRDFTexture.isReady()
+          )
+            await new Promise((resolve) => setTimeout(resolve, 16));
+        } finally {
+          if (!view.scene.isDisposed) view.dispose();
+        }
+      })()),
+    playing: () => playing,
+    pause: () => {
+      if (!playing) return;
+      playing = false;
+      cancelInteractions();
+      loop.pause();
+    },
     resume: () => {
-      if (halted()) return;
+      if (halted() || disposal) return;
       playing = true;
       controlsDirty = true;
       loop.resume();
     },
+    save: (info) =>
+      serializeMission(
+        mission.scenario,
+        simulation.snapshot(),
+        SIMULATION_TICK_SECONDS,
+        info,
+      ),
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;
       const actor = actorId && simulation.actorById(actorId);
@@ -975,14 +954,14 @@ export async function createTerrainPrototype(
       );
     },
   };
-  controls.onReady?.(session);
-  await Promise.all(
-    [...PROTOTYPE_ACTOR_GRAPHICS].map(async ([id, graphics]) => {
+  const modelsReady = Promise.all(
+    glbModels.map(async ([id, graphics]) => {
       let appearance: ActorAppearance;
       try {
         appearance = await loadSkinnedActorAppearance(view.scene, graphics);
       } catch (error) {
-        console.error(`Actor ${id} uses a stand-in model.`, error);
+        if (!view.scene.isDisposed)
+          console.error(`Actor ${id} uses a stand-in model.`, error);
         return;
       }
       if (view.scene.isDisposed) {
@@ -995,15 +974,17 @@ export async function createTerrainPrototype(
       previous?.dispose();
     }),
   );
+  controls.onReady?.(session);
   return session;
 }
 
-function createPrototypeStandInAppearances(
+/** Boxes in each model's color stand in while its GLB loads. */
+function standInAppearances(
   scene: Scene,
+  models: readonly (readonly [string, ActorGraphics])[],
 ): Map<string, ActorAppearance> {
   return new Map(
-    [...PROTOTYPE_ACTOR_GRAPHICS].map(([id, graphics]) => {
-      validateActorGraphics(graphics);
+    models.map(([id, graphics]) => {
       const { radius, height } = graphics.bounds;
       const mesh = MeshBuilder.CreateBox(
         `actor-template-${id}`,
@@ -1028,70 +1009,31 @@ function createPrototypeStandInAppearances(
   );
 }
 
-export function createPrototypeMap(scenario?: ScenarioDefinition): TerrainMap {
-  const createMap = (options: TerrainGridOptions) =>
-    new TerrainMap({ ...options, createLayers: prototypeTileLayers });
-  return scenario
-    ? createScenarioMap(scenario, createMap)
-    : createMap(PROTOTYPE_TERRAIN);
+export function createSessionMap(
+  scenario: ScenarioTerrain,
+  style: TerrainStyle,
+): TerrainMap {
+  const createLayers = terrainLayers(style);
+  return createScenarioMap(
+    scenario,
+    (options: TerrainGridOptions) =>
+      new TerrainMap({
+        ...options,
+        createLayers,
+        layerUpdateRadius: style.shore?.depthTiles,
+      }),
+  );
 }
 
-/** Layers follow each tile's terrain, so saved terrain keeps its look. */
-function prototypeTileLayers(
-  x: number,
-  z: number,
-  { typeId }: Readonly<TerrainTile>,
-): TileLayer[] {
-  const variation = Math.sin(x * 0.23) * 0.025 + Math.cos(z * 0.19) * 0.02;
-  // Water beyond the authored pond draws at full depth.
-  const depth =
-    typeId === "water" ? Math.max(0, prototypeWaterDepthAt(x, z)) || 1 : 0;
-  const terrainTint =
-    typeId === "path"
-      ? [1.08, 0.98, 0.78]
-      : typeId === "rough"
-        ? [0.68, 0.78, 0.64]
-        : [0.86, 0.9, 0.88];
-  const layers: TileLayer[] = [
-    {
-      type: PROTOTYPE_TILE_TYPES.dirt,
-      color: new Color4(
-        terrainTint[0] + variation,
-        terrainTint[1] + variation,
-        terrainTint[2] + variation,
-        1,
-      ),
+function viewOptions({ clearColor, lighting }: ViewStyle): GameViewOptions {
+  return {
+    clearColor: new Color3(...clearColor),
+    lighting: {
+      ...lighting,
+      skyColor: new Color3(...lighting.skyColor),
+      groundColor: new Color3(...lighting.groundColor),
+      sunColor: new Color3(...lighting.sunColor),
+      sunDirection: new Vector3(...lighting.sunDirection),
     },
-  ];
-
-  if (depth > 0) {
-    const alpha = waterAlpha(depth);
-    layers.push({
-      type: PROTOTYPE_TILE_TYPES.water,
-      color: new Color4(0.74, 0.94, 0.98, alpha),
-    });
-    layers.push({
-      type: PROTOTYPE_TILE_TYPES.waterRipples,
-      color: new Color4(0.82, 0.98, 1, alpha * WATER_RIPPLE_ALPHA),
-    });
-  }
-
-  if (typeId === "rough" || Math.sin(x * 0.47 - z * 0.29) > 0.82) {
-    layers.push({
-      type: PROTOTYPE_TILE_TYPES.clutter,
-      color: new Color4(0.99, 0.66, 0.33, 1),
-    });
-  }
-
-  return layers;
-}
-
-/**
- * Fades the pond towards its banks so its edge reads as a shoreline.
- *
- * @param depth 0 at the bank, 1 at the midline.
- */
-function waterAlpha(depth: number): number {
-  const eased = depth * depth * (3 - 2 * depth);
-  return WATER_SHORE_ALPHA + (WATER_DEEP_ALPHA - WATER_SHORE_ALPHA) * eased;
+  };
 }

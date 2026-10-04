@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 
 import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
-import type { TerrainPrototype } from "../src/prototype";
+import type { GameSession } from "../src/session";
 import type { GameView } from "../src/render";
 
 type ActorInteractionTest = {
@@ -26,7 +26,7 @@ test.use({ deviceScaleFactor: 2 });
 declare const harness: typeof import("./harness");
 
 async function openHarness(page: Page): Promise<void> {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
     Object.assign(window, { harness: await import(harnessPath) });
@@ -45,7 +45,7 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
     await route.continue();
   });
 
-  await page.goto("/?sandbox", { waitUntil: "domcontentloaded" });
+  await page.goto("/?level=sandbox", { waitUntil: "domcontentloaded" });
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await expect(canvas).toHaveAttribute("data-actor-ready", "true");
@@ -93,7 +93,7 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
     await route.continue();
   });
 
-  await page.goto("/?sandbox", { waitUntil: "domcontentloaded" });
+  await page.goto("/?level=sandbox", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-actor-ready",
     "true",
@@ -128,10 +128,15 @@ test("clicking a selected actor issues terrain-aware movement", async ({
 
   const targets = await page.evaluate(async () => {
     const { Vector3, frames, projectToCanvas } = harness;
-    const prototypePath: string = "/src/prototype.ts";
-    const { createTerrainPrototype, createPrototypeMap } = await import(
+    const prototypePath: string = "/src/session.ts";
+    const missionsPath: string = "/e2e/missions.ts";
+    const { createGameSession } = (await import(
       prototypePath
-    );
+    )) as typeof import("../src/session");
+    const { level, missionMap } = (await import(
+      missionsPath
+    )) as typeof import("./missions");
+    const mission = level("sandbox");
     const actorPath: string = "/src/simulation/actor.ts";
     const { createActor } = await import(actorPath);
     const canvas = document.createElement("canvas");
@@ -145,11 +150,10 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       height: "480px",
     });
     document.body.append(canvas, minimap);
-    const view: TerrainPrototype = await createTerrainPrototype(
-      canvas,
-      minimap,
-    );
-    const map = createPrototypeMap();
+    const view: GameSession = await createGameSession(canvas, minimap, {
+      mission,
+    });
+    const map = missionMap(mission);
     view.simulation.spawnActor(
       createActor({
         id: "prototype-trooper",
@@ -166,6 +170,15 @@ test("clicking a selected actor issues terrain-aware movement", async ({
     );
     await frames(2);
 
+    // This interaction checks rigged meshes, which replace the stand-ins.
+    for (const id of ["prototype-trooper", "prototype-scout"])
+      while (
+        !view.scene
+          .getTransformNodeByName(`actor-${id}-root`)
+          ?.getChildMeshes()
+          .some((mesh) => mesh.skeleton)
+      )
+        await frames(1);
     const trooper = view.scene.getTransformNodeByName(
       "actor-prototype-trooper-root",
     )!;

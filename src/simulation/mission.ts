@@ -34,6 +34,7 @@ import {
   updateCombat,
   validateCombatActor,
   validateCombatDefinition,
+  validateWrecks,
   WRECK_SECONDS,
 } from "./combat";
 import type { AttackEvent, Wreck } from "./combat";
@@ -118,6 +119,7 @@ import type {
 import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import { playerRelation } from "./faction";
+import { isIdList } from "./validation";
 import type { FogState, FogView, Vision } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
@@ -295,6 +297,15 @@ export function createMissionSimulation({
   if (!Number.isSafeInteger(initialState.tick) || initialState.tick < 0) {
     throw new RangeError("Mission state tick must be a non-negative integer.");
   }
+  // Hand-edited saves reach here, so name the list rather than crash in it.
+  if (
+    !Array.isArray(initialState.actors) ||
+    initialState.actors.some((actor) => typeof actor !== "object" || !actor) ||
+    !isIdList(initialState.retiredActorIds)
+  )
+    throw new RangeError(
+      "Mission state needs an actors list and a retiredActorIds list.",
+    );
 
   let state = structuredClone(initialState);
   if (
@@ -322,9 +333,6 @@ export function createMissionSimulation({
   const resultOf = (states: readonly ObjectiveState[]) =>
     objectivesFor(states).result;
   const ended = () => resultOf(state.objectives)?.kind === "defeat";
-  if (new Set(state.retiredActorIds).size !== state.retiredActorIds.length) {
-    throw new Error("Mission state contains duplicate retired actor IDs.");
-  }
   const savedTerrain = state.terrain;
   const restoringSnapshot = savedTerrain !== undefined;
   if (savedTerrain && !map) {
@@ -333,10 +341,7 @@ export function createMissionSimulation({
   delete state.terrain;
   const savedFog = state.fog;
   delete state.fog;
-  if (
-    (state.scenarioId !== undefined && savedFog === undefined) ||
-    (savedFog !== undefined && (!map || !isValidFogState(savedFog, map)))
-  )
+  if (savedFog !== undefined && (!map || !isValidFogState(savedFog, map)))
     throw new RangeError("Mission state has invalid fog.");
   if (
     state.playerFaction !== undefined &&
@@ -353,29 +358,13 @@ export function createMissionSimulation({
   );
   validateProductionDefinitions(definitionsById, behaviorsById, map);
   validateEconomyDefinitions(definitionsById);
-  const retired = new Set(state.retiredActorIds);
-  if (
-    !Array.isArray(state.wrecks) ||
-    state.wrecks.some(
-      (wreck, index) =>
-        !wreck ||
-        !retired.has(wreck.actorId) ||
-        state.wrecks.findIndex(({ actorId }) => actorId === wreck.actorId) !==
-          index ||
-        !definitionsById.has(wreck.definitionId) ||
-        !isFinitePosition(wreck.worldPosition) ||
-        !withinBounds(wreck.worldPosition, worldBounds) ||
-        !Number.isFinite(wreck.facing) ||
-        !Number.isSafeInteger(wreck.tick) ||
-        wreck.tick < 0 ||
-        wreck.tick > state.tick ||
-        (definitionsById.get(wreck.definitionId)!.footprint !== undefined) !==
-          (wreck.tilePlacement !== undefined) ||
-        (wreck.tilePlacement !== undefined &&
-          !isValidTilePlacement(wreck.tilePlacement)),
-    )
-  )
-    throw new RangeError("Mission state has invalid wrecks.");
+  validateWrecks(state.wrecks, {
+    map,
+    retiredIds: new Set(state.retiredActorIds),
+    definitions: definitionsById,
+    bounds: worldBounds,
+    tick: state.tick,
+  });
   deepFreeze(state.wrecks);
   if (state.economy)
     validateEconomyState(
@@ -1374,7 +1363,7 @@ export function createMissionSimulation({
         map && due.some(({ command }) => command.kind === "terrain")
           ? map.terrainState()
           : undefined;
-      const navigationVersion = map?.navigationChanges.version;
+      const versionBefore = map?.navigationChanges.version;
       try {
         const working = stageWorking();
         const outcomes = due.flatMap(({ command }) =>
@@ -1560,7 +1549,7 @@ export function createMissionSimulation({
         if (map) {
           if (terrainBefore) map.restoreTerrainState(terrainBefore);
           if (occupancy) rebuildOccupancy();
-          map.navigationChanges.restart(navigationVersion!);
+          map.navigationChanges.restart(versionBefore!);
         }
         throw error;
       }

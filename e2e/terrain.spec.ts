@@ -10,7 +10,7 @@ const CLEAR_COLOR_TOLERANCE = 40;
 declare const harness: typeof import("./harness");
 
 async function openHarness(page: Page): Promise<void> {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
     Object.assign(window, { harness: await import(harnessPath) });
@@ -617,7 +617,7 @@ test("loads layered terrain textures and advances both water passes", async ({
 });
 
 test("water animation changes rendered pixels", async ({ page }, testInfo) => {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");

@@ -37,6 +37,20 @@ export type TerrainTile = {
   outOfBounds?: boolean;
 };
 
+/** Whether untrusted data has a tile's shape; the map checks its type ID. */
+export function isTerrainTileShape(value: unknown): value is TerrainTile {
+  const tile = value as Partial<TerrainTile> | null;
+  return (
+    typeof tile === "object" &&
+    tile !== null &&
+    typeof tile.typeId === "string" &&
+    tile.typeId.length > 0 &&
+    [tile.surfacePassable, tile.surfaceBuildable, tile.outOfBounds].every(
+      (flag) => flag === undefined || typeof flag === "boolean",
+    )
+  );
+}
+
 /** Simulation terrain changes that apply together or not at all. */
 export type TerrainEdit = {
   heights?: readonly { x: number; z: number; height: number }[];
@@ -390,14 +404,7 @@ export class TerrainGrid {
   }
 
   private isValidTerrainTile(tile: TerrainTile): boolean {
-    return (
-      tile !== null &&
-      typeof tile === "object" &&
-      this.terrainTypeIds.has(tile.typeId) &&
-      [tile.surfacePassable, tile.surfaceBuildable, tile.outOfBounds].every(
-        (flag) => flag === undefined || typeof flag === "boolean",
-      )
-    );
+    return isTerrainTileShape(tile) && this.terrainTypeIds.has(tile.typeId);
   }
 
   /** Returns the tile containing a world position, including the far edges. */
@@ -408,8 +415,7 @@ export class TerrainGrid {
 
   tileCenter(x: number, z: number): WorldPosition {
     this.tileIndex(x, z);
-    const point = this.worldPositionAt(x + 0.5, z + 0.5);
-    return { x: point.x, z: point.z };
+    return this.worldPositionAt(x + 0.5, z + 0.5);
   }
 
   /** Maximum grade of either rendered triangle within a tile. */

@@ -75,16 +75,29 @@ export async function loadSkinnedActorAppearance(
   };
 }
 
-export function validateActorGraphics({
-  url,
-  bounds,
-  cycleDistance,
-  minimapColor,
-}: ActorGraphics): void {
+export function validateActorGraphics(graphics: ActorGraphics): void {
+  const { url, bounds, cycleDistance, minimapColor, clips } = graphics ?? {};
+  if (
+    typeof url !== "string" ||
+    !url ||
+    !clips ||
+    typeof clips.idle !== "string" ||
+    !clips.idle ||
+    typeof clips.locomotion !== "string" ||
+    !clips.locomotion ||
+    (clips.turn !== undefined &&
+      (!clips.turn ||
+        typeof clips.turn.left !== "string" ||
+        !clips.turn.left ||
+        typeof clips.turn.right !== "string" ||
+        !clips.turn.right))
+  )
+    throw new RangeError(`Actor model ${url} needs a URL and named clips`);
   if (!(cycleDistance > 0 && Number.isFinite(cycleDistance))) {
     throw new RangeError(`Actor model ${url} needs a positive cycle distance`);
   }
   if (
+    !bounds ||
     !Number.isFinite(bounds.radius) ||
     !Number.isFinite(bounds.height) ||
     bounds.radius <= 0 ||

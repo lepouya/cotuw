@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { terrainPoint, trainTestUnits } from "./prototype-helpers";
 
 async function opening(page: Page) {
-  await page.goto("/?sandbox");
+  await page.goto("/?level=sandbox");
   await trainTestUnits(page, ["trooper"]);
   await page.locator("#unit-roster button").first().click();
   await expect(page.locator("#game-canvas")).toHaveAttribute(
@@ -231,13 +231,13 @@ for (const mode of ["selection", "placement"] as const) {
     await assertUnchanged();
     await page.evaluate(() => {
       document.querySelector("#navigation-text-entry")!.remove();
-      document.querySelector<HTMLDialogElement>("#mission-result")!.showModal();
+      document.querySelector<HTMLDialogElement>("#game-menu")!.showModal();
     });
     await page.keyboard.press("r");
     await page.keyboard.press("Escape");
     await assertUnchanged();
     await page.evaluate(() =>
-      document.querySelector<HTMLDialogElement>("#mission-result")!.close(),
+      document.querySelector<HTMLDialogElement>("#game-menu")!.close(),
     );
     await canvas.focus();
     if (mode === "placement") {
@@ -335,7 +335,7 @@ test("edge panning stops over UI, during box drags, on blur, and in dialogs", as
   expect((await pose(page)).target).toEqual(blurred.target);
   await page.mouse.move(edge.x, edge.y);
   await page.evaluate(() =>
-    document.querySelector<HTMLDialogElement>("#mission-result")!.showModal(),
+    document.querySelector<HTMLDialogElement>("#game-menu")!.showModal(),
   );
   const modal = await pose(page);
   await page.waitForTimeout(300);

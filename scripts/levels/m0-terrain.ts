@@ -1,6 +1,6 @@
-import type { TileCoord } from "../simulation/grid";
-import type { TerrainGridOptions } from "../simulation/terrain";
-import { deepFreeze } from "../simulation/actor";
+// Procedural terrain for the economy opening, baked into its level file.
+import type { TileCoord } from "../../src/simulation/grid.ts";
+import type { TerrainGridOptions } from "../../src/simulation/terrain.ts";
 
 const MAP_SIZE = 100;
 const WATER_CENTER = { x: 42, z: 58 };
@@ -43,7 +43,7 @@ const PASSES: readonly Area[] = [
   { x: [77, 80], z: [26, 29] },
 ];
 
-export const PROTOTYPE_LANDMARKS: readonly TerrainLandmark[] = deepFreeze([
+export const PROTOTYPE_LANDMARKS: readonly TerrainLandmark[] = [
   {
     id: "split-summit",
     peaks: [
@@ -62,7 +62,7 @@ export const PROTOTYPE_LANDMARKS: readonly TerrainLandmark[] = deepFreeze([
     rise: 3,
     radius: 2,
   },
-]);
+];
 
 const within = (areas: readonly Area[], x: number, z: number) =>
   areas.some(
@@ -71,7 +71,7 @@ const within = (areas: readonly Area[], x: number, z: number) =>
   );
 
 /** 1 at the pond's center, 0 at its bank, and negative beyond it. */
-export function prototypeWaterDepthAt(x: number, z: number): number {
+function prototypeWaterDepthAt(x: number, z: number): number {
   return (
     1 -
     Math.hypot(x + 0.5 - WATER_CENTER.x, z + 0.5 - WATER_CENTER.z) /
@@ -79,8 +79,7 @@ export function prototypeWaterDepthAt(x: number, z: number): number {
   );
 }
 
-/** Authored semantics stay independent of Babylon terrain layers. */
-export function prototypeTerrainAt(x: number, z: number) {
+function prototypeTerrainAt(x: number, z: number) {
   const border = x < 3 || z < 3 || x >= MAP_SIZE - 3 || z >= MAP_SIZE - 3;
   const typeId =
     prototypeWaterDepthAt(x, z) > 0
@@ -105,8 +104,11 @@ function landmarkRiseAt(x: number, z: number): number {
   return rise;
 }
 
-/** The den's mountain walls join the ridge and leave one northern entrance. */
-export function prototypeHeightAt(x: number, z: number): number {
+/**
+ * The den's mountain walls join the ridge and leave one northern entrance.
+ * Heights keep two decimals so the level file stays readable.
+ */
+function prototypeHeightAt(x: number, z: number): number {
   const hillDistance = Math.hypot(x - 39, z - 47);
   const hill = Math.max(0, 1 - hillDistance / 18) ** 2 * 3.5;
   const mountain = within(MOUNTAINS, x, z) && !within(PASSES, x, z);
@@ -114,15 +116,14 @@ export function prototypeHeightAt(x: number, z: number): number {
   // Peaks rise only from walls, so they never narrow a pass.
   const peak = mountain ? landmarkRiseAt(x, z) : 0;
   const rolling = Math.sin(x * 0.13) * 0.08 + Math.cos(z * 0.11) * 0.07;
-  return hill + wall + peak + rolling;
+  return Math.round((hill + wall + peak + rolling) * 100) / 100;
 }
 
-/** Shared by the simulation scenario and the rendered map. */
-export const PROTOTYPE_TERRAIN = deepFreeze({
+export const PROTOTYPE_TERRAIN = {
   width: MAP_SIZE,
   height: MAP_SIZE,
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
   createHeight: prototypeHeightAt,
   createTerrain: prototypeTerrainAt,
-} as const satisfies TerrainGridOptions);
+} as const satisfies TerrainGridOptions;

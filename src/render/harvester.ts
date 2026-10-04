@@ -11,8 +11,10 @@ import type { ActorAppearance } from "./actor";
 export function createHarvesterAppearance(
   scene: Scene,
   reducedMotion: () => boolean = () => false,
+  scale = 1,
 ): ActorAppearance {
   const root = new TransformNode("harvester-template", scene);
+  root.scaling.setAll(scale);
   const steel = new StandardMaterial("harvester-steel", scene);
   steel.diffuseColor = new Color3(0.78, 0.58, 0.2);
   const rubber = new StandardMaterial("harvester-tracks", scene);
@@ -38,7 +40,7 @@ export function createHarvesterAppearance(
   box("harvester-right-track", 0.2, 0.28, 1.25, 0.43, 0.25, 0, rubber);
   const body = createMeshAppearance(
     root,
-    { radius: 0.72, height: 1.2 },
+    { radius: 0.72 * scale, height: 1.2 * scale },
     [0.94, 0.7, 0.22],
   );
   return {

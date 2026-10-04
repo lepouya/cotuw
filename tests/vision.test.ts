@@ -1,15 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
+import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { createMissionSimulation } from "../src/simulation/mission";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import {
   createScenarioState,
-  deserializeMission,
   defineScenario,
-  serializeMission,
 } from "../src/simulation/scenario";
+import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { visibleTiles } from "../src/simulation/vision";
@@ -156,11 +155,8 @@ describe("fog of war", () => {
   test("snapshots keep explored terrain and malformed fog is rejected", () => {
     const { simulation } = scouted();
     const { fog } = fixture(
-      deserializeMission(
-        serializeMission(simulation.snapshot(), 1),
-        scenario,
-        1,
-      ),
+      parseMission(serializeMission(scenario, simulation.snapshot(), 1), 1)
+        .state,
     );
     expect(fog.isExplored(25, 11)).toBe(true);
     expect(fog.isVisible(25, 11)).toBe(false);
@@ -171,18 +167,18 @@ describe("fog of war", () => {
     expect(() => fixture(invalid)).toThrow("Mission state has invalid fog.");
   });
 
-  test("scenario state and saves require explored terrain", () => {
+  test("saves without explored terrain reveal the whole map", () => {
     const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
-    const saved = JSON.parse(serializeMission(state, 1));
-    delete state.fog;
-    expect(() => fixture(state)).toThrow("Mission state has invalid fog.");
-    expect(() => serializeMission(state, 1)).toThrow(
-      "requires explored terrain",
-    );
+    const saved = JSON.parse(serializeMission(scenario, state, 1));
     delete saved.state.fog;
-    expect(() =>
-      deserializeMission(JSON.stringify(saved), scenario, 1),
-    ).toThrow("requires explored terrain");
+    const { simulation } = fixture(
+      parseMission(JSON.stringify(saved), 1).state,
+    );
+    expect(simulation.fog).toBeUndefined();
+    saved.state.fog = { explored: ["2".repeat(scenario.terrain.width)] };
+    expect(() => parseMission(JSON.stringify(saved), 1)).toThrow(
+      "explored rows",
+    );
   });
 
   test("building placement and rally points require explored terrain", () => {

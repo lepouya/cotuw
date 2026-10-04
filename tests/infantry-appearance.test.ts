@@ -4,7 +4,7 @@ import { NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { exportInfantry, INFANTRY_ROLES } from "../scripts/infantry-model";
-import { PROTOTYPE_ACTOR_GRAPHICS } from "../src/prototype-content";
+import { BASE_CONTENT } from "./helpers/content";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
 import type { AbstractMesh, TransformNode } from "@babylonjs/core";
@@ -36,7 +36,12 @@ function skinnedMesh(root: TransformNode): AbstractMesh {
   return root.getChildMeshes().find((mesh) => mesh.skeleton)!;
 }
 
-describe.each([...PROTOTYPE_ACTOR_GRAPHICS])("%s model", (_id, graphics) => {
+const glbModels = Object.entries(BASE_CONTENT.presentation).flatMap(
+  ([id, { model }]) =>
+    model && "glb" in model ? [[id, model.glb] as const] : [],
+);
+
+describe.each(glbModels)("%s model", (_id, graphics) => {
   test("gives each instance its own rig and clips", async () => {
     const { engine, scene, appearance } = await load(graphics);
     const first = appearance.instantiate("first", 0);

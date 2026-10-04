@@ -48,6 +48,14 @@ const NEIGHBORS: readonly (TileCoord & { distance: number })[] = [
 ];
 
 export function validateMovementProfile(profile: MovementProfile): void {
+  if (
+    !profile ||
+    typeof profile.id !== "string" ||
+    !profile.terrainCosts ||
+    typeof profile.terrainCosts !== "object" ||
+    Array.isArray(profile.terrainCosts)
+  )
+    throw new RangeError("Invalid movement profile shape.");
   const costs = Object.values(profile.terrainCosts);
   if (
     profile.id.length === 0 ||

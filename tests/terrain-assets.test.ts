@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
 
-import { PROTOTYPE_TILE_TYPES } from "../src/prototype";
+import { BASE_CONTENT } from "./helpers/content";
 
 import type { TileGraphics } from "../src/map";
 
-const tileGraphics = Object.values(PROTOTYPE_TILE_TYPES).map(
-  ({ id, graphics }): [string, TileGraphics] => [id, graphics],
+const { tileTypes } = BASE_CONTENT.terrain;
+const tileGraphics = Object.entries(tileTypes).map(
+  ([id, { graphics }]): [string, TileGraphics] => [id, graphics!],
 );
 // Several types can sample one file, so seams only need checking once per file.
 const texturePaths = [...new Set(tileGraphics.map(([, { url }]) => url))];
@@ -60,7 +61,7 @@ describe("terrain texture assets", () => {
 
   test("clutter masks tiles rather than tinting them", async () => {
     const clutter = alphaRange(
-      await readTexture(PROTOTYPE_TILE_TYPES.clutter.graphics.url),
+      await readTexture(tileTypes.clutter.graphics!.url),
     );
 
     expect(clutter).toEqual({ minimum: 0, maximum: 255 });

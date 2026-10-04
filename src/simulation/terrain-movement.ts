@@ -148,6 +148,7 @@ export function createTerrainMoveBehavior(
         isFinitePosition(point) && withinBounds(point, map.worldBounds);
       const waypoints = order.waypoints ?? [];
       if (
+        !Array.isArray(waypoints) ||
         !waypoints.every(onMap) ||
         (order.destination !== undefined && !onMap(order.destination)) ||
         (order.requestedTarget !== undefined && !onMap(order.requestedTarget))
@@ -543,6 +544,6 @@ function markBlocked(
 function isOptionalCount(value: number | undefined, max: number): boolean {
   return (
     value === undefined ||
-    (Number.isInteger(value) && value >= 0 && value <= max)
+    (Number.isSafeInteger(value) && value >= 0 && value <= max)
   );
 }

@@ -1,19 +1,22 @@
-import { ARC_ACTOR_DEFINITIONS } from "./arc";
-import { WILDLIFE_ACTOR_DEFINITIONS } from "./wildlife";
-import { TerrainGrid } from "../simulation/terrain";
-import type { ActorDefinition } from "../simulation/actor";
-import type { MaterialsLoot, MaterialsSite } from "../simulation/economy";
-import type { TileCoord } from "../simulation/grid";
-import { defineScenario } from "../simulation/scenario";
-import { PROTOTYPE_TERRAIN } from "./prototype-terrain";
+// The economy opening's authored content, baked into its level file.
+import { currentContentPack } from "../../src/content/packs.ts";
+import { materialsCost } from "../../src/simulation/economy.ts";
+import { TerrainGrid } from "../../src/simulation/terrain.ts";
+import { defineScenario } from "../../src/simulation/scenario.ts";
+import { PROTOTYPE_TERRAIN } from "./m0-terrain.ts";
+
+import type {
+  MaterialsLoot,
+  MaterialsSite,
+} from "../../src/simulation/economy.ts";
+import type { TileCoord } from "../../src/simulation/grid.ts";
 
 const map = new TerrainGrid(PROTOTYPE_TERRAIN);
 
-/** Every actor type the opening can contain. */
-export const ECONOMY_ACTOR_DEFINITIONS: readonly ActorDefinition[] = [
-  ...ARC_ACTOR_DEFINITIONS,
-  ...WILDLIFE_ACTOR_DEFINITIONS,
-];
+export const BASE_CONTENT = currentContentPack("base");
+
+const costOf = (id: string) =>
+  materialsCost(BASE_CONTENT.actors.find((actor) => actor.id === id)!);
 
 const DEN_WOLVES = [
   { actorId: "den-wolf-1", definitionId: "wolf", tile: { x: 74, z: 21 } },
@@ -51,6 +54,40 @@ const salvage = (id: string, name: string, tile: TileCoord): MaterialsLoot => ({
 
 export const ECONOMY_SCENARIO = defineScenario({
   id: "arc-economy-opening",
+  content: { id: BASE_CONTENT.id, version: BASE_CONTENT.version },
+  name: "Clear the wolf threat",
+  briefing: {
+    label: "Materials economy",
+    title: "Clear the wolf threat",
+    description: "Defeat all six wolves to win. Victory unlocks free play.",
+    goalsHeading: "Recommended preparation",
+    goalsNote:
+      "These counts show your current forces. Preparation steps guide you; defeating the wolves wins the mission.",
+    rules:
+      "Paid construction · Timed production · Sell buildings for half their cost",
+  },
+  goals: [
+    {
+      definitionId: "arc-materials-refinery",
+      label: "Build a Materials Refinery",
+      directive: `Spend ${costOf("arc-materials-refinery")} Materials near your Command Center and wait for construction.`,
+    },
+    {
+      definitionId: "arc-harvester",
+      label: "Produce a Harvester",
+      directive: `Select the Refinery, pay ${costOf("arc-harvester")} Materials, then send its Harvester to Near Materials.`,
+    },
+    {
+      definitionId: "arc-field-barracks",
+      label: "Build a Field Barracks",
+      directive: `Gather or collect salvage to pay ${costOf("arc-field-barracks")} Materials. Build within connected support coverage.`,
+    },
+    {
+      definitionId: "arc-trooper",
+      label: "Train Troopers",
+      directive: `Troopers cost ${costOf("arc-trooper")} Materials each. Use Attack Move to advance as a group; a Scout can reveal the route ahead.`,
+    },
+  ],
   tileSize: map.tileSize,
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),

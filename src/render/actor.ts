@@ -38,7 +38,7 @@ export type ActorAppearance = {
   /** A cylinder on the ground point that picking and selection use. */
   bounds: { radius: number; height: number };
   /** Minimap marker color, in 0-1 channels. */
-  minimapColor?: [number, number, number];
+  minimapColor?: Rgb;
   /** Releases what instances share, such as templates and materials. */
   dispose: () => void;
 };
@@ -207,7 +207,7 @@ export function createActorRenderer(
 export function createMeshAppearance(
   template: TransformNode,
   bounds: ActorAppearance["bounds"],
-  minimapColor?: [number, number, number],
+  minimapColor?: Rgb,
 ): ActorAppearance {
   template.setEnabled(false);
   return {

@@ -79,3 +79,24 @@ export async function trainTestUnits(page: Page, units = ["trooper", "scout"]) {
       .toBe(true);
   }
 }
+
+/** Imports a mission file through the game menu's Load panel. */
+export async function importMission(
+  page: Page,
+  source: string,
+  name = "mission.json",
+) {
+  if (!(await page.locator("#game-menu").isVisible()))
+    await page.locator("#open-menu").click();
+  if (await page.locator("#load-panel").isHidden())
+    await page.locator("#load-mission").click();
+  const chooser = page.waitForEvent("filechooser");
+  await page.locator("#import-mission").click();
+  await (
+    await chooser
+  ).setFiles({
+    name,
+    mimeType: "application/json",
+    buffer: Buffer.from(source),
+  });
+}

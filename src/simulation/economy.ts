@@ -7,6 +7,7 @@ import {
 import { findNavigationPath } from "./navigation";
 import { disconnectedBuildings } from "./support";
 import { secondsToTicks } from "./clock";
+import { isCount } from "./validation";
 
 import type {
   Actor,
@@ -652,8 +653,4 @@ export function updateEconomy(
     loot.collected = true;
     economy.materials += loot.materials;
   }
-}
-
-function isCount(value: number): boolean {
-  return Number.isSafeInteger(value) && value >= 0;
 }

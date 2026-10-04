@@ -4,6 +4,7 @@ import type {
   TerrainGridOptions,
   TerrainBounds,
   TerrainTile,
+  TerrainView,
 } from "./simulation/terrain";
 export type {
   TerrainBounds,
@@ -61,26 +62,61 @@ export type TerrainMapOptions = TerrainGridOptions & {
     x: number,
     z: number,
     terrain: Readonly<TerrainTile>,
+    map: TerrainView,
   ) => TileLayer[];
+  /** Neighboring tiles whose layers can depend on a changed tile. */
+  layerUpdateRadius?: number;
 };
 
-/** Babylon presentation over renderer-independent simulation terrain. */
+/**
+ * Babylon presentation over renderer-independent simulation terrain. Terrain
+ * semantics rebuild layers; height and visual edits preserve manual layers.
+ */
 export class TerrainMap extends TerrainGrid {
   readonly layers: TileLayer[][];
   readonly onChangedObservable = new Observable<TerrainBounds>();
-  constructor({ createLayers = () => [], ...options }: TerrainMapOptions) {
+  constructor({
+    createLayers = () => [],
+    layerUpdateRadius = 0,
+    ...options
+  }: TerrainMapOptions) {
     super(options);
-    this.layers = Array.from(
+    if (!Number.isSafeInteger(layerUpdateRadius) || layerUpdateRadius < 0)
+      throw new RangeError("Invalid terrain layer update radius.");
+    const layersAt = (x: number, z: number) =>
+      createLayers(x, z, this.terrainAt(x, z), this);
+    this.layers = Array.from({ length: this.width * this.height }, (_, index) =>
+      layersAt(index % this.width, Math.floor(index / this.width)),
+    );
+    const knownTerrain = Array.from(
       { length: this.width * this.height },
-      (_, index) => {
-        const x = index % this.width;
-        const z = Math.floor(index / this.width);
-        return createLayers(x, z, this.terrainAt(x, z));
-      },
+      (_, index) =>
+        this.terrainAt(index % this.width, Math.floor(index / this.width)),
     );
-    this.onChanged((bounds) =>
-      this.onChangedObservable.notifyObservers(bounds),
-    );
+    this.onChanged((bounds) => {
+      let terrainChanged = false;
+      for (let z = bounds.minZ; z <= bounds.maxZ; z += 1)
+        for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
+          const index = this.tileIndex(x, z);
+          const tile = this.terrainAt(x, z);
+          if (knownTerrain[index] !== tile) terrainChanged = true;
+          knownTerrain[index] = tile;
+        }
+      if (!terrainChanged) {
+        this.onChangedObservable.notifyObservers(bounds);
+        return;
+      }
+      const affected = {
+        minX: Math.max(0, bounds.minX - layerUpdateRadius),
+        minZ: Math.max(0, bounds.minZ - layerUpdateRadius),
+        maxX: Math.min(this.width - 1, bounds.maxX + layerUpdateRadius),
+        maxZ: Math.min(this.height - 1, bounds.maxZ + layerUpdateRadius),
+      };
+      for (let z = affected.minZ; z <= affected.maxZ; z += 1)
+        for (let x = affected.minX; x <= affected.maxX; x += 1)
+          this.layers[this.tileIndex(x, z)] = layersAt(x, z);
+      this.onChangedObservable.notifyObservers(affected);
+    });
   }
   worldPoint(x: number, z: number, height: number): Vector3 {
     const position = this.worldPositionAt(x, z);

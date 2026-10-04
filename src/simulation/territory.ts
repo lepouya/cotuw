@@ -7,6 +7,7 @@ import {
 } from "./world";
 import { isTick, secondsToTicks } from "./clock";
 import { insideRouteBounds, withinRouteBounds } from "./actor";
+import { isIdList } from "./validation";
 
 import type {
   Actor,
@@ -61,11 +62,6 @@ const modes: readonly WolfMode[] = [
   "returning-home",
   "regenerating",
 ];
-
-const isIdList = (ids: unknown): ids is string[] =>
-  Array.isArray(ids) &&
-  ids.every((id) => typeof id === "string" && id.length > 0) &&
-  new Set(ids).size === ids.length;
 
 export function validateTerritoryDefinition(definition: ActorDefinition): void {
   const t = definition.territory;

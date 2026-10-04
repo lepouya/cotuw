@@ -28,11 +28,15 @@
     "test:rs": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "levels": "node --no-experimental-webstorage scripts/generate-levels.ts"
   },
   "dependencies": {
     "@babylonjs/core": "^9",
-    "@babylonjs/loaders": "^9"
+    "@babylonjs/loaders": "^9",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-fs": "^2"
   },
   "devDependencies": {
     "@babylonjs/serializers": "^9",

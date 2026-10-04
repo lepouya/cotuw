@@ -213,6 +213,27 @@ describe("TerrainMap", () => {
     expect(map.navigationChanges.since(201)).toBeUndefined();
   });
 
+  test("rebuilds changed tiles' layers before observers hear of the edit", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 1,
+      terrainTypeIds: ["plain", "water"],
+      createLayers: (_x, _z, { typeId }) => [
+        { type: { id: typeId }, color: new Color4(1, 1, 1, 1) },
+      ],
+    });
+    const seen: (string | undefined)[] = [];
+    map.onChangedObservable.add(() =>
+      seen.push(map.layersAt(1, 0)[0].type?.id),
+    );
+
+    map.setTerrain(1, 0, { typeId: "water" });
+
+    expect(seen).toEqual(["water"]);
+    expect(map.layersAt(0, 0)[0].type?.id).toBe("plain");
+  });
+
   test("allows only declared terrain types", () => {
     const map = new TerrainMap({
       width: 2,
@@ -237,4 +258,23 @@ describe("TerrainMap", () => {
         }),
     ).toThrow("Terrain type plain is not declared");
   });
+});
+
+test("height and visual notifications preserve manually edited layers", () => {
+  const map = new TerrainMap({
+    width: 2,
+    height: 1,
+    tileSize: 1,
+    createLayers: () => [{ color: new Color4(1, 1, 1, 1) }],
+  });
+  const layers = map.layersAt(0, 0);
+  layers.push({ color: new Color4(1, 0, 0, 0.5) });
+  map.notifyChange(
+    { minX: 0, minZ: 0, maxX: 0, maxZ: 0 },
+    { affectsNavigation: false },
+  );
+  expect(map.layersAt(0, 0)).toBe(layers);
+  map.setHeight(0, 0, 2);
+  expect(map.layersAt(0, 0)).toBe(layers);
+  expect(layers).toHaveLength(2);
 });

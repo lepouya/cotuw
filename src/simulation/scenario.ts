@@ -6,7 +6,7 @@ import { createFogState } from "./vision";
 import { createHarvesterState } from "./economy";
 import { createTerritoryState } from "./territory";
 import { createObjectiveStates } from "./objectives";
-import type { ObjectiveDefinition } from "./objectives";
+import type { MissionScenario } from "./mission-file";
 
 import type { TerritoryAssignment } from "./territory";
 import type { ActorDefinition } from "./actor";
@@ -25,14 +25,11 @@ export type ScenarioUnit = {
   territory?: TerritoryAssignment;
 };
 
-export type ScenarioDefinition = {
-  readonly id: string;
-  readonly tileSize: number;
-  readonly terrainTypeIds: readonly string[];
+/** Authoring input for a level's opening state. */
+export type ScenarioDefinition = MissionScenario & {
   readonly terrain: TerrainState;
   /** The faction the player controls and whose vision the fog records. */
   readonly playerFaction: string;
-  readonly objectives?: readonly ObjectiveDefinition[];
   readonly buildings: readonly ActorPlacement[];
   /** Territorial units default to their starting position as home. */
   readonly units?: readonly ScenarioUnit[];
@@ -48,14 +45,20 @@ export function defineScenario(
   return deepFreeze(structuredClone(content));
 }
 
+/** Terrain content shared by scenario definitions and mission files. */
+export type ScenarioTerrain = Pick<
+  MissionScenario,
+  "tileSize" | "terrainTypeIds"
+> & { readonly terrain: TerrainState };
+
 /** The factory can add presentation without introducing renderer dependencies. */
-export function createScenarioMap(scenario: ScenarioDefinition): TerrainGrid;
+export function createScenarioMap(scenario: ScenarioTerrain): TerrainGrid;
 export function createScenarioMap<T extends TerrainGrid>(
-  scenario: ScenarioDefinition,
+  scenario: ScenarioTerrain,
   createMap: (options: TerrainGridOptions) => T,
 ): T;
 export function createScenarioMap(
-  scenario: ScenarioDefinition,
+  scenario: ScenarioTerrain,
   createMap: (options: TerrainGridOptions) => TerrainGrid = (options) =>
     new TerrainGrid(options),
 ): TerrainGrid {
@@ -125,88 +128,4 @@ export function createScenarioState(
     economy,
     fog: createFogState(terrain.width, terrain.height),
   };
-}
-
-const SAVE_VERSION = 7;
-
-export function serializeMission(
-  state: MissionState,
-  tickSeconds: number,
-): string {
-  if (!state.scenarioId || !state.terrain)
-    throw new RangeError("A mission save requires its scenario and terrain.");
-  if (state.fog === undefined)
-    throw new RangeError("A mission save requires explored terrain.");
-  return JSON.stringify({
-    version: SAVE_VERSION,
-    scenarioId: state.scenarioId,
-    tickSeconds,
-    state,
-  });
-}
-
-/** Simulation initialization validates the returned authoritative state. */
-export function deserializeMission(
-  source: string,
-  scenario: ScenarioDefinition,
-  tickSeconds: number,
-): MissionState {
-  const save = JSON.parse(source);
-  if (!save || save.version !== SAVE_VERSION)
-    throw new RangeError("This mission save uses an unsupported version.");
-  if (save.scenarioId !== scenario.id || save.state?.scenarioId !== scenario.id)
-    throw new RangeError("This mission save belongs to a different scenario.");
-  if (save.state.playerFaction !== scenario.playerFaction)
-    throw new RangeError(
-      "This mission save has an incompatible player faction.",
-    );
-  if (save.state.fog === undefined)
-    throw new RangeError("A mission save requires explored terrain.");
-  if (
-    save.tickSeconds !== tickSeconds ||
-    !save.state.terrain ||
-    save.state.terrain.width !== scenario.terrain.width ||
-    save.state.terrain.height !== scenario.terrain.height
-  )
-    throw new RangeError(
-      "This mission save has incompatible simulation settings.",
-    );
-  if (
-    !sameResources(
-      save.state.economy?.sites,
-      scenario.sites,
-      (site) => site.initialMaterials,
-    ) ||
-    !sameResources(
-      save.state.economy?.loot,
-      scenario.loot,
-      (loot) => loot.materials,
-    )
-  )
-    throw new RangeError(
-      "This mission save has incompatible resource content.",
-    );
-  return save.state;
-}
-
-/** Saved resources keep their authored order, identity, tile, and yield. */
-function sameResources<T extends MaterialsSite | MaterialsLoot>(
-  saved: unknown,
-  authored: readonly T[],
-  yieldOf: (resource: T) => number,
-): boolean {
-  return (
-    Array.isArray(saved) &&
-    saved.length === authored.length &&
-    authored.every((resource, index) => {
-      const copy = saved[index];
-      return (
-        copy?.id === resource.id &&
-        copy.name === resource.name &&
-        copy.tile?.x === resource.tile.x &&
-        copy.tile?.z === resource.tile.z &&
-        yieldOf(copy) === yieldOf(resource)
-      );
-    })
-  );
 }

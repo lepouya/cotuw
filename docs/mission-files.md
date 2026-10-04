@@ -1,0 +1,66 @@
+# Mission files
+
+Levels and saves share one JSON format. A level is a mission file at tick 0;
+a save is the same mission later. The game starts every mission, including the
+bundled levels, by loading a file through the same path, so any level or save
+can be read, edited by hand, and loaded again.
+
+## Files
+
+- [`src/content/levels/`](../src/content/levels/) holds the bundled levels:
+  `arc-economy-opening.json` and `sandbox.json`.
+- `npm run levels` rebuilds them from
+  [`scripts/levels/`](../scripts/levels/), replacing hand edits. Edit the
+  scripts to keep a change, or edit the JSON for quick experiments.
+- Prettier skips the level directory; the game writes its own layout.
+- Saves live in browser local storage or, in the desktop build, in the app
+  data folder's `saves` directory. **Export file** and **Import file** in the
+  game menu move them between the game and ordinary files.
+
+## Layout
+
+- `format` is `"cotuw-mission"` and `version` is the current file version.
+  Loading rejects other formats and versions.
+- `ticksPerSecond` must match the build's simulation rate.
+- `save` holds a save's name and ISO timestamp. Levels omit it.
+  A tick-0 save keeps its metadata and does not replace the restart level.
+- `scenario` holds authored content that stays fixed during a mission:
+  - `id` identifies the level. Restart reloads the level with this ID.
+  - `content` names the [content pack](content-packs.md) and version that
+    supply actor definitions and presentation. Loading rejects a pack the
+    build lacks or a different version, so a save keeps its rules.
+  - `actors` lists the pack's actor IDs this mission uses; omit it to use all.
+  - `name`, `briefing`, and `goals` fill the save list and sidebar.
+  - `tileSize`, `terrainTypeIds`, and `objectives` define the map scale, valid
+    terrain types, and victory and defeat rules.
+- `state` holds the complete simulation state. `state.scenarioId` must match
+  `scenario.id`.
+
+## Terrain and fog
+
+Text rows run north to south and characters run west to east, so a file reads
+like the minimap.
+
+- `terrain.legend` maps one character to one tile's semantics, such as
+  `"~": { "typeId": "water" }` or
+  `"#": { "typeId": "plain", "outOfBounds": true }`.
+- `terrain.tiles` has one string per row and one legend character per tile.
+- `terrain.heights` has one number array per row of tile corners, so it has
+  one more row and column than `tiles`.
+- `fog.explored` uses `1` for explored tiles. Removing `fog` reveals the whole
+  map.
+
+## Positions
+
+Actors store world positions. The map is centered on the origin, so a tile's
+center is at `x = (tileX + 0.5 - width / 2) * tileSize` and
+`z = (tileZ + 0.5 - height / 2) * tileSize`. Buildings take their position
+and facing from `tilePlacement`, whose `origin` is in tiles.
+
+## Validation
+
+Loading checks the file's shape, then builds a simulation from it before it
+replaces the current mission. Any error leaves the current mission running and
+shows its reason, such as an unknown legend character with its tile
+coordinates. Scenario metadata is checked too, including distinct actor and
+terrain IDs, briefing text, goal references, and save timestamps.

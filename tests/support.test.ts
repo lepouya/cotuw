@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ARC_ACTOR_DEFINITIONS } from "../src/content/arc";
+import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import {
   createSupportNetwork,
   createSupportResolver,
@@ -10,11 +10,8 @@ import type {
   MissionState,
   MissionSimulation,
 } from "../src/simulation/mission";
-import {
-  defineScenario,
-  serializeMission,
-  deserializeMission,
-} from "../src/simulation/scenario";
+import { defineScenario } from "../src/simulation/scenario";
+import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
@@ -294,11 +291,8 @@ describe("construction support", () => {
       }),
     ).toMatchObject({ accepted: false, reason: "disconnected" });
     const restored = fixture(
-      deserializeMission(
-        serializeMission(simulation.snapshot(), 1),
-        scenario,
-        1,
-      ),
+      parseMission(serializeMission(scenario, simulation.snapshot(), 1), 1)
+        .state,
     ).simulation;
     for (const current of [simulation, restored]) {
       current.spawnActor(building("restored-bridge", 13, 10));

@@ -23,7 +23,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 ### Codebase
 
 - [x] 0.4 Scaffold the Tauri 2, Vite, TypeScript, and Babylon.js application.
-- [ ] 0.5 Establish small module boundaries for simulation, rendering, and
+- [x] 0.5 Establish small module boundaries for simulation, rendering, and
       platform services.
 - [x] 0.6 Add the basic development, type-checking, and build commands.
 
@@ -38,8 +38,8 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Terrain and map content
 
-- [ ] 0.11 Define data-driven terrain-animation clips: frame sequence, frame
-      timing, playback mode, and per-layer texture source.
+- [ ] 0.11 Define and test data-driven terrain-animation clips: frame
+      sequence, frame timing, playback mode, and per-layer texture source.
 - [ ] 0.12 Render frame-based terrain texture animation without changing the
       deterministic terrain state.
 - [x] 0.13 Keep scrolling UV effects available independently for layers that
@@ -96,8 +96,8 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Verification
 
-- [ ] 0.32 Add focused tests for terrain-animation data, path finding, actor
-      movement, multi-tile occupancy, and group command destination assignment.
+- [x] 0.32 Add focused tests for path finding, actor movement, multi-tile
+      occupancy, and group command destination assignment.
 - [x] 0.33 Add a browser visual check covering the test map, minimap, selected
       actors, and a multi-tile stationary object.
 
@@ -131,7 +131,7 @@ base-building RTS loop, its technical architecture, and its player interface.
       detection, and regeneration.
 - [ ] 0.43 Implement the sidebar, top bar, radial context menu, objectives,
       alerts, notifications, explanatory popups, and victory or defeat results.
-- [ ] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
+- [x] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
       autosave, version validation, and paused inspection after loading.
 - [ ] 0.45 Expose every core action through on-screen controls that work in
       compact phone and tablet landscape browser profiles without hover or
@@ -147,6 +147,11 @@ base-building RTS loop, its technical architecture, and its player interface.
       depletion feedback, reassignment, ordinary salvage, and building resale.
       Include timed five-item production, cancellation refunds, blocked-exit
       waiting, serializable economy state, and mouse and compact touch checks.
+- [x] 0.54 Move actor rules, movement profiles, presentation, terrain styling,
+      and lighting into a versioned JSON content pack that mission files name,
+      leaving no mission-specific rules in session code.
+- [ ] 0.55 Tune M0 costs, timings, encounters, and layout from human playtests
+      toward a 15 to 25 minute first run and a 10 to 15 minute familiar replay.
 
 ### Playable-slice verification
 

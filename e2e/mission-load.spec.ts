@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { importMission } from "./prototype-helpers";
 
 declare global {
   interface Window {
@@ -12,32 +13,20 @@ for (const action of ["restart", "exit", "newer load"] as const) {
     const canvas = page.locator("#game-canvas");
     await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
     const source = await page.evaluate(async () => {
-      const contentPath: string = "/src/content/economy-scenario.ts";
-      const scenarioPath: string = "/src/simulation/scenario.ts";
-      const { ECONOMY_SCENARIO, ECONOMY_ACTOR_DEFINITIONS } = (await import(
-        contentPath
-      )) as typeof import("../src/content/economy-scenario");
-      const { createScenarioState, serializeMission } = (await import(
-        scenarioPath
-      )) as typeof import("../src/simulation/scenario");
-      const state = createScenarioState(
-        ECONOMY_SCENARIO,
-        ECONOMY_ACTOR_DEFINITIONS,
-      );
-      state.economy!.materials = 77;
-      return serializeMission(state, 1 / 60);
+      const missionsPath: string = "/e2e/missions.ts";
+      const { level, missionSource } = (await import(
+        missionsPath
+      )) as typeof import("./missions");
+      const mission = level();
+      mission.state.economy!.materials = 77;
+      // A save, not a level, so loading it never replaces the restart level.
+      mission.state.tick = 1;
+      return missionSource(mission);
     });
-    const upload = async (name: string, data = source) => {
-      await page.locator("#mission-save-file").setInputFiles({
-        name,
-        mimeType: "application/json",
-        buffer: Buffer.from(data),
-      });
-    };
+    const upload = (name: string, data = source) =>
+      importMission(page, data, name);
     await upload("initial.json");
-    await expect(page.locator("#mission-result-title")).toHaveText(
-      "Mission loaded",
-    );
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
     await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
     await expect(page.locator("#materials-counter")).toHaveText("77");
     await expect(page.locator("#restart-mission")).toBeEnabled();
@@ -59,6 +48,7 @@ for (const action of ["restart", "exit", "newer load"] as const) {
       await expect(page.locator("#restart-mission")).toBeEnabled();
       await page.locator("#inspect-loaded-mission").click();
     } else {
+      await page.locator("#cancel-load").click();
       await page
         .locator(action === "restart" ? "#restart-mission" : "#exit-mission")
         .click();
@@ -74,11 +64,11 @@ for (const action of ["restart", "exit", "newer load"] as const) {
       await frames(2);
     });
     if (action === "exit") {
-      await expect(page.locator("#mission-result-title")).toHaveText(
+      await expect(page.locator("#game-menu-title")).toHaveText(
         "Mission ended",
       );
     } else {
-      await expect(page.locator("#mission-result")).not.toBeVisible();
+      await expect(page.locator("#game-menu")).not.toBeVisible();
       await expect(page.locator("#materials-counter")).toHaveText(
         action === "restart" ? "150" : "99",
       );

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   ECONOMY_ACTOR_DEFINITIONS,
-  ECONOMY_SCENARIO,
-} from "../src/content/economy-scenario";
-import { PROTOTYPE_MOVEMENT_PROFILES } from "../src/prototype-content";
-import { PROTOTYPE_LANDMARKS } from "../src/content/prototype-terrain";
+  MOVEMENT_PROFILES,
+} from "./helpers/content";
+import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
+import { LEVEL_SOURCES } from "../src/content/levels";
+import { PROTOTYPE_LANDMARKS } from "../scripts/levels/m0-terrain";
 import { createActor } from "../src/simulation/actor";
 import type { Actor } from "../src/simulation/actor";
 import type { TileCoord } from "../src/simulation/grid";
@@ -18,20 +19,22 @@ import {
   segmentCost,
 } from "../src/simulation/navigation";
 import { OccupancyGrid } from "../src/simulation/occupancy";
-import {
-  createScenarioMap,
-  createScenarioState,
-  deserializeMission,
-  serializeMission,
-} from "../src/simulation/scenario";
+import { createScenarioMap } from "../src/simulation/scenario";
+import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 
 const seconds = 0.1;
-const scenario = ECONOMY_SCENARIO;
+const level = () =>
+  parseMission(
+    LEVEL_SOURCES.get("arc-economy-opening")!,
+    SIMULATION_TICK_SECONDS,
+  );
+const { scenario, state: opening } = level();
 const definitions = ECONOMY_ACTOR_DEFINITIONS;
-const initialState = () => createScenarioState(scenario, definitions);
+const initialState = (): MissionState => level().state;
 
-const mapForOpening = () => createScenarioMap(scenario);
+const mapForOpening = () =>
+  createScenarioMap({ ...scenario, terrain: opening.terrain });
 
 function fixture(state = initialState(), updateIdle = () => {}) {
   const map = mapForOpening();
@@ -47,7 +50,7 @@ function fixture(state = initialState(), updateIdle = () => {}) {
     behaviorRegistry: new Map([
       [
         "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, PROTOTYPE_MOVEMENT_PROFILES),
+        createTerrainMoveBehavior(map, occupancy, MOVEMENT_PROFILES),
       ],
       ["idle", { handleCommand: () => false, update: updateIdle }],
     ]),
@@ -135,11 +138,10 @@ describe("mission objectives", () => {
     for (let tick = 0; tick < 610; tick++) simulation.tick();
     expect(simulation.wrecks).toHaveLength(0);
     const restored = fixture(
-      deserializeMission(
-        serializeMission(simulation.snapshot(), seconds),
-        scenario,
+      parseMission(
+        serializeMission(scenario, simulation.snapshot(), seconds),
         seconds,
-      ),
+      ).state,
     );
     expect(restored.objectives).toEqual(simulation.objectives);
     restored.tick();
@@ -156,7 +158,7 @@ describe("mission objectives", () => {
     expect(goalsComplete(simulation)).toBe(true);
     const saved = simulation.snapshot();
     const restored = fixture(
-      deserializeMission(serializeMission(saved, seconds), scenario, seconds),
+      parseMission(serializeMission(scenario, saved, seconds), seconds).state,
     );
     expect(restored.result).toEqual(simulation.result);
     const command = {
@@ -267,48 +269,13 @@ describe("mission objectives", () => {
   });
 });
 
-describe("authored resource compatibility", () => {
-  test.each(["sites", "loot"] as const)(
-    "rejects incompatible %s content",
-    (kind) => {
-      const state = initialState();
-      const resources = state.economy![kind];
-      const original = resources[0];
-      const invalid = [
-        null,
-        1,
-        { ...original, id: "another-resource" },
-        { ...original, name: "Another patch" },
-        { ...original, tile: null },
-        { ...original, tile: { ...original.tile, x: original.tile.x + 1 } },
-        {
-          ...original,
-          [kind === "sites" ? "initialMaterials" : "materials"]: 999,
-        },
-      ];
-      for (const resource of invalid) {
-        const save = JSON.parse(serializeMission(state, seconds));
-        save.state.economy[kind][0] = resource;
-        expect(() =>
-          deserializeMission(JSON.stringify(save), scenario, seconds),
-        ).toThrow("resource content");
-      }
-      const save = JSON.parse(serializeMission(state, seconds));
-      save.state.economy[kind].reverse();
-      expect(() =>
-        deserializeMission(JSON.stringify(save), scenario, seconds),
-      ).toThrow("resource content");
-    },
-  );
-
-  test("resource identity stays compatible after gathering and collection", () => {
-    const state = initialState();
-    state.economy!.sites[0].remainingMaterials -= 25;
-    state.economy!.loot[0].collected = true;
-    expect(
-      deserializeMission(serializeMission(state, seconds), scenario, seconds),
-    ).toEqual(state);
-  });
+test("resources round-trip after gathering and collection", () => {
+  const state = initialState();
+  state.economy!.sites[0].remainingMaterials -= 25;
+  state.economy!.loot[0].collected = true;
+  expect(
+    parseMission(serializeMission(scenario, state, seconds), seconds).state,
+  ).toEqual(state);
 });
 
 describe("authored wolf encounters", () => {
@@ -322,7 +289,7 @@ describe("authored wolf encounters", () => {
       const definition = definitionsById.get(actor.definitionId)!;
       const center = territory.center ?? territory.home;
       const radius = territory.radius ?? definition.territory!.leashRadius;
-      const profile = PROTOTYPE_MOVEMENT_PROFILES.find(
+      const profile = MOVEMENT_PROFILES.find(
         ({ id }) => id === definition.movement!.profileId,
       )!;
       // Includes boundary tiles touched by continuous routes and separation.
@@ -374,10 +341,10 @@ describe("authored wolf encounters", () => {
     const grid = new NavigationGrid(
       map,
       new OccupancyGrid(map),
-      PROTOTYPE_MOVEMENT_PROFILES[0],
+      MOVEMENT_PROFILES[0],
     );
     const simulation = fixture();
-    const recovery = scenario.loot.filter(({ id }) =>
+    const recovery = opening.economy!.loot.filter(({ id }) =>
       ["salvage-2", "salvage-3"].includes(id),
     );
     expect(recovery).toHaveLength(2);
@@ -410,7 +377,7 @@ describe("authored wolf encounters", () => {
     const grid = new NavigationGrid(
       map,
       new OccupancyGrid(map),
-      PROTOTYPE_MOVEMENT_PROFILES[0],
+      MOVEMENT_PROFILES[0],
     );
     const from = map.tileCenter(35, 47);
     const to = map.tileCenter(58, 47);
@@ -446,7 +413,7 @@ describe("authored wolf encounters", () => {
     const grid = new NavigationGrid(
       map,
       new OccupancyGrid(map),
-      PROTOTYPE_MOVEMENT_PROFILES[0],
+      MOVEMENT_PROFILES[0],
     );
     for (const landmark of PROTOTYPE_LANDMARKS)
       for (const peak of landmark.peaks) {
@@ -479,7 +446,7 @@ describe("authored wolf encounters", () => {
     const grid = new NavigationGrid(
       map,
       new OccupancyGrid(map),
-      PROTOTYPE_MOVEMENT_PROFILES[0],
+      MOVEMENT_PROFILES[0],
     );
     const wolves = simulation
       .snapshot()
@@ -524,7 +491,7 @@ describe("authored wolf encounters", () => {
     const grid = new NavigationGrid(
       map,
       new OccupancyGrid(map),
-      PROTOTYPE_MOVEMENT_PROFILES[0],
+      MOVEMENT_PROFILES[0],
     );
     const from = map.tileCenter(46, 32);
     const to = map.tileCenter(78, 21);
@@ -592,11 +559,10 @@ describe("authored wolf encounters", () => {
     expect(propagators.has("lone-wolf")).toBe(false);
     expect(den.some((actor) => actor.combat?.attack)).toBe(true);
     const restored = fixture(
-      deserializeMission(
-        serializeMission(simulation.snapshot(), seconds),
-        scenario,
+      parseMission(
+        serializeMission(scenario, simulation.snapshot(), seconds),
         seconds,
-      ),
+      ).state,
     );
     for (let tick = 0; tick < 50; tick++) {
       simulation.tick();

@@ -16,6 +16,10 @@ awaken the deathless Everwake, eventually requiring an uneasy alliance.
   alternatives, and queued design questions.
 - [Actor assets](docs/actor-assets.md) — infantry GLB generation and rig
   contract.
+- [Mission files](docs/mission-files.md) — the level and save format and how
+  to edit it.
+- [Content packs](docs/content-packs.md) — shared actor rules and
+  presentation that missions name.
 
 ## Development
 
@@ -26,6 +30,7 @@ npm install
 npm run dev        # browser
 npm run tauri dev  # desktop
 npm run test:visual # browser screenshot checks
+npm run levels     # rebuild bundled levels, replacing hand edits
 npm run check      # required before completing a coding task
 ```
 
@@ -85,17 +90,21 @@ after a minute; building debris blocks construction until then. Damaged
 buildings sell for less.
 
 Combat destruction of the starting Command Center ends this opening in defeat
-and pauses immediately. The results panel provides Restart, Load, and Exit. Load
-accepts a compatible mission JSON file and begins paused; Inspect allows
-selection and camera inspection, and Resume mission starts the clock. Invalid
-files leave the current session intact.
+and pauses immediately. The results panel provides Restart, Load, and Exit.
+
+**Menu** or `F10` pauses the mission and opens the game menu. **Save** stores a
+named save or exports it as a file; **Quicksave** or `F5` replaces the single
+quicksave, and `F9` loads it. Completing an objective replaces the autosave.
+**Load** lists every save and can import a mission file. Loading begins
+paused; Inspect allows selection and camera inspection, and Resume mission
+starts the clock. Invalid files leave the current session intact.
 
 Defeat the lone wolf and all five den wolves to win. The Victory panel pauses
 the mission and offers **Continue free play**, Restart, Load, and Exit.
 Continuing restores construction, training, and exploration. Objective
-progress and victory survive saving and loading. Mission saves use version 7.
+progress and victory survive saving and loading.
 
-Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
+Open `/?level=sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
 rotate and **Cancel** or `Esc` to exit placement. A yellow preview arrow marks
 the preferred unit exit; blocked exits can use another side. Touch uses a

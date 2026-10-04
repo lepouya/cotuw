@@ -406,7 +406,7 @@ export function createBuildingPlacement(
       message(
         simulation.result?.kind === "defeat"
           ? "Mission ended in defeat. Restart or load a saved mission."
-          : "Simulation stopped. Reload to continue.",
+          : "Simulation stopped. Restart or load a mission from the menu.",
       );
     },
     dispose: () => {

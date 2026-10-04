@@ -1,11 +1,14 @@
+import { isCount } from "./validation";
+
 const BOUNDARY_TOLERANCE_TICKS = 1e-9;
+/** The game's fixed tick; mission files record it and load only at this rate. */
+export const SIMULATION_TICK_SECONDS = 1 / 60;
 
 /** Timed work takes at least one tick. */
 export const secondsToTicks = (seconds = 0, tickSeconds: number) =>
   Math.max(1, Math.ceil(seconds / tickSeconds));
 
-export const isTick = (value: unknown): value is number =>
-  Number.isSafeInteger(value) && (value as number) >= 0;
+export const isTick = isCount;
 
 export type FixedStepClockOptions = {
   tickSeconds: number;

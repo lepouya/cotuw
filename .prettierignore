@@ -2,3 +2,5 @@ dist/
 node_modules/
 src-tauri/
 *.md
+# Mission files have their own layout; see docs/mission-files.md.
+src/content/levels/

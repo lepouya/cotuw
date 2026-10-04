@@ -3,8 +3,11 @@
 import { Color3, Color4, Matrix, Vector3 } from "@babylonjs/core";
 
 import { TerrainMap } from "../src/map";
-import { TerrainGrid } from "../src/simulation/terrain";
-import { PROTOTYPE_TERRAIN } from "../src/content/prototype-terrain";
+import { LEVEL_SOURCES } from "../src/content/levels";
+import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
+import { parseMission } from "../src/simulation/mission-file";
+import { createScenarioMap } from "../src/simulation/scenario";
+import type { TerrainGrid } from "../src/simulation/terrain";
 import {
   createGameView,
   createMinimap,
@@ -22,7 +25,17 @@ export { EngineStore, Matrix, Vector3 } from "@babylonjs/core";
 let authoredTerrain: TerrainGrid | undefined;
 /** Shared geometry for input helpers targeting the unedited prototype map. */
 export function prototypeTerrainMap(): TerrainGrid {
-  return (authoredTerrain ??= new TerrainGrid(PROTOTYPE_TERRAIN));
+  if (!authoredTerrain) {
+    const { scenario, state } = parseMission(
+      LEVEL_SOURCES.get("sandbox")!,
+      SIMULATION_TICK_SECONDS,
+    );
+    authoredTerrain = createScenarioMap({
+      ...scenario,
+      terrain: state.terrain,
+    });
+  }
+  return authoredTerrain;
 }
 
 export const TEST_VIEW_OPTIONS = {

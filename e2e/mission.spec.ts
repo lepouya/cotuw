@@ -65,7 +65,7 @@ for (const profile of [
       await expect(page.locator('[data-goal-id="wolf-den"]')).toContainText(
         "(0/5)",
       );
-      await expect(page.locator("#mission-result")).not.toBeVisible();
+      await expect(page.locator("#game-menu")).not.toBeVisible();
 
       await mission.select("Trooper");
       for (const id of ["salvage-2", "salvage-3"]) {
@@ -109,7 +109,7 @@ for (const profile of [
       await mission.press("#attack-move");
       await mission.ground(78, 21);
       await mission.advance(30);
-      await expect(page.locator("#mission-result-title")).toHaveText("Victory");
+      await expect(page.locator("#game-menu-title")).toHaveText("Victory");
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-mission-result",
         "victory",
@@ -128,7 +128,7 @@ for (const profile of [
         contentType: "image/png",
       });
       await mission.press("#resume-mission");
-      await expect(page.locator("#mission-result")).not.toBeVisible();
+      await expect(page.locator("#game-menu")).not.toBeVisible();
       await mission.press("#tab-goals");
       await expect(
         page.locator("#mission-objectives .goal-complete"),

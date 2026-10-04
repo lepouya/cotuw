@@ -10,18 +10,9 @@ import { createGoalList } from "./goals";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { MissionResult, ObjectiveView } from "../simulation/objectives";
+import type { ScenarioGoal } from "../simulation/mission-file";
+import type { ActorPresentation } from "../content/content-pack";
 
-export type ActorPresentation = {
-  name: string;
-  description: string;
-  build?: { id: string; label: string };
-  train?: { id: string; label: string };
-};
-export type SidebarGoal = {
-  definitionId: string;
-  label: string;
-  directive?: string;
-};
 /** A sidebar action for one actor definition. */
 export type DefinitionButton = {
   definitionId: string;
@@ -54,7 +45,7 @@ export function createSidebar(
     definitions: readonly ActorDefinition[];
     economy?: boolean;
     presentations: ReadonlyMap<string, ActorPresentation>;
-    goals: readonly SidebarGoal[];
+    goals: readonly ScenarioGoal[];
     selectActor: (id: string, additive?: boolean) => void;
     /** The player's faction; rosters list only its actors. */
     playerFaction?: string;

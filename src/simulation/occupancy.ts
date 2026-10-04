@@ -1,4 +1,4 @@
-import { containsGridPoint, isTileCoord, tileBounds } from "./grid";
+import { containsGridPoint, isTileCoord, tileBounds, tileKey } from "./grid";
 import type { TerrainBounds, TileCoord } from "./grid";
 import type { TerrainEdit, TerrainGrid } from "./terrain";
 
@@ -49,7 +49,7 @@ export function isValidFootprint(value: unknown): value is Footprint {
     Array.isArray(footprint.occupiedTiles) &&
     footprint.occupiedTiles.length > 0 &&
     Array.from(footprint.occupiedTiles).every(isTileCoord) &&
-    new Set(footprint.occupiedTiles.map(({ x, z }) => `${x},${z}`)).size ===
+    new Set(footprint.occupiedTiles.map(tileKey)).size ===
       footprint.occupiedTiles.length
   );
 }
