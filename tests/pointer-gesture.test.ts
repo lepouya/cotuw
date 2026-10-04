@@ -8,8 +8,9 @@ function pointer(target: EventTarget, type: string, pointerId: number, x = 10) {
 }
 function fixture() {
   const host = new EventTarget();
+  const document = Object.assign(new EventTarget(), { defaultView: host });
   const target = Object.assign(new EventTarget(), {
-    ownerDocument: { defaultView: host },
+    ownerDocument: document,
     hasPointerCapture: () => false,
   });
   const start = vi.fn(() => true);
@@ -20,7 +21,7 @@ function fixture() {
     end,
     release,
   });
-  return { target, host, start, end, release, gesture };
+  return { target, host, document, start, end, release, gesture };
 }
 
 test("lost capture does not forget a finger that is still down", () => {
@@ -73,17 +74,20 @@ test("move runs only once a press becomes a drag", () => {
   gesture.dispose();
 });
 
-test("blur cancels a drag and disposal removes target and window listeners", () => {
-  const { target, host, start, end, release, gesture } = fixture();
-  pointer(target, "pointerdown", 1);
-  pointer(target, "pointermove", 1, 30);
-  host.dispatchEvent(new Event("blur"));
-  pointer(target, "pointerup", 1);
-  expect(release).toHaveBeenCalledTimes(1);
-  expect(end).not.toHaveBeenCalled();
-  gesture.dispose();
-  pointer(target, "pointerdown", 2);
-  pointer(host, "pointerup", 2);
-  expect(start).toHaveBeenCalledTimes(1);
-  expect(end).not.toHaveBeenCalled();
-});
+test.each(["blur", "visibilitychange"])(
+  "%s cancels a drag and disposal removes its listeners",
+  (event) => {
+    const { target, host, document, start, end, release, gesture } = fixture();
+    pointer(target, "pointerdown", 1);
+    pointer(target, "pointermove", 1, 30);
+    (event === "blur" ? host : document).dispatchEvent(new Event(event));
+    pointer(target, "pointerup", 1);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(end).not.toHaveBeenCalled();
+    gesture.dispose();
+    pointer(target, "pointerdown", 2);
+    pointer(host, "pointerup", 2);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(end).not.toHaveBeenCalled();
+  },
+);

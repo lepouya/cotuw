@@ -102,6 +102,9 @@ export function createPointerGesture<T>(
   host?.addEventListener("pointerup", up, { signal });
   host?.addEventListener("pointercancel", cancelled, { signal });
   host?.addEventListener("blur", blur, { signal });
+  target.ownerDocument?.addEventListener?.("visibilitychange", blur, {
+    signal,
+  });
   return {
     /** Abandons the active gesture; returns whether there was one. */
     cancel,

@@ -392,6 +392,7 @@ export async function createTerrainPrototype(
     },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
     enabled: () => !placement.active && !halted(),
+    pointerEnabled: () => !view.camera.primaryPanActive,
     groundTargetMode: () => rally.active || attackMove.active,
     onGroundTarget: (target) =>
       attackMove.active ? attackMove.choose(target) : rally.choose(target),
@@ -566,6 +567,7 @@ export async function createTerrainPrototype(
         })),
       controls,
       enabled: canCommand,
+      pointerEnabled: () => !view.camera.primaryPanActive,
       onPlaced: (actorId) => {
         input.select(actorId);
         showActor(actorId);
@@ -689,6 +691,10 @@ export async function createTerrainPrototype(
   const disposeCameraControls =
     controls.cameraControls &&
     bindCameraControls(controls.cameraControls, view.camera);
+  view.camera.onPanChangedObservable.add(() => {
+    input.cancelGesture();
+    placement.cancelGesture();
+  });
   input.select(undefined);
   if (controls.animate) controls.animate.checked = !reducedMotion.matches;
   let idleSeconds = 0;

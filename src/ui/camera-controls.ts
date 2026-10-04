@@ -12,11 +12,32 @@ const CAMERA_ACTIONS: Record<string, (camera: StrategyCamera) => void> = {
   "zoom-in": (camera) => camera.zoomBy(0.8),
   "zoom-out": (camera) => camera.zoomBy(1.25),
   reset: (camera) => camera.resetView(),
+  pan: (camera) => camera.setPanMode(!camera.panMode),
 };
 
 /** All pointer camera actions also have touch-sized buttons. */
 export function bindCameraControls(root: HTMLElement, camera: StrategyCamera) {
   const controller = new AbortController();
+  const { signal } = controller;
+  const edges = root.querySelector<HTMLInputElement>("#edge-panning");
+  if (edges) {
+    camera.setEdgePanEnabled(edges.checked);
+    edges.addEventListener(
+      "change",
+      () => camera.setEdgePanEnabled(edges.checked),
+      { signal },
+    );
+  }
+  const pan = root.querySelector<HTMLButtonElement>(
+    '[data-camera-action="pan"]',
+  );
+  const updatePan = () => {
+    if (!pan) return;
+    pan.setAttribute("aria-pressed", String(camera.panMode));
+    pan.textContent = camera.panMode ? "Pan ✓" : "Pan";
+  };
+  updatePan();
+  const observer = camera.onPanChangedObservable.add(updatePan);
   root.addEventListener(
     "click",
     (event) => {
@@ -27,7 +48,10 @@ export function bindCameraControls(root: HTMLElement, camera: StrategyCamera) {
       if (!button || button.disabled) return;
       CAMERA_ACTIONS[button.dataset.cameraAction!]?.(camera);
     },
-    { signal: controller.signal },
+    { signal },
   );
-  return () => controller.abort();
+  return () => {
+    controller.abort();
+    camera.onPanChangedObservable.remove(observer);
+  };
 }

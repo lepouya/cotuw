@@ -260,7 +260,8 @@
           </p>
           <p class="controls">
             Click to select or move · Shift-click to add<br />Drag to select ·
-            Right-drag to pan<br />Shift-right-drag to rotate · Scroll to zoom
+            Pan mode: drag or scroll · Space-drag to pan<br />Arrow keys pan the
+            focused world · Scroll to zoom · Shift-right-drag to rotate
           </p>
         </footer>
       </aside>
@@ -355,6 +356,18 @@
           >
             Tilt ↓
           </button>
+          <button
+            type="button"
+            data-camera-action="pan"
+            aria-label="Pan mode"
+            aria-pressed="false"
+            title="Pan mode: drag with one finger or scroll. Turn off to select and command units."
+          >
+            Pan
+          </button>
+          <label class="edge-pan-control">
+            <input id="edge-panning" type="checkbox" checked /> Edge panning
+          </label>
         </div>
         <canvas id="minimap" class="minimap" aria-label="Map overview"></canvas>
       </div>

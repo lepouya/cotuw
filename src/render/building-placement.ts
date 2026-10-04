@@ -10,6 +10,7 @@ import { footprintSize, tileKey } from "../simulation/grid";
 import { isOutcomeOf } from "../simulation/command";
 import { createTilePlacedActorViewRegistry } from "./tile-placed-actor-view";
 import { createPrimaryClick } from "./primary-click";
+import { isTextEntry, worldInputAvailable } from "./input-focus";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
@@ -58,6 +59,7 @@ export type BuildingPlacementOptions = {
   buildings: readonly BuildingPlacementChoice[];
   controls: BuildingPlacementControls;
   enabled?: () => boolean;
+  pointerEnabled?: () => boolean;
   onPlaced: (actorId: string) => void;
   onStart: () => void;
 };
@@ -74,10 +76,15 @@ export function createBuildingPlacement(
     buildings,
     controls,
     enabled = () => true,
+    pointerEnabled = () => true,
     onPlaced,
     onStart,
   }: BuildingPlacementOptions,
 ) {
+  const controller = new AbortController();
+  const { signal } = controller;
+  const acceptsPointer = () =>
+    pointerEnabled() && worldInputAvailable(canvas.ownerDocument);
   let definition = buildings[0]?.definition;
   let name = buildings[0]?.name ?? "";
   const preview = createTilePlacedActorViewRegistry(
@@ -140,7 +147,7 @@ export function createBuildingPlacement(
   };
   const update = () => {
     const available = enabled();
-    if (active && pointer && !pendingId) {
+    if (active && pointer && !pendingId && acceptsPointer()) {
       // Picking is costly, so repeat it only after the pointer or camera moves.
       const nextPickKey = JSON.stringify([
         pointer.clientX,
@@ -299,7 +306,7 @@ export function createBuildingPlacement(
     update();
   };
   const move = (event: PointerEvent) => {
-    if (!active || pendingId) return;
+    if (!active || pendingId || !acceptsPointer()) return;
     if (event.pointerType !== "touch") pointer = event;
   };
   const click = createPrimaryClick(
@@ -311,7 +318,7 @@ export function createBuildingPlacement(
       // Touch taps choose a footprint so a finger never obscures confirmation.
       if (event.pointerType !== "touch") confirm();
     },
-    () => active && !pendingId && !faulted,
+    () => active && !pendingId && !faulted && enabled() && acceptsPointer(),
   );
   const leave = () => {
     pointer = undefined;
@@ -320,6 +327,9 @@ export function createBuildingPlacement(
   const key = (event: KeyboardEvent) => {
     if (
       !active ||
+      !worldInputAvailable(canvas.ownerDocument) ||
+      isTextEntry(event.target) ||
+      event.defaultPrevented ||
       event.repeat ||
       event.ctrlKey ||
       event.metaKey ||
@@ -331,18 +341,17 @@ export function createBuildingPlacement(
     else return;
     event.preventDefault();
   };
-  const starters = buildings.map((building) => {
+  for (const building of buildings) {
     const startBuilding = () => start(building);
-    building.build?.addEventListener("click", startBuilding);
-    return () => building.build?.removeEventListener("click", startBuilding);
-  });
-  controls.rotate?.addEventListener("click", rotate);
-  controls.confirm?.addEventListener("click", confirm);
-  controls.cancel?.addEventListener("click", cancel);
-  canvas.addEventListener("pointermove", move);
-  canvas.addEventListener("pointerleave", leave);
-  canvas.addEventListener("pointercancel", leave);
-  window.addEventListener("keydown", key);
+    building.build?.addEventListener("click", startBuilding, { signal });
+  }
+  controls.rotate?.addEventListener("click", rotate, { signal });
+  controls.confirm?.addEventListener("click", confirm, { signal });
+  controls.cancel?.addEventListener("click", cancel, { signal });
+  canvas.addEventListener("pointermove", move, { signal });
+  canvas.addEventListener("pointerleave", leave, { signal });
+  canvas.addEventListener("pointercancel", leave, { signal });
+  window.addEventListener("keydown", key, { signal });
   const terrainObserver = map.onChangedObservable.add(() => {
     terrainRevision += 1;
     if (active) overlayOffset = footprintOverlayOffset(map);
@@ -355,6 +364,10 @@ export function createBuildingPlacement(
   );
   return {
     cancel,
+    cancelGesture: () => {
+      leave();
+      return click.cancel();
+    },
     get active() {
       return active;
     },
@@ -397,18 +410,11 @@ export function createBuildingPlacement(
       );
     },
     dispose: () => {
+      controller.abort();
       preview.dispose();
       click.dispose();
       clearOverlay();
       map.onChangedObservable.remove(terrainObserver);
-      for (const remove of starters) remove();
-      controls.rotate?.removeEventListener("click", rotate);
-      controls.confirm?.removeEventListener("click", confirm);
-      controls.cancel?.removeEventListener("click", cancel);
-      canvas.removeEventListener("pointermove", move);
-      canvas.removeEventListener("pointerleave", leave);
-      canvas.removeEventListener("pointercancel", leave);
-      window.removeEventListener("keydown", key);
     },
   };
 }

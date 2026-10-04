@@ -1,6 +1,14 @@
-import { ArcRotateCamera, Camera, Scene, Vector3 } from "@babylonjs/core";
+import {
+  ArcRotateCamera,
+  Camera,
+  Observable,
+  Scene,
+  Vector3,
+} from "@babylonjs/core";
 
 import { createPointerGesture } from "./pointer-gesture";
+import { createEdgePan } from "./edge-pan";
+import { worldInputAvailable, isTextEntry } from "./input-focus";
 
 import type { TerrainMap } from "../map";
 
@@ -26,11 +34,26 @@ const INITIAL_FAR_CLIP = 500;
 const FAR_CLIP_MARGIN = 100;
 /** How long a glide takes to reach its destination, whatever the distance. */
 const GLIDE_SECONDS = 0.3;
+const CONTINUOUS_PAN_SPEED = 3;
+const PAN_VIEW_FRACTION = 0.18;
+const PAN_KEYS: Readonly<Record<string, readonly [number, number]>> = {
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+};
 
 export type StrategyCamera = {
   /** Frames the starting view: centered, close enough to read one tile. */
   resetView: () => void;
   panView: (horizontal: number, vertical: number) => void;
+  readonly panMode: boolean;
+  /** Reserves primary pointers for navigation instead of world actions. */
+  readonly primaryPanActive: boolean;
+  readonly onPanChangedObservable: Observable<void>;
+  setPanMode: (active: boolean) => void;
+  readonly edgePanEnabled: boolean;
+  setEdgePanEnabled: (active: boolean) => void;
   rotateView: (radians: number) => void;
   tiltView: (radians: number) => void;
   zoomBy: (factor: number) => void;
@@ -161,6 +184,21 @@ export function createStrategyCamera(
     camera.beta = Math.max(LOWER_BETA_LIMIT, Math.min(UPPER_BETA_LIMIT, beta));
   };
   let canTouchPan = (_event: PointerEvent) => true;
+  let panMode = false;
+  let spaceHeld = false;
+  const panKeys = new Set<string>();
+  const onPanChangedObservable = new Observable<void>();
+  const primaryPanActive = () => panMode || spaceHeld;
+  const panChanged = () => {
+    pointer.cancel();
+    canvas.setAttribute?.("data-camera-pan-active", String(primaryPanActive()));
+    onPanChangedObservable.notifyObservers();
+  };
+  const setPanMode = (active: boolean) => {
+    if (panMode === active) return;
+    panMode = active;
+    panChanged();
+  };
   const pointAt = (x: number, y: number) => {
     // Refreshes the camera position after alpha, beta or target changes.
     camera.getViewMatrix();
@@ -175,37 +213,41 @@ export function createStrategyCamera(
     );
   };
   const pointer = createPointerGesture(canvas, {
+    enabled: () => worldInputAvailable(canvas.ownerDocument),
     start: (event) => {
       const touch = event.pointerType === "touch";
       if (!(
         event.button === 2 ||
-        (touch && event.button === 0 && canTouchPan(event))
+        (event.button === 0 &&
+          (primaryPanActive() || (touch && canTouchPan(event))))
       ))
         return undefined;
       glide = undefined;
-      return { rotate: !touch && event.shiftKey };
+      canvas.focus?.({ preventScroll: true });
+      return { rotate: event.button === 2 && !touch && event.shiftKey };
     },
     move: (event, gesture) => {
       if (gesture.data.rotate) {
         camera.alpha -= (event.clientX - gesture.last.clientX) * 0.005;
         setBeta(camera.beta - (event.clientY - gesture.last.clientY) * 0.005);
       } else {
-        const from = pointAt(gesture.last.clientX, gesture.last.clientY);
-        const to = pointAt(event.clientX, event.clientY);
-        moveTo(camera.target.add(from.subtract(to)));
+        canvas.setAttribute?.("data-camera-dragging", "true");
+        panPixels(
+          gesture.last.clientX - event.clientX,
+          gesture.last.clientY - event.clientY,
+        );
       }
     },
+    release: () => canvas.removeAttribute?.("data-camera-dragging"),
   });
+  /** Moves the view as far as the ground under a screen offset travels. */
+  const panPixels = (x: number, y: number) => {
+    const from = pointAt(0, 0);
+    moveTo(camera.target.add(pointAt(x, y).subtract(from)));
+  };
   const panView = (horizontal: number, vertical: number) => {
-    const bounds = canvas.getBoundingClientRect();
-    const centerX = bounds.left + bounds.width / 2;
-    const centerY = bounds.top + bounds.height / 2;
-    const from = pointAt(centerX, centerY);
-    const to = pointAt(
-      centerX + horizontal * bounds.height * 0.18,
-      centerY + vertical * bounds.height * 0.18,
-    );
-    moveTo(camera.target.add(to.subtract(from)));
+    const step = canvas.getBoundingClientRect().height * PAN_VIEW_FRACTION;
+    panPixels(horizontal * step, vertical * step);
   };
   const viewFootprint = (height = 0) =>
     orthographicViewFootprint(
@@ -220,9 +262,82 @@ export function createStrategyCamera(
     );
 
   const zoom = (event: WheelEvent) => {
-    const pixels = wheelDeltaPixels(event, canvas.clientHeight);
-    setViewHeight(viewHeight * Math.exp(pixels * ZOOM_SENSITIVITY));
     event.preventDefault();
+    const scale = wheelPixelScale(event, canvas.clientHeight);
+    if (panMode && !event.ctrlKey)
+      panPixels(event.deltaX * scale, event.deltaY * scale);
+    else
+      setViewHeight(
+        viewHeight * Math.exp(event.deltaY * scale * ZOOM_SENSITIVITY),
+      );
+  };
+  const document = canvas.ownerDocument;
+  const host = document?.defaultView;
+  const ownsKeyboard = () =>
+    document?.activeElement === canvas && worldInputAvailable(document);
+  const clearKeys = () => {
+    panKeys.clear();
+    if (!spaceHeld) return;
+    spaceHeld = false;
+    panChanged();
+  };
+  const keyDown = (event: KeyboardEvent) => {
+    if (
+      event.defaultPrevented ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey
+    )
+      return;
+    if (
+      event.key === "Escape" &&
+      primaryPanActive() &&
+      worldInputAvailable(document) &&
+      !isTextEntry(document?.activeElement)
+    ) {
+      clearKeys();
+      setPanMode(false);
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      return;
+    }
+    if (!ownsKeyboard()) return;
+    if (event.code === "Space") {
+      if (!spaceHeld) {
+        spaceHeld = true;
+        panChanged();
+      }
+    } else if (PAN_KEYS[event.key]) {
+      glide = undefined;
+      panKeys.add(event.key);
+    } else return;
+    event.preventDefault();
+  };
+  const keyUp = (event: KeyboardEvent) => {
+    if (event.code === "Space" && spaceHeld) {
+      spaceHeld = false;
+      panChanged();
+    } else if (!panKeys.delete(event.key)) return;
+    event.preventDefault();
+  };
+  const edgePan = createEdgePan(canvas);
+  const advanceNavigation = () => {
+    const seconds = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
+    if (!ownsKeyboard()) clearKeys();
+    let horizontal = 0;
+    let vertical = 0;
+    for (const key of panKeys) {
+      horizontal += PAN_KEYS[key][0];
+      vertical += PAN_KEYS[key][1];
+    }
+    // Keyboard direction takes precedence over an unattended cursor.
+    const edge = edgePan.advance(seconds);
+    if (panKeys.size === 0 && edge) [horizontal, vertical] = edge;
+    const length = Math.hypot(horizontal, vertical);
+    if (length === 0) return;
+    // A delayed frame must not fling the camera across the map.
+    const step = (seconds * CONTINUOUS_PAN_SPEED) / length;
+    panView(horizontal * step, vertical * step);
   };
   let syncedWidth = canvas.clientWidth;
   let syncedHeight = canvas.clientHeight;
@@ -240,17 +355,42 @@ export function createStrategyCamera(
     syncedHeight = canvas.clientHeight;
     setViewHeight(viewHeight);
   };
-  canvas.addEventListener("wheel", zoom, { passive: false });
+  const listeners = new AbortController();
+  const { signal } = listeners;
+  canvas.addEventListener("wheel", zoom, { passive: false, signal });
+  // Capture lets Escape leave Pan mode before world tools see it.
+  host?.addEventListener("keydown", keyDown, { capture: true, signal });
+  host?.addEventListener("keyup", keyUp, { signal });
+  host?.addEventListener("blur", clearKeys, { signal });
+  canvas.addEventListener("blur", clearKeys, { signal });
+  document?.addEventListener?.("visibilitychange", clearKeys, { signal });
   scene.onDisposeObservable.add(() => {
-    canvas.removeEventListener("wheel", zoom);
+    listeners.abort();
     pointer.dispose();
+    edgePan.dispose();
+    canvas.removeAttribute?.("data-camera-pan-active");
+    canvas.removeAttribute?.("data-camera-dragging");
+    onPanChangedObservable.clear();
   });
-  scene.onBeforeRenderObservable.add(advanceGlide);
   scene.onBeforeRenderObservable.add(syncToCanvas);
+  scene.onBeforeRenderObservable.add(advanceNavigation);
+  scene.onBeforeRenderObservable.add(advanceGlide);
 
   return {
     resetView,
     panView,
+    get panMode() {
+      return panMode;
+    },
+    get primaryPanActive() {
+      return primaryPanActive();
+    },
+    onPanChangedObservable,
+    setPanMode,
+    get edgePanEnabled() {
+      return edgePan.enabled;
+    },
+    setEdgePanEnabled: edgePan.setEnabled,
     rotateView: (radians) => {
       camera.alpha += radians;
     },
@@ -281,15 +421,15 @@ function easeOutCubic(progress: number): number {
   return 1 - (1 - progress) ** 3;
 }
 
-/** Wheel travel in pixels; Firefox mice report lines. */
-function wheelDeltaPixels(event: WheelEvent, pageHeight: number): number {
+/** Pixels per wheel delta unit; Firefox mice report lines. */
+function wheelPixelScale(event: WheelEvent, pageHeight: number): number {
   switch (event.deltaMode) {
     case WheelEvent.DOM_DELTA_LINE:
-      return event.deltaY * WHEEL_LINE_PIXELS;
+      return WHEEL_LINE_PIXELS;
     case WheelEvent.DOM_DELTA_PAGE:
-      return event.deltaY * pageHeight;
+      return pageHeight;
     default:
-      return event.deltaY;
+      return 1;
   }
 }
 

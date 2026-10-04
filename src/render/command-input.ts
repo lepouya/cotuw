@@ -1,6 +1,7 @@
 import { isTerrainPickMesh } from "./terrain-mesh";
 import { createSelection } from "./selection";
 import { createPointerGesture } from "./pointer-gesture";
+import { isTextEntry, worldInputAvailable } from "./input-focus";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type {
@@ -25,6 +26,8 @@ export type CommandInputOptions = {
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
   onSelectionChanged?: (actorIds: readonly string[]) => void;
   enabled?: () => boolean;
+  /** Reserves world pointers for other tools while keeping selection actions. */
+  pointerEnabled?: () => boolean;
   groundTargetMode?: () => boolean;
   onGroundTarget?: (target: WorldPosition) => void;
   cancelGroundTarget?: () => boolean;
@@ -62,6 +65,7 @@ export function createCommandInput(
     onSelectionChanged,
     onWorldSelectionChanged,
     enabled = () => true,
+    pointerEnabled = () => true,
     canMove = () => true,
     canAttack = () => false,
     groundTargetMode = () => false,
@@ -112,7 +116,10 @@ export function createCommandInput(
     };
   };
   const pointer = createPointerGesture(canvas, {
-    enabled,
+    enabled: () =>
+      enabled() &&
+      pointerEnabled() &&
+      worldInputAvailable(canvas.ownerDocument),
     start: (event) => {
       if (event.button !== 0) return undefined;
       canvas.focus({ preventScroll: true });
@@ -192,13 +199,16 @@ export function createCommandInput(
     return ids.length;
   };
   const key = (event: KeyboardEvent) => {
-    if (!enabled() || event.ctrlKey || event.metaKey || event.altKey) return;
     if (
-      event.target instanceof HTMLElement &&
-      (event.target.isContentEditable ||
-        event.target.closest("input, textarea, select"))
+      !enabled() ||
+      !worldInputAvailable(canvas.ownerDocument) ||
+      event.defaultPrevented ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey
     )
       return;
+    if (isTextEntry(event.target)) return;
     if (event.key === "Escape" && cancelGroundTarget?.()) {
       cancelGesture();
       event.preventDefault();
