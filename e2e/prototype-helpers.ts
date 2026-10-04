@@ -5,12 +5,9 @@ export async function terrainPoint(page: Page, x: number, z: number) {
   return page.evaluate(
     async ({ x, z }) => {
       const harnessPath: string = "/e2e/harness.ts";
-      const prototypePath: string = "/src/prototype.ts";
-      const { EngineStore, Vector3, projectToCanvas } = await import(
-        harnessPath
-      );
-      const { createPrototypeMap } = await import(prototypePath);
-      const map = createPrototypeMap();
+      const { EngineStore, Vector3, projectToCanvas, prototypeTerrainMap } =
+        await import(harnessPath);
+      const map = prototypeTerrainMap();
       const point = map.tileCenter(x, z);
       const scene = EngineStore.Instances[0].scenes[0];
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;

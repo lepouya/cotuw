@@ -132,6 +132,19 @@ export const ECONOMY_GOALS: readonly SidebarGoal[] = [
   },
 ];
 
+/** Sidebar text, by element ID, that replaces the sandbox's. */
+export const ECONOMY_BRIEFING: Readonly<Record<string, string>> = {
+  "scenario-label": "Materials economy",
+  "scenario-title": "Clear the wolf threat",
+  "scenario-description":
+    "Defeat all six wolves to win. Victory unlocks free play.",
+  "preparation-heading": "Recommended preparation",
+  "scenario-goals-note":
+    "These counts show your current forces. Preparation steps guide you; defeating the wolves wins the mission.",
+  "scenario-rules":
+    "Paid construction · Timed production · Sell buildings for half their cost",
+};
+
 export const PROTOTYPE_ACTOR_GRAPHICS = new Map<string, ActorGraphics>([
   [
     "arc-trooper",

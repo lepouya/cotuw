@@ -8,6 +8,7 @@ import {
   PROTOTYPE_ACTOR_DEFINITIONS,
   PROTOTYPE_ACTOR_PRESENTATIONS,
   PROTOTYPE_GOALS,
+  ECONOMY_BRIEFING,
   ECONOMY_GOALS,
 } from "./prototype-content";
 import { createSidebar } from "./ui/sidebar";
@@ -28,17 +29,8 @@ if (!sandbox) {
   document.querySelector("#network-view-control")!.removeAttribute("hidden");
   document.querySelector("#resource-bar")!.removeAttribute("hidden");
   document.querySelector("#economy-overview")!.removeAttribute("hidden");
-  document.querySelector("#scenario-label")!.textContent = "Materials economy";
-  document.querySelector("#scenario-description")!.textContent =
-    "Defeat all six wolves to win. Victory unlocks free play.";
-  document.querySelector("#scenario-title")!.textContent =
-    "Clear the wolf threat";
-  document.querySelector("#preparation-heading")!.textContent =
-    "Recommended preparation";
-  document.querySelector("#scenario-goals-note")!.textContent =
-    "These counts show your current forces. Preparation steps guide you; defeating the wolves wins the mission.";
-  document.querySelector("#scenario-rules")!.textContent =
-    "Paid construction · Timed production · Sell buildings for half their cost";
+  for (const [id, text] of Object.entries(ECONOMY_BRIEFING))
+    document.querySelector(`#${id}`)!.textContent = text;
 }
 const dialog = document.querySelector<HTMLDialogElement>("#mission-result")!;
 const title = document.querySelector<HTMLElement>("#mission-result-title")!;
@@ -60,6 +52,8 @@ const resumeLoaded = document.querySelector<HTMLButtonElement>(
 )!;
 const file = document.querySelector<HTMLInputElement>("#mission-save-file")!;
 let busy = false;
+// Restart, exit, and newer loads invalidate pending file reads.
+let loadRequest = 0;
 const RESULT_PANELS = {
   defeat: {
     title: "Defeat",
@@ -105,6 +99,7 @@ dialog.addEventListener("cancel", (event) => event.preventDefault());
 
 async function start(initialState?: MissionState) {
   if (busy) return;
+  loadRequest++;
   busy = true;
   for (const button of dialog.querySelectorAll<HTMLButtonElement>("button"))
     button.disabled = true;
@@ -163,6 +158,7 @@ resume.addEventListener("click", resumeMission);
 resumeLoaded.addEventListener("click", resumeMission);
 inspect.addEventListener("click", () => dialog.close());
 exit.addEventListener("click", () => {
+  loadRequest++;
   session?.dispose();
   session = undefined;
   showResult("exit");
@@ -172,10 +168,14 @@ file.addEventListener("change", async () => {
   const selected = file.files?.[0];
   file.value = "";
   if (!selected || !scenario || busy) return;
+  const request = ++loadRequest;
   try {
+    const source = await selected.text();
+    if (request !== loadRequest) return;
     // Rejects invalid state before releasing the current session.
-    await start(loadMissionSave(await selected.text(), scenario));
+    await start(loadMissionSave(source, scenario));
   } catch (error) {
+    if (request !== loadRequest) return;
     resultStatus.textContent =
       error instanceof Error
         ? error.message

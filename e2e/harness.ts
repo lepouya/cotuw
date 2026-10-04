@@ -3,6 +3,8 @@
 import { Color3, Color4, Matrix, Vector3 } from "@babylonjs/core";
 
 import { TerrainMap } from "../src/map";
+import { TerrainGrid } from "../src/simulation/terrain";
+import { PROTOTYPE_TERRAIN } from "../src/content/prototype-terrain";
 import {
   createGameView,
   createMinimap,
@@ -16,6 +18,12 @@ import type { GameViewOptions } from "../src/render";
 export { createMinimap } from "../src/render";
 export { minimapProjection } from "../src/render/minimap";
 export { EngineStore, Matrix, Vector3 } from "@babylonjs/core";
+
+let authoredTerrain: TerrainGrid | undefined;
+/** Shared geometry for input helpers targeting the unedited prototype map. */
+export function prototypeTerrainMap(): TerrainGrid {
+  return (authoredTerrain ??= new TerrainGrid(PROTOTYPE_TERRAIN));
+}
 
 export const TEST_VIEW_OPTIONS = {
   clearColor: new Color3(0.035, 0.07, 0.09),
