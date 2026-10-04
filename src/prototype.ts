@@ -4,6 +4,7 @@ import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
 import { TerrainGrid } from "./simulation/terrain";
 import type { MissionState } from "./simulation/mission";
+import type { MissionResult } from "./simulation/objectives";
 import { createScenarioState, deserializeMission } from "./simulation/scenario";
 import { disconnectedBuildings } from "./simulation/support";
 import { createSupportNetworkView } from "./render/support-network";
@@ -127,7 +128,7 @@ export type TerrainPrototypeControls = BuildingPlacementControls &
   AttackMoveControls & {
     initialState?: MissionState;
     startPaused?: boolean;
-    onDefeat?: () => void;
+    onResult?: (result: MissionResult) => void;
     buildings?: readonly DefinitionButton[];
     scenario?: ScenarioDefinition;
     economyRoot?: HTMLElement;
@@ -217,7 +218,7 @@ export function createPrototypeSimulation(
       (scenario
         ? createScenarioState(scenario, ECONOMY_ACTOR_DEFINITIONS)
         : createMissionState([])),
-    defeatOnDestruction: scenario?.defeatOnDestruction,
+    objectives: scenario?.objectives,
     behaviorRegistry: new Map([
       [
         "terrain-move",
@@ -355,8 +356,11 @@ export async function createTerrainPrototype(
   actorViews.update(actorsByKind().shownMobile, 1);
   tilePlacedViews.update(actorsByKind().placed, disconnected());
   let simulationFaulted = false;
-  /** A fault or mission result leaves the session for inspection only. */
-  const halted = () => simulationFaulted || !!simulation.result;
+  let playing = !controls.startPaused;
+  /** A fault or defeat leaves the session for inspection only. */
+  const halted = () =>
+    simulationFaulted || simulation.result?.kind === "defeat";
+  const canCommand = () => playing && !halted();
   let controlsDirty = true;
   const showActor = (actorId: string) => {
     const actor = simulation.actorById(actorId);
@@ -389,6 +393,7 @@ export async function createTerrainPrototype(
       );
     },
     canAttack: (actorId) => {
+      if (!canCommand()) return false;
       const actor = actorsByKind().byId.get(actorId);
       return (
         !!actor &&
@@ -397,7 +402,7 @@ export async function createTerrainPrototype(
       );
     },
     submitCommand: (command) => {
-      if (halted()) return;
+      if (!canCommand()) return;
       if (
         command.kind === "move" &&
         simulation.economy?.harvesters.some(
@@ -500,9 +505,10 @@ export async function createTerrainPrototype(
       player.owns(actor) &&
       isTilePlacedActor(actor) &&
       !pendingRemovalId &&
-      !halted() &&
+      canCommand() &&
       !placement.active;
     if (controls.remove) controls.remove.disabled = !canRemove;
+    placement.update();
     network.refresh();
     rally.refresh();
     attackMove.refresh();
@@ -516,8 +522,11 @@ export async function createTerrainPrototype(
       additiveMode: input.additiveMode,
       placementActive: placement.active,
       faulted: halted(),
+      paused: !playing,
       canRemove,
       materials: simulation.economy?.materials,
+      objectives: simulation.objectives,
+      result: simulation.result,
     });
     knownControlsTick = simulation.completedTicks;
     knownPlacementActive = placement.active;
@@ -544,6 +553,7 @@ export async function createTerrainPrototype(
           )?.button,
         })),
       controls,
+      enabled: canCommand,
       onPlaced: (actorId) => {
         input.select(actorId);
         showActor(actorId);
@@ -565,7 +575,7 @@ export async function createTerrainPrototype(
       !player.owns(actor) ||
       !isTilePlacedActor(actor) ||
       pendingRemovalId !== undefined ||
-      halted() ||
+      !canCommand() ||
       placement.active
     )
       return;
@@ -589,7 +599,8 @@ export async function createTerrainPrototype(
   const training = createUnitTraining(simulation, controls, {
     names: PROTOTYPE_ACTOR_NAMES,
     selectedActorId: selectedOwnActorId,
-    enabled: () => !halted() && !placement.active,
+    enabled: () => canCommand() && !placement.active,
+    paused: () => !playing,
   });
   const attackMove = createAttackMoveControls(simulation, controls, {
     selectedMobileIds: () =>
@@ -601,7 +612,7 @@ export async function createTerrainPrototype(
           isMobileActor(actor, definitionsById.get(actor.definitionId))
         );
       }),
-    enabled: () => !halted() && !placement.active,
+    enabled: () => canCommand() && !placement.active,
     changed: () => {
       controlsDirty = true;
     },
@@ -618,7 +629,7 @@ export async function createTerrainPrototype(
     },
     selectedActorId: selectedOwnActorId,
     isProducer: (id) => !!definitionsById.get(id)?.production,
-    enabled: () => !halted() && !placement.active,
+    enabled: () => canCommand() && !placement.active,
     onStart: () => {
       attackMove.cancel();
       input.setBoxMode(false);
@@ -641,7 +652,7 @@ export async function createTerrainPrototype(
           names: PROTOTYPE_ACTOR_NAMES,
           selectedActorId: selectedOwnActorId,
           canControl: player.owns,
-          enabled: () => !halted() && !placement.active,
+          enabled: () => canCommand() && !placement.active,
           focus: (tile) => view.camera.focusOnTile(tile.x, tile.z),
           explored,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
@@ -706,20 +717,35 @@ export async function createTerrainPrototype(
   };
   let knownSelectionTick = simulation.completedTicks;
 
-  /** Ends active interactions once the session halts. */
-  const haltControls = () => {
+  const cancelInteractions = () => {
     input.cancelGesture();
     attackMove.cancel();
     rally.cancel();
-    placement.fault();
-    training.fault();
+    placement.cancel();
     controlsDirty = true;
   };
-  const endMission = () => {
-    loop.stop();
-    haltControls();
-    canvas.dataset.missionResult = simulation.result!.kind;
-    controls.onDefeat?.();
+  /** Ends active interactions once the session halts. */
+  const haltControls = () => {
+    cancelInteractions();
+    placement.fault();
+    training.fault();
+  };
+  let shownResult: MissionResult["kind"] | undefined;
+  /** Defeat stops the mission; victory pauses it until play continues. */
+  const showMissionResult = () => {
+    const result = simulation.result;
+    if (!result || result.kind === shownResult) return;
+    shownResult = result.kind;
+    playing = false;
+    if (result.kind === "defeat") {
+      loop.stop();
+      haltControls();
+    } else {
+      loop.pause();
+      cancelInteractions();
+    }
+    canvas.dataset.missionResult = result.kind;
+    controls.onResult?.(result);
   };
   const loop = startSimulationLoop(simulation, {
     paused: controls.startPaused,
@@ -776,10 +802,10 @@ export async function createTerrainPrototype(
             : "rejected";
         }
       }
-      if (simulation.result) endMission();
+      showMissionResult();
     },
   });
-  if (simulation.result) endMission();
+  showMissionResult();
   const renderObserver = view.scene.onBeforeRenderObservable.add(() => {
     loop.advance();
     // Hostiles can leave vision without any fog change, so check every tick.
@@ -907,7 +933,12 @@ export async function createTerrainPrototype(
   const session: TerrainPrototype = {
     ...view,
     simulation,
-    resume: () => loop.resume(),
+    resume: () => {
+      if (halted()) return;
+      playing = true;
+      controlsDirty = true;
+      loop.resume();
+    },
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;
       const actor = actorId && simulation.actorById(actorId);
@@ -918,7 +949,12 @@ export async function createTerrainPrototype(
     },
     selectActors: (ids) => {
       if (simulationFaulted || placement.active) return;
-      input.selectMany(ids.filter((id) => !!simulation.actorById(id)));
+      input.selectMany(
+        ids.filter((id) => {
+          const actor = simulation.actorById(id);
+          return !!actor && player.shows(actor);
+        }),
+      );
     },
   };
   controls.onReady?.(session);

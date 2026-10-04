@@ -86,7 +86,12 @@ Combat destruction of the starting Command Center ends this opening in defeat
 and pauses immediately. The results panel provides Restart, Load, and Exit. Load
 accepts a compatible mission JSON file and begins paused; Inspect allows
 selection and camera inspection, and Resume mission starts the clock. Invalid
-files leave the current session intact. This opening has no victory condition.
+files leave the current session intact.
+
+Defeat the lone wolf and all five den wolves to win. The Victory panel pauses
+the mission and offers **Continue free play**, Restart, Load, and Exit.
+Continuing restores construction, training, and exploration. Objective
+progress and victory survive saving and loading. Mission saves use version 7.
 
 Open `/?sandbox` for the empty, free construction and infantry sandbox. Use
 **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
@@ -107,7 +112,10 @@ rotation, zoom, and reset buttons.
 
 **Selection** shows the selected actor or group and building actions.
 **Units** also lists buildings that train units and the units in the field.
-**Goals** shows construction and training goals and current counts.
+**Goals** shows the opening's wolf objectives, defeat counts, route and combat
+directives, and the Command Center protection rule. Recommended preparation
+explains gathering, construction, and training; its counts show current forces
+and are separate from the win condition. Sandbox goals show practice counts.
 **Building idle animation** controls rooftop equipment. A gathering Harvester
 lowers and spins its drill with a green light; idle Harvesters raise it and
 show amber. Reduced motion keeps these status cues without animated motion.

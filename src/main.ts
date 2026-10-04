@@ -14,6 +14,7 @@ import { createSidebar } from "./ui/sidebar";
 
 import type { MissionState } from "./simulation/mission";
 import type { TerrainPrototype } from "./prototype";
+import type { MissionResult } from "./simulation/objectives";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
 const minimap = document.querySelector<HTMLCanvasElement>("#minimap")!;
@@ -29,7 +30,13 @@ if (!sandbox) {
   document.querySelector("#economy-overview")!.removeAttribute("hidden");
   document.querySelector("#scenario-label")!.textContent = "Materials economy";
   document.querySelector("#scenario-description")!.textContent =
-    "Build a Refinery, produce its Harvester, gather Materials, then fund a Barracks and Troopers. A lone wolf roams the southern path. Protect the Command Center. No victory condition yet.";
+    "Defeat all six wolves to win. Victory unlocks free play.";
+  document.querySelector("#scenario-title")!.textContent =
+    "Clear the wolf threat";
+  document.querySelector("#preparation-heading")!.textContent =
+    "Recommended preparation";
+  document.querySelector("#scenario-goals-note")!.textContent =
+    "These counts show your current forces. Preparation steps guide you; defeating the wolves wins the mission.";
   document.querySelector("#scenario-rules")!.textContent =
     "Paid construction · Timed production · Sell buildings for half their cost";
 }
@@ -53,20 +60,39 @@ const resumeLoaded = document.querySelector<HTMLButtonElement>(
 )!;
 const file = document.querySelector<HTMLInputElement>("#mission-save-file")!;
 let busy = false;
-const showResult = (mode: "defeat" | "loaded" | "exit") => {
-  title.textContent =
-    mode === "defeat"
-      ? "Defeat"
-      : mode === "loaded"
-        ? "Mission loaded"
-        : "Mission ended";
-  description.textContent =
-    mode === "defeat"
-      ? "Your Command Center was destroyed. The mission is paused."
-      : mode === "loaded"
-        ? "Inspect the saved mission, then resume when ready."
-        : "Start a new mission or load a saved mission.";
-  resume.hidden = mode !== "loaded";
+const RESULT_PANELS = {
+  defeat: {
+    title: "Defeat",
+    description: "A mandatory objective failed. The mission is paused.",
+  },
+  victory: {
+    title: "Victory",
+    description:
+      "All victory objectives are complete. Continue building and exploring in free play, or restart the mission.",
+  },
+  loaded: {
+    title: "Mission loaded",
+    description: "Inspect the saved mission, then resume when ready.",
+  },
+  exit: {
+    title: "Mission ended",
+    description: "Start a new mission or load a saved mission.",
+  },
+};
+const showResult = (
+  mode: keyof typeof RESULT_PANELS,
+  result?: MissionResult,
+) => {
+  const panel = RESULT_PANELS[mode];
+  title.textContent = panel.title;
+  const failure =
+    result?.kind === "defeat" &&
+    scenario?.objectives?.find(({ id }) => id === result.objectiveId);
+  description.textContent = failure
+    ? `Objective failed: ${failure.label}. The mission is paused.`
+    : panel.description;
+  resume.hidden = mode !== "loaded" && mode !== "victory";
+  resume.textContent = mode === "victory" ? "Continue free play" : "Resume";
   inspect.hidden = mode !== "loaded";
   resumeLoaded.hidden = mode !== "loaded";
   restart.textContent = mode === "exit" ? "Start mission" : "Restart";
@@ -110,7 +136,7 @@ async function start(initialState?: MissionState) {
       onStateChanged: sidebar.update,
       showActor: sidebar.showActor,
       onDispose: sidebar.dispose,
-      onDefeat: () => showResult("defeat"),
+      onResult: (result) => showResult(result.kind, result),
       onReady: (ready) => {
         session = ready;
       },

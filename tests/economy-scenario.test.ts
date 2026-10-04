@@ -6,6 +6,7 @@ import {
 import { PROTOTYPE_MOVEMENT_PROFILES } from "../src/prototype-content";
 import { createActor } from "../src/simulation/actor";
 import { createMissionSimulation } from "../src/simulation/mission";
+import type { MissionState } from "../src/simulation/mission";
 import {
   findNavigationPath,
   NavigationGrid,
@@ -35,7 +36,7 @@ function mapForOpening() {
   return map;
 }
 
-function fixture(state = initialState()) {
+function fixture(state = initialState(), updateIdle = () => {}) {
   const map = mapForOpening();
   const occupancy = new OccupancyGrid(map);
   return createMissionSimulation({
@@ -45,15 +46,229 @@ function fixture(state = initialState()) {
     occupancy,
     tickSeconds: seconds,
     bounds: map.worldBounds,
+    objectives: scenario.objectives,
     behaviorRegistry: new Map([
       [
         "terrain-move",
         createTerrainMoveBehavior(map, occupancy, PROTOTYPE_MOVEMENT_PROFILES),
       ],
-      ["idle", { handleCommand: () => false, update: () => {} }],
+      ["idle", { handleCommand: () => false, update: updateIdle }],
     ]),
   });
 }
+
+type Simulation = ReturnType<typeof fixture>;
+const objective = (simulation: Simulation, id: string) =>
+  simulation.objectives.find((objective) => objective.id === id)!;
+const goalsComplete = (simulation: Simulation) =>
+  simulation.objectives
+    .filter(({ progress }) => progress)
+    .every(({ status }) => status === "complete");
+
+function finalFightState(): MissionState {
+  const state = initialState();
+  for (const wolf of state.actors.filter((actor) => actor.territory)) {
+    wolf.health = 1;
+    state.actors.push(
+      createActor({
+        id: `trooper-${wolf.id}`,
+        definitionId: "arc-trooper",
+        worldPosition: {
+          x: wolf.worldPosition.x - 1.5,
+          z: wolf.worldPosition.z,
+        },
+      }),
+    );
+  }
+  return state;
+}
+
+describe("mission objectives", () => {
+  test("presentation and verdict cannot mutate committed progress", () => {
+    const simulation = fixture(finalFightState());
+    simulation.tick();
+    const before = simulation.snapshot();
+    const view = objective(simulation, "wolf-den");
+    expect(() => {
+      view.progress!.current = 0;
+    }).toThrow(TypeError);
+    expect(() => {
+      simulation.result!.tick = 50;
+    }).toThrow(TypeError);
+    expect(simulation.snapshot()).toEqual(before);
+    expect(objective(simulation, "wolf-den").progress!.current).toBe(5);
+  });
+
+  test("a failed tick rolls back objective progress and verdict", () => {
+    const simulation = fixture(finalFightState(), () => {
+      throw new Error("behavior failed");
+    });
+    const before = simulation.snapshot();
+    expect(() => simulation.tick()).toThrow("behavior failed");
+    expect(simulation.snapshot()).toEqual(before);
+    expect(simulation.result).toBeUndefined();
+    expect(
+      simulation.objectives.every(({ status }) => status === "active"),
+    ).toBe(true);
+  });
+
+  test("the lone-wolf objective completes without granting victory", () => {
+    const state = initialState();
+    state.actors.find((actor) => actor.id === "lone-wolf")!.health = 1;
+    state.actors.push(
+      createActor({
+        id: "duelist",
+        definitionId: "arc-trooper",
+        worldPosition: mapForOpening().tileCenter(43, 32),
+      }),
+    );
+    const simulation = fixture(state);
+    simulation.tick();
+    expect(
+      simulation.objectives.map(({ status, progress }) => ({
+        status,
+        progress,
+      })),
+    ).toEqual([
+      { status: "active", progress: undefined },
+      { status: "complete", progress: { current: 1, total: 1 } },
+      { status: "active", progress: { current: 0, total: 5 } },
+    ]);
+    expect(simulation.result).toBeUndefined();
+    for (let tick = 0; tick < 610; tick++) simulation.tick();
+    expect(simulation.wrecks).toHaveLength(0);
+    const restored = fixture(
+      deserializeMission(
+        serializeMission(simulation.snapshot(), seconds),
+        scenario,
+        seconds,
+      ),
+    );
+    expect(restored.objectives).toEqual(simulation.objectives);
+    restored.tick();
+    simulation.tick();
+    expect(restored.snapshot()).toEqual(simulation.snapshot());
+  });
+
+  test("all six combat deaths grant persistent victory and allow free play", () => {
+    const simulation = fixture(finalFightState());
+    for (let tick = 0; tick < 20 && !simulation.result; tick++)
+      simulation.tick();
+    const won = simulation.result;
+    expect(won?.kind).toBe("victory");
+    expect(goalsComplete(simulation)).toBe(true);
+    const saved = simulation.snapshot();
+    const restored = fixture(
+      deserializeMission(serializeMission(saved, seconds), scenario, seconds),
+    );
+    expect(restored.result).toEqual(simulation.result);
+    const command = {
+      kind: "move" as const,
+      actorId: "trooper-lone-wolf",
+      target: mapForOpening().tileCenter(40, 32),
+    };
+    for (const sim of [simulation, restored]) {
+      sim.submitCommand(command);
+      expect(sim.tick()[0].accepted).toBe(true);
+      expect(sim.completedTicks).toBe(saved.tick + 1);
+      expect(sim.result).toEqual(won);
+    }
+    expect(restored.snapshot()).toEqual(simulation.snapshot());
+    expect(
+      fixture().objectives.every(
+        ({ status, progress }) => status === "active" && !progress?.current,
+      ),
+    ).toBe(true);
+  });
+
+  test("removing an objective actor does not count as defeating it", () => {
+    const simulation = fixture();
+    simulation.removeActor("lone-wolf");
+    simulation.tick();
+    expect(objective(simulation, "lone-wolf").progress!.current).toBe(0);
+    expect(simulation.result).toBeUndefined();
+    expect(fixture(simulation.snapshot()).objectives).toEqual(
+      simulation.objectives,
+    );
+  });
+
+  test("Command Center destruction takes priority over the final wolf deaths", () => {
+    const state = finalFightState();
+    const center = state.actors.find(
+      ({ id }) => id === "starting-command-center",
+    )!;
+    center.health = 1;
+    const wolf = state.actors.find(({ id }) => id === "lone-wolf")!;
+    wolf.worldPosition = { x: -39.5, z: 0.5 };
+    wolf.territory = { home: { ...wolf.worldPosition } };
+    wolf.combat = {
+      attack: { targetId: center.id, lastKnown: { ...center.worldPosition } },
+    };
+    state.actors.find(({ id }) => id === "trooper-lone-wolf")!.worldPosition = {
+      x: -36.5,
+      z: 0.5,
+    };
+    const simulation = fixture(state);
+    simulation.tick();
+    expect(goalsComplete(simulation)).toBe(true);
+    expect(simulation.result).toEqual({
+      kind: "defeat",
+      objectiveId: "protect-command-center",
+      tick: 0,
+    });
+    const defeated = simulation.snapshot();
+    simulation.tick();
+    expect(simulation.snapshot()).toEqual(defeated);
+    expect(fixture(defeated).result).toEqual(simulation.result);
+  });
+
+  test("Command Center destruction still ends post-victory free play", () => {
+    const won = fixture(finalFightState());
+    for (let tick = 0; tick < 20 && !won.result; tick++) won.tick();
+    const state = won.snapshot();
+    const center = state.actors.find(
+      ({ id }) => id === "starting-command-center",
+    )!;
+    center.health = 1;
+    const point = { x: -39.5, z: 0.5 };
+    const attacker = createActor({
+      id: "free-play-wolf",
+      definitionId: "wolf",
+      worldPosition: point,
+    });
+    attacker.territory = { home: point };
+    attacker.combat = {
+      attack: { targetId: center.id, lastKnown: { ...center.worldPosition } },
+    };
+    state.actors.push(attacker);
+    const simulation = fixture(state);
+    simulation.tick();
+    expect(simulation.result).toEqual({
+      kind: "defeat",
+      objectiveId: "protect-command-center",
+      tick: state.tick,
+    });
+    expect(goalsComplete(simulation)).toBe(true);
+    expect(fixture(simulation.snapshot()).result).toEqual(simulation.result);
+  });
+
+  test("rejects fabricated or inconsistent progress", () => {
+    const invalid = initialState();
+    invalid.objectives[1].destroyedActorIds.push("lone-wolf");
+    invalid.objectives[1].resolvedTick = 0;
+    invalid.tick = 1;
+    expect(() => fixture(invalid)).toThrow("objective progress");
+    const won = fixture(finalFightState());
+    for (let tick = 0; tick < 20 && !won.result; tick++) won.tick();
+    const unresolved = won.snapshot();
+    delete unresolved.objectives[1].resolvedTick;
+    expect(() => fixture(unresolved)).toThrow("objective progress");
+    const premature = initialState();
+    premature.objectives[2].resolvedTick = 0;
+    premature.tick = 1;
+    expect(() => fixture(premature)).toThrow("objective progress");
+  });
+});
 
 describe("authored wolf encounters", () => {
   test("six wolves have passable homes and the den shares one territory", () => {

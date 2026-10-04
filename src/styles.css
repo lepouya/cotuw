@@ -197,6 +197,13 @@ button:disabled {
 .goal-complete {
   color: #98d5b0;
 }
+.goal-failed {
+  color: #f0a096;
+}
+.goal-directive {
+  margin: 0.2rem 0 0.85rem;
+  line-height: 1.5;
+}
 .game-viewport {
   position: relative;
   min-width: 0;

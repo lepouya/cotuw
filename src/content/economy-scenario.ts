@@ -42,7 +42,31 @@ export const ECONOMY_SCENARIO = defineScenario({
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),
   playerFaction: "arc",
-  defeatOnDestruction: ["starting-command-center"],
+  objectives: [
+    {
+      id: "protect-command-center",
+      kind: "protect",
+      label: "Protect the Command Center",
+      directive: "Its destruction ends the mission in defeat.",
+      actorIds: ["starting-command-center"],
+    },
+    {
+      id: "lone-wolf",
+      kind: "destroy",
+      label: "Defeat the lone wolf",
+      directive:
+        "Follow the southern path. One Trooper can defeat this wolf; Scouts cannot attack.",
+      actorIds: ["lone-wolf"],
+    },
+    {
+      id: "wolf-den",
+      kind: "destroy",
+      label: "Clear the mountain den",
+      directive:
+        "Cross the ridge near the lone wolf, then follow the path north through the narrow entrance. Bring several Troopers to defeat four wolves and the larger alpha.",
+      actorIds: DEN_WOLVES.map(({ actorId }) => actorId),
+    },
+  ],
   buildings: [
     {
       actorId: "starting-command-center",

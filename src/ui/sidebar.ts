@@ -6,8 +6,10 @@ import {
 import { footprintSize } from "../simulation/grid";
 import { materialsCost } from "../simulation/economy";
 import { createPlayerAccess } from "../simulation/faction";
+import { createGoalList } from "./goals";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
+import type { MissionResult, ObjectiveView } from "../simulation/objectives";
 
 export type ActorPresentation = {
   name: string;
@@ -15,7 +17,11 @@ export type ActorPresentation = {
   build?: { id: string; label: string };
   train?: { id: string; label: string };
 };
-export type SidebarGoal = { definitionId: string; label: string };
+export type SidebarGoal = {
+  definitionId: string;
+  label: string;
+  directive?: string;
+};
 /** A sidebar action for one actor definition. */
 export type DefinitionButton = {
   definitionId: string;
@@ -29,8 +35,16 @@ export type SidebarState = {
   additiveMode?: boolean;
   placementActive: boolean;
   faulted: boolean;
+  paused?: boolean;
   canRemove: boolean;
   materials?: number;
+  objectives?: readonly ObjectiveView[];
+  result?: MissionResult;
+};
+
+const RESULT_DIRECTIVES: Record<MissionResult["kind"], string> = {
+  victory: "Victory secured. Continue building and exploring in free play.",
+  defeat: "Mission failed. Restart or load a saved mission.",
 };
 
 /** Tabs and actor lists present committed simulation state only. */
@@ -56,7 +70,6 @@ export function createSidebar(
     "training-options",
     "unit-roster",
     "producer-roster",
-    "scenario-goals",
   ])
     element(id).replaceChildren();
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
@@ -194,11 +207,12 @@ export function createSidebar(
     element("producer-roster"),
     "No production buildings yet. Open Buildings to place one.",
   );
-  const goalItems = goals.map((goal) => {
-    const item = document.createElement("li");
-    element("scenario-goals").append(item);
-    return { ...goal, item };
-  });
+  const preparation = createGoalList(element("scenario-goals"));
+  const objectiveList = element("mission-objectives");
+  const missionGoals = createGoalList(objectiveList, true);
+  const missionDirective = element("mission-directive");
+  objectiveList.hidden = true;
+  missionDirective.hidden = true;
   let actorsById = new Map<string, ActorRenderState>();
   let actorVersion: number | undefined;
   let selectionKey = "";
@@ -274,21 +288,34 @@ export function createSidebar(
     },
     showActor,
     update: (state: SidebarState) => {
+      const objectives = state.objectives ?? [];
+      objectiveList.hidden = objectives.length === 0;
+      missionDirective.hidden = !state.result;
+      const directiveText = state.result
+        ? RESULT_DIRECTIVES[state.result.kind]
+        : "";
+      if (missionDirective.textContent !== directiveText)
+        missionDirective.textContent = directiveText;
+      missionGoals.update(objectives);
       placementActions.hidden = !state.placementActive;
       remove.disabled = !state.canRemove;
       if (state.materials !== undefined) {
         const counter = document.querySelector("#materials-counter");
         if (counter && counter.textContent !== String(state.materials))
           counter.textContent = String(state.materials);
-        for (const { definitionId, button } of buildings) {
-          const cost = materialsCost(definitionById.get(definitionId)!);
-          button.disabled =
-            state.placementActive || state.faulted || state.materials < cost;
-          button.title =
-            state.materials < cost
-              ? `Need ${cost} Materials; available ${state.materials}.`
-              : "";
-        }
+      }
+      for (const { definitionId, button } of buildings) {
+        const cost = materialsCost(definitionById.get(definitionId)!);
+        const unaffordable =
+          state.materials !== undefined && state.materials < cost;
+        button.disabled =
+          state.placementActive ||
+          state.faulted ||
+          !!state.paused ||
+          unaffordable;
+        button.title = unaffordable
+          ? `Need ${cost} Materials; available ${state.materials}.`
+          : "";
       }
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
@@ -297,7 +324,11 @@ export function createSidebar(
           selected.has(actor.id) && friendly(actor) && isTilePlacedActor(actor),
       );
       // Box mode changes how terrain taps behave, so it changes the hint.
-      const nextSelectionKey = JSON.stringify([ids, state.boxMode ?? false]);
+      const nextSelectionKey = JSON.stringify([
+        ids,
+        state.boxMode ?? false,
+        state.paused ?? false,
+      ]);
       const unavailable = state.placementActive || state.faulted;
       boxSelect.disabled = unavailable;
       addSelection.disabled = unavailable;
@@ -308,6 +339,7 @@ export function createSidebar(
       );
       stop.disabled =
         unavailable ||
+        !!state.paused ||
         !state.actors.some(
           (actor) =>
             selected.has(actor.id) &&
@@ -349,11 +381,18 @@ export function createSidebar(
             actor.definitionId,
             (counts.get(actor.definitionId) ?? 0) + 1,
           );
-        for (const { definitionId, label, item } of goalItems) {
-          const count = counts.get(definitionId) ?? 0;
-          item.className = count ? "goal-complete" : "";
-          item.textContent = `${count ? "✓" : "○"} ${label} (${count})`;
-        }
+        preparation.update(
+          goals.map(({ definitionId, label, directive }) => {
+            const current = counts.get(definitionId) ?? 0;
+            return {
+              id: definitionId,
+              label,
+              directive,
+              status: current ? "complete" : "active",
+              progress: { current },
+            };
+          }),
+        );
       }
       const nextDisabled = unavailable;
       if (
@@ -374,9 +413,11 @@ export function createSidebar(
         trainingLink.hidden =
           !actor || !friendly(actor) || !definition?.production;
         const moveSubject = ids.length > 1 ? "the group" : "this unit";
-        const moveHint = state.boxMode
-          ? `Turn off Box select to move ${moveSubject}.`
-          : `Tap or click terrain to move ${moveSubject}.`;
+        const moveHint = state.paused
+          ? "Resume the mission to issue orders."
+          : state.boxMode
+            ? `Turn off Box select to move ${moveSubject}.`
+            : `Tap or click terrain to move ${moveSubject}.`;
         if (ids.length > 1) {
           const counts = new Map<string, number>();
           for (const id of ids) {

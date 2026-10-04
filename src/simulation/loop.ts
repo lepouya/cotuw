@@ -27,6 +27,7 @@ export type SimulationLoop = {
   advance: () => void;
   /** How far real time is into the next tick, from 0 to 1. */
   tickProgress: () => number;
+  pause: () => void;
   stop: () => void;
   resume: () => void;
 };
@@ -97,6 +98,9 @@ export function startSimulationLoop(
     },
     advance,
     tickProgress: () => (stopped || paused ? 1 : clock.tickProgress(now())),
+    pause: () => {
+      paused = true;
+    },
     resume: () => {
       if (!paused || stopped) return;
       clock = newClock();

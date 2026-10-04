@@ -916,8 +916,26 @@ Deterministic acceptance checks cover:
   saving, and the results panel offers Restart, Load, and Exit. Restart rebuilds
   the authored opening; Exit releases the session and offers a new mission.
   Load validates a mission JSON file before releasing the current session and
-  begins paused, with Inspect and Resume actions. A loaded defeat stays ended.
+  begins paused, with Inspect and Resume actions. Inspection allows selection
+  and camera movement; commands require resuming. A loaded defeat stays ended.
   Economic stalls and ordinary unit or building losses do not declare defeat.
+- Mission objectives are data. A `destroy` objective completes when combat
+  destroys all its targets; a `protect` objective fails when combat destroys
+  any of them. Removals and sales never count. The result derives from
+  objective state: the earliest failure is a defeat, with stable objective ID
+  breaking same-tick ties. Otherwise completing every `destroy` objective is
+  victory. The opening protects the starting Command Center and authors two
+  destruction objectives: defeat the lone wolf and clear all five den wolves.
+  Progress and resolution ticks survive corpse cleanup and saving. Command
+  Center destruction takes priority over victory when they occur in the same
+  tick.
+- Goals shows objective counters and route and combat directives, plus the
+  Command Center protection rule. Recommended preparation explains the economy
+  and army buildup with current actor counts; it is not a victory requirement.
+  Victory pauses at the interface and offers Continue free play, Restart, Load,
+  and Exit. Continuing restores all ordinary actions. A loaded victory opens
+  the same paused results panel. Command Center destruction still causes defeat
+  in free play.
 - Saves preserve health, weapon cooldowns, building aim, attack destinations,
   returns and their retry state, route bounds, remains, and the complete
   [wolf and alert state](#m0-wolf-implementation-contract).
@@ -964,6 +982,10 @@ a later tutorial could be made.
 - Scenario definitions are immutable content; mission saves are mutable runtime
   snapshots with stable actor identifiers and versioned envelopes. Actor IDs
   are never reassigned within a mission, including after saving and loading.
+- Mission saves use version 7 and preserve authored objective IDs, rules,
+  targets, defeated target IDs, and resolution ticks, from which victory or
+  defeat follows. Loading matches objectives by ID and rejects changed rules
+  or target sets.
 - Manual save, load, restart, one rolling quicksave, and one rolling autosave
   are required in M0. Loading begins paused.
 - Mission and campaign saves are separate schemas. A mission save owns one

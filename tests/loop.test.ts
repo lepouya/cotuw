@@ -6,6 +6,41 @@ import type { SimulationLoop } from "../src/simulation/loop";
 import type { CommandOutcome } from "../src/simulation/command";
 
 describe("simulation loop", () => {
+  test("pausing during a result discards backlog and resumes from the current time", () => {
+    let now = 0;
+    let ticks = 0;
+    let loop: SimulationLoop;
+    loop = startSimulationLoop(
+      {
+        tickSeconds: 0.01,
+        tick: () => {
+          ticks++;
+          return [];
+        },
+      },
+      {
+        pumpMilliseconds: 60_000,
+        maxCatchUpSeconds: 1,
+        now: () => now,
+        afterTick: () => {
+          if (ticks === 1) loop.pause();
+        },
+      },
+    );
+    now = 100;
+    loop.advance();
+    expect(ticks).toBe(1);
+    now = 10_000;
+    loop.advance();
+    expect(ticks).toBe(1);
+    loop.resume();
+    loop.advance();
+    expect(ticks).toBe(1);
+    now += 20;
+    loop.advance();
+    expect(ticks).toBe(3);
+    loop.stop();
+  });
   test("runs owed ticks with hooks around each one", () => {
     let now = 0;
     const calls: string[] = [];

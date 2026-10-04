@@ -33,6 +33,7 @@ export function createUnitTraining(
     names: ReadonlyMap<string, string>;
     selectedActorId: () => string | undefined;
     enabled: () => boolean;
+    paused?: () => boolean;
   },
 ) {
   const buttons = controls.train ?? [];
@@ -58,11 +59,13 @@ export function createUnitTraining(
     if (faulted || !options.enabled()) {
       for (const { button } of buttons) button.disabled = true;
       message(
-        simulation.result
+        simulation.result?.kind === "defeat"
           ? "Mission ended in defeat."
           : faulted
             ? "Simulation stopped. Reload to continue."
-            : "Finish or cancel building placement to train units.",
+            : options.paused?.()
+              ? "Resume the mission to train units."
+              : "Finish or cancel building placement to train units.",
       );
       return;
     }

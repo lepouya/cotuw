@@ -2,6 +2,7 @@ import { ARC_ACTOR_DEFINITIONS } from "./content/arc";
 import { createRefineryDetails } from "./render/refinery";
 import { createBarracksDetails } from "./render/barracks";
 import { createCommandCenterDetails } from "./render/command-center";
+import { materialsCost } from "./simulation/economy";
 
 import type { MovementProfile } from "./simulation/navigation";
 import type { ActorGraphics } from "./render/skinned-actor-appearance";
@@ -103,14 +104,32 @@ export const PROTOTYPE_GOALS: readonly SidebarGoal[] = [
   { definitionId: "arc-scout", label: "Train a Scout" },
 ];
 
+const costOf = (id: string) =>
+  materialsCost(
+    ARC_ACTOR_DEFINITIONS.find((definition) => definition.id === id)!,
+  );
+
 export const ECONOMY_GOALS: readonly SidebarGoal[] = [
   {
     definitionId: "arc-materials-refinery",
     label: "Build a Materials Refinery",
+    directive: `Spend ${costOf("arc-materials-refinery")} Materials near your Command Center and wait for construction.`,
   },
-  { definitionId: "arc-harvester", label: "Produce a Harvester" },
-  { definitionId: "arc-field-barracks", label: "Build a Field Barracks" },
-  { definitionId: "arc-trooper", label: "Train a Trooper" },
+  {
+    definitionId: "arc-harvester",
+    label: "Produce a Harvester",
+    directive: `Select the Refinery, pay ${costOf("arc-harvester")} Materials, then send its Harvester to Near Materials.`,
+  },
+  {
+    definitionId: "arc-field-barracks",
+    label: "Build a Field Barracks",
+    directive: `Gather or collect salvage to pay ${costOf("arc-field-barracks")} Materials. Build within connected support coverage.`,
+  },
+  {
+    definitionId: "arc-trooper",
+    label: "Train Troopers",
+    directive: `Troopers cost ${costOf("arc-trooper")} Materials each. Use Attack Move to advance as a group; a Scout can reveal the route ahead.`,
+  },
 ];
 
 export const PROTOTYPE_ACTOR_GRAPHICS = new Map<string, ActorGraphics>([

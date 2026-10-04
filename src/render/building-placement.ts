@@ -57,6 +57,7 @@ export type BuildingPlacementChoice = {
 export type BuildingPlacementOptions = {
   buildings: readonly BuildingPlacementChoice[];
   controls: BuildingPlacementControls;
+  enabled?: () => boolean;
   onPlaced: (actorId: string) => void;
   onStart: () => void;
 };
@@ -69,7 +70,13 @@ export function createBuildingPlacement(
   scene: Scene,
   map: TerrainMap,
   simulation: MissionSimulation,
-  { buildings, controls, onPlaced, onStart }: BuildingPlacementOptions,
+  {
+    buildings,
+    controls,
+    enabled = () => true,
+    onPlaced,
+    onStart,
+  }: BuildingPlacementOptions,
 ) {
   let definition = buildings[0]?.definition;
   let name = buildings[0]?.name ?? "";
@@ -132,6 +139,7 @@ export function createBuildingPlacement(
       : undefined;
   };
   const update = () => {
+    const available = enabled();
     if (active && pointer && !pendingId) {
       // Picking is costly, so repeat it only after the pointer or camera moves.
       const nextPickKey = JSON.stringify([
@@ -151,6 +159,7 @@ export function createBuildingPlacement(
     const nextStateKey = JSON.stringify([
       active,
       faulted,
+      available,
       pendingId,
       origin,
       quarterTurns,
@@ -203,6 +212,7 @@ export function createBuildingPlacement(
     const nextUiKey = JSON.stringify([
       active,
       faulted,
+      available,
       pendingId,
       origin,
       quarterTurns,
@@ -225,15 +235,16 @@ export function createBuildingPlacement(
     canvas.dataset.placementRotation = String(quarterTurns);
     canvas.dataset.placementOrigin = origin ? tileKey(origin) : "";
     for (const { build } of buildings) {
-      if (build) build.disabled = active || faulted;
+      if (build) build.disabled = active || faulted || !available;
     }
     if (controls.rotate)
-      controls.rotate.disabled = !active || !!pendingId || faulted;
+      controls.rotate.disabled =
+        !active || !!pendingId || faulted || !available;
     if (controls.cancel)
       controls.cancel.disabled = !active || !!pendingId || faulted;
     if (controls.confirm)
       controls.confirm.disabled =
-        !evaluation?.accepted || !!pendingId || faulted;
+        !evaluation?.accepted || !!pendingId || faulted || !available;
     if (active) {
       message(
         pendingId
@@ -249,7 +260,7 @@ export function createBuildingPlacement(
     }
   };
   const start = (building: BuildingPlacementChoice) => {
-    if (active || faulted) return;
+    if (active || faulted || !enabled()) return;
     ({ definition, name } = building);
     active = true;
     origin = undefined;
@@ -276,7 +287,7 @@ export function createBuildingPlacement(
     update();
   };
   const confirm = () => {
-    if (!active || pendingId || faulted) return;
+    if (!active || pendingId || faulted || !enabled()) return;
     const candidate = placement();
     if (!candidate || !simulation.evaluatePlacement(candidate).accepted) {
       update();
@@ -343,6 +354,7 @@ export function createBuildingPlacement(
       : "No buildings available.",
   );
   return {
+    cancel,
     get active() {
       return active;
     },
@@ -379,7 +391,7 @@ export function createBuildingPlacement(
       clearOverlay();
       update();
       message(
-        simulation.result
+        simulation.result?.kind === "defeat"
           ? "Mission ended in defeat. Restart or load a saved mission."
           : "Simulation stopped. Reload to continue.",
       );

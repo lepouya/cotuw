@@ -19,6 +19,7 @@ import { exploredScenarioState } from "./helpers/scenario";
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionState } from "../src/simulation/mission";
 import type { ScenarioUnit } from "../src/simulation/scenario";
+import type { ObjectiveDefinition } from "../src/simulation/objectives";
 
 const TICK_SECONDS = 0.1;
 const definitions = ECONOMY_ACTOR_DEFINITIONS;
@@ -39,9 +40,13 @@ const withChanges = (id: string, changes: Partial<ActorDefinition>) =>
     definition.id === id ? { ...definition, ...changes } : definition,
   );
 
-function scenario(units: ScenarioUnit[]) {
+function scenario(
+  units: ScenarioUnit[],
+  objectives: ObjectiveDefinition[] = [],
+) {
   return defineScenario({
     id: "combat-test",
+    objectives,
     tileSize: 1,
     playerFaction: "arc",
     terrainTypeIds: mapOptions.terrainTypeIds,
@@ -66,15 +71,16 @@ function fixture(
   state?: MissionState,
   content: readonly ActorDefinition[] = definitions,
   idleUpdate = () => {},
-  defeatOnDestruction: string[] = [],
+  objectives: ObjectiveDefinition[] = [],
 ) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
-  const initial = state ?? exploredScenarioState(scenario(units), content);
+  const initial =
+    state ?? exploredScenarioState(scenario(units, objectives), content);
   edit?.(initial);
   const simulation = createMissionSimulation({
     state: initial,
-    defeatOnDestruction,
+    objectives,
     definitions: content,
     map,
     occupancy,
@@ -1411,6 +1417,16 @@ describe("Attack Move", () => {
 });
 
 describe("Command Center defeat", () => {
+  const PROTECT_CC: ObjectiveDefinition[] = [
+    {
+      id: "protect-cc",
+      kind: "protect",
+      label: "Protect the Command Center",
+      directive: "Its destruction ends the mission.",
+      actorIds: ["cc"],
+    },
+  ];
+
   test("combat destruction ends the mission before movement or economy and restores frozen", () => {
     const units = [
       unit("wolf", "wolf", 4, 3),
@@ -1424,7 +1440,7 @@ describe("Command Center defeat", () => {
       undefined,
       definitions,
       () => {},
-      ["cc"],
+      PROTECT_CC,
     );
     simulation.submitCommand({
       kind: "move",
@@ -1434,7 +1450,7 @@ describe("Command Center defeat", () => {
     simulation.tick();
     expect(simulation.result).toEqual({
       kind: "defeat",
-      actorId: "cc",
+      objectiveId: "protect-cc",
       tick: 0,
     });
     expect(simulation.actorById("scout")!.worldPosition).toEqual(at(12, 10));
@@ -1449,7 +1465,7 @@ describe("Command Center defeat", () => {
       saved,
       definitions,
       () => {},
-      ["cc"],
+      PROTECT_CC,
     );
     for (let i = 0; i < 10; i++) {
       simulation.tick();
@@ -1479,7 +1495,7 @@ describe("Command Center defeat", () => {
       undefined,
       definitions,
       () => {},
-      ["cc"],
+      PROTECT_CC,
     ).simulation;
     expect(restarted.result).toBeUndefined();
     expect(restarted.actorById("cc")!.health).toBeUndefined();

@@ -45,6 +45,17 @@ import {
   validateWildlife,
 } from "./territory";
 import type { WildlifeState } from "./territory";
+import {
+  evaluateObjectives,
+  recordObjectiveDestruction,
+  validateObjectives,
+} from "./objectives";
+import type {
+  MissionResult,
+  ObjectiveDefinition,
+  ObjectiveState,
+  ObjectiveView,
+} from "./objectives";
 import { resolveNavigationDestination } from "./navigation";
 import {
   createFog,
@@ -145,6 +156,7 @@ type WorkingActors = {
   economy?: EconomyState;
   wildlife: WildlifeState;
   wrecks: Wreck[];
+  objectives: ObjectiveState[];
 };
 
 /** The authoritative, serializable state of one playable mission. */
@@ -168,7 +180,8 @@ export type MissionState = {
   wrecks: Wreck[];
   /** Wolf alerts; each wolf's own state lives on its actor. */
   wildlife: WildlifeState;
-  result?: { kind: "defeat"; actorId: string; tick: number };
+  /** Progress for the authored objectives, which also decide the result. */
+  objectives: ObjectiveState[];
 };
 
 export function createMissionState(actors: readonly Actor[]): MissionState {
@@ -179,6 +192,7 @@ export function createMissionState(actors: readonly Actor[]): MissionState {
     retiredActorIds: [],
     wrecks: [],
     wildlife: createWildlifeState(),
+    objectives: [],
   };
 }
 
@@ -201,8 +215,8 @@ export type MissionSimulationOptions = {
    * changed only by the mission. Footprint definitions require it.
    */
   occupancy?: OccupancyGrid;
-  /** Combat destruction of these authored actors ends the mission. */
-  defeatOnDestruction?: readonly string[];
+  /** Matches `state.objectives`; a failed objective ends the mission. */
+  objectives?: readonly ObjectiveDefinition[];
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -221,7 +235,9 @@ export type MissionSimulation = {
   /** Hits resolved during the latest tick. */
   readonly attacks: readonly AttackEvent[];
   readonly wrecks: readonly Wreck[];
-  readonly result: Readonly<MissionState["result"]>;
+  /** A defeat ends the mission; play continues after victory. */
+  readonly result: MissionResult | undefined;
+  readonly objectives: readonly ObjectiveView[];
   /** Whether a faction currently sees any tile of the actor. */
   detects: (
     faction: string | undefined,
@@ -265,7 +281,7 @@ export function createMissionSimulation({
   tickSeconds,
   map,
   occupancy,
-  defeatOnDestruction = [],
+  objectives: authoredObjectives = [],
 }: MissionSimulationOptions): MissionSimulation {
   if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) {
     throw new RangeError(
@@ -292,19 +308,20 @@ export function createMissionSimulation({
     )
   )
     throw new RangeError("Mission state has invalid queued commands.");
-  const criticalIds = new Set(defeatOnDestruction);
-  if (
-    state.result !== undefined &&
-    (!state.result ||
-      state.result.kind !== "defeat" ||
-      !criticalIds.has(state.result.actorId) ||
-      !state.retiredActorIds.includes(state.result.actorId) ||
-      !Number.isSafeInteger(state.result.tick) ||
-      state.result.tick < 0 ||
-      state.result.tick >= state.tick)
-  )
-    throw new RangeError("Mission state has an invalid result.");
-  if (state.result) deepFreeze(state.result);
+  const objectives = deepFreeze(structuredClone(authoredObjectives));
+  validateObjectives(
+    objectives,
+    state.objectives,
+    new Set(state.actors.map(({ id }) => id)),
+    new Set(state.retiredActorIds),
+    state.tick,
+  );
+  deepFreeze(state.objectives);
+  const objectivesFor = (states: readonly ObjectiveState[]) =>
+    deepFreeze(evaluateObjectives(objectives, states));
+  const resultOf = (states: readonly ObjectiveState[]) =>
+    objectivesFor(states).result;
+  const ended = () => resultOf(state.objectives)?.kind === "defeat";
   if (new Set(state.retiredActorIds).size !== state.retiredActorIds.length) {
     throw new Error("Mission state contains duplicate retired actor IDs.");
   }
@@ -394,7 +411,7 @@ export function createMissionSimulation({
   };
   const ensureMutable = () => {
     ensureRunning();
-    if (state.result) throw new Error("The mission has ended.");
+    if (ended()) throw new Error("The mission has ended.");
   };
   const definitionFor = (actor: Actor): ActorDefinition =>
     definitionsById.get(actor.definitionId)!;
@@ -753,6 +770,7 @@ export function createMissionSimulation({
       economy: state.economy && structuredClone(state.economy),
       wrecks: [...state.wrecks],
       wildlife: structuredClone(state.wildlife),
+      objectives: structuredClone(state.objectives),
     };
   };
 
@@ -1218,7 +1236,10 @@ export function createMissionSimulation({
       return attacks;
     },
     get result() {
-      return state.result;
+      return resultOf(state.objectives);
+    },
+    get objectives() {
+      return objectivesFor(state.objectives).views;
     },
     get wrecks() {
       return state.wrecks;
@@ -1347,7 +1368,7 @@ export function createMissionSimulation({
     },
     tick: () => {
       ensureRunning();
-      if (state.result) return [];
+      if (ended()) return [];
       const due = state.commands.filter(({ tick }) => tick <= state.tick);
       const terrainBefore =
         map && due.some(({ command }) => command.kind === "terrain")
@@ -1362,7 +1383,6 @@ export function createMissionSimulation({
             : [applyCommand(command, state.tick, working)],
         );
 
-        let result: MissionState["result"];
         const navigationVersion = map?.navigationChanges.version ?? 0;
         const tickAttacks = updateCombat({
           tick: state.tick,
@@ -1399,8 +1419,12 @@ export function createMissionSimulation({
           detects,
           move: moveActor,
           destroy: (actor) => {
-            if (criticalIds.has(actor.id) && !result)
-              result = { kind: "defeat", actorId: actor.id, tick: state.tick };
+            recordObjectiveDestruction(
+              objectives,
+              working.objectives,
+              actor.id,
+              state.tick,
+            );
             working.wrecks.push({
               actorId: actor.id,
               definitionId: actor.definitionId,
@@ -1416,7 +1440,8 @@ export function createMissionSimulation({
         });
 
         // A defeat freezes motion and the economy where combat left them.
-        if (!result) {
+        const defeated = resultOf(working.objectives)?.kind === "defeat";
+        if (!defeated) {
           const previousPositions = new Map(
             working.actors.map((actor) => [
               actor.id,
@@ -1499,10 +1524,10 @@ export function createMissionSimulation({
         state = {
           ...state,
           tick: state.tick + 1,
-          ...(result && { result: deepFreeze(result) }),
           actors: committedActors,
           retiredActorIds: working.retiredIds,
-          commands: result
+          objectives: deepFreeze(working.objectives),
+          commands: defeated
             ? []
             : state.commands.filter(({ tick }) => tick > state.tick),
           ...(working.economy && { economy: deepFreeze(working.economy) }),

@@ -7,6 +7,72 @@ import type {
   TerrainPrototypeControls,
 } from "../src/prototype";
 
+test("goal lists reconcile changed content, order, and failure status", async ({
+  page,
+}) => {
+  await page.goto("/?sandbox");
+  const result = await page.evaluate(async () => {
+    const path: string = "/src/ui/goals.ts";
+    const { createGoalList } = (await import(
+      path
+    )) as typeof import("../src/ui/goals");
+    const list = document.createElement("ul");
+    const goals = createGoalList(list, true);
+    goals.update([
+      {
+        id: "protect",
+        label: "Protect convoy",
+        directive: "Keep it alive.",
+        status: "active",
+      },
+      {
+        id: "clear",
+        label: "Clear guards",
+        status: "active",
+        progress: { current: 0, total: 2 },
+      },
+    ]);
+    const protection = list.children[0];
+    goals.update([
+      {
+        id: "clear",
+        label: "Clear outpost",
+        directive: "Both guards defeated.",
+        status: "complete",
+        progress: { current: 2, total: 2 },
+      },
+      { id: "protect", label: "Protect transports", status: "failed" },
+    ]);
+    const reconciled = {
+      ids: [...list.children].map(
+        (item) => (item as HTMLElement).dataset.goalId,
+      ),
+      preserved: list.children[1] === protection,
+      texts: [...list.children].map((item) => item.textContent),
+      failed: protection.className,
+      staleDirective: protection.querySelector("p")!.hidden,
+    };
+    goals.update([{ id: "clear", label: "Clear outpost", status: "complete" }]);
+    return {
+      ...reconciled,
+      remaining: list.children.length,
+      removed: !list.contains(protection),
+    };
+  });
+  expect(result).toEqual({
+    ids: ["clear", "protect"],
+    preserved: true,
+    texts: [
+      "✓ Clear outpost (2/2)Both guards defeated.",
+      "✗ Protect transports",
+    ],
+    failed: "goal-failed",
+    staleDirective: true,
+    remaining: 1,
+    removed: true,
+  });
+});
+
 test("starts empty with a reserved sidebar and builds and trains through its tabs", async ({
   page,
 }, testInfo) => {
