@@ -24,6 +24,18 @@ export const ECONOMY_ACTOR_DEFINITIONS: readonly ActorDefinition[] = [
   ...WILDLIFE_ACTOR_DEFINITIONS,
 ];
 
+const DEN_WOLVES = [
+  { actorId: "den-wolf-1", definitionId: "wolf", tile: { x: 74, z: 21 } },
+  { actorId: "den-wolf-2", definitionId: "wolf", tile: { x: 82, z: 21 } },
+  { actorId: "den-wolf-3", definitionId: "wolf", tile: { x: 75, z: 24 } },
+  { actorId: "den-wolf-4", definitionId: "wolf", tile: { x: 81, z: 24 } },
+  {
+    actorId: "den-alpha-wolf",
+    definitionId: "alpha-wolf",
+    tile: { x: 78, z: 19 },
+  },
+];
+
 export const ECONOMY_SCENARIO = defineScenario({
   id: "arc-economy-opening",
   tileSize: 1,
@@ -38,14 +50,23 @@ export const ECONOMY_SCENARIO = defineScenario({
       origin: { x: 8, z: 50 },
     },
   ],
-  // The lone wolf guards the southern path, out of sight of the base.
   units: [
     {
       actorId: "lone-wolf",
       definitionId: "wolf",
       tile: { x: 46, z: 32 },
       facing: -Math.PI / 2,
+      territory: { encounterId: "lone-wolf", radius: 14 },
     },
+    ...DEN_WOLVES.map((wolf) => ({
+      ...wolf,
+      facing: Math.PI,
+      territory: {
+        encounterId: "wolf-den",
+        center: map.tileCenter(78, 21),
+        radius: 12,
+      },
+    })),
   ],
   materials: 150,
   sites: [

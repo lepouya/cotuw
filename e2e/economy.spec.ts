@@ -129,6 +129,54 @@ async function action(page: Page, selector: string, touch = false) {
   if (touch) await locator.tap();
   else await locator.click();
 }
+test("scouting reveals the mountain den and its larger alpha", async ({
+  page,
+}, testInfo) => {
+  await controlledOpening(page);
+  await page.evaluate(() => {
+    const { view } = window.economyHarness;
+    view.simulation.spawnActor({
+      id: "den-scout",
+      definitionId: "arc-scout",
+      worldPosition: { x: 28.5, z: -27.5 },
+      facing: 0,
+      occupancyLayer: "surface",
+    });
+  });
+  await advance(page, 0.1);
+  const revealed = await page.evaluate(() => {
+    const { view } = window.economyHarness;
+    view.camera.focusOnTile(78, 23);
+    view.selectActor("den-alpha-wolf");
+    view.scene.render();
+    return view.simulation
+      .snapshot()
+      .actors.filter((actor) => actor.territory?.encounterId === "wolf-den")
+      .map((actor) => {
+        const root = view.scene.getTransformNodeByName(
+          `actor-${actor.id}-root`,
+        );
+        const pick = view.scene.getMeshByName(`actor-${actor.id}-pick`)!;
+        return {
+          id: actor.id,
+          shown: !!root?.isEnabled(),
+          height: pick.getBoundingInfo().boundingBox.extendSizeWorld.y * 2,
+        };
+      });
+  });
+  expect(revealed).toHaveLength(5);
+  expect(revealed.every((actor) => actor.shown)).toBe(true);
+  const alpha = revealed.find((actor) => actor.id === "den-alpha-wolf")!;
+  const normal = revealed.find((actor) => actor.id === "den-wolf-1")!;
+  expect(alpha.height / normal.height).toBeCloseTo(1.25);
+  await page.locator("#tab-selection").click();
+  await expect(page.locator("#selection-details")).toContainText("Alpha wolf");
+  await testInfo.attach("wolf-den", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+});
+
 async function place(
   page: Page,
   button: string,

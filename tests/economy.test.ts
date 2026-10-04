@@ -213,10 +213,11 @@ describe("Materials economy", () => {
       ECONOMY_SCENARIO,
       ECONOMY_ACTOR_DEFINITIONS,
     );
-    expect(state.actors.map((actor) => actor.definitionId)).toEqual([
-      "arc-command-center-prototype",
-      "wolf",
-    ]);
+    expect(
+      state.actors
+        .filter((actor) => actor.definitionId.startsWith("arc-"))
+        .map((actor) => actor.definitionId),
+    ).toEqual(["arc-command-center-prototype"]);
     expect(state.economy!.materials).toBe(150);
     expect(Object.isFrozen(ECONOMY_SCENARIO.terrain.tiles)).toBe(true);
     const independent = exploredScenarioState(

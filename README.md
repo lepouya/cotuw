@@ -66,19 +66,21 @@ releases the slot for connected work. Offline Refineries hold cargo delivery
 until reconnection. Broken links use dashed lines, and grouped alerts focus the
 camera on affected buildings. Cancellation and sale remain available offline.
 
-A lone wolf guards the southern path. It attacks on personal sight, returns
-home when it loses sight, and heals there after combat. Wolves relay alerts
-through sight and investigate the originating wolf's position. Idle Troopers
-engage nearby hostiles; to attack directly, select units and click or tap a
-visible wolf. Scouts cannot attack. **Attack Move** in the unit controls
-enters destination targeting; click or tap terrain to advance and engage along
-the way. Cancel or `Esc` exits targeting. Groups spread their destinations;
-unarmed units keep moving. Orange dashes and a diamond mark the order. Units
-search a lost target's last-known position, then resume their destination.
-Health bars appear on selected and fighting actors, and **Selection** shows
-exact health. Destroyed actors leave remains that clear after a minute;
-building debris blocks construction until then. Damaged buildings sell for
-less.
+A lone wolf guards the southern path. Four wolves and a larger alpha occupy a
+mountain den beyond the ridge's nearby crossing. Follow the path north through
+its narrow entrance; the den pack shares a territory with separate homes. Wolves
+attack on personal sight, return home when they lose sight, and heal there after
+combat. Wolves relay alerts through sight and investigate the originating wolf's
+position. Idle Troopers engage nearby hostiles; to attack directly, select units
+and click or tap a visible wolf. Scouts cannot attack. **Attack Move** in the
+unit controls enters destination targeting; click or tap terrain to advance and
+engage along the way. Cancel or `Esc` exits targeting. Groups spread their
+destinations; unarmed units keep moving. Orange dashes and a diamond mark the
+order. Units search a lost target's last-known position, then resume their
+destination. Health bars appear on selected and fighting actors, and
+**Selection** shows exact health. Destroyed actors leave remains that clear
+after a minute; building debris blocks construction until then. Damaged
+buildings sell for less.
 
 Combat destruction of the starting Command Center ends this opening in defeat
 and pauses immediately. The results panel provides Restart, Load, and Exit. Load

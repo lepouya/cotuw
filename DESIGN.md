@@ -903,7 +903,13 @@ Deterministic acceptance checks cover:
   tolerance is 0.15 world units. Content can tune these values per encounter.
   One Trooper can defeat one normal wolf.
 - The Materials opening places one lone wolf on the southern path at tile
-  (46, 32), out of sight of the base.
+  (46, 32), out of sight of the base, with a 14-tile territory. The den lies
+  east of the ridge, enclosed by six-unit mountain walls, with a three-tile
+  southern entrance at x 77–79. Four normal wolves start at (74, 21), (82, 21),
+  (75, 24), and (81, 24); the alpha starts at (78, 19). Their shared territory
+  centers on (78, 21) with radius 12. Rough ground surrounds the entrance path
+  inside the den. The ridge and encounter spacing isolate the lone wolf's
+  alerts from the pack.
 - Combat destruction of the opening's authored starting Command Center records
   a defeat at that tick. All simultaneous hits resolve, then movement and
   economy stop. Further ticks leave the state unchanged. The result survives
