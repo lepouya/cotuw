@@ -25,13 +25,19 @@ const wolf = {
   },
 } satisfies ActorDefinition;
 
+/** Alpha wolves are larger in body and appearance. */
+export const ALPHA_WOLF_SCALE = 1.25;
+
 export const WILDLIFE_ACTOR_DEFINITIONS = [
   wolf,
   {
     ...wolf,
     id: "alpha-wolf",
     health: 150,
-    movement: { ...wolf.movement, radius: wolf.movement.radius * 1.25 },
+    movement: {
+      ...wolf.movement,
+      radius: wolf.movement.radius * ALPHA_WOLF_SCALE,
+    },
     vision: { radius: 10 },
   },
 ] satisfies readonly ActorDefinition[];

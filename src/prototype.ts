@@ -2,10 +2,14 @@
 // Replace this with real game setup once the prototype has served its purpose.
 import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
-import { TerrainGrid } from "./simulation/terrain";
+import type { TerrainGrid, TerrainGridOptions } from "./simulation/terrain";
 import type { MissionState } from "./simulation/mission";
 import type { MissionResult } from "./simulation/objectives";
-import { createScenarioState, deserializeMission } from "./simulation/scenario";
+import {
+  createScenarioMap,
+  createScenarioState,
+  deserializeMission,
+} from "./simulation/scenario";
 import { disconnectedBuildings } from "./simulation/support";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
@@ -22,12 +26,10 @@ import { createWreckView } from "./render/wrecks";
 import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
 import { ECONOMY_ACTOR_DEFINITIONS } from "./content/economy-scenario";
 import type { ScenarioDefinition } from "./simulation/scenario";
+import { ALPHA_WOLF_SCALE } from "./content/wildlife";
 import {
-  PROTOTYPE_MAP_SIZE,
-  WATER_HALF_WIDTH,
-  WATER_CENTER,
-  prototypeTerrainAt,
-  prototypeHeightAt,
+  PROTOTYPE_TERRAIN,
+  prototypeWaterDepthAt,
 } from "./content/prototype-terrain";
 import {
   Color3,
@@ -86,7 +88,7 @@ import {
 } from "./simulation/mission";
 
 import type { Scene } from "@babylonjs/core";
-import type { TileLayer, TileType } from "./map";
+import type { TerrainTile, TileLayer, TileType } from "./map";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
 import type { ActorRenderState } from "./simulation/actor";
 import type { TileCoord } from "./simulation/grid";
@@ -95,8 +97,6 @@ import type { HealthBar } from "./render/health-bars";
 import { healthBarOpacity } from "./render/health-bars";
 import { createPlayerAccess } from "./simulation/faction";
 
-const TILE_COUNT = PROTOTYPE_MAP_SIZE;
-const TILE_SIZE = 1;
 /** Water opacity at the midline and at the last tile before the bank. */
 const WATER_DEEP_ALPHA = 0.98;
 const WATER_SHORE_ALPHA = 0.06;
@@ -243,13 +243,11 @@ export function loadMissionSave(
   scenario: ScenarioDefinition,
 ): MissionState {
   const state = deserializeMission(source, scenario, SIMULATION_TICK_SECONDS);
-  const map = new TerrainGrid({
-    width: scenario.terrain.width,
-    height: scenario.terrain.height,
-    tileSize: scenario.tileSize,
-    terrainTypeIds: scenario.terrainTypeIds,
-  });
-  createPrototypeSimulation(map, scenario, state).dispose();
+  createPrototypeSimulation(
+    createScenarioMap(scenario),
+    scenario,
+    state,
+  ).dispose();
   return state;
 }
 
@@ -258,16 +256,22 @@ export async function createTerrainPrototype(
   minimapCanvas: HTMLCanvasElement,
   controls: TerrainPrototypeControls = {},
 ): Promise<TerrainPrototype> {
-  const map = createPrototypeMap();
+  const scenario = controls.scenario;
+  const map = createPrototypeMap(
+    scenario && {
+      ...scenario,
+      terrain: controls.initialState?.terrain ?? scenario.terrain,
+    },
+  );
   const view = createGameView(canvas, map, PROTOTYPE_VIEW_OPTIONS);
 
-  const definitions = controls.scenario
+  const definitions = scenario
     ? ECONOMY_ACTOR_DEFINITIONS
     : PROTOTYPE_ACTOR_DEFINITIONS;
   createTerrainMeshes(view.scene, map);
   const simulation = createPrototypeSimulation(
     map,
-    controls.scenario,
+    scenario,
     controls.initialState,
   );
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -283,7 +287,11 @@ export async function createTerrainPrototype(
   );
   appearances.set(
     "alpha-wolf",
-    createWolfAppearance(view.scene, () => reducedMotion.matches, 1.25),
+    createWolfAppearance(
+      view.scene,
+      () => reducedMotion.matches,
+      ALPHA_WOLF_SCALE,
+    ),
   );
   const materialsView =
     simulation.economy &&
@@ -300,7 +308,6 @@ export async function createTerrainPrototype(
     view.camera.setFocusLimit((point) =>
       limitToExplored(map, fog, point, CAMERA_FRONTIER_MARGIN),
     );
-  if (controls.scenario) view.camera.focusOnTile(15, 50);
   const definitionsById = new Map(
     definitions.map((definition) => [definition.id, definition]),
   );
@@ -310,6 +317,11 @@ export async function createTerrainPrototype(
     definitionsById,
     simulation.detects,
   );
+  const startingActor = scenario && simulation.actors.find(player.owns);
+  if (startingActor) {
+    const { x, z } = startingActor.worldPosition;
+    view.camera.focusOnPoint(new Vector3(x, 0, z));
+  }
   const actorViews = createActorViewRegistry(
     view.scene,
     map,
@@ -1010,61 +1022,62 @@ function createPrototypeStandInAppearances(
   );
 }
 
-export function createPrototypeMap(): TerrainMap {
-  return new TerrainMap({
-    width: TILE_COUNT,
-    height: TILE_COUNT,
-    tileSize: TILE_SIZE,
-    createHeight: prototypeHeightAt,
-    createTerrain: prototypeTerrainAt,
-    terrainTypeIds: ["plain", "path", "rough", "water"],
-    createLayers: (x, z) => {
-      const terrain = prototypeTerrainAt(x, z);
-      const variation = Math.sin(x * 0.23) * 0.025 + Math.cos(z * 0.19) * 0.02;
-      const depth =
-        1 -
-        Math.hypot(x + 0.5 - WATER_CENTER.x, z + 0.5 - WATER_CENTER.z) /
-          WATER_HALF_WIDTH;
-      const terrainTint =
-        terrain.typeId === "path"
-          ? [1.08, 0.98, 0.78]
-          : terrain.typeId === "rough"
-            ? [0.68, 0.78, 0.64]
-            : [0.86, 0.9, 0.88];
-      const layers: TileLayer[] = [
-        {
-          type: PROTOTYPE_TILE_TYPES.dirt,
-          color: new Color4(
-            terrainTint[0] + variation,
-            terrainTint[1] + variation,
-            terrainTint[2] + variation,
-            1,
-          ),
-        },
-      ];
+export function createPrototypeMap(scenario?: ScenarioDefinition): TerrainMap {
+  const createMap = (options: TerrainGridOptions) =>
+    new TerrainMap({ ...options, createLayers: prototypeTileLayers });
+  return scenario
+    ? createScenarioMap(scenario, createMap)
+    : createMap(PROTOTYPE_TERRAIN);
+}
 
-      if (depth > 0) {
-        const alpha = waterAlpha(depth);
-        layers.push({
-          type: PROTOTYPE_TILE_TYPES.water,
-          color: new Color4(0.74, 0.94, 0.98, alpha),
-        });
-        layers.push({
-          type: PROTOTYPE_TILE_TYPES.waterRipples,
-          color: new Color4(0.82, 0.98, 1, alpha * WATER_RIPPLE_ALPHA),
-        });
-      }
-
-      if (terrain.typeId === "rough" || Math.sin(x * 0.47 - z * 0.29) > 0.82) {
-        layers.push({
-          type: PROTOTYPE_TILE_TYPES.clutter,
-          color: new Color4(0.99, 0.66, 0.33, 1),
-        });
-      }
-
-      return layers;
+/** Layers follow each tile's terrain, so saved terrain keeps its look. */
+function prototypeTileLayers(
+  x: number,
+  z: number,
+  { typeId }: Readonly<TerrainTile>,
+): TileLayer[] {
+  const variation = Math.sin(x * 0.23) * 0.025 + Math.cos(z * 0.19) * 0.02;
+  // Water beyond the authored pond draws at full depth.
+  const depth =
+    typeId === "water" ? Math.max(0, prototypeWaterDepthAt(x, z)) || 1 : 0;
+  const terrainTint =
+    typeId === "path"
+      ? [1.08, 0.98, 0.78]
+      : typeId === "rough"
+        ? [0.68, 0.78, 0.64]
+        : [0.86, 0.9, 0.88];
+  const layers: TileLayer[] = [
+    {
+      type: PROTOTYPE_TILE_TYPES.dirt,
+      color: new Color4(
+        terrainTint[0] + variation,
+        terrainTint[1] + variation,
+        terrainTint[2] + variation,
+        1,
+      ),
     },
-  });
+  ];
+
+  if (depth > 0) {
+    const alpha = waterAlpha(depth);
+    layers.push({
+      type: PROTOTYPE_TILE_TYPES.water,
+      color: new Color4(0.74, 0.94, 0.98, alpha),
+    });
+    layers.push({
+      type: PROTOTYPE_TILE_TYPES.waterRipples,
+      color: new Color4(0.82, 0.98, 1, alpha * WATER_RIPPLE_ALPHA),
+    });
+  }
+
+  if (typeId === "rough" || Math.sin(x * 0.47 - z * 0.29) > 0.82) {
+    layers.push({
+      type: PROTOTYPE_TILE_TYPES.clutter,
+      color: new Color4(0.99, 0.66, 0.33, 1),
+    });
+  }
+
+  return layers;
 }
 
 /**

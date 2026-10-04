@@ -13,7 +13,7 @@ import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
 import type { EconomyState, MaterialsSite, MaterialsLoot } from "./economy";
 import type { MissionState } from "./mission";
-import type { TerrainState } from "./terrain";
+import type { TerrainGridOptions, TerrainState } from "./terrain";
 import type { TileCoord } from "./grid";
 
 /** A mobile actor that starts at a tile's center. */
@@ -48,20 +48,41 @@ export function defineScenario(
   return deepFreeze(structuredClone(content));
 }
 
+/** The factory can add presentation without introducing renderer dependencies. */
+export function createScenarioMap(scenario: ScenarioDefinition): TerrainGrid;
+export function createScenarioMap<T extends TerrainGrid>(
+  scenario: ScenarioDefinition,
+  createMap: (options: TerrainGridOptions) => T,
+): T;
+export function createScenarioMap(
+  scenario: ScenarioDefinition,
+  createMap: (options: TerrainGridOptions) => TerrainGrid = (options) =>
+    new TerrainGrid(options),
+): TerrainGrid {
+  const { terrain } = scenario;
+  const map = createMap({
+    width: terrain.width,
+    height: terrain.height,
+    tileSize: scenario.tileSize,
+    terrainTypeIds: scenario.terrainTypeIds,
+    createHeight: (x, z) => terrain.heights[z * (terrain.width + 1) + x],
+    createTerrain: (x, z) => terrain.tiles[z * terrain.width + x],
+  });
+  map.restoreTerrainState(terrain);
+  return map;
+}
+
 export function createScenarioState(
   scenario: ScenarioDefinition,
   definitions: readonly ActorDefinition[],
 ): MissionState {
   const terrain = scenario.terrain;
-  const map = new TerrainGrid({
-    width: terrain.width,
-    height: terrain.height,
-    tileSize: scenario.tileSize,
-    terrainTypeIds: scenario.terrainTypeIds,
-  });
-  map.restoreTerrainState(terrain);
+  const map = createScenarioMap(scenario);
+  const definitionsById = new Map(
+    definitions.map((definition) => [definition.id, definition]),
+  );
   const definitionFor = (id: string) => {
-    const definition = definitions.find((definition) => definition.id === id);
+    const definition = definitionsById.get(id);
     if (!definition) throw new RangeError(`Unknown scenario actor: ${id}.`);
     return definition;
   };
@@ -150,32 +171,42 @@ export function deserializeMission(
     throw new RangeError(
       "This mission save has incompatible simulation settings.",
     );
-  const sites = save.state.economy?.sites;
-  const loot = save.state.economy?.loot;
   if (
-    !Array.isArray(sites) ||
-    !Array.isArray(loot) ||
-    sites.length !== scenario.sites.length ||
-    loot.length !== scenario.loot.length ||
-    scenario.sites.some(
-      (site, index) =>
-        sites[index]?.id !== site.id ||
-        sites[index]?.name !== site.name ||
-        sites[index]?.initialMaterials !== site.initialMaterials ||
-        sites[index]?.tile?.x !== site.tile.x ||
-        sites[index]?.tile?.z !== site.tile.z,
+    !sameResources(
+      save.state.economy?.sites,
+      scenario.sites,
+      (site) => site.initialMaterials,
     ) ||
-    scenario.loot.some(
-      (cache, index) =>
-        loot[index]?.id !== cache.id ||
-        loot[index]?.name !== cache.name ||
-        loot[index]?.materials !== cache.materials ||
-        loot[index]?.tile?.x !== cache.tile.x ||
-        loot[index]?.tile?.z !== cache.tile.z,
+    !sameResources(
+      save.state.economy?.loot,
+      scenario.loot,
+      (loot) => loot.materials,
     )
   )
     throw new RangeError(
       "This mission save has incompatible resource content.",
     );
   return save.state;
+}
+
+/** Saved resources keep their authored order, identity, tile, and yield. */
+function sameResources<T extends MaterialsSite | MaterialsLoot>(
+  saved: unknown,
+  authored: readonly T[],
+  yieldOf: (resource: T) => number,
+): boolean {
+  return (
+    Array.isArray(saved) &&
+    saved.length === authored.length &&
+    authored.every((resource, index) => {
+      const copy = saved[index];
+      return (
+        copy?.id === resource.id &&
+        copy.name === resource.name &&
+        copy.tile?.x === resource.tile.x &&
+        copy.tile?.z === resource.tile.z &&
+        yieldOf(copy) === yieldOf(resource)
+      );
+    })
+  );
 }

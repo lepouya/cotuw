@@ -1,6 +1,10 @@
 import { Color4, Observable, Vector3 } from "@babylonjs/core";
 import { TerrainGrid } from "./simulation/terrain";
-import type { TerrainGridOptions, TerrainBounds } from "./simulation/terrain";
+import type {
+  TerrainGridOptions,
+  TerrainBounds,
+  TerrainTile,
+} from "./simulation/terrain";
 export type {
   TerrainBounds,
   TileCoord,
@@ -52,7 +56,12 @@ export function layerSlot(layer: TileLayer, index: number): number {
 }
 
 export type TerrainMapOptions = TerrainGridOptions & {
-  createLayers?: (x: number, z: number) => TileLayer[];
+  /** Receives each tile's simulation terrain, already validated. */
+  createLayers?: (
+    x: number,
+    z: number,
+    terrain: Readonly<TerrainTile>,
+  ) => TileLayer[];
 };
 
 /** Babylon presentation over renderer-independent simulation terrain. */
@@ -61,8 +70,13 @@ export class TerrainMap extends TerrainGrid {
   readonly onChangedObservable = new Observable<TerrainBounds>();
   constructor({ createLayers = () => [], ...options }: TerrainMapOptions) {
     super(options);
-    this.layers = Array.from({ length: this.width * this.height }, (_, index) =>
-      createLayers(index % this.width, Math.floor(index / this.width)),
+    this.layers = Array.from(
+      { length: this.width * this.height },
+      (_, index) => {
+        const x = index % this.width;
+        const z = Math.floor(index / this.width);
+        return createLayers(x, z, this.terrainAt(x, z));
+      },
     );
     this.onChanged((bounds) =>
       this.onChangedObservable.notifyObservers(bounds),

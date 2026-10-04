@@ -4,20 +4,26 @@ import {
   ECONOMY_SCENARIO,
 } from "../src/content/economy-scenario";
 import { PROTOTYPE_MOVEMENT_PROFILES } from "../src/prototype-content";
+import { PROTOTYPE_LANDMARKS } from "../src/content/prototype-terrain";
 import { createActor } from "../src/simulation/actor";
+import type { Actor } from "../src/simulation/actor";
+import type { TileCoord } from "../src/simulation/grid";
+import { personallyDetects } from "../src/simulation/vision";
+import { distance } from "../src/simulation/world";
 import { createMissionSimulation } from "../src/simulation/mission";
 import type { MissionState } from "../src/simulation/mission";
 import {
   findNavigationPath,
   NavigationGrid,
+  segmentCost,
 } from "../src/simulation/navigation";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import {
+  createScenarioMap,
   createScenarioState,
   deserializeMission,
   serializeMission,
 } from "../src/simulation/scenario";
-import { TerrainGrid } from "../src/simulation/terrain";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 
 const seconds = 0.1;
@@ -25,16 +31,7 @@ const scenario = ECONOMY_SCENARIO;
 const definitions = ECONOMY_ACTOR_DEFINITIONS;
 const initialState = () => createScenarioState(scenario, definitions);
 
-function mapForOpening() {
-  const map = new TerrainGrid({
-    width: scenario.terrain.width,
-    height: scenario.terrain.height,
-    tileSize: scenario.tileSize,
-    terrainTypeIds: scenario.terrainTypeIds,
-  });
-  map.restoreTerrainState(scenario.terrain);
-  return map;
-}
+const mapForOpening = () => createScenarioMap(scenario);
 
 function fixture(state = initialState(), updateIdle = () => {}) {
   const map = mapForOpening();
@@ -270,7 +267,212 @@ describe("mission objectives", () => {
   });
 });
 
+describe("authored resource compatibility", () => {
+  test.each(["sites", "loot"] as const)(
+    "rejects incompatible %s content",
+    (kind) => {
+      const state = initialState();
+      const resources = state.economy![kind];
+      const original = resources[0];
+      const invalid = [
+        null,
+        1,
+        { ...original, id: "another-resource" },
+        { ...original, name: "Another patch" },
+        { ...original, tile: null },
+        { ...original, tile: { ...original.tile, x: original.tile.x + 1 } },
+        {
+          ...original,
+          [kind === "sites" ? "initialMaterials" : "materials"]: 999,
+        },
+      ];
+      for (const resource of invalid) {
+        const save = JSON.parse(serializeMission(state, seconds));
+        save.state.economy[kind][0] = resource;
+        expect(() =>
+          deserializeMission(JSON.stringify(save), scenario, seconds),
+        ).toThrow("resource content");
+      }
+      const save = JSON.parse(serializeMission(state, seconds));
+      save.state.economy[kind].reverse();
+      expect(() =>
+        deserializeMission(JSON.stringify(save), scenario, seconds),
+      ).toThrow("resource content");
+    },
+  );
+
+  test("resource identity stays compatible after gathering and collection", () => {
+    const state = initialState();
+    state.economy!.sites[0].remainingMaterials -= 25;
+    state.economy!.loot[0].collected = true;
+    expect(
+      deserializeMission(serializeMission(state, seconds), scenario, seconds),
+    ).toEqual(state);
+  });
+});
+
 describe("authored wolf encounters", () => {
+  test("encounters cannot see each other anywhere their leashes permit travel", () => {
+    const map = mapForOpening();
+    const wolves = initialState().actors.filter((actor) => actor.territory);
+    const definitionsById = new Map(definitions.map((d) => [d.id, d]));
+    const occupancy = new OccupancyGrid(map);
+    const travelTiles = (actor: Actor): TileCoord[] => {
+      const territory = actor.territory!;
+      const definition = definitionsById.get(actor.definitionId)!;
+      const center = territory.center ?? territory.home;
+      const radius = territory.radius ?? definition.territory!.leashRadius;
+      const profile = PROTOTYPE_MOVEMENT_PROFILES.find(
+        ({ id }) => id === definition.movement!.profileId,
+      )!;
+      // Includes boundary tiles touched by continuous routes and separation.
+      const grid = new NavigationGrid(map, occupancy, profile, "surface", {
+        center,
+        radius: radius + Math.SQRT1_2 * map.tileSize,
+      });
+      const home = map.tileAtWorldPosition(territory.home.x, territory.home.z);
+      const region = grid.regionAt(home.x, home.z);
+      expect(region).toBeGreaterThanOrEqual(0);
+      const tiles: TileCoord[] = [];
+      for (let z = 0; z < map.height; z++)
+        for (let x = 0; x < map.width; x++)
+          if (grid.regionAt(x, z) === region) tiles.push({ x, z });
+      expect(tiles.length).toBeGreaterThan(20);
+      return tiles;
+    };
+    const lone = wolves.find(({ id }) => id === "lone-wolf")!;
+    const loneTiles = travelTiles(lone);
+    const den = wolves.filter(({ id }) => id !== lone.id);
+    let occludedPairs = 0;
+    for (const observer of den) {
+      const radius = Math.max(
+        definitionsById.get(observer.definitionId)!.vision!.radius,
+        definitionsById.get(lone.definitionId)!.vision!.radius,
+      );
+      for (const from of travelTiles(observer)) {
+        observer.worldPosition = map.tileCenter(from.x, from.z);
+        for (const to of loneTiles) {
+          lone.worldPosition = map.tileCenter(to.x, to.z);
+          if (distance(observer.worldPosition, lone.worldPosition) > radius)
+            continue;
+          occludedPairs++;
+          expect(
+            personallyDetects(observer, lone, definitionsById, map),
+            `${observer.id} at ${from.x},${from.z} sees lone wolf at ${to.x},${to.z}`,
+          ).toBe(false);
+          expect(personallyDetects(lone, observer, definitionsById, map)).toBe(
+            false,
+          );
+        }
+      }
+    }
+    expect(occludedPairs).toBeGreaterThan(0);
+  });
+
+  test("recovery salvage rewards the lone-wolf approach and pays for two Troopers", () => {
+    const map = mapForOpening();
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      PROTOTYPE_MOVEMENT_PROFILES[0],
+    );
+    const simulation = fixture();
+    const recovery = scenario.loot.filter(({ id }) =>
+      ["salvage-2", "salvage-3"].includes(id),
+    );
+    expect(recovery).toHaveLength(2);
+    const trooper = definitions.find(({ id }) => id === "arc-trooper")!;
+    expect(recovery.reduce((total, loot) => total + loot.materials, 0)).toBe(
+      2 * trooper.materialsCost!,
+    );
+    for (const loot of recovery) {
+      expect(loot.tile.x).toBeGreaterThan(46);
+      expect(loot.tile.x).toBeLessThan(61);
+      expect(
+        distance(
+          map.tileCenter(loot.tile.x, loot.tile.z),
+          map.tileCenter(46, 32),
+        ),
+      ).toBeLessThan(14);
+      expect(
+        findNavigationPath(
+          grid,
+          map.tileCenter(46, 32),
+          map.tileCenter(loot.tile.x, loot.tile.z),
+        )?.reachedTarget,
+      ).toBe(true);
+      expect(simulation.fog!.isExplored(loot.tile.x, loot.tile.z)).toBe(false);
+    }
+  });
+
+  test("rough ground offers a faster detour and ridge routes reconnect", () => {
+    const map = mapForOpening();
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      PROTOTYPE_MOVEMENT_PROFILES[0],
+    );
+    const from = map.tileCenter(35, 47);
+    const to = map.tileCenter(58, 47);
+    const path = findNavigationPath(grid, from, to)!;
+    expect(path.reachedTarget).toBe(true);
+    let previous = from;
+    let length = 0;
+    let cost = 0;
+    for (const point of path.waypoints) {
+      length += distance(previous, point);
+      cost += segmentCost(grid, previous, point)!;
+      previous = point;
+    }
+    expect(length).toBeGreaterThan(distance(from, to));
+    expect(cost).toBeLessThan(segmentCost(grid, from, to)!);
+    const crossingFrom = map.tileCenter(56, 34);
+    const crossingTo = map.tileCenter(70, 34);
+    expect(
+      findNavigationPath(grid, crossingFrom, crossingTo)?.reachedTarget,
+    ).toBe(true);
+    for (let z = 32; z <= 35; z++)
+      for (let x = 61; x <= 65; x++)
+        map.setTerrain(x, z, { typeId: "path", surfacePassable: false });
+    const detour = findNavigationPath(grid, crossingFrom, crossingTo)!;
+    expect(detour.reachedTarget).toBe(true);
+    expect(
+      detour.waypoints.some((point) => point.z >= map.tileCenter(62, 66).z),
+    ).toBe(true);
+  });
+
+  test("distinct mountain peaks leave both ridge crossings and the den entrance usable", () => {
+    const map = mapForOpening();
+    const grid = new NavigationGrid(
+      map,
+      new OccupancyGrid(map),
+      PROTOTYPE_MOVEMENT_PROFILES[0],
+    );
+    for (const landmark of PROTOTYPE_LANDMARKS)
+      for (const peak of landmark.peaks) {
+        expect(map.heightAt(peak.x, peak.z), landmark.id).toBeGreaterThan(8);
+        expect(
+          findNavigationPath(
+            grid,
+            map.tileCenter(15, 50),
+            map.tileCenter(peak.x, peak.z),
+          )?.reachedTarget,
+        ).toBe(false);
+      }
+    for (const z of [32, 68]) {
+      const route = findNavigationPath(
+        grid,
+        map.tileCenter(56, z),
+        map.tileCenter(70, z),
+      );
+      expect(route?.reachedTarget).toBe(true);
+    }
+    expect(grid.costAt(78, 28)).toBeDefined();
+    expect(grid.costAt(75, 23)).toBeGreaterThan(grid.costAt(78, 23)!);
+    expect(grid.costAt(30, 44)).toBeDefined();
+    expect(map.slopeAt(30, 44)).toBeGreaterThan(0.1);
+  });
+
   test("six wolves have passable homes and the den shares one territory", () => {
     const simulation = fixture();
     const map = mapForOpening();

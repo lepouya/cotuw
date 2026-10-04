@@ -2,21 +2,12 @@ import { ARC_ACTOR_DEFINITIONS } from "./arc";
 import { WILDLIFE_ACTOR_DEFINITIONS } from "./wildlife";
 import { TerrainGrid } from "../simulation/terrain";
 import type { ActorDefinition } from "../simulation/actor";
+import type { MaterialsLoot, MaterialsSite } from "../simulation/economy";
+import type { TileCoord } from "../simulation/grid";
 import { defineScenario } from "../simulation/scenario";
-import {
-  PROTOTYPE_MAP_SIZE,
-  prototypeHeightAt,
-  prototypeTerrainAt,
-} from "./prototype-terrain";
+import { PROTOTYPE_TERRAIN } from "./prototype-terrain";
 
-const map = new TerrainGrid({
-  width: PROTOTYPE_MAP_SIZE,
-  height: PROTOTYPE_MAP_SIZE,
-  tileSize: 1,
-  terrainTypeIds: ["plain", "path", "rough", "water"],
-  createHeight: prototypeHeightAt,
-  createTerrain: prototypeTerrainAt,
-});
+const map = new TerrainGrid(PROTOTYPE_TERRAIN);
 
 /** Every actor type the opening can contain. */
 export const ECONOMY_ACTOR_DEFINITIONS: readonly ActorDefinition[] = [
@@ -36,9 +27,31 @@ const DEN_WOLVES = [
   },
 ];
 
+/** One named patch of 200-Materials tiles, numbered in authored order. */
+const patch = (
+  id: string,
+  name: string,
+  tiles: readonly TileCoord[],
+): MaterialsSite[] =>
+  tiles.map((tile, index) => ({
+    id: `${id}-${index + 1}`,
+    name,
+    tile,
+    initialMaterials: 200,
+    remainingMaterials: 200,
+  }));
+
+const salvage = (id: string, name: string, tile: TileCoord): MaterialsLoot => ({
+  id,
+  name,
+  tile,
+  materials: 25,
+  collected: false,
+});
+
 export const ECONOMY_SCENARIO = defineScenario({
   id: "arc-economy-opening",
-  tileSize: 1,
+  tileSize: map.tileSize,
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),
   playerFaction: "arc",
@@ -63,7 +76,7 @@ export const ECONOMY_SCENARIO = defineScenario({
       kind: "destroy",
       label: "Clear the mountain den",
       directive:
-        "Cross the ridge near the lone wolf, then follow the path north through the narrow entrance. Bring several Troopers to defeat four wolves and the larger alpha.",
+        "Collect the salvage beyond the lone wolf for two more Troopers. Cross the ridge south of the split summit, then follow the path south between the den teeth. Bring several Troopers to defeat four wolves and the larger alpha.",
       actorIds: DEN_WOLVES.map(({ actorId }) => actorId),
     },
   ],
@@ -94,70 +107,20 @@ export const ECONOMY_SCENARIO = defineScenario({
   ],
   materials: 150,
   sites: [
-    {
-      id: "near-materials-1",
-      name: "Near Materials",
-      tile: { x: 20, z: 50 },
-      initialMaterials: 200,
-      remainingMaterials: 200,
-    },
-    {
-      id: "near-materials-2",
-      name: "Near Materials",
-      tile: { x: 21, z: 50 },
-      initialMaterials: 200,
-      remainingMaterials: 200,
-    },
-    {
-      id: "near-materials-3",
-      name: "Near Materials",
-      tile: { x: 20, z: 51 },
-      initialMaterials: 200,
-      remainingMaterials: 200,
-    },
-    {
-      id: "near-materials-4",
-      name: "Near Materials",
-      tile: { x: 21, z: 51 },
-      initialMaterials: 200,
-      remainingMaterials: 200,
-    },
-    {
-      id: "north-materials-1",
-      name: "North Materials",
-      tile: { x: 24, z: 42 },
-      initialMaterials: 200,
-      remainingMaterials: 200,
-    },
-    {
-      id: "north-materials-2",
-      name: "North Materials",
-      tile: { x: 25, z: 42 },
-      initialMaterials: 200,
-      remainingMaterials: 200,
-    },
+    ...patch("near-materials", "Near Materials", [
+      { x: 20, z: 50 },
+      { x: 21, z: 50 },
+      { x: 20, z: 51 },
+      { x: 21, z: 51 },
+    ]),
+    ...patch("south-materials", "South Materials", [
+      { x: 24, z: 42 },
+      { x: 25, z: 42 },
+    ]),
   ],
   loot: [
-    {
-      id: "salvage-1",
-      name: "Materials salvage",
-      tile: { x: 25, z: 52 },
-      materials: 25,
-      collected: false,
-    },
-    {
-      id: "salvage-2",
-      name: "Materials salvage",
-      tile: { x: 27, z: 48 },
-      materials: 25,
-      collected: false,
-    },
-    {
-      id: "salvage-3",
-      name: "Materials salvage",
-      tile: { x: 28, z: 44 },
-      materials: 25,
-      collected: false,
-    },
+    salvage("salvage-1", "Materials salvage", { x: 25, z: 52 }),
+    salvage("salvage-2", "Crossing salvage", { x: 54, z: 32 }),
+    salvage("salvage-3", "Crossing salvage", { x: 56, z: 34 }),
   ],
 });
