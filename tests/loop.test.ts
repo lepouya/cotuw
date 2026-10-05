@@ -5,6 +5,37 @@ import { startSimulationLoop } from "../src/simulation/loop";
 import type { SimulationLoop } from "../src/simulation/loop";
 import type { CommandOutcome } from "../src/simulation/command";
 
+test("speed changes retain fractional ticks instead of discarding earned time", () => {
+  let now = 0;
+  let ticks = 0;
+  const loop = startSimulationLoop(
+    {
+      tickSeconds: 0.1,
+      tick: () => {
+        ticks++;
+        return [];
+      },
+    },
+    { pumpMilliseconds: 60_000, maxCatchUpSeconds: 1, now: () => now },
+  );
+  try {
+    now = 50;
+    loop.setSpeed(2);
+    expect(loop.tickProgress()).toBeCloseTo(0.5);
+    now = 75;
+    loop.advance();
+    expect(ticks).toBe(1);
+    now = 100;
+    loop.setSpeed(0.5);
+    expect(loop.tickProgress()).toBeCloseTo(0.5);
+    now = 200;
+    loop.advance();
+    expect(ticks).toBe(2);
+  } finally {
+    loop.stop();
+  }
+});
+
 describe("simulation loop", () => {
   test("pausing during a result discards backlog and resumes from the current time", () => {
     let now = 0;
@@ -114,6 +145,34 @@ describe("simulation loop", () => {
     expect(loop.fault).toBe(error);
     expect(loop.tickProgress()).toBe(1);
     expect(faults).toEqual([error]);
+  });
+
+  test("speed scales ticks per real second after running owed ticks", () => {
+    let now = 0;
+    let ticks = 0;
+    const loop = startSimulationLoop(
+      {
+        tickSeconds: 0.01,
+        tick: () => {
+          ticks++;
+          return [];
+        },
+      },
+      { pumpMilliseconds: 60_000, maxCatchUpSeconds: 1, now: () => now },
+    );
+    now = 50;
+    loop.setSpeed(2);
+    expect(ticks).toBe(5);
+    now = 100;
+    loop.advance();
+    expect(ticks).toBe(15);
+    expect(loop.speed).toBe(2);
+    loop.setSpeed(0.5);
+    now = 200;
+    loop.advance();
+    expect(ticks).toBe(20);
+    expect(() => loop.setSpeed(0)).toThrow(RangeError);
+    loop.stop();
   });
 });
 
