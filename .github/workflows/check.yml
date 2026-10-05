@@ -1,9 +1,8 @@
 name: Check
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  # Run only on request to conserve the GitHub Actions quota.
+  workflow_dispatch:
 
 permissions:
   contents: read

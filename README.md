@@ -146,8 +146,12 @@ show amber. Reduced motion keeps these status cues without animated motion.
 The visual tests start the Vite app in headless Chromium. They check the
 camera, terrain rendering, terrain editing, and texture behavior, some through
 canvas screenshots and some through in-page helpers in `e2e/harness.ts`. They
-write an HTML report to `playwright-report/`. CI runs them only on macOS,
-whose runners have a GPU, and uploads that report after a failed check.
+write an HTML report to `playwright-report/`. The GitHub Actions Check workflow
+is disabled to conserve the monthly quota. Its only configured trigger is a
+manual request; enable it explicitly when remote checks are needed. The
+workflow runs visual tests on macOS, whose runners have a GPU, and uploads that
+report after a failed check. Run `npm run check` locally before completing a
+coding task.
 Install the browsers locally once with `npx playwright install chromium`, plus
 `webkit` on macOS, where the tests also run against WebKit to match the Tauri
 webview.
