@@ -1,9 +1,9 @@
-/** World input pauses for dialogs, hidden pages, and lost window focus. */
+/** World input yields to dialogs and menus, hidden pages, and lost focus. */
 export function worldInputAvailable(document: Document | undefined): boolean {
   return (
     !document?.hidden &&
     document?.hasFocus?.() !== false &&
-    !document?.querySelector("dialog[open]")
+    !document?.querySelector('dialog[open], [role="menu"]:not([hidden])')
   );
 }
 

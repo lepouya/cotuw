@@ -184,6 +184,8 @@ export type MissionState = {
   wildlife: WildlifeState;
   /** Progress for the authored objectives, which also decide the result. */
   objectives: ObjectiveState[];
+  /** Scenario popups the player dismissed; the simulation only keeps them. */
+  dismissedPopups?: string[];
 };
 
 export function createMissionState(actors: readonly Actor[]): MissionState {

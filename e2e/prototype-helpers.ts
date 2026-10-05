@@ -25,11 +25,20 @@ export async function terrainPoint(page: Page, x: number, z: number) {
   );
 }
 
+/** Checks a scenario popup's title, then dismisses it. */
+export async function dismissExplanation(page: Page, title: string) {
+  await expect(page.locator("#explanation-title")).toHaveText(title);
+  await page.locator("#dismiss-explanation").click();
+  await expect(page.locator("#explanation")).toBeHidden();
+}
+
 export async function placeBuilding(
   page: Page,
   buttonId: string,
   x: number,
   z: number,
+  /** The popup title that starting this placement shows. */
+  explanation?: string,
 ) {
   const canvas = page.locator("#game-canvas");
   const count = Number(
@@ -37,6 +46,7 @@ export async function placeBuilding(
   );
   await page.locator("#tab-buildings").click();
   await page.locator(`#${buttonId}`).click();
+  if (explanation) await dismissExplanation(page, explanation);
   const point = await terrainPoint(page, x, z);
   await page.mouse.move(point.x, point.y);
   await expect(page.locator("#game-canvas")).toHaveAttribute(

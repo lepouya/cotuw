@@ -27,17 +27,17 @@ test("manual saves and the quicksave restore earlier progress", async ({
   );
   await page.locator("#resume-mission").click();
   await page.keyboard.press("F5");
-  await expect(page.locator("#save-status")).toHaveText(
+  await expect(page.locator("#notifications")).toContainText(
     "Quick save complete: Quicksave",
   );
-  await placeBuilding(page, "build-refinery", 12, 49);
+  await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
   await expect(materials(page)).toHaveText("50");
 
   await page.keyboard.press("F9");
   await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
   await expect(materials(page)).toHaveText("150");
   await page.locator("#resume-mission").click();
-  await placeBuilding(page, "build-refinery", 12, 49);
+  await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
   await expect(materials(page)).toHaveText("50");
 
   await openLoadPanel(page);
@@ -93,7 +93,7 @@ test("completing an objective writes the autosave", async ({ page }) => {
   });
   await importMission(page, source);
   await page.locator("#resume-mission").click();
-  await expect(page.locator("#save-status")).toHaveText(
+  await expect(page.locator("#notifications")).toContainText(
     "Auto save complete: Autosave: Defeat the lone wolf",
     { timeout: 15_000 },
   );
@@ -180,7 +180,7 @@ test("invalid scenario metadata leaves the current session intact", async ({
   await expect(materials(page)).toHaveText("150");
   await page.locator("#cancel-load").click();
   await page.locator("#resume-mission").click();
-  await placeBuilding(page, "build-refinery", 12, 49);
+  await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
   await expect(materials(page)).toHaveText("50");
 });
 
@@ -204,8 +204,11 @@ test("opening and closing the menu during inspection preserves a way to resume",
   await page.locator("#open-menu").click();
   await expect(page.locator("#resume-mission")).toHaveText("Close");
   await page.locator("#resume-mission").click();
-  await expect(page.locator("#resume-loaded-mission")).toBeVisible();
-  await page.locator("#resume-loaded-mission").click();
+  await expect(page.locator("#pause-mission")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.locator("#pause-mission").click();
   await placeBuilding(page, "build-barracks", 49, 39);
   await page.locator("#open-menu").click();
   await expect(page.locator("#resume-mission")).toHaveText("Resume");

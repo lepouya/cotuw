@@ -24,9 +24,10 @@ for (const profile of [
         "data-tile-placed-actor-count",
         "1",
       );
-      await mission.place("refinery", 12, 49);
+      await mission.place("refinery", 12, 49, "Support Network");
       await mission.press("#train-harvester");
       await mission.advance(6);
+      await mission.explanation("Harvester Operations");
       await mission.select("Harvester");
       await mission.press(
         '#gather-sites [data-economy-action="gather:near-materials-1"]',

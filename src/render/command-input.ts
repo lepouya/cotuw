@@ -7,10 +7,72 @@ import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type {
   ActorCommand,
   AttackCommand,
+  AttackMoveCommand,
+  GroupAttackMoveCommand,
   GroupMoveCommand,
 } from "../simulation/command";
 import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
+
+export type ContextActionKind =
+  "attack" | "select" | "add" | "remove" | "move" | "attack-move" | "clear";
+
+/** A world command the radial menu offers. */
+export type ContextAction = {
+  kind: ContextActionKind;
+  label: string;
+  run: () => void;
+};
+
+/**
+ * Actions for a clicked actor or ground point, the primary click's default
+ * first. An empty list means a primary click does nothing.
+ */
+export function contextActionKinds(
+  target: { actorId?: string; ground: boolean },
+  state: {
+    selectedIds: readonly string[];
+    /** Selected actors that can move. */
+    movers: readonly string[];
+    boxMode: boolean;
+    additive: boolean;
+    canCommand?: boolean;
+    canAttack: (actorId: string) => boolean;
+    canMove: (actorId: string) => boolean;
+  },
+): ContextActionKind[] {
+  const { actorId } = target;
+  const { selectedIds, movers, boxMode, additive } = state;
+  if (actorId) {
+    if (
+      state.canCommand !== false &&
+      !boxMode &&
+      movers.length > 0 &&
+      state.canAttack(actorId)
+    )
+      return ["attack", "select"];
+    const toggle = selectedIds.includes(actorId) ? "remove" : "add";
+    if (additive) return [toggle];
+    return state.canMove(actorId) && movers.length > 0
+      ? ["select", toggle]
+      : ["select"];
+  }
+  if (!target.ground) return [];
+  if (state.canCommand === false || boxMode || movers.length === 0)
+    return selectedIds.length > 0 && !additive ? ["clear"] : [];
+  return ["move", "attack-move"];
+}
+
+const CONTEXT_LABELS: Record<ContextActionKind, string> = {
+  attack: "Attack",
+  select: "Select",
+  add: "Add to group",
+  remove: "Remove from group",
+  move: "Move",
+  "attack-move": "Attack Move",
+  clear: "Clear selection",
+};
+
 export type CommandInputOptions = {
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   /** Maps clickable world objects to ground destinations. */
@@ -19,19 +81,36 @@ export type CommandInputOptions = {
   ) => WorldPosition | undefined;
   actorIdsInRect: (rect: SelectionRect) => string[];
   submitCommand: (
-    command: ActorCommand | GroupMoveCommand | AttackCommand,
+    command:
+      | ActorCommand
+      | GroupMoveCommand
+      | AttackCommand
+      | AttackMoveCommand
+      | GroupAttackMoveCommand,
+  ) => void;
+  /** Names a move to this point, such as Gather or Collect. */
+  moveLabel?: (target: WorldPosition) => string | undefined;
+  /** Opens the radial menu for a secondary click; absent disables it. */
+  onContextMenu?: (
+    clientX: number,
+    clientY: number,
+    actions: readonly ContextAction[],
   ) => void;
   /** Whether clicking this actor attacks it instead of selecting it. */
   canAttack?: (actorId: string) => boolean;
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
   onSelectionChanged?: (actorIds: readonly string[]) => void;
   enabled?: () => boolean;
-  /** Reserves world pointers for other tools while keeping selection actions. */
+  /** Reserves primary world gestures for other tools; checked at press. */
   pointerEnabled?: () => boolean;
   groundTargetMode?: () => boolean;
   onGroundTarget?: (target: WorldPosition) => void;
   cancelGroundTarget?: () => boolean;
   canMove?: (actorId: string) => boolean;
+  /** Whether an actor still exists and is visible to the player. */
+  canSelect?: (actorId: string) => boolean;
+  /** Inspection permits selection without offering simulation commands. */
+  canCommand?: () => boolean;
 };
 
 export type CommandInput = {
@@ -67,10 +146,14 @@ export function createCommandInput(
     enabled = () => true,
     pointerEnabled = () => true,
     canMove = () => true,
+    canSelect = () => true,
+    canCommand = () => true,
     canAttack = () => false,
     groundTargetMode = () => false,
     onGroundTarget,
     cancelGroundTarget,
+    moveLabel = () => undefined,
+    onContextMenu,
   }: CommandInputOptions,
 ): CommandInput {
   const selection = createSelection(canMove);
@@ -116,16 +199,21 @@ export function createCommandInput(
     };
   };
   const pointer = createPointerGesture(canvas, {
-    enabled: () =>
-      enabled() &&
-      pointerEnabled() &&
-      worldInputAvailable(canvas.ownerDocument),
+    enabled: () => enabled() && worldInputAvailable(canvas.ownerDocument),
     start: (event) => {
-      if (event.button !== 0) return undefined;
+      const secondary =
+        event.button === 2 && !!onContextMenu && !groundTargetMode();
+      // Pan mode reserves only primary gestures.
+      if (!secondary && (event.button !== 0 || !pointerEnabled()))
+        return undefined;
       canvas.focus({ preventScroll: true });
       return {
-        box: !groundTargetMode() && (event.pointerType !== "touch" || boxMode),
-        additive: event.shiftKey || additiveMode,
+        secondary,
+        box:
+          !secondary &&
+          !groundTargetMode() &&
+          (event.pointerType !== "touch" || boxMode),
+        additive: !secondary && (event.shiftKey || additiveMode),
       };
     },
     release: () => {
@@ -143,7 +231,9 @@ export function createCommandInput(
       });
     },
     end: (event, gesture) => {
-      const { additive, box } = gesture.data;
+      const { additive, box, secondary } = gesture.data;
+      // A secondary drag pans the camera instead.
+      if (secondary && gesture.dragged) return;
       if (gesture.dragged) {
         if (box) {
           selectMany(actorIdsInRect(rectAt(gesture.start, event)), additive);
@@ -170,29 +260,78 @@ export function createCommandInput(
         if (target) onGroundTarget?.(target);
         return;
       }
-      const ids = selection.ids.filter(canMove);
-      if (picked && !boxMode && ids.length > 0 && canAttack(picked)) {
-        for (const actorId of ids)
-          submitCommand({ kind: "attack", actorId, targetId: picked });
-      } else if (picked) {
-        select(picked, additive);
-        onWorldSelectionChanged?.(selection.ids);
-      } else if (target) {
-        if (boxMode || ids.length === 0) {
-          if (!additive) select(undefined);
-          onWorldSelectionChanged?.(selection.ids);
-        } else {
-          if (ids.length === 1)
-            submitCommand({ kind: "move", actorId: ids[0]!, target });
-          else
-            submitCommand({ kind: "group-move", actorIds: [...ids], target });
-        }
-      }
+      const actions = contextActions(picked, target, additive);
+      if (secondary) {
+        if (actions.length)
+          onContextMenu?.(event.clientX, event.clientY, actions);
+      } else if (actions.length) actions[0]!.run();
+      else if (target) onWorldSelectionChanged?.(selection.ids);
     },
   });
+  const contextActions = (
+    picked: string | undefined,
+    target: WorldPosition | undefined,
+    additive: boolean,
+  ): ContextAction[] => {
+    const movers = selection.ids.filter(canMove);
+    const kinds = contextActionKinds(
+      { actorId: picked, ground: !!target },
+      {
+        selectedIds: selection.ids,
+        movers,
+        boxMode,
+        additive,
+        canAttack,
+        canMove,
+        canCommand: canCommand(),
+      },
+    );
+    const choose = (id: string | undefined, add: boolean) => {
+      if (id && !canSelect(id)) return;
+      select(id, add);
+      onWorldSelectionChanged?.(selection.ids);
+    };
+    const currentMovers = () =>
+      movers.filter((id) => selection.ids.includes(id) && canMove(id));
+    const order = (kind: "move" | "attack-move") => {
+      const actorIds = currentMovers();
+      if (!canCommand() || !actorIds.length) return;
+      const groupKind = kind === "move" ? "group-move" : "group-attack-move";
+      if (actorIds.length === 1)
+        submitCommand({ kind, actorId: actorIds[0]!, target: target! });
+      else submitCommand({ kind: groupKind, actorIds, target: target! });
+    };
+    const runs: Record<ContextActionKind, () => void> = {
+      attack: () => {
+        if (!canCommand() || !canAttack(picked!)) return;
+        for (const actorId of currentMovers())
+          submitCommand({ kind: "attack", actorId, targetId: picked! });
+      },
+      select: () => choose(picked, false),
+      add: () => {
+        if (!selection.ids.includes(picked!)) choose(picked, true);
+      },
+      remove: () => {
+        if (selection.ids.includes(picked!)) choose(picked, true);
+      },
+      move: () => order("move"),
+      "attack-move": () => order("attack-move"),
+      clear: () => choose(undefined, false),
+    };
+    return kinds.map((kind) => ({
+      kind,
+      label:
+        (kind === "move" && target && moveLabel(target)) ||
+        CONTEXT_LABELS[kind],
+      run: () => {
+        if (enabled() && worldInputAvailable(canvas.ownerDocument))
+          runs[kind]();
+      },
+    }));
+  };
   const cancelGesture = pointer.cancel;
   const stop = () => {
-    if (!enabled()) return 0;
+    if (!enabled() || !canCommand()) return 0;
     cancelGroundTarget?.();
     const ids = selection.ids.filter(canMove);
     for (const actorId of ids) submitCommand({ kind: "stop", actorId });

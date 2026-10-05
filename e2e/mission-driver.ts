@@ -149,9 +149,17 @@ export class MissionDriver {
     await this.advance(0.05);
   }
 
-  async place(type: string, x: number, z: number) {
+  /** Checks a scenario popup's title, then dismisses it. */
+  async explanation(title: string) {
+    await expect(this.page.locator("#explanation-title")).toHaveText(title);
+    await this.press("#dismiss-explanation");
+    await expect(this.page.locator("#explanation")).toBeHidden();
+  }
+
+  async place(type: string, x: number, z: number, explanation?: string) {
     await this.press("#tab-buildings");
     await this.press(`#build-${type}`);
+    if (explanation) await this.explanation(explanation);
     await this.ground(x, z);
     if (this.touch) await this.press("#confirm-building");
     await expect(this.page.locator("#game-canvas")).toHaveAttribute(

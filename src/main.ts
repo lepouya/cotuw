@@ -5,11 +5,17 @@ import { worldInputAvailable } from "./render/input-focus";
 import { createGameSession, loadMission } from "./session";
 import { createSaveLibrary } from "./saves";
 import { createSidebar } from "./ui/sidebar";
+import { createNotifications } from "./ui/notifications";
+import { createTopBar, formatElapsed, topBarState } from "./ui/top-bar";
 
 import type { Platform } from "./platform";
 import type { GameSession, LoadedMission } from "./session";
 import type { SaveKind, SaveLibrary } from "./saves";
-import type { ScenarioBriefing } from "./simulation/mission-file";
+import type { SidebarState } from "./ui/sidebar";
+import type {
+  ScenarioBriefing,
+  ScenarioPopup,
+} from "./simulation/mission-file";
 import type { MissionResult, ObjectiveView } from "./simulation/objectives";
 import { evaluateObjectives } from "./simulation/objectives";
 
@@ -21,14 +27,13 @@ const dialog = byId<HTMLDialogElement>("game-menu");
 const title = byId("game-menu-title");
 const description = byId("game-menu-description");
 const menuStatus = byId("game-menu-status");
-const saveStatus = byId("save-status");
 const actions = byId("game-menu-actions");
 const restart = byId<HTMLButtonElement>("restart-mission");
 const load = byId<HTMLButtonElement>("load-mission");
 const exit = byId<HTMLButtonElement>("exit-mission");
 const resume = byId<HTMLButtonElement>("resume-mission");
 const inspect = byId<HTMLButtonElement>("inspect-loaded-mission");
-const resumeLoaded = byId<HTMLButtonElement>("resume-loaded-mission");
+const explanation = byId<HTMLDialogElement>("explanation");
 const save = byId<HTMLButtonElement>("save-mission");
 const quicksave = byId<HTMLButtonElement>("quicksave-mission");
 const saveForm = byId<HTMLFormElement>("save-form");
@@ -50,7 +55,10 @@ let saveListRequest = 0;
 let completed = new Set<string>();
 let resumeOnClose = false;
 let menuMode: keyof typeof MENU_TEXT = "exit";
-let saveStatusTimer: ReturnType<typeof setTimeout> | undefined;
+let sidebar: ReturnType<typeof createSidebar> | undefined;
+/** A popup waiting for the game menu to close. */
+let pendingPopup: ScenarioPopup | undefined;
+let shownPopup: { popup: ScenarioPopup; resume: boolean } | undefined;
 
 const KIND_LABELS: Record<SaveKind, string> = {
   manual: "Manual",
@@ -89,21 +97,8 @@ const BRIEFING_ELEMENTS: Record<keyof ScenarioBriefing, string> = {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-const formatElapsed = (seconds: number) => {
-  const whole = Math.floor(seconds);
-  const [hours, minutes] = [Math.floor(whole / 3600), Math.floor(whole / 60)];
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return hours
-    ? `${hours}:${pad(minutes % 60)}:${pad(whole % 60)}`
-    : `${minutes}:${pad(whole % 60)}`;
-};
-
 const elapsed = () =>
-  session
-    ? formatElapsed(
-        session.simulation.completedTicks * session.simulation.tickSeconds,
-      )
-    : "";
+  session ? formatElapsed(topBarState(session).elapsedSeconds) : "";
 
 /** Rolling saves would otherwise replace good progress with a lost mission. */
 const canSave = () =>
@@ -119,17 +114,48 @@ const saveSource = (name: string) =>
 const fileNameFor = (name: string) =>
   `${name.replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "mission"}.json`;
 
+const notifications = createNotifications(document);
+
+const topBar = createTopBar(byId("top-bar"), {
+  togglePause: () => {
+    if (!session || busy) return;
+    if (session.playing()) session.pause();
+    else session.resume();
+  },
+  setSpeed: (speed) => session?.setSpeed(speed),
+  showObjectives: () => sidebar?.showGoals(),
+});
+
+const updateTopBar = (state?: SidebarState) =>
+  topBar.update(topBarState(session, state));
+
 const report = (message: string) => {
-  if (dialog.open) {
-    menuStatus.textContent = message;
-    return;
-  }
-  saveStatus.textContent = message;
-  clearTimeout(saveStatusTimer);
-  saveStatusTimer = setTimeout(() => {
-    saveStatus.textContent = "";
-  }, 5000);
+  if (dialog.open) menuStatus.textContent = message;
+  else notifications.message(message);
 };
+
+/** Shows a waiting popup once no other dialog is open, pausing the mission. */
+function showPopup() {
+  if (!session || !pendingPopup || dialog.open || explanation.open) return;
+  const popup = pendingPopup;
+  pendingPopup = undefined;
+  shownPopup = { popup, resume: session.playing() };
+  // Placement continues after the explanation of it.
+  session.pause({ keepInteractions: true });
+  byId("explanation-title").textContent = popup.title;
+  byId("explanation-text").textContent = popup.text;
+  explanation.showModal();
+}
+
+function dismissPopup() {
+  if (!shownPopup) return;
+  const { popup, resume } = shownPopup;
+  shownPopup = undefined;
+  explanation.close();
+  session?.dismissPopup(popup.id);
+  if (resume) session?.resume();
+  canvas.focus({ preventScroll: true });
+}
 
 function showPanel(panel: "actions" | "save" | "load") {
   saveListRequest++;
@@ -157,8 +183,6 @@ function showMenu(mode: keyof typeof MENU_TEXT, result?: MissionResult) {
         ? "Close"
         : "Resume";
   inspect.hidden = mode !== "loaded";
-  resumeLoaded.hidden =
-    mode !== "loaded" && !(mode === "menu" && !resumeOnClose);
   save.hidden = quicksave.hidden = !canSave();
   restart.textContent = mode === "exit" ? "Start mission" : "Restart";
   restart.hidden = !levels.has(mission?.scenario.id ?? "");
@@ -169,7 +193,7 @@ function showMenu(mode: keyof typeof MENU_TEXT, result?: MissionResult) {
 }
 
 function openMenu() {
-  if (!session || busy || dialog.open) return;
+  if (!session || busy || dialog.open || explanation.open) return;
   resumeOnClose = session.playing();
   session.pause();
   showMenu("menu");
@@ -190,12 +214,13 @@ async function start(next: LoadedMission, loaded = false) {
   if (busy) return;
   loadRequest++;
   setBusy(true);
-  let sidebar: ReturnType<typeof createSidebar> | undefined;
   try {
     await session?.disposeAsync();
     session = undefined;
     dialog.close();
-    resumeLoaded.hidden = true;
+    pendingPopup = shownPopup = undefined;
+    explanation.close();
+    notifications.clear();
     delete canvas.dataset.missionResult;
     delete canvas.dataset.terrainReady;
     delete canvas.dataset.simulationFault;
@@ -206,11 +231,7 @@ async function start(next: LoadedMission, loaded = false) {
         .map(({ id }) => id),
     );
     showBriefing(next.scenario.briefing);
-    for (const id of [
-      "network-view-control",
-      "resource-bar",
-      "economy-overview",
-    ])
+    for (const id of ["network-view-control", "economy-overview"])
       byId(id).hidden = !next.state.economy;
     sidebar = createSidebar(byId("game-sidebar"), {
       definitions: next.definitions,
@@ -228,7 +249,15 @@ async function start(next: LoadedMission, loaded = false) {
       cameraControls: byId("camera-controls"),
       onStateChanged: (state) => {
         activeSidebar.update(state);
+        updateTopBar(state);
         autosaveOnProgress(state.objectives ?? []);
+      },
+      onAlerts: (alerts) => {
+        for (const alert of alerts) notifications.alert(alert, elapsed());
+      },
+      onPopup: (popup) => {
+        pendingPopup = popup;
+        showPopup();
       },
       showActor: activeSidebar.showActor,
       onDispose: activeSidebar.dispose,
@@ -236,11 +265,14 @@ async function start(next: LoadedMission, loaded = false) {
       onResult: (result) => session && showMenu(result.kind, result),
       onReady: (ready) => {
         session = ready;
+        notifications.setFocus(ready.focus);
       },
     });
   } catch (error) {
     sidebar?.dispose();
+    sidebar = undefined;
     session = undefined;
+    updateTopBar();
     console.error("The mission failed to start.", error);
     showMenu("exit");
     menuStatus.textContent = "The mission could not start. Try restarting.";
@@ -369,8 +401,8 @@ const resumeMission = () => {
   loadRequest++;
   saveListRequest++;
   session?.resume();
-  resumeLoaded.hidden = true;
   dialog.close();
+  showPopup();
 };
 const closeMenu = () => {
   if (busy) return;
@@ -379,6 +411,7 @@ const closeMenu = () => {
     loadRequest++;
     saveListRequest++;
     dialog.close();
+    showPopup();
   }
 };
 dialog.addEventListener("cancel", (event) => {
@@ -386,12 +419,17 @@ dialog.addEventListener("cancel", (event) => {
   if (menuMode === "menu") closeMenu();
 });
 resume.addEventListener("click", closeMenu);
-resumeLoaded.addEventListener("click", resumeMission);
 inspect.addEventListener("click", () => {
   if (busy) return;
   loadRequest++;
   saveListRequest++;
   dialog.close();
+  showPopup();
+});
+byId("dismiss-explanation").addEventListener("click", dismissPopup);
+explanation.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  dismissPopup();
 });
 restart.addEventListener("click", () => startLevel(mission!.scenario.id));
 exit.addEventListener("click", async () => {
@@ -401,6 +439,9 @@ exit.addEventListener("click", async () => {
   try {
     await session?.disposeAsync();
     session = undefined;
+    notifications.clear();
+    sidebar = undefined;
+    updateTopBar();
     showMenu("exit");
   } finally {
     setBusy(false);

@@ -278,6 +278,7 @@ export function createSidebar(
       animate: element<HTMLInputElement>("animate-building"),
     },
     showActor,
+    showGoals: () => showTab("panel-goals"),
     update: (state: SidebarState) => {
       const objectives = state.objectives ?? [];
       objectiveList.hidden = objectives.length === 0;
@@ -290,11 +291,6 @@ export function createSidebar(
       missionGoals.update(objectives);
       placementActions.hidden = !state.placementActive;
       remove.disabled = !state.canRemove;
-      if (state.materials !== undefined) {
-        const counter = document.querySelector("#materials-counter");
-        if (counter && counter.textContent !== String(state.materials))
-          counter.textContent = String(state.materials);
-      }
       for (const { definitionId, button } of buildings) {
         const cost = materialsCost(definitionById.get(definitionId)!);
         const unaffordable =

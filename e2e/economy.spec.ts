@@ -26,30 +26,21 @@ async function controlledOpening(
       errors.push(String(event.reason)),
     );
   });
-  await page.goto("/");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
+  // The harness owns one session and its controls on the production HTML.
+  await page.route("**/src/main.ts", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: 'import "/src/styles.css";',
+    }),
   );
+  await page.goto("/");
   const hiddenUnitsAtLoad = await page.evaluate(
     async ({ materials, playerFaction, extraBuildings, startPaused }) => {
-      const harnessPath: string = "/e2e/harness.ts";
       const prototypePath: string = "/src/session.ts";
       const sidebarPath: string = "/src/ui/sidebar.ts";
       const missionsPath: string = "/e2e/missions.ts";
-      const { EngineStore, frames } = (await import(
-        harnessPath
-      )) as typeof import("./harness");
-      const engines = [...EngineStore.Instances];
-      for (const engine of engines) {
-        for (const scene of engine.scenes) {
-          await scene.whenReadyAsync();
-          // Babylon's deferred RGBD decode must finish before engine teardown.
-          while (scene.textures.some((texture) => !texture.isReady()))
-            await frames(1);
-        }
-        engine.dispose();
-      }
+      const notificationsPath: string = "/src/ui/notifications.ts";
+      const topBarPath: string = "/src/ui/top-bar.ts";
       const { createGameSession } = (await import(
         prototypePath
       )) as typeof import("../src/session");
@@ -59,7 +50,16 @@ async function controlledOpening(
       const { level, placeBuildings } = (await import(
         missionsPath
       )) as typeof import("./missions");
+      const { createNotifications } = (await import(
+        notificationsPath
+      )) as typeof import("../src/ui/notifications");
+      const notifications = createNotifications(document);
+      const { createTopBar, topBarState } = (await import(
+        topBarPath
+      )) as typeof import("../src/ui/top-bar");
       const mission = level();
+      for (const id of ["network-view-control", "economy-overview"])
+        document.getElementById(id)!.hidden = false;
       mission.state.economy!.materials = materials;
       mission.state.playerFaction = playerFaction;
       placeBuildings(mission, extraBuildings);
@@ -75,6 +75,14 @@ async function controlledOpening(
           selectActor: (id, additive) => view.selectActor(id, additive),
         },
       );
+      const topBar = createTopBar(
+        document.querySelector<HTMLElement>("#top-bar")!,
+        {
+          togglePause: () => (view.playing() ? view.pause() : view.resume()),
+          setSpeed: (speed) => view.setSpeed(speed),
+          showObjectives: sidebar.showGoals,
+        },
+      );
       view = await createGameSession(
         document.querySelector<HTMLCanvasElement>("#game-canvas")!,
         document.querySelector<HTMLCanvasElement>("#minimap")!,
@@ -82,11 +90,18 @@ async function controlledOpening(
           ...sidebar.controls,
           startPaused,
           mission,
-          onStateChanged: sidebar.update,
+          onStateChanged: (state) => {
+            sidebar.update(state);
+            topBar.update(topBarState(view, state));
+          },
           showActor: sidebar.showActor,
           onDispose: sidebar.dispose,
+          onAlerts: (alerts) => {
+            for (const alert of alerts) notifications.alert(alert, "");
+          },
         },
       );
+      notifications.setFocus(view.focus);
       window.economyHarness = { view, now: performance.now() };
       Object.defineProperty(performance, "now", {
         configurable: true,
@@ -102,6 +117,10 @@ async function controlledOpening(
         .map((actor) => actor.id);
     },
     { materials, playerFaction, extraBuildings, startPaused },
+  );
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-terrain-ready",
+    "true",
   );
   expect(hiddenUnitsAtLoad).toEqual([]);
   expect(
@@ -718,10 +737,16 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   await page.locator("#tab-selection").click();
   await page.locator("#remove-building").click();
   await advance(page, 0.1);
-  await expect(page.locator("#network-alerts button")).toContainText(
-    "1 building disconnected",
-  );
-  await page.locator("#network-alerts button").click();
+  const networkAlerts = page
+    .locator("#alert-history li")
+    .filter({ hasText: /building (dis|re)connected/ });
+  await expect(networkAlerts).toHaveText(["⚠ 1 building disconnected"]);
+  await page.locator("#alert-toggle").click();
+  await page
+    .locator("#alert-history button")
+    .filter({ hasText: "1 building disconnected" })
+    .click();
+  await page.locator("#alert-toggle").click();
   await page.evaluate(
     (id) => window.economyHarness.view.selectActor(id),
     remoteId,
@@ -762,9 +787,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   await place(page, "#build-barracks", 16, 50);
   await advance(page, 5);
   await expect(page.locator("#unit-roster button")).toHaveCount(1);
-  await expect(page.locator("#network-alerts button").first()).toContainText(
-    "1 building reconnected",
-  );
+  await expect(networkAlerts.first()).toHaveText("• 1 building reconnected");
   await page.evaluate(async () => {
     const contentPath: string = "/src/content/packs.ts";
     const harnessPath: string = "/e2e/harness.ts";
@@ -798,14 +821,14 @@ test("selling a support bridge pauses production and rebuilding restores it", as
       completedTicks: totalTicks - 2,
     };
     simulation.spawnActor(backup);
-    document.querySelector("#network-alerts")!.replaceChildren();
+    document.querySelector("#alert-history")!.replaceChildren();
     simulation.submitCommand({ kind: "sell-actor", actorId: replacement.id });
   });
   // One render frame commits both the outage and the backup's completion.
   await advance(page, 0.1);
-  await expect(page.locator("#network-alerts button")).toHaveText([
-    "1 building reconnected",
-    "1 building disconnected",
+  await expect(networkAlerts).toHaveText([
+    "• 1 building reconnected",
+    "⚠ 1 building disconnected",
   ]);
   await expect(page.locator("#game-canvas")).not.toHaveAttribute(
     "data-simulation-fault",
@@ -1031,6 +1054,21 @@ for (const profile of [
       const point = await terrainPoint(page, 52, 32);
       if (profile.touch) await page.touchscreen.tap(point.x, point.y);
       else await page.mouse.click(point.x, point.y);
+      const destination = await page.evaluate(async () => {
+        const path: string = "/e2e/harness.ts";
+        const { prototypeTerrainMap } = await import(path);
+        const order = window.economyHarness.view.simulation
+          .snapshot()
+          .commands.find(({ command }) => command.kind === "attack-move");
+        if (order?.command.kind !== "attack-move")
+          throw new Error("The terrain press issued no Attack Move order.");
+        const { target } = order.command;
+        return {
+          target,
+          tile: prototypeTerrainMap().tileAtWorldPosition(target.x, target.z),
+        };
+      });
+      expect(destination.tile).toEqual({ x: 52, z: 32 });
       await advance(page, 1);
       await expect(page.locator("#movement-status")).toContainText(
         "Attack Move order",
@@ -1057,8 +1095,9 @@ for (const profile of [
       });
       expect(result.wolf).toBeUndefined();
       expect(result.aggressive).toBeUndefined();
-      expect(result.point.x).toBeCloseTo(2.5, 1);
-      expect(result.point.z).toBeCloseTo(-17.5, 1);
+      // Pointer coordinates round to pixels; arrival matches the issued order.
+      expect(result.point.x).toBeCloseTo(destination.target.x, 6);
+      expect(result.point.z).toBeCloseTo(destination.target.z, 6);
       expect(result.health).toBeGreaterThan(0);
       await testInfo.attach(`attack-move-${profile.name}`, {
         body: await page.screenshot(),
@@ -1275,12 +1314,12 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   await upload(saves.pending);
   await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
   await page.locator("#inspect-loaded-mission").click();
-  await expect(page.locator("#resume-loaded-mission")).toBeVisible();
+  await expect(page.locator("#pause-mission")).toHaveText("▶ Paused");
   await expect(page.locator("#game-canvas")).not.toHaveAttribute(
     "data-mission-result",
     "defeat",
   );
-  await page.locator("#resume-loaded-mission").click();
+  await page.locator("#pause-mission").click();
   await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-mission-result",

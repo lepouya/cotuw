@@ -33,10 +33,18 @@ const SELECTED_ACTOR_COLOR = "rgb(255 220 112)";
 const SELECTED_ACTOR_OUTLINE_WIDTH = 1.5;
 /** Marker radius in CSS pixels. */
 const ACTOR_RADIUS = 3;
+const PING_COLOR = "rgb(255 96 72)";
+const PING_SECONDS = 2.4;
+/** One expanding ring lasts this long; a ping repeats it. */
+const PING_RING_SECONDS = 0.8;
+/** The ring's largest radius, in CSS pixels. */
+const PING_RADIUS = 14;
 
 export type Minimap = {
   /** Re-reads `actors` before the next redraw. Call it when they change. */
   refreshActors: () => void;
+  /** Pulses a ring at a world point to draw attention to it. */
+  ping: (point: { x: number; z: number }) => void;
   dispose: () => void;
 };
 
@@ -60,6 +68,8 @@ export type MinimapOptions = {
   commandMode?: () => boolean;
   /** Returns whether it used the point; otherwise the camera navigates. */
   onCommand?: (target: { x: number; z: number }) => boolean;
+  /** Draws pings as steady rings instead of expanding ones. */
+  reducedMotion?: () => boolean;
 };
 
 /**
@@ -77,6 +87,7 @@ export function createMinimap(
     fog = () => undefined,
     commandMode = () => false,
     onCommand,
+    reducedMotion = () => false,
   }: MinimapOptions = {},
 ): Minimap {
   const context = canvas.getContext("2d");
@@ -126,6 +137,7 @@ export function createMinimap(
 
   let outline: ScreenPoint[] = [];
   let actorMarkers: ActorMarker[] = [];
+  let pings: { point: { x: number; z: number }; start: number }[] = [];
   // Runs after each main render, so the outline matches the frame on screen.
   // Actors change at the simulation's pace, not every frame.
   let actorsStale = true;
@@ -164,8 +176,10 @@ export function createMinimap(
         needsDraw = true;
       }
     }
+    const now = performance.now();
+    pings = pings.filter(({ start }) => now - start < PING_SECONDS * 1000);
     const footprint = camera.viewFootprint().map(projection.toMinimap);
-    if (!needsDraw && samePoints(footprint, outline)) {
+    if (!needsDraw && !pings.length && samePoints(footprint, outline)) {
       return;
     }
     needsDraw = false;
@@ -188,6 +202,22 @@ export function createMinimap(
     );
     drawActors(context, actorMarkers);
     drawFootprint(context, footprint);
+    const steady = reducedMotion();
+    context.lineWidth = 2;
+    context.strokeStyle = PING_COLOR;
+    for (const { point, start } of pings) {
+      const { x, y } = projection.toMinimap(point);
+      const ring = steady
+        ? 1
+        : (((now - start) / 1000) % PING_RING_SECONDS) / PING_RING_SECONDS;
+      context.beginPath();
+      context.arc(x, y, ACTOR_RADIUS + ring * PING_RADIUS, 0, Math.PI * 2);
+      context.globalAlpha = steady ? 1 : 1 - ring;
+      context.stroke();
+    }
+    context.globalAlpha = 1;
+    // Clears the last ring once every ping has ended.
+    if (pings.length) needsDraw = true;
   };
   const renderObserver = scene.onAfterRenderObservable.add(draw);
 
@@ -271,6 +301,9 @@ export function createMinimap(
   return {
     refreshActors: () => {
       actorsStale = true;
+    },
+    ping: (point) => {
+      pings.push({ point: { ...point }, start: performance.now() });
     },
     dispose,
   };

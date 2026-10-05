@@ -31,10 +31,16 @@ can be read, edited by hand, and loaded again.
     build lacks or a different version, so a save keeps its rules.
   - `actors` lists the pack's actor IDs this mission uses; omit it to use all.
   - `name`, `briefing`, and `goals` fill the save list and sidebar.
+  - `popups` lists explanations with an `id`, `title`, `text`, and a
+    `trigger`: `{ "kind": "placement", "definitionId": ... }` while placing
+    that building, or `{ "kind": "actor", "definitionId": ... }` once the
+    player owns a completed actor of it. Placement triggers require an actor
+    definition with a footprint.
   - `tileSize`, `terrainTypeIds`, and `objectives` define the map scale, valid
     terrain types, and victory and defeat rules.
 - `state` holds the complete simulation state. `state.scenarioId` must match
-  `scenario.id`.
+  `scenario.id`. `state.dismissedPopups` lists the popup IDs the player
+  dismissed; removing an ID shows that popup again.
 
 ## Terrain and fog
 

@@ -19,10 +19,6 @@
           <p class="muted">
             <span id="scenario-label"></span>
           </p>
-          <button id="open-menu" type="button" title="Game menu (F10)">
-            Menu
-          </button>
-          <p id="save-status" class="save-status" role="status"></p>
         </header>
         <div class="sidebar-tabs" role="tablist" aria-label="Command panels">
           <button
@@ -66,12 +62,6 @@
           </button>
         </div>
         <div class="sidebar-content">
-          <div
-            id="network-alerts"
-            class="actor-list"
-            aria-label="Support network alerts"
-            aria-live="polite"
-          ></div>
           <section
             id="panel-selection"
             role="tabpanel"
@@ -253,121 +243,217 @@
         <footer class="sidebar-footer">
           <p id="scenario-rules" class="muted"></p>
           <p class="controls">
-            Click to select or move · Shift-click to add<br />Drag to select ·
-            Pan mode: drag or scroll · Space-drag to pan<br />Arrow keys pan the
-            focused world · Scroll to zoom · Shift-right-drag to rotate
+            Click to select or move · Shift-click to add · Right-click for
+            actions<br />Drag to select · Pan mode: drag or scroll · Space-drag
+            to pan<br />Arrow keys pan the focused world · Scroll to zoom ·
+            Shift-right-drag to rotate
           </p>
         </footer>
       </aside>
       <div class="game-viewport">
-        <div class="mission-status">
-          <div id="resource-bar" class="resource-bar" hidden>
-            <strong>Materials <span id="materials-counter">0</span></strong>
+        <header id="top-bar" class="top-bar" aria-label="Mission status">
+          <div class="top-bar-group">
+            <button id="open-menu" type="button" title="Game menu (F10)">
+              Menu
+            </button>
+            <div class="time-controls" role="group" aria-label="Game speed">
+              <button id="pause-mission" type="button" aria-pressed="false">
+                ⏸ Pause
+              </button>
+              <button
+                type="button"
+                data-speed="0.5"
+                aria-pressed="false"
+                aria-label="Half speed"
+              >
+                ½×
+              </button>
+              <button
+                type="button"
+                data-speed="1"
+                aria-pressed="true"
+                aria-label="Normal speed"
+              >
+                1×
+              </button>
+              <button
+                type="button"
+                data-speed="2"
+                aria-pressed="false"
+                aria-label="Double speed"
+              >
+                2×
+              </button>
+            </div>
           </div>
-          <button id="resume-loaded-mission" type="button" hidden>
-            Resume mission
+          <button
+            id="objective-summary"
+            class="objective-summary"
+            type="button"
+            hidden
+          >
+            <span aria-hidden="true">◎</span>
+            <span id="objective-text" class="objective-text"></span>
           </button>
+          <div class="top-bar-group">
+            <span
+              id="resource-bar"
+              class="resource-bar"
+              title="Materials"
+              hidden
+              ><span class="resource-name">Materials</span
+              ><span class="resource-symbol" aria-hidden="true">◆</span>
+              <strong id="materials-counter">0</strong></span
+            >
+            <span
+              id="mission-time"
+              class="mission-time"
+              role="timer"
+              title="Elapsed mission time"
+              >0:00</span
+            >
+            <button
+              id="alert-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="alert-history-panel"
+            >
+              ⚠ <span id="alert-unread" class="alert-unread"></span>
+            </button>
+          </div>
+        </header>
+        <div class="world-view">
+          <section
+            id="alert-history-panel"
+            class="alert-history"
+            aria-label="Alert history"
+            hidden
+          >
+            <h2>Alerts</h2>
+            <ol id="alert-history"></ol>
+          </section>
+          <div
+            id="notifications"
+            class="notifications"
+            role="status"
+            aria-live="polite"
+          ></div>
+          <canvas
+            id="game-canvas"
+            aria-label="Game world"
+            tabindex="0"
+          ></canvas>
+          <div
+            id="camera-controls"
+            class="camera-controls"
+            role="group"
+            aria-label="Camera controls"
+          >
+            <button
+              type="button"
+              data-camera-action="rotate-left"
+              aria-label="Rotate camera left"
+            >
+              ↶
+            </button>
+            <button
+              type="button"
+              data-camera-action="up"
+              aria-label="Pan camera up"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              data-camera-action="rotate-right"
+              aria-label="Rotate camera right"
+            >
+              ↷
+            </button>
+            <button
+              type="button"
+              data-camera-action="left"
+              aria-label="Pan camera left"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              data-camera-action="reset"
+              aria-label="Reset camera view"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              data-camera-action="right"
+              aria-label="Pan camera right"
+            >
+              →
+            </button>
+            <button
+              type="button"
+              data-camera-action="zoom-in"
+              aria-label="Zoom camera in"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              data-camera-action="down"
+              aria-label="Pan camera down"
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              data-camera-action="zoom-out"
+              aria-label="Zoom camera out"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              data-camera-action="tilt-up"
+              aria-label="Tilt camera up"
+            >
+              Tilt ↑
+            </button>
+            <button
+              type="button"
+              data-camera-action="tilt-down"
+              aria-label="Tilt camera down"
+            >
+              Tilt ↓
+            </button>
+            <button
+              type="button"
+              data-camera-action="pan"
+              aria-label="Pan mode"
+              aria-pressed="false"
+              title="Pan mode: drag with one finger or scroll. Turn off to select and command units."
+            >
+              Pan
+            </button>
+            <label class="edge-pan-control">
+              <input id="edge-panning" type="checkbox" checked /> Edge panning
+            </label>
+          </div>
+          <canvas
+            id="minimap"
+            class="minimap"
+            aria-label="Map overview"
+          ></canvas>
         </div>
-        <canvas id="game-canvas" aria-label="Game world" tabindex="0"></canvas>
-        <div
-          id="camera-controls"
-          class="camera-controls"
-          role="group"
-          aria-label="Camera controls"
-        >
-          <button
-            type="button"
-            data-camera-action="rotate-left"
-            aria-label="Rotate camera left"
-          >
-            ↶
-          </button>
-          <button
-            type="button"
-            data-camera-action="up"
-            aria-label="Pan camera up"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            data-camera-action="rotate-right"
-            aria-label="Rotate camera right"
-          >
-            ↷
-          </button>
-          <button
-            type="button"
-            data-camera-action="left"
-            aria-label="Pan camera left"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            data-camera-action="reset"
-            aria-label="Reset camera view"
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            data-camera-action="right"
-            aria-label="Pan camera right"
-          >
-            →
-          </button>
-          <button
-            type="button"
-            data-camera-action="zoom-in"
-            aria-label="Zoom camera in"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            data-camera-action="down"
-            aria-label="Pan camera down"
-          >
-            ↓
-          </button>
-          <button
-            type="button"
-            data-camera-action="zoom-out"
-            aria-label="Zoom camera out"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            data-camera-action="tilt-up"
-            aria-label="Tilt camera up"
-          >
-            Tilt ↑
-          </button>
-          <button
-            type="button"
-            data-camera-action="tilt-down"
-            aria-label="Tilt camera down"
-          >
-            Tilt ↓
-          </button>
-          <button
-            type="button"
-            data-camera-action="pan"
-            aria-label="Pan mode"
-            aria-pressed="false"
-            title="Pan mode: drag with one finger or scroll. Turn off to select and command units."
-          >
-            Pan
-          </button>
-          <label class="edge-pan-control">
-            <input id="edge-panning" type="checkbox" checked /> Edge panning
-          </label>
-        </div>
-        <canvas id="minimap" class="minimap" aria-label="Map overview"></canvas>
       </div>
     </main>
+    <dialog id="explanation" aria-labelledby="explanation-title">
+      <p class="eyebrow">Field guide</p>
+      <h2 id="explanation-title"></h2>
+      <p id="explanation-text"></p>
+      <p class="muted">The mission is paused.</p>
+      <button id="dismiss-explanation" type="button">Continue</button>
+    </dialog>
     <dialog id="game-menu" aria-labelledby="game-menu-title">
       <h2 id="game-menu-title">Paused</h2>
       <p id="game-menu-description"></p>

@@ -27,6 +27,17 @@ export type ScenarioBriefing = {
   rules: string;
 };
 
+/**
+ * A dismissible explanation shown the first time its trigger holds: while the
+ * player places a building of the definition, or owns a completed actor of it.
+ */
+export type ScenarioPopup = {
+  id: string;
+  title: string;
+  text: string;
+  trigger: { kind: "placement" | "actor"; definitionId: string };
+};
+
 /** Authored content that stays fixed during a mission and travels with it. */
 export type MissionScenario = {
   readonly id: string;
@@ -40,6 +51,7 @@ export type MissionScenario = {
   readonly objectives?: readonly ObjectiveDefinition[];
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
+  readonly popups?: readonly ScenarioPopup[];
 };
 
 export type SaveInfo = { name: string; savedAt: string };
@@ -95,6 +107,7 @@ export function serializeMission(
     objectives,
     briefing,
     goals,
+    popups,
   } = scenario;
   return formatJson({
     format: FORMAT,
@@ -111,6 +124,7 @@ export function serializeMission(
       objectives,
       briefing,
       goals,
+      popups,
     },
     state: {
       ...state,
@@ -198,6 +212,34 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
       ))
   )
     throw new RangeError("Scenario goals need an actor ID and text.");
+  const popups = scenario.popups;
+  if (
+    popups !== undefined &&
+    (!Array.isArray(popups) ||
+      !isIdList(popups.map((popup) => popup?.id)) ||
+      popups.some(
+        ({ title, text, trigger }) =>
+          typeof title !== "string" ||
+          typeof text !== "string" ||
+          !isRecord(trigger) ||
+          !["placement", "actor"].includes(trigger.kind as string) ||
+          !isId(trigger.definitionId),
+      ))
+  )
+    throw new RangeError(
+      "Scenario popups need distinct IDs, text, and a placement or actor trigger.",
+    );
+  const dismissed = state?.dismissedPopups;
+  if (
+    dismissed !== undefined &&
+    (!isIdList(dismissed) ||
+      dismissed.some(
+        (id) => !popups?.some((popup: ScenarioPopup) => popup.id === id),
+      ))
+  )
+    throw new RangeError(
+      "Dismissed popups must be distinct IDs of the scenario's popups.",
+    );
   if (scenario.objectives !== undefined && !Array.isArray(scenario.objectives))
     throw new RangeError("Scenario objectives must be a list.");
   if (

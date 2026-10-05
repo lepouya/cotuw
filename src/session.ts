@@ -80,6 +80,13 @@ import type { TerrainStyle } from "./render/terrain-style";
 import type { ContentPack, ViewStyle } from "./content/content-pack";
 import { healthBarOpacity } from "./render/health-bars";
 import { createPlayerAccess } from "./simulation/faction";
+import { createAlertTracker } from "./ui/mission-alerts";
+import type { MissionAlert } from "./ui/mission-alerts";
+import { duePopup } from "./ui/popups";
+import { contextualMoveCommands } from "./ui/contextual-move";
+import { createRadialMenu } from "./ui/radial-menu";
+import type { ScenarioPopup } from "./simulation/mission-file";
+import type { WorldPosition } from "./simulation/world";
 
 const SITE_MINIMAP_COLOR: Rgb = [0.3, 0.66, 0.75];
 const SALVAGE_MINIMAP_COLOR: Rgb = [0.88, 0.65, 0.2];
@@ -102,8 +109,16 @@ export type LoadedMission = MissionFile & {
 export type GameSession = GameView & {
   simulation: MissionSimulation;
   playing: () => boolean;
-  pause: () => void;
+  /** Pausing ends placement and targeting unless they are kept. */
+  pause: (options?: { keepInteractions?: boolean }) => void;
   resume: () => void;
+  /** Simulated seconds per real second. */
+  speed: () => number;
+  setSpeed: (speed: number) => void;
+  /** Records a popup's dismissal in the mission state. */
+  dismissPopup: (id: string) => void;
+  /** Eases the camera to a world point. */
+  focus: (point: Readonly<WorldPosition>) => void;
   /** Waits for model and texture initialization before releasing the engine. */
   disposeAsync: () => Promise<void>;
   /** The current mission as a save file. */
@@ -129,6 +144,10 @@ export type GameSessionControls = BuildingPlacementControls &
     onStateChanged?: (state: SidebarState) => void;
     /** Reveals details for an actor the player selected or placed. */
     showActor?: (definitionId: string) => void;
+    /** Receives grouped alerts after each tick. */
+    onAlerts?: (alerts: readonly MissionAlert[]) => void;
+    /** Shows a scenario popup once each time its trigger first holds. */
+    onPopup?: (popup: ScenarioPopup) => void;
     remove?: HTMLButtonElement;
     animate?: HTMLInputElement;
     cameraControls?: HTMLElement;
@@ -179,11 +198,21 @@ export function loadMission(source: string): LoadedMission {
       })
     : content.actors;
   const mission = { ...file, content, definitions };
-  for (const goal of file.scenario.goals ?? [])
-    if (!definitions.some(({ id }) => id === goal.definitionId))
+  const requireActor = (use: string, definitionId: string) => {
+    const definition = definitions.find(({ id }) => id === definitionId);
+    if (!definition)
       throw new RangeError(
-        `Scenario goal uses unknown actor "${goal.definitionId}".`,
+        `Scenario ${use} uses unknown actor "${definitionId}".`,
       );
+    return definition;
+  };
+  for (const goal of file.scenario.goals ?? [])
+    requireActor("goal", goal.definitionId);
+  for (const { trigger } of file.scenario.popups ?? []) {
+    const definition = requireActor("popup", trigger.definitionId);
+    if (trigger.kind === "placement" && !definition.footprint)
+      throw new RangeError("Placement popups require a building definition.");
+  }
   createSessionSimulation(
     createScenarioMap({ ...file.scenario, terrain: file.state.terrain }),
     mission,
@@ -327,6 +356,7 @@ export async function createGameSession(
     const actor = simulation.actorById(actorId);
     if (actor) controls.showActor?.(actor.definitionId);
   };
+  const radial = createRadialMenu(document.body, canvas);
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: (mesh) => {
       const id =
@@ -342,6 +372,11 @@ export async function createGameSession(
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
     enabled: () => !placement.active && !halted(),
     pointerEnabled: () => !view.camera.primaryPanActive,
+    canCommand,
+    canSelect: (id) => {
+      const actor = actorsByKind().byId.get(id);
+      return !!actor && player.shows(actor);
+    },
     groundTargetMode: () => rally.active || attackMove.active,
     onGroundTarget: (target) =>
       attackMove.active ? attackMove.choose(target) : rally.choose(target),
@@ -354,6 +389,26 @@ export async function createGameSession(
         isMobileActor(actor, definitionsById.get(actor.definitionId))
       );
     },
+    moveLabel: (target) => {
+      const tile = map.tileAtWorldPosition(target.x, target.z);
+      const at = ({ x, z }: TileCoord) =>
+        x === tile.x && z === tile.z && explored(tile);
+      const economy = simulation.economy;
+      if (economy?.loot.some((loot) => !loot.collected && at(loot.tile)))
+        return "Collect";
+      const harvesters = new Set(
+        economy?.harvesters.map(({ actorId }) => actorId),
+      );
+      if (
+        input.selectedActorIds.some((id) => harvesters.has(id)) &&
+        economy?.sites.some(
+          (site) => site.remainingMaterials > 0 && at(site.tile),
+        )
+      )
+        return "Gather";
+      return undefined;
+    },
+    onContextMenu: radial.show,
     canAttack: (actorId) => {
       if (!canCommand()) return false;
       const actor = actorsByKind().byId.get(actorId);
@@ -365,31 +420,29 @@ export async function createGameSession(
     },
     submitCommand: (command) => {
       if (!canCommand()) return;
+      const economy = simulation.economy;
       if (
-        command.kind === "move" &&
-        simulation.economy?.harvesters.some(
-          (worker) => worker.actorId === command.actorId,
-        )
+        (command.kind === "move" || command.kind === "group-move") &&
+        economy
       ) {
         const tile = map.tileAtWorldPosition(
           command.target.x,
           command.target.z,
         );
-        const site = simulation.economy.sites.find(
+        const site = economy.sites.find(
           (site) =>
             site.remainingMaterials > 0 &&
             site.tile.x === tile.x &&
             site.tile.z === tile.z &&
             explored(site.tile),
         );
-        if (site) {
-          simulation.submitCommand({
-            kind: "gather",
-            actorId: command.actorId,
-            siteId: site.id,
-          });
-          return;
-        }
+        for (const order of contextualMoveCommands(
+          command,
+          new Set(economy.harvesters.map(({ actorId }) => actorId)),
+          site?.id,
+        ))
+          simulation.submitCommand(order);
+        return;
       }
       simulation.submitCommand(command);
     },
@@ -413,6 +466,7 @@ export async function createGameSession(
   });
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
     fog: () => simulation.fog,
+    reducedMotion: () => reducedMotion.matches,
     commandMode: () => attackMove.active,
     onCommand: (target) => {
       if (!explored(map.tileAtWorldPosition(target.x, target.z))) return false;
@@ -492,7 +546,43 @@ export async function createGameSession(
     knownControlsTick = simulation.completedTicks;
     knownPlacementActive = placement.active;
     controlsDirty = false;
+    raisePopup();
   };
+  const popups = mission.scenario.popups ?? [];
+  const dismissedPopups = new Set(mission.state.dismissedPopups);
+  let raisedPopup: string | undefined;
+  const raisePopup = () => {
+    if (halted()) return;
+    const popup = duePopup(popups, dismissedPopups, {
+      placing: placement.definitionId,
+      owns: (id) =>
+        simulation.actors.some(
+          (actor) =>
+            actor.definitionId === id &&
+            !actor.construction &&
+            player.owns(actor),
+        ),
+    });
+    if (!popup || popup.id === raisedPopup) return;
+    raisedPopup = popup.id;
+    controls.onPopup?.(popup);
+  };
+  const alertTracker = createAlertTracker({
+    owns: player.owns,
+    nameOf: (id) => names.get(id) ?? id,
+  });
+  const observeAlerts = () =>
+    alertTracker.observe({
+      tick: simulation.completedTicks,
+      tickSeconds: simulation.tickSeconds,
+      actors: simulation.actors,
+      attacks: simulation.attacks,
+      wrecks: simulation.wrecks,
+      support: simulation.support,
+      objectives: simulation.objectives,
+      harvesterIds:
+        simulation.economy?.harvesters.map(({ actorId }) => actorId) ?? [],
+    });
   const placement = createBuildingPlacement(
     canvas,
     view.scene,
@@ -526,6 +616,7 @@ export async function createGameSession(
         input.setBoxMode(false);
         input.setAdditiveMode(false);
         input.select(undefined);
+        raisePopup();
       },
     },
   );
@@ -601,10 +692,6 @@ export async function createGameSession(
   const network = createNetworkControls(simulation, controls, {
     selectedActorId: selectedOwnActorId,
     canControl: (id) => actorsByKind().ownIds.has(id),
-    focus: (point) => {
-      const tile = map.tileAtWorldPosition(point.x, point.z);
-      view.camera.focusOnTile(tile.x, tile.z);
-    },
   });
   const economyRoot = controls.economyRoot;
   const economyControls =
@@ -684,6 +771,7 @@ export async function createGameSession(
   let knownSelectionTick = simulation.completedTicks;
 
   const cancelInteractions = () => {
+    radial.close();
     input.cancelGesture();
     attackMove.cancel();
     rally.cancel();
@@ -734,8 +822,11 @@ export async function createGameSession(
         )
           combatEffects.hit(hit, style);
       }
-      network.capture();
       minimap.refreshActors();
+      const alerts = observeAlerts();
+      for (const alert of alerts)
+        if (alert.pulse && alert.position) minimap.ping(alert.position);
+      if (alerts.length) controls.onAlerts?.(alerts);
       const moveStatus = unitControls.onOutcomes(outcomes);
       if (moveStatus) canvas.dataset.moveStatus = moveStatus;
       for (const outcome of outcomes) {
@@ -769,9 +860,12 @@ export async function createGameSession(
         }
       }
       showMissionResult();
+      raisePopup();
     },
   });
   showMissionResult();
+  // Loading a mission records its state without raising alerts.
+  observeAlerts();
   const renderObserver = view.scene.onBeforeRenderObservable.add(() => {
     loop.advance();
     // Hostiles can leave vision without any fog change, so check every tick.
@@ -872,7 +966,7 @@ export async function createGameSession(
     training.dispose();
     rally.dispose();
     attackMove.dispose();
-    network.dispose();
+    radial.dispose();
     networkView.dispose();
     rallyView.dispose();
     fogOverlay.dispose();
@@ -917,10 +1011,12 @@ export async function createGameSession(
         }
       })()),
     playing: () => playing,
-    pause: () => {
+    pause: ({ keepInteractions = false } = {}) => {
+      if (keepInteractions) radial.close();
+      else cancelInteractions();
       if (!playing) return;
       playing = false;
-      cancelInteractions();
+      controlsDirty = true;
       loop.pause();
     },
     resume: () => {
@@ -929,10 +1025,26 @@ export async function createGameSession(
       controlsDirty = true;
       loop.resume();
     },
+    speed: () => loop.speed,
+    setSpeed: (speed) => {
+      loop.setSpeed(speed);
+      controlsDirty = true;
+    },
+    dismissPopup: (id) => {
+      dismissedPopups.add(id);
+      controlsDirty = true;
+    },
+    focus: (point) =>
+      view.camera.glideToPoint(new Vector3(point.x, 0, point.z)),
     save: (info) =>
       serializeMission(
         mission.scenario,
-        simulation.snapshot(),
+        {
+          ...simulation.snapshot(),
+          dismissedPopups: dismissedPopups.size
+            ? [...dismissedPopups]
+            : undefined,
+        },
         SIMULATION_TICK_SECONDS,
         info,
       ),

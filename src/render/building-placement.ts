@@ -371,6 +371,10 @@ export function createBuildingPlacement(
     get active() {
       return active;
     },
+    /** The building being placed, while placement is active. */
+    get definitionId() {
+      return active ? definition?.id : undefined;
+    },
     update,
     onOutcome: (outcome: CommandOutcome) => {
       if (

@@ -88,6 +88,20 @@ export const ECONOMY_SCENARIO = defineScenario({
       directive: `Troopers cost ${costOf("arc-trooper")} Materials each. Use Attack Move to advance as a group; a Scout can reveal the route ahead.`,
     },
   ],
+  popups: [
+    {
+      id: "support-network",
+      title: "Support Network",
+      text: "ARC buildings draw support from a connected network rooted at the Command Center. Place each blueprint inside the support radius of a completed, connected building. If a building loses its path back to the Command Center, its construction, production, and cargo delivery pause until the connection returns.",
+      trigger: { kind: "placement", definitionId: "arc-materials-refinery" },
+    },
+    {
+      id: "harvester-operations",
+      title: "Harvester Operations",
+      text: "Select the Harvester and choose a Materials patch to gather. It fills its 100-Materials cargo, returns it to its Refinery, and repeats automatically. When the patch is exhausted, it delivers its last load and waits; choose a new patch to reassign it.",
+      trigger: { kind: "actor", definitionId: "arc-harvester" },
+    },
+  ],
   tileSize: map.tileSize,
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),

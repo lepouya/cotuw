@@ -242,6 +242,68 @@ test.each([
     "objectives",
   ],
   [
+    "duplicate popups",
+    (file: any) => {
+      const popup = {
+        id: "intro",
+        title: "Intro",
+        text: "Text",
+        trigger: { kind: "actor", definitionId: "arc-trooper" },
+      };
+      file.scenario.popups = [popup, popup];
+    },
+    "popups need distinct IDs",
+  ],
+  [
+    "invalid popup trigger",
+    (file: any) => {
+      file.scenario.popups = [
+        {
+          id: "intro",
+          title: "Intro",
+          text: "Text",
+          trigger: { kind: "tick", definitionId: "arc-trooper" },
+        },
+      ];
+    },
+    "placement or actor trigger",
+  ],
+  [
+    "unknown popup actor",
+    (file: any) => {
+      file.scenario.popups = [
+        {
+          id: "intro",
+          title: "Intro",
+          text: "Text",
+          trigger: { kind: "actor", definitionId: "dragon" },
+        },
+      ];
+    },
+    'popup uses unknown actor "dragon"',
+  ],
+  [
+    "a placement popup naming a mobile actor",
+    (file: any) => {
+      file.scenario.popups = [
+        {
+          id: "intro",
+          title: "Intro",
+          text: "Text",
+          trigger: { kind: "placement", definitionId: "arc-trooper" },
+        },
+      ];
+    },
+    "require a building definition",
+  ],
+  [
+    "dismissal of an unknown popup",
+    (file: any) => {
+      file.state.dismissedPopups = ["intro"];
+    },
+    "scenario's popups",
+  ],
+  [
     "invalid metadata",
     (file: any) => {
       file.save = { name: "Save", savedAt: "yesterday" };
@@ -394,4 +456,20 @@ test("mission tick rates must be finite numbers", () => {
     );
     expect(() => parseMission("{}", seconds)).toThrow("tick seconds");
   }
+});
+
+test("dismissed popups survive saving and loading", () => {
+  const mission = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
+  expect(mission.scenario.popups?.map(({ id }) => id)).toEqual([
+    "support-network",
+    "harvester-operations",
+  ]);
+  const source = serializeMission(
+    mission.scenario,
+    { ...mission.state, dismissedPopups: ["harvester-operations"] },
+    SIMULATION_TICK_SECONDS,
+  );
+  expect(loadMission(source).state.dismissedPopups).toEqual([
+    "harvester-operations",
+  ]);
 });
