@@ -191,6 +191,9 @@ async function advance(page: Page, seconds: number) {
     const steps = Math.ceil(seconds);
     for (let i = 0; i < steps; i++) {
       harness.now += 1000 * Math.min(1, seconds - i);
+      harness.view.scene.onBeforeAnimationsObservable.notifyObservers(
+        harness.view.scene,
+      );
       harness.view.scene.onBeforeRenderObservable.notifyObservers(
         harness.view.scene,
       );

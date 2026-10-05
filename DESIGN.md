@@ -520,6 +520,22 @@ story.
 - The playable map uses an irregular mask within a rectangular data grid. Camera
   bounds follow explored terrain and do not expose the full map early.
 
+## Actor animation
+
+- Actor animation is presentation. It follows committed simulation state and
+  real time, never changes simulation state, and saves nothing; loading
+  rebuilds it.
+- Triggers are committed simulation events an actor's appearance responds to.
+  `attack` fires with each hit the actor deals, as a shot or a bite.
+- An actor's GLB supplies skeletal clips by role: idle, locomotion, optional
+  left and right turn leans, one per trigger, and death. Rendered movement
+  blends idle, locomotion, and leans. A trigger plays its clip once, layered
+  over the others as its difference from its first frame. Remains play the
+  death clip once from destruction and hold its last frame, so remains older
+  than the clip, as after loading, show that frame. Without a death clip,
+  remains lie on their side.
+- Reduced motion skips trigger clips and shows death clips' last frame at once.
+
 ## Fog, stealth, and detection
 
 - Terrain is **Unexplored**, **Explored**, or currently **Visible**. Actor

@@ -446,8 +446,10 @@ test("prototype controls skip unchanged frames and removal works without a sideb
         evaluations += 1;
         return evaluateTraining(command);
       };
-      const refresh = () =>
+      const refresh = () => {
+        view.scene.onBeforeAnimationsObservable.notifyObservers(view.scene);
         view.scene.onBeforeRenderObservable.notifyObservers(view.scene);
+      };
       refresh();
       const baseline = updates;
       const baselineEvaluations = evaluations;

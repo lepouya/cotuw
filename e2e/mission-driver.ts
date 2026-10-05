@@ -67,6 +67,7 @@ export class MissionDriver {
             const milliseconds = 1000 * Math.min(1, remaining);
             window.missionClock += milliseconds;
             engine.getDeltaTime = () => milliseconds;
+            scene.onBeforeAnimationsObservable.notifyObservers(scene);
             scene.onBeforeRenderObservable.notifyObservers(scene);
             // Record result changes at this frame rather than the whole batch's end.
             await Promise.resolve();

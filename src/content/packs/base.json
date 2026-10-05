@@ -311,7 +311,9 @@
             "turn": {
               "left": "turn-left",
               "right": "turn-right"
-            }
+            },
+            "attack": "fire",
+            "death": "death"
           },
           "cycleDistance": 2.1
         }
@@ -338,7 +340,8 @@
             "turn": {
               "left": "turn-left",
               "right": "turn-right"
-            }
+            },
+            "death": "death"
           },
           "cycleDistance": 1.5
         }

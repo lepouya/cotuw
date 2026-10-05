@@ -341,18 +341,16 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     }
     return group;
   };
-  const bob = (
+  /** Keys the pelvis moving `offset` from its rest position. */
+  const shift = (
     group: AnimationGroup,
     endFrame: number,
-    drop: (phase: number) => number,
+    offset: (phase: number) => Vec3,
   ) => {
-    const [x, y, z] = JOINTS[0].offset;
+    const rest = new Vector3(...JOINTS[0].offset);
     group.addTargetedAnimation(
-      keyed(
-        `${group.name}-pelvis-bob`,
-        "position",
-        endFrame,
-        (phase) => new Vector3(x, y - drop(phase), z),
+      keyed(`${group.name}-pelvis`, "position", endFrame, (phase) =>
+        rest.add(new Vector3(...offset(phase))),
       ),
       bones.get("pelvis")!.getTransformNode(),
     );
@@ -366,7 +364,7 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
   const idle = clip("idle", 60, (joint, phase) =>
     joint === "head" ? [Math.sin(phase) * 0.025, 0, 0] : neutral(joint),
   );
-  bob(idle, 60, (phase) => (1 - Math.cos(phase)) * 0.004);
+  shift(idle, 60, (phase) => [0, (Math.cos(phase) - 1) * 0.004, 0]);
   const walk = clip("walk", 30, (joint, phase) => {
     const stride = Math.sin(phase);
     switch (joint) {
@@ -389,7 +387,7 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     }
   });
   // Lowest with the legs apart, highest as they pass.
-  bob(walk, 30, (phase) => (1 - Math.cos(phase * 2)) * 0.015);
+  shift(walk, 30, (phase) => [0, (Math.cos(phase * 2) - 1) * 0.015, 0]);
   // Turn clips are additive: neutral at the first frame, full lean at the last.
   for (const [clipName, direction] of [
     ["turn-left", -1],
@@ -407,6 +405,42 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
       ["spine", "head"],
     );
   }
+  // The attack clip is also additive: the shoulders kick back early, then
+  // recover to neutral.
+  clip(
+    "fire",
+    8,
+    (joint, phase) => {
+      const kick = Math.sin(Math.PI * Math.sqrt(phase / (Math.PI * 2)));
+      return joint === "spine" ? [-0.12 * kick, 0, 0] : [0.06 * kick, 0, 0];
+    },
+    ["spine", "head"],
+  );
+  // Knees buckle, then the body falls back faster and faster and lies still.
+  const fallen = (phase: number) => (phase / (Math.PI * 2)) ** 2;
+  const death = clip("death", 24, (joint, phase) => {
+    const fall = fallen(phase);
+    const buckle = Math.sin(phase / 2);
+    switch (joint) {
+      case "pelvis":
+        return [-1.45 * fall, 0, 0];
+      case "left-leg":
+      case "right-leg":
+        return [0.15 * fall - 0.3 * buckle, 0, 0];
+      case "left-shin":
+      case "right-shin":
+        return [0.6 * buckle, 0, 0];
+      case "left-arm":
+        return [0, 0, -0.08 - 0.5 * fall];
+      case "right-arm":
+        return [0, 0, 0.08 + 0.5 * fall];
+      case "head":
+        return [-0.2 * fall, 0, 0];
+      default:
+        return neutral(joint);
+    }
+  });
+  shift(death, 24, (phase) => [0, -0.6 * fallen(phase), -0.25 * fallen(phase)]);
 }
 
 /** Keys `value` across one cycle, where phase runs from 0 to 2π. */

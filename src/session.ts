@@ -346,6 +346,15 @@ export async function createGameSession(
     tilesFor: (wreck) =>
       wreckTiles(wreck, definitionsById.get(wreck.definitionId)!),
   });
+  const updateWrecks = (seconds: number) =>
+    wreckView.update(
+      simulation.wrecks,
+      (wreck) =>
+        (simulation.completedTicks - wreck.tick) * simulation.tickSeconds,
+      WRECK_SECONDS,
+      (wreck) => player.owns(wreck) || simulation.detects(playerFaction, wreck),
+      seconds,
+    );
   const partition = (actors: readonly ActorRenderState[]) => {
     const mobile = actors.filter((actor) => !isTilePlacedActor(actor));
     return {
@@ -807,10 +816,11 @@ export async function createGameSession(
   input.select(undefined);
   if (controls.animate) controls.animate.checked = !reducedMotion.matches;
   const syncAnimationControl = () => {
-    if (controls.animate) controls.animate.disabled = reducedMotion.matches;
+    const reduced = reducedMotion.matches;
+    if (controls.animate && controls.animate.disabled !== reduced)
+      controls.animate.disabled = reduced;
   };
   syncAnimationControl();
-  reducedMotion.addEventListener("change", syncAnimationControl);
   let idleSeconds = 0;
   let pickupSeconds = 0;
   let previousFrameTime = performance.now();
@@ -900,6 +910,9 @@ export async function createGameSession(
             simulation.sees(playerFaction, hit.to))
         )
           combatEffects.hit(hit, style);
+        const attacker = simulation.actorById(hit.attackerId);
+        if (attacker && player.shows(attacker))
+          actorViews.play(hit.attackerId, "attack");
       }
       minimap.refreshActors();
       const alerts = observeAlerts();
@@ -945,7 +958,10 @@ export async function createGameSession(
   showMissionResult();
   // Loading a mission records its state without raising alerts.
   observeAlerts();
-  const renderObserver = view.scene.onBeforeRenderObservable.add(() => {
+  // Weighted clip seeks must precede Babylon's animation evaluation.
+  const renderObserver = view.scene.onBeforeAnimationsObservable.add(() => {
+    // Polled rather than evented: the query can change before its event fires.
+    syncAnimationControl();
     loop.advance();
     // Hostiles can leave vision without any fog change, so check every tick.
     if (
@@ -995,13 +1011,7 @@ export async function createGameSession(
     materialsView?.animate(pickupSeconds);
     const { shownMobile } = actorsByKind();
     combatEffects.update(frameSeconds);
-    wreckView.update(
-      simulation.wrecks,
-      (wreck) =>
-        (simulation.completedTicks - wreck.tick) * simulation.tickSeconds,
-      WRECK_SECONDS,
-      (wreck) => player.owns(wreck) || simulation.detects(playerFaction, wreck),
-    );
+    updateWrecks(frameSeconds);
     actorViews.update(
       shownMobile,
       loop.tickProgress(),
@@ -1010,6 +1020,7 @@ export async function createGameSession(
           .filter((worker) => worker.phase === "gathering")
           .map((worker) => worker.actorId),
       ),
+      frameSeconds,
     );
     movementPath.update(shownMobile);
     // Other factions' queues would reveal their intent.
@@ -1045,7 +1056,6 @@ export async function createGameSession(
     loop.stop();
     simulation.dispose();
     input.dispose();
-    reducedMotion.removeEventListener("change", syncAnimationControl);
     unitControls.dispose();
     disposeCameraControls?.();
     placement.dispose();
@@ -1063,7 +1073,7 @@ export async function createGameSession(
     economyControls?.dispose();
     materialsView?.dispose();
     controls.onDispose?.();
-    view.scene.onBeforeRenderObservable.remove(renderObserver);
+    view.scene.onBeforeAnimationsObservable.remove(renderObserver);
     actorViews.dispose();
     tilePlacedViews.dispose();
     movementPath.dispose();
@@ -1158,7 +1168,9 @@ export async function createGameSession(
     glbModels.map(async ([id, graphics]) => {
       let appearance: ActorAppearance;
       try {
-        appearance = await loadSkinnedActorAppearance(view.scene, graphics);
+        appearance = await loadSkinnedActorAppearance(view.scene, graphics, {
+          reducedMotion: () => reducedMotion.matches,
+        });
       } catch (error) {
         if (!view.scene.isDisposed)
           console.error(`Actor ${id} uses a stand-in model.`, error);
@@ -1171,6 +1183,7 @@ export async function createGameSession(
       const previous = appearances.get(id);
       appearances.set(id, appearance);
       actorViews.update(actorsByKind().shownMobile, loop.tickProgress());
+      updateWrecks(0);
       previous?.dispose();
     }),
   );

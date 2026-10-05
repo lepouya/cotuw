@@ -18,7 +18,7 @@ import {
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
-import type { ActorAppearance, ActorPose } from "./actor";
+import type { ActorAppearance, ActorPose, ActorTrigger } from "./actor";
 import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 
@@ -38,6 +38,11 @@ export type ActorViewRegistry = {
   setSelectedActors: (actorIds: readonly string[]) => void;
   /** Where an actor was last drawn, between ticks. */
   groundPosition: (actorId: string) => WorldPosition | undefined;
+  /**
+   * Queues a trigger for the next update, if the actor is drawn then. Repeated
+   * triggers between rendered frames coalesce.
+   */
+  play: (actorId: string, trigger: ActorTrigger) => void;
   actorIdsInRect: (canvas: HTMLCanvasElement, rect: SelectionRect) => string[];
   /**
    * Creates and removes views to match `actors`, then draws each one
@@ -47,6 +52,7 @@ export type ActorViewRegistry = {
     actors: readonly ActorRenderState[],
     tickProgress: number,
     workingActorIds?: ReadonlySet<string>,
+    seconds?: number,
   ) => void;
 };
 
@@ -79,6 +85,7 @@ export function createActorViewRegistry(
     (fallback ??= createFallbackAppearance(scene));
 
   const previousPoses = new Map<string, ActorPose>();
+  const pendingTriggers = new Map<string, Set<ActorTrigger>>();
   const pose: ActorPose = { worldPosition: { x: 0, z: 0 }, facing: 0 };
   let selectedActorIds = new Set<string>();
 
@@ -138,6 +145,7 @@ export function createActorViewRegistry(
     dispose: () => {
       renderers.dispose();
       previousPoses.clear();
+      pendingTriggers.clear();
       selectionMaterial.dispose();
       hostileSelectionMaterial.dispose();
       fallback?.dispose();
@@ -146,6 +154,11 @@ export function createActorViewRegistry(
     groundPosition: (actorId) => {
       const point = renderers.get(actorId)?.selectionPoint();
       return point && { x: point.x, z: point.z };
+    },
+    play: (actorId, trigger) => {
+      let pending = pendingTriggers.get(actorId);
+      if (!pending) pendingTriggers.set(actorId, (pending = new Set()));
+      pending.add(trigger);
     },
     actorIdsInRect: (canvas, rect) => {
       if (!scene.activeCamera) return [];
@@ -179,12 +192,16 @@ export function createActorViewRegistry(
       }
       return ids;
     },
-    update: (actors, tickProgress, workingActorIds) => {
+    update: (actors, tickProgress, workingActorIds, seconds = 0) => {
       renderers.sync(actors);
       for (const actor of actors) {
         interpolatePose(previousPoses.get(actor.id), actor, tickProgress, pose);
-        renderers.get(actor.id)!.update(pose, workingActorIds?.has(actor.id));
+        const renderer = renderers.get(actor.id)!;
+        renderer.update(pose, workingActorIds?.has(actor.id), seconds);
+        for (const trigger of pendingTriggers.get(actor.id) ?? [])
+          renderer.play(trigger);
       }
+      pendingTriggers.clear();
     },
   };
 }

@@ -266,6 +266,33 @@ describe("actor view registry", () => {
     views.dispose();
     engine.dispose();
   });
+
+  test("triggers use the current pose and skip hidden actors without replay", () => {
+    const played: [string, number][] = [];
+    const { engine, views } = setup((scene) => ({
+      bounds: { radius: 0.5, height: 1 },
+      instantiate: (name) => {
+        const root = new TransformNode(name, scene);
+        return {
+          root,
+          play: () =>
+            played.push([name, (root.parent as TransformNode).position.x]),
+          dispose: () => root.dispose(),
+        };
+      },
+      dispose: () => {},
+    }));
+    views.update([actor("old")], 1);
+    views.play("old", "attack");
+    views.play("new", "attack");
+    views.play("new", "attack");
+    views.update([actor("new", 4)], 1);
+    expect(played).toEqual([["actor-new", 4]]);
+    views.update([actor("old"), actor("new", 4)], 1);
+    expect(played).toHaveLength(1);
+    views.dispose();
+    engine.dispose();
+  });
 });
 
 test("stable unit values stay in range and differ between IDs", () => {

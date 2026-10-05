@@ -8,7 +8,10 @@ import { BASE_CONTENT } from "./helpers/content";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
 import type { AbstractMesh, TransformNode } from "@babylonjs/core";
-import type { ActorGraphics } from "../src/render/skinned-actor-appearance";
+import type {
+  ActorGraphics,
+  SkinnedActorOptions,
+} from "../src/render/skinned-actor-appearance";
 
 test.each(INFANTRY_ROLES)("the committed %s GLB is current", async (role) => {
   const committed = readFileSync(`public/assets/actors/arc-${role}.glb`);
@@ -21,15 +24,23 @@ test.each(INFANTRY_ROLES)("the committed %s GLB is current", async (role) => {
 });
 
 /** Loads through the real glTF loader, from the committed file. */
-async function load(graphics: ActorGraphics) {
+async function load(graphics: ActorGraphics, options?: SkinnedActorOptions) {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   const data = readFileSync(`public${graphics.url}`).toString("base64");
-  const appearance = await loadSkinnedActorAppearance(scene, {
-    ...graphics,
-    url: `data:model/gltf-binary;base64,${data}`,
-  });
+  const appearance = await loadSkinnedActorAppearance(
+    scene,
+    { ...graphics, url: `data:model/gltf-binary;base64,${data}` },
+    options,
+  );
   return { engine, scene, appearance };
+}
+
+/** A joint's height above the actor's ground point. */
+function jointHeight(scene: Scene, name: string): number {
+  const node = scene.getTransformNodeByName(name)!;
+  node.computeWorldMatrix(true);
+  return node.getAbsolutePosition().y;
 }
 
 function skinnedMesh(root: TransformNode): AbstractMesh {
@@ -61,7 +72,10 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
         graphics.clips.locomotion,
         graphics.clips.turn!.left,
         graphics.clips.turn!.right,
+        graphics.clips.attack,
+        graphics.clips.death,
       ]
+        .filter((name) => name !== undefined)
         .map((name) => `first-${name}`)
         .sort(),
     );
@@ -112,6 +126,121 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
     expect(Math.sign(left.spine)).toBe(-Math.sign(right.spine));
     engine.dispose();
   });
+
+  test.runIf(graphics.clips.attack)(
+    "layers one recoil per shot over the idle pose",
+    async () => {
+      const { engine, scene, appearance } = await load(graphics);
+      const instance = appearance.instantiate("shooter", 0);
+      const spine = () =>
+        scene.getTransformNodeByName("shooter-spine")!.rotationQuaternion!.x;
+      const step = (frames: number) => {
+        let kick = 0;
+        for (let frame = 0; frame < frames; frame++) {
+          instance.animate!({ distance: 0, turn: 0, seconds: 1 / 60 });
+          scene.animate();
+          kick = Math.min(kick, spine());
+        }
+        return kick;
+      };
+      step(2);
+      expect(spine()).toBeCloseTo(0);
+
+      instance.play!("attack");
+      expect(step(6)).toBeLessThan(-0.02);
+      step(30);
+      expect(spine()).toBeCloseTo(0);
+      engine.dispose();
+    },
+  );
+
+  test.runIf(graphics.clips.death)(
+    "falls once and holds the last pose",
+    async () => {
+      const { engine, scene, appearance } = await load(graphics);
+      const instance = appearance.instantiate("fallen", 0);
+      const head = () => jointHeight(scene, "fallen-head");
+      instance.die!(0);
+      scene.animate();
+      const standing = head();
+      instance.die!(0.4);
+      scene.animate();
+      const falling = head();
+      instance.die!(5);
+      scene.animate();
+      const fallen = head();
+      instance.die!(60);
+      scene.animate();
+
+      expect(falling).toBeLessThan(standing);
+      expect(fallen).toBeLessThan(falling);
+      expect(fallen).toBeLessThan(0.5);
+      expect(fallen).toBeGreaterThan(0);
+      expect(jointHeight(scene, "fallen-left-shin")).toBeGreaterThan(0);
+      expect(head()).toBeCloseTo(fallen);
+      engine.dispose();
+    },
+  );
+
+  test("reduced motion skips recoil and shows remains already fallen", async () => {
+    let reduced = true;
+    const { engine, scene, appearance } = await load(graphics, {
+      reducedMotion: () => reduced,
+    });
+    const instance = appearance.instantiate("still", 0);
+    instance.play?.("attack");
+    instance.animate!({ distance: 0, turn: 0, seconds: 1 / 30 });
+    scene.animate();
+    expect(
+      scene.getTransformNodeByName("still-spine")!.rotationQuaternion!.x,
+    ).toBeCloseTo(0);
+    if (instance.die) {
+      const remains = appearance.instantiate("remains", 0);
+      remains.die!(0);
+      scene.animate();
+      const still = jointHeight(scene, "remains-head");
+      reduced = false;
+      remains.die!(0.1);
+      scene.animate();
+      expect(still).toBeCloseTo(jointHeight(scene, "remains-head"));
+    }
+    engine.dispose();
+  });
+
+  test.runIf(graphics.clips.attack)(
+    "restarts recoil and cancels it when reduced motion changes",
+    async () => {
+      let reduced = false;
+      const { engine, scene, appearance } = await load(graphics, {
+        reducedMotion: () => reduced,
+      });
+      const instance = appearance.instantiate("shooter", 0);
+      const spine = () =>
+        scene.getTransformNodeByName("shooter-spine")!.rotationQuaternion!.x;
+      const step = (seconds: number) => {
+        instance.animate!({ distance: 0, turn: 0, seconds });
+        scene.animate();
+      };
+      step(0);
+      instance.play!("attack");
+      step(0.05);
+      const first = spine();
+      expect(first).toBeLessThan(-0.02);
+      instance.play!("attack");
+      step(0.05);
+      expect(spine()).toBeCloseTo(first);
+      reduced = true;
+      step(0.01);
+      expect(spine()).toBeCloseTo(0);
+      reduced = false;
+      step(0.01);
+      expect(spine()).toBeCloseTo(0);
+      instance.play!("attack");
+      step(1);
+      expect(spine()).toBeCloseTo(0);
+      engine.dispose();
+    },
+  );
 
   test("rejects a model without a named clip", async () => {
     await expect(

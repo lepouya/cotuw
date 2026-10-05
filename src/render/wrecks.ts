@@ -34,11 +34,25 @@ export function createWreckView(
   rubble.specularColor = Color3.Black();
   const views = new Map<
     string,
-    { root: TransformNode; dispose: () => void; meshes: AbstractMesh[] }
+    {
+      root: TransformNode;
+      appearance: ActorAppearance | undefined;
+      seconds: number;
+      dispose: () => void;
+      meshes: AbstractMesh[];
+      /** Advances the death clip by real seconds. */
+      animate?: (seconds: number) => void;
+    }
   >();
-  const create = (wreck: Wreck) => {
+  /** `age` starts a death clip partway, so older remains show its end. */
+  const create = (
+    wreck: Wreck,
+    age: number,
+    appearance: ActorAppearance | undefined,
+  ) => {
     const root = new TransformNode(`wreck-${wreck.actorId}`, scene);
     let dispose = () => root.dispose();
+    let animate: ((seconds: number) => void) | undefined;
     if (wreck.tilePlacement) {
       for (const tile of tilesFor(wreck)) {
         const center = map.tileCenter(tile.x, tile.z);
@@ -62,7 +76,6 @@ export function createWreckView(
         );
       }
     } else {
-      const appearance = appearanceFor(wreck.definitionId);
       if (appearance) {
         const instance = appearance.instantiate(
           `wreck-${wreck.actorId}`,
@@ -71,13 +84,20 @@ export function createWreckView(
         const { x, z } = wreck.worldPosition;
         root.position.set(x, map.heightAtWorldPosition(x, z), z);
         root.rotation.y = wreck.facing;
-        // Fallen onto its side.
-        const tilt = new TransformNode(`wreck-${wreck.actorId}-tilt`, scene);
-        tilt.parent = root;
-        tilt.rotation.z = Math.PI / 2;
-        tilt.position.y = appearance.bounds.radius * 0.4;
-        instance.root.parent = tilt;
-        instance.freeze?.();
+        const { die } = instance;
+        if (die) {
+          instance.root.parent = root;
+          die(age);
+          animate = die;
+        } else {
+          // Without a death clip, remains lie on their side.
+          const tilt = new TransformNode(`wreck-${wreck.actorId}-tilt`, scene);
+          tilt.parent = root;
+          tilt.rotation.z = Math.PI / 2;
+          tilt.position.y = appearance.bounds.radius * 0.4;
+          instance.root.parent = tilt;
+          instance.freeze?.();
+        }
         dispose = () => {
           instance.dispose();
           root.dispose();
@@ -86,15 +106,19 @@ export function createWreckView(
     }
     const meshes = root.getChildMeshes();
     for (const mesh of meshes) mesh.isPickable = false;
-    return { root, dispose, meshes };
+    return { root, appearance, seconds: age, dispose, meshes, animate };
   };
   return {
-    /** `age` is seconds since destruction; hidden remains are not drawn. */
+    /**
+     * `age` is seconds since destruction and `frameSeconds` real time since
+     * the last update. Hidden remains are not drawn.
+     */
     update: (
       wrecks: readonly Wreck[],
       age: (wreck: Wreck) => number,
       lifetime: number,
       visible: (wreck: Wreck) => boolean,
+      frameSeconds: number,
     ) => {
       const present = new Set(wrecks.map(({ actorId }) => actorId));
       for (const [id, view] of views) {
@@ -104,9 +128,17 @@ export function createWreckView(
       }
       for (const wreck of wrecks) {
         let view = views.get(wreck.actorId);
-        if (!view) {
-          view = create(wreck);
+        const appearance = wreck.tilePlacement
+          ? undefined
+          : appearanceFor(wreck.definitionId);
+        if (!view || view.appearance !== appearance) {
+          const seconds = Math.max(age(wreck), view?.seconds ?? 0);
+          view?.dispose();
+          view = create(wreck, seconds, appearance);
           views.set(wreck.actorId, view);
+        } else {
+          view.seconds += frameSeconds;
+          view.animate?.(view.seconds);
         }
         view.root.setEnabled(visible(wreck));
         const opacity = Math.min(1, (lifetime - age(wreck)) / FADE_SECONDS);

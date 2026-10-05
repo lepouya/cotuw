@@ -22,11 +22,16 @@ const SELECTION_RING_MARGIN = 0.15;
 const PICK_TESSELLATION = 12;
 /** Hostile inspection uses a broken ring, so shape as well as color differs. */
 const HOSTILE_MARKER_SEGMENTS = 8;
-/** Caps the frame time animation sees, so a stalled frame cannot overshoot. */
-const MAX_ANIMATION_SECONDS = 0.1;
 export const ACTOR_PICK_KIND = "actor";
 /** Shared by the minimap and fallback model when an actor names no color. */
 export const DEFAULT_ACTOR_COLOR: Rgb = [0.871, 0.345, 0.122];
+
+/**
+ * Committed simulation events an actor's appearance can respond to, such as
+ * with a clip or a frame effect. `attack` is each hit the actor deals.
+ */
+export const ACTOR_TRIGGERS = ["attack"] as const;
+export type ActorTrigger = (typeof ACTOR_TRIGGERS)[number];
 
 /** How one kind of actor looks. */
 export type ActorAppearance = {
@@ -49,6 +54,10 @@ export type ActorInstance = {
   /** Present when the appearance animates. */
   animate?: (motion: Readonly<ActorMotion>) => void;
   setWorking?: (working: boolean) => void;
+  /** Plays the actor's response to a trigger. */
+  play?: (trigger: ActorTrigger) => void;
+  /** Poses remains `seconds` after destruction; replaces animate. */
+  die?: (seconds: number) => void;
   /** Stops any playing clips, as for remains. */
   freeze?: () => void;
   dispose: () => void;
@@ -64,7 +73,9 @@ export type ActorRenderer = {
   actorId: string;
   selectionPoint: () => Vector3;
   setSelected: (selected: boolean) => void;
-  update: (pose: ActorPose, working?: boolean) => void;
+  /** `seconds` is real time since the previous update. */
+  update: (pose: ActorPose, working?: boolean, seconds?: number) => void;
+  play: (trigger: ActorTrigger) => void;
   dispose: () => void;
 };
 
@@ -157,7 +168,11 @@ export function createActorRenderer(
 
   const motion: ActorMotion = { distance: 0, turn: 0, seconds: 0 };
   let last: ActorPose | undefined;
-  const update = ({ worldPosition, facing }: ActorPose, working = false) => {
+  const update = (
+    { worldPosition, facing }: ActorPose,
+    working = false,
+    seconds = 0,
+  ) => {
     instance.setWorking?.(working);
     if (instance.animate) {
       if (last) {
@@ -166,10 +181,7 @@ export function createActorRenderer(
           worldPosition.z - last.worldPosition.z,
         );
         motion.turn = shortestTurn(last.facing, facing);
-        motion.seconds = Math.min(
-          scene.getEngine().getDeltaTime() / 1000,
-          MAX_ANIMATION_SECONDS,
-        );
+        motion.seconds = seconds;
         instance.animate(motion);
         last.worldPosition.x = worldPosition.x;
         last.worldPosition.z = worldPosition.z;
@@ -192,6 +204,7 @@ export function createActorRenderer(
     selectionPoint: () => root.position.add(new Vector3(0, height / 2, 0)),
     setSelected,
     update,
+    play: (trigger) => instance.play?.(trigger),
     dispose: () => {
       instance.dispose();
       root.dispose();
