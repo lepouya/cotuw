@@ -59,9 +59,9 @@ base-building RTS loop, its technical architecture, and its player interface.
       movement along a valid path.
 - [x] 0.20 Provide path finding that respects terrain and occupancy, replans
       when blockers change, and reports unreachable targets clearly.
-- [ ] 0.21 Define actor animation clips for skeletal animation and texture-frame
+- [x] 0.21 Define actor animation clips for skeletal animation and texture-frame
       animation, including their simulation-facing state.
-- [ ] 0.22 Render both animation types on prototype actors without coupling
+- [x] 0.22 Render both animation types on prototype actors without coupling
       animation playback to simulation timing.
 
 ### Structures and selection

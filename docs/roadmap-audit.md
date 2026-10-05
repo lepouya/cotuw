@@ -39,6 +39,23 @@ the requirements.
   requested blocked targets from reachable destinations and shows rejected
   targets. [Group tests](../tests/group-movement.test.ts) verify receipts and
   separate approach positions.
+- **0.21 and 0.22, actor animation:** [DESIGN.md](../DESIGN.md#actor-animation)
+  defines skeletal clip roles, triggers, and frame effects as presentation
+  driven by committed attack events and remains.
+  [The base content pack](../src/content/packs/base.json) gives infantry
+  idle, walking, turning, attack, and death clips, which
+  [the GLB loader](../src/render/skinned-actor-appearance.ts) plays, and gives
+  the Trooper a muzzle flash that
+  [frame effects](../src/render/frame-effects.ts) play on each hit.
+  [Model tests](../tests/infantry-appearance.test.ts) cover recoil, falling,
+  holding, and reduced motion;
+  [view tests](../tests/actor-view-registry.test.ts) cover triggers and effects;
+  [remains tests](../tests/wrecks.test.ts) cover timing and model replacement.
+  [Content](../tests/content-pack.test.ts) and
+  [effect asset](../tests/effect-assets.test.ts) tests cover validation and
+  the generated sheet. [Browser checks](../e2e/frame-effects.spec.ts) verify
+  anchoring, playback, reduced motion, and cleanup in Chromium and WebKit, the
+  lone-wolf duel shows the flash in a mission, and a manual playtest passes.
 - **0.30, minimap rendering:**
   [the minimap](../src/render/minimap.ts) draws terrain, footprint polygons,
   mobile actors, selected outlines, fog, and the camera viewport.
@@ -176,24 +193,21 @@ the requirements.
 
 ## Remaining scope
 
-- **Desktop persistence:** the save folder and file dialogs need a manual
-  check in Tauri. Chromium and WebKit coverage includes the
+- **Desktop persistence:** saving to and loading from the app data folder
+  work in the desktop app. Export file and Import file, which open the native
+  dialogs, still need a check there. Chromium and WebKit coverage includes the
   [save checks](../e2e/saves.spec.ts).
 
-- **0.21 and 0.22, actor animation:**
-  [the base content pack](../src/content/packs/base.json) and
-  [the GLB loader](../src/render/skinned-actor-appearance.ts) implement skeletal
-  idle, walking, and turning. Actor texture-frame playback, such as the
-  muzzle flash, can use the terrain's clip format but is absent.
-- **0.46, presentation:** skeletal infantry, articulated machinery, tracers,
-  bite effects, health bars, remains, blueprint progress, and staged resource
-  markers work. Actor frame animation, the complete actor combat/death clips,
-  ambient objects, escalating damage effects, construction stages, and the
-  remaining building activity animations still need integration.
+- **0.46, presentation:** skeletal infantry with attack and death clips,
+  articulated machinery, tracers, muzzle flashes, bite effects, health bars,
+  remains, blueprint progress, and staged resource markers work. Wolf attack
+  and death animation, ambient objects, escalating damage effects,
+  construction stages, and the remaining building activity animations still
+  need integration.
 
 ## Recommended next task
 
-Take **0.21** and **0.22** with the Trooper's muzzle flash as the first actor
-texture clip, using [`loadClipFrames`](../src/render/texture-clip.ts),
-followed by the remaining **0.46** presentation. Check Tauri saves and run
-first-time human playtests for **0.55** alongside.
+Continue **0.46** with wolf attack and death animation through the same
+triggers and remains, then construction stages and damage effects. Check
+desktop export and import, and run first-time human playtests for **0.55**
+alongside.
