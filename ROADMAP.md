@@ -129,7 +129,7 @@ base-building RTS loop, its technical architecture, and its player interface.
       personal sight and stable target selection, visible-wolf alert
       propagation, pursuit, hard leash, alert investigation, return on lost
       detection, and regeneration.
-- [ ] 0.43 Implement the sidebar, top bar, radial context menu, objectives,
+- [x] 0.43 Implement the sidebar, top bar, radial context menu, objectives,
       alerts, notifications, explanatory popups, and victory or defeat results.
 - [x] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
       autosave, version validation, and paused inspection after loading.

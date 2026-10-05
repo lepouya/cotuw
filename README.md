@@ -92,12 +92,21 @@ buildings sell for less.
 Combat destruction of the starting Command Center ends this opening in defeat
 and pauses immediately. The results panel provides Restart, Load, and Exit.
 
+The top bar holds **Menu**, **Pause**, and ½×, 1×, and 2× speed on the left;
+the next objective, which opens **Goals**, in the center; and Materials, mission
+time, and the alert history on the right. Alerts for attacks, losses, completed
+work, blocked units, network changes, and objectives appear briefly over the
+map and stay in the history; select one to move the camera there. The first
+Refinery placement and first Harvester each show a short explanation that
+pauses the mission until dismissed. Right-click the map for a radial menu of
+the target's actions; the highlighted one matches a left click.
+
 **Menu** or `F10` pauses the mission and opens the game menu. **Save** stores a
 named save or exports it as a file; **Quicksave** or `F5` replaces the single
 quicksave, and `F9` loads it. Completing an objective replaces the autosave.
 **Load** lists every save and can import a mission file. Loading begins
-paused; Inspect allows selection and camera inspection, and Resume mission
-starts the clock. Invalid files leave the current session intact.
+paused; Inspect allows selection and camera inspection, and **Paused** in the
+top bar starts the clock. Invalid files leave the current session intact.
 
 Defeat the lone wolf and all five den wolves to win. The Victory panel pauses
 the mission and offers **Continue free play**, Restart, Load, and Exit.

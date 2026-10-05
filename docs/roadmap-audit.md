@@ -89,6 +89,17 @@ the requirements.
   recovery supplies.
   Sight checks cover each wolf's movement profile and territory over a
   conservative superset of travel tiles, including leash boundary tiles.
+- **0.43, mission interface:** the [sidebar](../src/ui/sidebar.ts),
+  [top bar](../src/ui/top-bar.ts), [radial menu](../src/ui/radial-menu.ts),
+  [alerts](../src/ui/mission-alerts.ts), and scenario popups have focused
+  [unit](../tests/mission-alerts.test.ts) and
+  [browser](../e2e/interface.spec.ts) coverage. Checks exercise pause and speed,
+  compact touch controls, popup persistence and tick-time pauses, alert history,
+  and radial keyboard navigation and dismissal.
+  [Command input tests](../tests/command-input.test.ts) cover stale actions
+  after selection, visibility, or pause changes. Mission and economy checks
+  cover objectives, victory, free play, and defeat. Manual mission interface
+  playtesting passes.
 - **0.44, persistence:** levels and saves share
   [one JSON format](mission-files.md), and every mission starts by loading a
   file. The game menu provides named saves, export, a save list with import
@@ -123,8 +134,8 @@ the requirements.
 ## Remaining scope
 
 - **Desktop persistence:** the save folder and file dialogs need a manual
-  check in Tauri. The browser suite passes all 166 Chromium and WebKit checks,
-  including the [save checks](../e2e/saves.spec.ts).
+  check in Tauri. Chromium and WebKit coverage includes the
+  [save checks](../e2e/saves.spec.ts).
 
 - **0.11 and 0.12, terrain frame animation:** terrain supports static textures
   and UV scrolling. Frame sequences, timing, playback modes, their data tests,
@@ -133,14 +144,9 @@ the requirements.
   [the base content pack](../src/content/packs/base.json) and
   [the GLB loader](../src/render/skinned-actor-appearance.ts) implement skeletal
   idle, walking, and turning. Actor texture-frame clips and playback are absent.
-- **0.43, mission interface:** sidebar tabs, resource display, count-based
-  practice goals, mission objectives, victory and defeat results, status
-  feedback, and network alerts work. The radial menu, general notifications,
-  explanatory popups, and top-bar time/menu controls remain.
 - **0.45, on-screen actions:** construction, production, economy, rally points,
-  selection, movement, camera, and Attack Move actions have on-screen controls
-  that work with compact touch input. The game menu's **Menu** button sits in
-  the sidebar header until the top bar exists. Speed, Focus, Follow, and
+  selection, movement, camera, Attack Move, pause, and speed actions have
+  on-screen controls that work with compact touch input. Focus, Follow, and
   queued orders lack controls.
 - **0.46, presentation:** skeletal infantry, articulated machinery, tracers,
   bite effects, health bars, remains, blueprint progress, and staged resource
@@ -156,9 +162,9 @@ the requirements.
   [Navigation checks](../e2e/camera-navigation.spec.ts) cover mouse, phone, and
   tablet input, construction previews, interrupted gestures, form fields,
   dialogs, blur, and restored commands.
-  Queued orders, camera presets, actor Focus/Follow, secondary-button radial
-  and pan bindings, the minimap command mode, and other locked bindings are
-  incomplete.
+  Secondary click opens the radial menu and secondary drag pans. Queued
+  orders, camera presets, actor Focus/Follow, the minimap command mode, and
+  other locked bindings are incomplete.
 - **0.50, compact interaction checks:** phone landscape checks exercise
   construction, production, economy, rally points, selection, movement, and
   camera controls without a keyboard or secondary button. Attack Move also has
@@ -168,7 +174,7 @@ the requirements.
 
 ## Recommended next task
 
-Check Tauri saves. Then take **0.55**: a manual playthrough won in about four
-minutes, far below the 15 to 25 minute target, and tuning needs only content
-pack and level edits. **0.43**, whose top bar would take over the game menu,
-is the next interface step.
+Check Tauri saves. Then take **0.11** and **0.12**: their frame-clip format also
+serves actor texture clips in **0.21** and **0.22**. Camera presets and
+Focus/Follow from **0.47** follow. **0.55** needs first-time human playtests,
+which the notifications and popups now support.

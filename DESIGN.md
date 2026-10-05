@@ -283,6 +283,15 @@ story.
   modes. Box select must be disabled before a terrain tap issues movement.
 - Secondary click opens a radial context menu. Secondary drag pans; Shift plus
   secondary drag rotates. Every secondary action has an on-screen alternative.
+- The radial menu rings the clicked point with the target's applicable commands.
+  The primary click's default comes first and is highlighted: Attack for
+  detected hostiles with movers selected, Select and Add to or Remove from group
+  for actors, Move with Attack Move for ground, and Clear selection when nothing
+  selected can move or commands wait for resuming. Move reads Gather on a
+  Materials site for a selected Harvester and Collect on salvage; in a mixed
+  group, Harvesters gather while the other units move there. An action, Escape,
+  or a press outside closes it. A world press that closes it issues no command,
+  and Escape closes it before clearing selection. It also opens in Pan mode.
 - Pan mode reserves primary and one-finger world gestures for navigation,
   preserving selection and pending commands. In Pan mode, scrolling pans;
   Ctrl-scroll zooms. Outside Pan mode, scrolling zooms.
@@ -317,7 +326,28 @@ story.
   selection details, contextual actions, construction and production, queues,
   and a keyboard-free Cancel action.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed mission
-  time, and single-player pause and speed controls.
+  time, and single-player pause and speed controls. The left holds Menu, Pause,
+  and ½×, 1×, and 2× speed. The center shows the first unfinished victory
+  objective with progress, or the result, and opens Goals. The right shows
+  Materials, elapsed simulation time, and the alert history toggle with its
+  unread count. Compact screens reduce the objective and resource label to
+  symbols. Speed changes only how many fixed ticks run per real second;
+  missions start at 1×. Changing speed preserves fractional tick progress.
+- Alerts report attacks, losses, completed construction and training, units
+  whose routes become blocked, disconnected and reconnected buildings, and
+  objective results. They appear as brief non-modal toasts and stay in the
+  alert history; entries with a location glide the camera there. Hits on the
+  same kind of target, Harvester, building, or unit, form one attack until 15
+  simulated seconds pass without one. Attacks, losses, failures, and
+  disconnections are high priority, and Harvester attacks also pulse on the
+  minimap. Normal toasts yield space to active high-priority alerts. Alerts
+  derive from committed state and never pause simulation.
+- Scenario popups explain a mechanic the first time their trigger holds: while
+  placing a building type, or once the player owns a completed actor type. A
+  popup pauses single-player until dismissed and keeps an active placement.
+  Actor triggers are checked after committed ticks, independently of rendering.
+  Dismissals are mission state, so loading never repeats one and restarting
+  shows them again.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
   Load, Restart, and Exit; its Load panel lists saves and imports files. F5
   quicksaves, F9 loads the quicksave, and F10 opens the menu.
@@ -991,8 +1021,10 @@ a later tutorial could be made.
   Economic or military dead ends remain player-judged soft defeats.
 - A first successful run should take about 15 to 25 minutes; a familiar replay
   about 10 to 15 minutes. Neither is a hard timer.
-- M0 includes contextual notifications, two simple explanatory popups, full
-  save/load/restart coverage, and compact landscape browser UI checks.
+- M0 includes contextual notifications, full save/load/restart coverage,
+  compact landscape browser UI checks, and two explanatory popups: **Support
+  Network** when the first Refinery placement begins, and **Harvester
+  Operations** when the first Harvester completes.
 - M0 excludes the Circle, Everwake, rare and exotic resources, repair, healing,
   upgrades, veterancy, stealth, special movement layers, oversized deployables,
   multiplayer, native mobile builds, a map editor, mod management, and the
@@ -1025,6 +1057,7 @@ a later tutorial could be made.
 - Mission files preserve objective IDs, rules, targets, defeated target IDs,
   and resolution ticks, from which victory or defeat follows. Objective
   progress must match the objective definitions in the same file.
+- Mission files carry their scenario popups and the IDs the player dismissed.
 - Manual save, load, restart, one rolling quicksave, and one rolling autosave
   are required in M0. Loading begins paused. Restart reloads the level with
   the mission's scenario ID; loading a level file makes it that scenario's
