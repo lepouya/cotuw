@@ -11,6 +11,14 @@ the requirements.
   [platform services](../src/platform/index.ts) have separate modules. Browser
   and Tauri adapters implement save storage and file exchange behind one
   interface; the game imports the Tauri adapter only inside Tauri.
+- **0.11 and 0.12, terrain frame animation:** dense and sparse grass clips play
+  generated sprite sheets with per-frame durations, phase lags, and reduced
+  motion. [Clip tests](../tests/texture-clip.test.ts) cover timing, playback
+  modes, cells, and validation; [mesh](../tests/terrain-mesh.test.ts) and
+  [asset](../tests/terrain-assets.test.ts) tests cover phase groups, seams,
+  and the generator. [Browser checks](../e2e/terrain-animation.spec.ts) verify
+  frame loading, playback, reduced motion, terrain independence, and cleanup
+  in Chromium and WebKit, and a manual playtest passes.
 - **0.16, renderer-independent map content:**
   [level files](../src/content/levels/) store terrain as text, and
   [the mission file codec](../src/simulation/mission-file.ts) and
@@ -109,6 +117,34 @@ the requirements.
   [Codec](../tests/mission-file.test.ts) and
   [save library](../tests/saves.test.ts) tests pass, and a manual browser
   playthrough saved and loaded successfully.
+- **0.45, on-screen actions:** construction, production, economy, rally points,
+  selection, movement, camera views, Focus, Follow, Attack Move, pause, and
+  speed actions have on-screen controls that work with compact touch input,
+  including the Queue Orders mode. Chromium and WebKit checks cover them;
+  phone and tablet coverage belongs to **0.50**.
+- **0.47, locked controls:** selection, contextual commands, Stop/Clear,
+  touch camera controls, smooth minimap navigation, and reduced motion for
+  camera moves, minimap, building activity, and terrain clips work. Pan mode,
+  scrolling in Pan mode, Space-drag, and focused-world arrow keys provide
+  laptop and touch navigation while preserving selection.
+  Mouse edge panning supports corners and an on-screen toggle, with gesture,
+  UI, dialog, and focus safeguards.
+  [Navigation checks](../e2e/camera-navigation.spec.ts) cover mouse, phone, and
+  tablet input, construction previews, interrupted gestures, form fields,
+  dialogs, blur, and restored commands.
+  Secondary click opens the radial menu and secondary drag pans.
+  [The camera](../src/render/camera.ts) provides eased Isometric, Top-down,
+  Grid, and Reset View presets, preset-aware rotation, Focus, and Follow, with
+  [unit tests](../tests/camera.test.ts) for headings, focus retention, Follow
+  cancellation, and live reduced-motion changes. The View popup dismisses on
+  outside presses, focus changes, and Escape. The minimap accepts targets in
+  Attack Move mode, including Shift and Queue Orders. These modes append to
+  saved per-actor queues with a route preview;
+  [queue tests](../tests/queued-orders.test.ts) cover
+  sequencing, replacement, groups, attacks, saves, and validation. The
+  [camera](../e2e/camera-navigation.spec.ts) and
+  [queue](../e2e/queued-orders.spec.ts) browser checks pass in Chromium and
+  WebKit, and a manual playtest passes.
 - **0.48, slice unit tests:** economy, construction support, production, fog,
   combat, wolf state and save continuation have focused tests. The
   [objective tests](../tests/objectives.test.ts) and
@@ -123,7 +159,14 @@ the requirements.
   Only time is controlled; resources, actors, health, and objectives use the
   authored values. [Playthrough notes](m0-playthrough.md) describe the resource
   budget, measured pacing, and the normal-speed check.
-
+- **0.50, compact interaction checks:** [shared profiles](../e2e/profiles.ts)
+  run the touch checks at phone and tablet landscape sizes without a keyboard,
+  hover, or secondary button. They cover construction previews and
+  confirmation, production, the economy opening, rally points, additive and
+  box selection, movement, Stop, camera controls and views, Focus, Follow,
+  Attack Move, Queue Orders, the top bar and popups, and the game menu's save,
+  quicksave, load, and delete controls. The full mission loop also passes by
+  phone touch.
 - **0.54, content packs:** [the base pack](../src/content/packs/base.json)
   holds actor definitions, movement profiles, presentation, terrain styling,
   and lighting. [Session code](../src/session.ts) reads them from the mission's
@@ -137,44 +180,20 @@ the requirements.
   check in Tauri. Chromium and WebKit coverage includes the
   [save checks](../e2e/saves.spec.ts).
 
-- **0.11 and 0.12, terrain frame animation:** terrain supports static textures
-  and UV scrolling. Frame sequences, timing, playback modes, their data tests,
-  and frame-based texture playback are absent.
 - **0.21 and 0.22, actor animation:**
   [the base content pack](../src/content/packs/base.json) and
   [the GLB loader](../src/render/skinned-actor-appearance.ts) implement skeletal
-  idle, walking, and turning. Actor texture-frame clips and playback are absent.
-- **0.45, on-screen actions:** construction, production, economy, rally points,
-  selection, movement, camera, Attack Move, pause, and speed actions have
-  on-screen controls that work with compact touch input. Focus, Follow, and
-  queued orders lack controls.
+  idle, walking, and turning. Actor texture-frame playback, such as the
+  muzzle flash, can use the terrain's clip format but is absent.
 - **0.46, presentation:** skeletal infantry, articulated machinery, tracers,
   bite effects, health bars, remains, blueprint progress, and staged resource
-  markers work. Frame animation, the complete actor combat/death clips,
+  markers work. Actor frame animation, the complete actor combat/death clips,
   ambient objects, escalating damage effects, construction stages, and the
   remaining building activity animations still need integration.
-- **0.47, locked controls:** basic selection, contextual commands, Stop/Clear,
-  touch camera controls, smooth minimap navigation, and some reduced-motion
-  behavior work. Pan mode, scrolling in Pan mode, Space-drag, and focused-world
-  arrow keys provide laptop and touch navigation while preserving selection.
-  Mouse edge panning supports corners and an on-screen toggle, with gesture,
-  UI, dialog, and focus safeguards.
-  [Navigation checks](../e2e/camera-navigation.spec.ts) cover mouse, phone, and
-  tablet input, construction previews, interrupted gestures, form fields,
-  dialogs, blur, and restored commands.
-  Secondary click opens the radial menu and secondary drag pans. Queued
-  orders, camera presets, actor Focus/Follow, the minimap command mode, and
-  other locked bindings are incomplete.
-- **0.50, compact interaction checks:** phone landscape checks exercise
-  construction, production, economy, rally points, selection, movement, and
-  camera controls without a keyboard or secondary button. Attack Move also has
-  phone and tablet checks. The full mission loop has phone coverage; the
-  remaining tablet interactions and future persistence controls remain
-  unverified.
 
 ## Recommended next task
 
-Check Tauri saves. Then take **0.11** and **0.12**: their frame-clip format also
-serves actor texture clips in **0.21** and **0.22**. Camera presets and
-Focus/Follow from **0.47** follow. **0.55** needs first-time human playtests,
-which the notifications and popups now support.
+Take **0.21** and **0.22** with the Trooper's muzzle flash as the first actor
+texture clip, using [`loadClipFrames`](../src/render/texture-clip.ts),
+followed by the remaining **0.46** presentation. Check Tauri saves and run
+first-time human playtests for **0.55** alongside.

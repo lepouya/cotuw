@@ -38,9 +38,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Terrain and map content
 
-- [ ] 0.11 Define and test data-driven terrain-animation clips: frame
+- [x] 0.11 Define and test data-driven terrain-animation clips: frame
       sequence, frame timing, playback mode, and per-layer texture source.
-- [ ] 0.12 Render frame-based terrain texture animation without changing the
+- [x] 0.12 Render frame-based terrain texture animation without changing the
       deterministic terrain state.
 - [x] 0.13 Keep scrolling UV effects available independently for layers that
       need them.
@@ -133,13 +133,13 @@ base-building RTS loop, its technical architecture, and its player interface.
       alerts, notifications, explanatory popups, and victory or defeat results.
 - [x] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
       autosave, version validation, and paused inspection after loading.
-- [ ] 0.45 Expose every core action through on-screen controls that work in
+- [x] 0.45 Expose every core action through on-screen controls that work in
       compact phone and tablet landscape browser profiles without hover or
       right-click.
 - [ ] 0.46 Integrate the required animated textures, skeletal actors,
       articulated buildings, tracer and weapon effects, ambient objects, damage
       effects, construction stages, and resource-depletion visuals.
-- [ ] 0.47 Replace the prototype bindings with the locked mouse, keyboard, and
+- [x] 0.47 Replace the prototype bindings with the locked mouse, keyboard, and
       touch controls; camera presets; smooth Focus and Follow; and
       reduced-motion behavior.
 - [x] 0.53 Add a paid Materials economy opening with a fixed Command Center,
@@ -160,7 +160,7 @@ base-building RTS loop, its technical architecture, and its player interface.
       restart reconstruction.
 - [x] 0.49 Add a browser end-to-end check for the complete M0 loop from the
       starting Command Center through victory and post-victory free play.
-- [ ] 0.50 Add compact landscape interaction checks using touch-style input and
+- [x] 0.50 Add compact landscape interaction checks using touch-style input and
       no keyboard, hover, or secondary mouse button.
 
 ### Complete when
