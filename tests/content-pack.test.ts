@@ -39,6 +39,35 @@ describe("content packs", () => {
     ).toThrow('unknown tile type "snow"');
   });
 
+  test("reject frame effects with unknown triggers, clips, or anchors", () => {
+    const trooper = (pack: any) => pack.presentation["arc-trooper"];
+    expect(
+      withEdit((pack) => {
+        const effects = trooper(pack).frameEffects;
+        effects.reload = effects.attack;
+      }),
+    ).toThrow("The reload frame effect for arc-trooper is invalid");
+    expect(
+      withEdit((pack) => (trooper(pack).frameEffects.attack.clip = "smoke")),
+    ).toThrow("The attack frame effect for arc-trooper is invalid");
+    expect(
+      withEdit((pack) => (trooper(pack).frameEffects.attack.anchor = [0, 1])),
+    ).toThrow("The attack frame effect for arc-trooper is invalid");
+    expect(
+      withEdit((pack) => (trooper(pack).model.glb.clips.attack = "")),
+    ).toThrow("needs a URL and named clips");
+  });
+
+  test("reject frame effects on geometry that cannot play them", () => {
+    expect(
+      withEdit((pack) => {
+        pack.presentation[
+          pack.actors.find((actor: any) => actor.footprint).id
+        ].frameEffects = pack.presentation["arc-trooper"].frameEffects;
+      }),
+    ).toThrow("needs a mobile model");
+  });
+
   test("terrain styles follow tile types, coverage, and shore depth", () => {
     const map = new TerrainGrid({
       width: 7,

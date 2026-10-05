@@ -21,7 +21,8 @@ import type { GameViewOptions } from "../src/render";
 export { createMinimap, createTerrainMeshes } from "../src/render";
 export { currentContentPack } from "../src/content/packs";
 export { minimapProjection } from "../src/render/minimap";
-export { EngineStore, Matrix, Vector3 } from "@babylonjs/core";
+export { createFrameEffectsView } from "../src/render/frame-effects";
+export { EngineStore, Matrix, TransformNode, Vector3 } from "@babylonjs/core";
 
 let authoredTerrain: TerrainGrid | undefined;
 /** Shared geometry for input helpers targeting the unedited prototype map. */

@@ -19,6 +19,10 @@ import { createMaterialsSitesView } from "./render/materials-sites";
 import { createHealthBarView } from "./render/health-bars";
 import { createCombatEffectsView } from "./render/combat-effects";
 import { createWreckView } from "./render/wrecks";
+import {
+  createFrameEffectsView,
+  withFrameEffects,
+} from "./render/frame-effects";
 import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { contentPack } from "./content/packs";
@@ -26,6 +30,7 @@ import {
   Color3,
   MeshBuilder,
   StandardMaterial,
+  TransformNode,
   Vector3,
 } from "@babylonjs/core";
 import { TerrainMap } from "./map";
@@ -269,10 +274,28 @@ export async function createGameSession(
   const glbModels = models.flatMap(([id, model]) =>
     "glb" in model ? [[id, model.glb] as const] : [],
   );
-  const appearances = standInAppearances(view.scene, glbModels);
+  const frameEffects = createFrameEffectsView(
+    view.scene,
+    content.clips ?? {},
+    () => reducedMotion.matches,
+  );
+  const appearances = new Map<string, ActorAppearance>();
+  /** Each appearance also plays its actor's frame effects. */
+  const setAppearance = (id: string, appearance: ActorAppearance) => {
+    const effects = presentationOf(id)?.frameEffects;
+    if (effects) frameEffects.prepare(effects);
+    appearances.set(
+      id,
+      effects
+        ? withFrameEffects(appearance, effects, frameEffects)
+        : appearance,
+    );
+  };
+  for (const [id, appearance] of standInAppearances(view.scene, glbModels))
+    setAppearance(id, appearance);
   for (const [id, model] of models)
     if ("builtin" in model)
-      appearances.set(
+      setAppearance(
         id,
         BUILTIN_ACTOR_MODELS[model.builtin](view.scene, {
           scale: model.scale,
@@ -1011,6 +1034,7 @@ export async function createGameSession(
     materialsView?.animate(pickupSeconds);
     const { shownMobile } = actorsByKind();
     combatEffects.update(frameSeconds);
+    frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
     actorViews.update(
       shownMobile,
@@ -1069,6 +1093,7 @@ export async function createGameSession(
     fogOverlay.dispose();
     healthBars.dispose();
     combatEffects.dispose();
+    frameEffects.dispose();
     wreckView.dispose();
     economyControls?.dispose();
     materialsView?.dispose();
@@ -1181,7 +1206,7 @@ export async function createGameSession(
         return;
       }
       const previous = appearances.get(id);
-      appearances.set(id, appearance);
+      setAppearance(id, appearance);
       actorViews.update(actorsByKind().shownMobile, loop.tickProgress());
       updateWrecks(0);
       previous?.dispose();
@@ -1204,6 +1229,8 @@ function standInAppearances(
         { width: radius * 1.4, height, depth: radius * 1.4 },
         scene,
       );
+      const root = new TransformNode(`actor-template-${id}-root`, scene);
+      mesh.parent = root;
       mesh.position.y = height / 2;
       const material = new StandardMaterial(
         `actor-template-${id}-material`,
@@ -1216,7 +1243,7 @@ function standInAppearances(
       mesh.material = material;
       return [
         id,
-        createMeshAppearance(mesh, graphics.bounds, graphics.minimapColor),
+        createMeshAppearance(root, graphics.bounds, graphics.minimapColor),
       ];
     }),
   );

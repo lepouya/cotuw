@@ -15,10 +15,12 @@ import {
   createActorViewRegistry,
   interpolatePose,
 } from "../src/render/actor-view-registry";
+import { withFrameEffects } from "../src/render/frame-effects";
 
 import type { ActorAppearance, ActorPose } from "../src/render/actor";
 import type { ActorMotion } from "../src/render/actor-gait";
 import type { ActorRenderState } from "../src/simulation/actor";
+import type { FrameEffect } from "../src/render/frame-effects";
 
 function pose(x: number, z: number, facing: number): ActorPose {
   return { worldPosition: { x, z }, facing };
@@ -263,6 +265,47 @@ describe("actor view registry", () => {
 
     views.update([], 1);
     expect(disposed).toEqual(["actor-a"]);
+    views.dispose();
+    engine.dispose();
+  });
+
+  test("plays triggers on drawn actors with their frame effects", () => {
+    const played: string[] = [];
+    const effect: FrameEffect = {
+      clip: "flash",
+      url: "/flash.png",
+      size: 1,
+      anchor: [0, 1, 1],
+    };
+    const { engine, scene, views } = setup((scene) =>
+      withFrameEffects(
+        {
+          bounds: { radius: 0.5, height: 1 },
+          instantiate: (name) => ({
+            root: new TransformNode(name, scene),
+            play: (trigger) => played.push(trigger),
+            dispose: () => {},
+          }),
+          dispose: () => {},
+        },
+        { attack: effect },
+        {
+          play: (shown, node) => {
+            played.push(`${shown.clip} on ${node.name}`);
+          },
+        },
+      ),
+    );
+    views.update([actor("a")], 1);
+
+    views.play("a", "attack");
+    views.play("hidden", "attack");
+    views.update([actor("a")], 1);
+
+    expect(played).toEqual(["attack", "flash on actor-a"]);
+    expect(scene.getTransformNodeByName("actor-a")!.parent!.name).toBe(
+      "actor-a-root",
+    );
     views.dispose();
     engine.dispose();
   });

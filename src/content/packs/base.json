@@ -317,6 +317,14 @@
           },
           "cycleDistance": 2.1
         }
+      },
+      "frameEffects": {
+        "attack": {
+          "clip": "muzzle-flash",
+          "url": "/assets/effects/muzzle-flash.png",
+          "size": 0.6,
+          "anchor": [0.12, 1.15, 1.15]
+        }
       }
     },
     "arc-scout": {
@@ -419,6 +427,29 @@
     }
   },
   "clips": {
+    "muzzle-flash": {
+      "columns": 4,
+      "rows": 1,
+      "frames": [
+        {
+          "cell": 0,
+          "seconds": 0.025
+        },
+        {
+          "cell": 1,
+          "seconds": 0.035
+        },
+        {
+          "cell": 2,
+          "seconds": 0.03
+        },
+        {
+          "cell": 3,
+          "seconds": 0.04
+        }
+      ],
+      "playback": "once"
+    },
     "grass-sway": {
       "columns": 4,
       "rows": 2,

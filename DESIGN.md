@@ -534,7 +534,12 @@ story.
   death clip once from destruction and hold its last frame, so remains older
   than the clip, as after loading, show that frame. Without a death clip,
   remains lie on their side.
-- Reduced motion skips trigger clips and shows death clips' last frame at once.
+- Frame effects play a content pack's texture clip once on a camera-facing
+  square anchored in the actor's model space, so they turn with it. An actor's
+  presentation names them by trigger. The Trooper's muzzle flash plays on
+  `attack`.
+- Reduced motion skips trigger clips, holds frame effects on their first
+  frame, and shows death clips' last frame at once.
 
 ## Fog, stealth, and detection
 

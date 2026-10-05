@@ -894,6 +894,26 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
     };
   });
   expect(engaged).toEqual({ trooper: "lone-wolf", wolf: "duelist" });
+  // A shot within the rifle's one-second cooldown flashes at the Trooper.
+  const flashed = await page.evaluate(() => {
+    const harness = window.economyHarness;
+    for (let step = 0; step < 40; step++) {
+      harness.now += 50;
+      harness.view.scene.onBeforeAnimationsObservable.notifyObservers(
+        harness.view.scene,
+      );
+      harness.view.scene.onBeforeRenderObservable.notifyObservers(
+        harness.view.scene,
+      );
+      const { scene } = harness.view;
+      const flash = scene.meshes.find(({ name }) => name === "frame-effect");
+      if (flash)
+        return flash.isDescendantOf(
+          scene.getTransformNodeByName("actor-duelist-root")!,
+        );
+    }
+  });
+  expect(flashed).toBe(true);
   await advance(page, 12);
   const result = await page.evaluate(() => {
     const { simulation } = window.economyHarness.view;

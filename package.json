@@ -10,6 +10,7 @@
     "dev": "vite",
     "assets:infantry": "node --no-experimental-webstorage scripts/generate-infantry.ts",
     "assets:grass": "node --no-experimental-webstorage scripts/generate-grass.ts",
+    "assets:effects": "node --no-experimental-webstorage scripts/generate-effects.ts",
     "build": "npm run typecheck:ts && vite build",
     "format": "npm run format:ts && npm run format:rs",
     "format:ts": "prettier --write .",

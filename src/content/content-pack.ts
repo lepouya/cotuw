@@ -13,11 +13,13 @@ import {
   BUILTIN_BUILDING_DETAILS,
 } from "../render/builtin-models";
 import { validateActorGraphics } from "../render/skinned-actor-appearance";
+import { validateFrameEffects } from "../render/frame-effects";
 import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
 import type { MovementProfile } from "../simulation/navigation";
 import type { AttackEffectStyle } from "../render/combat-effects";
+import type { FrameEffects } from "../render/frame-effects";
 import type { Rgb } from "../render/color";
 import type { TerrainStyle } from "../render/terrain-style";
 import type { ActorGraphics } from "../render/skinned-actor-appearance";
@@ -41,6 +43,7 @@ export type ActorPresentation = {
   train?: { id: string; label: string };
   attackEffect?: AttackEffectStyle;
   model?: ActorModel;
+  frameEffects?: FrameEffects;
   building?: {
     height: number;
     color: Rgb;
@@ -174,6 +177,15 @@ export function parseContentPack(source: string): ContentPack {
         if (model.scale !== undefined && !isPositive(model.scale))
           throw invalid(`gives ${actor.id} an invalid model scale`);
       }
+    }
+    if (presentation.frameEffects !== undefined) {
+      if (!model || actor.footprint)
+        throw invalid(`needs a mobile model for ${actor.id}'s frame effects`);
+      validateFrameEffects(
+        actor.id,
+        presentation.frameEffects,
+        pack.clips ?? {},
+      );
     }
     const building = presentation.building;
     if (building !== undefined) {

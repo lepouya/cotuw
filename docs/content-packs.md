@@ -27,7 +27,13 @@ bundled packs through the same parser future mod packs will use.
   - `name`, `description`, and optional `build` or `train` button labels.
   - `attackEffect` is `"tracer"` or `"bite"`.
   - `model` is a GLB with clips under `glb`, or a built-in procedural model
-    under `builtin`, such as `"wolf"`, with an optional `scale`.
+    under `builtin`, such as `"wolf"`, with an optional `scale`. GLB `clips`
+    name the `idle`, `locomotion`, optional `turn`, trigger, and `death`
+    clips, as [actor assets](actor-assets.md) describes.
+  - `frameEffects` on mobile models maps a trigger to a clip played once on a
+    camera-facing square. `attack` plays with each hit. Each names its `clip`,
+    the sheet at `url`, its `size` in world units, and an `anchor` in the
+    actor's model space: `[x, y, z]` from its ground point, facing +Z.
   - `building` sets a tile-placed actor's height, colors, and optional
     built-in `details`, such as `"command-center"`.
 - `clips` maps IDs to frame-sequenced textures. `columns` and `rows` divide a
@@ -63,5 +69,9 @@ and packs them into sheets.
 [`scripts/grass-sheet.ts`](../scripts/grass-sheet.ts) builds the dense and
 sparse grass sheets, whose cells each span four tiles so repeats are hard to
 spot. Run `npm run assets:grass` after changing it and copy the printed clip
-and minimap colors into the pack. The unit tests fail while
-the committed sheet or clip differs from what the script builds.
+and minimap colors into the pack.
+[`scripts/muzzle-flash-sheet.ts`](../scripts/muzzle-flash-sheet.ts) builds the
+muzzle flash; run `npm run assets:effects` after changing it and copy the
+printed clip into the pack. Effect cells must be transparent at their edges.
+The unit tests fail while a committed sheet or clip differs from what its
+script builds.
