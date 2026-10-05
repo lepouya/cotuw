@@ -10,6 +10,10 @@ import {
 } from "@babylonjs/core";
 
 import { createDebugOverlay } from "./debug-overlay";
+import { loadClipFrames } from "./texture-clip";
+import { compileTextureClip } from "../content/texture-clip";
+import type { ClipFrames } from "./texture-clip";
+import type { TextureClip } from "../content/texture-clip";
 
 import type {
   TerrainBounds,
@@ -21,6 +25,8 @@ import type {
 import type { AbstractMesh } from "@babylonjs/core";
 
 const CHUNK_SIZE = 32;
+/** Clip lags round to this many shares of a cycle, each with one material. */
+export const CLIP_PHASE_GROUPS = 8;
 export const TERRAIN_LAYER_OFFSET = 0.012;
 export const TERRAIN_PICK_KIND = "terrain";
 
@@ -33,6 +39,8 @@ type LayerTile = {
 type LayerGroup = {
   layerIndex: number;
   type?: TileType;
+  /** The clip phase group its tiles share. */
+  phase: number;
   tiles: LayerTile[];
 };
 
@@ -42,19 +50,76 @@ export type TerrainMeshes = {
 
 export type TerrainMeshOptions = {
   debugOverlay?: boolean;
+  /** The content pack's clips, which tile graphics name. */
+  clips?: Readonly<Record<string, TextureClip>>;
+  /** Holds every clip on its first frame. */
+  reducedMotion?: () => boolean;
 };
 
 /** Builds independently replaceable terrain chunks with shared materials. */
 export function createTerrainMeshes(
   scene: Scene,
   map: TerrainMap,
-  { debugOverlay = false }: TerrainMeshOptions = {},
+  {
+    debugOverlay = false,
+    clips = {},
+    reducedMotion = () => false,
+  }: TerrainMeshOptions = {},
 ): TerrainMeshes {
   const chunkMeshes = new Map<string, Mesh[]>();
   const tileTypes = new Map<string, TileType>();
   // Types without graphics share one plain material.
-  const materials = new Map<string | undefined, StandardMaterial>();
+  const materials = new Map<string, StandardMaterial>();
   const animatedTextures = new Map<Texture, { u: number; v: number }>();
+  /** Each clip type's frame textures, shared by its phase groups. */
+  const clipFrames = new Map<string, ClipFrames>();
+  const timings = new Map<TextureClip, ReturnType<typeof compileTextureClip>>();
+  const timingOf = (clip: TextureClip) => {
+    let timing = timings.get(clip);
+    if (!timing) {
+      timing = compileTextureClip(clip);
+      timings.set(clip, timing);
+    }
+    return timing;
+  };
+  const clipPlayers: {
+    material: StandardMaterial;
+    clip: TextureClip;
+    frames: ClipFrames["frames"];
+    frameAt: (seconds: number) => number;
+    lagSeconds: number;
+  }[] = [];
+  let clipSeconds = 0;
+  const clipOf = (type?: TileType) => {
+    const id = type?.graphics?.clip;
+    if (id === undefined) return undefined;
+    const clip = clips[id];
+    if (!clip) throw new Error(`Unknown texture clip: ${id}.`);
+    return clip;
+  };
+  const phaseAt = (type: TileType | undefined, x: number, z: number) => {
+    const clip = clipOf(type);
+    const lag = type?.graphics?.clipPhase;
+    if (!clip || !lag) return 0;
+    const share = ((x * lag.u + z * lag.v) / timingOf(clip).duration) % 1;
+    return (
+      (Math.round(share * CLIP_PHASE_GROUPS) + CLIP_PHASE_GROUPS) %
+      CLIP_PHASE_GROUPS
+    );
+  };
+  const framesFor = (type: TileType, clip: TextureClip) => {
+    let loading = clipFrames.get(type.id);
+    if (!loading) {
+      const graphics = type.graphics!;
+      loading = loadClipFrames(scene, graphics.url, clip, (texture) => {
+        configureLayerTexture(texture, graphics);
+        if (graphics.scrollSpeed)
+          animatedTextures.set(texture, graphics.scrollSpeed);
+      });
+      clipFrames.set(type.id, loading);
+    }
+    return loading.frames;
+  };
   const canonicalType = (type?: TileType): TileType | undefined => {
     if (!type) {
       return undefined;
@@ -79,13 +144,26 @@ export function createTerrainMeshes(
     }
   }
 
-  const materialFor = (type?: TileType) => {
+  const materialFor = (type: TileType | undefined, phase: number) => {
     const textured = type?.graphics ? type : undefined;
-    let material = materials.get(textured?.id);
+    const clip = clipOf(textured);
+    const key = JSON.stringify([textured?.id, clip ? phase : 0]);
+    let material = materials.get(key);
 
     if (!material) {
-      material = createLayerMaterial(scene, textured);
-      materials.set(textured?.id, material);
+      material = createLayerMaterial(scene, textured, !clip);
+      materials.set(key, material);
+      if (clip) {
+        // Hidden until its frames load, rather than drawn as bare color.
+        material.alpha = 0;
+        clipPlayers.push({
+          material,
+          clip,
+          frames: framesFor(textured!, clip),
+          frameAt: timingOf(clip).frameAt,
+          lagSeconds: (phase * timingOf(clip).duration) / CLIP_PHASE_GROUPS,
+        });
+      }
 
       const scrollSpeed = textured?.graphics?.scrollSpeed;
       if (scrollSpeed && material.diffuseTexture instanceof Texture) {
@@ -102,13 +180,15 @@ export function createTerrainMeshes(
     const minZ = chunkZ * CHUNK_SIZE;
     const maxX = Math.min(minX + CHUNK_SIZE, map.width);
     const maxZ = Math.min(minZ + CHUNK_SIZE, map.height);
-    const groups = new Map<number, Map<string | undefined, LayerGroup>>();
+    const groups = new Map<number, Map<string, LayerGroup>>();
 
     for (let z = minZ; z < maxZ; z += 1) {
       for (let x = minX; x < maxX; x += 1) {
         for (const [index, layer] of map.layersAt(x, z).entries()) {
           const type = canonicalType(layer.type);
           const layerIndex = type?.slot ?? index;
+          const phase = phaseAt(type, x, z);
+          const groupKey = JSON.stringify([type?.id, phase]);
           let layerGroups = groups.get(layerIndex);
 
           if (!layerGroups) {
@@ -116,11 +196,11 @@ export function createTerrainMeshes(
             groups.set(layerIndex, layerGroups);
           }
 
-          let group = layerGroups.get(type?.id);
+          let group = layerGroups.get(groupKey);
 
           if (!group) {
-            group = { layerIndex, type, tiles: [] };
-            layerGroups.set(type?.id, group);
+            group = { layerIndex, type, phase, tiles: [] };
+            layerGroups.set(groupKey, group);
           }
 
           group.tiles.push({ x, z, layer });
@@ -138,7 +218,7 @@ export function createTerrainMeshes(
             chunkX,
             chunkZ,
             group,
-            materialFor(group.type),
+            materialFor(group.type, group.phase),
           ),
         );
       }
@@ -174,6 +254,15 @@ export function createTerrainMeshes(
       texture.uOffset = (texture.uOffset + speed.u * elapsedSeconds) % 1;
       texture.vOffset = (texture.vOffset + speed.v * elapsedSeconds) % 1;
     }
+    clipSeconds += elapsedSeconds;
+    const still = reducedMotion();
+    for (const { material, clip, frames, lagSeconds, frameAt } of clipPlayers) {
+      const frame = frameAt(still ? 0 : clipSeconds - lagSeconds);
+      const texture = frames.get(clip.frames[frame]!.cell);
+      if (!texture || material.diffuseTexture === texture) continue;
+      material.diffuseTexture = texture;
+      material.alpha = 1;
+    }
   });
   const overlay = debugOverlay
     ? createDebugOverlay(scene, map, { layerOffset: TERRAIN_LAYER_OFFSET })
@@ -207,9 +296,15 @@ export function createTerrainMeshes(
         mesh.dispose();
       }
     }
+    // Clip materials share frame textures, which are released once below.
+    const clipMaterials = new Set(clipPlayers.map(({ material }) => material));
     for (const material of materials.values()) {
-      material.dispose(true, true);
+      material.dispose(true, !clipMaterials.has(material));
     }
+    for (const loading of clipFrames.values()) loading.dispose();
+    clipFrames.clear();
+    timings.clear();
+    clipPlayers.length = 0;
     chunkMeshes.clear();
     materials.clear();
     tileTypes.clear();
@@ -241,6 +336,8 @@ function sameGraphics(
   }
   return (
     left.url === right.url &&
+    left.clip === right.clip &&
+    samePair(left.clipPhase, right.clipPhase) &&
     left.hasAlpha === right.hasAlpha &&
     Boolean(left.layerAlphaOnly) === Boolean(right.layerAlphaOnly) &&
     samePair(left.scale, right.scale) &&
@@ -400,7 +497,12 @@ function tileTypeName(type?: TileType): string {
   return type ? `tile-${type.id}` : "plain";
 }
 
-function createLayerMaterial(scene: Scene, type?: TileType): StandardMaterial {
+/** `textured` false leaves the diffuse texture to a clip player. */
+function createLayerMaterial(
+  scene: Scene,
+  type: TileType | undefined,
+  textured: boolean,
+): StandardMaterial {
   const material = new StandardMaterial(
     `terrain-material-${tileTypeName(type)}`,
     scene,
@@ -410,7 +512,11 @@ function createLayerMaterial(scene: Scene, type?: TileType): StandardMaterial {
 
   const graphics = type?.graphics;
   if (graphics) {
-    material.diffuseTexture = createLayerTexture(scene, graphics);
+    if (textured)
+      material.diffuseTexture = configureLayerTexture(
+        new Texture(graphics.url, scene),
+        graphics,
+      );
     material.useAlphaFromDiffuseTexture =
       graphics.hasAlpha && !graphics.layerAlphaOnly;
     if (graphics.hasAlpha) {
@@ -421,8 +527,10 @@ function createLayerMaterial(scene: Scene, type?: TileType): StandardMaterial {
   return material;
 }
 
-function createLayerTexture(scene: Scene, graphics: TileGraphics): Texture {
-  const texture = new Texture(graphics.url, scene);
+function configureLayerTexture<T extends Texture>(
+  texture: T,
+  graphics: TileGraphics,
+): T {
   texture.hasAlpha = graphics.hasAlpha;
   // Repeating rather than mirroring, which would alternate reflected copies.
   // Relies on matching opposite edges; see scripts/reconcile-texture-edges.ts.

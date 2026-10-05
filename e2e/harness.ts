@@ -18,7 +18,8 @@ import type { ArcRotateCamera, Scene } from "@babylonjs/core";
 import type { TerrainMapOptions, TileType } from "../src/map";
 import type { GameViewOptions } from "../src/render";
 
-export { createMinimap } from "../src/render";
+export { createMinimap, createTerrainMeshes } from "../src/render";
+export { currentContentPack } from "../src/content/packs";
 export { minimapProjection } from "../src/render/minimap";
 export { EngineStore, Matrix, Vector3 } from "@babylonjs/core";
 

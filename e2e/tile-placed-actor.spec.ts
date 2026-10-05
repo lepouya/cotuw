@@ -199,6 +199,15 @@ test("selects a constructed building and freezes idle equipment when disabled", 
   expect(await angle()).toBe(frozen);
   await page.locator("#animate-building").check();
   await expect.poll(angle).toBeGreaterThan(frozen);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator("#animate-building")).toBeDisabled();
+  await page.waitForTimeout(100);
+  const reduced = await angle();
+  await page.waitForTimeout(150);
+  expect(await angle()).toBe(reduced);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(page.locator("#animate-building")).toBeEnabled();
+  await expect.poll(angle).toBeGreaterThan(reduced);
 });
 
 test("touch previews before explicit confirmation in compact landscape", async ({

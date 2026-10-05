@@ -5,6 +5,7 @@ import { TerrainMap } from "../src/map";
 import {
   chunksForBounds,
   cornerAlpha,
+  CLIP_PHASE_GROUPS,
   createTerrainMeshes,
 } from "../src/render/terrain-mesh";
 
@@ -130,6 +131,52 @@ describe("createTerrainMeshes", () => {
     ).toBe(1);
     expect(overlay).toHaveLength(3);
     expect(overlay.every(({ isPickable }) => !isPickable)).toBe(true);
+    engine.dispose();
+  });
+
+  test("clip layers split into phase groups that wrap with the cycle", () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const map = new TerrainMap({
+      width: CLIP_PHASE_GROUPS + 1,
+      height: 1,
+      tileSize: 1,
+      createLayers: () => [
+        {
+          type: {
+            id: "grass",
+            graphics: {
+              url: "/grass.png",
+              clip: "sway",
+              // One eighth of the 0.8 second cycle per tile.
+              clipPhase: { u: 0.1, v: 0 },
+              hasAlpha: true,
+              minimapColor: [0.4, 0.5, 0.2, 0.3],
+            },
+          },
+          color: new Color4(1, 1, 1, 1),
+        },
+      ],
+    });
+    const frames = Array.from({ length: 8 }, (_, cell) => ({
+      cell,
+      seconds: 0.1,
+    }));
+
+    createTerrainMeshes(scene, map, {
+      clips: { sway: { columns: 4, rows: 2, frames, playback: "loop" } },
+    });
+    const grass = scene.meshes.filter(({ name }) =>
+      name.includes("tile-grass"),
+    );
+
+    expect(grass).toHaveLength(CLIP_PHASE_GROUPS);
+    // The first and last tiles lag a whole cycle apart, so they share one.
+    expect(
+      grass.map((mesh) => mesh.getTotalVertices()).sort((a, b) => b - a)[0],
+    ).toBe(8);
+    // Frames are not drawn until the sheet loads.
+    expect(grass.every(({ material }) => material!.alpha === 0)).toBe(true);
     engine.dispose();
   });
 

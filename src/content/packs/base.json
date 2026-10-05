@@ -415,6 +415,47 @@
       }
     }
   },
+  "clips": {
+    "grass-sway": {
+      "columns": 4,
+      "rows": 2,
+      "frames": [
+        {
+          "cell": 0,
+          "seconds": 0.14
+        },
+        {
+          "cell": 1,
+          "seconds": 0.16
+        },
+        {
+          "cell": 2,
+          "seconds": 0.22
+        },
+        {
+          "cell": 3,
+          "seconds": 0.16
+        },
+        {
+          "cell": 4,
+          "seconds": 0.14
+        },
+        {
+          "cell": 5,
+          "seconds": 0.16
+        },
+        {
+          "cell": 6,
+          "seconds": 0.22
+        },
+        {
+          "cell": 7,
+          "seconds": 0.16
+        }
+      ],
+      "playback": "loop"
+    }
+  },
   "terrain": {
     "tileTypes": {
       "dirt": {
@@ -463,6 +504,42 @@
           "hasAlpha": true,
           "minimapColor": [0.409, 0.373, 0.341, 0.05]
         }
+      },
+      "grass": {
+        "slot": 4,
+        "featherEdges": true,
+        "graphics": {
+          "url": "/assets/terrain/grass.png",
+          "clip": "grass-sway",
+          "clipPhase": {
+            "u": 0.09,
+            "v": 0.035
+          },
+          "hasAlpha": true,
+          "scale": {
+            "u": 0.25,
+            "v": 0.25
+          },
+          "minimapColor": [0.353, 0.442, 0.174, 0.576]
+        }
+      },
+      "grass-sparse": {
+        "slot": 4,
+        "featherEdges": true,
+        "graphics": {
+          "url": "/assets/terrain/grass-sparse.png",
+          "clip": "grass-sway",
+          "clipPhase": {
+            "u": 0.09,
+            "v": 0.035
+          },
+          "hasAlpha": true,
+          "scale": {
+            "u": 0.25,
+            "v": 0.25
+          },
+          "minimapColor": [0.369, 0.444, 0.174, 0.26]
+        }
       }
     },
     "shore": {
@@ -481,6 +558,10 @@
           "tileType": "clutter",
           "color": [0.99, 0.66, 0.33, 1],
           "coverage": 0.19397
+        },
+        {
+          "tileType": "grass-sparse",
+          "color": [0.95, 1, 0.9, 1]
         }
       ],
       "path": [
@@ -504,6 +585,10 @@
         {
           "tileType": "clutter",
           "color": [0.99, 0.66, 0.33, 1]
+        },
+        {
+          "tileType": "grass",
+          "color": [0.95, 1, 0.9, 1]
         }
       ],
       "water": [

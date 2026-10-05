@@ -17,8 +17,15 @@ export type {
 
 /** How a tile type is drawn. */
 export type TileGraphics = {
-  /** An image that repeats once per tile. */
+  /** An image that repeats once per tile, or a clip's sprite sheet. */
   url: string;
+  /** Names a content-pack texture clip that plays cells of `url`. */
+  clip?: string;
+  /**
+   * Seconds each tile's clip lags its neighbor toward negative x and z, so
+   * motion rolls across the terrain instead of playing in unison.
+   */
+  clipPhase?: { u: number; v: number };
   hasAlpha: boolean;
   /** Ignores the image's alpha, so the layer color alone sets opacity. */
   layerAlphaOnly?: boolean;

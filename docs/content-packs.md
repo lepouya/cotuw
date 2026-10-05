@@ -30,10 +30,19 @@ bundled packs through the same parser future mod packs will use.
     under `builtin`, such as `"wolf"`, with an optional `scale`.
   - `building` sets a tile-placed actor's height, colors, and optional
     built-in `details`, such as `"command-center"`.
+- `clips` maps IDs to frame-sequenced textures. `columns` and `rows` divide a
+  sprite sheet into equal cells numbered row by row from the top left.
+  `frames` lists `{ cell, seconds }` in play order, and `playback` is
+  `"loop"`, `"ping-pong"`, or `"once"`. Sheet dimensions must divide into
+  whole-pixel cells. Clip validation and timing live in
+  `src/content/texture-clip.ts`; GPU frame loading lives in
+  `src/render/texture-clip.ts`.
 - `terrain.tileTypes` defines textured layers. Each pins a `slot` so optional
   layers stack consistently. A layer marked `layerAlphaOnly` ignores its
   image's alpha, so the layer color alone controls opacity; the water image
-  caps itself at about two thirds opaque.
+  caps itself at about two thirds opaque. `clip` plays a clip from the sheet
+  at `url`, and `clipPhase` delays each tile by `u` seconds per tile along x
+  and `v` along z. Every cell must repeat without a seam.
 - `terrain.layers` lists, for each terrain type, its layers from the bottom:
   - `variation` adds a gentle per-tile tint.
   - `coverage` shows the layer on that share of tiles in a fixed pattern.
@@ -46,3 +55,13 @@ Built-in models and building details live in
 that names one the build lacks. Parsing validates presentation, lighting,
 textures, and terrain layers before a mission can use the pack. Cached packs
 are immutable; editing a loaded mission cannot change another mission's rules.
+
+## Generated sprite sheets
+
+[`scripts/sprite-sheet.ts`](../scripts/sprite-sheet.ts) draws seamless frames
+and packs them into sheets.
+[`scripts/grass-sheet.ts`](../scripts/grass-sheet.ts) builds the dense and
+sparse grass sheets, whose cells each span four tiles so repeats are hard to
+spot. Run `npm run assets:grass` after changing it and copy the printed clip
+and minimap colors into the pack. The unit tests fail while
+the committed sheet or clip differs from what the script builds.

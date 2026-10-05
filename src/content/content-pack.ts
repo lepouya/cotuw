@@ -13,6 +13,7 @@ import {
   BUILTIN_BUILDING_DETAILS,
 } from "../render/builtin-models";
 import { validateActorGraphics } from "../render/skinned-actor-appearance";
+import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
 import type { MovementProfile } from "../simulation/navigation";
@@ -20,6 +21,7 @@ import type { AttackEffectStyle } from "../render/combat-effects";
 import type { Rgb } from "../render/color";
 import type { TerrainStyle } from "../render/terrain-style";
 import type { ActorGraphics } from "../render/skinned-actor-appearance";
+import type { TextureClip } from "./texture-clip";
 
 const FORMAT = "cotuw-content";
 export const CONTENT_FORMAT_VERSION = 1;
@@ -66,6 +68,8 @@ export type ContentPack = ContentReference & {
   actors: readonly ActorDefinition[];
   movementProfiles: readonly MovementProfile[];
   presentation: Readonly<Record<string, ActorPresentation>>;
+  /** Sprite-sheet frame sequences that textures name by ID. */
+  clips?: Readonly<Record<string, TextureClip>>;
   terrain: TerrainStyle;
   view: ViewStyle;
 };
@@ -194,7 +198,11 @@ export function parseContentPack(source: string): ContentPack {
     if (actor.footprint ? !building : actor.movement && !model)
       throw invalid(`needs presentation for ${actor.id}'s geometry`);
   }
-  validateTerrainStyle(pack.terrain, invalid);
+  if (pack.clips !== undefined && !isRecord(pack.clips))
+    throw invalid("needs clips keyed by ID");
+  for (const [id, clip] of Object.entries(pack.clips ?? {}))
+    validateTextureClip(id, clip);
+  validateTerrainStyle(pack.terrain, pack.clips ?? {}, invalid);
   return deepFreeze(pack);
 }
 
@@ -211,6 +219,7 @@ const isOptionalBoolean = (value: unknown) =>
 
 function validateTerrainStyle(
   style: TerrainStyle,
+  clips: Readonly<Record<string, unknown>>,
   invalid: (problem: string) => Error,
 ): void {
   for (const [id, type] of Object.entries(style.tileTypes)) {
@@ -227,12 +236,17 @@ function validateTerrainStyle(
         !isId(graphics.url) ||
         typeof graphics.hasAlpha !== "boolean" ||
         !isOptionalBoolean(graphics.layerAlphaOnly) ||
-        !isRgba(graphics.minimapColor)
+        !isRgba(graphics.minimapColor) ||
+        (graphics.clip !== undefined &&
+          (!isId(graphics.clip) ||
+            !Object.prototype.hasOwnProperty.call(clips, graphics.clip))) ||
+        (graphics.clipPhase !== undefined && graphics.clip === undefined)
       )
         throw invalid(`has invalid graphics for terrain tile type "${id}"`);
       for (const [value, positive] of [
         [graphics.scale, true],
         [graphics.scrollSpeed, false],
+        [graphics.clipPhase, false],
       ] as const)
         if (
           value !== undefined &&

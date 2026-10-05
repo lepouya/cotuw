@@ -52,8 +52,8 @@ describe("content packs", () => {
     const layers = terrainLayers(BASE_CONTENT.terrain);
     const ids = (x: number) =>
       layers(x, 0, map.terrainAt(x, 0), map).map(({ type }) => type?.id);
-    expect(ids(0)).toEqual(["dirt", "clutter"]);
-    expect(ids(1)).toEqual(["dirt"]);
+    expect(ids(0)).toEqual(["dirt", "clutter", "grass"]);
+    expect(ids(1)).toEqual(["dirt", "grass-sparse"]);
     expect(ids(2)).toEqual(["dirt", "water", "water-ripples"]);
     const waterAlpha = (x: number) =>
       layers(x, 0, map.terrainAt(x, 0), map)[1].color.a;
@@ -62,6 +62,13 @@ describe("content packs", () => {
 });
 
 test.each([
+  [
+    "non-string clip reference",
+    (pack: any) => {
+      pack.terrain.tileTypes.grass.graphics.clip = ["grass-sway"];
+    },
+    "graphics",
+  ],
   [
     "missing lighting",
     (pack: any) => {
@@ -124,6 +131,27 @@ test.each([
       pack.presentation = null;
     },
     "presentation",
+  ],
+  [
+    "invalid texture clip",
+    (pack: any) => {
+      pack.clips["grass-sway"].frames[0].cell = 99;
+    },
+    "grass-sway",
+  ],
+  [
+    "unknown texture clip",
+    (pack: any) => {
+      pack.terrain.tileTypes.grass.graphics.clip = "missing";
+    },
+    "graphics",
+  ],
+  [
+    "clip phase without a clip",
+    (pack: any) => {
+      delete pack.terrain.tileTypes.grass.graphics.clip;
+    },
+    "graphics",
   ],
   [
     "duplicate actor",

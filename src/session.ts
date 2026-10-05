@@ -233,9 +233,12 @@ export async function createGameSession(
   );
   const options = viewOptions(content.view);
   const view = createGameView(canvas, map, options);
-  createTerrainMeshes(view.scene, map);
-  const simulation = createSessionSimulation(map, mission);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  createTerrainMeshes(view.scene, map, {
+    clips: content.clips,
+    reducedMotion: () => reducedMotion.matches,
+  });
+  const simulation = createSessionSimulation(map, mission);
   const presentationOf = (id: string) => content.presentation[id];
   const names = new Map(
     definitions.map(({ id }) => [id, presentationOf(id)?.name ?? id]),
@@ -732,6 +735,11 @@ export async function createGameSession(
   });
   input.select(undefined);
   if (controls.animate) controls.animate.checked = !reducedMotion.matches;
+  const syncAnimationControl = () => {
+    if (controls.animate) controls.animate.disabled = reducedMotion.matches;
+  };
+  syncAnimationControl();
+  reducedMotion.addEventListener("change", syncAnimationControl);
   let idleSeconds = 0;
   let pickupSeconds = 0;
   let previousFrameTime = performance.now();
@@ -908,7 +916,7 @@ export async function createGameSession(
     const frameTime = performance.now();
     const frameSeconds = (frameTime - previousFrameTime) / 1000;
     previousFrameTime = frameTime;
-    if (controls.animate?.checked ?? !reducedMotion.matches) {
+    if (!reducedMotion.matches && (controls.animate?.checked ?? true)) {
       idleSeconds += frameSeconds;
     }
     if (!reducedMotion.matches) pickupSeconds += frameSeconds;
@@ -959,6 +967,7 @@ export async function createGameSession(
     loop.stop();
     simulation.dispose();
     input.dispose();
+    reducedMotion.removeEventListener("change", syncAnimationControl);
     unitControls.dispose();
     disposeCameraControls?.();
     placement.dispose();

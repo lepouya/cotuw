@@ -5,14 +5,30 @@ import { describe, expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
 
+import { clipCellRect } from "../src/content/texture-clip";
+import {
+  buildGrassSheet,
+  GRASS_CLIP,
+  GRASS_SHEETS,
+  TILES_PER_REPEAT,
+} from "../scripts/grass-sheet";
+
 import type { TileGraphics } from "../src/map";
+import type { TextureClip } from "../src/content/texture-clip";
 
 const { tileTypes } = BASE_CONTENT.terrain;
 const tileGraphics = Object.entries(tileTypes).map(
   ([id, { graphics }]): [string, TileGraphics] => [id, graphics!],
 );
 // Several types can sample one file, so seams only need checking once per file.
-const texturePaths = [...new Set(tileGraphics.map(([, { url }]) => url))];
+const texturePaths = [
+  ...new Map(
+    tileGraphics.map(([, { url, clip }]) => [
+      url,
+      clip ? BASE_CONTENT.clips![clip] : undefined,
+    ]),
+  ),
+];
 
 async function readTexture(url: string): Promise<PNG> {
   return PNG.sync.read(
@@ -23,12 +39,18 @@ async function readTexture(url: string): Promise<PNG> {
 describe("terrain texture assets", () => {
   // Terrain samples with WRAP_ADDRESSMODE, so a texture whose opposite edges
   // disagree shows a seam at every repeat.
-  test.each(texturePaths)("%s has matching opposite edges", async (url) => {
-    expect(maximumEdgeDelta(await readTexture(url))).toEqual({
-      horizontal: 0,
-      vertical: 0,
-    });
-  });
+  // Clips repeat each cell on its own, so each cell must tile.
+  test.each(texturePaths)(
+    "%s has matching opposite edges",
+    async (url, clip) => {
+      const png = await readTexture(url);
+      const cells = clip
+        ? clip.frames.map(({ cell }) => cropCell(png, clip, cell))
+        : [png];
+      for (const cell of cells)
+        expect(maximumEdgeDelta(cell)).toEqual({ horizontal: 0, vertical: 0 });
+    },
+  );
 
   test.each(tileGraphics)(
     "%s declares its alpha channel honestly",
@@ -59,6 +81,21 @@ describe("terrain texture assets", () => {
     },
   );
 
+  test.each(Object.entries(GRASS_SHEETS))(
+    "the %s sheet and clip match their generator",
+    async (id, style) => {
+      const { url, clip, scale } = tileTypes[id]!.graphics!;
+      expect(BASE_CONTENT.clips![clip!]).toEqual(GRASS_CLIP);
+      expect(scale).toEqual({
+        u: 1 / TILES_PER_REPEAT,
+        v: 1 / TILES_PER_REPEAT,
+      });
+      expect(
+        (await readTexture(url)).data.equals(buildGrassSheet(style).data),
+      ).toBe(true);
+    },
+  );
+
   test("clutter masks tiles rather than tinting them", async () => {
     const clutter = alphaRange(
       await readTexture(tileTypes.clutter.graphics!.url),
@@ -67,6 +104,13 @@ describe("terrain texture assets", () => {
     expect(clutter).toEqual({ minimum: 0, maximum: 255 });
   });
 });
+
+function cropCell(png: PNG, clip: TextureClip, cell: number): PNG {
+  const rect = clipCellRect(clip, cell, png);
+  const cropped = new PNG({ width: rect.width, height: rect.height });
+  PNG.bitblt(png, cropped, rect.x, rect.y, rect.width, rect.height, 0, 0);
+  return cropped;
+}
 
 function maximumEdgeDelta(png: PNG) {
   let horizontal = 0;

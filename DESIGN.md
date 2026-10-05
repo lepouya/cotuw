@@ -368,8 +368,15 @@ story.
   opposite edges.
 - Tile type IDs resolve one canonical visual definition. Conflicting definitions
   with the same ID are invalid content.
-- Scrolling textures and future frame-based terrain animation are rendering
-  effects and do not enter deterministic terrain state.
+- Scrolling textures and frame-based texture clips are rendering effects and
+  do not enter deterministic terrain state. A content pack's clips play cells
+  of a sprite sheet laid out as an equal grid, numbered row by row. Each frame
+  names its cell and duration, and a clip loops, ping-pongs without repeating
+  its end frames, or plays once and holds its last frame. A tile type names a
+  clip and its sheet, and may lag each tile's playback by its position so
+  motion rolls across the terrain; lags round to eighths of a cycle. Reduced
+  motion holds the first frame. Generated sheets come from scripts that tests
+  check against the committed images.
 - A mission owns its simulation terrain: corner heights and tile terrain. They
   change only through terrain commands at the start of a tick, so saves and
   replays capture every edit. A terrain command applies whole or is rejected.
