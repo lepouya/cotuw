@@ -24,6 +24,7 @@ export type SidebarState = {
   selectedActorIds: readonly string[];
   boxMode?: boolean;
   additiveMode?: boolean;
+  queueMode?: boolean;
   placementActive: boolean;
   faulted: boolean;
   paused?: boolean;
@@ -83,6 +84,7 @@ export function createSidebar(
   const remove = element<HTMLButtonElement>("remove-building");
   const boxSelect = element<HTMLButtonElement>("box-select");
   const addSelection = element<HTMLButtonElement>("add-selection");
+  const queueOrders = element<HTMLButtonElement>("queue-orders");
   const stop = element<HTMLButtonElement>("stop-units");
   const clearSelection = element<HTMLButtonElement>("clear-selection");
   const focusSelection = element<HTMLButtonElement>("focus-selection");
@@ -269,6 +271,7 @@ export function createSidebar(
       remove,
       boxSelect,
       addSelection,
+      queueOrders,
       stop,
       attackMove: element<HTMLButtonElement>("attack-move"),
       cancelAttackMove: element<HTMLButtonElement>("cancel-attack-move"),
@@ -325,6 +328,14 @@ export function createSidebar(
       const unavailable = state.placementActive || state.faulted;
       boxSelect.disabled = unavailable;
       addSelection.disabled = unavailable;
+      queueOrders.disabled = unavailable;
+      queueOrders.setAttribute(
+        "aria-pressed",
+        String(state.queueMode ?? false),
+      );
+      const queueLabel = state.queueMode ? "✓ Done queuing" : "⋯ Queue orders";
+      if (queueOrders.textContent !== queueLabel)
+        queueOrders.textContent = queueLabel;
       boxSelect.setAttribute("aria-pressed", String(state.boxMode ?? false));
       addSelection.setAttribute(
         "aria-pressed",

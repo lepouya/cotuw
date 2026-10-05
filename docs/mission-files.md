@@ -63,6 +63,18 @@ center is at `x = (tileX + 0.5 - width / 2) * tileSize` and
 `z = (tileZ + 0.5 - height / 2) * tileSize`. Buildings take their position
 and facing from `tilePlacement`, whose `origin` is in tiles.
 
+## Unit orders
+
+- Mobile actors may carry a nonempty `orders` list. Omit it for an empty queue.
+- Each entry is a `move` or `attack-move` with a world `target`, an `attack`
+  with a `targetId`, or a `gather` with a `siteId`.
+- Group destinations may include `requestedTarget`, the original group click.
+  Both positions must lie within mission bounds.
+- Queues start in sequence after the current order ends. Targets and paths
+  are checked when the order starts; removed or unavailable targets are skipped.
+- Queued attacks require a weapon and queued Gather requires harvesting rules.
+  Scheduled queueable commands use `queued: true` to append instead of replace.
+
 ## Validation
 
 Loading checks the file's shape, then builds a simulation from it before it

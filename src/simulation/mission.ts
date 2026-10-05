@@ -11,10 +11,12 @@ import type { TrainUnitCommand } from "./command";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
 import { clearCombatOrders, deepFreeze } from "./actor";
 import {
+  ACTOR_ORDER_KINDS,
   ACTOR_REMOVAL_KINDS,
   ECONOMY_COMMAND_KINDS,
   isCommandOf,
   isMissionCommand,
+  isQueuedOrder,
 } from "./command";
 import { tileKey } from "./grid";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
@@ -77,7 +79,7 @@ import {
   validateEconomyDefinitions,
   validateEconomyState,
 } from "./economy";
-import type { EconomyState, EconomyView } from "./economy";
+import type { EconomyState, EconomyView, HarvesterState } from "./economy";
 import {
   createTilePlacedActor,
   evaluateFootprint,
@@ -95,6 +97,7 @@ import type {
   ActorBehavior,
   ActorDefinition,
   ActorRenderState,
+  QueuedOrder,
   RouteBounds,
 } from "./actor";
 import type {
@@ -119,7 +122,7 @@ import type {
 import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import { playerRelation } from "./faction";
-import { isIdList } from "./validation";
+import { isId, isIdList } from "./validation";
 import type { FogState, FogView, Vision } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
@@ -488,6 +491,22 @@ export function createMissionSimulation({
     ) {
       throw new RangeError(`Actor ${actor.id} has an invalid move target.`);
     }
+    if (
+      actor.orders !== undefined &&
+      (!Array.isArray(actor.orders) ||
+        actor.orders.length === 0 ||
+        !isMobileActor(actor, definition) ||
+        !actor.orders.every(
+          (order) =>
+            isQueuedOrder(order) &&
+            canQueueOrder(order, definition, !!state.economy) &&
+            (!("target" in order) || withinBounds(order.target, worldBounds)) &&
+            (!("requestedTarget" in order) ||
+              order.requestedTarget === undefined ||
+              withinBounds(order.requestedTarget, worldBounds)),
+        ))
+    )
+      throw new RangeError(`Actor ${actor.id} has invalid queued orders.`);
     validateCombatActor(actor, definition, worldBounds);
     behaviorFor(actor).validateActor?.(actor, definitionFor(actor));
   };
@@ -907,6 +926,16 @@ export function createMissionSimulation({
     const grid = behaviorFor(actor).navigationGrid?.(actor, definition);
     return grid && { actor, definition, grid };
   };
+  const interruptHarvesting = (actor: Actor, economy?: EconomyState) => {
+    const worker = economy?.harvesters.find(
+      (worker) => worker.actorId === actor.id,
+    );
+    if (!worker) return;
+    worker.phase = worker.refineryId ? "idle" : "unassigned";
+    delete worker.targetSiteId;
+    delete worker.activeSiteId;
+    delete worker.retryNavigationVersion;
+  };
   const handle = (working: WorkingActors, applied: AppliedActorCommand) => {
     const actor = working.actorsById.get(applied.actorId);
     if (!actor) return false;
@@ -918,20 +947,97 @@ export function createMissionSimulation({
     );
     if (accepted) {
       clearCombatOrders(actor);
-    }
-    if (accepted && working.economy) {
-      const worker = working.economy.harvesters.find(
-        (worker) => worker.actorId === actor.id,
-      );
-      if (worker) {
-        worker.phase = worker.refineryId ? "idle" : "unassigned";
-        delete worker.targetSiteId;
-        delete worker.activeSiteId;
-        delete worker.retryNavigationVersion;
-      }
+      interruptHarvesting(actor, working.economy);
     }
     validateUpdate(actor, before);
     return accepted;
+  };
+  /** Whether an actor is still carrying out an order or a harvest trip. */
+  const busy = (actor: Actor, economy: EconomyState | undefined) =>
+    (!!actor.movement && !actor.movement.blocked) ||
+    (!!actor.attackMove && !actor.attackMove.blocked) ||
+    !!actor.combat?.attack ||
+    (!!actor.combat?.returning && !actor.combat.returning.blocked) ||
+    !!economy?.harvesters.some(
+      ({ actorId, phase }) =>
+        actorId === actor.id && HARVEST_TRIP_PHASES.includes(phase),
+    );
+  const queuedOrderOf = (
+    command: ActorOrderCommand,
+    requestedTarget?: WorldPosition,
+  ): QueuedOrder | undefined => {
+    switch (command.kind) {
+      case "move":
+      case "attack-move":
+        if (!isFinitePosition(command.target)) return undefined;
+        return {
+          kind: command.kind,
+          target: clampToBounds(command.target, worldBounds),
+          ...(requestedTarget && { requestedTarget: { ...requestedTarget } }),
+        };
+      case "attack":
+        return isId(command.targetId)
+          ? { kind: "attack", targetId: command.targetId }
+          : undefined;
+      case "gather":
+        return isId(command.siteId)
+          ? { kind: "gather", siteId: command.siteId }
+          : undefined;
+      default:
+        return undefined;
+    }
+  };
+  /** Queues a queued order behind a busy actor's current one. */
+  const sequence = (
+    command: ActorOrderCommand,
+    order: QueuedOrder | undefined,
+    tick: number,
+    working: WorkingActors,
+  ): CommandOutcome | undefined => {
+    const actor = working.actorsById.get(command.actorId);
+    if (!actor || !("queued" in command && command.queued)) return undefined;
+    if (!actor.orders && !busy(actor, working.economy)) return undefined;
+    const definition = definitionFor(actor);
+    // Only checks it can ever carry the order out; the rest waits until then.
+    const accepted =
+      !!order &&
+      isMobileActor(actor, definition) &&
+      canQueueOrder(order, definition, !!working.economy);
+    if (accepted) (actor.orders ??= []).push(order);
+    return {
+      tick,
+      command: structuredClone(command),
+      accepted,
+      ...(accepted
+        ? { queued: true }
+        : order?.kind === "attack" && !definition.weapon
+          ? { reason: "unarmed" }
+          : order?.kind === "gather" && !definition.harvesting
+            ? { reason: "invalid-harvester" }
+            : {}),
+    } as CommandOutcome;
+  };
+  // A rejected order leaves the current one and its queue running.
+  const replaceQueue = (outcome: CommandOutcome, working: WorkingActors) => {
+    if (outcome.accepted && "actorId" in outcome.command)
+      delete working.actorsById.get(outcome.command.actorId)?.orders;
+    return outcome;
+  };
+  /** Starts an idle actor's queued orders until one is under way. */
+  const startQueuedOrders = (
+    actor: Actor,
+    tick: number,
+    working: WorkingActors,
+  ) => {
+    while (actor.orders && !busy(actor, working.economy)) {
+      const order = actor.orders.shift()!;
+      if (!actor.orders.length) delete actor.orders;
+      const command = { ...structuredClone(order), actorId: actor.id };
+      if (command.kind === "move" || command.kind === "attack-move") {
+        const { requestedTarget, ...move } = command;
+        applyMove(move, tick, working, requestedTarget);
+      } else executeCommand(command, tick, working);
+    }
   };
   const applyMove = (
     command: MoveCommand | AttackMoveCommand,
@@ -1004,13 +1110,36 @@ export function createMissionSimulation({
         kind: command.kind === "group-attack-move" ? "attack-move" : "move",
         actorId,
         target: destination?.target ?? target,
+        ...(command.queued && { queued: true }),
       };
+      const waiting = sequence(
+        move,
+        destination && queuedOrderOf(move, destination.requestedTarget),
+        tick,
+        working,
+      );
+      if (waiting) return waiting;
       return destination
-        ? applyMove(move, tick, working, destination.requestedTarget)
+        ? replaceQueue(
+            applyMove(move, tick, working, destination.requestedTarget),
+            working,
+          )
         : ({ tick, command: move, accepted: false } as CommandOutcome);
     });
   };
   const applyCommand = (
+    command: Exclude<MissionCommand, GroupMoveCommand | GroupAttackMoveCommand>,
+    tick: number,
+    working: WorkingActors,
+  ): CommandOutcome => {
+    if (!isCommandOf(command, ACTOR_ORDER_KINDS))
+      return executeCommand(command, tick, working);
+    return (
+      sequence(command, queuedOrderOf(command), tick, working) ??
+      replaceQueue(executeCommand(command, tick, working), working)
+    );
+  };
+  const executeCommand = (
     command: Exclude<MissionCommand, GroupMoveCommand | GroupAttackMoveCommand>,
     tick: number,
     working: WorkingActors,
@@ -1175,7 +1304,10 @@ export function createMissionSimulation({
         definitions: definitionsById,
         detects,
       });
-      if (!reason) startAttack(actor!, target!);
+      if (!reason) {
+        startAttack(actor!, target!);
+        interruptHarvesting(actor!, working.economy);
+      }
       return {
         tick,
         command: applied,
@@ -1373,6 +1505,8 @@ export function createMissionSimulation({
             ? applyGroupMove(command, state.tick, working)
             : [applyCommand(command, state.tick, working)],
         );
+        for (const actor of working.actors)
+          startQueuedOrders(actor, state.tick, working);
 
         const navigationVersion = map?.navigationChanges.version ?? 0;
         const tickAttacks = updateCombat({
@@ -1558,6 +1692,29 @@ export function createMissionSimulation({
     },
   };
 }
+
+function canQueueOrder(
+  order: QueuedOrder,
+  definition: ActorDefinition,
+  hasEconomy: boolean,
+): boolean {
+  return (
+    (order.kind !== "attack" || !!definition.weapon) &&
+    (order.kind !== "gather" || (hasEconomy && !!definition.harvesting))
+  );
+}
+
+/** Harvester phases that keep it busy before its queued orders. */
+const HARVEST_TRIP_PHASES: readonly HarvesterState["phase"][] = [
+  "travelling",
+  "gathering",
+  "returning",
+];
+
+type ActorOrderCommand = Extract<
+  MissionCommand,
+  { kind: (typeof ACTOR_ORDER_KINDS)[number] }
+>;
 
 function indexDefinitions(
   definitions: readonly ActorDefinition[],

@@ -1,3 +1,4 @@
+import { moveCommand } from "../simulation/command";
 import type { MissionSimulation } from "../simulation/mission";
 import type { WorldPosition } from "../simulation/world";
 
@@ -52,22 +53,17 @@ export function createAttackMoveControls(
       return choosingFor.length > 0;
     },
     cancel,
-    choose: (target: WorldPosition) => {
+    /** A queued target keeps the mode open for further waypoints. */
+    choose: (target: WorldPosition, queued = false) => {
       if (!choosingFor.length || !options.enabled()) return;
-      if (choosingFor.length === 1)
-        simulation.submitCommand({
-          kind: "attack-move",
-          actorId: choosingFor[0]!,
-          target,
-        });
-      else
-        simulation.submitCommand({
-          kind: "group-attack-move",
-          actorIds: [...choosingFor],
-          target,
-        });
-      choosingFor = [];
-      message("Attack Move submitted.");
+      simulation.submitCommand(
+        moveCommand("attack-move", choosingFor, target, queued),
+      );
+      if (queued) message("Attack Move queued. Choose another or Cancel.");
+      else {
+        choosingFor = [];
+        message("Attack Move submitted.");
+      }
       options.changed();
     },
     refresh: () => {

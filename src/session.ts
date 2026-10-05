@@ -60,6 +60,7 @@ import { bindCameraControls } from "./ui/camera-controls";
 import { createRallyControls } from "./ui/rally-controls";
 import type { RallyControls } from "./ui/rally-controls";
 import { createRallyPointView } from "./render/rally-point";
+import { createQueuedOrderView } from "./render/queued-orders";
 import { createUnitTraining } from "./ui/unit-training";
 import type { UnitTrainingControls } from "./ui/unit-training";
 import type { DefinitionButton, SidebarState } from "./ui/sidebar";
@@ -319,6 +320,25 @@ export async function createGameSession(
   const disconnected = () => disconnectedBuildings(simulation.support);
   const rallyView = createRallyPointView(view.scene, map);
   const movementPath = createMovementPathView(view.scene, map);
+  const queuedOrders = createQueuedOrderView(view.scene, map, (order) => {
+    switch (order.kind) {
+      case "move":
+      case "attack-move":
+        return order.target;
+      case "gather": {
+        const site = simulation.economy?.sites.find(
+          ({ id }) => id === order.siteId,
+        );
+        return site && map.tileCenter(site.tile.x, site.tile.z);
+      }
+      case "attack": {
+        const target = actorsByKind().byId.get(order.targetId);
+        return target && player.shows(target)
+          ? target.worldPosition
+          : undefined;
+      }
+    }
+  });
   const healthBars = createHealthBarView(view.scene, map);
   const combatEffects = createCombatEffectsView(view.scene, map);
   const wreckView = createWreckView(view.scene, map, {
@@ -411,8 +431,10 @@ export async function createGameSession(
       return !!actor && player.shows(actor);
     },
     groundTargetMode: () => rally.active || attackMove.active,
-    onGroundTarget: (target) =>
-      attackMove.active ? attackMove.choose(target) : rally.choose(target),
+    onGroundTarget: (target, queued) =>
+      attackMove.active
+        ? attackMove.choose(target, queued)
+        : rally.choose(target),
     cancelGroundTarget: () => attackMove.cancel() || rally.cancel(),
     canMove: (actorId) => {
       const actor = actorsByKind().byId.get(actorId);
@@ -505,9 +527,9 @@ export async function createGameSession(
     fog: () => simulation.fog,
     reducedMotion: () => reducedMotion.matches,
     commandMode: () => attackMove.active,
-    onCommand: (target) => {
+    onCommand: (target, shiftKey) => {
       if (!explored(map.tileAtWorldPosition(target.x, target.z))) return false;
-      attackMove.choose(target);
+      attackMove.choose(target, shiftKey || input.queueMode);
       return true;
     },
     // Structures first, so unit markers draw over them.
@@ -572,6 +594,7 @@ export async function createGameSession(
       selectedActorIds: input.selectedActorIds,
       boxMode: input.boxMode,
       additiveMode: input.additiveMode,
+      queueMode: input.queueMode,
       placementActive: placement.active,
       faulted: halted(),
       paused: !playing,
@@ -653,6 +676,7 @@ export async function createGameSession(
         attackMove.cancel();
         input.setBoxMode(false);
         input.setAdditiveMode(false);
+        input.setQueueMode(false);
         input.select(undefined);
         raisePopup();
       },
@@ -746,6 +770,7 @@ export async function createGameSession(
           },
           explored,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
+          queueMode: () => input.queueMode,
         })
       : undefined;
   view.camera.setTouchPanFilter(
@@ -987,6 +1012,13 @@ export async function createGameSession(
       ),
     );
     movementPath.update(shownMobile);
+    // Other factions' queues would reveal their intent.
+    queuedOrders.update(
+      input.selectedActorIds.flatMap((id) => {
+        const actor = actorsByKind().byId.get(id);
+        return actor && player.owns(actor) ? [actor] : [];
+      }),
+    );
     updateHealthBars();
     const ownIds = actorsByKind().ownIds;
     networkView.update(
@@ -1035,6 +1067,7 @@ export async function createGameSession(
     actorViews.dispose();
     tilePlacedViews.dispose();
     movementPath.dispose();
+    queuedOrders.dispose();
     for (const appearance of appearances.values()) appearance.dispose();
   });
 

@@ -279,6 +279,18 @@ story.
   Buildings remain individually selected and cannot join a mobile group.
 - Stop cancels selected mobile actors' orders without clearing selection.
   Clear removes selection without changing orders. Selection is client UI state.
+- Shift-commands, and commands in the touch Queue Orders mode, append Move,
+  Attack Move, Attack, Gather, and Collect orders to each selected unit's
+  queue; Done leaves the mode, and a queued Attack Move target keeps Attack
+  Move mode open. Accepted unqueued commands and Stop replace the current
+  order and clear the queue. A unit starts its next order at the start of the
+  tick after its current one ends; a blocked route counts as ended, and a
+  rejected order gives way to the next. Harvesting continues until its site
+  runs out, so orders behind a Gather wait until then. Units cannot queue
+  orders they could never carry out, such as an unarmed attack. Queues are
+  saved mission state.
+  Selected units preview them as dashed legs with rings at destinations,
+  crosses on attack targets, and diamonds on Gather sites.
 - Touch and on-screen controls provide persistent Box select and Add units
   modes. Box select must be disabled before a terrain tap issues movement.
 - Secondary click opens a radial context menu. Secondary drag pans; Shift plus

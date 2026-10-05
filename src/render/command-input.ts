@@ -2,6 +2,7 @@ import { isTerrainPickMesh } from "./terrain-mesh";
 import { createSelection } from "./selection";
 import { createPointerGesture } from "./pointer-gesture";
 import { isTextEntry, worldInputAvailable } from "./input-focus";
+import { moveCommand } from "../simulation/command";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type {
@@ -120,7 +121,8 @@ export type CommandInputOptions = {
   /** Reserves primary world gestures for other tools; checked at press. */
   pointerEnabled?: () => boolean;
   groundTargetMode?: () => boolean;
-  onGroundTarget?: (target: WorldPosition) => void;
+  /** `queued` when Shift or Queue Orders mode appends the order. */
+  onGroundTarget?: (target: WorldPosition, queued: boolean) => void;
   cancelGroundTarget?: () => boolean;
   canMove?: (actorId: string) => boolean;
   /** Whether an actor still exists and is visible to the player. */
@@ -134,8 +136,11 @@ export type CommandInput = {
   readonly selectedActorIds: readonly string[];
   readonly boxMode: boolean;
   readonly additiveMode: boolean;
+  /** Appends world commands to the selection's order queues, like Shift. */
+  readonly queueMode: boolean;
   setBoxMode: (active: boolean) => void;
   setAdditiveMode: (active: boolean) => void;
+  setQueueMode: (active: boolean) => void;
   select: (actorId: string | undefined, additive?: boolean) => void;
   selectMany: (actorIds: readonly string[], additive?: boolean) => void;
   retainSelection: (exists: (id: string) => boolean) => void;
@@ -179,6 +184,7 @@ export function createCommandInput(
   const selection = createSelection(canMove);
   let boxMode = false;
   let additiveMode = false;
+  let queueMode = false;
   const box = document.createElement("div");
   box.className = "selection-box";
   box.hidden = true;
@@ -234,6 +240,7 @@ export function createCommandInput(
           !groundTargetMode() &&
           (event.pointerType !== "touch" || boxMode),
         additive: !secondary && (event.shiftKey || additiveMode),
+        queued: event.shiftKey || queueMode,
       };
     },
     release: () => {
@@ -251,7 +258,7 @@ export function createCommandInput(
       });
     },
     end: (event, gesture) => {
-      const { additive, box, secondary } = gesture.data;
+      const { additive, box, secondary, queued } = gesture.data;
       // A secondary drag pans the camera instead.
       if (secondary && gesture.dragged) return;
       if (gesture.dragged) {
@@ -277,10 +284,10 @@ export function createCommandInput(
           ? { x: pick.pickedPoint.x, z: pick.pickedPoint.z }
           : undefined);
       if (groundTargetMode()) {
-        if (target) onGroundTarget?.(target);
+        if (target) onGroundTarget?.(target, queued);
         return;
       }
-      const actions = contextActions(picked, target, additive);
+      const actions = contextActions(picked, target, additive, queued);
       if (secondary) {
         if (actions.length)
           onContextMenu?.(event.clientX, event.clientY, actions);
@@ -292,6 +299,7 @@ export function createCommandInput(
     picked: string | undefined,
     target: WorldPosition | undefined,
     additive: boolean,
+    queued: boolean,
   ): ContextAction[] => {
     const movers = selection.ids.filter(canMove);
     const kinds = contextActionKinds(
@@ -321,16 +329,18 @@ export function createCommandInput(
     const order = (kind: "move" | "attack-move") => {
       const actorIds = currentMovers();
       if (!canCommand() || !actorIds.length) return;
-      const groupKind = kind === "move" ? "group-move" : "group-attack-move";
-      if (actorIds.length === 1)
-        submitCommand({ kind, actorId: actorIds[0]!, target: target! });
-      else submitCommand({ kind: groupKind, actorIds, target: target! });
+      submitCommand(moveCommand(kind, actorIds, target!, queued));
     };
     const runs: Record<ContextActionKind, () => void> = {
       attack: () => {
         if (!canCommand() || !canAttack(picked!)) return;
         for (const actorId of currentMovers())
-          submitCommand({ kind: "attack", actorId, targetId: picked! });
+          submitCommand({
+            kind: "attack",
+            actorId,
+            targetId: picked!,
+            ...(queued && { queued }),
+          });
       },
       select: () => choose(picked, false),
       add: () => {
@@ -403,6 +413,9 @@ export function createCommandInput(
     get additiveMode() {
       return additiveMode;
     },
+    get queueMode() {
+      return queueMode;
+    },
     setBoxMode: (active) => {
       if (active) cancelGroundTarget?.();
       cancelGesture();
@@ -410,6 +423,9 @@ export function createCommandInput(
     },
     setAdditiveMode: (active) => {
       additiveMode = active;
+    },
+    setQueueMode: (active) => {
+      queueMode = active;
     },
     select,
     selectMany,

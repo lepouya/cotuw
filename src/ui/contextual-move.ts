@@ -1,3 +1,4 @@
+import { moveCommand } from "../simulation/command";
 import type {
   EconomyCommand,
   GroupMoveCommand,
@@ -16,16 +17,11 @@ export function contextualMoveCommands(
   const ids = command.kind === "move" ? [command.actorId] : command.actorIds;
   const workers = ids.filter((id) => harvesterIds.has(id));
   if (!workers.length) return [command];
+  const queue = command.queued ? { queued: true } : {};
   const commands: (GatherCommand | MoveCommand | GroupMoveCommand)[] =
-    workers.map((actorId) => ({ kind: "gather", actorId, siteId }));
+    workers.map((actorId) => ({ kind: "gather", actorId, siteId, ...queue }));
   const movers = ids.filter((id) => !harvesterIds.has(id));
-  if (movers.length === 1)
-    commands.push({
-      kind: "move",
-      actorId: movers[0]!,
-      target: command.target,
-    });
-  else if (movers.length > 1)
-    commands.push({ ...command, kind: "group-move", actorIds: movers });
+  if (movers.length)
+    commands.push(moveCommand("move", movers, command.target, command.queued));
   return commands;
 }

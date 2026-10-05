@@ -4,6 +4,7 @@ import { layerSlot } from "../map";
 import { DEFAULT_ACTOR_COLOR } from "./actor";
 import { watchCanvasSize } from "./canvas-size";
 import { createPointerGesture } from "./pointer-gesture";
+import { worldInputAvailable } from "./input-focus";
 import { fogAlpha } from "./fog";
 import type { Rgb } from "./color";
 export type { Rgb } from "./color";
@@ -67,7 +68,7 @@ export type MinimapOptions = {
   /** While true, presses offer their ground point to `onCommand` first. */
   commandMode?: () => boolean;
   /** Returns whether it used the point; otherwise the camera navigates. */
-  onCommand?: (target: { x: number; z: number }) => boolean;
+  onCommand?: (target: { x: number; z: number }, shiftKey: boolean) => boolean;
   /** Draws pings as steady rings instead of expanding ones. */
   reducedMotion?: () => boolean;
 };
@@ -231,6 +232,7 @@ export function createMinimap(
   const glideTo = (point: ScreenPoint) =>
     camera.glideToPoint(clampToMap(projection.toWorld(point), map));
   const pointer = createPointerGesture(canvas, {
+    enabled: () => worldInputAvailable(canvas.ownerDocument),
     start: (event) => {
       if (event.button !== 0) return undefined;
       event.preventDefault();
@@ -242,6 +244,7 @@ export function createMinimap(
       return {
         point,
         command,
+        shiftKey: event.shiftKey,
         grabbed,
         offset: centroid(camera.viewFootprint()).subtract(
           projection.toWorld(point),
@@ -258,7 +261,7 @@ export function createMinimap(
       if (dragged) return;
       if (data.command && commandMode()) {
         const point = clampToMap(projection.toWorld(localPoint(event)), map);
-        if (onCommand?.({ x: point.x, z: point.z })) return;
+        if (onCommand?.({ x: point.x, z: point.z }, data.shiftKey)) return;
       }
       if (data.grabbed || data.command) glideTo(data.point);
     },
@@ -377,7 +380,7 @@ export type MinimapProjection = {
 };
 
 export function minimapProjection(
-  map: TerrainMap,
+  map: Pick<TerrainMap, "width" | "height" | "tileSize">,
   width: number,
   height: number,
 ): MinimapProjection {

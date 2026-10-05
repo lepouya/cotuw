@@ -526,6 +526,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       button.remove();
     for (const panel of root.querySelectorAll<HTMLElement>("[role=tabpanel]"))
       panel.hidden = false;
+    const submitted: import("../src/simulation/command").MissionCommand[] = [];
     const controls = createEconomyControls(
       root,
       {
@@ -533,7 +534,10 @@ test("Harvester controls use matching Refineries and type-specific load timing",
         economy: snapshot.economy,
         support: undefined,
         tickSeconds: 1 / 60,
-        submitCommand: () => 0,
+        submitCommand: (command) => {
+          submitted.push(command);
+          return 0;
+        },
       },
       {
         definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
@@ -543,10 +547,33 @@ test("Harvester controls use matching Refineries and type-specific load timing",
         focus: () => {},
         explored: () => true,
         positionForTile: () => ({ x: 0, z: 0 }),
+        queueMode: () => true,
       },
     );
     controls.refresh();
     document.body.append(root);
+    root.querySelector<HTMLButtonElement>("#gather-sites button")!.click();
+    root
+      .querySelector<HTMLButtonElement>("[data-economy-action^=loot]")!
+      .click();
+    if (
+      submitted.length !== 2 ||
+      submitted.some((command) => !("queued" in command) || !command.queued)
+    )
+      throw new Error(
+        "On-screen Gather and Collect must respect Queue Orders.",
+      );
+    controls.onOutcome({
+      tick: 0,
+      command: {
+        kind: "gather",
+        actorId: worker.actorId,
+        siteId: worker.targetSiteId!,
+      },
+      accepted: true,
+      queued: true,
+    });
+    controls.refresh();
   });
   const root = page.locator("#review-economy-root");
   await expect(root.locator("#refinery-assignments button")).toHaveCount(1);
@@ -554,6 +581,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
     "Assigned to",
   );
   await expect(root.locator("#economy-alert")).toContainText("60 seconds");
+  await expect(root.locator("#harvester-status")).toHaveText("Order queued.");
 });
 
 for (const touch of [false, true]) {

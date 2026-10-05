@@ -125,6 +125,10 @@ and out of the selection. Primary drag selects mobile units; touch uses **Box
 select**, which must be turned off before tapping a movement destination.
 Click or tap terrain to move selected units to separate nearby positions.
 **Stop** or `S` cancels their routes; **Clear** or `Esc` clears selection.
+Shift-commands or **Queue orders** append destinations and targets. **Done**
+ends Queue orders mode; accepted ordinary commands and Stop clear the queue.
+Selected units show queued destinations on the ground. Gather continues until
+its patch is depleted before the next order starts.
 
 Turn on **Pan** in the camera controls to drag anywhere with a normal touchpad
 click or one finger, including over troops. Pan mode preserves selection and

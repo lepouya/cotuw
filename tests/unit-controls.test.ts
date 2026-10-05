@@ -14,8 +14,10 @@ function fixture() {
     {
       boxMode: false,
       additiveMode: false,
+      queueMode: false,
       setBoxMode: () => {},
       setAdditiveMode: () => {},
+      setQueueMode: () => {},
       stop: () => 0,
       select: () => {},
     },
@@ -78,6 +80,27 @@ test("a rejected stop does not replace feedback for a rejected move", () => {
   ).toBe("unreachable");
   expect(movementStatus.textContent).toBe(
     "0 move orders accepted · 1 unit unable to move.",
+  );
+  controls.dispose();
+});
+
+test("queued receipts are reported apart from orders that start now", () => {
+  const { controls, movementStatus } = fixture();
+  const queued = { ...move, reachedTarget: undefined, queued: true as const };
+  expect(controls.onOutcomes([queued, queued])).toBe("accepted");
+  expect(movementStatus.textContent).toBe("2 move orders queued.");
+  controls.onOutcomes([move, queued]);
+  expect(movementStatus.textContent).toBe(
+    "1 move order accepted · 1 move order queued.",
+  );
+  const attack = {
+    tick: 0,
+    command: { kind: "attack", actorId: "a", targetId: "t" },
+    accepted: true,
+  } as const;
+  controls.onOutcomes([attack, { ...attack, queued: true }]);
+  expect(movementStatus.textContent).toBe(
+    "1 unit attacking · 1 attack order queued.",
   );
   controls.dispose();
 });

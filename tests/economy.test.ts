@@ -168,6 +168,74 @@ const gather = (siteId = "site"): MissionCommand => ({
 });
 
 describe("Materials economy", () => {
+  test("an armed Harvester's attack interrupts gathering", () => {
+    const rifle = definitions.find(
+      (definition) => definition.id === "arc-trooper",
+    )!;
+    const armed = definitions.map((definition) =>
+      definition.harvesting
+        ? { ...definition, weapon: rifle.weapon }
+        : definition,
+    );
+    const enemy = { ...rifle, id: "enemy", faction: "hostile" };
+    const { simulation } = fixture(undefined, 1, false, [...armed, enemy]);
+    command(simulation, build());
+    finishBuilding(simulation);
+    command(simulation, {
+      kind: "train-unit",
+      producerId: "refinery",
+      actorId: "worker",
+      definitionId: "arc-harvester",
+    });
+    until(simulation, () => !!simulation.actorById("worker"));
+    command(simulation, gather());
+    const point = simulation.actorById("worker")!.worldPosition;
+    simulation.spawnActor(
+      createActor({
+        id: "enemy",
+        definitionId: "enemy",
+        worldPosition: { x: point.x + 1, z: point.z },
+      }),
+    );
+    const outcome = command(simulation, {
+      kind: "attack",
+      actorId: "worker",
+      targetId: "enemy",
+    });
+    expect(outcome.accepted).toBe(true);
+    expect(worker(simulation).phase).toBe("idle");
+    expect(worker(simulation).targetSiteId).toBeUndefined();
+    expect(simulation.actorById("worker")!.combat?.attack?.targetId).toBe(
+      "enemy",
+    );
+  });
+
+  test("queued movement waits for Gather depletion and the final delivery", () => {
+    const { simulation, map } = workerFixture();
+    command(simulation, gather());
+    const target = map.tileCenter(24, 10);
+    const outcome = command(simulation, {
+      kind: "move",
+      actorId: "worker",
+      target,
+      queued: true,
+    });
+    expect(outcome.queued).toBe(true);
+    until(
+      simulation,
+      () =>
+        simulation
+          .economy!.sites.slice(0, 2)
+          .every((site) => site.remainingMaterials === 0),
+      1000,
+    );
+    until(simulation, () => !simulation.actorById("worker")!.orders, 1000);
+    expect(worker(simulation).cargo).toBe(0);
+    expect(simulation.economy!.depositedMaterials).toBe(190);
+    until(simulation, () => !simulation.actorById("worker")!.movement);
+    expect(simulation.actorById("worker")!.worldPosition).toEqual(target);
+  });
+
   test("authored Harvesters start unassigned and can join a Refinery", () => {
     const content = defineScenario({
       ...scenario,

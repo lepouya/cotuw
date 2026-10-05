@@ -3,22 +3,28 @@ import { isTerrainTileShape } from "./terrain";
 import type { ActorPlacement, PlacementReason } from "./placement";
 import type { TrainingReason } from "./production";
 import type { WorldPosition } from "./world";
-import type { RouteBounds } from "./actor";
+import type { QueuedOrder, RouteBounds } from "./actor";
 import type { EconomyReason } from "./economy";
 import type { AttackReason } from "./combat";
 import { isFinitePosition } from "./world";
 import { isTileCoord } from "./grid";
 import { isId } from "./validation";
 
+/**
+ * Waits behind a busy actor's current order instead of replacing it and its
+ * queue. Accepted only from mobile actors.
+ */
+type Queueable = { queued?: boolean };
+
 /** Orders an actor to approach a target using its movement rules. */
-export type MoveCommand = {
+export type MoveCommand = Queueable & {
   kind: "move";
   actorId: string;
   target: WorldPosition;
 };
 
 /** Assigns distinct reachable destinations at the start of the tick. */
-export type GroupMoveCommand = {
+export type GroupMoveCommand = Queueable & {
   kind: "group-move";
   actorIds: string[];
   target: WorldPosition;
@@ -33,7 +39,7 @@ export type GroupAttackMoveCommand = Omit<GroupMoveCommand, "kind"> & {
 };
 
 /** Orders an armed actor to pursue and attack a detected hostile. */
-export type AttackCommand = {
+export type AttackCommand = Queueable & {
   kind: "attack";
   actorId: string;
   targetId: string;
@@ -94,7 +100,7 @@ export type ActorLifecycleCommand =
   PlaceActorCommand | RemoveActorCommand | TrainUnitCommand;
 
 export type EconomyCommand =
-  | { kind: "gather"; actorId: string; siteId: string }
+  | (Queueable & { kind: "gather"; actorId: string; siteId: string })
   | { kind: "assign-refinery"; actorId: string; refineryId: string }
   | { kind: "return-cargo"; actorId: string }
   | { kind: "cancel-production"; actorId: string };
@@ -112,6 +118,22 @@ export const ECONOMY_COMMAND_KINDS = [
   "return-cargo",
   "cancel-production",
 ] as const satisfies readonly EconomyCommand["kind"][];
+
+/** Orders an actor's queue can hold. */
+export const QUEUEABLE_KINDS = [
+  "move",
+  "attack-move",
+  "attack",
+  "gather",
+] as const satisfies readonly QueuedOrder["kind"][];
+
+/** Orders that replace a mobile actor's current order and queue. */
+export const ACTOR_ORDER_KINDS = [
+  ...QUEUEABLE_KINDS,
+  "stop",
+  "assign-refinery",
+  "return-cargo",
+] as const;
 
 /** Commands that take a committed actor out of the mission. */
 export const ACTOR_REMOVAL_KINDS = [
@@ -143,10 +165,45 @@ export type ScheduledCommand = {
   command: MissionCommand;
 };
 
+/**
+ * A move or Attack Move for one actor, or for a group that spreads around the
+ * target. `queued` appends it behind busy actors' current orders.
+ */
+export function moveCommand<K extends "move" | "attack-move">(
+  kind: K,
+  actorIds: readonly string[],
+  target: WorldPosition,
+  queued = false,
+): K extends "move"
+  ? MoveCommand | GroupMoveCommand
+  : AttackMoveCommand | GroupAttackMoveCommand {
+  const queue = queued ? { queued } : {};
+  return (
+    actorIds.length === 1
+      ? { kind, actorId: actorIds[0]!, target, ...queue }
+      : {
+          kind: kind === "move" ? "group-move" : "group-attack-move",
+          actorIds: [...actorIds],
+          target,
+          ...queue,
+        }
+  ) as never;
+}
+
 /** Checks saved command structure; gameplay legality is checked at its tick. */
 export function isMissionCommand(value: unknown): value is MissionCommand {
   if (!value || typeof value !== "object") return false;
   const command = value as Partial<MissionCommand>;
+  if (
+    "queued" in command &&
+    (typeof command.queued !== "boolean" ||
+      !isCommandOf(command as MissionCommand, [
+        ...QUEUEABLE_KINDS,
+        "group-move",
+        "group-attack-move",
+      ]))
+  )
+    return false;
   switch (command.kind) {
     case "move":
     case "attack-move":
@@ -230,6 +287,8 @@ export type CommandOutcome<C extends MissionCommand = MissionCommand> =
         accepted: boolean;
         /** Why the command was rejected, as evaluated at command application. */
         reason?: RejectionReason<C>;
+        /** Present when the order waits in the actor's queue. */
+        queued?: true;
         /** Whether the move's requested point was reachable at application. */
         reachedTarget?: C extends MoveCommand | AttackMoveCommand
           ? boolean
@@ -250,4 +309,25 @@ export function isOutcomeOf<K extends MissionCommand["kind"]>(
   ...kinds: K[]
 ): outcome is Extract<CommandOutcome, { command: { kind: K } }> {
   return isCommandOf(outcome.command, kinds);
+}
+
+/** Checks a saved queued order's structure. */
+export function isQueuedOrder(value: unknown): value is QueuedOrder {
+  if (!value || typeof value !== "object") return false;
+  const order = value as Partial<Record<string, unknown>>;
+  switch (order.kind) {
+    case "move":
+    case "attack-move":
+      return (
+        isFinitePosition(order.target) &&
+        (order.requestedTarget === undefined ||
+          isFinitePosition(order.requestedTarget))
+      );
+    case "attack":
+      return isId(order.targetId);
+    case "gather":
+      return isId(order.siteId);
+    default:
+      return false;
+  }
 }

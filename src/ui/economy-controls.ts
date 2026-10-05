@@ -63,6 +63,7 @@ export function createEconomyControls(
     names: ReadonlyMap<string, string>;
     selectedActorId: () => string | undefined;
     enabled: () => boolean;
+    queueMode?: () => boolean;
     canControl?: (actor: ActorRenderState) => boolean;
     focus: (tile: TileCoord) => void;
     /** Undiscovered sites and salvage stay unlisted. */
@@ -76,7 +77,7 @@ export function createEconomyControls(
     options.definitions.map((definition) => [definition.id, definition]),
   );
   const canControl = options.canControl ?? (() => true);
-  const actions = new Map<string, () => void>();
+  const actions = new Map<string, (shiftKey: boolean) => void>();
   const buttons = new Map<string, HTMLButtonElement>();
   const sync = (
     container: HTMLElement,
@@ -84,7 +85,7 @@ export function createEconomyControls(
       key: string;
       text: string;
       disabled: boolean;
-      action: () => void;
+      action: (shiftKey: boolean) => void;
     }[],
   ) => {
     const keys = new Set(entries.map((entry) => entry.key));
@@ -110,9 +111,14 @@ export function createEconomyControls(
         container.insertBefore(button, container.children[index] ?? null);
     });
   };
-  const submit = (command: MissionCommand) => {
+  const submit = (command: MissionCommand, shiftKey = false) => {
     if (!options.enabled()) return;
-    simulation.submitCommand(command);
+    simulation.submitCommand(
+      (command.kind === "move" || command.kind === "gather") &&
+        (shiftKey || options.queueMode?.())
+        ? { ...command, queued: true }
+        : command,
+    );
     element("harvester-status").textContent = "Order submitted.";
   };
   root.addEventListener(
@@ -123,7 +129,7 @@ export function createEconomyControls(
         "[data-economy-action]",
       );
       if (button && !button.disabled)
-        actions.get(button.dataset.economyAction!)?.();
+        actions.get(button.dataset.economyAction!)?.(event.shiftKey);
     },
     { signal: controller.signal },
   );
@@ -185,12 +191,15 @@ export function createEconomyControls(
             key: `gather:${site.id}`,
             text: `Gather ${site.name} (${remaining})`,
             disabled: !enabled || !worker.refineryId,
-            action: () =>
-              submit({
-                kind: "gather",
-                actorId: worker.actorId,
-                siteId: site.id,
-              }),
+            action: (shiftKey) =>
+              submit(
+                {
+                  kind: "gather",
+                  actorId: worker.actorId,
+                  siteId: site.id,
+                },
+                shiftKey,
+              ),
           })),
         );
         sync(element("return-cargo-actions"), [
@@ -243,14 +252,17 @@ export function createEconomyControls(
             key: `loot:${cache.id}`,
             text: `${mobile ? "Collect" : "Show"} salvage (+${cache.materials} Materials)`,
             disabled: !enabled,
-            action: () => {
+            action: (shiftKey: boolean) => {
               options.focus(cache.tile);
               if (mobile) {
-                submit({
-                  kind: "move",
-                  actorId: mobile.id,
-                  target: options.positionForTile(cache.tile),
-                });
+                submit(
+                  {
+                    kind: "move",
+                    actorId: mobile.id,
+                    target: options.positionForTile(cache.tile),
+                  },
+                  shiftKey,
+                );
               }
             },
           })),
@@ -332,7 +344,9 @@ export function createEconomyControls(
     onOutcome: (outcome: CommandOutcome) => {
       if (isOutcomeOf(outcome, ...ECONOMY_COMMAND_KINDS)) {
         lastResult = outcome.accepted
-          ? "Order accepted."
+          ? outcome.queued
+            ? "Order queued."
+            : "Order accepted."
           : REASONS[outcome.reason ?? "invalid-harvester"];
       }
     },

@@ -50,12 +50,13 @@ function fixture() {
       },
     },
   );
-  const menu = (actorId?: string) => {
+  const menu = (actorId?: string, shiftKey = false) => {
     picked = actorId;
     for (const type of ["pointerdown", "pointerup"])
       canvas.dispatchEvent(
         Object.assign(new Event(type), {
           button: 2,
+          shiftKey,
           clientX: 10,
           clientY: 10,
           pointerId: 1,
@@ -133,6 +134,37 @@ test("an Add action cannot toggle out a unit selected since the menu opened", ()
     input.select("unit-2", true);
     add.run();
     expect(input.selectedActorIds).toEqual(["unit-1", "unit-2"]);
+  } finally {
+    input.dispose();
+  }
+});
+
+test("Shift or Queue Orders mode queues moves and attacks", () => {
+  const { input, menu, submitCommand } = fixture();
+  try {
+    input.select("unit-1");
+    menu(undefined, true)("move").run();
+    expect(submitCommand).toHaveBeenLastCalledWith({
+      kind: "move",
+      actorId: "unit-1",
+      target: { x: 1, z: 2 },
+      queued: true,
+    });
+    input.setQueueMode(true);
+    menu("wolf")("attack").run();
+    expect(submitCommand).toHaveBeenLastCalledWith({
+      kind: "attack",
+      actorId: "unit-1",
+      targetId: "wolf",
+      queued: true,
+    });
+    input.setQueueMode(false);
+    menu()("move").run();
+    expect(submitCommand).toHaveBeenLastCalledWith({
+      kind: "move",
+      actorId: "unit-1",
+      target: { x: 1, z: 2 },
+    });
   } finally {
     input.dispose();
   }

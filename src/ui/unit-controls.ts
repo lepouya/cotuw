@@ -8,6 +8,7 @@ export type UnitControls = {
   addSelection?: HTMLButtonElement;
   stop?: HTMLButtonElement;
   clearSelection?: HTMLButtonElement;
+  queueOrders?: HTMLButtonElement;
   focusSelection?: HTMLButtonElement;
   followSelection?: HTMLButtonElement;
   movementStatus?: HTMLElement;
@@ -23,6 +24,8 @@ export function createUnitControls(
     | "additiveMode"
     | "setBoxMode"
     | "setAdditiveMode"
+    | "queueMode"
+    | "setQueueMode"
     | "stop"
     | "select"
   >,
@@ -63,6 +66,14 @@ export function createUnitControls(
   listen(controls.addSelection, () =>
     input.setAdditiveMode(!input.additiveMode),
   );
+  listen(controls.queueOrders, () => {
+    input.setQueueMode(!input.queueMode);
+    message(
+      input.queueMode
+        ? "Choose destinations or targets in order, then press Done."
+        : "Orders now replace current ones.",
+    );
+  });
   listen(controls.stop, input.stop);
   listen(controls.clearSelection, () => input.select(undefined));
   // Camera actions stay available for inspection after the mission halts.
@@ -82,6 +93,8 @@ export function createUnitControls(
       let status: MoveStatus | undefined;
       if (moves.length) {
         const accepted = moves.filter((outcome) => outcome.accepted);
+        const queued = accepted.filter((outcome) => outcome.queued).length;
+        const started = accepted.length - queued;
         const blocked = accepted.filter(
           ({ reachedTarget }) => reachedTarget === false,
         ).length;
@@ -91,7 +104,10 @@ export function createUnitControls(
           : "move order";
         message(
           [
-            `${count(accepted.length, order)} accepted`,
+            ...(started || !queued
+              ? [`${count(started, order)} accepted`]
+              : []),
+            ...(queued ? [`${count(queued, order)} queued`] : []),
             ...(blocked ? [count(blocked, "blocked destination")] : []),
             ...(rejected ? [`${count(rejected, "unit")} unable to move`] : []),
             ...(stops ? [`${count(stops, "stop order")} accepted`] : []),
@@ -109,13 +125,17 @@ export function createUnitControls(
       );
       if (attacks.length) {
         const accepted = attacks.filter((outcome) => outcome.accepted).length;
+        const queued = attacks.filter((outcome) => outcome.queued).length;
         const unarmed = attacks.filter(
           ({ reason }) => reason === "unarmed",
         ).length;
         const other = attacks.length - accepted - unarmed;
         message(
           [
-            ...(accepted ? [`${count(accepted, "unit")} attacking`] : []),
+            ...(accepted > queued
+              ? [`${count(accepted - queued, "unit")} attacking`]
+              : []),
+            ...(queued ? [`${count(queued, "attack order")} queued`] : []),
             ...(unarmed ? [`${count(unarmed, "unit")} cannot attack`] : []),
             ...(other ? ["The target cannot be attacked"] : []),
           ].join(" · ") + ".",

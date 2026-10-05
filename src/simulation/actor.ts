@@ -120,7 +120,20 @@ export type Actor = {
   combat?: CombatState;
   /** Present for actors whose definition has a territory. */
   territory?: TerritoryState;
+  /** Player orders that start in sequence once the current one ends. */
+  orders?: QueuedOrder[];
 };
+
+/** An order waiting behind a mobile actor's current one. */
+export type QueuedOrder =
+  | {
+      kind: "move" | "attack-move";
+      target: WorldPosition;
+      /** The group's click, when this actor's slot only approaches it. */
+      requestedTarget?: WorldPosition;
+    }
+  | { kind: "attack"; targetId: string }
+  | { kind: "gather"; siteId: string };
 
 export type CombatState = {
   /** Present while an armed actor pursues or attacks a target. */
@@ -293,6 +306,7 @@ export type ActorRenderState = DeepReadonly<
     | "rallyPoint"
     | "health"
     | "combat"
+    | "orders"
   >
 >;
 
