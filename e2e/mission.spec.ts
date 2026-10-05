@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { MissionDriver } from "./mission-driver";
+import { MOUSE_PROFILE, TOUCH_PROFILES } from "./profiles";
 
 const realTime = process.env.COTUW_REALTIME_PLAYTHROUGH === "1";
 
-for (const profile of [
-  { name: "mouse", touch: false, viewport: { width: 1280, height: 720 } },
-  { name: "phone touch", touch: true, viewport: { width: 844, height: 390 } },
-]) {
+// Tablet runs the same controls with more room; the compact checks cover it.
+for (const profile of [MOUSE_PROFILE, TOUCH_PROFILES[0]]) {
   test.describe(profile.name, () => {
     test.use({ viewport: profile.viewport, hasTouch: profile.touch });
     test(`complete M0 mission from the authored opening with ${profile.name}`, async ({

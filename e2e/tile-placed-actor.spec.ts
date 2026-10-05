@@ -1,5 +1,6 @@
 import { terrainPoint, placeBuilding } from "./prototype-helpers";
 import { expect, test } from "@playwright/test";
+import { TOUCH_PROFILES } from "./profiles";
 
 import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
@@ -210,29 +211,30 @@ test("selects a constructed building and freezes idle equipment when disabled", 
   await expect.poll(angle).toBeGreaterThan(reduced);
 });
 
-test("touch previews before explicit confirmation in compact landscape", async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: { width: 844, height: 390 },
-    hasTouch: true,
+for (const profile of TOUCH_PROFILES)
+  test(`${profile.name} touch previews before explicit confirmation`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: profile.viewport,
+      hasTouch: true,
+    });
+    const page = await context.newPage();
+    try {
+      await ready(page);
+      await page.locator("#build-command-center").tap();
+      const point = await terrainPoint(page, 55, 39);
+      await page.touchscreen.tap(point.x, point.y);
+      const canvas = page.locator("#game-canvas");
+      await expect(canvas).toHaveAttribute("data-placement-status", "valid");
+      await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
+      await page.locator("#rotate-building").tap();
+      await page.locator("#confirm-building").tap();
+      await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
+    } finally {
+      await context.close();
+    }
   });
-  const page = await context.newPage();
-  try {
-    await ready(page);
-    await page.locator("#build-command-center").tap();
-    const point = await terrainPoint(page, 55, 39);
-    await page.touchscreen.tap(point.x, point.y);
-    const canvas = page.locator("#game-canvas");
-    await expect(canvas).toHaveAttribute("data-placement-status", "valid");
-    await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
-    await page.locator("#rotate-building").tap();
-    await page.locator("#confirm-building").tap();
-    await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
-  } finally {
-    await context.close();
-  }
-});
 
 test("previews reject water, cliffs, and the playable-map boundary", async ({
   page,

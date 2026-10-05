@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TOUCH_PROFILES } from "./profiles";
 
 import { placeBuilding, terrainPoint } from "./prototype-helpers";
 
@@ -195,47 +196,50 @@ test("blocked exits disable training until a unit moves away", async ({
   await expect(page.locator("#unit-roster button")).toHaveCount(11);
 });
 
-test("compact touch layout can build a barracks and train both unit types", async ({
-  browser,
-}, testInfo) => {
-  const context = await browser.newContext({
-    viewport: { width: 844, height: 390 },
-    hasTouch: true,
-  });
-  const page = await context.newPage();
-  try {
-    await page.goto("/?level=sandbox");
-    await expect(page.locator("#game-canvas")).toHaveAttribute(
-      "data-terrain-ready",
-      "true",
-    );
-    await page.locator("#build-barracks").tap();
-    const point = await terrainPoint(page, 55, 39);
-    await page.touchscreen.tap(point.x, point.y);
-    await expect(page.locator("#game-canvas")).toHaveAttribute(
-      "data-placement-status",
-      "valid",
-    );
-    await page.locator("#confirm-building").tap();
-    await expect(page.locator("#selection-details")).toContainText(
-      "Field Barracks",
-    );
-    await expect(page.locator("#panel-units")).toBeVisible();
-    await page.locator("#train-trooper").tap();
-    await expect(page.locator("#unit-roster button")).toHaveCount(1);
-    await page.locator("#train-scout").tap();
-    await expect(page.locator("#unit-roster button")).toHaveCount(2);
-    const bounds = (await page.locator("#game-canvas").boundingBox())!;
-    expect(bounds.x).toBe(224);
-    expect(bounds.width).toBe(620);
-    await testInfo.attach("sidebar-touch", {
-      body: await page.screenshot(),
-      contentType: "image/png",
+for (const profile of TOUCH_PROFILES)
+  test(`${profile.name} touch layout can build a barracks and train both unit types`, async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      viewport: profile.viewport,
+      hasTouch: true,
     });
-  } finally {
-    await context.close();
-  }
-});
+    const page = await context.newPage();
+    try {
+      await page.goto("/?level=sandbox");
+      await expect(page.locator("#game-canvas")).toHaveAttribute(
+        "data-terrain-ready",
+        "true",
+      );
+      await page.locator("#build-barracks").tap();
+      const point = await terrainPoint(page, 55, 39);
+      await page.touchscreen.tap(point.x, point.y);
+      await expect(page.locator("#game-canvas")).toHaveAttribute(
+        "data-placement-status",
+        "valid",
+      );
+      await page.locator("#confirm-building").tap();
+      await expect(page.locator("#selection-details")).toContainText(
+        "Field Barracks",
+      );
+      await expect(page.locator("#panel-units")).toBeVisible();
+      await page.locator("#train-trooper").tap();
+      await expect(page.locator("#unit-roster button")).toHaveCount(1);
+      await page.locator("#train-scout").tap();
+      await expect(page.locator("#unit-roster button")).toHaveCount(2);
+      // The world fills the space the reserved sidebar leaves.
+      const sidebar = (await page.locator("#game-sidebar").boundingBox())!;
+      const bounds = (await page.locator("#game-canvas").boundingBox())!;
+      expect(bounds.x).toBe(sidebar.x + sidebar.width);
+      expect(bounds.x + bounds.width).toBe(profile.viewport.width);
+      await testInfo.attach(`sidebar-${profile.name}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+    } finally {
+      await context.close();
+    }
+  });
 
 test("sidebar derives custom content and can be disposed and recreated", async ({
   page,

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { importMission, placeBuilding } from "./prototype-helpers";
+import { MissionDriver } from "./mission-driver";
+import { TOUCH_PROFILES } from "./profiles";
 
 import type { Page } from "@playwright/test";
 
@@ -213,3 +215,48 @@ test("opening and closing the menu during inspection preserves a way to resume",
   await page.locator("#open-menu").click();
   await expect(page.locator("#resume-mission")).toHaveText("Resume");
 });
+
+for (const profile of TOUCH_PROFILES)
+  test.describe(profile.name, () => {
+    test.use({ viewport: profile.viewport, hasTouch: true });
+    test("the game menu saves, quicksaves, loads, and deletes by touch", async ({
+      page,
+    }) => {
+      const mission = new MissionDriver(page, true, false);
+      await mission.opening();
+      await mission.press("#open-menu");
+      await expect(page.locator("#game-menu-title")).toHaveText("Paused");
+      await mission.press("#save-mission");
+      await page.locator("#save-name").fill("Opening");
+      await mission.press("#confirm-save");
+      await expect(page.locator("#game-menu-status")).toHaveText(
+        "Manual save complete: Opening",
+      );
+      await mission.press("#quicksave-mission");
+      await expect(
+        page.getByText("Quick save complete: Quicksave").first(),
+      ).toBeVisible();
+      await mission.press("#resume-mission");
+      await mission.place("refinery", 12, 49, "Support Network");
+      await expect(materials(page)).toHaveText("50");
+
+      await mission.press("#open-menu");
+      await mission.press("#load-mission");
+      const entries = page.locator("#save-entries li");
+      await expect(entries).toHaveCount(2);
+      const opening = entries.filter({ hasText: "Manual · Opening" });
+      await opening.getByRole("button", { name: "Load" }).tap();
+      await expect(page.locator("#game-menu-title")).toHaveText(
+        "Mission loaded",
+      );
+      await expect(materials(page)).toHaveText("150");
+
+      await mission.press("#load-mission");
+      for (const name of ["Quicksave", "Opening"]) {
+        const entry = entries.filter({ hasText: name });
+        await entry.getByRole("button", { name: "Delete" }).tap();
+        await entry.getByRole("button", { name: "Confirm" }).tap();
+      }
+      await expect(entries).toHaveText(["No saved missions yet."]);
+    });
+  });

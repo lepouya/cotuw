@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { PROFILES } from "./profiles";
 import { importMission, terrainPoint } from "./prototype-helpers";
 import type { Page } from "@playwright/test";
 import type { GameSession } from "../src/session";
@@ -584,14 +585,12 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   await expect(root.locator("#harvester-status")).toHaveText("Order queued.");
 });
 
-for (const touch of [false, true]) {
-  test(`economy opening funds a Barracks and Trooper with ${touch ? "compact touch" : "mouse"} controls`, async ({
+for (const { touch, ...profile } of PROFILES) {
+  test(`economy opening funds a Barracks and Trooper with ${profile.name} controls`, async ({
     browser,
   }, testInfo) => {
     const context = await browser.newContext({
-      viewport: touch
-        ? { width: 844, height: 390 }
-        : { width: 1280, height: 720 },
+      viewport: profile.viewport,
       hasTouch: touch,
     });
     const page = await context.newPage();
@@ -636,7 +635,7 @@ for (const touch of [false, true]) {
         "true",
       );
       expect(errors).toEqual([]);
-      await testInfo.attach(touch ? "economy-touch" : "economy-desktop", {
+      await testInfo.attach(`economy-${profile.name}`, {
         body: await page.screenshot(),
         contentType: "image/png",
       });
@@ -646,14 +645,12 @@ for (const touch of [false, true]) {
   });
 }
 
-for (const touch of [false, true]) {
-  test(`rally points support ${touch ? "compact touch" : "mouse"} placement, cancellation, and production`, async ({
+for (const { touch, ...profile } of PROFILES) {
+  test(`rally points support ${profile.name} placement, cancellation, and production`, async ({
     browser,
   }, testInfo) => {
     const context = await browser.newContext({
-      viewport: touch
-        ? { width: 844, height: 390 }
-        : { width: 1280, height: 720 },
+      viewport: profile.viewport,
       hasTouch: touch,
     });
     const page = await context.newPage();
@@ -709,7 +706,7 @@ for (const touch of [false, true]) {
           () => !!window.economyHarness.view.scene.getMeshByName("rally-point"),
         ),
       ).toBe(true);
-      await testInfo.attach("rally-point", {
+      await testInfo.attach(`rally-${profile.name}`, {
         body: await page.screenshot(),
         contentType: "image/png",
       });
@@ -1037,11 +1034,7 @@ test("damaged building sale feedback matches the credited refund", async ({
   await expect(page.locator("#materials-counter")).toHaveText("273");
 });
 
-for (const profile of [
-  { name: "mouse", viewport: { width: 1280, height: 720 }, touch: false },
-  { name: "phone touch", viewport: { width: 844, height: 390 }, touch: true },
-  { name: "tablet touch", viewport: { width: 1024, height: 768 }, touch: true },
-]) {
+for (const profile of PROFILES) {
   test(`Attack Move supports ${profile.name} cancellation, combat, and resumption`, async ({
     browser,
   }, testInfo) => {
@@ -1139,10 +1132,7 @@ for (const profile of [
   });
 }
 
-for (const profile of [
-  { name: "mouse", viewport: { width: 1280, height: 720 }, touch: false },
-  { name: "phone touch", viewport: { width: 844, height: 390 }, touch: true },
-]) {
+for (const profile of PROFILES) {
   test(`Goals tracks victory and restores free play with ${profile.name}`, async ({
     browser,
   }, testInfo) => {
@@ -1224,7 +1214,7 @@ for (const profile of [
       });
       expect(saves.result).toBe("victory");
       const upload = async (source: string) => {
-        await importMission(page, source);
+        await importMission(page, source, "mission.json", profile.touch);
         await expect(page.locator("#game-menu")).toBeVisible();
       };
       await upload(saves.partial);

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TOUCH_PROFILES } from "./profiles";
 import { MissionDriver } from "./mission-driver";
 import { terrainPoint } from "./prototype-helpers";
 
@@ -154,48 +155,52 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   expect(errors).toEqual([]);
 });
 
-test.describe("phone touch", () => {
-  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true });
-  test("the compact top bar and popups work without a keyboard or hover", async ({
-    page,
-  }, testInfo) => {
-    const mission = new MissionDriver(page, true, false);
-    await mission.opening();
-    for (const selector of [
-      "#open-menu",
-      "#pause-mission",
-      '[data-speed="0.5"]',
-      '[data-speed="2"]',
-      "#objective-summary",
-      "#mission-time",
-      "#alert-toggle",
-    ])
-      await expect(page.locator(selector)).toBeInViewport({ ratio: 1 });
-    await expect(page.locator("#objective-text")).toBeHidden();
-    await expect(page.locator("#objective-summary")).toHaveAccessibleName(
-      /Defeat the lone wolf.*Show objectives/,
-    );
-    await expect(page.locator("#resource-bar")).toHaveAccessibleName(
-      "150 Materials",
-    );
-    await mission.press('[data-speed="2"]');
-    await mission.advance(5);
-    await expect(time(page)).toHaveText("0:10");
-    await mission.press("#pause-mission");
-    await mission.advance(5);
-    await expect(time(page)).toHaveText("0:10");
-    await mission.press("#pause-mission");
-    await mission.press("#objective-summary");
-    await expect(page.locator("#panel-goals")).toBeVisible();
-    await mission.place("refinery", 12, 49, "Support Network");
-    await expect(page.locator("#notifications")).toContainText(
-      "Materials Refinery complete",
-    );
-    await mission.press("#alert-toggle");
-    await expect(page.locator("#alert-history-panel")).toBeVisible();
-    await testInfo.attach("compact-top-bar", {
-      body: await page.screenshot(),
-      contentType: "image/png",
+for (const profile of TOUCH_PROFILES)
+  test.describe(profile.name, () => {
+    test.use({ viewport: profile.viewport, hasTouch: true });
+    test("the top bar and popups work without a keyboard or hover", async ({
+      page,
+    }, testInfo) => {
+      const mission = new MissionDriver(page, true, false);
+      await mission.opening();
+      for (const selector of [
+        "#open-menu",
+        "#pause-mission",
+        '[data-speed="0.5"]',
+        '[data-speed="2"]',
+        "#objective-summary",
+        "#mission-time",
+        "#alert-toggle",
+      ])
+        await expect(page.locator(selector)).toBeInViewport({ ratio: 1 });
+      // Short screens reduce the objective and resource labels to symbols.
+      if (profile.viewport.height <= 600) {
+        await expect(page.locator("#objective-text")).toBeHidden();
+        await expect(page.locator("#objective-summary")).toHaveAccessibleName(
+          /Defeat the lone wolf.*Show objectives/,
+        );
+      } else await expect(page.locator("#objective-text")).toBeVisible();
+      await expect(page.locator("#resource-bar")).toHaveAccessibleName(
+        "150 Materials",
+      );
+      await mission.press('[data-speed="2"]');
+      await mission.advance(5);
+      await expect(time(page)).toHaveText("0:10");
+      await mission.press("#pause-mission");
+      await mission.advance(5);
+      await expect(time(page)).toHaveText("0:10");
+      await mission.press("#pause-mission");
+      await mission.press("#objective-summary");
+      await expect(page.locator("#panel-goals")).toBeVisible();
+      await mission.place("refinery", 12, 49, "Support Network");
+      await expect(page.locator("#notifications")).toContainText(
+        "Materials Refinery complete",
+      );
+      await mission.press("#alert-toggle");
+      await expect(page.locator("#alert-history-panel")).toBeVisible();
+      await testInfo.attach(`top-bar-${profile.name}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
     });
   });
-});

@@ -94,6 +94,9 @@ export function createTopBar(
       setText(time, formatElapsed(state.elapsedSeconds));
       resource.hidden = state.materials === undefined;
       setText(materials, String(state.materials ?? 0));
+      const resourceLabel = `${state.materials ?? 0} Materials`;
+      if (resource.getAttribute("aria-label") !== resourceLabel)
+        resource.setAttribute("aria-label", resourceLabel);
       const summary = objectiveSummary(state.objectives, state.result);
       objective.hidden = !summary;
       setText(objectiveText, summary);
