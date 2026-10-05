@@ -360,6 +360,36 @@ export async function createGameSession(
     if (actor) controls.showActor?.(actor.definitionId);
   };
   const radial = createRadialMenu(document.body, canvas);
+  const isMobile = (actor: ActorRenderState) =>
+    isMobileActor(actor, definitionsById.get(actor.definitionId));
+  /** The rendered center of shown actors; undefined once none remain. */
+  const cameraPointFor = (ids: readonly string[]) => {
+    const points = ids.flatMap((id) => {
+      const actor = actorsByKind().byId.get(id);
+      if (!actor || !player.shows(actor)) return [];
+      return [
+        (isMobile(actor) && actorViews.groundPosition(id)) ||
+          actor.worldPosition,
+      ];
+    });
+    if (!points.length) return undefined;
+    const sum = (axis: "x" | "z") =>
+      points.reduce((total, point) => total + point[axis], 0) / points.length;
+    return new Vector3(sum("x"), 0, sum("z"));
+  };
+  const focusActors = (ids: readonly string[]) => {
+    const point = cameraPointFor(ids);
+    if (point) view.camera.glideToPoint(point);
+  };
+  const followableIds = (ids: readonly string[]) =>
+    ids.filter((id) => {
+      const actor = actorsByKind().byId.get(id);
+      return !!actor && isMobile(actor);
+    });
+  const followActors = (ids: readonly string[]) => {
+    const tracked = followableIds(ids);
+    if (tracked.length) view.camera.follow(() => cameraPointFor(tracked));
+  };
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: (mesh) => {
       const id =
@@ -412,6 +442,10 @@ export async function createGameSession(
       return undefined;
     },
     onContextMenu: radial.show,
+    focusActor: (actorId) => focusActors([actorId]),
+    canFollow: (actorId) => followableIds([actorId]).length > 0,
+    followActor: (actorId) => followActors([actorId]),
+    cancelFocus: view.camera.cancelFocus,
     canAttack: (actorId) => {
       if (!canCommand()) return false;
       const actor = actorsByKind().byId.get(actorId);
@@ -541,6 +575,7 @@ export async function createGameSession(
       placementActive: placement.active,
       faulted: halted(),
       paused: !playing,
+      following: view.camera.following,
       canRemove,
       materials: simulation.economy?.materials,
       objectives: simulation.objectives,
@@ -705,7 +740,10 @@ export async function createGameSession(
           selectedActorId: selectedOwnActorId,
           canControl: player.owns,
           enabled: () => canCommand() && !placement.active,
-          focus: (tile) => view.camera.focusOnTile(tile.x, tile.z),
+          focus: (tile) => {
+            const { x, z } = map.tileCenter(tile.x, tile.z);
+            view.camera.glideToPoint(new Vector3(x, 0, z));
+          },
           explored,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
         })
@@ -725,10 +763,18 @@ export async function createGameSession(
     changed: () => {
       controlsDirty = true;
     },
+    focus: () => focusActors(input.selectedActorIds),
+    toggleFollow: () => {
+      if (view.camera.following) view.camera.cancelFocus();
+      else followActors(input.selectedActorIds);
+    },
   });
   const disposeCameraControls =
     controls.cameraControls &&
     bindCameraControls(controls.cameraControls, view.camera);
+  view.camera.onViewChangedObservable.add(() => {
+    controlsDirty = true;
+  });
   view.camera.onPanChangedObservable.add(() => {
     input.cancelGesture();
     placement.cancelGesture();

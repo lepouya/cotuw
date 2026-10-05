@@ -13,6 +13,8 @@ const ICONS: Record<ContextActionKind, string> = {
   move: "➜",
   "attack-move": "⚔➜",
   clear: "✕",
+  focus: "⌖",
+  follow: "⤳",
 };
 
 /** Actions ringed around a world point; Escape or a press outside closes. */

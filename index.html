@@ -217,6 +217,15 @@
             </button>
             <button id="stop-units" type="button" disabled>Stop (S)</button>
             <button id="clear-selection" type="button" disabled>Clear</button>
+            <button id="focus-selection" type="button" disabled>⌖ Focus</button>
+            <button
+              id="follow-selection"
+              type="button"
+              aria-pressed="false"
+              disabled
+            >
+              ⤳ Follow
+            </button>
           </div>
           <p id="movement-status" class="muted" role="status"></p>
         </section>
@@ -379,10 +388,12 @@
             </button>
             <button
               type="button"
-              data-camera-action="reset"
-              aria-label="Reset camera view"
+              data-camera-action="views"
+              aria-label="Camera views"
+              aria-expanded="false"
+              aria-controls="camera-views"
             >
-              Reset
+              View
             </button>
             <button
               type="button"
@@ -435,6 +446,43 @@
             >
               Pan
             </button>
+            <div
+              id="camera-views"
+              class="camera-views"
+              data-world-input-blocking
+              role="group"
+              aria-label="Camera views"
+              hidden
+            >
+              <button
+                type="button"
+                data-camera-view="isometric"
+                aria-pressed="false"
+              >
+                Isometric
+              </button>
+              <button
+                type="button"
+                data-camera-view="top-down"
+                aria-pressed="false"
+              >
+                Top-down
+              </button>
+              <button
+                type="button"
+                data-camera-view="grid"
+                aria-pressed="false"
+              >
+                Grid
+              </button>
+              <button
+                type="button"
+                data-camera-view="reset"
+                aria-label="Reset camera view"
+              >
+                Reset
+              </button>
+            </div>
             <label class="edge-pan-control">
               <input id="edge-panning" type="checkbox" checked /> Edge panning
             </label>

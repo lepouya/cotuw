@@ -15,6 +15,8 @@ function navigationFixture() {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   const host = new EventTarget();
+  const motion = { matches: false };
+  Object.assign(host, { matchMedia: () => motion });
   const document = {
     defaultView: host,
     activeElement: undefined as unknown,
@@ -78,6 +80,7 @@ function navigationFixture() {
     navigation,
     scene,
     host,
+    motion,
     canvas,
     document,
     attributes,
@@ -93,6 +96,28 @@ function navigationFixture() {
 }
 
 describe("keyboard camera navigation", () => {
+  test.each(["hidden", "focus", "dialog"])(
+    "%s prevents wheel navigation",
+    (reason) => {
+      const fixture = navigationFixture();
+      try {
+        fixture.navigation.setPanMode(true);
+        if (reason === "hidden") fixture.document.hidden = true;
+        if (reason === "focus") fixture.document.focused = false;
+        if (reason === "dialog") fixture.document.modal = true;
+        const wheel = Object.assign(new Event("wheel", { cancelable: true }), {
+          deltaX: 30,
+          deltaY: 30,
+          deltaMode: 0,
+        });
+        fixture.canvas.dispatchEvent(wheel);
+        expect(fixture.target()).toEqual(Vector3.Zero());
+        expect(wheel.defaultPrevented).toBe(false);
+      } finally {
+        fixture.dispose();
+      }
+    },
+  );
   test.each(["hidden", "focus", "dialog"])(
     "%s releases held navigation and cannot restart it until the world returns",
     (reason) => {
@@ -316,6 +341,202 @@ describe("edge camera navigation", () => {
       fixture.pointer("pointermove", 900, 300);
       for (let i = 0; i < 5; i++) fixture.frame(100);
       expect(fixture.target()).toEqual(Vector3.Zero());
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
+
+describe("camera views", () => {
+  const heading = (fixture: ReturnType<typeof navigationFixture>) => {
+    const camera = fixture.scene.activeCamera as ArcRotateCamera;
+    return { alpha: camera.alpha, beta: camera.beta };
+  };
+  const settle = (fixture: ReturnType<typeof navigationFixture>) => {
+    for (let i = 0; i < 20; i++) fixture.frame(50);
+  };
+
+  test("a stationary press in Pan mode leaves a focus glide running", () => {
+    const fixture = navigationFixture();
+    try {
+      fixture.navigation.glideToPoint(new Vector3(8, 0, 0));
+      fixture.navigation.setPanMode(true);
+      for (const type of ["pointerdown", "pointerup"])
+        fixture.canvas.dispatchEvent(
+          Object.assign(new Event(type), {
+            button: 0,
+            pointerId: 1,
+            clientX: 400,
+            clientY: 300,
+            pointerType: "mouse",
+          }),
+        );
+      fixture.frame(150);
+      expect(fixture.target().x).toBeCloseTo(4);
+      expect(fixture.navigation.cancelFocus()).toBe(true);
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("rapid repeated rotation keeps its direction across a full turn", () => {
+    const fixture = navigationFixture();
+    try {
+      fixture.navigation.setPreset("grid");
+      settle(fixture);
+      const start = heading(fixture).alpha;
+      for (let i = 0; i < 3; i++) fixture.navigation.rotateView(1);
+      fixture.frame(150);
+      expect(heading(fixture).alpha).toBeGreaterThan(start);
+      settle(fixture);
+      expect(heading(fixture).alpha).toBeCloseTo(start + (3 * Math.PI) / 2);
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("manual tilt interrupts a preset at its current pitch", () => {
+    const fixture = navigationFixture();
+    try {
+      const start = heading(fixture).beta;
+      fixture.navigation.setPreset("top-down");
+      fixture.navigation.tiltView(0.05);
+      settle(fixture);
+      expect(heading(fixture).beta).toBeCloseTo(start + 0.05);
+      expect(fixture.navigation.preset).toBeUndefined();
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("presets ease to their heading while keeping focus and zoom", () => {
+    const fixture = navigationFixture();
+    try {
+      const camera = fixture.scene.activeCamera as ArcRotateCamera;
+      fixture.navigation.focusOnPoint(new Vector3(5, 0, 7));
+      const zoom = camera.orthoTop;
+      const start = heading(fixture);
+      fixture.navigation.setPreset("grid");
+      expect(heading(fixture)).toEqual(start);
+      fixture.frame(150);
+      expect(heading(fixture).alpha).not.toBeCloseTo(start.alpha);
+      settle(fixture);
+      // The NNE start snaps north, its nearest cardinal direction.
+      expect(heading(fixture).alpha).toBeCloseTo(-Math.PI / 2);
+      expect(fixture.navigation.preset).toBe("grid");
+      // Equally near diagonals resolve toward Rotate right.
+      fixture.navigation.setPreset("isometric");
+      settle(fixture);
+      expect(heading(fixture).alpha).toBeCloseTo(-Math.PI / 4);
+      fixture.navigation.setPreset("top-down");
+      settle(fixture);
+      expect(heading(fixture).alpha).toBeCloseTo(-Math.PI / 2);
+      expect(heading(fixture).beta).toBeLessThan(0.05);
+      expect(fixture.target()).toEqual(new Vector3(5, 0, 7));
+      expect(camera.orthoTop).toBe(zoom);
+      fixture.navigation.resetView();
+      settle(fixture);
+      expect(heading(fixture)).toEqual(start);
+      expect(fixture.navigation.preset).toBeUndefined();
+      expect(fixture.target()).toEqual(new Vector3(5, 0, 7));
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("rotation steps through preset headings and leaves presets when free", () => {
+    const fixture = navigationFixture();
+    try {
+      const start = heading(fixture).alpha;
+      fixture.navigation.rotateView(1);
+      settle(fixture);
+      expect(heading(fixture).alpha).toBeCloseTo(start + Math.PI / 8);
+      fixture.navigation.setPreset("grid");
+      fixture.navigation.rotateView(1);
+      fixture.navigation.rotateView(1);
+      settle(fixture);
+      expect(Math.cos(heading(fixture).alpha)).toBeCloseTo(0);
+      expect(Math.sin(heading(fixture).alpha)).toBeCloseTo(1);
+      expect(fixture.navigation.preset).toBe("grid");
+      fixture.navigation.tiltView(0.1);
+      expect(fixture.navigation.preset).toBeUndefined();
+      // Tilting up from Top-down holds the pitch instead of dropping it.
+      fixture.navigation.setPreset("top-down");
+      settle(fixture);
+      const topDown = heading(fixture).beta;
+      fixture.navigation.tiltView(-0.1);
+      expect(heading(fixture).beta).toBe(topDown);
+      fixture.navigation.tiltView(0.1);
+      expect(heading(fixture).beta).toBeCloseTo(topDown + 0.1);
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("Follow eases after its target, survives zoom, and ends on pan or loss", () => {
+    const fixture = navigationFixture();
+    try {
+      let target: Vector3 | undefined = new Vector3(10, 0, 0);
+      fixture.navigation.follow(() => target);
+      fixture.frame(50);
+      expect(fixture.target().x).toBeGreaterThan(0);
+      expect(fixture.target().x).toBeLessThan(10);
+      settle(fixture);
+      expect(fixture.target().x).toBeCloseTo(10);
+      fixture.navigation.zoomBy(0.8);
+      fixture.navigation.setPreset("grid");
+      expect(fixture.navigation.following).toBe(true);
+      target = undefined;
+      fixture.frame(50);
+      expect(fixture.navigation.following).toBe(false);
+      expect(fixture.target().x).toBeCloseTo(10);
+      fixture.navigation.follow(() => new Vector3(0, 0, 0));
+      fixture.navigation.panView(1, 0);
+      expect(fixture.navigation.following).toBe(false);
+      fixture.navigation.follow(() => new Vector3(0, 0, 0));
+      expect(fixture.navigation.cancelFocus()).toBe(true);
+      expect(fixture.navigation.cancelFocus()).toBe(false);
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("reduced motion applies views, glides, and Follow immediately", () => {
+    const fixture = navigationFixture();
+    try {
+      Object.assign(fixture.host, { matchMedia: () => ({ matches: true }) });
+      // The query is read at creation, so build a second camera.
+      const reduced = createStrategyCamera(
+        fixture.scene,
+        fixture.canvas as unknown as HTMLCanvasElement,
+        new TerrainMap({ width: 100, height: 100, tileSize: 1 }),
+      );
+      const camera = fixture.scene.cameras[1] as ArcRotateCamera;
+      reduced.setPreset("top-down");
+      expect(camera.beta).toBeLessThan(0.05);
+      reduced.glideToPoint(new Vector3(3, 0, 4));
+      expect(camera.target).toEqual(new Vector3(3, 0, 4));
+      reduced.follow(() => new Vector3(6, 0, 2));
+      fixture.frame(1);
+      expect(camera.target).toEqual(new Vector3(6, 0, 2));
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("enabling reduced motion finishes a running view and focus transition", () => {
+    const fixture = navigationFixture();
+    try {
+      const target = new Vector3(12, 0, 7);
+      fixture.navigation.glideToPoint(target);
+      fixture.navigation.setPreset("top-down");
+      fixture.frame(50);
+      expect(fixture.target()).not.toEqual(target);
+      fixture.motion.matches = true;
+      fixture.frame(1);
+      expect(fixture.target()).toEqual(target);
+      expect(heading(fixture).beta).toBeLessThan(0.05);
+      expect(fixture.navigation.cancelFocus()).toBe(false);
     } finally {
       fixture.dispose();
     }

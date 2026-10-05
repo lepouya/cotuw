@@ -511,6 +511,18 @@ button:disabled {
   border-color: #d8bd79;
   background: #304e4d;
 }
+/* Opens beside the cluster so short landscape screens keep every button. */
+.camera-views {
+  position: absolute;
+  left: calc(100% + 0.2rem);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.2rem;
+}
+.camera-views[hidden] {
+  display: none;
+}
 .edge-pan-control {
   grid-column: 1 / -1;
   display: flex;

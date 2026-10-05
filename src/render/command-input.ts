@@ -15,7 +15,15 @@ import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 
 export type ContextActionKind =
-  "attack" | "select" | "add" | "remove" | "move" | "attack-move" | "clear";
+  | "attack"
+  | "select"
+  | "add"
+  | "remove"
+  | "move"
+  | "attack-move"
+  | "clear"
+  | "focus"
+  | "follow";
 
 /** A world command the radial menu offers. */
 export type ContextAction = {
@@ -71,6 +79,8 @@ const CONTEXT_LABELS: Record<ContextActionKind, string> = {
   move: "Move",
   "attack-move": "Attack Move",
   clear: "Clear selection",
+  focus: "Focus",
+  follow: "Follow",
 };
 
 export type CommandInputOptions = {
@@ -98,6 +108,12 @@ export type CommandInputOptions = {
   ) => void;
   /** Whether clicking this actor attacks it instead of selecting it. */
   canAttack?: (actorId: string) => boolean;
+  /** Offers Focus on actors in the radial menu. */
+  focusActor?: (actorId: string) => void;
+  canFollow?: (actorId: string) => boolean;
+  followActor?: (actorId: string) => void;
+  /** Escape ends a camera focus or Follow before clearing selection. */
+  cancelFocus?: () => boolean;
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
   onSelectionChanged?: (actorIds: readonly string[]) => void;
   enabled?: () => boolean;
@@ -154,6 +170,10 @@ export function createCommandInput(
     cancelGroundTarget,
     moveLabel = () => undefined,
     onContextMenu,
+    focusActor,
+    canFollow = () => false,
+    followActor,
+    cancelFocus,
   }: CommandInputOptions,
 ): CommandInput {
   const selection = createSelection(canMove);
@@ -286,6 +306,11 @@ export function createCommandInput(
         canCommand: canCommand(),
       },
     );
+    // Camera actions follow the commands, so they are never the default.
+    if (picked && !additive && focusActor) {
+      kinds.push("focus");
+      if (followActor && canFollow(picked)) kinds.push("follow");
+    }
     const choose = (id: string | undefined, add: boolean) => {
       if (id && !canSelect(id)) return;
       select(id, add);
@@ -317,6 +342,8 @@ export function createCommandInput(
       move: () => order("move"),
       "attack-move": () => order("attack-move"),
       clear: () => choose(undefined, false),
+      focus: () => focusActor?.(picked!),
+      follow: () => followActor?.(picked!),
     };
     return kinds.map((kind) => ({
       kind,
@@ -348,7 +375,7 @@ export function createCommandInput(
     )
       return;
     if (isTextEntry(event.target)) return;
-    if (event.key === "Escape" && cancelGroundTarget?.()) {
+    if (event.key === "Escape" && (cancelGroundTarget?.() || cancelFocus?.())) {
       cancelGesture();
       event.preventDefault();
       return;

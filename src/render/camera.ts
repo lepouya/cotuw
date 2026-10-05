@@ -22,18 +22,26 @@ const INITIAL_VIEW_TILES = 24;
 const ZOOM_SENSITIVITY = 0.0015;
 /** Pixels per wheel line, for line-based deltas. */
 const WHEEL_LINE_PIXELS = 16;
-// Look 22.5° east of north (+z).
-const INITIAL_ALPHA = (-5 * Math.PI) / 8;
+// The view looks along -(cos α, sin α), so α = -π/2 faces north (+z).
+const NORTH_ALPHA = -Math.PI / 2;
+// Look 22.5° east of north.
+const INITIAL_ALPHA = NORTH_ALPHA - Math.PI / 8;
 const INITIAL_BETA = Math.PI / 3.2;
+/** Nearly vertical; exactly vertical leaves the view's up axis undefined. */
+const TOP_DOWN_BETA = 0.01;
 const LOWER_BETA_LIMIT = Math.PI / 7;
 const UPPER_BETA_LIMIT = Math.PI / 2.15;
+const QUARTER_TURN = Math.PI / 2;
+const FREE_ROTATION_STEP = Math.PI / 8;
 const NEAR_CLIP = 0.01;
 /** Replaced by the distance-based far clip once the view is framed. */
 const INITIAL_FAR_CLIP = 500;
 /** Extra depth range beyond twice the camera distance. */
 const FAR_CLIP_MARGIN = 100;
-/** How long a glide takes to reach its destination, whatever the distance. */
-const GLIDE_SECONDS = 0.3;
+/** How long a glide or view change takes, whatever the distance. */
+const TRANSITION_SECONDS = 0.3;
+/** How quickly Follow closes the gap to its target, per second. */
+const FOLLOW_RATE = 8;
 const CONTINUOUS_PAN_SPEED = 3;
 const PAN_VIEW_FRACTION = 0.18;
 const PAN_KEYS: Readonly<Record<string, readonly [number, number]>> = {
@@ -43,9 +51,17 @@ const PAN_KEYS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowRight: [1, 0],
 };
 
+/** Isometric faces a diagonal, Grid a cardinal direction, Top-down north. */
+export type CameraPreset = "isometric" | "top-down" | "grid";
+
 export type StrategyCamera = {
-  /** Frames the starting view: centered, close enough to read one tile. */
+  /** Restores the starting pitch and heading, keeping focus and zoom. */
   resetView: () => void;
+  /** Absent after a reset or a manual rotation or tilt. */
+  readonly preset: CameraPreset | undefined;
+  setPreset: (preset: CameraPreset) => void;
+  /** Notifies preset and Follow changes. */
+  readonly onViewChangedObservable: Observable<void>;
   panView: (horizontal: number, vertical: number) => void;
   readonly panMode: boolean;
   /** Reserves primary pointers for navigation instead of world actions. */
@@ -54,7 +70,11 @@ export type StrategyCamera = {
   setPanMode: (active: boolean) => void;
   readonly edgePanEnabled: boolean;
   setEdgePanEnabled: (active: boolean) => void;
-  rotateView: (radians: number) => void;
+  /**
+   * Turns to the preset's next heading a quarter turn away, or by a free step
+   * without a preset. Positive is Rotate right.
+   */
+  rotateView: (direction: 1 | -1) => void;
   tiltView: (radians: number) => void;
   zoomBy: (factor: number) => void;
   /** Constrains every new focal point, such as to explored terrain. */
@@ -69,6 +89,14 @@ export type StrategyCamera = {
   focusOnPoint: (point: Vector3) => void;
   /** Eases the view onto a world point; any other pan cancels the glide. */
   glideToPoint: (point: Vector3) => void;
+  readonly following: boolean;
+  /**
+   * Keeps easing the view toward `target` until a pan or another focus, or
+   * until `target` returns undefined.
+   */
+  follow: (target: () => Vector3 | undefined) => void;
+  /** Ends a focus glide or Follow; returns whether either was active. */
+  cancelFocus: () => boolean;
   /**
    * The world quad where the view volume currently meets `height`, ordered
    * bottom-left, bottom-right, top-right, top-left as seen on screen.
@@ -91,7 +119,8 @@ export function createStrategyCamera(
   );
 
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
-  camera.lowerBetaLimit = LOWER_BETA_LIMIT;
+  // Manual tilt stops at LOWER_BETA_LIMIT; only the Top-down preset goes past.
+  camera.lowerBetaLimit = TOP_DOWN_BETA;
   camera.upperBetaLimit = UPPER_BETA_LIMIT;
   camera.lowerRadiusLimit = MINIMUM_CAMERA_DISTANCE;
   camera.upperRadiusLimit = MINIMUM_CAMERA_DISTANCE;
@@ -125,25 +154,46 @@ export function createStrategyCamera(
     camera.radius = safeDistance;
     camera.maxZ = safeDistance * 2 + FAR_CLIP_MARGIN;
   };
+  const motionQuery = canvas.ownerDocument?.defaultView?.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  );
+  const reducedMotion = () => !!motionQuery?.matches;
   let glide: { from: Vector3; to: Vector3; elapsed: number } | undefined;
+  let turn: { from: Heading; to: Heading; elapsed: number } | undefined;
+  let followTarget: (() => Vector3 | undefined) | undefined;
+  let preset: CameraPreset | undefined;
+  const onViewChangedObservable = new Observable<void>();
+  const setPresetState = (next: CameraPreset | undefined) => {
+    if (preset === next) return;
+    preset = next;
+    onViewChangedObservable.notifyObservers();
+  };
+  const stopFollowing = () => {
+    if (!followTarget) return false;
+    followTarget = undefined;
+    onViewChangedObservable.notifyObservers();
+    return true;
+  };
   let limitFocus = (point: Vector3) => point;
   // Babylon would otherwise re-derive alpha, beta and radius from the
   // unchanged position and tilt the fixed isometric view.
   const retarget = (target: Vector3) =>
     camera.setTarget(target, false, false, true);
-  // Every deliberate move replaces a glide instead of fighting it.
+  // Every deliberate move replaces a glide or Follow instead of fighting it.
   const moveTo = (target: Vector3) => {
     glide = undefined;
+    stopFollowing();
     retarget(limitFocus(target));
   };
   const fitToMap = () => {
     glide = undefined;
+    stopFollowing();
     retarget(Vector3.Zero());
     setDistance(cameraDistanceForMap(map));
     setViewHeight(viewHeightToFitMap(camera, canvas, map));
   };
   // Small maps get fitted instead, so the start never overshoots the map.
-  const resetView = () => {
+  const frameStart = () => {
     camera.alpha = INITIAL_ALPHA;
     camera.beta = INITIAL_BETA;
     moveTo(Vector3.Zero());
@@ -155,33 +205,119 @@ export function createStrategyCamera(
       ),
     );
   };
+  /** Where the view is heading, so repeated turns build on each other. */
+  const aim = (): Heading =>
+    turn?.to ?? { alpha: camera.alpha, beta: camera.beta };
+  const turnTo = (to: Heading, shortest = true) => {
+    const from = { alpha: camera.alpha, beta: camera.beta };
+    // Take the short way round, landing exactly on the requested heading.
+    const fullTurns = shortest
+      ? Math.round((from.alpha - to.alpha) / (2 * Math.PI))
+      : 0;
+    const alpha = to.alpha + fullTurns * 2 * Math.PI;
+    turn = { from, to: { alpha, beta: to.beta }, elapsed: 0 };
+    if (!reducedMotion()) return;
+    turn = undefined;
+    camera.alpha = alpha;
+    camera.beta = to.beta;
+  };
+  const setPreset = (next: CameraPreset) => {
+    turnTo(
+      next === "top-down"
+        ? { alpha: NORTH_ALPHA, beta: TOP_DOWN_BETA }
+        : {
+            alpha: nearestHeading(aim().alpha, PRESET_HEADINGS[next]),
+            beta: INITIAL_BETA,
+          },
+    );
+    setPresetState(next);
+  };
+  const resetView = () => {
+    turnTo({ alpha: INITIAL_ALPHA, beta: INITIAL_BETA });
+    setPresetState(undefined);
+  };
+  const rotateView = (direction: 1 | -1) => {
+    const { alpha, beta } = aim();
+    turnTo(
+      preset
+        ? {
+            alpha:
+              nearestHeading(alpha, PRESET_HEADINGS[preset]) +
+              direction * QUARTER_TURN,
+            beta,
+          }
+        : { alpha: alpha + direction * FREE_ROTATION_STEP, beta },
+      false,
+    );
+  };
   const focusOnPoint = (point: Vector3) => moveTo(groundPoint(point));
   const focusOnTile = (x: number, z: number) => {
     focusOnPoint(map.worldPoint(x + 0.5, z + 0.5, 0));
   };
   const glideToPoint = (point: Vector3) => {
+    if (reducedMotion()) return focusOnPoint(point);
+    stopFollowing();
     glide = {
       from: camera.target.clone(),
       to: limitFocus(groundPoint(point)),
       elapsed: 0,
     };
   };
-  const advanceGlide = () => {
-    if (!glide) {
-      return;
+  const follow = (target: () => Vector3 | undefined) => {
+    glide = undefined;
+    followTarget = target;
+    onViewChangedObservable.notifyObservers();
+  };
+  const advanceTransitions = () => {
+    const seconds = scene.getEngine().getDeltaTime() / 1000;
+    const immediate = reducedMotion();
+    if (glide) {
+      glide.elapsed += seconds;
+      const progress = immediate
+        ? 1
+        : Math.min(glide.elapsed / TRANSITION_SECONDS, 1);
+      retarget(
+        limitFocus(
+          Vector3.Lerp(glide.from, glide.to, easeInOutCubic(progress)),
+        ),
+      );
+      if (progress === 1) glide = undefined;
     }
-
-    glide.elapsed += scene.getEngine().getDeltaTime() / 1000;
-    const progress = Math.min(glide.elapsed / GLIDE_SECONDS, 1);
-    retarget(
-      limitFocus(Vector3.Lerp(glide.from, glide.to, easeOutCubic(progress))),
-    );
-    if (progress === 1) {
-      glide = undefined;
+    if (turn) {
+      turn.elapsed += seconds;
+      const progress = immediate
+        ? 1
+        : Math.min(turn.elapsed / TRANSITION_SECONDS, 1);
+      const eased = easeInOutCubic(progress);
+      const { from, to } = turn;
+      camera.alpha = from.alpha + (to.alpha - from.alpha) * eased;
+      camera.beta = from.beta + (to.beta - from.beta) * eased;
+      if (progress === 1) {
+        Object.assign(camera, to);
+        turn = undefined;
+      }
+    }
+    if (followTarget) {
+      const point = followTarget();
+      if (!point) {
+        stopFollowing();
+        return;
+      }
+      const blend = immediate ? 1 : 1 - Math.exp(-FOLLOW_RATE * seconds);
+      retarget(
+        limitFocus(Vector3.Lerp(camera.target, groundPoint(point), blend)),
+      );
     }
   };
-  const setBeta = (beta: number) => {
-    camera.beta = Math.max(LOWER_BETA_LIMIT, Math.min(UPPER_BETA_LIMIT, beta));
+  /** Manual rotation and tilt leave any preset and interrupt its turn. */
+  const turnManually = () => {
+    turn = undefined;
+    setPresetState(undefined);
+  };
+  // Tilting from a steeper preset pitch eases back into range, never past it.
+  const setBeta = (beta: number, from: number) => {
+    const lower = Math.min(LOWER_BETA_LIMIT, from);
+    camera.beta = Math.max(lower, Math.min(UPPER_BETA_LIMIT, beta));
   };
   let canTouchPan = (_event: PointerEvent) => true;
   let panMode = false;
@@ -222,14 +358,17 @@ export function createStrategyCamera(
           (primaryPanActive() || (touch && canTouchPan(event))))
       ))
         return undefined;
-      glide = undefined;
       canvas.focus?.({ preventScroll: true });
       return { rotate: event.button === 2 && !touch && event.shiftKey };
     },
     move: (event, gesture) => {
       if (gesture.data.rotate) {
+        turnManually();
         camera.alpha -= (event.clientX - gesture.last.clientX) * 0.005;
-        setBeta(camera.beta - (event.clientY - gesture.last.clientY) * 0.005);
+        setBeta(
+          camera.beta - (event.clientY - gesture.last.clientY) * 0.005,
+          camera.beta,
+        );
       } else {
         canvas.setAttribute?.("data-camera-dragging", "true");
         panPixels(
@@ -262,6 +401,7 @@ export function createStrategyCamera(
     );
 
   const zoom = (event: WheelEvent) => {
+    if (!worldInputAvailable(canvas.ownerDocument)) return;
     event.preventDefault();
     const scale = wheelPixelScale(event, canvas.clientHeight);
     if (panMode && !event.ctrlKey)
@@ -371,13 +511,20 @@ export function createStrategyCamera(
     canvas.removeAttribute?.("data-camera-pan-active");
     canvas.removeAttribute?.("data-camera-dragging");
     onPanChangedObservable.clear();
+    onViewChangedObservable.clear();
   });
   scene.onBeforeRenderObservable.add(syncToCanvas);
   scene.onBeforeRenderObservable.add(advanceNavigation);
-  scene.onBeforeRenderObservable.add(advanceGlide);
+  scene.onBeforeRenderObservable.add(advanceTransitions);
+  frameStart();
 
   return {
     resetView,
+    get preset() {
+      return preset;
+    },
+    setPreset,
+    onViewChangedObservable,
     panView,
     get panMode() {
       return panMode;
@@ -391,10 +538,12 @@ export function createStrategyCamera(
       return edgePan.enabled;
     },
     setEdgePanEnabled: edgePan.setEnabled,
-    rotateView: (radians) => {
-      camera.alpha += radians;
+    rotateView,
+    tiltView: (radians) => {
+      const beta = camera.beta;
+      turnManually();
+      setBeta(beta + radians, beta);
     },
-    tiltView: (radians) => setBeta(camera.beta + radians),
     zoomBy: (factor) => setViewHeight(viewHeight * factor),
     setFocusLimit: (limit) => {
       limitFocus = limit;
@@ -408,8 +557,35 @@ export function createStrategyCamera(
     focusOnTile,
     focusOnPoint,
     glideToPoint,
+    get following() {
+      return !!followTarget;
+    },
+    follow,
+    cancelFocus: () => {
+      const active = !!glide;
+      glide = undefined;
+      return stopFollowing() || active;
+    },
     viewFootprint,
   };
+}
+
+type Heading = { alpha: number; beta: number };
+
+/** The orbit angle of one heading in each preset's quarter-turn family. */
+const PRESET_HEADINGS: Record<CameraPreset, number> = {
+  isometric: NORTH_ALPHA - Math.PI / 4,
+  grid: NORTH_ALPHA,
+  "top-down": NORTH_ALPHA,
+};
+
+/**
+ * The heading in `base`'s quarter-turn family closest to `alpha`. Ties, such
+ * as Grid to Isometric, go toward Rotate right despite rounding error.
+ */
+function nearestHeading(alpha: number, base: number): number {
+  const turns = Math.round((alpha - base) / QUARTER_TURN + 1e-9);
+  return base + turns * QUARTER_TURN;
 }
 
 /** Targets stay on the ground plane; only x/z come from the point. */
@@ -417,8 +593,8 @@ function groundPoint(point: Vector3): Vector3 {
   return new Vector3(point.x, 0, point.z);
 }
 
-function easeOutCubic(progress: number): number {
-  return 1 - (1 - progress) ** 3;
+function easeInOutCubic(progress: number): number {
+  return progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
 }
 
 /** Pixels per wheel delta unit; Firefox mice report lines. */

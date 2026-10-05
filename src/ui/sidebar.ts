@@ -27,6 +27,8 @@ export type SidebarState = {
   placementActive: boolean;
   faulted: boolean;
   paused?: boolean;
+  /** Whether the camera follows actors. */
+  following?: boolean;
   canRemove: boolean;
   materials?: number;
   objectives?: readonly ObjectiveView[];
@@ -83,6 +85,8 @@ export function createSidebar(
   const addSelection = element<HTMLButtonElement>("add-selection");
   const stop = element<HTMLButtonElement>("stop-units");
   const clearSelection = element<HTMLButtonElement>("clear-selection");
+  const focusSelection = element<HTMLButtonElement>("focus-selection");
+  const followSelection = element<HTMLButtonElement>("follow-selection");
   const showTab = (id: string) => {
     root.querySelector<HTMLElement>(".sidebar-content")!.scrollTop = 0;
     const focusedPanel = panels.find((panel) =>
@@ -269,6 +273,8 @@ export function createSidebar(
       attackMove: element<HTMLButtonElement>("attack-move"),
       cancelAttackMove: element<HTMLButtonElement>("cancel-attack-move"),
       clearSelection,
+      focusSelection,
+      followSelection,
       movementStatus: element("movement-status"),
       rotate: element<HTMLButtonElement>("rotate-building"),
       confirm: element<HTMLButtonElement>("confirm-building"),
@@ -346,6 +352,18 @@ export function createSidebar(
           selectionHealth.textContent = text;
       }
       clearSelection.disabled = unavailable || ids.length === 0;
+      focusSelection.disabled = ids.length === 0;
+      followSelection.setAttribute(
+        "aria-pressed",
+        String(state.following ?? false),
+      );
+      followSelection.disabled =
+        !state.following &&
+        !state.actors.some(
+          (actor) =>
+            selected.has(actor.id) &&
+            isMobileActor(actor, definitionById.get(actor.definitionId)),
+        );
       const membershipChanged = state.actorVersion !== actorVersion;
       if (membershipChanged) {
         actorVersion = state.actorVersion;

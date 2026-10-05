@@ -37,7 +37,6 @@ export function createGameView(
   const canvasSize = watchCanvasSize(canvas);
 
   const camera = createStrategyCamera(scene, canvas, map);
-  camera.resetView();
   const lighting = createLighting(scene, lightingConfig);
   engine.runRenderLoop(() => {
     if (canvasSize.takeChange()) {

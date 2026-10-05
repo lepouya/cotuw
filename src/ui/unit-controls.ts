@@ -8,6 +8,8 @@ export type UnitControls = {
   addSelection?: HTMLButtonElement;
   stop?: HTMLButtonElement;
   clearSelection?: HTMLButtonElement;
+  focusSelection?: HTMLButtonElement;
+  followSelection?: HTMLButtonElement;
   movementStatus?: HTMLElement;
 };
 
@@ -25,17 +27,26 @@ export function createUnitControls(
     | "select"
   >,
   controls: UnitControls,
-  options: { enabled: () => boolean; changed: () => void },
+  options: {
+    enabled: () => boolean;
+    changed: () => void;
+    focus?: () => void;
+    toggleFollow?: () => void;
+  },
 ) {
   const controller = new AbortController();
   const message = (text: string) => {
     if (controls.movementStatus) controls.movementStatus.textContent = text;
   };
-  const listen = (button: HTMLButtonElement | undefined, action: () => void) =>
+  const listen = (
+    button: HTMLButtonElement | undefined,
+    action: () => void,
+    gated = true,
+  ) =>
     button?.addEventListener(
       "click",
       () => {
-        if (!options.enabled()) return;
+        if (gated && !options.enabled()) return;
         action();
         options.changed();
       },
@@ -54,6 +65,9 @@ export function createUnitControls(
   );
   listen(controls.stop, input.stop);
   listen(controls.clearSelection, () => input.select(undefined));
+  // Camera actions stay available for inspection after the mission halts.
+  listen(controls.focusSelection, () => options.focus?.(), false);
+  listen(controls.followSelection, () => options.toggleFollow?.(), false);
   return {
     /** Reports this tick's move receipts and returns their overall status. */
     onOutcomes: (

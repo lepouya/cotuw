@@ -287,7 +287,8 @@ story.
   The primary click's default comes first and is highlighted: Attack for
   detected hostiles with movers selected, Select and Add to or Remove from group
   for actors, Move with Attack Move for ground, and Clear selection when nothing
-  selected can move or commands wait for resuming. Move reads Gather on a
+  selected can move or commands wait for resuming. Actor targets end with
+  Focus, and Follow for mobile actors. Move reads Gather on a
   Materials site for a selected Harvester and Collect on salvage; in a mixed
   group, Harvesters gather while the other units move there. An action, Escape,
   or a press outside closes it. A world press that closes it issues no command,
@@ -317,7 +318,23 @@ story.
   requested point, the requested point uses a distinct blocked marker. A
   rejected move order briefly shows the same marker at its target.
 - The camera provides orthographic Isometric, Top-down, Grid, and Reset View
-  presets. Preset and focus changes ease unless reduced motion is enabled.
+  presets. Isometric faces the nearest diagonal and Grid the nearest cardinal
+  direction at the default pitch, breaking ties toward Rotate right. Top-down
+  looks straight down with north up. Reset View restores the default pitch and
+  heading. Presets keep the focal point and zoom.
+- A View button beside the camera cluster opens the presets and closes after
+  one is chosen, an outside press, or moving focus elsewhere. Escape closes
+  this popup before acting on the world selection. Rotate left and right turn
+  a quarter turn between the active preset's headings, or by 22.5 degrees
+  without one. Manual rotation or tilt leaves the preset.
+- Preset, focus, and rotation changes ease over 0.3 seconds unless reduced
+  motion is enabled; conflicting rotation or tilt input interrupts them.
+- Focus glides to the selection's center. Follow keeps easing toward the
+  center of the mobile actors it started with. Panning, another focus, or
+  Escape ends Follow, and Escape ends a focus glide or Follow before clearing
+  selection; zoom, rotation, and presets do not end it. Follow ends where
+  its actors were last shown once all are gone or undetected. The sidebar's
+  selection controls and the radial menu on actors offer both.
 - Initial and reset views look 22.5 degrees east of north (NNE).
 - Camera zoom is measured in visible tile rows so framing is independent of map
   and tile size. New views show roughly 24 rows or fit a smaller map; resizing

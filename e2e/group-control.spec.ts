@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TOUCH_PROFILES } from "./profiles";
 import { terrainPoint, trainTestUnits } from "./prototype-helpers";
 import type { Page } from "@playwright/test";
 
@@ -201,74 +202,77 @@ test("cancelled drags never select or move units", async ({ page }) => {
   );
 });
 
-test("compact touch controls support additive and box selection, movement, and camera actions", async ({
-  browser,
-}, testInfo) => {
-  const context = await browser.newContext({
-    viewport: { width: 844, height: 390 },
-    hasTouch: true,
-  });
-  const page = await context.newPage();
-  try {
-    await page.goto("/?level=sandbox");
-    // Use the same on-screen production controls without secondary clicks.
-    await page.locator("#build-barracks").tap();
-    const building = await terrainPoint(page, 49, 39);
-    await page.touchscreen.tap(building.x, building.y);
-    await page.locator("#confirm-building").tap();
-    for (const unit of ["trooper", "scout", "trooper"])
-      await page.locator(`#train-${unit}`).tap();
-    await expect(page.locator("#unit-roster button")).toHaveCount(3);
-    await page.locator("#unit-roster button").first().tap();
-    await page.locator("#add-selection").tap();
-    await page.locator("#tab-units").tap();
-    await page.locator("#unit-roster button").nth(1).tap();
-    await expect.poll(async () => (await selected(page)).length).toBe(2);
-    await page.locator("#add-selection").tap();
-    await page.locator("#box-select").tap();
-    const bounds = await groupBounds(page);
-    const before = await cameraPose(page);
-    await touchDrag(
-      page,
-      { x: bounds.left, y: bounds.top },
-      { x: bounds.right, y: bounds.bottom },
-    );
-    await expect.poll(async () => (await selected(page)).length).toBe(3);
-    expect(await cameraPose(page)).toEqual(before);
-    await page.locator("#box-select").tap();
-    // Keep the destination clear of the units' projected silhouettes.
-    const destination = await terrainPoint(page, 54, 49);
-    await page.touchscreen.tap(destination.x, destination.y);
-    await expect(page.locator("#movement-status")).toHaveText(
-      "3 move orders accepted.",
-    );
-    await page.locator("#stop-units").tap();
-    await expect(page.locator("#movement-status")).toHaveText(
-      "Selected units stopped.",
-    );
-    for (const label of [
-      "Pan camera left",
-      "Rotate camera right",
-      "Zoom camera in",
-      "Tilt camera up",
-    ]) {
-      const pose = await cameraPose(page);
-      await page.getByRole("button", { name: label, exact: true }).tap();
-      await expect.poll(() => cameraPose(page)).not.toEqual(pose);
-    }
-    await page.getByRole("button", { name: "Reset camera view" }).tap();
-    await expect.poll(() => cameraPose(page)).toEqual(before);
-    // A press on a unit selects instead of panning, so start in a corner.
-    const canvas = (await page.locator("#game-canvas").boundingBox())!;
-    const empty = { x: canvas.x + 40, y: canvas.y + 40 };
-    await touchDrag(page, empty, { x: empty.x + 50, y: empty.y + 15 });
-    await expect.poll(() => cameraPose(page)).not.toEqual(before);
-    await expect.poll(async () => (await selected(page)).length).toBe(3);
-    await testInfo.attach("group-touch", {
-      body: await page.screenshot(),
-      contentType: "image/png",
+for (const profile of TOUCH_PROFILES)
+  test(`${profile.name} touch controls support additive and box selection, movement, and camera actions`, async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      viewport: profile.viewport,
+      hasTouch: true,
     });
-  } finally {
-    await context.close();
-  }
-});
+    const page = await context.newPage();
+    try {
+      await page.goto("/?level=sandbox");
+      // Use the same on-screen production controls without secondary clicks.
+      await page.locator("#build-barracks").tap();
+      const building = await terrainPoint(page, 49, 39);
+      await page.touchscreen.tap(building.x, building.y);
+      await page.locator("#confirm-building").tap();
+      for (const unit of ["trooper", "scout", "trooper"])
+        await page.locator(`#train-${unit}`).tap();
+      await expect(page.locator("#unit-roster button")).toHaveCount(3);
+      await page.locator("#unit-roster button").first().tap();
+      await page.locator("#add-selection").tap();
+      await page.locator("#tab-units").tap();
+      await page.locator("#unit-roster button").nth(1).tap();
+      await expect.poll(async () => (await selected(page)).length).toBe(2);
+      await page.locator("#add-selection").tap();
+      await page.locator("#box-select").tap();
+      const bounds = await groupBounds(page);
+      const before = await cameraPose(page);
+      await touchDrag(
+        page,
+        { x: bounds.left, y: bounds.top },
+        { x: bounds.right, y: bounds.bottom },
+      );
+      await expect.poll(async () => (await selected(page)).length).toBe(3);
+      expect(await cameraPose(page)).toEqual(before);
+      await page.locator("#box-select").tap();
+      // Keep the destination clear of the units' projected silhouettes.
+      const destination = await terrainPoint(page, 54, 49);
+      await page.touchscreen.tap(destination.x, destination.y);
+      await expect(page.locator("#movement-status")).toHaveText(
+        "3 move orders accepted.",
+      );
+      await page.locator("#stop-units").tap();
+      await expect(page.locator("#movement-status")).toHaveText(
+        "Selected units stopped.",
+      );
+      const press = async (labels: readonly string[]) => {
+        for (const label of labels) {
+          const pose = await cameraPose(page);
+          await page.getByRole("button", { name: label, exact: true }).tap();
+          await expect.poll(() => cameraPose(page)).not.toEqual(pose);
+        }
+      };
+      await press(["Rotate camera right", "Tilt camera up"]);
+      // Reset View restores the heading and keeps the focal point and zoom.
+      await page.getByRole("button", { name: "Camera views" }).tap();
+      await page.getByRole("button", { name: "Reset camera view" }).tap();
+      await expect.poll(() => cameraPose(page)).toEqual(before);
+      await press(["Pan camera left", "Zoom camera in"]);
+      const moved = await cameraPose(page);
+      // A press on a unit selects instead of panning, so start in a corner.
+      const canvas = (await page.locator("#game-canvas").boundingBox())!;
+      const empty = { x: canvas.x + 40, y: canvas.y + 40 };
+      await touchDrag(page, empty, { x: empty.x + 50, y: empty.y + 15 });
+      await expect.poll(() => cameraPose(page)).not.toEqual(moved);
+      await expect.poll(async () => (await selected(page)).length).toBe(3);
+      await testInfo.attach(`group-${profile.name}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+    } finally {
+      await context.close();
+    }
+  });

@@ -113,8 +113,8 @@ the mission and offers **Continue free play**, Restart, Load, and Exit.
 Continuing restores construction, training, and exploration. Objective
 progress and victory survive saving and loading.
 
-Open `/?level=sandbox` for the empty, free construction and infantry sandbox. Use
-**Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
+Open `/?level=sandbox` for the empty, free construction and infantry sandbox.
+Use **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
 rotate and **Cancel** or `Esc` to exit placement. A yellow preview arrow marks
 the preferred unit exit; blocked exits can use another side. Touch uses a
 terrain tap followed by **Place building**. Construction and training in this
@@ -136,6 +136,10 @@ With the world focused, hold `Space` and primary-drag to pan temporarily, or
 hold the arrow keys to pan continuously. Secondary drag also pans;
 Shift-secondary drag rotates. Touch drags on empty terrain pan when Box select
 is off. Camera pan, rotation, zoom, and reset also have on-screen buttons.
+**View** offers Isometric, Top-down, Grid, and Reset View while keeping the
+current focus and zoom. **Focus** centers the selection; **Follow** tracks the
+mobile actors it starts with until panning, another focus, or `Esc`. Reduced
+motion makes focus and view changes immediate.
 
 Rest the mouse cursor near an edge of the world view to pan without clicking;
 corners pan diagonally. This preserves selection and stops while dragging or
