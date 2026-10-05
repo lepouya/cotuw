@@ -27,11 +27,13 @@ async function controlledOpening(
     );
   });
   // The harness owns one session and its controls on the production HTML.
-  await page.route("**/src/main.ts", (route) =>
-    route.fulfill({
-      contentType: "text/javascript",
-      body: 'import "/src/styles.css";',
-    }),
+  await page.route(
+    (url) => url.pathname === "/src/main.ts",
+    (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: 'import "/src/styles.css";',
+      }),
   );
   await page.goto("/");
   const hiddenUnitsAtLoad = await page.evaluate(

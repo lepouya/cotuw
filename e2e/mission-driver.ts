@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
-import { terrainPoint } from "./prototype-helpers";
+import { activate, terrainPoint } from "./prototype-helpers";
 
 declare global {
   interface Window {
@@ -83,8 +83,7 @@ export class MissionDriver {
   }
 
   private async activate(locator: Locator) {
-    if (this.touch) await locator.tap();
-    else await locator.click();
+    await activate(locator, this.touch);
     await this.advance(0.05);
   }
 
