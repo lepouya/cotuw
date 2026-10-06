@@ -36,6 +36,10 @@ can be read, edited by hand, and loaded again.
     that building, or `{ "kind": "actor", "definitionId": ... }` once the
     player owns a completed actor of it. Placement triggers require an actor
     definition with a footprint.
+  - `flocks` lists ambient birds, each with a world `center`, loop `radius`,
+    `altitude` above the highest terrain under the loop, bird `count`, and
+    `lapSeconds`. Radius, altitude, and lap time must be positive; count is a
+    non-negative integer. They are presentation only.
   - `tileSize`, `terrainTypeIds`, and `objectives` define the map scale, valid
     terrain types, and victory and defeat rules.
 - `state` holds the complete simulation state. `state.scenarioId` must match

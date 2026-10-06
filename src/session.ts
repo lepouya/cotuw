@@ -18,6 +18,12 @@ import { createEconomyControls } from "./ui/economy-controls";
 import { createMaterialsSitesView } from "./render/materials-sites";
 import { createHealthBarView } from "./render/health-bars";
 import { createCombatEffectsView } from "./render/combat-effects";
+import {
+  createDamageEffectsView,
+  damageSeverity,
+} from "./render/damage-effects";
+import type { DamagedActor } from "./render/damage-effects";
+import { createAmbientBirdsView } from "./render/ambient-birds";
 import { createWreckView } from "./render/wrecks";
 import {
   createFrameEffectsView,
@@ -344,6 +350,7 @@ export async function createGameSession(
     map,
     definitions,
     buildingAppearances,
+    { reducedMotion: () => reducedMotion.matches },
   );
   const networkView = createSupportNetworkView(view.scene, map);
   const disconnected = () => disconnectedBuildings(simulation.support);
@@ -372,9 +379,41 @@ export async function createGameSession(
   const combatEffects = createCombatEffectsView(view.scene, map, (style) =>
     propAssets.get(style),
   );
+  const damageEffects = createDamageEffectsView(
+    view.scene,
+    (prop) => propAssets.get(prop),
+    () => reducedMotion.matches,
+  );
+  const birds = createAmbientBirdsView(map, mission.scenario.flocks ?? [], {
+    bird: () => propAssets.get("bird"),
+    explored,
+    reducedMotion: () => reducedMotion.matches,
+  });
+  const buildingModelTops = new Map<string, number>();
   const wreckView = createWreckView(view.scene, map, {
     appearanceFor: (id) => appearances.get(id),
     rubble: () => propAssets.get("rubble"),
+    reducedMotion: () => reducedMotion.matches,
+    topHeightFor: (wreck) => {
+      const drawn = tilePlacedViews.topHeight(wreck.actorId);
+      if (drawn !== undefined) return drawn;
+      const appearance = buildingAppearances.get(wreck.definitionId);
+      if (!appearance || !wreck.tilePlacement) return undefined;
+      const tiles = wreckTiles(wreck, definitionsById.get(wreck.definitionId)!);
+      const roof = Math.max(
+        ...tiles.flatMap(({ x, z }) => [
+          map.heightAt(x, z),
+          map.heightAt(x + 1, z),
+          map.heightAt(x, z + 1),
+          map.heightAt(x + 1, z + 1),
+        ]),
+      );
+      return (
+        roof +
+        appearance.height +
+        (buildingModelTops.get(wreck.definitionId) ?? 1) * map.tileSize
+      );
+    },
     tilesFor: (wreck) =>
       wreckTiles(wreck, definitionsById.get(wreck.definitionId)!),
   });
@@ -857,13 +896,24 @@ export async function createGameSession(
   let pickupSeconds = 0;
   let previousFrameTime = performance.now();
   let knownActorVersion = simulation.actorVersion;
-  /** Selected actors and those in recent combat show health bars. */
-  const updateHealthBars = () => {
+  let knownWreckActorVersion = simulation.actorVersion;
+  /**
+   * Selected actors and those in recent combat show health bars; damaged
+   * actors whose presentation names a damage effect show it.
+   */
+  const updateHealth = (frameSeconds: number) => {
     const selected = new Set(input.selectedActorIds);
     const bars: HealthBar[] = [];
+    const damaged: DamagedActor[] = [];
     for (const actor of simulation.actors) {
       const maximum = definitionsById.get(actor.definitionId)?.health;
       if (!maximum || !player.shows(actor)) continue;
+      const fraction = (actor.health ?? maximum) / maximum;
+      const placed = isTilePlacedActor(actor);
+      const worldPosition = placed
+        ? actor.worldPosition
+        : (actorViews.groundPosition(actor.id) ?? actor.worldPosition);
+      const bounds = appearances.get(actor.definitionId)?.bounds;
       const activeTick = actor.combat?.activeTick;
       const opacity = healthBarOpacity(
         selected.has(actor.id),
@@ -871,23 +921,38 @@ export async function createGameSession(
           ? Infinity
           : (simulation.completedTicks - activeTick) * simulation.tickSeconds,
       );
-      if (opacity === 0) continue;
-      const placed = isTilePlacedActor(actor);
-      bars.push({
-        actorId: actor.id,
-        worldPosition: placed
-          ? actor.worldPosition
-          : (actorViews.groundPosition(actor.id) ?? actor.worldPosition),
+      if (opacity > 0)
+        bars.push({
+          actorId: actor.id,
+          worldPosition,
+          height: placed
+            ? BUILDING_BAR_HEIGHT
+            : (bounds?.height ?? 1) + UNIT_BAR_CLEARANCE,
+          width: placed ? 2 : 0.9,
+          fraction,
+          opacity,
+        });
+      const style = presentationOf(actor.definitionId)?.damageEffect;
+      const severity = damageSeverity(fraction);
+      if (!style || !severity) continue;
+      const { x, z } = worldPosition;
+      const ground = map.heightAtWorldPosition(x, z);
+      const footprint = definitionsById.get(actor.definitionId)?.footprint;
+      damaged.push({
+        id: actor.id,
+        style,
+        severity,
+        position: new Vector3(x, ground, z),
         height: placed
-          ? BUILDING_BAR_HEIGHT
-          : (appearances.get(actor.definitionId)?.bounds.height ?? 1) +
-            UNIT_BAR_CLEARANCE,
-        width: placed ? 2 : 0.9,
-        fraction: (actor.health ?? maximum) / maximum,
-        opacity,
+          ? (tilePlacedViews.topHeight(actor.id) ?? ground + 1) - ground
+          : (bounds?.height ?? 1),
+        radius: footprint
+          ? (Math.sqrt(footprint.occupiedTiles.length) * map.tileSize) / 2
+          : (bounds?.radius ?? 0.5),
       });
     }
     healthBars.update(bars);
+    damageEffects.update(damaged, frameSeconds);
   };
   let knownSelectionTick = simulation.completedTicks;
 
@@ -933,6 +998,14 @@ export async function createGameSession(
       canvas.dataset.simulationFault = "true";
     },
     afterTick: (outcomes) => {
+      // Capture a destroyed building's height before its view leaves.
+      if (simulation.actorVersion !== knownWreckActorVersion) {
+        updateWrecks(0);
+        knownWreckActorVersion = simulation.actorVersion;
+      }
+      // Completion and activity can share a tick; pose the committed building.
+      if (simulation.buildingActivity.length)
+        tilePlacedViews.update(actorsByKind().placed, disconnected());
       const markedTargets = new Set<string>();
       for (const hit of simulation.attacks) {
         const style = presentationOf(hit.attackerDefinitionId)?.attackEffect;
@@ -945,6 +1018,11 @@ export async function createGameSession(
         const attacker = simulation.actorById(hit.attackerId);
         if (attacker && player.shows(attacker))
           actorViews.play(hit.attackerId, "attack");
+      }
+      for (const { buildingId, kind } of simulation.buildingActivity) {
+        const building = simulation.actorById(buildingId);
+        if (building && player.shows(building))
+          tilePlacedViews.play(buildingId, kind);
       }
       minimap.refreshActors();
       const alerts = observeAlerts();
@@ -1039,12 +1117,13 @@ export async function createGameSession(
       idleSeconds += frameSeconds;
     }
     if (!reducedMotion.matches) pickupSeconds += frameSeconds;
-    tilePlacedViews.animate(idleSeconds);
+    tilePlacedViews.animate(idleSeconds, frameSeconds);
     materialsView?.animate(pickupSeconds);
     const { shownMobile } = actorsByKind();
     combatEffects.update(frameSeconds);
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
+    birds.update(frameSeconds);
     actorViews.update(
       shownMobile,
       loop.tickProgress(),
@@ -1063,7 +1142,7 @@ export async function createGameSession(
         return actor && player.owns(actor) ? [actor] : [];
       }),
     );
-    updateHealthBars();
+    updateHealth(frameSeconds);
     const ownIds = actorsByKind().ownIds;
     networkView.update(
       simulation.support && {
@@ -1102,6 +1181,8 @@ export async function createGameSession(
     fogOverlay.dispose();
     healthBars.dispose();
     combatEffects.dispose();
+    damageEffects.dispose();
+    birds.dispose();
     frameEffects.dispose();
     wreckView.dispose();
     economyControls?.dispose();
@@ -1217,6 +1298,8 @@ export async function createGameSession(
   const propLoaded: Partial<Record<PropId, (asset: ModelAsset) => void>> = {
     foundation: (asset) =>
       setBuildings([...buildingAppearances.keys()], { foundation: asset }),
+    scaffold: (asset) =>
+      setBuildings([...buildingAppearances.keys()], { scaffold: asset }),
     "materials-mound": (asset) => materialsView?.setMound(asset),
     salvage: (asset) => materialsView?.setSalvage(asset),
   };
@@ -1260,11 +1343,13 @@ export async function createGameSession(
       const graphics = presentationOf(id)?.building?.glb;
       return graphics
         ? [
-            loadModel(`Building ${id}`, graphics, (asset) =>
+            loadModel(`Building ${id}`, graphics, (asset) => {
+              if (asset.topHeight !== undefined)
+                buildingModelTops.set(id, asset.topHeight);
               setBuildings([id], {
                 createDetails: modelBuildingDetails(asset),
-              }),
-            ),
+              });
+            }),
           ]
         : [];
     }),

@@ -297,6 +297,7 @@
         "label": "Train Trooper"
       },
       "attackEffect": "tracer",
+      "damageEffect": "biological",
       "model": {
         "glb": {
           "url": "/assets/actors/arc-trooper.glb",
@@ -334,6 +335,7 @@
         "id": "train-scout",
         "label": "Train Scout"
       },
+      "damageEffect": "biological",
       "model": {
         "glb": {
           "url": "/assets/actors/arc-scout.glb",
@@ -362,6 +364,7 @@
         "id": "build-command-center",
         "label": "Place Command Center"
       },
+      "damageEffect": "mechanical",
       "building": {
         "height": 0.3,
         "color": [0.28, 0.38, 0.42],
@@ -379,13 +382,17 @@
         "id": "build-barracks",
         "label": "Build Field Barracks"
       },
+      "damageEffect": "mechanical",
       "building": {
         "height": 0.25,
         "color": [0.28, 0.34, 0.26],
         "minimapColor": [0.65, 0.72, 0.32],
         "glb": {
           "url": "/assets/models/barracks.glb",
-          "idle": "idle"
+          "idle": "idle",
+          "activities": {
+            "exit": "exit"
+          }
         }
       }
     },
@@ -396,13 +403,18 @@
         "id": "build-refinery",
         "label": "Build Materials Refinery"
       },
+      "damageEffect": "mechanical",
       "building": {
         "height": 0.45,
         "color": [0.45, 0.38, 0.22],
         "minimapColor": [0.85, 0.65, 0.2],
         "glb": {
           "url": "/assets/models/refinery.glb",
-          "idle": "idle"
+          "idle": "idle",
+          "activities": {
+            "exit": "exit",
+            "delivery": "delivery"
+          }
         }
       }
     },
@@ -413,6 +425,7 @@
         "id": "train-harvester",
         "label": "Produce Harvester"
       },
+      "damageEffect": "mechanical",
       "model": {
         "glb": {
           "url": "/assets/models/harvester.glb",
@@ -436,6 +449,7 @@
       "name": "Wolf",
       "description": "Hostile wildlife",
       "attackEffect": "bite",
+      "damageEffect": "biological",
       "model": {
         "glb": {
           "url": "/assets/models/wolf.glb",
@@ -459,6 +473,7 @@
       "name": "Alpha wolf",
       "description": "Pack leader",
       "attackEffect": "bite",
+      "damageEffect": "biological",
       "model": {
         "glb": {
           "url": "/assets/models/wolf.glb",
@@ -761,6 +776,9 @@
     "foundation": {
       "url": "/assets/models/foundation.glb"
     },
+    "scaffold": {
+      "url": "/assets/models/scaffold.glb"
+    },
     "rubble": {
       "url": "/assets/models/rubble.glb"
     },
@@ -776,6 +794,20 @@
     },
     "bite": {
       "url": "/assets/models/bite.glb"
+    },
+    "smoke": {
+      "url": "/assets/models/smoke.glb"
+    },
+    "fire": {
+      "url": "/assets/models/fire.glb",
+      "idle": "flicker"
+    },
+    "wound": {
+      "url": "/assets/models/wound.glb"
+    },
+    "bird": {
+      "url": "/assets/models/bird.glb",
+      "idle": "flap"
     }
   }
 }

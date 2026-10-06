@@ -3,6 +3,7 @@ import {
   isCount,
   isId,
   isIdList,
+  isOneOf,
   isPositive,
   isRecord,
 } from "../simulation/validation";
@@ -16,11 +17,14 @@ import { validateActorGraphics } from "../render/skinned-actor-appearance";
 import { validateModelGraphics } from "../render/glb-model";
 import type { ModelGraphics } from "../render/glb-model";
 import { validateFrameEffects } from "../render/frame-effects";
+import { DAMAGE_EFFECT_STYLES } from "../render/damage-effects";
+import { ATTACK_EFFECT_STYLES } from "../render/combat-effects";
 import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
 import type { MovementProfile } from "../simulation/navigation";
 import type { AttackEffectStyle } from "../render/combat-effects";
+import type { DamageEffectStyle } from "../render/damage-effects";
 import type { FrameEffects } from "../render/frame-effects";
 import type { Rgb } from "../render/color";
 import type { TerrainStyle } from "../render/terrain-style";
@@ -44,6 +48,8 @@ export type ActorPresentation = {
   build?: { id: string; label: string };
   train?: { id: string; label: string };
   attackEffect?: AttackEffectStyle;
+  /** How damage shows once health drops; absent shows none. */
+  damageEffect?: DamageEffectStyle;
   model?: ActorModel;
   frameEffects?: FrameEffects;
   building?: {
@@ -70,11 +76,16 @@ export type ViewStyle = {
 
 export const PROP_IDS = [
   "foundation",
+  "scaffold",
   "rubble",
   "materials-mound",
   "salvage",
   "tracer",
   "bite",
+  "smoke",
+  "fire",
+  "wound",
+  "bird",
 ] as const;
 
 export type PropId = (typeof PROP_IDS)[number];
@@ -87,7 +98,10 @@ export type ContentPack = ContentReference & {
   presentation: Readonly<Record<string, ActorPresentation>>;
   /** Sprite-sheet frame sequences that textures name by ID. */
   clips?: Readonly<Record<string, TextureClip>>;
-  /** Shared meshes for terrain foundations, resources, salvage, and debris. */
+  /**
+   * Shared meshes for foundations, scaffolds, resources, salvage, debris,
+   * weapon and damage effects, and ambient birds.
+   */
   props?: Partial<Record<PropId, ModelGraphics>>;
   terrain: TerrainStyle;
   view: ViewStyle;
@@ -169,9 +183,14 @@ export function parseContentPack(source: string): ContentPack {
     }
     if (
       presentation.attackEffect !== undefined &&
-      !["tracer", "bite"].includes(presentation.attackEffect)
+      !isOneOf(ATTACK_EFFECT_STYLES, presentation.attackEffect)
     )
       throw invalid(`gives ${actor.id} an unknown attack effect`);
+    if (
+      presentation.damageEffect !== undefined &&
+      !isOneOf(DAMAGE_EFFECT_STYLES, presentation.damageEffect)
+    )
+      throw invalid(`gives ${actor.id} an unknown damage effect`);
     const model = presentation.model;
     if (model !== undefined) {
       if (!isRecord(model)) throw invalid(`gives ${actor.id} an invalid model`);
@@ -238,8 +257,7 @@ export function parseContentPack(source: string): ContentPack {
   if (pack.props !== undefined && !isRecord(pack.props))
     throw invalid("needs props keyed by ID");
   for (const [id, graphics] of Object.entries(pack.props ?? {})) {
-    if (!(PROP_IDS as readonly string[]).includes(id))
-      throw invalid(`has an unknown prop ${id}`);
+    if (!isOneOf(PROP_IDS, id)) throw invalid(`has an unknown prop ${id}`);
     validateModelGraphics(graphics);
   }
   validateTerrainStyle(pack.terrain, pack.clips ?? {}, invalid);

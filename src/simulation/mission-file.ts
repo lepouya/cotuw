@@ -4,6 +4,8 @@ import { isTerrainTileShape } from "./terrain";
 import { isCount, isId, isIdList, isPositive, isRecord } from "./validation";
 
 import type { TerrainState, TerrainTile } from "./terrain";
+import { isFinitePosition } from "./world";
+import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
 export const MISSION_FILE_VERSION = 8;
@@ -38,6 +40,16 @@ export type ScenarioPopup = {
   trigger: { kind: "placement" | "actor"; definitionId: string };
 };
 
+/** Ambient birds circling a world point; presentation only. */
+export type BirdFlock = {
+  center: WorldPosition;
+  radius: number;
+  /** Height above the highest terrain under the loop. */
+  altitude: number;
+  count: number;
+  lapSeconds: number;
+};
+
 /** Authored content that stays fixed during a mission and travels with it. */
 export type MissionScenario = {
   readonly id: string;
@@ -52,6 +64,7 @@ export type MissionScenario = {
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
   readonly popups?: readonly ScenarioPopup[];
+  readonly flocks?: readonly BirdFlock[];
 };
 
 export type SaveInfo = { name: string; savedAt: string };
@@ -108,6 +121,7 @@ export function serializeMission(
     briefing,
     goals,
     popups,
+    flocks,
   } = scenario;
   return formatJson({
     format: FORMAT,
@@ -125,6 +139,7 @@ export function serializeMission(
       briefing,
       goals,
       popups,
+      flocks,
     },
     state: {
       ...state,
@@ -239,6 +254,22 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
   )
     throw new RangeError(
       "Dismissed popups must be distinct IDs of the scenario's popups.",
+    );
+  if (
+    scenario.flocks !== undefined &&
+    (!Array.isArray(scenario.flocks) ||
+      scenario.flocks.some(
+        (flock) =>
+          !isRecord(flock) ||
+          !isFinitePosition(flock.center) ||
+          !isPositive(flock.radius) ||
+          !isPositive(flock.altitude) ||
+          !isCount(flock.count) ||
+          !isPositive(flock.lapSeconds),
+      ))
+  )
+    throw new RangeError(
+      "Scenario flocks need a center, radius, altitude, count, and lap time.",
     );
   if (scenario.objectives !== undefined && !Array.isArray(scenario.objectives))
     throw new RangeError("Scenario objectives must be a list.");

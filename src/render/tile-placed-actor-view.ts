@@ -1,7 +1,6 @@
 import {
   Color3,
   MeshBuilder,
-  PBRMaterial,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -14,7 +13,9 @@ import { createViewRegistry } from "./view-registry";
 import { isRgb } from "./color";
 import { createFootprintOverlay } from "./footprint-overlay";
 import { createScreenBar } from "./screen-bar";
-import { unitCubeInstance } from "./glb-model";
+import { constructionStage, stageBlueprint } from "./construction-stage";
+import { createMaterialCopies } from "./material-copies";
+import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
@@ -22,7 +23,7 @@ import type { ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
 import type { BuildingActivityKind } from "../simulation/production";
 import type { Rgb } from "./color";
-import type { ModelAsset } from "./glb-model";
+import type { ModelAsset, ModelInstance } from "./glb-model";
 
 /** Gap left on footprint sides that face unoccupied tiles. */
 const EDGE_INSET_TILES = 0.06;
@@ -76,6 +77,8 @@ export type TilePlacedActorAppearance = {
   minimapColor?: Rgb;
   createDetails?: TilePlacedActorDetailsFactory;
   foundation?: ModelAsset;
+  /** A unit-cube frame that construction stages scale around the footprint. */
+  scaffold?: ModelAsset;
 };
 
 export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
@@ -88,7 +91,15 @@ export type TilePlacedActorViewRegistry = {
     actors: readonly TilePlacedActorState[],
     disconnected?: ReadonlySet<string>,
   ) => void;
-  animate: (elapsedSeconds: number) => void;
+  /**
+   * Poses idle motion at `elapsedSeconds` and advances activities by
+   * `frameSeconds` of real time.
+   */
+  animate: (elapsedSeconds: number, frameSeconds?: number) => void;
+  /** Starts an activity's motion unless motion is reduced. */
+  play: (actorId: string, kind: BuildingActivityKind) => void;
+  /** The world height of a drawn building's highest point. */
+  topHeight: (actorId: string) => number | undefined;
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   setSelectedActor: (actorId: string | undefined) => void;
   dispose: () => void;
@@ -103,7 +114,10 @@ export function createTilePlacedActorViewRegistry(
   map: TerrainMap,
   definitions: readonly ActorDefinition[],
   appearances: TilePlacedActorAppearanceCatalog,
-  { preview = false }: { preview?: boolean } = {},
+  {
+    preview = false,
+    reducedMotion = () => false,
+  }: { preview?: boolean; reducedMotion?: () => boolean } = {},
 ): TilePlacedActorViewRegistry {
   for (const [definitionId, appearance] of appearances) {
     if (
@@ -130,6 +144,11 @@ export function createTilePlacedActorViewRegistry(
   const terrainRevisions = new Map<string, number>();
   let terrainRevision = 0;
   let terrainDirty = false;
+  // Keep activity time when terrain or loaded art replaces a view.
+  const playing = new Map<
+    string,
+    { kind: BuildingActivityKind; seconds: number }
+  >();
   const terrainObserver = map.onChangedObservable.add((bounds) => {
     terrainRevision += 1;
     for (const actor of actors) {
@@ -227,7 +246,7 @@ export function createTilePlacedActorViewRegistry(
     const roof =
       Math.max(...tiles.flatMap(cornerHeights)) +
       (appearances.get(definition.id)?.height ?? DEFAULT_HEIGHT);
-    const foundations: { dispose: () => void }[] = [];
+    const foundations: ModelInstance[] = [];
     for (const tile of tiles) {
       const inset = (dx: number, dz: number) =>
         occupied.has(tileKey({ x: tile.x + dx, z: tile.z + dz }))
@@ -260,7 +279,8 @@ export function createTilePlacedActorViewRegistry(
       );
     }
     const { worldPosition, facing } = tilePlacedPose(map, actor, definition);
-    const details = appearances.get(definition.id)?.createDetails?.(
+    const appearance = appearances.get(definition.id);
+    const details = appearance?.createDetails?.(
       root,
       {
         center: new Vector3(worldPosition.x, roof, worldPosition.z),
@@ -280,35 +300,40 @@ export function createTilePlacedActorViewRegistry(
       preview && definition.production
         ? createProductionExitMarker(scene, map, root, tiles, facing)
         : undefined;
-    // The view key includes construction, so completion rebuilds the view.
+    const top = root.getHierarchyBoundingVectors(true).max.y;
+    // The view key includes the construction stage, so each stage rebuilds.
     const disconnected = !preview && disconnectedIds.has(actor.id);
     const constructing = !preview && actor.construction !== undefined;
-    if (constructing)
+    const materials = createMaterialCopies(root.name);
+    let scaffold: ModelInstance | undefined;
+    if (constructing) {
       for (const mesh of root.getChildMeshes()) mesh.visibility = 0.45;
-    const offlineMaterials = new Map<
-      StandardMaterial | PBRMaterial,
-      StandardMaterial | PBRMaterial
-    >();
+      const foundationMeshes = new Set(
+        foundations.flatMap(({ root }) => hierarchyMeshes(root)),
+      );
+      scaffold = stageBlueprint(
+        {
+          root,
+          parts: root
+            .getChildMeshes()
+            .filter((mesh) => !foundationMeshes.has(mesh)),
+          tiles,
+          roof,
+          top,
+        },
+        constructionStage(actor.construction!),
+        map,
+        materials,
+        appearance?.scaffold,
+      );
+    }
     if (disconnected)
-      for (const mesh of root.getChildMeshes()) {
-        if (!(
-          mesh.material instanceof StandardMaterial ||
-          mesh.material instanceof PBRMaterial
-        ))
-          continue;
-        let dimmed = offlineMaterials.get(mesh.material);
-        if (!dimmed) {
-          dimmed = mesh.material.clone(
-            `${root.name}-offline-${mesh.material.name}`,
-          );
-          if (dimmed instanceof StandardMaterial)
-            dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
-          else dimmed.albedoColor = dimmed.albedoColor.scale(0.35);
-          dimmed.emissiveColor = Color3.Black();
-          offlineMaterials.set(mesh.material, dimmed);
-        }
-        mesh.material = dimmed;
-      }
+      materials.edit(root.getChildMeshes(), "offline", (dimmed) => {
+        if (dimmed instanceof StandardMaterial)
+          dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
+        else dimmed.albedoColor = dimmed.albedoColor.scale(0.35);
+        dimmed.emissiveColor = Color3.Black();
+      });
     if (disconnected) {
       const badge = MeshBuilder.CreateLineSystem(
         `${root.name}-offline`,
@@ -355,8 +380,11 @@ export function createTilePlacedActorViewRegistry(
       });
       progress = { bar, fill };
     }
+    const active = !constructing && !disconnected;
+    if (!active) playing.delete(actor.id);
     return {
       root,
+      top,
       update: ({ construction }: TilePlacedActorState) => {
         if (!progress || !construction) return;
         progress.bar.setFill(
@@ -364,14 +392,37 @@ export function createTilePlacedActorViewRegistry(
           progress.fill,
         );
       },
-      animate: (seconds: number) =>
-        details?.update(constructing || disconnected ? 0 : seconds),
+      animate: (seconds: number, frameSeconds: number) => {
+        details?.update(active ? seconds : 0);
+        const activity = playing.get(actor.id);
+        if (!activity) return;
+        const motion = details?.activities?.[activity.kind];
+        if (!motion) {
+          playing.delete(actor.id);
+          return;
+        }
+        activity.seconds += frameSeconds;
+        if (reducedMotion()) activity.seconds = motion.seconds;
+        motion.pose(Math.min(activity.seconds, motion.seconds));
+        if (activity.seconds >= motion.seconds) playing.delete(actor.id);
+      },
+      play: (kind: BuildingActivityKind) => {
+        const motion = details?.activities?.[kind];
+        if (!motion || !active || reducedMotion()) return;
+        // A new activity replaces one in progress.
+        const previous = playing.get(actor.id);
+        const previousMotion = previous && details?.activities?.[previous.kind];
+        previousMotion?.pose(previousMotion.seconds);
+        motion.pose(0);
+        playing.set(actor.id, { kind, seconds: 0 });
+      },
       dispose: () => {
         details?.dispose();
         exit?.dispose();
+        scaffold?.dispose();
         for (const foundation of foundations) foundation.dispose();
         root.dispose();
-        for (const material of offlineMaterials.values()) material.dispose();
+        materials.dispose();
       },
     };
   };
@@ -384,10 +435,11 @@ export function createTilePlacedActorViewRegistry(
       construction,
     }: TilePlacedActorState) => ({
       appearance: appearances.get(definitionId),
+      placement: JSON.stringify([definitionId, tilePlacement]),
       key: JSON.stringify([
         definitionId,
         tilePlacement,
-        !!construction,
+        construction && constructionStage(construction),
         disconnectedIds.has(id),
         map.navigationChanges.generation,
         terrainRevisions.get(id),
@@ -395,6 +447,10 @@ export function createTilePlacedActorViewRegistry(
     }),
     sameKey: (left, right) =>
       left.appearance === right.appearance && left.key === right.key,
+    onRemove: (id) => playing.delete(id),
+    onReplace: (id, previous, next) => {
+      if (previous.placement !== next.placement) playing.delete(id);
+    },
     create,
   });
 
@@ -414,10 +470,12 @@ export function createTilePlacedActorViewRegistry(
   };
   return {
     update,
-    animate: (seconds) => {
+    animate: (seconds, frameSeconds = 0) => {
       if (terrainDirty) update(actors);
-      for (const view of roots.values()) view.animate(seconds);
+      for (const view of roots.values()) view.animate(seconds, frameSeconds);
     },
+    play: (actorId, kind) => roots.get(actorId)?.play(kind),
+    topHeight: (actorId) => roots.get(actorId)?.top,
     actorIdForMesh: (mesh) => {
       for (
         let node = mesh as TransformNode | null;

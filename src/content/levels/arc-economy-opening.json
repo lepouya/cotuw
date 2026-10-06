@@ -83,6 +83,15 @@
         "text": "Select the Harvester and choose a Materials patch to gather. It fills its 100-Materials cargo, returns it to its Refinery, and repeats automatically. When the patch is exhausted, it delivers its last load and waits; choose a new patch to reassign it.",
         "trigger": { "kind": "actor", "definitionId": "arc-harvester" }
       }
+    ],
+    "flocks": [
+      {
+        "center": { "x": -19.5, "z": 7.5 },
+        "radius": 6,
+        "altitude": 5,
+        "count": 4,
+        "lapSeconds": 28
+      }
     ]
   },
   "state": {

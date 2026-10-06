@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 
 import { TerrainMap } from "../src/map";
 import { createWreckView } from "../src/render/wrecks";
-import { loadModelAsset } from "../src/render/glb-model";
+import { loadModelAsset, staticInstance } from "../src/render/glb-model";
 import { glbDataUrl } from "./helpers/assets";
 
 import type { ActorAppearance } from "../src/render/actor";
@@ -203,4 +203,113 @@ describe("remains", () => {
       engine.dispose();
     }
   });
+});
+
+test("building debris collapses onto its footprint unless motion is reduced", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const map = new TerrainMap({
+      width: 2,
+      height: 2,
+      tileSize: 1,
+      createHeight: () => 2,
+    });
+    let reduced = false;
+    const views = createWreckView(scene, map, {
+      appearanceFor: () => undefined,
+      tilesFor: () => [{ x: 0, z: 0 }],
+      reducedMotion: () => reduced,
+      topHeightFor: () => 5,
+    });
+    const wreck: Wreck = {
+      actorId: "building",
+      definitionId: "building",
+      tick: 0,
+      worldPosition: { x: -0.5, z: -0.5 },
+      facing: 0,
+      tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
+    };
+    const extent = () =>
+      scene
+        .getTransformNodeByName("wreck-building")!
+        .getHierarchyBoundingVectors(true);
+    const update = (age: number, frameSeconds: number) =>
+      views.update(
+        [wreck],
+        () => age,
+        60,
+        () => true,
+        frameSeconds,
+      );
+    update(0, 0);
+    const standing = extent().max.y;
+    expect(standing).toBeCloseTo(5);
+    expect(extent().min.y).toBeCloseTo(2);
+    update(0.4, 0.4);
+    expect(extent().max.y).toBeLessThan(standing);
+    update(1, 0.6);
+    const settled = extent().max.y;
+    expect(extent().min.y).toBeCloseTo(2);
+    update(5, 4);
+    expect(extent().max.y).toBeCloseTo(settled);
+
+    views.update(
+      [],
+      () => 0,
+      60,
+      () => true,
+      0,
+    );
+    reduced = true;
+    update(0, 0);
+    expect(extent().max.y).toBeCloseTo(settled);
+    reduced = false;
+    update(0.1, 0.1);
+    expect(extent().max.y).toBeCloseTo(settled);
+    views.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("flat replacement rubble cannot produce non-finite collapse transforms", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const map = new TerrainMap({ width: 2, height: 2, tileSize: 1 });
+    const rubble = {
+      instantiate: (name: string) =>
+        staticInstance(MeshBuilder.CreateGround(name, {}, scene)),
+      dispose: () => {},
+    };
+    const views = createWreckView(scene, map, {
+      appearanceFor: () => undefined,
+      tilesFor: () => [{ x: 0, z: 0 }],
+      rubble: () => rubble,
+      topHeightFor: () => 5,
+    });
+    views.update(
+      [
+        {
+          actorId: "flat",
+          definitionId: "building",
+          tick: 0,
+          worldPosition: { x: -0.5, z: -0.5 },
+          facing: 0,
+          tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
+        },
+      ],
+      () => 0,
+      60,
+      () => true,
+      0,
+    );
+    const chunk = scene.getMeshByName("wreck-flat-0-0")!;
+    expect(chunk.scaling.asArray().every(Number.isFinite)).toBe(true);
+    expect(chunk.position.asArray().every(Number.isFinite)).toBe(true);
+    views.dispose();
+  } finally {
+    engine.dispose();
+  }
 });

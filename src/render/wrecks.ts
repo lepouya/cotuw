@@ -17,19 +17,32 @@ import type { ModelAsset } from "./glb-model";
 /** Remains fade out over this many seconds before they clear. */
 const FADE_SECONDS = 5;
 const DEBRIS_HEIGHT = 0.18;
+/** Used when the destroyed building's height is unavailable. */
+const FALLBACK_COLLAPSE_SCALE = 6;
+const COLLAPSE_SECONDS = 0.8;
 
 export type WreckViewOptions = {
   appearanceFor: (definitionId: string) => ActorAppearance | undefined;
   /** Footprint tiles of building debris. */
   tilesFor: (wreck: Wreck) => readonly TileCoord[];
   rubble?: () => ModelAsset | undefined;
+  /** World height of the destroyed building's top, before collapse. */
+  topHeightFor?: (wreck: Wreck) => number | undefined;
+  /** Shows collapsed debris at once. */
+  reducedMotion?: () => boolean;
 };
 
 /** Fallen units and building rubble; never pickable. */
 export function createWreckView(
   scene: Scene,
   map: TerrainMap,
-  { appearanceFor, tilesFor, rubble: rubbleAsset }: WreckViewOptions,
+  {
+    appearanceFor,
+    tilesFor,
+    rubble: rubbleAsset,
+    topHeightFor,
+    reducedMotion = () => false,
+  }: WreckViewOptions,
 ) {
   const rubble = new StandardMaterial("wreck-rubble", scene);
   rubble.diffuseColor = new Color3(0.2, 0.19, 0.17);
@@ -43,6 +56,7 @@ export function createWreckView(
       dispose: () => void;
       meshes: AbstractMesh[];
       rubbleModel: ModelAsset | undefined;
+      topHeight: number | undefined;
       ground: () => void;
       /** Advances the death clip by real seconds. */
       animate?: (seconds: number) => void;
@@ -58,6 +72,7 @@ export function createWreckView(
     age: number,
     appearance: ActorAppearance | undefined,
     rubbleModel: ModelAsset | undefined,
+    topHeight: number | undefined,
   ) => {
     const root = new TransformNode(`wreck-${wreck.actorId}`, scene);
     let dispose = () => root.dispose();
@@ -65,6 +80,8 @@ export function createWreckView(
     const groundUpdates: (() => void)[] = [];
     if (wreck.tilePlacement) {
       const chunks: { dispose: () => void }[] = [];
+      const settles: ((seconds: number) => void)[] = [];
+      let collapseTime = age;
       for (const tile of tilesFor(wreck)) {
         const center = map.tileCenter(tile.x, tile.z);
         const seed = stableUnit(`${wreck.actorId}-${tile.x}-${tile.z}`);
@@ -83,14 +100,41 @@ export function createWreckView(
         chunk.root.parent = root;
         chunk.root.rotation.y = seed * Math.PI;
         chunk.root.position.set(center.x, 0, center.z);
-        const { min } = chunk.root.getHierarchyBoundingVectors(true);
+        const settled = chunk.root.scaling.y;
+        // The bottom's height per unit of vertical scale.
+        const bottom =
+          chunk.root.getHierarchyBoundingVectors(true).min.y / settled;
+        const fullHeight =
+          chunk.root.getHierarchyBoundingVectors(true).max.y / settled - bottom;
         const ground = () => {
           chunk.root.position.y =
-            map.heightAtWorldPosition(center.x, center.z) - min.y;
+            map.heightAtWorldPosition(center.x, center.z) -
+            bottom * chunk.root.scaling.y;
         };
-        ground();
+        settles.push((seconds) => {
+          const remaining = Math.max(0, 1 - seconds / COLLAPSE_SECONDS);
+          const standing =
+            topHeight === undefined || !(fullHeight > 0)
+              ? settled * FALLBACK_COLLAPSE_SCALE
+              : Math.max(
+                  settled,
+                  (topHeight - map.heightAtWorldPosition(center.x, center.z)) /
+                    fullHeight,
+                );
+          chunk.root.scaling.y =
+            settled + (standing - settled) * remaining ** 2;
+          ground();
+        });
         groundUpdates.push(ground);
       }
+      animate = (seconds) => {
+        collapseTime = Math.max(
+          collapseTime,
+          reducedMotion() ? COLLAPSE_SECONDS : seconds,
+        );
+        for (const settle of settles) settle(collapseTime);
+      };
+      animate(age);
       dispose = () => {
         for (const chunk of chunks) chunk.dispose();
         root.dispose();
@@ -137,6 +181,7 @@ export function createWreckView(
       meshes,
       animate,
       rubbleModel,
+      topHeight,
       ground: () => {
         for (const update of groundUpdates) update();
       },
@@ -172,8 +217,9 @@ export function createWreckView(
           view.rubbleModel !== rubbleModel
         ) {
           const seconds = Math.max(age(wreck), view?.seconds ?? 0);
+          const topHeight = view?.topHeight ?? topHeightFor?.(wreck);
           view?.dispose();
-          view = create(wreck, seconds, appearance, rubbleModel);
+          view = create(wreck, seconds, appearance, rubbleModel, topHeight);
           views.set(wreck.actorId, view);
         } else {
           view.seconds += frameSeconds;

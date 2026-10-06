@@ -552,6 +552,44 @@ story.
 - Reduced motion skips trigger clips, holds frame effects on their first
   frame, and shows death clips' last frame at once.
 
+## Building and ambient presentation
+
+- Building presentation follows committed simulation state and real time,
+  never changes simulation state, and saves nothing. Building activities are
+  committed per-tick events: `exit` when a produced unit leaves its producer,
+  and `delivery` when a Harvester unloads at its Refinery.
+- A building GLB supplies a looping idle clip and an optional clip per
+  activity. Activity clips start and end at rest, play once per activity, and
+  key no channel that idle keys; a new activity replaces one in progress.
+  Blueprints and disconnected buildings play neither. The Command Center
+  turns its sensor array. The Barracks slides its entrance open for each
+  trained unit. The Refinery rolls its garage door up for each Harvester it
+  produces, and for each delivery also runs its press and raises a green
+  processing lamp.
+  Activity time survives terrain and asset refreshes; disconnection or actor
+  removal clears it.
+- Construction shows three equal stages of progress: the foundation inside a
+  scaffold at half the building's height, then the building cut off at half
+  height inside a full scaffold, then the whole building inside the scaffold.
+  Blueprints stay translucent under their progress bar, and completion removes
+  the scaffold.
+- Actors whose presentation names a damage effect show it at 60% health or
+  less and more strongly at 30% or less. Mechanical actors, which are
+  buildings and Harvesters, release intermittent smoke puffs when moderately
+  damaged and a dense smoke column with fire and sparks when critical.
+  Biological actors, which are infantry and wolves, drip occasional drops when
+  moderately damaged and frequent ones when critical. Effect size, frequency,
+  and fire, not color alone, convey severity.
+- Destroyed buildings collapse: their debris slumps from building height to
+  rubble over 0.8 seconds.
+- Missions may author bird flocks that circle a point at a fixed altitude
+  above the highest terrain under their loop. Birds hide over unexplored
+  terrain. Clearance includes the flock's varying radii and refreshes after
+  terrain edits.
+- Reduced motion skips activity clips, holds damage effects and birds still,
+  preserves a visible damage cue during emission gaps, and shows collapsed
+  debris at once.
+
 ## Fog, stealth, and detection
 
 - Terrain is **Unexplored**, **Explored**, or currently **Visible**. Actor
@@ -916,10 +954,11 @@ Deterministic acceptance checks cover:
   and appear on the minimap. Exhaustion, missing assignments,
   blocked routes, and unaffordable harvesting recovery have explanatory
   feedback. Building timers show in Units and Selection, with a progress bar
-  over translucent blueprints.
+  over translucent, staged blueprints.
   Gathering Harvesters lower and spin a drill with a green light; idle workers
-  raise the drill and show amber. Refineries animate a rooftop fan and pump
-  when complete. Reduced motion retains static activity cues.
+  raise the drill and show amber. Completed Refineries turn a rooftop fan and
+  work a pump, and animate each Harvester exit and delivery. Reduced motion
+  retains static activity cues.
 - Mission snapshots include stockpiles, tile yields, collected salvage,
   Harvester assignments, cargo, gathering progress, phases, routes, paid
   production, rally points, blueprint progress and queue order, explored
@@ -1125,7 +1164,8 @@ a later tutorial could be made.
 - Mission files preserve objective IDs, rules, targets, defeated target IDs,
   and resolution ticks, from which victory or defeat follows. Objective
   progress must match the objective definitions in the same file.
-- Mission files carry their scenario popups and the IDs the player dismissed.
+- Mission files carry their scenario popups and the IDs the player dismissed,
+  and any ambient bird flocks.
 - Manual save, load, restart, one rolling quicksave, and one rolling autosave
   are required in M0. Loading begins paused. Restart reloads the level with
   the mission's scenario ID; loading a level file makes it that scenario's

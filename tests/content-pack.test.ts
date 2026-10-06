@@ -37,6 +37,17 @@ describe("content packs", () => {
     expect(
       withEdit((pack) => (pack.terrain.layers.rough[1].tileType = "snow")),
     ).toThrow('unknown tile type "snow"');
+    expect(
+      withEdit((pack) => (pack.presentation.wolf.damageEffect = "sparks")),
+    ).toThrow("gives wolf an unknown damage effect");
+    expect(
+      withEdit(
+        (pack) =>
+          (pack.presentation["arc-field-barracks"].building.glb.activities = {
+            parade: "exit",
+          }),
+      ),
+    ).toThrow("needs activity clips named by activity kind");
   });
 
   test("reject frame effects with unknown triggers, clips, or anchors", () => {

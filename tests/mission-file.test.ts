@@ -304,6 +304,30 @@ test.each([
     "scenario's popups",
   ],
   [
+    "a flock without birds",
+    (file: any) => {
+      file.scenario.flocks = [
+        {
+          center: { x: 0, z: 0 },
+          radius: 4,
+          altitude: 3,
+          count: -1,
+          lapSeconds: 20,
+        },
+      ];
+    },
+    "Scenario flocks need",
+  ],
+  [
+    "a flock without a center",
+    (file: any) => {
+      file.scenario.flocks = [
+        { radius: 4, altitude: 3, count: 2, lapSeconds: 20 },
+      ];
+    },
+    "Scenario flocks need",
+  ],
+  [
     "invalid metadata",
     (file: any) => {
       file.save = { name: "Save", savedAt: "yesterday" };
@@ -458,8 +482,9 @@ test("mission tick rates must be finite numbers", () => {
   }
 });
 
-test("dismissed popups survive saving and loading", () => {
+test("dismissed popups and bird flocks survive saving and loading", () => {
   const mission = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
+  expect(mission.scenario.flocks).toHaveLength(1);
   expect(mission.scenario.popups?.map(({ id }) => id)).toEqual([
     "support-network",
     "harvester-operations",
@@ -469,7 +494,34 @@ test("dismissed popups survive saving and loading", () => {
     { ...mission.state, dismissedPopups: ["harvester-operations"] },
     SIMULATION_TICK_SECONDS,
   );
-  expect(loadMission(source).state.dismissedPopups).toEqual([
-    "harvester-operations",
-  ]);
+  const loaded = loadMission(source);
+  expect(loaded.state.dismissedPopups).toEqual(["harvester-operations"]);
+  expect(loaded.scenario.flocks).toEqual(mission.scenario.flocks);
+});
+
+test.each([
+  { center: null },
+  { center: { x: "1", z: 0 } },
+  { radius: 0 },
+  { radius: -1 },
+  { altitude: 0 },
+  { altitude: -1 },
+  { count: 0.5 },
+  { count: -1 },
+  { lapSeconds: 0 },
+])("rejects invalid bird flocks: %j", (change) => {
+  const file = JSON.parse(serializeMission(scenario, testMission(), 1));
+  file.scenario.flocks = [
+    {
+      center: { x: 0, z: 0 },
+      radius: 1,
+      altitude: 2,
+      count: 3,
+      lapSeconds: 10,
+      ...change,
+    },
+  ];
+  expect(() => parseMission(JSON.stringify(file), 1)).toThrow(
+    "Scenario flocks",
+  );
 });

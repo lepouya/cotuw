@@ -12,15 +12,17 @@ clips match their generators, and reject unregistered files in `public/assets`.
   Scout meshes, materials, skeletons, idle, walk, turn, and death clips. The
   Trooper uses the fire clip for combat.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
-  Refinery, and Barracks meshes and idle machinery clips; a skinned wolf with
-  idle, walk, bite, and death; a rigid Harvester with idle, transit, harvest,
-  and death; crystal resource mounds; animated salvage; foundations; debris
-  rubble; tracers; and bite marks. The alpha wolf scales the generated wolf
-  asset.
+  Refinery, and Barracks meshes with idle machinery and activity clips; a
+  skinned wolf with idle, walk, bite, and death; a rigid Harvester with idle,
+  transit, harvest, and death; crystal resource mounds; animated salvage;
+  foundations; construction scaffolds; debris rubble; tracers; bite marks;
+  smoke puffs; flickering fire; wound drops; and a bird with a wing-beat
+  clip. The alpha wolf scales the generated wolf asset.
 - Building and vehicle geometry builders in `src/render` supply the export
   script. A building's details declare `loopSeconds`, the period of their
-  motion, which becomes the exported idle clip. The base pack loads the
-  resulting GLBs during gameplay.
+  motion, which becomes the exported idle clip, and `activities`, whose
+  one-shot motions become clips named for each activity. The base pack loads
+  the resulting GLBs during gameplay.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
 - `npm run assets:terrain`: `scripts/terrain-textures.ts` generates seamless
@@ -92,12 +94,19 @@ what glTF stores and the game renders.
 
 ## Buildings and props
 
-`building.glb` supplies a URL and idle clip. The runtime seats it above the
-terrain-conforming foundation and applies the building's facing and tile size.
-Idle playback freezes during construction, disconnection, and reduced motion.
-Instances own clips and node visibility. Materials are shared; offline dimming
-clones the materials it changes. Preview opacity stays on the meshes.
+`building.glb` supplies a URL, an idle clip, and activity clips. The runtime
+seats it above the terrain-conforming foundation and applies the building's
+facing and tile size. Idle playback freezes during construction,
+disconnection, and reduced motion. Activity clips start and end at rest and
+key no channel that idle keys. Loading rejects overlapping idle channels,
+duplicate channels, and activity endpoints that differ from the model's rest
+pose. Instances own clips and node visibility. Materials are shared; offline
+dimming and construction-stage clipping clone the materials they change.
+Preview opacity stays on the meshes.
 
-The pack's `props` names foundations, rubble, mounds, salvage, tracers, and bite
-marks by URL, with an optional idle clip. Salvage plays its exported hover and
-rotation clip. Mounds shrink in depletion stages without changing navigation.
+The pack's `props` names foundations, scaffolds, rubble, mounds, salvage,
+tracers, bite marks, smoke, fire, wound drops, and birds by URL, with an
+optional idle clip. Salvage plays its exported hover and rotation clip, fire
+its flicker, and birds their wing beat. The scaffold is a unit cube that
+construction stages scale around the footprint. Mounds shrink in depletion
+stages without changing navigation.

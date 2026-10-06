@@ -26,6 +26,8 @@ bundled packs through the same parser future mod packs will use.
 - `presentation` maps actor IDs to what the player sees:
   - `name`, `description`, and optional `build` or `train` button labels.
   - `attackEffect` is `"tracer"` or `"bite"`.
+  - `damageEffect` is `"mechanical"` smoke and fire or `"biological"` drops,
+    shown once health falls to 60%; absent shows no damage effect.
   - `model` is a GLB with clips under `glb`, or a built-in procedural model
     under `builtin`, such as `"wolf"`, with an optional `scale`. GLB `clips`
     name the `idle`, `locomotion`, optional `turn`, `work`, trigger, and `death`
@@ -38,10 +40,12 @@ bundled packs through the same parser future mod packs will use.
     the sheet at `url`, its `size` in world units, and an `anchor` in the
     actor's model space: `[x, y, z]` from its ground point, facing +Z.
   - `building` sets a tile-placed actor's height, colors, and optional
-    built-in `details`, such as `"command-center"`, or a `glb` with `url` and
-    optional `idle` clip. A building cannot name both kinds of art.
-- `props` names generated `foundation`, `rubble`, `materials-mound`, `salvage`,
-  `tracer`, and `bite` GLBs with `url` and an optional `idle` clip.
+    built-in `details`, such as `"command-center"`, or a `glb` with `url`, an
+    optional `idle` clip, and optional `activities` that name a clip for
+    `exit` or `delivery`. A building cannot name both kinds of art.
+- `props` names generated `foundation`, `scaffold`, `rubble`,
+  `materials-mound`, `salvage`, `tracer`, `bite`, `smoke`, `fire`, `wound`,
+  and `bird` GLBs with `url` and an optional `idle` clip.
 - `clips` maps IDs to frame-sequenced textures. `columns` and `rows` divide a
   sprite sheet into equal cells numbered row by row from the top left.
   `frames` lists `{ cell, seconds }` in play order, and `playback` is

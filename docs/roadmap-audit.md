@@ -200,15 +200,23 @@ the requirements.
 
 - **0.46, presentation:** skeletal infantry with attack and death clips,
   articulated machinery, tracers, muzzle flashes, bite effects, health bars,
-  remains, blueprint progress, staged resource markers, wolf attack and death,
-  and Harvester transit, harvesting, and destruction clips work. Models,
-  materials, skeletons, clips, textures, and sprite sheets have offline
-  generators; runtime art loads their committed files. Ambient objects,
-  escalating damage effects, construction stages, and the remaining building
-  activity animations still need integration.
+  remains, staged resource markers, wolf attack and death, and Harvester
+  transit, harvesting, and destruction clips work. Blueprints rise through
+  three [construction stages](../src/render/construction-stage.ts) inside
+  a scaffold. Barracks and Refineries play
+  [activity clips](../tests/building-presentation.test.ts) on unit exits and
+  deliveries. [Damage effects](../src/render/damage-effects.ts) escalate at
+  60% and 30% health, destroyed buildings collapse, and an authored flock of
+  [ambient birds](../src/render/ambient-birds.ts) circles the lake shore.
+  Models, materials, skeletons, clips, textures, and sprite sheets have
+  offline generators; runtime art loads their committed files. Unit tests
+  cover these views, a [browser check](../e2e/presentation.spec.ts) renders
+  them in Chromium and WebKit, and a full human playthrough showed them
+  working. Hit-reaction clips, the wolf regeneration effect, and Harvester
+  deploy, stow, and unloading clips remain.
 
 ## Recommended next task
 
-Continue **0.46** with construction stages, damage effects, ambient objects,
-and building activity animations. Check desktop export and import, and run
-first-time human playtests for **0.55** alongside.
+Finish **0.46** with hit reactions, the wolf regeneration effect, and the
+remaining Harvester clips. Check desktop export and import, and run first-time human playtests for
+**0.55** alongside.

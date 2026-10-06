@@ -102,6 +102,16 @@ export const ECONOMY_SCENARIO = defineScenario({
       trigger: { kind: "actor", definitionId: "arc-harvester" },
     },
   ],
+  // Circles the lake shore beyond the near patch, visible early on.
+  flocks: [
+    {
+      center: map.tileCenter(30, 57),
+      radius: 6,
+      altitude: 5,
+      count: 4,
+      lapSeconds: 28,
+    },
+  ],
   tileSize: map.tileSize,
   terrainTypeIds: [...map.terrainTypeIds],
   terrain: map.terrainState(),
