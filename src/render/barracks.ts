@@ -1,6 +1,10 @@
-import { createBuildingAssembly } from "./building-assembly";
+import { createBuildingAssembly, openAndClose } from "./building-assembly";
 
 import type { TilePlacedActorDetailsFactory } from "./tile-placed-actor-view";
+
+/** Seconds the entrance stays open for a trained unit. */
+const EXIT_SECONDS = 2.4;
+const DOOR_SECONDS = 0.45;
 
 export const createBarracksDetails: TilePlacedActorDetailsFactory = (
   root,
@@ -21,6 +25,16 @@ export const createBarracksDetails: TilePlacedActorDetailsFactory = (
   box("roof", [2.82, 0.12, 1.74], [0, 0.91, -0.1], trim);
   box("entrance", [0.8, 0.65, 0.04], [0, 0.33, 0.69], dark);
   box("entry-canopy", [1.05, 0.1, 0.44], [0, 0.73, 0.73], marking);
+  // Sliding leaves cover the dark entrance until a unit leaves.
+  const leaves = [-1, 1].map((side) => {
+    const leaf = box(
+      `entrance-leaf-${side}`,
+      [0.4, 0.63, 0.04],
+      [side * 0.2, 0.33, 0.72],
+      trim,
+    );
+    return { leaf, side };
+  });
   for (const x of [-1.06, 1.06]) {
     box(`window-${x}`, [0.42, 0.23, 0.04], [x, 0.58, 0.69], dark);
     box(`stripe-${x}`, [0.15, 0.58, 0.05], [x, 0.3, 0.7], marking);
@@ -33,6 +47,16 @@ export const createBarracksDetails: TilePlacedActorDetailsFactory = (
       blades.rotation.y = (seconds / loopSeconds) * Math.PI * 4;
     },
     loopSeconds,
+    activities: {
+      exit: {
+        seconds: EXIT_SECONDS,
+        pose: (seconds) => {
+          const open = openAndClose(seconds, EXIT_SECONDS, DOOR_SECONDS);
+          for (const { leaf, side } of leaves)
+            leaf.position.x = side * (0.2 + open * 0.38);
+        },
+      },
+    },
     dispose: () => assembly.dispose(),
   };
 };

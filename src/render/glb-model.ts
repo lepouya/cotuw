@@ -1,4 +1,5 @@
 import {
+  AbstractMesh,
   AnimationGroup,
   LoadAssetContainerAsync,
   MeshBuilder,
@@ -7,10 +8,15 @@ import {
 import { RegisterSceneLoaderPlugin } from "@babylonjs/core/Loading/sceneLoader.js";
 import { GLTFFileLoaderMetadata } from "@babylonjs/loaders/glTF/glTFFileLoader.metadata.js";
 
-import { isId, isRecord } from "../simulation/validation";
+import { isId, isOneOf, isRecord } from "../simulation/validation";
+import { BUILDING_ACTIVITY_KINDS } from "../simulation/production";
 
 import type { AssetContainer, Material, Scene } from "@babylonjs/core";
-import type { TilePlacedActorDetailsFactory } from "./tile-placed-actor-view";
+import type { BuildingActivityKind } from "../simulation/production";
+import type {
+  BuildingMotions,
+  TilePlacedActorDetailsFactory,
+} from "./tile-placed-actor-view";
 
 // Generated eyes and weapon effects use unlit materials.
 RegisterSceneLoaderPlugin({
@@ -32,17 +38,36 @@ RegisterSceneLoaderPlugin({
   },
 });
 
-export type ModelGraphics = { url: string; idle?: string };
+export type ModelGraphics = {
+  url: string;
+  idle?: string;
+  /**
+   * Clips that play once per building activity. Each starts and ends at rest
+   * and keys no channel that idle keys.
+   */
+  activities?: Partial<Record<BuildingActivityKind, string>>;
+};
 export type ModelInstance = {
   root: TransformNode;
   pose: (seconds: number) => void;
+  activities?: BuildingMotions;
   dispose: () => void;
 };
 export type ModelAsset = {
+  /** Highest point above the origin at rest, in model units. */
+  topHeight?: number;
   /** Instances share materials; clone a material before editing it. */
   instantiate: (name: string) => ModelInstance;
   dispose: () => void;
 };
+
+/** Includes a mesh root as well as its descendants. */
+export function hierarchyMeshes(root: TransformNode): AbstractMesh[] {
+  return [
+    ...(root instanceof AbstractMesh ? [root] : []),
+    ...root.getChildMeshes(),
+  ];
+}
 
 export function validateModelGraphics(
   graphics: unknown,
@@ -53,6 +78,18 @@ export function validateModelGraphics(
     (graphics.idle !== undefined && !isId(graphics.idle))
   )
     throw new RangeError("A model needs a URL and a valid idle clip name");
+  const activities = graphics.activities;
+  if (
+    activities !== undefined &&
+    (!isRecord(activities) ||
+      Object.entries(activities).some(
+        ([kind, clip]) =>
+          !isOneOf(BUILDING_ACTIVITY_KINDS, kind) || !isId(clip),
+      ))
+  )
+    throw new RangeError(
+      `Model ${graphics.url} needs activity clips named by activity kind`,
+    );
 }
 
 /** Loads a GLB and checks it with `prepare`, releasing it if that throws. */
@@ -97,6 +134,8 @@ export function findClip(
   for (const { target } of found.targetedAnimations)
     if (!owned.has(target))
       throw invalid(`clip ${name} animates ${target?.name ?? "a target"}`);
+  if (clipChannels(found).size !== found.targetedAnimations.length)
+    throw invalid(`clip ${name} keys a channel more than once`);
   for (const { animation } of found.targetedAnimations) {
     const keys = animation.getKeys();
     if (
@@ -136,6 +175,63 @@ export function findClip(
   return found;
 }
 
+/** `findClip` for a clip that must span more than one frame. */
+export function findTimedClip(
+  assets: AssetContainer,
+  name: string,
+  invalid: (problem: string) => Error,
+): AnimationGroup {
+  const found = findClip(assets, name, invalid);
+  if (!(found.to > found.from))
+    throw invalid(`clip ${name} needs more than one frame`);
+  return found;
+}
+
+/** A one-shot clip must start and finish at its model's authored rest pose. */
+export function findRestClip(
+  assets: AssetContainer,
+  name: string,
+  invalid: (problem: string) => Error,
+): AnimationGroup {
+  const clip = findTimedClip(assets, name, invalid);
+  const components = (
+    value: number | { asArray?: () => number[] } | null | undefined,
+  ): number[] =>
+    typeof value === "number" ? [value] : (value?.asArray?.() ?? []);
+  for (const { target, animation } of clip.targetedAnimations) {
+    const rest = components(
+      animation.targetPropertyPath.reduce((value, key) => value?.[key], target),
+    );
+    const atRest = (frame: number) => {
+      const value = components(animation.evaluate(frame));
+      const matches = (sign: number) =>
+        rest.length > 0 &&
+        value.length === rest.length &&
+        value.every(
+          (each, index) => Math.abs(each * sign - rest[index]!) <= 1e-5,
+        );
+      // Opposite quaternion signs describe the same rotation.
+      return (
+        matches(1) ||
+        (animation.targetProperty === "rotationQuaternion" && matches(-1))
+      );
+    };
+    if (!atRest(clip.from) || !atRest(clip.to))
+      throw invalid(`clip ${name} must start and end at rest`);
+  }
+  return clip;
+}
+
+/** The node properties a clip keys, as comparable strings. */
+export function clipChannels(clip: AnimationGroup): Set<string> {
+  return new Set(
+    clip.targetedAnimations.map(
+      ({ target, animation }) =>
+        `${target.uniqueId}:${animation.targetProperty}`,
+    ),
+  );
+}
+
 /** A clip's length at its shared frame rate, which `findClip` checks. */
 export function clipSeconds(group: AnimationGroup): number {
   return (group.to - group.from) / clipFrameRate(group);
@@ -143,6 +239,16 @@ export function clipSeconds(group: AnimationGroup): number {
 
 function clipFrameRate(group: AnimationGroup): number {
   return group.targetedAnimations[0]!.animation.framePerSecond;
+}
+
+/** Seeks a paused clip `seconds` in, wrapping or holding its last frame. */
+function seekClip(group: AnimationGroup, seconds: number, loop: boolean) {
+  const span = group.to - group.from;
+  const frames = Math.max(0, seconds) * clipFrameRate(group);
+  group.goToFrame(
+    group.from + (loop ? frames % span : Math.min(frames, span)),
+    true,
+  );
 }
 
 /**
@@ -205,7 +311,7 @@ export async function loadModelAsset(
   graphics: ModelGraphics,
 ): Promise<ModelAsset> {
   validateModelGraphics(graphics);
-  const { assets, prepared: idle } = await loadContainer(
+  const { assets, prepared } = await loadContainer(
     scene,
     graphics.url,
     (assets) => {
@@ -213,39 +319,67 @@ export async function loadModelAsset(
         new Error(`Model ${graphics.url} ${problem}`);
       if (!assets.meshes.some((mesh) => mesh.getTotalVertices() > 0))
         throw invalid("has no geometry");
-      const clip =
+      const idle =
         graphics.idle === undefined
           ? undefined
-          : findClip(assets, graphics.idle, invalid);
-      if (clip && !(clip.to > clip.from))
-        throw invalid(`clip ${graphics.idle} needs more than one frame`);
+          : findTimedClip(assets, graphics.idle, invalid);
+      const idleChannels = idle ? clipChannels(idle) : new Set<string>();
+      const activities = Object.entries(graphics.activities ?? {}).map(
+        ([kind, name]) => {
+          const clip = findRestClip(assets, name!, invalid);
+          if ([...clipChannels(clip)].some((each) => idleChannels.has(each)))
+            throw invalid(`clip ${name} keys a channel that idle keys`);
+          return [kind, clip] as const;
+        },
+      );
       for (const group of assets.animationGroups) group.stop();
-      return clip;
+      const topHeight = Math.max(
+        ...assets.meshes
+          .filter((mesh) => mesh.getTotalVertices() > 0)
+          .map((mesh) => {
+            mesh.computeWorldMatrix(true);
+            return mesh.getBoundingInfo().boundingBox.maximumWorld.y;
+          }),
+      );
+      return { idle, activities, topHeight };
     },
   );
+  const { idle, activities } = prepared;
+  const used = [...(idle ? [idle] : []), ...activities.map(([, clip]) => clip)];
+  const sources = assets.animationGroups.filter((each) => used.includes(each));
   return {
+    topHeight: prepared.topHeight,
     instantiate: (name) => {
       const { root, entries, dispose } = instantiateContainer(
         assets,
         name,
-        idle ? [idle] : [],
+        used,
       );
-      const group = entries.animationGroups[0];
-      if (group) {
+      const clone = (source: AnimationGroup) => {
+        const group = entries.animationGroups[sources.indexOf(source)]!;
         group.start(true);
         group.pause();
-      }
+        group.goToFrame(group.from);
+        return group;
+      };
+      const group = idle && clone(idle);
       return {
         root,
         pose: (seconds) => {
-          if (!group) return;
-          group.goToFrame(
-            group.from +
-              ((Math.max(0, seconds) * clipFrameRate(group)) %
-                (group.to - group.from)),
-            true,
-          );
+          if (group) seekClip(group, seconds, true);
         },
+        activities: Object.fromEntries(
+          activities.map(([kind, source]) => {
+            const motion = clone(source);
+            return [
+              kind,
+              {
+                seconds: clipSeconds(motion),
+                pose: (seconds: number) => seekClip(motion, seconds, false),
+              },
+            ];
+          }),
+        ),
         dispose,
       };
     },
@@ -268,6 +402,10 @@ export function modelBuildingDetails(
     instance.root.rotation.y = placement.facing;
     instance.root.scaling.setAll(placement.tileSize);
     instance.pose(0);
-    return { update: instance.pose, dispose: instance.dispose };
+    return {
+      update: instance.pose,
+      activities: instance.activities,
+      dispose: instance.dispose,
+    };
   };
 }

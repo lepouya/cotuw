@@ -1,5 +1,3 @@
-import { TransformNode } from "@babylonjs/core";
-
 import { createBuildingAssembly } from "./building-assembly";
 
 import type { TilePlacedActorDetailsFactory } from "./tile-placed-actor-view";
@@ -10,8 +8,7 @@ export const createCommandCenterDetails: TilePlacedActorDetailsFactory = (
   placement,
   sharedMaterial,
 ) => {
-  const scene = root.getScene();
-  const { assembly, material, box, fan } = createBuildingAssembly(
+  const { assembly, material, pivot, box, fan } = createBuildingAssembly(
     root,
     placement,
     sharedMaterial,
@@ -38,14 +35,16 @@ export const createCommandCenterDetails: TilePlacedActorDetailsFactory = (
   box("roof-equipment", [0.52, 0.18, 0.65], [0.43, 1.12, -0.13], dark);
   const blades = fan(0.45, 0.025, [0.43, 1.23, -0.13], trim);
   box("mast", [0.065, 0.55, 0.065], [-0.38, 1.31, -0.24], trim);
-  const radar = new TransformNode(`${root.name}-radar`, scene);
-  radar.parent = assembly;
-  radar.position.set(-0.38, 1.56, -0.24);
-  const panel = box("radar-panel", [0.52, 0.27, 0.065], [0, 0, 0], armor);
-  panel.parent = radar;
+  const radar = pivot("radar", [-0.38, 1.56, -0.24]);
+  const panel = box(
+    "radar-panel",
+    [0.52, 0.27, 0.065],
+    [0, 0, 0],
+    armor,
+    radar,
+  );
   panel.rotation.x = -0.2;
-  const panelFace = box("radar-face", [0.44, 0.19, 0.015], [0, 0, 0.04], glass);
-  panelFace.parent = panel;
+  box("radar-face", [0.44, 0.19, 0.015], [0, 0, 0.04], glass, panel);
   const loopSeconds = 14;
   return {
     update: (seconds) => {

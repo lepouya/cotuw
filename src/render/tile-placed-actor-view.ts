@@ -20,6 +20,7 @@ import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
+import type { BuildingActivityKind } from "../simulation/production";
 import type { Rgb } from "./color";
 import type { ModelAsset } from "./glb-model";
 
@@ -29,6 +30,16 @@ const DEFAULT_HEIGHT = 1.5;
 /** Below the building health bar, which sits higher above the ground. */
 const CONSTRUCTION_BAR_HEIGHT = 1.9;
 const DEFAULT_COLOR: Rgb = [0.35, 0.42, 0.46];
+
+/** A one-shot motion that starts and ends at the rest pose. */
+export type BuildingMotion = {
+  seconds: number;
+  pose: (seconds: number) => void;
+};
+/** Motions that play once per building activity. */
+export type BuildingMotions = Partial<
+  Record<BuildingActivityKind, BuildingMotion>
+>;
 
 /**
  * Returns the registry's material for this definition and name, calling
@@ -53,6 +64,8 @@ export type TilePlacedActorDetailsFactory = (
   update: (elapsedSeconds: number) => void;
   /** `update` repeats after this many seconds, so it can loop as one clip. */
   loopSeconds?: number;
+  /** Each activity's motion; none moves a part that `update` moves. */
+  activities?: BuildingMotions;
   dispose: () => void;
 };
 

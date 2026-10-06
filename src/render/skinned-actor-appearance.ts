@@ -5,8 +5,10 @@ import { ACTOR_TRIGGERS } from "./actor";
 import { createGaitState, stepGait } from "./actor-gait";
 import { isRgb } from "./color";
 import {
+  clipChannels,
   clipSeconds,
   findClip,
+  findTimedClip,
   instantiateContainer,
   loadContainer,
 } from "./glb-model";
@@ -166,12 +168,7 @@ function prepareClips(
     throw invalid("has no skin");
   }
   const group = (name: string) => findClip(assets, name, invalid);
-  const timed = (name: string) => {
-    const found = group(name);
-    if (!(found.to > found.from))
-      throw invalid(`clip ${name} needs more than one frame`);
-    return found;
-  };
+  const timed = (name: string) => findTimedClip(assets, name, invalid);
   // A layered clip is its difference from the first frame, added on top.
   const layered = (name: string) => {
     const found = timed(name);
@@ -181,16 +178,9 @@ function prepareClips(
   };
   const idle = group(clips.idle);
   const locomotion = timed(clips.locomotion);
-  const channels = (clip: AnimationGroup) =>
-    new Set(
-      clip.targetedAnimations.map(
-        ({ target, animation }) =>
-          `${target.uniqueId}:${animation.targetProperty}`,
-      ),
-    );
-  const idleChannels = channels(idle);
+  const idleChannels = clipChannels(idle);
   const requirePose = (clip: AnimationGroup, exact: boolean) => {
-    const keyed = channels(clip);
+    const keyed = clipChannels(clip);
     if (
       (exact && keyed.size !== idleChannels.size) ||
       [...idleChannels.keys()].some((channel) => !keyed.has(channel))

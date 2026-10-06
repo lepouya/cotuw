@@ -282,7 +282,10 @@ function harvester(scene: Scene, name: string) {
   });
 }
 
-/** A building's articulated parts, with one loop of their motion as idle. */
+/**
+ * A building's articulated parts, with one loop of their motion as idle and a
+ * clip named for each activity.
+ */
 function building(factory: TilePlacedActorDetailsFactory) {
   return (scene: Scene, name: string) => {
     const root = new TransformNode(name, scene);
@@ -303,6 +306,8 @@ function building(factory: TilePlacedActorDetailsFactory) {
     if (!details.loopSeconds)
       throw new Error(`Building ${name} has no looping motion`);
     clip(root, "idle", details.loopSeconds, details.update, false);
+    for (const [kind, motion] of Object.entries(details.activities ?? {}))
+      clip(root, kind, motion.seconds, motion.pose, false);
   };
 }
 
@@ -506,6 +511,192 @@ function salvage(scene: Scene, name: string) {
   });
 }
 
+/** A unit-cube lattice of posts, rails, and braces around a blueprint. */
+function scaffold(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const thickness = 0.03;
+  const poles: Mesh[] = [];
+  const braces: Mesh[] = [];
+  /** A bar along x, rolled by `tilt` and then turned by `yaw`. */
+  const bar = (
+    parts: Mesh[],
+    length: number,
+    [x, y, z]: readonly [number, number, number],
+    tilt: number,
+    yaw: number,
+  ) => {
+    const mesh = MeshBuilder.CreateBox(
+      `bar-${parts.length}`,
+      { width: length, height: thickness, depth: thickness },
+      scene,
+    );
+    mesh.position.set(x, y, z);
+    mesh.rotation.set(0, yaw, tilt);
+    parts.push(mesh);
+  };
+  const edges = [-0.5, 0, 0.5];
+  // Posts at the corners and edge midpoints; rails at three levels.
+  for (const x of edges)
+    for (const z of edges) if (x || z) bar(poles, 1, [x, 0, z], Math.PI / 2, 0);
+  for (const y of edges)
+    for (const side of [-0.5, 0.5]) {
+      bar(poles, 1, [0, y, side], 0, 0);
+      bar(poles, 1, [side, y, 0], 0, Math.PI / 2);
+    }
+  // One brace per bay on each side, leaning alternately.
+  const diagonal = Math.hypot(0.5, 0.5);
+  for (const yaw of [0, Math.PI / 2])
+    for (const side of [-0.5, 0.5])
+      for (const [index, along] of [-0.25, 0.25].entries()) {
+        const lean = ((index ? -1 : 1) * Math.PI) / 4;
+        const y = -0.25 + index * 0.5;
+        bar(
+          braces,
+          diagonal,
+          yaw ? [side, y, along] : [along, y, side],
+          lean,
+          yaw,
+        );
+      }
+  merge(
+    root,
+    "poles",
+    poles,
+    surface(scene, "scaffold-poles", [0.86, 0.62, 0.16]),
+  );
+  merge(
+    root,
+    "braces",
+    braces,
+    surface(scene, "scaffold-braces", [0.32, 0.33, 0.34]),
+  );
+}
+
+/** A lumpy unit-wide smoke puff that damage effects raise and fade. */
+function smoke(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const lumps = (
+    [
+      [0.5, 0, 0, 0],
+      [0.32, 0.22, 0.12, 0.08],
+      [0.3, -0.2, 0.1, -0.1],
+    ] as const
+  ).map(([radius, x, y, z], index) => {
+    const lump = MeshBuilder.CreateIcoSphere(
+      `lump-${index}`,
+      { radius, subdivisions: 1 },
+      scene,
+    );
+    lump.position.set(x, y, z);
+    return lump;
+  });
+  merge(root, "puff", lumps, surface(scene, "smoke", [0.42, 0.42, 0.43]));
+}
+
+/** Flickering flame tongues with rising sparks, based at the origin. */
+function fire(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const flames = (
+    [
+      [0.34, 0.75, 0, 0, [1, 0.42, 0.08]],
+      [0.24, 0.5, 0.16, 0.08, [1, 0.62, 0.12]],
+      [0.2, 0.45, -0.14, -0.06, [1, 0.62, 0.12]],
+      [0.16, 0.38, 0, 0.02, [1, 0.9, 0.4]],
+    ] as const
+  ).map(([diameter, height, x, z, color], index) => {
+    const node = new TransformNode(`flame-${index}`, scene);
+    node.parent = root;
+    node.position.set(x, 0, z);
+    const cone = MeshBuilder.CreateCylinder(
+      `flame-${index}-cone`,
+      { height, diameterTop: 0, diameterBottom: diameter, tessellation: 5 },
+      scene,
+    );
+    cone.parent = node;
+    cone.position.y = height / 2;
+    cone.material = unlit(scene, `flame-${index}`, new Color3(...color));
+    return node;
+  });
+  const sparkMaterial = unlit(scene, "spark", new Color3(1, 0.85, 0.45));
+  const sparks = [0, 1, 2].map((index) => {
+    const spark = MeshBuilder.CreateBox(
+      `spark-${index}`,
+      { size: 0.04 },
+      scene,
+    );
+    spark.parent = root;
+    spark.position.set((index - 1) * 0.12, 0.3, (index % 2) * 0.1 - 0.05);
+    spark.material = sparkMaterial;
+    return spark;
+  });
+  const seconds = 0.6;
+  clip(root, "flicker", seconds, (time) => {
+    const phase = (time / seconds) * Math.PI * 2;
+    flames.forEach((flame, index) => {
+      flame.scaling.y =
+        1 + Math.sin(phase * (index % 2 ? 2 : 1) + index) * 0.18;
+      flame.rotation.z = Math.sin(phase + index * 1.7) * 0.12;
+    });
+    sparks.forEach((spark, index) => {
+      const rise = (time / seconds + index / sparks.length) % 1;
+      spark.position.y = 0.3 + rise * 0.9;
+      spark.scaling.setAll(1 - rise);
+    });
+  });
+}
+
+/** A falling drop for wounded biological actors. */
+function wound(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const drop = MeshBuilder.CreatePolyhedron(
+    "drop",
+    { type: 1, sizeX: 0.035, sizeY: 0.06, sizeZ: 0.035 },
+    scene,
+  );
+  drop.parent = root;
+  drop.material = surface(scene, "wound", [0.5, 0.04, 0.05]);
+}
+
+/** A dark bird facing +Z whose wings beat in its idle clip. */
+function bird(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const plumage = surface(scene, "plumage", [0.14, 0.14, 0.17]);
+  const body = MeshBuilder.CreateBox(
+    "body",
+    { width: 0.1, height: 0.08, depth: 0.36 },
+    scene,
+  );
+  body.parent = root;
+  body.material = plumage;
+  const tail = MeshBuilder.CreateBox(
+    "tail",
+    { width: 0.14, height: 0.02, depth: 0.12 },
+    scene,
+  );
+  tail.parent = root;
+  tail.position.z = -0.22;
+  tail.material = plumage;
+  const wings = [-1, 1].map((side) => {
+    const shoulder = new TransformNode(`shoulder-${side}`, scene);
+    shoulder.parent = root;
+    shoulder.position.x = side * 0.05;
+    const wing = MeshBuilder.CreateBox(
+      `wing-${side}`,
+      { width: 0.42, height: 0.015, depth: 0.16 },
+      scene,
+    );
+    wing.parent = shoulder;
+    wing.position.x = side * 0.21;
+    wing.material = plumage;
+    return { shoulder, side };
+  });
+  const seconds = 0.5;
+  clip(root, "flap", seconds, (time) => {
+    const beat = Math.sin((time / seconds) * Math.PI * 2) * 0.6;
+    for (const { shoulder, side } of wings) shoulder.rotation.z = side * beat;
+  });
+}
+
 /** Each model's builder fills an empty scene with nodes, materials, and clips. */
 const BUILDERS = {
   "command-center": building(createCommandCenterDetails),
@@ -517,8 +708,13 @@ const BUILDERS = {
   salvage,
   rubble,
   foundation: cube([0.35, 0.42, 0.46]),
+  scaffold,
   tracer,
   bite,
+  smoke,
+  fire,
+  wound,
+  bird,
 } satisfies Record<string, (scene: Scene, name: string) => void>;
 
 export type ModelAsset = keyof typeof BUILDERS;

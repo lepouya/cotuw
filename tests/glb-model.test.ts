@@ -21,6 +21,7 @@ import { expect, test } from "vitest";
 import { rigidSkin } from "../scripts/glb-export";
 import {
   findClip,
+  findRestClip,
   instantiateContainer,
   loadModelAsset,
 } from "../src/render/glb-model";
@@ -209,6 +210,49 @@ test("rejects ambiguous clip names", () => {
     expect(() =>
       findClip(assets, "idle", (message) => new Error(message)),
     ).toThrow("multiple clips named idle");
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("activity clips return to authored rest and reject duplicate channels", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const assets = new AssetContainer(scene);
+    const target = new TransformNode("door", scene);
+    assets.transformNodes.push(target);
+    const group = new AnimationGroup("exit", scene);
+    const animation = new Animation(
+      "slide",
+      "position.x",
+      30,
+      Animation.ANIMATIONTYPE_FLOAT,
+    );
+    const keys = (start: number, end: number) => [
+      { frame: 0, value: start },
+      { frame: 15, value: 1 },
+      { frame: 30, value: end },
+    ];
+    animation.setKeys(keys(0, 0));
+    group.addTargetedAnimation(animation, target);
+    assets.animationGroups.push(group);
+    const invalid = (message: string) => new Error(message);
+    expect(findRestClip(assets, "exit", invalid)).toBe(group);
+    for (const [start, end] of [
+      [0.2, 0],
+      [0, 0.2],
+    ]) {
+      animation.setKeys(keys(start!, end!));
+      expect(() => findRestClip(assets, "exit", invalid)).toThrow(
+        "start and end at rest",
+      );
+    }
+    animation.setKeys(keys(0, 0));
+    group.addTargetedAnimation(animation.clone(), target);
+    expect(() => findClip(assets, "exit", invalid)).toThrow(
+      "keys a channel more than once",
+    );
   } finally {
     engine.dispose();
   }

@@ -1,95 +1,100 @@
-import { Color3, MeshBuilder, TransformNode } from "@babylonjs/core";
+import {
+  createBuildingAssembly,
+  ease,
+  openAndClose,
+} from "./building-assembly";
+
 import type { TilePlacedActorDetailsFactory } from "./tile-placed-actor-view";
 
+const DOOR_SECONDS = 0.45;
+/** Seconds the garage stays open while a Harvester deploys. */
+const EXIT_SECONDS = 2.4;
+/** Seconds of unloading and processing after each delivery. */
+const DELIVERY_SECONDS = 3;
+const DOOR_HEIGHT = 0.58;
+
+/** A processing hall with a roll-up garage door beside a storage tank. */
 export const createRefineryDetails: TilePlacedActorDetailsFactory = (
   root,
   placement,
-  shared,
+  sharedMaterial,
 ) => {
-  const scene = root.getScene();
-  const steel = shared("steel", (material) => {
-    material.diffuseColor = new Color3(0.3, 0.4, 0.42);
-  });
-  const tank = MeshBuilder.CreateCylinder(
-    `${root.name}-tank`,
-    {
-      height: 1.25,
-      diameter: 1.05,
-      tessellation: 16,
-    },
-    scene,
+  const { assembly, material, pivot, box, cylinder } = createBuildingAssembly(
+    root,
+    placement,
+    sharedMaterial,
+    [0.16, 0.15, 0.12],
   );
-  tank.parent = root;
-  tank.position.set(
-    placement.center.x,
-    placement.roof + 0.625,
-    placement.center.z,
+  const steel = material("steel", [0.3, 0.4, 0.42]);
+  const hull = material("hull", [0.52, 0.45, 0.3]);
+  const dark = material("bay", [0.09, 0.1, 0.1]);
+  const marking = material("markings", [0.94, 0.46, 0.12]);
+  const fanSurface = material("fan", [0.85, 0.68, 0.25]);
+  const beacon = material("beacon", [1, 0.65, 0.15], true);
+  const processing = material("processing-light", [0.2, 1, 0.65], true);
+  box("hall", [1.7, 0.75, 1.5], [-0.55, 0.375, -0.1], hull);
+  box("hall-roof", [1.82, 0.1, 1.62], [-0.55, 0.8, -0.1], steel);
+  box("bay", [0.95, DOOR_HEIGHT, 0.03], [-0.55, DOOR_HEIGHT / 2, 0.66], dark);
+  box("bay-header", [1.1, 0.08, 0.06], [-0.55, 0.62, 0.67], marking);
+  const door = box(
+    "garage-door",
+    [0.95, DOOR_HEIGHT, 0.04],
+    [-0.55, DOOR_HEIGHT / 2, 0.69],
+    steel,
   );
-  tank.material = steel;
-  const beacon = MeshBuilder.CreateBox(
-    `${root.name}-beacon`,
-    { size: 0.2 },
-    scene,
+  cylinder("tank", [0.95, 1.2], [0.8, 0.6, -0.3], steel);
+  cylinder("tank-band", [1, 0.08], [0.8, 0.85, -0.3], marking);
+  box("beacon", [0.18, 0.18, 0.18], [0.8, 1.29, -0.3], beacon);
+  const pump = cylinder("pump", [0.22, 0.5], [1.15, 0.35, 0.55], steel);
+  const piston = cylinder("press", [0.18, 0.4], [-0.05, 0.95, 0.3], steel);
+  // Rises out of the roof while the hall processes a delivery.
+  const lamp = box(
+    "processing",
+    [0.16, 0.12, 0.16],
+    [-1.1, 0.72, 0.3],
+    processing,
   );
-  beacon.parent = root;
-  beacon.position.set(
-    placement.center.x,
-    placement.roof + 1.4,
-    placement.center.z,
-  );
-  beacon.material = shared("beacon", (material) => {
-    material.diffuseColor = new Color3(1, 0.65, 0.15);
-    material.emissiveColor = new Color3(0.4, 0.2, 0.03);
-  });
-  const fan = new TransformNode(`${root.name}-fan`, scene);
-  fan.parent = root;
-  fan.position.set(
-    placement.center.x,
-    placement.roof + 1.3,
-    placement.center.z,
-  );
-  for (let i = 0; i < 3; i++) {
-    const blade = MeshBuilder.CreateBox(
-      `${root.name}-fan-blade-${i}`,
-      {
-        width: 0.2,
-        height: 0.08,
-        depth: 0.85,
-      },
-      scene,
-    );
-    blade.parent = fan;
-    blade.rotation.y = (i * Math.PI) / 3;
-    blade.material = shared("fan", (material) => {
-      material.diffuseColor = new Color3(0.85, 0.68, 0.25);
-    });
-  }
-  const pump = MeshBuilder.CreateCylinder(
-    `${root.name}-pump`,
-    {
-      height: 0.6,
-      diameter: 0.25,
-      tessellation: 8,
-    },
-    scene,
-  );
-  pump.parent = root;
-  const sideX = Math.cos(placement.facing) * 0.85;
-  const sideZ = -Math.sin(placement.facing) * 0.85;
-  pump.position.set(
-    placement.center.x + sideX,
-    placement.roof + 0.5,
-    placement.center.z + sideZ,
-  );
-  pump.material = steel;
+  const fan = pivot("fan", [-0.75, 0.92, -0.35]);
+  for (let i = 0; i < 3; i++)
+    box(
+      `fan-blade-${i}`,
+      [0.2, 0.06, 0.85],
+      [0, 0, 0],
+      fanSurface,
+      fan,
+    ).rotation.y = (i * Math.PI) / 3;
+  const rollDoor = (open: number) => {
+    // The door rolls up into the header, keeping its top edge in place.
+    door.scaling.y = 1 - open * 0.85;
+    door.position.y = DOOR_HEIGHT - (DOOR_HEIGHT * door.scaling.y) / 2;
+  };
   const loopSeconds = 4;
   return {
     update: (seconds) => {
       const turn = (seconds / loopSeconds) * Math.PI * 4;
       fan.rotation.y = turn;
-      pump.position.y = placement.roof + 0.5 + Math.sin(turn) * 0.2;
+      pump.position.y = 0.35 + Math.sin(turn) * 0.15;
     },
     loopSeconds,
-    dispose: () => {},
+    activities: {
+      exit: {
+        seconds: EXIT_SECONDS,
+        pose: (seconds) =>
+          rollDoor(openAndClose(seconds, EXIT_SECONDS, DOOR_SECONDS)),
+      },
+      delivery: {
+        seconds: DELIVERY_SECONDS,
+        pose: (seconds) => {
+          rollDoor(openAndClose(seconds, DELIVERY_SECONDS, DOOR_SECONDS));
+          const working = openAndClose(seconds, DELIVERY_SECONDS, 0.5);
+          lamp.position.y = 0.72 + working * 0.2;
+          // Four press strokes while the hall works.
+          const stroke = ease(seconds, 0.5, DELIVERY_SECONDS - 0.5);
+          piston.position.y =
+            0.95 - Math.sin(stroke * Math.PI * 4) ** 2 * 0.15 * working;
+        },
+      },
+    },
+    dispose: () => assembly.dispose(),
   };
 };
