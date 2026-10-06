@@ -5,6 +5,8 @@ import {
   VertexBuffer,
 } from "@babylonjs/core";
 import { expect, test } from "vitest";
+import { glbDataUrl } from "./helpers/assets";
+import { loadModelAsset } from "../src/render/glb-model";
 import { TerrainMap } from "../src/map";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import {
@@ -213,14 +215,14 @@ test("Refinery animation freezes during construction and progresses when operati
     expect(
       scene.getTransformNodeByName("tile-placed-actor-building-root-fan")!
         .rotation.y,
-    ).toBe(4);
+    ).toBeCloseTo(2 * Math.PI);
     views.dispose();
   } finally {
     engine.dispose();
   }
 });
 
-test("resource and gift markers follow edited terrain and release their observer", () => {
+test("resource and gift markers follow edited terrain and release their observer", async () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   try {
@@ -256,11 +258,20 @@ test("resource and gift markers follow edited terrain and release their observer
     };
     const hadObservers = map.onChangedObservable.hasObservers();
     const view = createMaterialsSitesView(scene, map, economy);
-    const site = scene.getMeshByName("materials-site")!;
+    const load = (name: string, idle?: string) =>
+      loadModelAsset(scene, {
+        url: glbDataUrl(`/assets/models/${name}.glb`),
+        idle,
+      });
+    const mound = await load("materials-mound");
+    const salvage = await load("salvage", "idle");
+    view.setMound(mound);
+    view.setSalvage(salvage);
+    const site = scene.getTransformNodeByName("materials-site")!;
     const gift = scene.getTransformNodeByName("materials-cache-gift")!;
     view.animate(1);
     const siteHeight = site.position.y;
-    const giftHeight = gift.position.y;
+    const giftHeight = gift.getHierarchyBoundingVectors(true).max.y;
     map.editTerrain({
       heights: [5, 6, 7, 8].flatMap((x) =>
         [5, 6].map((z) => ({ x, z, height: 2 })),
@@ -268,11 +279,13 @@ test("resource and gift markers follow edited terrain and release their observer
     });
     view.animate(1);
     expect(site.position.y).toBeCloseTo(siteHeight + 2);
-    expect(gift.position.y).toBeCloseTo(giftHeight + 2);
+    expect(gift.getHierarchyBoundingVectors(true).max.y).toBeCloseTo(
+      giftHeight + 2,
+    );
     economy.sites[0].remainingMaterials = 25;
     view.update(economy, () => true);
     site.computeWorldMatrix(true);
-    expect(site.getBoundingInfo().boundingBox.minimumWorld.y).toBeCloseTo(2);
+    expect(site.getHierarchyBoundingVectors(true).min.y).toBeCloseTo(2);
     view.dispose();
     expect(map.onChangedObservable.hasObservers()).toBe(hadObservers);
   } finally {
@@ -280,7 +293,7 @@ test("resource and gift markers follow edited terrain and release their observer
   }
 });
 
-test("gift salvage hovers, rotates, targets its tile and disappears on collection", () => {
+test("gift salvage hovers, rotates, targets its tile and disappears on collection", async () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   try {
@@ -307,15 +320,27 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
       ],
     };
     const view = createMaterialsSitesView(scene, map, economy);
+    const load = (name: string, idle?: string) =>
+      loadModelAsset(scene, {
+        url: glbDataUrl(`/assets/models/${name}.glb`),
+        idle,
+      });
+    const mound = await load("materials-mound");
+    const salvage = await load("salvage", "idle");
+    view.setMound(mound);
+    view.setSalvage(salvage);
     const gift = scene.getTransformNodeByName(
       "materials-cache-gift",
     ) as TransformNode;
     view.animate(0);
-    const height = gift.position.y;
-    const rotation = gift.rotation.y;
+    const height = gift.getHierarchyBoundingVectors(true).max.y;
+    const animated = scene.getTransformNodeByName(
+      "materials-cache-model-salvage",
+    )!;
+    const rotation = animated.rotationQuaternion!.y;
     view.animate(1);
-    expect(gift.position.y).not.toBe(height);
-    expect(gift.rotation.y).not.toBe(rotation);
+    expect(gift.getHierarchyBoundingVectors(true).max.y).not.toBe(height);
+    expect(animated.rotationQuaternion!.y).not.toBe(rotation);
     for (const mesh of gift.getChildMeshes()) {
       expect(mesh.isPickable).toBe(true);
       expect(view.lootTileForMesh(mesh)).toEqual({ x: 5, z: 5 });
@@ -328,6 +353,8 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
     for (const mesh of gift.getChildMeshes())
       expect(view.lootTileForMesh(mesh)).toBeUndefined();
     view.dispose();
+    mound.dispose();
+    salvage.dispose();
     expect(scene.meshes).toHaveLength(0);
     expect(scene.materials).toHaveLength(0);
   } finally {

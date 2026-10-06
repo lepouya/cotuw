@@ -200,14 +200,15 @@ the requirements.
 
 - **0.46, presentation:** skeletal infantry with attack and death clips,
   articulated machinery, tracers, muzzle flashes, bite effects, health bars,
-  remains, blueprint progress, and staged resource markers work. Wolf attack
-  and death animation, ambient objects, escalating damage effects,
-  construction stages, and the remaining building activity animations still
-  need integration.
+  remains, blueprint progress, staged resource markers, wolf attack and death,
+  and Harvester transit, harvesting, and destruction clips work. Models,
+  materials, skeletons, clips, textures, and sprite sheets have offline
+  generators; runtime art loads their committed files. Ambient objects,
+  escalating damage effects, construction stages, and the remaining building
+  activity animations still need integration.
 
 ## Recommended next task
 
-Continue **0.46** with wolf attack and death animation through the same
-triggers and remains, then construction stages and damage effects. Check
-desktop export and import, and run first-time human playtests for **0.55**
-alongside.
+Continue **0.46** with construction stages, damage effects, ambient objects,
+and building activity animations. Check desktop export and import, and run
+first-time human playtests for **0.55** alongside.

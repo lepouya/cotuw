@@ -5,9 +5,17 @@ import {
   TransformNode,
 } from "@babylonjs/core";
 import { stableUnit } from "./actor";
-import type { AbstractMesh, Scene } from "@babylonjs/core";
+import { staticInstance } from "./glb-model";
+import type { AbstractMesh, Mesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { EconomyView } from "../simulation/economy";
+import type { ModelAsset, ModelInstance } from "./glb-model";
+
+// Generated mound and salvage models share these colors.
+export const MATERIALS_COLOR = new Color3(0.3, 0.66, 0.75);
+export const SALVAGE_COLOR = new Color3(1, 0.72, 0.2);
+
+type Marker = { root: TransformNode; model: ModelInstance };
 
 /** Depletion changes presentation without changing terrain or navigation. */
 export function createMaterialsSitesView(
@@ -15,108 +23,124 @@ export function createMaterialsSitesView(
   map: TerrainMap,
   initial: EconomyView,
 ) {
-  const material = new StandardMaterial("materials-site", scene);
-  material.diffuseColor = new Color3(0.3, 0.66, 0.75);
-  material.emissiveColor = new Color3(0.04, 0.12, 0.15);
-  const giftMaterial = new StandardMaterial("materials-gift", scene);
-  giftMaterial.diffuseColor = new Color3(1, 0.72, 0.2);
-  giftMaterial.emissiveColor = new Color3(0.18, 0.09, 0.01);
-  const ribbonMaterial = new StandardMaterial("materials-gift-ribbon", scene);
-  ribbonMaterial.diffuseColor = new Color3(0.8, 0.13, 0.24);
   const groundAt = (node: TransformNode) =>
     map.heightAtWorldPosition(node.position.x, node.position.z);
-  // Markers stand on the ground at every depletion stage.
-  const seat = (mesh: AbstractMesh) => {
-    mesh.position.y = groundAt(mesh) + 0.45 * mesh.scaling.y;
+  const rootAt = (name: string, tile: TileCoord) => {
+    const root = new TransformNode(name, scene);
+    const point = map.tileCenter(tile.x, tile.z);
+    root.position.set(point.x, 0, point.z);
+    root.position.y = groundAt(root);
+    return root;
+  };
+  const standInMaterial = (name: string, color: Color3) => {
+    const material = new StandardMaterial(name, scene);
+    material.diffuseColor = color.clone();
+    return material;
+  };
+  const siteMaterial = standInMaterial(
+    "materials-site-fallback",
+    MATERIALS_COLOR,
+  );
+  const giftMaterial = standInMaterial(
+    "materials-gift-fallback",
+    SALVAGE_COLOR,
+  );
+  // Plain shapes stand in until the pack's models load, or without them.
+  const standIn = (mesh: Mesh, material: StandardMaterial, y: number) => {
+    const root = new TransformNode(`${mesh.name}-fallback`, scene);
+    mesh.parent = root;
+    mesh.position.y = y;
+    mesh.material = material;
+    return staticInstance(root);
+  };
+  const lootTiles = new WeakMap<AbstractMesh, TileCoord>();
+  const showSite = (site: Marker) => {
+    for (const mesh of site.model.root.getChildMeshes())
+      mesh.isPickable = false;
+  };
+  const showGift = (gift: Marker & { tile: TileCoord; phase: number }) => {
+    for (const mesh of gift.model.root.getChildMeshes())
+      lootTiles.set(mesh, gift.tile);
+    gift.model.pose(gift.phase);
+  };
+  const attach = <T extends Marker>(marker: T, show: (marker: T) => void) => {
+    marker.model.root.parent = marker.root;
+    show(marker);
+  };
+  const swap = <T extends Marker>(
+    markers: ReadonlyMap<string, T>,
+    asset: ModelAsset,
+    show: (marker: T) => void,
+  ) => {
+    for (const [id, marker] of markers) {
+      marker.model.dispose();
+      marker.model = asset.instantiate(`materials-${id}-model`);
+      attach(marker, show);
+    }
   };
   const sites = new Map(
     initial.sites.map((site) => {
-      const mesh = MeshBuilder.CreateCylinder(
-        `materials-${site.id}`,
-        {
-          diameterTop: 0.25,
-          diameterBottom: 0.85,
-          height: 0.9,
-          tessellation: 5,
-        },
-        scene,
-      );
-      const point = map.tileCenter(site.tile.x, site.tile.z);
-      mesh.position.set(point.x, 0, point.z);
-      seat(mesh);
-      mesh.isPickable = false;
-      mesh.material = material;
-      return [site.id, mesh] as const;
+      const name = `materials-${site.id}`;
+      const marker = {
+        root: rootAt(name, site.tile),
+        model: standIn(
+          MeshBuilder.CreateCylinder(
+            `${name}-marker`,
+            {
+              diameterTop: 0.25,
+              diameterBottom: 0.85,
+              height: 0.9,
+              tessellation: 5,
+            },
+            scene,
+          ),
+          siteMaterial,
+          0.45,
+        ),
+      };
+      attach(marker, showSite);
+      return [site.id, marker] as const;
     }),
   );
-  const lootTiles = new WeakMap<AbstractMesh, TileCoord>();
   const loot = new Map(
     initial.loot.map((cache) => {
-      const root = new TransformNode(`materials-${cache.id}-gift`, scene);
-      const point = map.tileCenter(cache.tile.x, cache.tile.z);
-      const ground = map.heightAtWorldPosition(point.x, point.z);
-      root.position.set(point.x, ground + 0.8, point.z);
-      const box = (
-        part: string,
-        width: number,
-        height: number,
-        depth: number,
-        y: number,
-        ribbon = false,
-      ) => {
-        const mesh = MeshBuilder.CreateBox(
-          `${root.name}-${part}`,
-          { width, height, depth },
-          scene,
-        );
-        mesh.parent = root;
-        mesh.position.y = y;
-        mesh.material = ribbon ? ribbonMaterial : giftMaterial;
+      const root = rootAt(`materials-${cache.id}-gift`, cache.tile);
+      const marker = {
+        root,
+        tile: cache.tile,
+        ground: root.position.y,
+        phase: stableUnit(cache.id) * 8,
+        model: standIn(
+          MeshBuilder.CreateBox(
+            `materials-${cache.id}-box`,
+            { size: 0.65 },
+            scene,
+          ),
+          giftMaterial,
+          0,
+        ),
       };
-      box("box", 0.65, 0.55, 0.65, 0);
-      box("lid", 0.72, 0.12, 0.72, 0.3);
-      box("ribbon-x", 0.13, 0.69, 0.735, 0.035, true);
-      box("ribbon-z", 0.735, 0.69, 0.13, 0.035, true);
-      for (const side of [-1, 1]) {
-        const bow = MeshBuilder.CreateTorus(
-          `${root.name}-bow-${side}`,
-          {
-            diameter: 0.24,
-            thickness: 0.055,
-            tessellation: 12,
-          },
-          scene,
-        );
-        bow.parent = root;
-        bow.position.set(side * 0.12, 0.43, 0);
-        bow.rotation.z = (side * Math.PI) / 4;
-        bow.material = ribbonMaterial;
-      }
-      for (const mesh of root.getChildMeshes()) lootTiles.set(mesh, cache.tile);
-      const gift = { root, ground, phase: stableUnit(cache.id) * Math.PI * 2 };
-      return [cache.id, gift] as const;
+      attach(marker, showGift);
+      return [cache.id, marker] as const;
     }),
   );
-  // `animate` repositions gifts every frame from their stored ground.
   const terrainObserver = map.onChangedObservable.add(() => {
-    for (const mesh of sites.values()) seat(mesh);
+    for (const { root } of sites.values()) root.position.y = groundAt(root);
     for (const gift of loot.values()) gift.ground = groundAt(gift.root);
   });
   return {
+    setMound: (mound: ModelAsset) => swap(sites, mound, showSite),
+    setSalvage: (salvage: ModelAsset) => swap(loot, salvage, showGift),
     lootTileForMesh: (mesh: AbstractMesh | null) =>
       mesh?.isEnabled() ? lootTiles.get(mesh) : undefined,
     /** Hides resources on tiles the player has not explored. */
     update: (economy: EconomyView, explored: (tile: TileCoord) => boolean) => {
       for (const site of economy.sites) {
-        const mesh = sites.get(site.id)!;
-        mesh.setEnabled(site.remainingMaterials > 0 && explored(site.tile));
+        const { root } = sites.get(site.id)!;
+        root.setEnabled(site.remainingMaterials > 0 && explored(site.tile));
         const stage =
           Math.ceil((4 * site.remainingMaterials) / site.initialMaterials) / 4;
-        const scale = 0.35 + 0.65 * stage;
-        if (mesh.scaling.y !== scale) {
-          mesh.scaling.setAll(scale);
-          seat(mesh);
-        }
+        root.scaling.setAll(0.35 + 0.65 * stage);
       }
       for (const cache of economy.loot)
         loot
@@ -124,18 +148,20 @@ export function createMaterialsSitesView(
           .root.setEnabled(!cache.collected && explored(cache.tile));
     },
     animate: (seconds: number) => {
-      for (const { root, ground, phase } of loot.values()) {
-        root.position.y = ground + 0.8 + Math.sin(seconds * 2 + phase) * 0.12;
-        root.rotation.y = phase + seconds * 0.8;
+      for (const { root, ground, phase, model } of loot.values()) {
+        if (!root.isEnabled()) continue;
+        root.position.y = ground + 0.8;
+        model.pose(seconds + phase);
       }
     },
     dispose: () => {
       map.onChangedObservable.remove(terrainObserver);
-      for (const mesh of sites.values()) mesh.dispose();
-      for (const { root } of loot.values()) root.dispose();
-      material.dispose();
+      for (const { root, model } of [...sites.values(), ...loot.values()]) {
+        model.dispose();
+        root.dispose();
+      }
+      siteMaterial.dispose();
       giftMaterial.dispose();
-      ribbonMaterial.dispose();
     },
   };
 }

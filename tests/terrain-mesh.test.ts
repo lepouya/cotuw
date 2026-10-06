@@ -43,6 +43,63 @@ describe("cornerAlpha", () => {
     expect(cornerAlpha(map, layer, 1, 1)).toBe(0.4);
   });
 
+  test("fades vegetation by grade while preserving base and water layers", () => {
+    for (const tileSize of [1, 2]) {
+      const map = new TerrainMap({
+        width: 2,
+        height: 2,
+        tileSize,
+        createLayers: () => [water(1)],
+      });
+      const grass: TileLayer = {
+        type: { id: "grass", slopeFade: { start: 0.5, end: 1.25 } },
+        color: new Color4(1, 1, 1, 0.8),
+      };
+      const rock: TileLayer = {
+        type: { id: "rock", slopeFade: { start: 1.25, end: 0.5 } },
+        color: new Color4(1, 1, 1, 1),
+      };
+      for (const [grade, alpha] of [
+        [0.25, 0.8],
+        [0.875, 0.4],
+        [2, 0],
+      ]) {
+        for (let z = 0; z <= 2; z++)
+          for (let x = 0; x <= 2; x++)
+            map.setHeight(x, z, x * grade * tileSize);
+        expect(cornerAlpha(map, grass, 1, 1)).toBeCloseTo(alpha);
+        expect(cornerAlpha(map, grass, 0, 0)).toBeCloseTo(alpha);
+        expect(cornerAlpha(map, rock, 1, 1)).toBeCloseTo(1 - alpha / 0.8);
+        expect(cornerAlpha(map, water(1), 1, 1)).toBe(1);
+        const dirt = { color: new Color4(1, 1, 1, 1) };
+        expect(cornerAlpha(map, dirt, 1, 1)).toBe(1);
+      }
+    }
+  });
+
+  test("slope fading multiplies feathered alpha at the edge of vegetation", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 1,
+      createHeight: (x) => x * 0.875,
+      createLayers: (x) =>
+        x === 0
+          ? [
+              {
+                type: {
+                  id: "grass",
+                  featherEdges: true,
+                  slopeFade: { start: 0.5, end: 1.25 },
+                },
+                color: new Color4(1, 1, 1, 1),
+              },
+            ]
+          : [],
+    });
+    expect(cornerAlpha(map, map.layersAt(0, 0)[0], 1, 0)).toBeCloseTo(0.25);
+  });
+
   test("averages the four tiles meeting at an interior corner", () => {
     // Only tile (1, 1) is wet, so corner (1, 1) has one wet tile of four.
     const map = wetMap(3, 3, (x, z) => x === 1 && z === 1);
@@ -131,6 +188,46 @@ describe("createTerrainMeshes", () => {
     ).toBe(1);
     expect(overlay).toHaveLength(3);
     expect(overlay.every(({ isPickable }) => !isPickable)).toBe(true);
+    engine.dispose();
+  });
+
+  test("height edits refresh slope fading on both sides of a chunk boundary", () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const map = new TerrainMap({
+      width: 33,
+      height: 1,
+      tileSize: 1,
+      createLayers: () => [
+        {
+          type: { id: "grass", slopeFade: { start: 0.5, end: 1.25 } },
+          color: new Color4(1, 1, 1, 1),
+        },
+      ],
+    });
+    const view = createTerrainMeshes(scene, map);
+    const alphas = (chunk: number) => {
+      const mesh = scene.getMeshByName(
+        `terrain-${chunk}-0-layer-0-tile-grass`,
+      )!;
+      expect(mesh.hasVertexAlpha).toBe(true);
+      return mesh.getVerticesData("color")!.filter((_, i) => i % 4 === 3);
+    };
+    expect(alphas(0).every((a) => a === 1)).toBe(true);
+    map.setHeight(33, 0, 4);
+    map.setHeight(33, 1, 4);
+    map.notifyChange(map.tilesAroundCorner(33, 0));
+    scene.onBeforeRenderObservable.notifyObservers(scene);
+    expect(alphas(0).slice(-2)).toEqual([0, 0]);
+    // A tile left fully clear draws nothing.
+    expect(scene.getMeshByName("terrain-1-0-layer-0-tile-grass")).toBeNull();
+    map.setHeight(33, 0, 0);
+    map.setHeight(33, 1, 0);
+    map.notifyChange(map.tilesAroundCorner(33, 0));
+    scene.onBeforeRenderObservable.notifyObservers(scene);
+    expect(alphas(0).every((a) => a === 1)).toBe(true);
+    expect(alphas(1)).toEqual([1, 1, 1, 1]);
+    view.dispose();
     engine.dispose();
   });
 

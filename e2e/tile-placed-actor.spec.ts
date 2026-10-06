@@ -3,13 +3,14 @@ import { expect, test } from "@playwright/test";
 import { TOUCH_PROFILES } from "./profiles";
 
 import type { Page } from "@playwright/test";
-import type { AbstractMesh } from "@babylonjs/core";
+import type { AbstractMesh, TransformNode } from "@babylonjs/core";
 
 async function ready(page: Page) {
   await page.goto("/?level=sandbox");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-tile-placed-actor-ready",
+    "data-models-ready",
     "true",
+    { timeout: 15_000 },
   );
 }
 
@@ -22,14 +23,21 @@ async function buildingPreview(page: Page) {
       "tile-placed-actor-building-preview-root",
     );
     if (!root) return null;
-    const assembly = scene.getTransformNodeByName(`${root.name}-assembly`)!;
-    const canopy = scene.getMeshByName(`${root.name}-entry-canopy`)!;
+    const assembly = scene.getTransformNodeByName(`${root.name}-model`)!;
+    const canopy = root
+      .getChildMeshes()
+      .find((mesh: AbstractMesh) => mesh.name.endsWith("-entry-canopy"))!;
     canopy.computeWorldMatrix(true);
     return {
       facing: assembly.rotation.y,
       transparent: root
         .getChildMeshes()
-        .every((mesh: AbstractMesh) => mesh.material?.alpha === 0.42),
+        .filter((mesh: AbstractMesh) => mesh.getTotalVertices() > 0)
+        .every((mesh: AbstractMesh) => {
+          if (mesh.visibility !== 0.42)
+            throw new Error(`${mesh.name}: visibility ${mesh.visibility}`);
+          return true;
+        }),
       pickable: root
         .getChildMeshes()
         .some((mesh: AbstractMesh) => mesh.isPickable),
@@ -85,12 +93,14 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
       const root = scene.getTransformNodeByName(
         "tile-placed-actor-arc-command-center-prototype-1-root",
       )!;
-      const assembly = scene.getTransformNodeByName(`${root.name}-assembly`)!;
+      const assembly = scene.getTransformNodeByName(`${root.name}-model`)!;
       return {
         tiles: root
           .getChildMeshes()
-          .filter(({ name }: { name: string }) => name.includes("-tile-"))
-          .length,
+          .filter(
+            (mesh: AbstractMesh) =>
+              mesh.name.includes("-tile-") && mesh.getTotalVertices() > 0,
+          ).length,
         detailCount: root.getChildMeshes().length,
         facing: assembly.rotation.y,
         selected: !!scene.getMeshByName("building-selection-outline"),
@@ -172,9 +182,12 @@ test("selects a constructed building and freezes idle equipment when disabled", 
     const { EngineStore, projectToCanvas } = await import(path);
     const engine = EngineStore.Instances[0];
     const scene = engine.scenes[0];
-    const mesh = scene.getMeshByName(
-      "tile-placed-actor-arc-command-center-prototype-1-root-command-cabin",
-    )!;
+    const mesh = scene
+      .getTransformNodeByName(
+        "tile-placed-actor-arc-command-center-prototype-1-root",
+      )!
+      .getChildMeshes()
+      .find((mesh: AbstractMesh) => mesh.name.endsWith("-command-cabin"))!;
     mesh.computeWorldMatrix(true);
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     return projectToCanvas(scene, canvas, mesh.getAbsolutePosition());
@@ -191,24 +204,28 @@ test("selects a constructed building and freezes idle equipment when disabled", 
     page.evaluate(async () => {
       const path: string = "/e2e/harness.ts";
       const { EngineStore } = await import(path);
-      return EngineStore.Instances[0].scenes[0].getTransformNodeByName(
-        "tile-placed-actor-arc-command-center-prototype-1-root-radar",
-      )!.rotation.y;
+      return EngineStore.Instances[0].scenes[0]
+        .getTransformNodeByName(
+          "tile-placed-actor-arc-command-center-prototype-1-root",
+        )!
+        .getChildTransformNodes()
+        .find((node: TransformNode) => node.name.endsWith("-radar"))!
+        .rotationQuaternion!.asArray();
     });
   const frozen = await angle();
   await page.waitForTimeout(150);
-  expect(await angle()).toBe(frozen);
+  expect(await angle()).toEqual(frozen);
   await page.locator("#animate-building").check();
-  await expect.poll(angle).toBeGreaterThan(frozen);
+  await expect.poll(angle).not.toEqual(frozen);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("#animate-building")).toBeDisabled();
   await page.waitForTimeout(100);
   const reduced = await angle();
   await page.waitForTimeout(150);
-  expect(await angle()).toBe(reduced);
+  expect(await angle()).toEqual(reduced);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator("#animate-building")).toBeEnabled();
-  await expect.poll(angle).toBeGreaterThan(reduced);
+  await expect.poll(angle).not.toEqual(reduced);
 });
 
 for (const profile of TOUCH_PROFILES)

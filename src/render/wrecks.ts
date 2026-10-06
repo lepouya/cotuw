@@ -1,17 +1,18 @@
 import {
   AbstractMesh,
   Color3,
-  MeshBuilder,
   StandardMaterial,
   TransformNode,
 } from "@babylonjs/core";
 import { stableUnit } from "./actor";
+import { unitCubeInstance } from "./glb-model";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { Wreck } from "../simulation/combat";
 import type { TileCoord } from "../simulation/grid";
 import type { ActorAppearance } from "./actor";
+import type { ModelAsset } from "./glb-model";
 
 /** Remains fade out over this many seconds before they clear. */
 const FADE_SECONDS = 5;
@@ -21,13 +22,14 @@ export type WreckViewOptions = {
   appearanceFor: (definitionId: string) => ActorAppearance | undefined;
   /** Footprint tiles of building debris. */
   tilesFor: (wreck: Wreck) => readonly TileCoord[];
+  rubble?: () => ModelAsset | undefined;
 };
 
 /** Fallen units and building rubble; never pickable. */
 export function createWreckView(
   scene: Scene,
   map: TerrainMap,
-  { appearanceFor, tilesFor }: WreckViewOptions,
+  { appearanceFor, tilesFor, rubble: rubbleAsset }: WreckViewOptions,
 ) {
   const rubble = new StandardMaterial("wreck-rubble", scene);
   rubble.diffuseColor = new Color3(0.2, 0.19, 0.17);
@@ -40,6 +42,7 @@ export function createWreckView(
       seconds: number;
       dispose: () => void;
       meshes: AbstractMesh[];
+      rubbleModel: ModelAsset | undefined;
       /** Advances the death clip by real seconds. */
       animate?: (seconds: number) => void;
     }
@@ -49,32 +52,39 @@ export function createWreckView(
     wreck: Wreck,
     age: number,
     appearance: ActorAppearance | undefined,
+    rubbleModel: ModelAsset | undefined,
   ) => {
     const root = new TransformNode(`wreck-${wreck.actorId}`, scene);
     let dispose = () => root.dispose();
     let animate: ((seconds: number) => void) | undefined;
     if (wreck.tilePlacement) {
+      const chunks: { dispose: () => void }[] = [];
       for (const tile of tilesFor(wreck)) {
         const center = map.tileCenter(tile.x, tile.z);
         const seed = stableUnit(`${wreck.actorId}-${tile.x}-${tile.z}`);
-        const chunk = MeshBuilder.CreateBox(
+        const chunk = unitCubeInstance(
+          rubbleModel,
           `wreck-${wreck.actorId}-${tile.x}-${tile.z}`,
-          {
-            width: map.tileSize * (0.7 + seed * 0.3),
-            height: DEBRIS_HEIGHT * (0.6 + seed),
-            depth: map.tileSize * (0.95 - seed * 0.3),
-          },
+          rubble,
           scene,
         );
-        chunk.parent = root;
-        chunk.material = rubble;
-        chunk.rotation.y = seed * Math.PI;
-        chunk.position.set(
-          center.x,
-          map.heightAtWorldPosition(center.x, center.z) + DEBRIS_HEIGHT / 2,
-          center.z,
+        chunks.push(chunk);
+        chunk.root.scaling.set(
+          map.tileSize * (0.7 + seed * 0.3),
+          DEBRIS_HEIGHT * (0.6 + seed),
+          map.tileSize * (0.95 - seed * 0.3),
         );
+        chunk.root.parent = root;
+        chunk.root.rotation.y = seed * Math.PI;
+        chunk.root.position.set(center.x, 0, center.z);
+        const { min } = chunk.root.getHierarchyBoundingVectors(true);
+        chunk.root.position.y =
+          map.heightAtWorldPosition(center.x, center.z) - min.y;
       }
+      dispose = () => {
+        for (const chunk of chunks) chunk.dispose();
+        root.dispose();
+      };
     } else {
       if (appearance) {
         const instance = appearance.instantiate(
@@ -106,7 +116,15 @@ export function createWreckView(
     }
     const meshes = root.getChildMeshes();
     for (const mesh of meshes) mesh.isPickable = false;
-    return { root, appearance, seconds: age, dispose, meshes, animate };
+    return {
+      root,
+      appearance,
+      seconds: age,
+      dispose,
+      meshes,
+      animate,
+      rubbleModel,
+    };
   };
   return {
     /**
@@ -131,10 +149,15 @@ export function createWreckView(
         const appearance = wreck.tilePlacement
           ? undefined
           : appearanceFor(wreck.definitionId);
-        if (!view || view.appearance !== appearance) {
+        const rubbleModel = wreck.tilePlacement ? rubbleAsset?.() : undefined;
+        if (
+          !view ||
+          view.appearance !== appearance ||
+          view.rubbleModel !== rubbleModel
+        ) {
           const seconds = Math.max(age(wreck), view?.seconds ?? 0);
           view?.dispose();
-          view = create(wreck, seconds, appearance);
+          view = create(wreck, seconds, appearance, rubbleModel);
           views.set(wreck.actorId, view);
         } else {
           view.seconds += frameSeconds;

@@ -28,14 +28,20 @@ bundled packs through the same parser future mod packs will use.
   - `attackEffect` is `"tracer"` or `"bite"`.
   - `model` is a GLB with clips under `glb`, or a built-in procedural model
     under `builtin`, such as `"wolf"`, with an optional `scale`. GLB `clips`
-    name the `idle`, `locomotion`, optional `turn`, trigger, and `death`
-    clips, as [actor assets](actor-assets.md) describes.
+    name the `idle`, `locomotion`, optional `turn`, `work`, trigger, and `death`
+    clips, as [actor assets](actor-assets.md) describes. `rig` defaults to
+    `"skeletal"`; `"rigid"` permits articulated models without a skin. An
+    optional GLB `scale` changes the mesh size; bounds and cycle distance use
+    final world units. The base pack uses generated GLBs for every actor.
   - `frameEffects` on mobile models maps a trigger to a clip played once on a
     camera-facing square. `attack` plays with each hit. Each names its `clip`,
     the sheet at `url`, its `size` in world units, and an `anchor` in the
     actor's model space: `[x, y, z]` from its ground point, facing +Z.
   - `building` sets a tile-placed actor's height, colors, and optional
-    built-in `details`, such as `"command-center"`.
+    built-in `details`, such as `"command-center"`, or a `glb` with `url` and
+    optional `idle` clip. A building cannot name both kinds of art.
+- `props` names generated `foundation`, `rubble`, `materials-mound`, `salvage`,
+  `tracer`, and `bite` GLBs with `url` and an optional `idle` clip.
 - `clips` maps IDs to frame-sequenced textures. `columns` and `rows` divide a
   sprite sheet into equal cells numbered row by row from the top left.
   `frames` lists `{ cell, seconds }` in play order, and `playback` is
@@ -46,9 +52,15 @@ bundled packs through the same parser future mod packs will use.
 - `terrain.tileTypes` defines textured layers. Each pins a `slot` so optional
   layers stack consistently. A layer marked `layerAlphaOnly` ignores its
   image's alpha, so the layer color alone controls opacity; the water image
-  caps itself at about two thirds opaque. `clip` plays a clip from the sheet
+  varies opacity across ripple crests. `clip` plays a clip from the sheet
   at `url`, and `clipPhase` delays each tile by `u` seconds per tile along x
-  and `v` along z. Every cell must repeat without a seam.
+  and `v` along z. Every cell must repeat without a seam. `scale` sets repeats
+  per tile. Optional `slopeFade: { start, end }` fades alpha from full at grade
+  `start` to none at grade `end`, measured as rise over horizontal run; an
+  `end` below `start` shows the layer on steep ground only. The steepest tile
+  at each shared corner sets its fade.
+  Fully faded tiles draw nothing. The base grass layers fade out between grades
+  0.5 and 1.25; the rock layer fades in between 0.7 and 1.4.
 - `terrain.layers` lists, for each terrain type, its layers from the bottom:
   - `variation` adds a gentle per-tile tint.
   - `coverage` shows the layer on that share of tiles in a fixed pattern.

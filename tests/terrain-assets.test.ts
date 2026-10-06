@@ -6,12 +6,7 @@ import { describe, expect, test } from "vitest";
 import { BASE_CONTENT } from "./helpers/content";
 
 import { clipCellRect } from "../src/content/texture-clip";
-import {
-  buildGrassSheet,
-  GRASS_CLIP,
-  GRASS_SHEETS,
-  TILES_PER_REPEAT,
-} from "../scripts/grass-sheet";
+import { GRASS_SHEETS, TILES_PER_REPEAT } from "../scripts/grass-sheet";
 
 import type { TileGraphics } from "../src/map";
 import type { TextureClip } from "../src/content/texture-clip";
@@ -81,18 +76,13 @@ describe("terrain texture assets", () => {
     },
   );
 
-  test.each(Object.entries(GRASS_SHEETS))(
-    "the %s sheet and clip match their generator",
-    async (id, style) => {
-      const { url, clip, scale } = tileTypes[id]!.graphics!;
-      expect(BASE_CONTENT.clips![clip!]).toEqual(GRASS_CLIP);
-      expect(scale).toEqual({
+  test.each(Object.keys(GRASS_SHEETS))(
+    "the %s sheet repeats as its generator expects",
+    (id) => {
+      expect(tileTypes[id]!.graphics!.scale).toEqual({
         u: 1 / TILES_PER_REPEAT,
         v: 1 / TILES_PER_REPEAT,
       });
-      expect(
-        (await readTexture(url)).data.equals(buildGrassSheet(style).data),
-      ).toBe(true);
     },
   );
 

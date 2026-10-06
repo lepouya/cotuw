@@ -18,7 +18,10 @@ import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome } from "../simulation/command";
 import type { ActorPlacement, PlacementReason } from "../simulation/placement";
 import type { ActorDefinition } from "../simulation/actor";
-import type { TilePlacedActorAppearance } from "./tile-placed-actor-view";
+import type {
+  TilePlacedActorAppearance,
+  TilePlacedActorAppearanceCatalog,
+} from "./tile-placed-actor-view";
 
 export type BuildingPlacementControls = {
   rotate?: HTMLButtonElement;
@@ -50,13 +53,14 @@ export type BuildingPlacementChoice = {
   build?: HTMLButtonElement;
   /** Must define a footprint. Placed actor IDs derive from its ID. */
   definition: ActorDefinition;
-  appearance: TilePlacedActorAppearance;
   /** Display name for status text. */
   name: string;
 };
 
 export type BuildingPlacementOptions = {
   buildings: readonly BuildingPlacementChoice[];
+  /** Late asset loads also replace an active preview. */
+  appearances: TilePlacedActorAppearanceCatalog;
   controls: BuildingPlacementControls;
   enabled?: () => boolean;
   pointerEnabled?: () => boolean;
@@ -74,6 +78,7 @@ export function createBuildingPlacement(
   simulation: MissionSimulation,
   {
     buildings,
+    appearances,
     controls,
     enabled = () => true,
     pointerEnabled = () => true,
@@ -91,12 +96,7 @@ export function createBuildingPlacement(
     scene,
     map,
     buildings.map(({ definition }) => definition),
-    new Map(
-      buildings.map(({ definition, appearance }) => [
-        definition.id,
-        appearance,
-      ]),
-    ),
+    appearances,
     { preview: true },
   );
   let active = false;
@@ -111,6 +111,7 @@ export function createBuildingPlacement(
   let overlayOffset = 0;
   let pickKey = "";
   let stateKey = "";
+  let lastAppearance: TilePlacedActorAppearance | undefined;
   let overlayKey = "";
   let uiKey = "";
   let terrainRevision = 0;
@@ -146,6 +147,11 @@ export function createBuildingPlacement(
       : undefined;
   };
   const update = () => {
+    const appearance = definition && appearances.get(definition.id);
+    if (appearance !== lastAppearance) {
+      lastAppearance = appearance;
+      stateKey = "";
+    }
     const available = enabled();
     if (active && pointer && !pendingId && acceptsPointer()) {
       // Picking is costly, so repeat it only after the pointer or camera moves.

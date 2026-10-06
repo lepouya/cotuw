@@ -342,7 +342,7 @@ test("preview models tolerate map edges and keep placed materials opaque", () =>
       "tile-placed-actor-preview-root",
     )!;
     for (const mesh of root.getChildMeshes()) {
-      expect(mesh.material!.alpha).toBe(0.42);
+      expect(mesh.visibility).toBe(0.42);
       expect(mesh.isPickable).toBe(false);
       expect(preview.actorIdForMesh(mesh)).toBeUndefined();
       mesh.computeWorldMatrix(true);
@@ -360,7 +360,7 @@ test("preview models tolerate map edges and keep placed materials opaque", () =>
     )!;
     expect(building.isDisposed()).toBe(false);
     for (const mesh of building.getChildMeshes())
-      expect(mesh.material!.alpha).toBe(1);
+      expect(mesh.visibility).toBe(1);
     placed.dispose();
   } finally {
     engine.dispose();

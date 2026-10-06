@@ -1,0 +1,530 @@
+import {
+  Animation,
+  AnimationGroup,
+  Bone,
+  Color3,
+  Matrix,
+  Mesh,
+  MeshBuilder,
+  Quaternion,
+  Skeleton,
+  StandardMaterial,
+  TransformNode,
+  Vector3,
+  VertexData,
+} from "@babylonjs/core";
+
+import { createCommandCenterDetails } from "../src/render/command-center.ts";
+import { createBarracksDetails } from "../src/render/barracks.ts";
+import { createRefineryDetails } from "../src/render/refinery.ts";
+import { createHarvesterAppearance } from "../src/render/harvester.ts";
+import { createWolfAppearance } from "../src/render/wolf.ts";
+import { BITE_COLOR, TRACER_COLOR } from "../src/render/combat-effects.ts";
+import {
+  MATERIALS_COLOR,
+  SALVAGE_COLOR,
+} from "../src/render/materials-sites.ts";
+import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
+import { seededRandom } from "./sprite-sheet.ts";
+
+import type { Scene } from "@babylonjs/core";
+import type { ActorAppearance } from "../src/render/actor.ts";
+import type { TilePlacedActorDetailsFactory } from "../src/render/tile-placed-actor-view.ts";
+
+/** Samples authored poses into glTF node channels; playback needs no builder. */
+function clip(
+  root: TransformNode,
+  name: string,
+  seconds: number,
+  pose: (seconds: number) => void,
+  completePose = true,
+) {
+  const nodes = [
+    root,
+    ...root
+      .getDescendants(false)
+      .filter((node): node is TransformNode => node instanceof TransformNode),
+  ];
+  const rest = nodes.map((node) => ({
+    position: node.position.clone(),
+    rotation: node.rotation.clone(),
+    scaling: node.scaling.clone(),
+  }));
+  const restore = () =>
+    nodes.forEach((node, index) => {
+      node.position.copyFrom(rest[index]!.position);
+      node.rotation.copyFrom(rest[index]!.rotation);
+      node.scaling.copyFrom(rest[index]!.scaling);
+    });
+  const frames = Math.round(seconds * FRAMES_PER_SECOND);
+  const keys = nodes.map(() => ({
+    position: [] as { frame: number; value: Vector3 }[],
+    rotationQuaternion: [] as { frame: number; value: Quaternion }[],
+    scaling: [] as { frame: number; value: Vector3 }[],
+  }));
+  for (let frame = 0; frame <= frames; frame++) {
+    restore();
+    pose(frame / FRAMES_PER_SECOND);
+    nodes.forEach((node, index) => {
+      keys[index]!.position.push({ frame, value: node.position.clone() });
+      keys[index]!.rotationQuaternion.push({
+        frame,
+        value: Quaternion.FromEulerVector(node.rotation),
+      });
+      keys[index]!.scaling.push({ frame, value: node.scaling.clone() });
+    });
+  }
+  const group = new AnimationGroup(name, root.getScene());
+  restore();
+  nodes.forEach((node, index) => {
+    node.rotationQuaternion = Quaternion.FromEulerVector(node.rotation);
+    for (const property of [
+      "position",
+      "rotationQuaternion",
+      "scaling",
+    ] as const) {
+      const values = keys[index]![property];
+      const first = values[0]!.value.asArray();
+      if (
+        !completePose &&
+        values.every(({ value }) =>
+          value
+            .asArray()
+            .every((component, channel) => component === first[channel]),
+        )
+      )
+        continue;
+      const animation = new Animation(
+        `${name}-${node.name}-${property}`,
+        property,
+        FRAMES_PER_SECOND,
+        property === "rotationQuaternion"
+          ? Animation.ANIMATIONTYPE_QUATERNION
+          : Animation.ANIMATIONTYPE_VECTOR3,
+      );
+      animation.setKeys(keys[index]![property]);
+      group.addTargetedAnimation(animation, node);
+    }
+  });
+  return group;
+}
+
+/** Rigid weights preserve the part hierarchy while exporting a real skin. */
+function skin(root: TransformNode) {
+  const scene = root.getScene();
+  const parts = root
+    .getChildMeshes()
+    .filter(
+      (mesh): mesh is Mesh =>
+        mesh instanceof Mesh && mesh.getTotalVertices() > 0,
+    );
+  const vertices = parts.map((part) => {
+    const data = VertexData.ExtractFromMesh(part);
+    data.transform(part.computeWorldMatrix(true));
+    return data;
+  });
+  const joints = parts.map((part) => {
+    const joint = new TransformNode(`${part.name}-joint`, scene);
+    joint.parent = part.parent;
+    joint.position.copyFrom(part.position);
+    joint.rotation.copyFrom(part.rotation);
+    joint.scaling.copyFrom(part.scaling);
+    for (const child of part.getChildren()) child.parent = joint;
+    return joint;
+  });
+  const skeleton = new Skeleton("wolf-rig", "wolf-rig", scene);
+  skeleton.useTextureToStoreBoneMatrices = true;
+  const bones = new Map<TransformNode, Bone>();
+  const add = (node: TransformNode): Bone | null => {
+    if (node === root) return null;
+    if (bones.has(node)) return bones.get(node)!;
+    const parent =
+      node.parent instanceof TransformNode ? add(node.parent) : null;
+    const matrix = Matrix.Compose(
+      node.scaling,
+      Quaternion.FromEulerVector(node.rotation),
+      node.position,
+    );
+    const bone = new Bone(node.name, skeleton, parent, matrix);
+    bone.linkTransformNode(node);
+    bones.set(node, bone);
+    return bone;
+  };
+  for (const joint of joints) add(joint);
+  for (const material of new Set(parts.map((part) => part.material)))
+    rigidSkin(
+      `wolf-${material!.name}-skin`,
+      parts.flatMap((part, index) =>
+        part.material === material
+          ? [
+              {
+                vertices: vertices[index]!,
+                bone: skeleton.bones.indexOf(bones.get(joints[index]!)!),
+              },
+            ]
+          : [],
+      ),
+      skeleton,
+      material!,
+      root,
+    );
+  for (const part of parts) part.dispose(false, false);
+}
+
+function surface(
+  scene: Scene,
+  name: string,
+  color: Color3 | readonly [number, number, number],
+  glow = false,
+) {
+  const material = new StandardMaterial(name, scene);
+  material.diffuseColor =
+    color instanceof Color3 ? color.clone() : new Color3(...color);
+  material.specularColor = Color3.Black();
+  if (glow) material.emissiveColor = material.diffuseColor.scale(0.25);
+  return material;
+}
+
+function unlit(scene: Scene, name: string, color: Color3) {
+  const material = surface(scene, name, color);
+  material.disableLighting = true;
+  material.emissiveColor = material.diffuseColor;
+  return material;
+}
+
+/** Bakes parts that share a material into one mesh, keeping draw calls low. */
+function merge(
+  root: TransformNode,
+  name: string,
+  parts: Mesh[],
+  material: StandardMaterial,
+) {
+  const mesh = Mesh.MergeMeshes(parts, true, true)!;
+  mesh.convertToFlatShadedMesh();
+  mesh.name = name;
+  mesh.material = material;
+  mesh.parent = root;
+}
+
+/** Instantiates a built-in actor's parts as the model, without its template. */
+function actorParts(
+  scene: Scene,
+  name: string,
+  create: (scene: Scene) => ActorAppearance,
+) {
+  const instance = create(scene).instantiate(name, 0);
+  // Remove the hidden template without releasing the instance's materials.
+  scene.getTransformNodeByName(`${name}-template`)!.dispose(false, false);
+  return instance.root;
+}
+
+function wolf(scene: Scene, name: string) {
+  const root = actorParts(scene, name, createWolfAppearance);
+  skin(root);
+  const hips = root
+    .getChildTransformNodes()
+    .filter((node) => /wolf-leg-\d$/.test(node.name));
+  const head = root
+    .getChildTransformNodes()
+    .find((node) => node.name.endsWith("wolf-head-joint"))!;
+  clip(root, "idle", 2, (seconds) => {
+    head.rotation.x = -0.15 + Math.sin(seconds * Math.PI) * 0.025;
+  });
+  clip(root, "walk", 1, (seconds) => {
+    hips.forEach((hip, index) => {
+      hip.rotation.x =
+        Math.sin(
+          seconds * Math.PI * 2 + (index === 0 || index === 3 ? 0 : Math.PI),
+        ) * 0.55;
+    });
+  });
+  clip(
+    root,
+    "bite",
+    0.4,
+    (seconds) => {
+      const lunge = Math.sin((seconds / 0.4) * Math.PI);
+      head.rotation.x = -0.15 - lunge * 0.45;
+      root.position.z = lunge * 0.18;
+    },
+    false,
+  );
+  clip(root, "death", 0.8, (seconds) => {
+    const fall = (seconds / 0.8) ** 2;
+    root.rotation.z = (fall * Math.PI) / 2;
+    root.position.y = fall * 0.18;
+    hips.forEach((hip) => {
+      hip.rotation.x = -fall * 0.3;
+    });
+  });
+}
+
+function harvester(scene: Scene, name: string) {
+  const root = actorParts(scene, name, createHarvesterAppearance);
+  const drill = scene.getTransformNodeByName("harvester-drill")!;
+  const amber = scene.getMeshByName("harvester-work-beacon")!;
+  amber.name = "idle-signal";
+  const green = amber.clone("working-signal", root)!;
+  green.material = surface(scene, "working-light", [0.2, 1, 0.65], true);
+  clip(root, "idle", 2, () => {});
+  clip(root, "transit", 1, (seconds) => {
+    root.position.y = Math.sin(seconds * Math.PI * 4) * 0.018;
+  });
+  clip(root, "harvest", 2, (seconds) => {
+    drill.position.y = 0.3 + Math.sin(seconds * Math.PI * 12) * 0.035;
+    drill.rotation.z = seconds * Math.PI * 4;
+  });
+  clip(root, "death", 0.8, (seconds) => {
+    const fall = (seconds / 0.8) ** 2;
+    root.rotation.z = -fall * 0.5;
+    root.position.y = -fall * 0.12;
+    drill.rotation.x = fall * 0.8;
+  });
+}
+
+/** A building's articulated parts, with one loop of their motion as idle. */
+function building(factory: TilePlacedActorDetailsFactory) {
+  return (scene: Scene, name: string) => {
+    const root = new TransformNode(name, scene);
+    const materials = new Map<string, StandardMaterial>();
+    const details = factory(
+      root,
+      { center: Vector3.Zero(), roof: 0, tileSize: 1, facing: 0 },
+      (materialName, configure) => {
+        let material = materials.get(materialName);
+        if (!material) {
+          material = new StandardMaterial(materialName, scene);
+          configure(material);
+          materials.set(materialName, material);
+        }
+        return material;
+      },
+    );
+    if (!details.loopSeconds)
+      throw new Error(`Building ${name} has no looping motion`);
+    clip(root, "idle", details.loopSeconds, details.update, false);
+  };
+}
+
+/** A unit-length shot along +Z that hits scale to their range. */
+function tracer(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const material = unlit(scene, name, TRACER_COLOR);
+  const beam = MeshBuilder.CreateBox(
+    "beam",
+    { width: 0.025, height: 0.025, depth: 1 },
+    scene,
+  );
+  beam.parent = root;
+  beam.position.z = 0.5;
+  beam.material = material;
+}
+
+/** Three slanted claw slashes across the strike direction. */
+function bite(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const material = unlit(scene, name, BITE_COLOR);
+  for (const side of [-1, 0, 1]) {
+    const slash = MeshBuilder.CreateBox(
+      `claw-${side}`,
+      { width: 0.025, height: 0.5, depth: 0.025 },
+      scene,
+    );
+    slash.parent = root;
+    slash.position.x = side * 0.12;
+    slash.rotation.z = -0.5;
+    slash.material = material;
+  }
+}
+
+/** A unit cube that placement scales to fit. */
+function cube(color: [number, number, number]) {
+  return (scene: Scene, name: string) => {
+    const root = new TransformNode(name, scene);
+    const mesh = MeshBuilder.CreateBox(name, { size: 1 }, scene);
+    mesh.parent = root;
+    mesh.material = surface(scene, name, color);
+  };
+}
+
+/** A tall crystal ringed by shorter ones leaning outward, on a stony bed. */
+function materialsMound(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  // Every part rests on the ground plane, so depletion shrinks toward it.
+  const random = seededRandom(0x3a7e);
+  const shards = Array.from({ length: 7 }, (_, index) => {
+    const center = index === 0;
+    const height = center ? 0.85 : 0.3 + random() * 0.28;
+    const width = center ? 0.22 : 0.1 + random() * 0.07;
+    const tip = width * 1.1;
+    const parts = [
+      MeshBuilder.CreateCylinder(
+        "prism",
+        { height: height - tip, diameter: width, tessellation: 6 },
+        scene,
+      ),
+      MeshBuilder.CreateCylinder(
+        "tip",
+        { height: tip, diameterTop: 0, diameterBottom: width, tessellation: 6 },
+        scene,
+      ),
+    ];
+    parts[0]!.position.y = (height - tip) / 2;
+    parts[1]!.position.y = height - tip / 2;
+    const shard = Mesh.MergeMeshes(parts, true)!;
+    const angle = (index / 6) * Math.PI * 2 + random() * 0.6;
+    const ring = center ? 0 : 0.16 + random() * 0.12;
+    const lean = center ? 0.05 : 0.25 + random() * 0.2;
+    shard.position.set(
+      Math.sin(angle) * ring,
+      (width / 2) * Math.sin(lean),
+      Math.cos(angle) * ring,
+    );
+    // Yaw applies after pitch, so the top leans toward the heading.
+    shard.rotation.set(lean, angle, 0);
+    return shard;
+  });
+  const stones = Array.from({ length: 6 }, (_, index) => {
+    const angle = (index / 6) * Math.PI * 2 + random();
+    const ring = 0.2 + random() * 0.15;
+    const size = 0.07 + random() * 0.05;
+    // Babylon's dodecahedron spans ±1 vertically per unit size.
+    const stone = MeshBuilder.CreatePolyhedron(
+      `bed-${index}`,
+      { type: 2, sizeX: size, sizeY: size / 2, sizeZ: size },
+      scene,
+    );
+    stone.position.set(
+      Math.sin(angle) * ring,
+      size / 2,
+      Math.cos(angle) * ring,
+    );
+    stone.rotation.y = random() * Math.PI;
+    return stone;
+  });
+  merge(
+    root,
+    "crystal",
+    shards,
+    surface(scene, "materials", MATERIALS_COLOR, true),
+  );
+  merge(
+    root,
+    "bed",
+    stones,
+    surface(scene, "materials-bed", [0.27, 0.25, 0.23]),
+  );
+}
+
+/** Broken slabs and bent beams within the unit cube that placement scales. */
+function rubble(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const random = seededRandom(0x5ab0);
+  const pieces = new Map<string, Mesh[]>([
+    ["concrete", []],
+    ["scorched", []],
+    ["metal", []],
+  ]);
+  for (let index = 0; index < 16; index++) {
+    const width = 0.14 + random() * 0.3;
+    const height = 0.25 + random() * 0.65;
+    const depth = 0.14 + random() * 0.3;
+    const chunk = MeshBuilder.CreateBox(
+      `chunk-${index}`,
+      { width, height, depth },
+      scene,
+    );
+    chunk.position.set(
+      (random() - 0.5) * (1 - width),
+      -0.5 + height * 0.42,
+      (random() - 0.5) * (1 - depth),
+    );
+    chunk.rotation.set(
+      (random() - 0.5) * 0.5,
+      random() * Math.PI,
+      (random() - 0.5) * 0.5,
+    );
+    pieces.get(random() < 0.3 ? "scorched" : "concrete")!.push(chunk);
+  }
+  for (let index = 0; index < 3; index++) {
+    const beam = MeshBuilder.CreateBox(
+      `beam-${index}`,
+      { width: 0.06, height: 0.12, depth: 0.7 + random() * 0.2 },
+      scene,
+    );
+    beam.position.set((random() - 0.5) * 0.5, -0.25, (random() - 0.5) * 0.3);
+    beam.rotation.set(0.35 + random() * 0.3, random() * Math.PI, 0);
+    pieces.get("metal")!.push(beam);
+  }
+  for (const [part, color] of [
+    ["concrete", [0.3, 0.29, 0.27]],
+    ["scorched", [0.12, 0.11, 0.1]],
+    ["metal", [0.4, 0.38, 0.35]],
+  ] as const)
+    merge(
+      root,
+      part,
+      pieces.get(part)!,
+      surface(scene, `rubble-${part}`, [...color]),
+    );
+}
+
+/** A ribboned gift box that bobs and turns. */
+function salvage(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const gold = surface(scene, "salvage-box", SALVAGE_COLOR, true);
+  const ribbon = surface(scene, "salvage-ribbon", [0.8, 0.13, 0.24]);
+  for (const [part, size, y, material] of [
+    ["box", [0.65, 0.55, 0.65], 0, gold],
+    ["lid", [0.72, 0.12, 0.72], 0.3, gold],
+    ["ribbon-x", [0.13, 0.69, 0.735], 0.035, ribbon],
+    ["ribbon-z", [0.735, 0.69, 0.13], 0.035, ribbon],
+  ] as const) {
+    const mesh = MeshBuilder.CreateBox(
+      part,
+      { width: size[0], height: size[1], depth: size[2] },
+      scene,
+    );
+    mesh.parent = root;
+    mesh.position.y = y;
+    mesh.material = material;
+  }
+  for (const side of [-1, 1]) {
+    const bow = MeshBuilder.CreateTorus(
+      `bow-${side}`,
+      { diameter: 0.24, thickness: 0.055, tessellation: 12 },
+      scene,
+    );
+    bow.parent = root;
+    bow.position.set(side * 0.12, 0.43, 0);
+    bow.rotation.z = (side * Math.PI) / 4;
+    bow.material = ribbon;
+  }
+  clip(root, "idle", 8, (seconds) => {
+    root.position.y = Math.sin((seconds * Math.PI) / 2) * 0.12;
+    root.rotation.y = (seconds * Math.PI) / 4;
+  });
+}
+
+/** Each model's builder fills an empty scene with nodes, materials, and clips. */
+const BUILDERS = {
+  "command-center": building(createCommandCenterDetails),
+  barracks: building(createBarracksDetails),
+  refinery: building(createRefineryDetails),
+  harvester,
+  wolf,
+  "materials-mound": materialsMound,
+  salvage,
+  rubble,
+  foundation: cube([0.35, 0.42, 0.46]),
+  tracer,
+  bite,
+} satisfies Record<string, (scene: Scene, name: string) => void>;
+
+export type ModelAsset = keyof typeof BUILDERS;
+export const MODEL_ASSETS = Object.keys(BUILDERS) as ModelAsset[];
+
+/** Exports model geometry, materials, rigs, and clips from code alone. */
+export function exportModelAsset(kind: ModelAsset): Promise<Uint8Array> {
+  return exportGlb(kind, (scene) => BUILDERS[kind](scene, kind));
+}

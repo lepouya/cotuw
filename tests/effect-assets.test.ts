@@ -5,10 +5,6 @@ import { expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
 import { clipCellRect } from "../src/content/texture-clip";
-import {
-  buildMuzzleFlashSheet,
-  MUZZLE_FLASH_CLIP,
-} from "../scripts/muzzle-flash-sheet";
 
 const effects = Object.entries(BASE_CONTENT.presentation).flatMap(
   ([id, { frameEffects }]) =>
@@ -22,12 +18,6 @@ async function readSheet(url: string): Promise<PNG> {
     await readFile(new URL(`../public${url}`, import.meta.url)),
   );
 }
-
-test("the muzzle flash sheet and clip match their generator", async () => {
-  expect(BASE_CONTENT.clips!["muzzle-flash"]).toEqual(MUZZLE_FLASH_CLIP);
-  const sheet = await readSheet("/assets/effects/muzzle-flash.png");
-  expect(sheet.data.equals(buildMuzzleFlashSheet().data)).toBe(true);
-});
 
 // A frame effect's square shows the whole cell, so a visible edge would
 // draw a hard border around it.

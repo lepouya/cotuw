@@ -12,6 +12,7 @@ import {
 import { createDebugOverlay } from "./debug-overlay";
 import { loadClipFrames } from "./texture-clip";
 import { compileTextureClip } from "../content/texture-clip";
+import { cornerAlpha } from "../map";
 import type { ClipFrames } from "./texture-clip";
 import type { TextureClip } from "../content/texture-clip";
 
@@ -211,16 +212,15 @@ export function createTerrainMeshes(
     const meshes: Mesh[] = [];
     for (const layerGroups of groups.values()) {
       for (const group of layerGroups.values()) {
-        meshes.push(
-          createLayerMesh(
-            scene,
-            map,
-            chunkX,
-            chunkZ,
-            group,
-            materialFor(group.type, group.phase),
-          ),
+        const mesh = createLayerMesh(
+          scene,
+          map,
+          chunkX,
+          chunkZ,
+          group,
+          materialFor(group.type, group.phase),
         );
+        if (mesh) meshes.push(mesh);
       }
     }
     for (const mesh of chunkMeshes.get(chunkKey) ?? []) {
@@ -323,6 +323,8 @@ function sameTileType(left: TileType, right: TileType): boolean {
     left.id === right.id &&
     left.slot === right.slot &&
     Boolean(left.featherEdges) === Boolean(right.featherEdges) &&
+    left.slopeFade?.start === right.slopeFade?.start &&
+    left.slopeFade?.end === right.slopeFade?.end &&
     sameGraphics(left.graphics, right.graphics)
   );
 }
@@ -387,7 +389,7 @@ function createLayerMesh(
   chunkZ: number,
   { layerIndex, type, tiles }: LayerGroup,
   material: StandardMaterial,
-): Mesh {
+): Mesh | undefined {
   const positions: number[] = [];
   const indices: number[] = [];
   const normals: number[] = [];
@@ -403,8 +405,13 @@ function createLayerMesh(
       [x + 1, z],
       [x + 1, z + 1],
     ] as const;
+    const alphas = corners.map(([cornerX, cornerZ]) =>
+      cornerAlpha(map, layer, cornerX, cornerZ),
+    );
+    // Slope-faded layers are clear on most tiles; skip drawing those.
+    if (alphas.every((alpha) => alpha === 0)) continue;
 
-    for (const [cornerX, cornerZ] of corners) {
+    for (const [index, [cornerX, cornerZ]] of corners.entries()) {
       const position = map.worldPoint(
         cornerX,
         cornerZ,
@@ -412,7 +419,7 @@ function createLayerMesh(
       );
       const { r, g, b } = layer.color;
       positions.push(position.x, position.y, position.z);
-      colors.push(r, g, b, cornerAlpha(map, layer, cornerX, cornerZ));
+      colors.push(r, g, b, alphas[index]!);
       // Global tile coordinates keep the texture phase continuous across
       // quads and chunk boundaries.
       uvs.push(cornerX, cornerZ);
@@ -427,6 +434,7 @@ function createLayerMesh(
       vertexOffset + 1,
     );
   }
+  if (positions.length === 0) return undefined;
 
   VertexData.ComputeNormals(positions, indices, normals);
   const mesh = new Mesh(
@@ -441,7 +449,8 @@ function createLayerMesh(
   vertexData.uvs = uvs;
   vertexData.applyToMesh(mesh);
   mesh.hasVertexAlpha = tiles.some(
-    ({ layer }) => layer.color.a < 1 || layer.type?.featherEdges,
+    ({ layer }) =>
+      layer.color.a < 1 || layer.type?.featherEdges || layer.type?.slopeFade,
   );
   mesh.material = material;
   mesh.metadata = { pickKind: TERRAIN_PICK_KIND };
@@ -456,42 +465,7 @@ export function isTerrainPickMesh(mesh: AbstractMesh | null): boolean {
   return mesh?.metadata?.pickKind === TERRAIN_PICK_KIND;
 }
 
-/**
- * The layer's own alpha, or when it feathers, the average across the tiles
- * meeting at this corner, counting tiles without the layer as clear. Tiles off
- * the map are skipped so borders do not feather inward.
- */
-export function cornerAlpha(
-  map: TerrainMap,
-  layer: TileLayer,
-  cornerX: number,
-  cornerZ: number,
-): number {
-  if (!layer.type?.featherEdges) {
-    return layer.color.a;
-  }
-
-  let total = 0;
-  let sampled = 0;
-  for (const [x, z] of [
-    [cornerX - 1, cornerZ - 1],
-    [cornerX, cornerZ - 1],
-    [cornerX - 1, cornerZ],
-    [cornerX, cornerZ],
-  ]) {
-    if (!map.containsTile(x, z)) {
-      continue;
-    }
-
-    const neighbor = map
-      .layersAt(x, z)
-      .find((candidate) => candidate.type?.id === layer.type?.id);
-    total += neighbor?.color.a ?? 0;
-    sampled += 1;
-  }
-
-  return sampled > 0 ? total / sampled : 0;
-}
+export { cornerAlpha } from "../map";
 
 function tileTypeName(type?: TileType): string {
   return type ? `tile-${type.id}` : "plain";
@@ -533,7 +507,7 @@ function configureLayerTexture<T extends Texture>(
 ): T {
   texture.hasAlpha = graphics.hasAlpha;
   // Repeating rather than mirroring, which would alternate reflected copies.
-  // Relies on matching opposite edges; see scripts/reconcile-texture-edges.ts.
+  // Generated textures have matching opposite edges.
   texture.wrapU = Texture.WRAP_ADDRESSMODE;
   texture.wrapV = Texture.WRAP_ADDRESSMODE;
   if (graphics.scale) {

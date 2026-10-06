@@ -1,6 +1,7 @@
 import {
   Color3,
   MeshBuilder,
+  PBRMaterial,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -13,12 +14,14 @@ import { createViewRegistry } from "./view-registry";
 import { isRgb } from "./color";
 import { createFootprintOverlay } from "./footprint-overlay";
 import { createScreenBar } from "./screen-bar";
+import { unitCubeInstance } from "./glb-model";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
 import type { Rgb } from "./color";
+import type { ModelAsset } from "./glb-model";
 
 /** Gap left on footprint sides that face unoccupied tiles. */
 const EDGE_INSET_TILES = 0.06;
@@ -46,7 +49,12 @@ export type TilePlacedActorDetailsFactory = (
     facing: number;
   },
   material: SharedMaterial,
-) => { update: (elapsedSeconds: number) => void; dispose: () => void };
+) => {
+  update: (elapsedSeconds: number) => void;
+  /** `update` repeats after this many seconds, so it can loop as one clip. */
+  loopSeconds?: number;
+  dispose: () => void;
+};
 
 /** Renderer-owned presentation for one tile-placed actor definition. */
 export type TilePlacedActorAppearance = {
@@ -54,6 +62,7 @@ export type TilePlacedActorAppearance = {
   color: Rgb;
   minimapColor?: Rgb;
   createDetails?: TilePlacedActorDetailsFactory;
+  foundation?: ModelAsset;
 };
 
 export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
@@ -74,7 +83,7 @@ export type TilePlacedActorViewRegistry = {
 
 /**
  * Draws tile-placed actors from renderer-owned appearances. Definitions and
- * appearances are read once per view, so they must not change afterwards.
+ * appearances are read once per view; replace catalog entries to refresh art.
  */
 export function createTilePlacedActorViewRegistry(
   scene: Scene,
@@ -205,6 +214,7 @@ export function createTilePlacedActorViewRegistry(
     const roof =
       Math.max(...tiles.flatMap(cornerHeights)) +
       (appearances.get(definition.id)?.height ?? DEFAULT_HEIGHT);
+    const foundations: { dispose: () => void }[] = [];
     for (const tile of tiles) {
       const inset = (dx: number, dz: number) =>
         occupied.has(tileKey({ x: tile.x + dx, z: tile.z + dz }))
@@ -219,18 +229,22 @@ export function createTilePlacedActorViewRegistry(
       const maxX = low.x + map.tileSize - inset(1, 0);
       const minZ = low.z + inset(0, -1);
       const maxZ = low.z + map.tileSize - inset(0, 1);
-      const column = MeshBuilder.CreateBox(
+      const foundation = unitCubeInstance(
+        appearances.get(definition.id)?.foundation,
         `tile-placed-actor-${actor.id}-tile-${tile.x}-${tile.z}`,
-        { width: maxX - minX, depth: maxZ - minZ, height: roof - low.y },
+        body,
         scene,
       );
+      foundations.push(foundation);
+      const column = foundation.root;
+      for (const mesh of column.getChildMeshes()) mesh.material = body;
+      column.scaling.set(maxX - minX, roof - low.y, maxZ - minZ);
       column.parent = root;
       column.position.set(
         (minX + maxX) / 2,
         (low.y + roof) / 2,
         (minZ + maxZ) / 2,
       );
-      column.material = body;
     }
     const { worldPosition, facing } = tilePlacedPose(map, actor, definition);
     const details = appearances.get(definition.id)?.createDetails?.(
@@ -246,7 +260,7 @@ export function createTilePlacedActorViewRegistry(
     if (preview) {
       for (const mesh of root.getChildMeshes()) {
         mesh.isPickable = false;
-        if (mesh.material) mesh.material.alpha = 0.42;
+        mesh.visibility = 0.42;
       }
     }
     const exit =
@@ -258,16 +272,25 @@ export function createTilePlacedActorViewRegistry(
     const constructing = !preview && actor.construction !== undefined;
     if (constructing)
       for (const mesh of root.getChildMeshes()) mesh.visibility = 0.45;
-    const offlineMaterials = new Map<StandardMaterial, StandardMaterial>();
+    const offlineMaterials = new Map<
+      StandardMaterial | PBRMaterial,
+      StandardMaterial | PBRMaterial
+    >();
     if (disconnected)
       for (const mesh of root.getChildMeshes()) {
-        if (!(mesh.material instanceof StandardMaterial)) continue;
+        if (!(
+          mesh.material instanceof StandardMaterial ||
+          mesh.material instanceof PBRMaterial
+        ))
+          continue;
         let dimmed = offlineMaterials.get(mesh.material);
         if (!dimmed) {
           dimmed = mesh.material.clone(
             `${root.name}-offline-${mesh.material.name}`,
           );
-          dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
+          if (dimmed instanceof StandardMaterial)
+            dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
+          else dimmed.albedoColor = dimmed.albedoColor.scale(0.35);
           dimmed.emissiveColor = Color3.Black();
           offlineMaterials.set(mesh.material, dimmed);
         }
@@ -333,6 +356,7 @@ export function createTilePlacedActorViewRegistry(
       dispose: () => {
         details?.dispose();
         exit?.dispose();
+        for (const foundation of foundations) foundation.dispose();
         root.dispose();
         for (const material of offlineMaterials.values()) material.dispose();
       },
@@ -345,8 +369,9 @@ export function createTilePlacedActorViewRegistry(
       definitionId,
       tilePlacement,
       construction,
-    }: TilePlacedActorState) =>
-      JSON.stringify([
+    }: TilePlacedActorState) => ({
+      appearance: appearances.get(definitionId),
+      key: JSON.stringify([
         definitionId,
         tilePlacement,
         !!construction,
@@ -354,6 +379,9 @@ export function createTilePlacedActorViewRegistry(
         map.navigationChanges.generation,
         terrainRevisions.get(id),
       ]),
+    }),
+    sameKey: (left, right) =>
+      left.appearance === right.appearance && left.key === right.key,
     create,
   });
 

@@ -46,11 +46,13 @@ export const createCommandCenterDetails: TilePlacedActorDetailsFactory = (
   panel.rotation.x = -0.2;
   const panelFace = box("radar-face", [0.44, 0.19, 0.015], [0, 0, 0.04], glass);
   panelFace.parent = panel;
+  const loopSeconds = 14;
   return {
     update: (seconds) => {
-      radar.rotation.y = seconds * 0.45;
-      blades.rotation.y = seconds * 2.5;
+      radar.rotation.y = (seconds / loopSeconds) * Math.PI * 2;
+      blades.rotation.y = (seconds / loopSeconds) * Math.PI * 4;
     },
+    loopSeconds,
     dispose: () => assembly.dispose(),
   };
 };

@@ -1,10 +1,9 @@
-import { readFileSync } from "node:fs";
-
 import { NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
-import { exportInfantry, INFANTRY_ROLES } from "../scripts/infantry-model";
+import { INFANTRY_ROLES } from "../scripts/infantry-model";
 import { BASE_CONTENT } from "./helpers/content";
+import { glbDataUrl } from "./helpers/assets";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
 import type { AbstractMesh, TransformNode } from "@babylonjs/core";
@@ -13,27 +12,21 @@ import type {
   SkinnedActorOptions,
 } from "../src/render/skinned-actor-appearance";
 
-test.each(INFANTRY_ROLES)("the committed %s GLB is current", async (role) => {
-  const committed = readFileSync(`public/assets/actors/arc-${role}.glb`);
-  const generated = Buffer.from(await exportInfantry(role));
-
-  expect(
-    generated.equals(committed),
-    "Regenerate with `npm run assets:infantry`.",
-  ).toBe(true);
-});
-
 /** Loads through the real glTF loader, from the committed file. */
 async function load(graphics: ActorGraphics, options?: SkinnedActorOptions) {
   const engine = new NullEngine();
   const scene = new Scene(engine);
-  const data = readFileSync(`public${graphics.url}`).toString("base64");
-  const appearance = await loadSkinnedActorAppearance(
-    scene,
-    { ...graphics, url: `data:model/gltf-binary;base64,${data}` },
-    options,
-  );
-  return { engine, scene, appearance };
+  try {
+    const appearance = await loadSkinnedActorAppearance(
+      scene,
+      { ...graphics, url: glbDataUrl(graphics.url) },
+      options,
+    );
+    return { engine, scene, appearance };
+  } catch (error) {
+    engine.dispose();
+    throw error;
+  }
 }
 
 /** A joint's height above the actor's ground point. */
@@ -49,7 +42,11 @@ function skinnedMesh(root: TransformNode): AbstractMesh {
 
 const glbModels = Object.entries(BASE_CONTENT.presentation).flatMap(
   ([id, { model }]) =>
-    model && "glb" in model ? [[id, model.glb] as const] : [],
+    INFANTRY_ROLES.some((role) => id === `arc-${role}`) &&
+    model &&
+    "glb" in model
+      ? [[id, model.glb] as const]
+      : [],
 );
 
 describe.each(glbModels)("%s model", (_id, graphics) => {

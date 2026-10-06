@@ -61,8 +61,14 @@ the crisis their conflict helped release.
 - Package manager: npm
 - Language: TypeScript
 - 3D rendering: Babylon.js
-- Actor models and skeletal clips: glTF 2.0 binary assets (`.glb`), referenced
-  by actor graphics definitions. Keep editor source files for authored assets.
+- Model geometry, materials, skeletons, and animations are generated offline
+  into glTF 2.0 binary assets (`.glb`). Texture files, including sprite sheets,
+  are generated offline into PNGs. Seeded generators are the source of truth;
+  committed output must match them. No hand-authored binary art is required.
+- Infantry and wolves use skeletal GLBs; vehicles and building machinery may
+  use articulated node clips. Content packs reference the generated files.
+  Terrain heightfields and placement transforms remain map-dependent rendering
+  geometry; interface overlays remain renderer-owned.
 
 The core game remains browser-runnable. Tauri-specific functionality must stay
 behind platform-service boundaries so simulation, rendering, and UI remain
@@ -393,8 +399,10 @@ story.
   tint and optional edge feathering. A layer may pin itself to a fixed slot so
   that layers only some tiles carry do not shift the stack out of alignment
   between neighbors. Tile and map-boundary lines are optional debug overlays.
-- Terrain textures repeat by wrapping, so authored tiles must have matching
-  opposite edges.
+- Terrain textures repeat by wrapping, so generated tiles must have matching
+  opposite edges. Vegetation layers fade out on steep grades to avoid stretching
+  blades over cliff faces, and a rock layer fades in to cover hillsides and
+  cliffs. Slope fading changes rendering only.
 - Tile type IDs resolve one canonical visual definition. Conflicting definitions
   with the same ID are invalid content.
 - Scrolling textures and frame-based texture clips are rendering effects and
@@ -527,13 +535,16 @@ story.
   rebuilds it.
 - Triggers are committed simulation events an actor's appearance responds to.
   `attack` fires with each hit the actor deals, as a shot or a bite.
-- An actor's GLB supplies skeletal clips by role: idle, locomotion, optional
-  left and right turn leans, one per trigger, and death. Rendered movement
+- An actor's GLB supplies skeletal or articulated clips by role: idle,
+  locomotion, optional left and right turn leans, work, one per trigger, and
+  death. Rendered movement
   blends idle, locomotion, and leans. A trigger plays its clip once, layered
   over the others as its difference from its first frame. Remains play the
   death clip once from destruction and hold its last frame, so remains older
   than the clip, as after loading, show that frame. Without a death clip,
   remains lie on their side.
+  The Harvester's work clip replaces idle and transit while gathering; generated
+  amber and green lamps preserve its state when motion is reduced.
 - Frame effects play a content pack's texture clip once on a camera-facing
   square anchored in the actor's model space, so they turn with it. An actor's
   presentation names them by trigger. The Trooper's muzzle flash plays on
@@ -1162,8 +1173,7 @@ a later tutorial could be made.
   - World-event cadence and escalation.
   - Whether corruption spreads, and how players counter or exploit it.
 - **Interface and presentation**
-  - Accessibility tuning, art direction, audio direction, and asset-production
-    approach.
+  - Accessibility tuning, art direction, and audio direction.
 - **Future systems**
   - Technology-tree and permanent-research design.
   - Script conflict precedence, missing-target policies, and mission-driven

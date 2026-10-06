@@ -14,8 +14,8 @@ awaken the deathless Everwake, eventually requiring an uneasy alliance.
 - [Roadmap](ROADMAP.md) — milestones and implementation work.
 - [Design questionnaire](docs/design-questionnaire.md) — detailed rationale,
   alternatives, and queued design questions.
-- [Actor assets](docs/actor-assets.md) — infantry GLB generation and rig
-  contract.
+- [Actor assets](docs/actor-assets.md) — generated models, textures, and
+  animation contracts.
 - [Mission files](docs/mission-files.md) — the level and save format and how
   to edit it.
 - [Content packs](docs/content-packs.md) — shared actor rules and
@@ -31,6 +31,7 @@ npm run dev        # browser
 npm run tauri dev  # desktop
 npm run test:visual # browser screenshot checks
 npm run levels     # rebuild bundled levels, replacing hand edits
+npm run assets     # rebuild all bundled model and texture files
 npm run check      # required before completing a coding task
 ```
 
@@ -174,12 +175,10 @@ Install the browsers locally once with `npx playwright install chromium`, plus
 webview.
 Set `COTUW_TEST_PORT=1421` to run checks beside a server using the default port.
 
-Terrain textures repeat by wrapping, so they must tile without a seam. After
-editing one, make its opposite edges match with
-`node scripts/reconcile-texture-edges.ts <png>...`, which rewrites the files in
-place; the unit tests verify the result. Run it on freshly edited art only:
-each run blends the edge band further, so re-running it on an already
-reconciled texture degrades the art without changing the test outcome.
+Bundled models, rigs, animations, materials, and texture files come from code.
+Run `npm run assets` after changing their generators. The asset tests compare
+committed files with generated output and reject files without a generator.
+See [actor assets](docs/actor-assets.md) for the inventory and contracts.
 
 ## Working principles
 

@@ -13,6 +13,8 @@ import {
   BUILTIN_BUILDING_DETAILS,
 } from "../render/builtin-models";
 import { validateActorGraphics } from "../render/skinned-actor-appearance";
+import { validateModelGraphics } from "../render/glb-model";
+import type { ModelGraphics } from "../render/glb-model";
 import { validateFrameEffects } from "../render/frame-effects";
 import { validateTextureClip } from "./texture-clip";
 
@@ -50,6 +52,7 @@ export type ActorPresentation = {
     minimapColor?: Rgb;
     /** A built-in set of articulated parts. */
     details?: string;
+    glb?: ModelGraphics;
   };
 };
 
@@ -65,6 +68,17 @@ export type ViewStyle = {
   };
 };
 
+export const PROP_IDS = [
+  "foundation",
+  "rubble",
+  "materials-mound",
+  "salvage",
+  "tracer",
+  "bite",
+] as const;
+
+export type PropId = (typeof PROP_IDS)[number];
+
 /** Shared rules and presentation that mission files name by ID and version. */
 export type ContentPack = ContentReference & {
   name: string;
@@ -73,6 +87,8 @@ export type ContentPack = ContentReference & {
   presentation: Readonly<Record<string, ActorPresentation>>;
   /** Sprite-sheet frame sequences that textures name by ID. */
   clips?: Readonly<Record<string, TextureClip>>;
+  /** Shared meshes for terrain foundations, resources, salvage, and debris. */
+  props?: Partial<Record<PropId, ModelGraphics>>;
   terrain: TerrainStyle;
   view: ViewStyle;
 };
@@ -206,6 +222,11 @@ export function parseContentPack(source: string): ContentPack {
         throw invalid(
           `gives ${actor.id} unknown building details "${building.details}"`,
         );
+      if (building.glb !== undefined) {
+        validateModelGraphics(building.glb);
+        if (building.details !== undefined)
+          throw invalid(`gives ${actor.id} multiple building models`);
+      }
     }
     if (actor.footprint ? !building : actor.movement && !model)
       throw invalid(`needs presentation for ${actor.id}'s geometry`);
@@ -214,6 +235,13 @@ export function parseContentPack(source: string): ContentPack {
     throw invalid("needs clips keyed by ID");
   for (const [id, clip] of Object.entries(pack.clips ?? {}))
     validateTextureClip(id, clip);
+  if (pack.props !== undefined && !isRecord(pack.props))
+    throw invalid("needs props keyed by ID");
+  for (const [id, graphics] of Object.entries(pack.props ?? {})) {
+    if (!(PROP_IDS as readonly string[]).includes(id))
+      throw invalid(`has an unknown prop ${id}`);
+    validateModelGraphics(graphics);
+  }
   validateTerrainStyle(pack.terrain, pack.clips ?? {}, invalid);
   return deepFreeze(pack);
 }
@@ -229,6 +257,18 @@ const isRgba = (value: unknown) =>
 const isOptionalBoolean = (value: unknown) =>
   value === undefined || typeof value === "boolean";
 
+/** Two distinct, non-negative grades; either may be the steeper. */
+function isSlopeFade(value: unknown): boolean {
+  const isGrade = (grade: unknown) =>
+    typeof grade === "number" && Number.isFinite(grade) && grade >= 0;
+  return (
+    isRecord(value) &&
+    isGrade(value.start) &&
+    isGrade(value.end) &&
+    value.start !== value.end
+  );
+}
+
 function validateTerrainStyle(
   style: TerrainStyle,
   clips: Readonly<Record<string, unknown>>,
@@ -238,7 +278,8 @@ function validateTerrainStyle(
     if (
       !isRecord(type) ||
       (type.slot !== undefined && !isCount(type.slot)) ||
-      !isOptionalBoolean(type.featherEdges)
+      !isOptionalBoolean(type.featherEdges) ||
+      (type.slopeFade !== undefined && !isSlopeFade(type.slopeFade))
     )
       throw invalid(`has invalid terrain tile type "${id}"`);
     const graphics = type.graphics;

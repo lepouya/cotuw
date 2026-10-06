@@ -4,6 +4,11 @@ import { PNG } from "pngjs";
 
 export type Rgba = readonly [number, number, number, number];
 
+/** `value` within `[0, period)`, so coordinates repeat every period. */
+export function wrap(value: number, period: number): number {
+  return ((value % period) + period) % period;
+}
+
 /** The color `t` of the way from `from` to `to`. */
 export function mixRgba(from: Rgba, to: Rgba, t: number): Rgba {
   return [0, 1, 2, 3].map(
@@ -27,9 +32,8 @@ export function drawDisc(
   x: number,
   y: number,
   radius: number,
-  [red, green, blue, alpha]: Rgba,
+  color: Rgba,
 ): void {
-  const { period, pixels } = frame;
   const reach = Math.ceil(radius + 1);
   for (let py = Math.floor(y - reach); py <= Math.ceil(y + reach); py++)
     for (let px = Math.floor(x - reach); px <= Math.ceil(x + reach); px++) {
@@ -37,17 +41,25 @@ export function drawDisc(
         1,
         Math.max(0, radius + 0.5 - Math.hypot(px + 0.5 - x, py + 0.5 - y)),
       );
-      if (coverage === 0) continue;
-      const source = alpha * coverage;
-      const wrappedX = ((px % period) + period) % period;
-      const wrappedY = ((py % period) + period) % period;
-      const index = (wrappedY * period + wrappedX) * 4;
-      const keep = 1 - source;
-      pixels[index] = red * source + pixels[index]! * keep;
-      pixels[index + 1] = green * source + pixels[index + 1]! * keep;
-      pixels[index + 2] = blue * source + pixels[index + 2]! * keep;
-      pixels[index + 3] = source + pixels[index + 3]! * keep;
+      if (coverage > 0) blendPixel(frame, px, py, color, coverage);
     }
+}
+
+/** Composites a straight-alpha color over one pixel, wrapping at the edges. */
+export function blendPixel(
+  { period, pixels }: Frame,
+  px: number,
+  py: number,
+  [red, green, blue, alpha]: Rgba,
+  coverage = 1,
+): void {
+  const source = alpha * coverage;
+  const index = (wrap(py, period) * period + wrap(px, period)) * 4;
+  const keep = 1 - source;
+  pixels[index] = red * source + pixels[index]! * keep;
+  pixels[index + 1] = green * source + pixels[index + 1]! * keep;
+  pixels[index + 2] = blue * source + pixels[index + 2]! * keep;
+  pixels[index + 3] = source + pixels[index + 3]! * keep;
 }
 
 /**
@@ -94,6 +106,7 @@ export function minimapColor(png: PNG): Rgba {
     blue += png.data[index + 2]! * alpha;
     weight += alpha;
   }
+  if (weight === 0) return [0, 0, 0, 0];
   const round = (value: number) => Math.round(value * 1000) / 1000;
   return [
     round(red / weight / 255),

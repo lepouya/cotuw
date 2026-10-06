@@ -6,19 +6,18 @@ import {
   Bone,
   Color3,
   Matrix,
-  Mesh,
   MeshBuilder,
-  NullEngine,
   PBRMaterial,
   Quaternion,
-  Scene,
   Skeleton,
   TransformNode,
   Vector3,
-  VertexBuffer,
   VertexData,
 } from "@babylonjs/core";
-import { GLTF2Export } from "@babylonjs/serializers/glTF/index.js";
+
+import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
+
+import type { Scene } from "@babylonjs/core";
 
 export const INFANTRY_ROLES = ["trooper", "scout"] as const;
 export type InfantryRole = (typeof INFANTRY_ROLES)[number];
@@ -37,7 +36,6 @@ type Part = {
 };
 type Pose = (joint: string, phase: number) => Vec3;
 
-const FRAMES_PER_SECOND = 30;
 const KEY_STEP = 2;
 const ROLE_SCALE: Record<InfantryRole, number> = { trooper: 1, scout: 0.84 };
 const DARK: Vec3 = [0.09, 0.13, 0.15];
@@ -222,22 +220,8 @@ function part(
 }
 
 /** Exports one role's model, skin, and clips as GLB bytes. */
-export async function exportInfantry(role: InfantryRole): Promise<Uint8Array> {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
-  try {
-    buildInfantry(scene, role);
-    const name = `arc-${role}`;
-    const data = await GLTF2Export.GLBAsync(scene, name);
-    const blob = data.files[`${name}.glb`];
-    if (!(blob instanceof Blob)) {
-      throw new Error(`Exporter did not produce ${name}.glb`);
-    }
-    return new Uint8Array(await blob.arrayBuffer());
-  } finally {
-    scene.dispose();
-    engine.dispose();
-  }
+export function exportInfantry(role: InfantryRole): Promise<Uint8Array> {
+  return exportGlb(`arc-${role}`, (scene) => buildInfantry(scene, role));
 }
 
 function buildInfantry(scene: Scene, role: InfantryRole): void {
@@ -276,43 +260,17 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
   visor.metallic = 0;
   visor.roughness = 0.3;
 
-  const skinned = (label: string, parts: Part[], material: PBRMaterial) => {
-    const partCounts = new Map<Part, number>();
-    const [merged, ...rest] = parts.map((each) => {
-      const vertices = partVertices(scene, each, linear(palette[each.finish]));
-      partCounts.set(each, vertices.positions!.length / 3);
-      return vertices;
-    });
-    merged.merge(rest, true);
-    const mesh = new Mesh(`${name}-${label}`, scene);
-    merged.applyToMesh(mesh);
-    // Byte joint indices, as glTF stores them; floats would export padded.
-    const joints = new Uint8Array(mesh.getTotalVertices() * 4);
-    const weights = new Float32Array(joints.length);
-    let vertex = 0;
-    for (const each of parts) {
-      const boneIndex = skeleton.bones.indexOf(bones.get(each.joint)!);
-      const end = vertex + partCounts.get(each)!;
-      for (; vertex < end; vertex++) {
-        joints[vertex * 4] = boneIndex;
-        weights[vertex * 4] = 1;
-      }
-    }
-    mesh.setVerticesBuffer(
-      new VertexBuffer(
-        scene.getEngine(),
-        joints,
-        VertexBuffer.MatricesIndicesKind,
-        {
-          size: 4,
-        },
-      ),
+  const skinned = (label: string, parts: Part[], material: PBRMaterial) =>
+    rigidSkin(
+      `${name}-${label}`,
+      parts.map((each) => ({
+        vertices: partVertices(scene, each, linear(palette[each.finish])),
+        bone: skeleton.bones.indexOf(bones.get(each.joint)!),
+      })),
+      skeleton,
+      material,
+      root,
     );
-    mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, weights);
-    mesh.skeleton = skeleton;
-    mesh.material = material;
-    mesh.parent = root;
-  };
   skinned(
     "body",
     PARTS.filter(({ finish }) => finish !== "visor"),

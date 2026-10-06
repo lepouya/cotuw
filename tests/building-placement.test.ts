@@ -97,10 +97,12 @@ function fixture(
     map,
     simulation,
     {
+      appearances: new Map([
+        [definition.id, { height: 0.3, color: [0.2, 0.4, 0.6] }],
+      ]),
       buildings: [
         {
           definition,
-          appearance: { height: 0.3, color: [0.2, 0.4, 0.6] },
           name: "Store",
           build: controls.build as unknown as HTMLButtonElement,
         },

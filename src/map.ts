@@ -48,6 +48,12 @@ export type TileType = {
   slot?: number;
   /** Fades alpha at corners shared with tiles that lack this type. */
   featherEdges?: boolean;
+  /**
+   * Fades alpha from full at grade `start` to none at grade `end`, as rise
+   * over horizontal run. An `end` below `start` shows the layer on steep
+   * ground only.
+   */
+  slopeFade?: { start: number; end: number };
   /** Absent for a plain surface drawn in the layer color alone. */
   graphics?: TileGraphics;
 };
@@ -61,6 +67,64 @@ export type TileLayer = {
 
 export function layerSlot(layer: TileLayer, index: number): number {
   return layer.type?.slot ?? index;
+}
+
+/** The share of a layer's alpha its slope fade keeps at this grade. */
+export function slopeCoverage(type: TileType | undefined, slope: number) {
+  const fade = type?.slopeFade;
+  if (!fade) return 1;
+  const t = Math.max(
+    0,
+    Math.min(1, (slope - fade.start) / (fade.end - fade.start)),
+  );
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/**
+ * The layer's own alpha, or when it feathers, the average across the tiles
+ * meeting at this corner, counting tiles without the layer as clear. Tiles off
+ * the map are skipped so borders do not feather inward. Optional slope fading
+ * multiplies coverage using the steepest tile meeting at the corner.
+ */
+export function cornerAlpha(
+  map: TerrainMap,
+  layer: TileLayer,
+  cornerX: number,
+  cornerZ: number,
+): number {
+  let coverage = 1;
+  if (layer.type?.slopeFade) {
+    // Shared corner coverage keeps adjacent tiles and chunks continuous.
+    let slope = 0;
+    for (let z = cornerZ - 1; z <= cornerZ; z++)
+      for (let x = cornerX - 1; x <= cornerX; x++)
+        if (map.containsTile(x, z)) slope = Math.max(slope, map.slopeAt(x, z));
+    coverage = slopeCoverage(layer.type, slope);
+  }
+  if (!layer.type?.featherEdges) {
+    return layer.color.a * coverage;
+  }
+
+  let total = 0;
+  let sampled = 0;
+  for (const [x, z] of [
+    [cornerX - 1, cornerZ - 1],
+    [cornerX, cornerZ - 1],
+    [cornerX - 1, cornerZ],
+    [cornerX, cornerZ],
+  ]) {
+    if (!map.containsTile(x, z)) {
+      continue;
+    }
+
+    const neighbor = map
+      .layersAt(x, z)
+      .find((candidate) => candidate.type?.id === layer.type?.id);
+    total += neighbor?.color.a ?? 0;
+    sampled += 1;
+  }
+
+  return sampled > 0 ? (total / sampled) * coverage : 0;
 }
 
 export type TerrainMapOptions = TerrainGridOptions & {

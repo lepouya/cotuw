@@ -27,10 +27,12 @@ export const createBarracksDetails: TilePlacedActorDetailsFactory = (
   }
   box("vent", [0.56, 0.16, 0.56], [0.82, 1.05, -0.2], dark);
   const blades = fan(0.48, 0.03, [0.82, 1.15, -0.2], trim);
+  const loopSeconds = 4;
   return {
     update: (seconds) => {
-      blades.rotation.y = seconds * 2;
+      blades.rotation.y = (seconds / loopSeconds) * Math.PI * 4;
     },
+    loopSeconds,
     dispose: () => assembly.dispose(),
   };
 };

@@ -57,6 +57,8 @@ import {
   occupiedTilesFor,
 } from "./simulation/placement";
 import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
+import { loadModelAsset, modelBuildingDetails } from "./render/glb-model";
+import type { ModelAsset, ModelGraphics } from "./render/glb-model";
 import { startSimulationLoop } from "./simulation/loop";
 import { createBuildingPlacement } from "./render/building-placement";
 import { createUnitControls } from "./ui/unit-controls";
@@ -83,7 +85,7 @@ import type { HealthBar } from "./render/health-bars";
 import type { TilePlacedActorAppearance } from "./render/tile-placed-actor-view";
 import type { ActorGraphics } from "./render/skinned-actor-appearance";
 import type { TerrainStyle } from "./render/terrain-style";
-import type { ContentPack, ViewStyle } from "./content/content-pack";
+import type { ContentPack, PropId, ViewStyle } from "./content/content-pack";
 import { healthBarOpacity } from "./render/health-bars";
 import { createPlayerAccess } from "./simulation/faction";
 import { createAlertTracker } from "./ui/mission-alerts";
@@ -253,7 +255,7 @@ export async function createGameSession(
     definitions.flatMap(({ id }) => {
       const building = presentationOf(id)?.building;
       if (!building) return [];
-      const { details, ...appearance } = building;
+      const { details, glb: _glb, ...appearance } = building;
       return [
         [
           id,
@@ -267,6 +269,9 @@ export async function createGameSession(
       ];
     }),
   );
+  const propAssets = new Map<PropId, ModelAsset>();
+  /** Every loaded prop and building model, released with the session. */
+  const modelAssets: ModelAsset[] = [];
   const models = definitions.flatMap(({ id }) => {
     const model = presentationOf(id)?.model;
     return model ? [[id, model] as const] : [];
@@ -363,9 +368,12 @@ export async function createGameSession(
     }
   });
   const healthBars = createHealthBarView(view.scene, map);
-  const combatEffects = createCombatEffectsView(view.scene, map);
+  const combatEffects = createCombatEffectsView(view.scene, map, (style) =>
+    propAssets.get(style),
+  );
   const wreckView = createWreckView(view.scene, map, {
     appearanceFor: (id) => appearances.get(id),
+    rubble: () => propAssets.get("rubble"),
     tilesFor: (wreck) =>
       wreckTiles(wreck, definitionsById.get(wreck.definitionId)!),
   });
@@ -682,6 +690,7 @@ export async function createGameSession(
     map,
     simulation,
     {
+      appearances: buildingAppearances,
       buildings: definitions
         .filter(
           (definition) =>
@@ -690,7 +699,6 @@ export async function createGameSession(
         )
         .map((definition) => ({
           definition,
-          appearance: buildingAppearances.get(definition.id)!,
           name: names.get(definition.id)!,
           build: controls.buildings?.find(
             ({ definitionId }) => definitionId === definition.id,
@@ -1104,6 +1112,7 @@ export async function createGameSession(
     movementPath.dispose();
     queuedOrders.dispose();
     for (const appearance of appearances.values()) appearance.dispose();
+    for (const asset of modelAssets) asset.dispose();
   });
 
   view.scene.onAfterRenderObservable.addOnce(() => {
@@ -1189,29 +1198,92 @@ export async function createGameSession(
       );
     },
   };
-  const modelsReady = Promise.all(
-    glbModels.map(async ([id, graphics]) => {
-      let appearance: ActorAppearance;
-      try {
-        appearance = await loadSkinnedActorAppearance(view.scene, graphics, {
-          reducedMotion: () => reducedMotion.matches,
-        });
-      } catch (error) {
-        if (!view.scene.isDisposed)
-          console.error(`Actor ${id} uses a stand-in model.`, error);
-        return;
-      }
-      if (view.scene.isDisposed) {
-        appearance.dispose();
-        return;
-      }
-      const previous = appearances.get(id);
-      setAppearance(id, appearance);
-      actorViews.update(actorsByKind().shownMobile, loop.tickProgress());
-      updateWrecks(0);
-      previous?.dispose();
+  /** Updates building appearances, then rebuilds the views that use them. */
+  const setBuildings = (
+    ids: Iterable<string>,
+    change: Partial<TilePlacedActorAppearance>,
+  ) => {
+    for (const id of ids)
+      buildingAppearances.set(id, {
+        ...buildingAppearances.get(id)!,
+        ...change,
+      });
+    tilePlacedViews.update(actorsByKind().placed, disconnected());
+  };
+  /** Props whose views swap stand-ins as they load; others are looked up. */
+  const propLoaded: Partial<Record<PropId, (asset: ModelAsset) => void>> = {
+    foundation: (asset) =>
+      setBuildings([...buildingAppearances.keys()], { foundation: asset }),
+    "materials-mound": (asset) => materialsView?.setMound(asset),
+    salvage: (asset) => materialsView?.setSalvage(asset),
+  };
+  /** Loaded assets arrive only while the scene lives; failures keep stand-ins. */
+  const loadAsset = async <T extends { dispose: () => void }>(
+    label: string,
+    load: () => Promise<T>,
+    use: (asset: T) => void,
+  ) => {
+    try {
+      const asset = await load();
+      if (view.scene.isDisposed) asset.dispose();
+      else use(asset);
+    } catch (error) {
+      if (!view.scene.isDisposed)
+        console.error(`${label} failed to load and keeps its stand-in.`, error);
+    }
+  };
+  const loadModel = (
+    label: string,
+    graphics: ModelGraphics,
+    use: (asset: ModelAsset) => void,
+  ) =>
+    loadAsset(
+      label,
+      () => loadModelAsset(view.scene, graphics),
+      (asset) => {
+        modelAssets.push(asset);
+        use(asset);
+      },
+    );
+  const modelsReady = Promise.all([
+    ...(Object.entries(content.props ?? {}) as [PropId, ModelGraphics][]).map(
+      ([id, graphics]) =>
+        loadModel(`Prop ${id}`, graphics, (asset) => {
+          propAssets.set(id, asset);
+          propLoaded[id]?.(asset);
+        }),
+    ),
+    ...definitions.flatMap(({ id }) => {
+      const graphics = presentationOf(id)?.building?.glb;
+      return graphics
+        ? [
+            loadModel(`Building ${id}`, graphics, (asset) =>
+              setBuildings([id], {
+                createDetails: modelBuildingDetails(asset),
+              }),
+            ),
+          ]
+        : [];
     }),
-  );
+    ...glbModels.map(([id, graphics]) =>
+      loadAsset(
+        `Actor ${id}`,
+        () =>
+          loadSkinnedActorAppearance(view.scene, graphics, {
+            reducedMotion: () => reducedMotion.matches,
+          }),
+        (appearance) => {
+          const previous = appearances.get(id);
+          setAppearance(id, appearance);
+          actorViews.update(actorsByKind().shownMobile, loop.tickProgress());
+          updateWrecks(0);
+          previous?.dispose();
+        },
+      ),
+    ),
+  ]).then(() => {
+    if (!view.scene.isDisposed) canvas.dataset.modelsReady = "true";
+  });
   controls.onReady?.(session);
   return session;
 }

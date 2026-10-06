@@ -82,11 +82,14 @@ export const createRefineryDetails: TilePlacedActorDetailsFactory = (
     placement.center.z + sideZ,
   );
   pump.material = steel;
+  const loopSeconds = 4;
   return {
     update: (seconds) => {
-      fan.rotation.y = seconds * 2;
-      pump.position.y = placement.roof + 0.5 + Math.sin(seconds * 3) * 0.2;
+      const turn = (seconds / loopSeconds) * Math.PI * 4;
+      fan.rotation.y = turn;
+      pump.position.y = placement.roof + 0.5 + Math.sin(turn) * 0.2;
     },
+    loopSeconds,
     dispose: () => {},
   };
 };

@@ -81,8 +81,8 @@ describe("content packs", () => {
     const layers = terrainLayers(BASE_CONTENT.terrain);
     const ids = (x: number) =>
       layers(x, 0, map.terrainAt(x, 0), map).map(({ type }) => type?.id);
-    expect(ids(0)).toEqual(["dirt", "clutter", "grass"]);
-    expect(ids(1)).toEqual(["dirt", "grass-sparse"]);
+    expect(ids(0)).toEqual(["dirt", "clutter", "grass", "rock"]);
+    expect(ids(1)).toEqual(["dirt", "grass-sparse", "rock"]);
     expect(ids(2)).toEqual(["dirt", "water", "water-ripples"]);
     const waterAlpha = (x: number) =>
       layers(x, 0, map.terrainAt(x, 0), map)[1].color.a;
@@ -115,14 +115,14 @@ test.each([
   [
     "negative model scale",
     (pack: any) => {
-      pack.presentation.wolf.model.scale = -1;
+      pack.presentation.wolf.model.glb.scale = -1;
     },
     "model scale",
   ],
   [
     "prototype model name",
     (pack: any) => {
-      pack.presentation.wolf.model.builtin = "constructor";
+      pack.presentation.wolf.model = { builtin: "constructor" };
     },
     "unknown built-in",
   ],
@@ -235,4 +235,33 @@ test("cached content cannot be mutated without changing its version", () => {
   expect(() => {
     (BASE_CONTENT.movementProfiles[0].terrainCosts as any).plain = 20;
   }).toThrow();
+});
+
+test.each([
+  { start: -1, end: 1 },
+  { start: 1, end: -1 },
+  { start: 1, end: 1 },
+  { start: "0.5", end: 1.25 },
+  { start: 0.5 },
+  null,
+])("rejects invalid slope fading %j", (slopeFade) => {
+  expect(
+    withEdit((pack) => {
+      pack.terrain.tileTypes.grass.slopeFade = slopeFade;
+    }),
+  ).toThrow('invalid terrain tile type "grass"');
+});
+
+test("rejects unknown and repeated actor animation roles before loading assets", () => {
+  expect(
+    withEdit((pack) => {
+      pack.presentation["arc-trooper"].model.glb.clips.walk = "walk";
+    }),
+  ).toThrow("needs a URL and named clips");
+  expect(
+    withEdit((pack) => {
+      const clips = pack.presentation["arc-trooper"].model.glb.clips;
+      clips.locomotion = clips.idle;
+    }),
+  ).toThrow("uses one clip for multiple animation roles");
 });
