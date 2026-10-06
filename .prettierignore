@@ -1,6 +1,7 @@
 dist/
 node_modules/
 src-tauri/
+.claude/settings.local.json
 *.md
 # Mission files have their own layout; see docs/mission-files.md.
 src/content/levels/
