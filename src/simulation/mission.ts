@@ -6,7 +6,7 @@ import {
   evaluateTraining as evaluateUnitTraining,
   validateProductionDefinitions,
 } from "./production";
-import type { TrainingEvaluation } from "./production";
+import type { BuildingActivity, TrainingEvaluation } from "./production";
 import type { TrainUnitCommand } from "./command";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
 import { clearCombatOrders, deepFreeze } from "./actor";
@@ -158,6 +158,7 @@ type WorkingActors = {
   usedIds: Set<string>;
   retiredIds: string[];
   lifecycleChanges: number;
+  activity: BuildingActivity[];
   economy?: EconomyState;
   wildlife: WildlifeState;
   wrecks: Wreck[];
@@ -241,6 +242,8 @@ export type MissionSimulation = {
   readonly playerFaction: string | undefined;
   /** Hits resolved during the latest tick. */
   readonly attacks: readonly AttackEvent[];
+  /** Unit exits and cargo deliveries during the latest tick. */
+  readonly buildingActivity: readonly BuildingActivity[];
   readonly wrecks: readonly Wreck[];
   /** A defeat ends the mission; play continues after victory. */
   readonly result: MissionResult | undefined;
@@ -755,6 +758,7 @@ export function createMissionSimulation({
     const rally = working.actorsById.get(producerId)?.rallyPoint;
     if (rally) moveActor(actor, rally);
     stageActor(working, actor);
+    working.activity.push({ buildingId: producerId, kind: "exit" });
   };
   /** Starts a route for automated work; returns whether it was accepted. */
   const moveActor = (
@@ -777,6 +781,7 @@ export function createMissionSimulation({
       usedIds: new Set(usedActorIds),
       retiredIds: [...state.retiredActorIds],
       lifecycleChanges: 0,
+      activity: [],
       economy: state.economy && structuredClone(state.economy),
       wrecks: [...state.wrecks],
       wildlife: structuredClone(state.wildlife),
@@ -918,6 +923,7 @@ export function createMissionSimulation({
     );
   let debrisTiles = debrisFor(state.wrecks);
   let attacks: readonly AttackEvent[] = [];
+  let buildingActivity: readonly BuildingActivity[] = [];
 
   /** Mobile actors whose behavior exposes navigation queries. */
   const navigatingActor = (actor: Actor): NavigatingActor | undefined => {
@@ -1358,6 +1364,9 @@ export function createMissionSimulation({
     get attacks() {
       return attacks;
     },
+    get buildingActivity() {
+      return buildingActivity;
+    },
     get result() {
       return resultOf(state.objectives);
     },
@@ -1607,6 +1616,11 @@ export function createMissionSimulation({
               support: () => supportFor(working.actors),
               spawn: (actor, producerId) =>
                 stageProducedActor(working, actor, producerId),
+              deliver: (refineryId) =>
+                working.activity.push({
+                  buildingId: refineryId,
+                  kind: "delivery",
+                }),
             });
 
           separateMobileActors(
@@ -1672,6 +1686,7 @@ export function createMissionSimulation({
         )
           debrisTiles = debrisFor(state.wrecks);
         attacks = deepFreeze(tickAttacks);
+        buildingActivity = deepFreeze(working.activity);
         actorsById = new Map(committedActors.map((actor) => [actor.id, actor]));
         usedActorIds = working.usedIds;
         if (due.length > 0) queuedActorIds = queuedCreationIds();

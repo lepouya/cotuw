@@ -520,6 +520,9 @@ describe("Materials economy", () => {
     until(simulation, () => simulation.economy!.materials === 100);
     expect(worker(simulation).cargo).toBe(0);
     expect(simulation.economy!.depositedMaterials).toBe(100);
+    expect(simulation.buildingActivity).toEqual([
+      { buildingId: "refinery", kind: "delivery" },
+    ]);
     expect(
       command(simulation, {
         kind: "place-actor",
@@ -537,8 +540,12 @@ describe("Materials economy", () => {
         definitionId: "arc-trooper",
       }).accepted,
     ).toBe(true);
-    advance(simulation, 3);
-    expect(simulation.actorById("trooper")).toBeDefined();
+    until(simulation, () => simulation.actorById("trooper") !== undefined);
+    expect(simulation.buildingActivity).toEqual([
+      { buildingId: "barracks", kind: "exit" },
+    ]);
+    simulation.tick();
+    expect(simulation.buildingActivity).toEqual([]);
   });
 
   test("depletes nearby tiles, delivers a partial final load, and waits for reassignment", () => {

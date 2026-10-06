@@ -27,6 +27,16 @@ export type TrainingReason =
   | "under-construction"
   | "disconnected";
 
+/** A produced unit leaves, or a Harvester delivers cargo. */
+export const BUILDING_ACTIVITY_KINDS = ["exit", "delivery"] as const;
+export type BuildingActivityKind = (typeof BUILDING_ACTIVITY_KINDS)[number];
+
+/** A building event during one tick that its appearance responds to. */
+export type BuildingActivity = {
+  buildingId: string;
+  kind: BuildingActivityKind;
+};
+
 export type TrainingEvaluation =
   | { accepted: true; actor: Actor }
   | { accepted: true; queued: true }

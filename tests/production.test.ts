@@ -140,12 +140,18 @@ describe("unit production", () => {
     expect(second.definitionId).toBe("scout");
     expect(first.worldPosition).not.toEqual(second.worldPosition);
     expect(simulation.actorVersion).toBe(2);
+    expect(simulation.buildingActivity).toEqual([
+      { buildingId: "barracks-1", kind: "exit" },
+      { buildingId: "barracks-1", kind: "exit" },
+    ]);
+    expect(Object.isFrozen(simulation.buildingActivity)).toBe(true);
     simulation.submitCommand({
       kind: "move",
       actorId: first.id,
       target: { x: 3, z: 3 },
     });
     expect(simulation.tick()[0].accepted).toBe(true);
+    expect(simulation.buildingActivity).toEqual([]);
     expect(simulation.actorById(first.id)!.worldPosition).not.toEqual(
       first.worldPosition,
     );

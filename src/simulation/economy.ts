@@ -358,6 +358,7 @@ export type EconomyWorld = {
   evaluateSpawn: (job: ProductionJob) => TrainingEvaluation;
   support: () => SupportView;
   spawn: (actor: Actor, producerId: string) => void;
+  deliver: (refineryId: string) => void;
 };
 
 export function applyEconomyCommand(
@@ -565,6 +566,7 @@ export function updateEconomy(
         if (disconnected.has(worker.refineryId)) continue;
         economy.materials += worker.cargo;
         economy.depositedMaterials += worker.cargo;
+        world.deliver(worker.refineryId);
         worker.cargo = 0;
         worker.phase = worker.targetSiteId ? "travelling" : "idle";
         delete worker.activeSiteId;
