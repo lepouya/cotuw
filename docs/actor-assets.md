@@ -70,7 +70,8 @@ A generated model must keep:
   lacks a named clip.
 
 The runtime starts with stand-ins, then replaces them as their GLBs load. A
-failed asset keeps its stand-in. Remains refresh when a model loads.
+failed asset keeps its stand-in. Remains refresh when a model loads. Sessions
+expose `disposeAsync()` so pending loads finish before releasing the engine.
 Generated assets use glTF 2.0 and `KHR_materials_unlit` for eyes and weapon
 effects.
 Register any additional extension centrally before exporting an asset that

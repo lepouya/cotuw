@@ -1,6 +1,43 @@
 import { expect, test } from "@playwright/test";
 import { terrainPoint } from "./prototype-helpers";
 
+test("restart clears asset readiness and finishes after a failed BRDF load", async ({
+  page,
+}) => {
+  await page.goto("/?level=sandbox");
+  const canvas = page.locator("#game-canvas");
+  await expect(canvas).toHaveAttribute("data-models-ready", "true", {
+    timeout: 15_000,
+  });
+  await page.evaluate(async () => {
+    const path: string = "/e2e/harness.ts";
+    const { EngineStore } = (await import(path)) as typeof import("./harness");
+    const texture = EngineStore.Instances[0].scenes[0].environmentBRDFTexture!;
+    Object.defineProperty(texture, "loadingError", { get: () => true });
+    texture.isReady = () => false;
+  });
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/assets/models/command-center.glb", async (route) => {
+    await held;
+    await route.continue();
+  });
+  try {
+    await page.locator("#open-menu").click();
+    await page.locator("#restart-mission").click();
+    await expect(page.locator("#game-menu")).not.toBeVisible();
+    await expect(canvas).not.toHaveAttribute("data-models-ready", "true");
+    release();
+    await expect(canvas).toHaveAttribute("data-models-ready", "true", {
+      timeout: 15_000,
+    });
+  } finally {
+    release();
+  }
+});
+
 test("an active building preview refreshes when its generated model loads", async ({
   page,
 }) => {

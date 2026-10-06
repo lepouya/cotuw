@@ -99,7 +99,7 @@ test("a restored mission renders its own map and saved terrain", async ({
         faulted: canvas.dataset.simulationFault,
       };
     } finally {
-      view.dispose();
+      await view.disposeAsync();
       canvas.remove();
       minimap.remove();
     }

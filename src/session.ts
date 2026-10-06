@@ -114,7 +114,7 @@ export type LoadedMission = MissionFile & {
   definitions: readonly ActorDefinition[];
 };
 
-export type GameSession = GameView & {
+export type GameSession = Omit<GameView, "dispose"> & {
   simulation: MissionSimulation;
   playing: () => boolean;
   /** Pausing ends placement and targeting unless they are kept. */
@@ -233,6 +233,7 @@ export async function createGameSession(
   minimapCanvas: HTMLCanvasElement,
   controls: GameSessionControls,
 ): Promise<GameSession> {
+  delete canvas.dataset.modelsReady;
   const { mission } = controls;
   const { content, definitions } = mission;
   const map = createSessionMap(
@@ -1123,8 +1124,9 @@ export async function createGameSession(
   });
 
   let disposal: Promise<void> | undefined;
+  const { dispose: disposeView, ...sessionView } = view;
   const session: GameSession = {
-    ...view,
+    ...sessionView,
     simulation,
     disposeAsync: () =>
       (disposal ??= (async () => {
@@ -1135,11 +1137,12 @@ export async function createGameSession(
           while (
             !view.scene.isDisposed &&
             view.scene.environmentBRDFTexture &&
+            !view.scene.environmentBRDFTexture.loadingError &&
             !view.scene.environmentBRDFTexture.isReady()
           )
             await new Promise((resolve) => setTimeout(resolve, 16));
         } finally {
-          if (!view.scene.isDisposed) view.dispose();
+          if (!view.scene.isDisposed) disposeView();
         }
       })()),
     playing: () => playing,

@@ -509,7 +509,7 @@ test("prototype controls skip unchanged frames and removal works without a sideb
       if (nowDescriptor)
         Object.defineProperty(performance, "now", nowDescriptor);
       else Reflect.deleteProperty(performance, "now");
-      view.dispose();
+      await view.disposeAsync();
       canvas.remove();
       minimap.remove();
     }

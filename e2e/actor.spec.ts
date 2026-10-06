@@ -4,14 +4,13 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";
 import type { GameSession } from "../src/session";
-import type { GameView } from "../src/render";
 
 type ActorInteractionTest = {
   canvas: HTMLCanvasElement;
   initialScoutX: number;
   initialTrooperX: number;
   minimap: HTMLCanvasElement;
-  view: GameView;
+  view: GameSession;
 };
 
 declare global {
@@ -321,7 +320,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
     return scout !== null && scout.getAbsolutePosition().x < test.initialScoutX;
   });
 
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     const test = window.actorInteractionTest!;
     const trooper = test.view.scene.getTransformNodeByName(
       "actor-prototype-trooper-root",
@@ -338,7 +337,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       trooperX: trooper.getAbsolutePosition().x,
     };
 
-    test.view.dispose();
+    await test.view.disposeAsync();
     test.canvas.remove();
     test.minimap.remove();
     window.actorInteractionTest = undefined;
