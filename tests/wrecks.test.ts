@@ -1,8 +1,10 @@
-import { NullEngine, Scene, TransformNode } from "@babylonjs/core";
+import { MeshBuilder, NullEngine, Scene, TransformNode } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { TerrainMap } from "../src/map";
 import { createWreckView } from "../src/render/wrecks";
+import { loadModelAsset } from "../src/render/glb-model";
+import { glbDataUrl } from "./helpers/assets";
 
 import type { ActorAppearance } from "../src/render/actor";
 import type { Wreck } from "../src/simulation/combat";
@@ -90,5 +92,115 @@ describe("remains", () => {
     expect(deaths).toEqual([]);
     expect(tilted).toEqual(["wreck-w"]);
     engine.dispose();
+  });
+
+  test.each([false, true])(
+    "seats rubble on the ground and follows terrain edits (generated: %s)",
+    async (generated) => {
+      const engine = new NullEngine();
+      const scene = new Scene(engine);
+      try {
+        const map = new TerrainMap({
+          width: 2,
+          height: 2,
+          tileSize: 1,
+          createHeight: () => 3,
+        });
+        const asset = generated
+          ? await loadModelAsset(scene, {
+              url: glbDataUrl("/assets/models/rubble.glb"),
+            })
+          : undefined;
+        const views = createWreckView(scene, map, {
+          appearanceFor: () => undefined,
+          tilesFor: () => [{ x: 0, z: 0 }],
+          rubble: () => asset,
+        });
+        const wreck: Wreck = {
+          actorId: "building",
+          definitionId: "building",
+          tick: 0,
+          worldPosition: { x: -0.5, z: -0.5 },
+          facing: 0,
+          tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
+        };
+        const update = () =>
+          views.update(
+            [wreck],
+            () => 0,
+            60,
+            () => true,
+            0,
+          );
+        const bottom = () =>
+          scene
+            .getTransformNodeByName("wreck-building")!
+            .getHierarchyBoundingVectors(true).min.y;
+        update();
+        const previous = scene.getTransformNodeByName("wreck-building");
+        expect(bottom()).toBeCloseTo(3);
+        for (let z = 0; z <= 2; z++)
+          for (let x = 0; x <= 2; x++) map.setHeight(x, z, 7);
+        map.notifyChange({ minX: 0, minZ: 0, maxX: 1, maxZ: 1 });
+        update();
+        expect(bottom()).toBeCloseTo(7);
+        expect(
+          scene.getTransformNodeByName("wreck-building") === previous,
+        ).toBe(true);
+        views.dispose();
+        expect(map.onChangedObservable.hasObservers()).toBe(false);
+        asset?.dispose();
+      } finally {
+        engine.dispose();
+      }
+    },
+  );
+
+  test("reseats fallen units after terrain edits without restarting their death", () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    try {
+      const map = new TerrainMap({ width: 2, height: 2, tileSize: 1 });
+      const deaths: number[] = [];
+      const appearance: ActorAppearance = {
+        bounds: { radius: 0.5, height: 1 },
+        instantiate: (name) => ({
+          root: MeshBuilder.CreateBox(name, {}, scene),
+          die: (age) => deaths.push(age),
+          dispose: () => {},
+        }),
+        dispose: () => {},
+      };
+      const views = createWreckView(scene, map, {
+        appearanceFor: () => appearance,
+        tilesFor: () => [],
+      });
+      const wreck: Wreck = {
+        actorId: "unit",
+        definitionId: "unit",
+        tick: 0,
+        worldPosition: { x: 0, z: 0 },
+        facing: 0,
+      };
+      const update = (seconds: number) =>
+        views.update(
+          [wreck],
+          () => 0,
+          60,
+          () => true,
+          seconds,
+        );
+      update(0);
+      update(0.4);
+      for (let z = 0; z <= 2; z++)
+        for (let x = 0; x <= 2; x++) map.setHeight(x, z, 3);
+      map.notifyChange({ minX: 0, minZ: 0, maxX: 1, maxZ: 1 });
+      update(0);
+      expect(scene.getTransformNodeByName("wreck-unit")!.position.y).toBe(3);
+      expect(deaths).toEqual([0, 0.4, 0.4]);
+      views.dispose();
+    } finally {
+      engine.dispose();
+    }
   });
 });

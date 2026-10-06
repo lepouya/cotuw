@@ -131,6 +131,25 @@ describe("actor view registry", () => {
     engine.dispose();
   });
 
+  test("late model loads preserve the current movement interpolation", () => {
+    const { appearances, engine, scene, views } = setup();
+    views.update([actor("a")], 1);
+    views.capturePreviousPoses([actor("a")]);
+    views.update([actor("a", 4)], 0.25);
+    expect(views.groundPosition("a")!.x).toBe(1);
+    const loaded = MeshBuilder.CreateBox("loaded", {}, scene);
+    appearances.set(
+      "trooper",
+      createMeshAppearance(loaded, { radius: 0.4, height: 1 }),
+    );
+    views.update([actor("a", 4)], 0.25);
+    expect(views.groundPosition("a")!.x).toBe(1);
+    views.update([actor("a", 4)], 0.5);
+    expect(views.groundPosition("a")!.x).toBe(2);
+    views.dispose();
+    engine.dispose();
+  });
+
   test("rebuilds a view when its appearance finishes loading", () => {
     const { appearances, engine, scene, views } = setup();
     views.update([actor("a")], 1);

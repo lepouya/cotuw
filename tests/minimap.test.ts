@@ -136,6 +136,45 @@ describe("tileColor", () => {
     expect(tileColor(map, 0, 0, BLACK)).toEqual([0.472, 0.339, 0.217]);
   });
 
+  test("fades vegetation and reveals rock beside steep neighboring tiles", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 1,
+      tileSize: 1,
+      createHeight: (x) => (x === 2 ? 4 : 0),
+      createLayers: () => [
+        {
+          type: { id: "grass", slopeFade: { start: 0.5, end: 1.25 } },
+          color: opaque(0, 1, 0),
+        },
+        {
+          type: { id: "rock", slopeFade: { start: 1.4, end: 0.7 } },
+          color: opaque(1, 0, 0),
+        },
+      ],
+    });
+    // The flat tile shares two corners with the cliff. Both layers transition.
+    expect(tileColor(map, 0, 0, BLACK)).toEqual([0.5, 0.25, 0]);
+  });
+
+  test("includes feathered layer coverage at shoreline tiles", () => {
+    const map = new TerrainMap({
+      width: 3,
+      height: 1,
+      tileSize: 1,
+      createLayers: (x) =>
+        x === 1
+          ? [
+              {
+                type: { id: "water", featherEdges: true },
+                color: opaque(0, 0, 1),
+              },
+            ]
+          : [],
+    });
+    expect(tileColor(map, 1, 0, BLACK)).toEqual([0, 0, 0.5]);
+  });
+
   test("lights slopes facing the northwest and shades those facing away", () => {
     const layers = () => [{ color: opaque(0.5, 0.5, 0.5) }];
     // Rising eastward faces west, towards the light.

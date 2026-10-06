@@ -1,6 +1,6 @@
 import { Vector3 } from "@babylonjs/core";
 
-import { layerSlot } from "../map";
+import { cornerAlpha, layerSlot } from "../map";
 import { DEFAULT_ACTOR_COLOR } from "./actor";
 import { watchCanvasSize } from "./canvas-size";
 import { createPointerGesture } from "./pointer-gesture";
@@ -119,7 +119,14 @@ export function createMinimap(
     shade();
   };
   paint({ minX: 0, minZ: 0, maxX: map.width - 1, maxZ: map.height - 1 });
-  const changeObserver = map.onChangedObservable.add(paint);
+  const changeObserver = map.onChangedObservable.add((bounds) =>
+    paint({
+      minX: Math.max(0, bounds.minX - 1),
+      minZ: Math.max(0, bounds.minZ - 1),
+      maxX: Math.min(map.width - 1, bounds.maxX + 1),
+      maxZ: Math.min(map.height - 1, bounds.maxZ + 1),
+    }),
+  );
 
   let projection = minimapProjection(map, 0, 0);
   const resize = () => {
@@ -486,7 +493,14 @@ export function tileColor(
       green * layer.color.g,
       blue * layer.color.b,
     ];
-    const alpha = coverage * layer.color.a;
+    // The diagonal corners belong to both equal-area terrain triangles.
+    const alpha =
+      (coverage *
+        (cornerAlpha(map, layer, x, z) +
+          2 * cornerAlpha(map, layer, x + 1, z) +
+          2 * cornerAlpha(map, layer, x, z + 1) +
+          cornerAlpha(map, layer, x + 1, z + 1))) /
+      6;
     for (let channel = 0; channel < 3; channel += 1) {
       color[channel] += (tint[channel] - color[channel]) * alpha;
     }

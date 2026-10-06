@@ -58,7 +58,7 @@ bundled packs through the same parser future mod packs will use.
   per tile. Optional `slopeFade: { start, end }` fades alpha from full at grade
   `start` to none at grade `end`, measured as rise over horizontal run; an
   `end` below `start` shows the layer on steep ground only. The steepest tile
-  at each shared corner sets its fade.
+  at each shared corner sets its fade, and the minimap applies it per tile.
   Fully faded tiles draw nothing. The base grass layers fade out between grades
   0.5 and 1.25; the rock layer fades in between 0.7 and 1.4.
 - `terrain.layers` lists, for each terrain type, its layers from the bottom:

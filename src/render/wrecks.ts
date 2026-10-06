@@ -43,10 +43,15 @@ export function createWreckView(
       dispose: () => void;
       meshes: AbstractMesh[];
       rubbleModel: ModelAsset | undefined;
+      ground: () => void;
       /** Advances the death clip by real seconds. */
       animate?: (seconds: number) => void;
     }
   >();
+  let terrainDirty = false;
+  const terrainObserver = map.onChangedObservable.add(() => {
+    terrainDirty = true;
+  });
   /** `age` starts a death clip partway, so older remains show its end. */
   const create = (
     wreck: Wreck,
@@ -57,6 +62,7 @@ export function createWreckView(
     const root = new TransformNode(`wreck-${wreck.actorId}`, scene);
     let dispose = () => root.dispose();
     let animate: ((seconds: number) => void) | undefined;
+    const groundUpdates: (() => void)[] = [];
     if (wreck.tilePlacement) {
       const chunks: { dispose: () => void }[] = [];
       for (const tile of tilesFor(wreck)) {
@@ -78,8 +84,12 @@ export function createWreckView(
         chunk.root.rotation.y = seed * Math.PI;
         chunk.root.position.set(center.x, 0, center.z);
         const { min } = chunk.root.getHierarchyBoundingVectors(true);
-        chunk.root.position.y =
-          map.heightAtWorldPosition(center.x, center.z) - min.y;
+        const ground = () => {
+          chunk.root.position.y =
+            map.heightAtWorldPosition(center.x, center.z) - min.y;
+        };
+        ground();
+        groundUpdates.push(ground);
       }
       dispose = () => {
         for (const chunk of chunks) chunk.dispose();
@@ -93,6 +103,9 @@ export function createWreckView(
         );
         const { x, z } = wreck.worldPosition;
         root.position.set(x, map.heightAtWorldPosition(x, z), z);
+        groundUpdates.push(() => {
+          root.position.y = map.heightAtWorldPosition(x, z);
+        });
         root.rotation.y = wreck.facing;
         const { die } = instance;
         if (die) {
@@ -124,6 +137,9 @@ export function createWreckView(
       meshes,
       animate,
       rubbleModel,
+      ground: () => {
+        for (const update of groundUpdates) update();
+      },
     };
   };
   return {
@@ -162,13 +178,16 @@ export function createWreckView(
         } else {
           view.seconds += frameSeconds;
           view.animate?.(view.seconds);
+          if (terrainDirty) view.ground();
         }
         view.root.setEnabled(visible(wreck));
         const opacity = Math.min(1, (lifetime - age(wreck)) / FADE_SECONDS);
         for (const mesh of view.meshes) mesh.visibility = Math.max(opacity, 0);
       }
+      terrainDirty = false;
     },
     dispose: () => {
+      map.onChangedObservable.remove(terrainObserver);
       for (const view of views.values()) view.dispose();
       views.clear();
       rubble.dispose();

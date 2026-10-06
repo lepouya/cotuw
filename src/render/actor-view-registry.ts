@@ -100,6 +100,9 @@ export function createActorViewRegistry(
     onRemove: (id) => {
       previousPoses.delete(id);
     },
+    onReplace: (id, previous, next) => {
+      if (previous.definitionId !== next.definitionId) previousPoses.delete(id);
+    },
     create: (actor, { appearance }) => {
       const hostile = isHostile(actor.definitionId);
       const renderer = createActorRenderer(
