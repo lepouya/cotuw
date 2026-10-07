@@ -111,10 +111,9 @@ export class TerrainGrid {
   readonly height: number;
   readonly tileSize: number;
   /** The map's horizontal extent, centered on the world origin. */
-  readonly worldBounds: WorldBounds;
+  readonly worldBounds: Readonly<WorldBounds>;
   private readonly cornerHeights: Float32Array;
-  /** Every profile moving on this map must price each of these. */
-  readonly terrainTypeIds: ReadonlySet<string>;
+  private readonly terrainTypes: ReadonlySet<string>;
   private readonly listeners = new Set<(bounds: TerrainBounds) => void>();
   private readonly editRules = new Set<TerrainEditRule>();
   /** Records terrain changes that may affect an active route. */
@@ -148,12 +147,12 @@ export class TerrainGrid {
     this.tileSize = tileSize;
     const halfWidth = (width * tileSize) / 2;
     const halfHeight = (height * tileSize) / 2;
-    this.worldBounds = {
+    this.worldBounds = Object.freeze({
       minX: -halfWidth,
       maxX: halfWidth,
       minZ: -halfHeight,
       maxZ: halfHeight,
-    };
+    });
     this.cornerHeights = new Float32Array((width + 1) * (height + 1));
     this.terrain = Array.from({ length: width * height });
 
@@ -170,7 +169,7 @@ export class TerrainGrid {
         });
       }
     }
-    this.terrainTypeIds = new Set(
+    this.terrainTypes = new Set(
       terrainTypeIds ?? this.terrain.map(({ typeId }) => typeId),
     );
     for (const { typeId } of this.terrain) {
@@ -179,6 +178,11 @@ export class TerrainGrid {
     if (!this.terrain.every((tile) => this.isValidTerrainTile(tile))) {
       throw new RangeError("Invalid terrain tile.");
     }
+  }
+
+  /** A copy of the catalog every moving profile must price. */
+  get terrainTypeIds(): ReadonlySet<string> {
+    return new Set(this.terrainTypes);
   }
 
   containsCorner(x: number, z: number): boolean {
@@ -396,7 +400,7 @@ export class TerrainGrid {
   }
 
   private ensureTerrainType(typeId: string): void {
-    if (!this.terrainTypeIds.has(typeId)) {
+    if (!this.terrainTypes.has(typeId)) {
       throw new RangeError(
         `Terrain type ${typeId} is not declared by the map.`,
       );
@@ -404,7 +408,7 @@ export class TerrainGrid {
   }
 
   private isValidTerrainTile(tile: TerrainTile): boolean {
-    return isTerrainTileShape(tile) && this.terrainTypeIds.has(tile.typeId);
+    return isTerrainTileShape(tile) && this.terrainTypes.has(tile.typeId);
   }
 
   /** Returns the tile containing a world position, including the far edges. */

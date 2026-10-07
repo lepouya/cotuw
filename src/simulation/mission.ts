@@ -299,6 +299,12 @@ export function createMissionSimulation({
     );
   }
   ensureValidBounds(bounds);
+  if (
+    map &&
+    (!withinBounds({ x: bounds.minX, z: bounds.minZ }, map.worldBounds) ||
+      !withinBounds({ x: bounds.maxX, z: bounds.maxZ }, map.worldBounds))
+  )
+    throw new RangeError("Simulation bounds cannot exceed the terrain map.");
   if (occupancy && (!map || !occupancy.isForTerrain(map))) {
     throw new RangeError("Mission occupancy must belong to its terrain map.");
   }
@@ -402,12 +408,14 @@ export function createMissionSimulation({
   let actorVersion = 0;
   let faulted = false;
   let disposed = false;
+  let ticking = false;
   const ensureRunning = () => {
     if (disposed) throw new Error("Mission simulation is disposed.");
     if (faulted) throw new Error("Mission simulation is faulted.");
   };
   const ensureMutable = () => {
     ensureRunning();
+    if (ticking) throw new Error("Mission mutations cannot run during a tick.");
     if (ended()) throw new Error("The mission has ended.");
   };
   const definitionFor = (actor: Actor): ActorDefinition =>
@@ -1493,6 +1501,8 @@ export function createMissionSimulation({
     },
     dispose: () => {
       if (disposed) return;
+      if (ticking)
+        throw new Error("Mission disposal cannot run during a tick.");
       disposed = true;
       releaseTerrainRule?.();
       fog?.dispose();
@@ -1500,6 +1510,7 @@ export function createMissionSimulation({
     },
     tick: () => {
       ensureRunning();
+      if (ticking) throw new Error("Mission ticks cannot run recursively.");
       if (ended()) return [];
       const due = state.commands.filter(({ tick }) => tick <= state.tick);
       const terrainBefore =
@@ -1507,6 +1518,7 @@ export function createMissionSimulation({
           ? map.terrainState()
           : undefined;
       const versionBefore = map?.navigationChanges.version;
+      ticking = true;
       try {
         const working = stageWorking();
         const outcomes = due.flatMap(({ command }) =>
@@ -1704,6 +1716,8 @@ export function createMissionSimulation({
           map.navigationChanges.restart(versionBefore!);
         }
         throw error;
+      } finally {
+        ticking = false;
       }
     },
   };

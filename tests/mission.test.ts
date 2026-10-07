@@ -79,6 +79,42 @@ function move(actorId: string, x: number, z: number): ActorCommand {
   return { kind: "move", actorId, target: { x, z } };
 }
 
+test.each(["tick", "spawn", "remove", "submit", "dispose"] as const)(
+  "a behavior cannot %s the mission while its tick is staged",
+  (operation) => {
+    let simulation: ReturnType<typeof mission>;
+    simulation = createMissionSimulation({
+      state: createMissionState([actor()]),
+      behaviorRegistry: new Map([
+        [
+          "walk",
+          {
+            ...walkBehavior,
+            update: () => {
+              if (operation === "tick") simulation.tick();
+              if (operation === "spawn")
+                simulation.spawnActor(actor("scout-1", "scout"));
+              if (operation === "remove") simulation.removeActor("trooper");
+              if (operation === "submit")
+                simulation.submitCommand(move("trooper", 3, 0));
+              if (operation === "dispose") simulation.dispose();
+            },
+          },
+        ],
+      ]),
+      definitions,
+      bounds,
+      tickSeconds: 0.5,
+    });
+    const before = simulation.snapshot();
+    expect(() => simulation.tick()).toThrow(/during a tick|recursively/);
+    expect(simulation.snapshot()).toEqual(before);
+    expect(simulation.actorVersion).toBe(0);
+    expect(() => simulation.tick()).toThrow("faulted");
+    simulation.dispose();
+  },
+);
+
 test.each(["move", "attack-move", "group-move", "group-attack-move"] as const)(
   "%s rejects missing targets without faulting the mission",
   (kind) => {

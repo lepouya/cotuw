@@ -336,7 +336,10 @@ export function createActor({
   };
 }
 
-/** Trusted code for one serializable behavior ID. It is never actor state. */
+/**
+ * Trusted code for one serializable behavior ID. Behaviors change only their
+ * staged actor; mission mutation methods cannot run within a tick.
+ */
 export type ActorBehavior = {
   /** Read-only navigation queries for group orders and local separation. */
   navigationGrid?: (

@@ -21,6 +21,42 @@ const ground = {
 const makeMap = () => new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
 
 describe("simulation terrain", () => {
+  test.each([{ minX: -10 }, { maxX: 10 }, { minZ: -10 }, { maxZ: 10 }])(
+    "rejects simulation bounds beyond the map: %j",
+    (bounds) => {
+      const map = makeMap();
+      const before = map.terrainState();
+      expect(() =>
+        createMissionSimulation({
+          state: createMissionState([]),
+          definitions: [],
+          behaviorRegistry: new Map(),
+          map,
+          tickSeconds: 0.1,
+          bounds: { ...map.worldBounds, ...bounds },
+        }),
+      ).toThrow("bounds cannot exceed the terrain map");
+      expect(map.terrainState()).toEqual(before);
+    },
+  );
+
+  test("terrain queries cannot change map geometry or its terrain catalog", () => {
+    const map = makeMap();
+    const before = map.terrainState();
+    const catalog = map.terrainTypeIds as Set<string>;
+    catalog.clear();
+    catalog.add("water");
+    expect([...map.terrainTypeIds]).toEqual(["plain"]);
+    expect(() => Object.assign(map.worldBounds, { minX: -100 })).toThrow(
+      TypeError,
+    );
+    expect(map.tileAtWorldPosition(0, 0)).toEqual({ x: 2, z: 1 });
+    expect(() => map.setTerrain(0, 0, { typeId: "water" })).toThrow(
+      "not declared by the map",
+    );
+    expect(map.terrainState()).toEqual(before);
+  });
+
   test("height queries cannot mutate terrain or bypass edit rules", () => {
     const map = makeMap();
     const before = map.terrainState();
