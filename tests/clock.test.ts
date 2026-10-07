@@ -11,6 +11,37 @@ function clock(maxCatchUpTicks = 100) {
 }
 
 describe("fixed-step clock", () => {
+  test.each([NaN, Infinity, -Infinity, Number.MAX_VALUE])(
+    "invalid time %s does not corrupt earned ticks",
+    (now) => {
+      const fixed = clock();
+      for (const read of [
+        fixed.ticksDue,
+        fixed.pendingTicks,
+        fixed.tickProgress,
+      ])
+        expect(() => read(now)).toThrow(RangeError);
+      expect(fixed.ticksDue(1_050)).toBe(3);
+    },
+  );
+
+  test("rejects origins, intervals and batch limits outside clock arithmetic", () => {
+    const options = {
+      tickSeconds: 0.1,
+      startMilliseconds: 0,
+      maxCatchUpTicks: 100,
+    };
+    for (const change of [
+      { startMilliseconds: NaN },
+      { startMilliseconds: Infinity },
+      { tickSeconds: Number.MAX_VALUE },
+      { maxCatchUpTicks: Number.MAX_SAFE_INTEGER + 1 },
+    ])
+      expect(() => createFixedStepClock({ ...options, ...change })).toThrow(
+        RangeError,
+      );
+  });
+
   test("owes one tick per elapsed tick interval", () => {
     const fixed = clock();
 
@@ -31,12 +62,26 @@ describe("fixed-step clock", () => {
     expect(ticks).toBe(3_600);
   });
 
-  test("catches up after a stall and drops backlog beyond the cap", () => {
+  test("catches up in bounded batches without dropping stalled time", () => {
     const fixed = clock(30);
 
     expect(fixed.ticksDue(1_250)).toBe(15);
     expect(fixed.ticksDue(3_000)).toBe(30);
-    expect(fixed.ticksDue(3_017)).toBe(1);
+    expect(fixed.tickProgress(3_000)).toBe(1);
+    expect(fixed.ticksDue(3_000)).toBe(30);
+    expect(fixed.ticksDue(3_000)).toBe(30);
+    expect(fixed.ticksDue(3_017)).toBe(16);
+    expect(fixed.ticksDue(3_017)).toBe(0);
+    expect(fixed.tickProgress(3_017)).toBeCloseTo(0.02);
+  });
+
+  test("a ten-second stall accounts for every tick across five-second batches", () => {
+    const fixed = clock(300);
+
+    expect(fixed.ticksDue(11_000)).toBe(300);
+    expect(fixed.ticksDue(11_000)).toBe(300);
+    expect(fixed.ticksDue(11_000)).toBe(0);
+    expect(fixed.tickProgress(11_000)).toBe(0);
   });
 
   test("reports progress into the next tick", () => {

@@ -12,6 +12,31 @@ async function rightClick(page: Page, x: number, z: number) {
   await page.mouse.click(point.x, point.y, { button: "right" });
 }
 
+test("a ten-second stall catches up while rendering is stopped", async ({
+  page,
+}) => {
+  const mission = new MissionDriver(page, false, false);
+  await mission.opening();
+  await page.evaluate(() => {
+    window.missionClock += 10_000;
+  });
+
+  // Saving reads committed ticks without rendering a frame.
+  await expect
+    .poll(async () => {
+      await page.keyboard.press("F5");
+      return page.evaluate(() => {
+        const source = localStorage.getItem("cotuw.save.quicksave");
+        return source ? JSON.parse(source).state.tick : 0;
+      });
+    })
+    .toBe(600);
+  await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+    "data-simulation-fault",
+    "true",
+  );
+});
+
 test("the top bar, popups, alerts, and radial menu drive the opening with a mouse", async ({
   page,
 }, testInfo) => {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { startSimulationLoop } from "../src/simulation/loop";
 
@@ -37,6 +37,172 @@ test("speed changes retain fractional ticks instead of discarding earned time", 
 });
 
 describe("simulation loop", () => {
+  test.each(["beforeTick", "afterTick"] as const)(
+    "pause and resume in %s discard the old batch",
+    (hook) => {
+      let now = 0;
+      let ticks = 0;
+      let restarted = false;
+      const loop = startSimulationLoop(
+        {
+          tickSeconds: 0.1,
+          tick: () => {
+            ticks++;
+            return [];
+          },
+        },
+        {
+          pumpMilliseconds: 60_000,
+          maxCatchUpSeconds: 1,
+          now: () => now,
+          [hook]: () => {
+            if (restarted) return;
+            restarted = true;
+            loop.pause();
+            loop.resume();
+          },
+        },
+      );
+      try {
+        now = 10_000;
+        loop.advance();
+        const before = hook === "beforeTick" ? 0 : 1;
+        expect(ticks).toBe(before);
+        loop.advance();
+        expect(ticks).toBe(before);
+        now += 100;
+        loop.advance();
+        expect(ticks).toBe(before + 1);
+      } finally {
+        loop.stop();
+      }
+    },
+  );
+
+  test("recursive hook advances cannot exceed the batch limit", () => {
+    let now = 0;
+    let ticks = 0;
+    const loop = startSimulationLoop(
+      {
+        tickSeconds: 0.1,
+        tick: () => {
+          ticks++;
+          return [];
+        },
+      },
+      {
+        pumpMilliseconds: 60_000,
+        maxCatchUpSeconds: 1,
+        now: () => now,
+        beforeTick: () => loop.advance(),
+        afterTick: () => loop.advance(),
+      },
+    );
+    try {
+      now = 10_000;
+      loop.advance();
+      expect(ticks).toBe(10);
+      loop.advance();
+      expect(ticks).toBe(20);
+    } finally {
+      loop.stop();
+    }
+  });
+
+  test("a broken time source faults instead of silently poisoning the clock", () => {
+    let now = 0;
+    const tick = vi.fn(() => []);
+    const onFault = vi.fn();
+    const loop = startSimulationLoop(
+      { tickSeconds: 0.1, tick },
+      {
+        pumpMilliseconds: 60_000,
+        maxCatchUpSeconds: 1,
+        now: () => now,
+        onFault,
+      },
+    );
+    now = NaN;
+    loop.advance();
+    expect(loop.faulted).toBe(true);
+    expect(onFault).toHaveBeenCalledOnce();
+    now = 1_000;
+    loop.advance();
+    expect(tick).not.toHaveBeenCalled();
+  });
+
+  test.each([0, -1, NaN, Infinity])(
+    "rejects invalid pump and catch-up intervals %s",
+    (invalid) => {
+      const simulation = { tickSeconds: 0.1, tick: () => [] };
+      for (const options of [
+        { pumpMilliseconds: invalid, maxCatchUpSeconds: 1 },
+        { pumpMilliseconds: 1, maxCatchUpSeconds: invalid },
+      ])
+        expect(() => startSimulationLoop(simulation, options)).toThrow(
+          RangeError,
+        );
+    },
+  );
+
+  test.each([0.5, 2])(
+    "speed %s preserves whole and fractional ticks owed before a rate change",
+    (speed) => {
+      let now = 0;
+      let ticks = 0;
+      const loop = startSimulationLoop(
+        {
+          tickSeconds: 0.1,
+          tick: () => {
+            ticks++;
+            return [];
+          },
+        },
+        { pumpMilliseconds: 60_000, maxCatchUpSeconds: 1, now: () => now },
+      );
+      try {
+        now = 10_050;
+        loop.setSpeed(speed);
+        expect(ticks).toBe(0);
+        expect(loop.tickProgress()).toBe(1);
+        for (let batch = 0; batch < 20; batch++) loop.advance();
+        expect(ticks).toBe(100);
+        expect(loop.tickProgress()).toBeCloseTo(0.5);
+        now += 50 / speed;
+        loop.advance();
+        expect(ticks).toBe(101);
+        expect(loop.tickProgress()).toBeCloseTo(0);
+      } finally {
+        loop.stop();
+      }
+    },
+  );
+
+  test.each([4, 250, 1_000])(
+    "timer pumps every %s ms run at 60 Hz without a render loop",
+    (pumpMilliseconds) => {
+      vi.useFakeTimers();
+      let ticks = 0;
+      const loop = startSimulationLoop(
+        {
+          tickSeconds: 1 / 60,
+          tick: () => {
+            ticks++;
+            return [];
+          },
+        },
+        { pumpMilliseconds, maxCatchUpSeconds: 5 },
+      );
+      try {
+        vi.advanceTimersByTime(10_000);
+        expect(ticks).toBe(600);
+      } finally {
+        loop.stop();
+        vi.useRealTimers();
+      }
+    },
+  );
+
   test("pausing during a result discards backlog and resumes from the current time", () => {
     let now = 0;
     let ticks = 0;
@@ -58,10 +224,10 @@ describe("simulation loop", () => {
         },
       },
     );
-    now = 100;
+    now = 10_000;
     loop.advance();
     expect(ticks).toBe(1);
-    now = 10_000;
+    now = 20_000;
     loop.advance();
     expect(ticks).toBe(1);
     loop.resume();
@@ -136,7 +302,7 @@ describe("simulation loop", () => {
       },
     );
 
-    now = 25;
+    now = 10_000;
     loop.advance();
     loop.advance();
 
@@ -147,7 +313,7 @@ describe("simulation loop", () => {
     expect(faults).toEqual([error]);
   });
 
-  test("speed scales ticks per real second after running owed ticks", () => {
+  test("speed scales ticks per real second and carries owed ticks", () => {
     let now = 0;
     let ticks = 0;
     const loop = startSimulationLoop(
@@ -162,7 +328,7 @@ describe("simulation loop", () => {
     );
     now = 50;
     loop.setSpeed(2);
-    expect(ticks).toBe(5);
+    expect(ticks).toBe(0);
     now = 100;
     loop.advance();
     expect(ticks).toBe(15);
@@ -195,7 +361,7 @@ test("stopping in a tick callback discards the remaining clock backlog", () => {
       afterTick: () => loop.stop(),
     },
   );
-  now = 1000;
+  now = 10_000;
   loop.advance();
   expect(ticks).toBe(1);
   expect(loop.tickProgress()).toBe(1);
@@ -203,7 +369,7 @@ test("stopping in a tick callback discards the remaining clock backlog", () => {
   expect(ticks).toBe(1);
 });
 
-test("loading paused owes no ticks until resumed and drops inspection time", () => {
+test("paused inspection owes no ticks even when its speed changes", () => {
   let now = 0;
   let ticks = 0;
   const loop = startSimulationLoop(
@@ -222,6 +388,8 @@ test("loading paused owes no ticks until resumed and drops inspection time", () 
     },
   );
   now = 1000;
+  loop.setSpeed(2);
+  now = 10_000;
   loop.advance();
   expect(ticks).toBe(0);
   loop.resume();
@@ -229,7 +397,7 @@ test("loading paused owes no ticks until resumed and drops inspection time", () 
   expect(ticks).toBe(0);
   now += 20;
   loop.advance();
-  expect(ticks).toBe(2);
+  expect(ticks).toBe(4);
   loop.stop();
 });
 

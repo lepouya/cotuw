@@ -109,7 +109,7 @@ import type { WorldPosition } from "./simulation/world";
 const SITE_MINIMAP_COLOR: Rgb = [0.3, 0.66, 0.75];
 const SALVAGE_MINIMAP_COLOR: Rgb = [0.88, 0.65, 0.2];
 const SIMULATION_PUMP_MILLISECONDS = 4;
-/** Covers background-tab throttling to one timer callback per second. */
+/** Bounds each pump's work while retaining longer stalls. */
 const MAX_CATCH_UP_SECONDS = 5;
 /** How far past explored tile centers the camera may look, in world units. */
 const CAMERA_FRONTIER_MARGIN = 4;

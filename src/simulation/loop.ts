@@ -1,4 +1,5 @@
 import { createFixedStepClock } from "./clock";
+import { isPositive } from "./validation";
 
 import type { CommandOutcome } from "./command";
 import type { MissionSimulation } from "./mission";
@@ -6,7 +7,7 @@ import type { MissionSimulation } from "./mission";
 export type SimulationLoopOptions = {
   /** How often the timer wakes the clock. It does not set the tick rate. */
   pumpMilliseconds: number;
-  /** Longer stalls drop time rather than freeze the page replaying it. */
+  /** Bounds each advance call; excess ticks remain owed. */
   maxCatchUpSeconds: number;
   /** Runs before each tick, while the state still shows the previous tick. */
   beforeTick?: () => void;
@@ -23,16 +24,16 @@ export type SimulationLoop = {
   readonly faulted: boolean;
   /** The error that stopped the loop, if a tick or hook failed. */
   readonly fault: unknown | undefined;
-  /** Runs the ticks real time owes now, such as right before a render. */
+  /** Runs a bounded batch of owed ticks, such as right before a render. */
   advance: () => void;
-  /** How far real time is into the next tick, from 0 to 1. */
+  /** Interpolation toward the next tick; 1 while halted or catching up. */
   tickProgress: () => number;
   pause: () => void;
   stop: () => void;
   resume: () => void;
   /** Simulated seconds per real second. */
   readonly speed: number;
-  /** Changes the speed after running the ticks owed at the current one. */
+  /** Changes the rate while preserving owed whole and fractional ticks. */
   setSpeed: (speed: number) => void;
 };
 
@@ -52,12 +53,16 @@ export function startSimulationLoop(
     paused = false,
   }: SimulationLoopOptions,
 ): SimulationLoop {
+  if (!isPositive(pumpMilliseconds) || !isPositive(maxCatchUpSeconds))
+    throw new RangeError(
+      "Simulation pump and catch-up intervals must be positive and finite.",
+    );
   let speed = 1;
-  const newClock = (rate = speed, progress = 0) => {
+  const newClock = (rate = speed, pendingTicks = 0, at = now()) => {
     const tickSeconds = simulation.tickSeconds / rate;
     return createFixedStepClock({
       tickSeconds,
-      startMilliseconds: now() - progress * tickSeconds * 1000,
+      startMilliseconds: at - pendingTicks * tickSeconds * 1000,
       maxCatchUpTicks: Math.max(Math.ceil(maxCatchUpSeconds / tickSeconds), 1),
     });
   };
@@ -65,6 +70,8 @@ export function startSimulationLoop(
   let fault: unknown;
   let faulted = false;
   let stopped = false;
+  let advancing = false;
+  let pauseGeneration = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
   const stop = () => {
     stopped = true;
@@ -73,14 +80,16 @@ export function startSimulationLoop(
     }
   };
   const advance = () => {
-    if (stopped || paused) {
+    if (stopped || paused || advancing) {
       return;
     }
+    advancing = true;
+    const generation = pauseGeneration;
     try {
       for (let ticks = clock.ticksDue(now()); ticks > 0; ticks -= 1) {
-        if (stopped || paused) break;
+        if (stopped || paused || generation !== pauseGeneration) break;
         beforeTick?.();
-        if (stopped || paused) break;
+        if (stopped || paused || generation !== pauseGeneration) break;
         const outcomes = simulation.tick();
         afterTick?.(outcomes);
       }
@@ -89,6 +98,8 @@ export function startSimulationLoop(
       fault = error;
       stop();
       onFault?.(error);
+    } finally {
+      advancing = false;
     }
   };
   timer = setInterval(advance, pumpMilliseconds);
@@ -103,6 +114,7 @@ export function startSimulationLoop(
     advance,
     tickProgress: () => (stopped || paused ? 1 : clock.tickProgress(now())),
     pause: () => {
+      if (!paused) pauseGeneration++;
       paused = true;
     },
     resume: () => {
@@ -117,11 +129,10 @@ export function startSimulationLoop(
       if (!Number.isFinite(next) || next <= 0)
         throw new RangeError("Simulation speed must be positive and finite.");
       if (next === speed) return;
-      advance();
-      // Speed changes preserve the fraction of the next tick already earned.
-      const nextClock = newClock(next, paused ? 0 : clock.tickProgress(now()));
+      // Owed ticks are counted in ticks, so they carry over unchanged.
+      const at = now();
+      clock = newClock(next, clock.pendingTicks(at), at);
       speed = next;
-      clock = nextClock;
     },
     stop,
   };

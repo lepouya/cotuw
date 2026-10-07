@@ -81,6 +81,12 @@ interpolates between immutable states from the last two committed ticks. A tick
 commits actor, footprint, and terrain state atomically; invalid behavior output
 permanently faults the simulation and restores the last committed state.
 
+Catch-up work is bounded per clock pump; further owed ticks stay pending until
+later pumps run them. Speed changes preserve both whole and fractional owed
+ticks. Render interpolation holds at the latest committed pose while catching
+up. Pausing discards outstanding catch-up time; resuming starts from the
+current time, so inspection and paused time never advance the mission.
+
 ## Mission terminology
 
 - A campaign is a faction's long-form narrative and progression.

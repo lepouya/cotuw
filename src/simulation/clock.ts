@@ -14,14 +14,16 @@ export type FixedStepClockOptions = {
   tickSeconds: number;
   /** A monotonic timestamp, such as `performance.now()`, when ticking starts. */
   startMilliseconds: number;
-  /** The most ticks one call may return. Any larger backlog is dropped. */
+  /** The most ticks one call may return; the rest remain pending. */
   maxCatchUpTicks: number;
 };
 
 /** Converts monotonic real time into the whole fixed ticks it owes. */
 export type FixedStepClock = {
   ticksDue: (nowMilliseconds: number) => number;
-  /** How far real time is past the last counted tick, from 0 to 1. */
+  /** Unreturned ticks, including the fraction of the next tick. */
+  pendingTicks: (nowMilliseconds: number) => number;
+  /** Interpolation fraction, clamped to 1 while whole ticks remain pending. */
   tickProgress: (nowMilliseconds: number) => number;
 };
 
@@ -35,15 +37,27 @@ export function createFixedStepClock({
       "Clock tick seconds must be a positive finite number.",
     );
   }
-  if (!Number.isInteger(maxCatchUpTicks) || maxCatchUpTicks < 1) {
-    throw new RangeError("Clock catch-up ticks must be a positive integer.");
+  if (!isCount(maxCatchUpTicks) || maxCatchUpTicks < 1) {
+    throw new RangeError(
+      "Clock catch-up ticks must be a positive safe integer.",
+    );
   }
 
   const tickMilliseconds = tickSeconds * 1_000;
+  if (!Number.isFinite(tickMilliseconds) || !Number.isFinite(startMilliseconds))
+    throw new RangeError("Clock interval and origin must be finite.");
   // Counting from a fixed origin keeps rounding from accumulating as drift.
-  const elapsed = (nowMilliseconds: number) =>
-    (nowMilliseconds - startMilliseconds) / tickMilliseconds;
+  const elapsed = (nowMilliseconds: number) => {
+    const ticks = (nowMilliseconds - startMilliseconds) / tickMilliseconds;
+    if (!Number.isFinite(ticks) || Math.abs(ticks) > Number.MAX_SAFE_INTEGER)
+      throw new RangeError(
+        "Clock time must resolve to a finite, safe tick count.",
+      );
+    return ticks;
+  };
   let ticksCounted = 0;
+  const pendingTicks = (nowMilliseconds: number) =>
+    Math.max(elapsed(nowMilliseconds) - ticksCounted, 0);
   return {
     ticksDue: (nowMilliseconds) => {
       // The tolerance lets an exact boundary count despite an inexact tick.
@@ -55,10 +69,12 @@ export function createFixedStepClock({
         return 0;
       }
 
-      ticksCounted = elapsedTicks;
-      return Math.min(due, maxCatchUpTicks);
+      const ticks = Math.min(due, maxCatchUpTicks);
+      ticksCounted += ticks;
+      return ticks;
     },
+    pendingTicks,
     tickProgress: (nowMilliseconds) =>
-      Math.min(Math.max(elapsed(nowMilliseconds) - ticksCounted, 0), 1),
+      Math.min(pendingTicks(nowMilliseconds), 1),
   };
 }

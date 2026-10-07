@@ -1500,7 +1500,7 @@ describe("Command Center defeat", () => {
   });
 });
 
-test("aggressive combat is identical with frequent or sparse clock pumps", () => {
+test("combat state matches across frequent, sparse, and stalled clock pumps", () => {
   const run = (pumpMilliseconds: number) => {
     const { simulation } = fixture([
       unit("trooper", "arc-trooper", 12, 10),
@@ -1519,9 +1519,12 @@ test("aggressive combat is identical with frequent or sparse clock pumps", () =>
     });
     for (; now < 20_000; now += pumpMilliseconds) loop.advance();
     now = 20_000;
-    loop.advance();
+    for (let batch = 0; batch < 4; batch++) loop.advance();
     loop.stop();
+    expect(simulation.completedTicks).toBe(200);
     return simulation.snapshot();
   };
-  expect(run(233)).toEqual(run(5));
+  const expected = run(5);
+  for (const pumpMilliseconds of [233, 1_000, 10_000, 20_000])
+    expect(run(pumpMilliseconds)).toEqual(expected);
 });
