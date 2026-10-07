@@ -324,7 +324,12 @@ export async function createGameSession(
       );
   const materialsView =
     simulation.economy &&
-    createMaterialsSitesView(view.scene, map, simulation.economy);
+    createMaterialsSitesView(
+      view.scene,
+      map,
+      simulation.economy,
+      content.materialsStages,
+    );
   const explored = ({ x, z }: TileCoord) =>
     simulation.fog?.isExplored(x, z) ?? true;
   const fogOverlay = createFogOverlay(view.scene, map, options.clearColor);

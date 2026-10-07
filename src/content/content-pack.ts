@@ -19,6 +19,8 @@ import type { ModelGraphics } from "../render/glb-model";
 import { validateFrameEffects } from "../render/frame-effects";
 import { DAMAGE_EFFECT_STYLES } from "../render/damage-effects";
 import { ATTACK_EFFECT_STYLES } from "../render/combat-effects";
+import { validateMaterialsStages } from "../render/materials-sites";
+import type { MaterialsStage } from "../render/materials-sites";
 import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
@@ -105,6 +107,8 @@ export type ContentPack = ContentReference & {
    * weapon and damage effects, and ambient birds.
    */
   props?: Partial<Record<PropId, ModelGraphics>>;
+  /** Descending fullness cutoffs; the last stage starts above zero. */
+  materialsStages?: readonly MaterialsStage[];
   terrain: TerrainStyle;
   view: ViewStyle;
 };
@@ -266,6 +270,8 @@ export function parseContentPack(source: string): ContentPack {
     if (!isOneOf(PROP_IDS, id)) throw invalid(`has an unknown prop ${id}`);
     validateModelGraphics(graphics);
   }
+  if (pack.materialsStages !== undefined)
+    validateMaterialsStages(pack.materialsStages);
   validateTerrainStyle(pack.terrain, pack.clips ?? {}, invalid);
   return deepFreeze(pack);
 }

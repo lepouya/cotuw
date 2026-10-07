@@ -5,7 +5,8 @@ import {
   TransformNode,
 } from "@babylonjs/core";
 import { stableUnit } from "./actor";
-import { staticInstance } from "./glb-model";
+import { hierarchyMeshes, staticInstance } from "./glb-model";
+import { isPositive, isRecord } from "../simulation/validation";
 import type { AbstractMesh, Mesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { EconomyView } from "../simulation/economy";
@@ -17,11 +18,48 @@ export const SALVAGE_COLOR = new Color3(1, 0.72, 0.2);
 
 type Marker = { root: TransformNode; model: ModelInstance };
 
+/** A marker scale for remaining fractions strictly greater than `above`. */
+export type MaterialsStage = { readonly above: number; readonly scale: number };
+
+export const DEFAULT_MATERIALS_STAGES: readonly MaterialsStage[] =
+  Object.freeze([
+    Object.freeze({ above: 0.75, scale: 1 }),
+    Object.freeze({ above: 0.5, scale: 0.8375 }),
+    Object.freeze({ above: 0.25, scale: 0.675 }),
+    Object.freeze({ above: 0, scale: 0.5125 }),
+  ]);
+
+/** Cutoffs in [0, 1) descend to zero while scales shrink. */
+export function validateMaterialsStages(
+  stages: unknown,
+): asserts stages is MaterialsStage[] {
+  if (
+    !Array.isArray(stages) ||
+    stages[stages.length - 1]?.above !== 0 ||
+    stages.some(
+      (stage, index) =>
+        !isRecord(stage) ||
+        !isFraction(stage.above) ||
+        !isPositive(stage.scale) ||
+        (index > 0 &&
+          (stage.above >= stages[index - 1].above ||
+            stage.scale >= stages[index - 1].scale)),
+    )
+  )
+    throw new RangeError(
+      "Materials stages need descending thresholds ending at zero and positive descending scales.",
+    );
+}
+
+const isFraction = (value: unknown): value is number =>
+  typeof value === "number" && value >= 0 && value < 1;
+
 /** Depletion changes presentation without changing terrain or navigation. */
 export function createMaterialsSitesView(
   scene: Scene,
   map: TerrainMap,
   initial: EconomyView,
+  stages: readonly MaterialsStage[] = DEFAULT_MATERIALS_STAGES,
 ) {
   const groundAt = (node: TransformNode) =>
     map.heightAtWorldPosition(node.position.x, node.position.z);
@@ -55,11 +93,11 @@ export function createMaterialsSitesView(
   };
   const lootTiles = new WeakMap<AbstractMesh, TileCoord>();
   const showSite = (site: Marker) => {
-    for (const mesh of site.model.root.getChildMeshes())
+    for (const mesh of hierarchyMeshes(site.model.root))
       mesh.isPickable = false;
   };
   const showGift = (gift: Marker & { tile: TileCoord; phase: number }) => {
-    for (const mesh of gift.model.root.getChildMeshes())
+    for (const mesh of hierarchyMeshes(gift.model.root))
       lootTiles.set(mesh, gift.tile);
     gift.model.pose(gift.phase);
   };
@@ -138,9 +176,9 @@ export function createMaterialsSitesView(
       for (const site of economy.sites) {
         const { root } = sites.get(site.id)!;
         root.setEnabled(site.remainingMaterials > 0 && explored(site.tile));
-        const stage =
-          Math.ceil((4 * site.remainingMaterials) / site.initialMaterials) / 4;
-        root.scaling.setAll(0.35 + 0.65 * stage);
+        const fraction = site.remainingMaterials / site.initialMaterials;
+        const stage = stages.find(({ above }) => fraction > above);
+        root.scaling.setAll(stage?.scale ?? 0);
       }
       for (const cache of economy.loot)
         loot

@@ -291,6 +291,40 @@ test("rejects unknown and repeated actor animation roles before loading assets",
   ).toThrow("uses one clip for multiple animation roles");
 });
 
+test("Materials presentation accepts tunable stages and rejects gaps or ambiguous ordering", () => {
+  expect(
+    withEdit((pack) => {
+      pack.materialsStages = [
+        { above: 0.6, scale: 1 },
+        { above: 0, scale: 0.5 },
+      ];
+    })(),
+  ).toBeTruthy();
+  for (const stages of [
+    [],
+    [{ above: 0.2, scale: 1 }],
+    [
+      { above: 1, scale: 1 },
+      { above: 0, scale: 0.5 },
+    ],
+    [
+      { above: 0.2, scale: 0.5 },
+      { above: 0, scale: 1 },
+    ],
+    [
+      { above: 0.5, scale: 1 },
+      { above: 0.5, scale: 0.6 },
+      { above: 0, scale: 0.2 },
+    ],
+    [{ above: 0, scale: -1 }],
+  ])
+    expect(
+      withEdit((pack) => {
+        pack.materialsStages = stages;
+      }),
+    ).toThrow("descending thresholds");
+});
+
 test("rejects a non-boolean regeneration effect", () => {
   expect(
     withEdit((pack) => {

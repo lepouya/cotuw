@@ -834,5 +834,23 @@
       "url": "/assets/models/regeneration.glb",
       "idle": "pulse"
     }
-  }
+  },
+  "materialsStages": [
+    {
+      "above": 0.75,
+      "scale": 1
+    },
+    {
+      "above": 0.5,
+      "scale": 0.8375
+    },
+    {
+      "above": 0.25,
+      "scale": 0.675
+    },
+    {
+      "above": 0,
+      "scale": 0.5125
+    }
+  ]
 }

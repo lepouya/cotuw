@@ -961,8 +961,10 @@ Deterministic acceptance checks cover:
   become buildable.
 - The sidebar provides cargo, phase, Gather, Return cargo, Refinery assignment,
   paid-order cancellation, patch totals, and salvage commands. The top bar
-  shows available Materials. Blue resource markers shrink in four stages and
-  disappear at depletion; salvage uses hovering, rotating gold gift boxes
+  shows available Materials. Blue resource markers shrink in four nonempty
+  stages and disappear at depletion. The content pack sets descending fullness
+  cutoffs and model scales; a fraction equal to a cutoff enters the smaller
+  stage. Salvage uses hovering, rotating gold gift boxes
   with red ribbons and disappears on collection. Clicking a gift box sends
   selected mobile units to its tile. Both marker types follow terrain edits
   and appear on the minimap. Exhaustion, missing assignments,

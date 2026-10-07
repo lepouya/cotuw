@@ -382,3 +382,54 @@ test("content scale applies to the entire Harvester and its bounds", () => {
     engine.dispose();
   }
 });
+
+test("Materials stages obey pack thresholds at their boundaries and disappear only when empty", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const map = new TerrainMap({ width: 4, height: 4, tileSize: 1 });
+    const economy: EconomyState = {
+      materials: 0,
+      depositedMaterials: 0,
+      harvesters: [],
+      production: [],
+      loot: [],
+      sites: [
+        {
+          id: "site",
+          name: "Materials",
+          tile: { x: 1, z: 1 },
+          initialMaterials: 100,
+          remainingMaterials: 100,
+        },
+      ],
+    };
+    const view = createMaterialsSitesView(scene, map, economy, [
+      { above: 0.6, scale: 1 },
+      { above: 0.2, scale: 0.7 },
+      { above: 0, scale: 0.4 },
+    ]);
+    const root = scene.getTransformNodeByName("materials-site")!;
+    const scales = [100, 61, 60, 21, 20, 1, 0].map((remaining) => {
+      economy.sites[0].remainingMaterials = remaining;
+      view.update(economy, () => true);
+      return [root.scaling.x, root.isEnabled()];
+    });
+    expect(scales).toEqual([
+      [1, true],
+      [1, true],
+      [0.7, true],
+      [0.7, true],
+      [0.4, true],
+      [0.4, true],
+      [0, false],
+    ]);
+    economy.sites[0].remainingMaterials = 100;
+    view.update(economy, () => false);
+    expect(root.isEnabled()).toBe(false);
+    expect(map.terrainAt(1, 1).typeId).toBe("plain");
+    view.dispose();
+  } finally {
+    engine.dispose();
+  }
+});

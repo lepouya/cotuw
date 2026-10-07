@@ -50,6 +50,11 @@ bundled packs through the same parser future mod packs will use.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
   `materials-mound`, `salvage`, `tracer`, `bite`, `smoke`, `fire`, `wound`,
   `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.
+- `materialsStages` lists `{ above, scale }` in descending order. A remaining
+  fraction strictly greater than `above` uses that scale. Cutoffs lie in
+  `[0, 1)`, scales are positive and decrease, and the last cutoff is zero.
+  The base pack has four nonempty stages; exhausted markers disappear.
+  Omitting this field uses the base four-stage defaults.
 - `clips` maps IDs to frame-sequenced textures. `columns` and `rows` divide a
   sprite sheet into equal cells numbered row by row from the top left.
   `frames` lists `{ cell, seconds }` in play order, and `playback` is

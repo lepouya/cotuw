@@ -124,7 +124,7 @@ This audit corrected or clarified:
   campaign opening.
 - Decorative water remains available for the UV-animation proof while water
   traversal remains outside M0.
-- Finite M0 Materials tiles now match the four resource-depletion visuals.
+- Finite M0 Materials tiles now match the resource-depletion stages.
 - Movement profiles and occupancy layers are separate, so watercraft remain on
   the surface layer while air and subterranean actors use distinct layers.
 - Q10-Q17 now use actor detection rather than terrain vision wherever selection,
@@ -965,7 +965,7 @@ yields or also by pressure on existing collection sites.
   their contrasting relationship with the world.
 - Exact rates, capacities, recovery times, and balance remain deferred.
 - **M0 exception:** The prototype uses finite Materials tiles so harvesting can
-  demonstrate the four visual depletion states selected in Q18. It does not
+  demonstrate the depletion stages selected in Q18. It does not
   need to model ARC's broader ecological damage rules or the Circle's dormancy
   and recovery cycle. Harvester loss can still create the soft-defeat state
   described in Q5.
@@ -2283,9 +2283,9 @@ creating excessive battlefield particle clutter.
   give it simulation authority; gameplay-bearing projectiles still use
   deterministic simulation rules.
 - **State-driven tile graphics:** A tile may visibly change when its simulation
-  state changes. In M0, each harvestable resource tile has four visual states:
-  **full**, **reduced**, **sparse**, and **exhausted**. The deterministic amount
-  remaining selects the state through data-driven thresholds, whose exact
+  state changes. In M0, each harvestable resource tile has four nonempty
+  shrinking stages and an **exhausted** state. The deterministic amount
+  remaining selects the stage through data-driven thresholds, whose exact
   percentages remain tuning values.
 - Animation playback remains a rendering concern. Deterministic simulation
   selects meaningful states, such as moving, firing, operating, damaged, or
@@ -2338,8 +2338,8 @@ Selected M0 examples include:
   remains immediate simulation state and does not wait for the tracer.
 - Include one simple ambient bird flight loop as the non-combat independent
   animated-object example.
-- Change resource-patch tile art through the four locked fullness states as
-  Materials are removed.
+- Change resource-patch tile art through the four nonempty stages and the
+  exhausted state as Materials are removed.
 - A travelling thrown projectile remains a valid later example, but M0 should
   not add one because its rifle damage is resolved immediately and its tracer
   is visual feedback rather than a simulated projectile.
@@ -2643,7 +2643,7 @@ viewport with touch-style input and no keyboard, hover, or right-click.
   and popup paths defined in Q16 and Q20.
 - **Animation:** Scrolling water, frame-animated vegetation, skeletal and
   articulated actors and buildings, the muzzle flash, tracer, ambient bird,
-  damage effects, building stages, and four resource-depletion visuals prove
+  damage effects, building stages, and resource-depletion stages prove
   the animation paths selected in Q18 without controlling simulation timing.
 - **Persistence:** Manual saves, quicksave, and autosave round-trip the complete
   authoritative mission state within the same build. Loading begins paused,
