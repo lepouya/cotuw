@@ -5,12 +5,46 @@ verification evidence. Open items can have substantial working parts.
 The [roadmap](../ROADMAP.md) owns task status; [DESIGN.md](../DESIGN.md) owns
 the requirements.
 
+## Milestone 0 closeout
+
+54 of 57 tasks are complete. The remaining tasks are **0.44**, native
+persistence verification; **0.55**, human playtesting and pacing; and **0.57**,
+essential sound effects. The mission loop has browser coverage from the
+authored opening through victory and free play. Milestone acceptance also
+requires recorded unaided first-time human completion and a desktop mission
+run. Background music is optional.
+
+## Verification baseline
+
+- `npm run check` passes: formatting, TypeScript and Rust linting and type
+  checks, 881 unit tests, and 242 Chromium and WebKit browser checks.
+  Two conditional Scout attack-animation tests are skipped because Scouts
+  cannot attack. The Rust test harness has no tests.
+- `npm run build` and `npm run tauri build -- --debug --no-bundle` pass on
+  macOS. This verifies compilation; desktop runtime acceptance remains open.
+
 ## Completion evidence
 
 - **0.5, module boundaries:** simulation, rendering, content, UI, and
   [platform services](../src/platform/index.ts) have separate modules. Browser
   and Tauri adapters implement save storage and file exchange behind one
   interface; the game imports the Tauri adapter only inside Tauri.
+  [Runtime extension contracts](runtime-boundaries.md) describe behavior and
+  resource ownership. Unit and browser checks cover recursive ticks, protected
+  terrain queries, and cleanup after failed session initialization.
+- **0.56, simulation clock catch-up:**
+  [the clock](../src/simulation/clock.ts) retains ticks beyond its batch limit.
+  [Clock tests](../tests/clock.test.ts) verify that a ten-second stall at 60 Hz
+  runs all 600 ticks across bounded batches, with interpolation clamped while
+  whole ticks remain pending.
+  [Loop tests](../tests/loop.test.ts) cover whole and fractional owed ticks
+  across speed changes, independent timer pumps at 4, 250, and 1,000 ms,
+  paused inspection, result pauses, faults, and stopping during catch-up.
+  [Combat tests](../tests/combat.test.ts) compare identical mission snapshots
+  under frequent, one-second, ten-second, and twenty-second pump schedules.
+  [Browser checks](../e2e/interface.spec.ts) verify that the production app's
+  timers commit all 600 ticks after a ten-second gap with rendering stopped,
+  reading authoritative progress through quicksave in Chromium and WebKit.
 - **0.11 and 0.12, terrain frame animation:** dense and sparse grass clips play
   generated sprite sheets with per-frame durations, phase lags, and reduced
   motion. [Clip tests](../tests/texture-clip.test.ts) cover timing, playback
@@ -125,7 +159,7 @@ the requirements.
   after selection, visibility, or pause changes. Mission and economy checks
   cover objectives, victory, free play, and defeat. Manual mission interface
   playtesting passes.
-- **0.44, persistence:** levels and saves share
+- **0.44, persistence implementation:** levels and saves share
   [one JSON format](mission-files.md), and every mission starts by loading a
   file. The game menu provides named saves, export, a save list with import
   and deletion, quicksave (`F5`), quickload (`F9`), restart, and exit;
@@ -133,7 +167,8 @@ the requirements.
   rejects other versions, tick rates, and content pack versions clearly.
   [Codec](../tests/mission-file.test.ts) and
   [save library](../tests/saves.test.ts) tests pass, and a manual browser
-  playthrough saved and loaded successfully.
+  playthrough saved and loaded successfully. Native file exchange verification
+  remains open below.
 - **0.45, on-screen actions:** construction, production, economy, rally points,
   selection, movement, camera views, Focus, Follow, Attack Move, pause, and
   speed actions have on-screen controls that work with compact touch input,
@@ -220,12 +255,70 @@ the requirements.
 
 ## Remaining scope
 
-- **Desktop persistence:** saving to and loading from the app data folder
-  work in the desktop app. Export file and Import file, which open the native
-  dialogs, still need a check there. Chromium and WebKit coverage includes the
-  [save checks](../e2e/saves.spec.ts).
+- **0.44, native persistence verification:** saving to and loading from the
+  app data folder have desktop playtest evidence. Export and Import still need
+  a check using the native dialogs; browser and mocked adapter tests do not
+  exercise their file access. Export a mid-mission save, change the mission,
+  import it, and verify paused inspection and restored progress. Check dialog
+  cancellation and invalid or incompatible imports preserve the session.
+  Exercise quicksave, objective autosave, and restart in the desktop app.
+  Record the platform, build, and results before marking the task complete.
+- **0.55, human playtesting and pacing:**
+  [the playthrough evidence](m0-playthrough.md#pacing) records automated and
+  familiar-replay times below the design's targets; first-time times and
+  unaided completion remain unrecorded. Resolve the
+  [duration target review](#duration-target-review) before tuning. Human
+  feedback also identifies missing sound as a required improvement. Record
+  wall time, mission time, speed setting, pauses, losses, route choices,
+  confusion, stalls, and whether help was needed. A useful initial sample is
+  three RTS-familiar first-time players and at least one familiar replay. Tune
+  against the accepted pacing criteria and encounter rules, regenerate affected
+  assets or levels, and repeat the playtests.
+- **0.57, essential sound effects:** the app has no audio playback or audio
+  assets. Implement the required cues and playback rules in
+  [the audio specification](../DESIGN.md#audio), including clear distinctions
+  between accepted and rejected actions and audible priority alerts. Verify
+  browser playback after interaction, desktop output, compact touch volume and
+  mute controls, group and combat sound limits, and loading without replaying
+  historical sounds. Confirm that hidden hostiles stay inaudible and muting or
+  unavailable audio leaves the mission playable. Record a human listening
+  check for cue clarity and mix levels, plus asset provenance.
+
+## Optional background music
+
+Evaluate one quiet looping track after essential sound effects are in place.
+Use human playtests to judge whether it improves the mission and leaves alerts
+and combat readable. If included, verify independent music volume and mute,
+loop transitions, and asset licensing. Music does not gate M0 completion.
+
+## Duration target review
+
+The current duration targets remain in [DESIGN.md](../DESIGN.md). Slower
+gathering or production alone would lengthen waiting without adding decisions,
+and the mission's one economy buildup and two encounters may not fill the
+current targets. The proposed revision is to close **0.55** on recorded
+unaided first-time completion, clear economy and exploration guidance, useful
+decisions without prolonged idle waiting, and the locked lone-wolf and den
+difficulty. Record completion times as observations rather than requiring a
+minimum mission length. Adopting this proposal requires an explicit change to
+the design and roadmap duration targets.
+
+## Final milestone acceptance
+
+- Run `npm run check` after audio implementation and any pacing changes. The
+  authored mission, Chromium and WebKit checks, and compact phone and tablet
+  interactions must pass with the final content, including audio controls.
+- Build the browser and Tauri app. In the desktop app, run from the fixed
+  Command Center through victory and continued free play, and verify defeat,
+  load, and restart. Record Windows and macOS coverage; browser WebKit checks
+  do not prove native dialogs or packaged runtime behavior.
+- Record human playtest results in [the playthrough notes](m0-playthrough.md)
+  and update the completion evidence here. Keep the milestone open until the
+  three remaining tasks and the roadmap's completion conditions have evidence.
 
 ## Recommended next task
 
-Run first-time human playtests for **0.55** to tune M0 costs, timings,
-encounters, and layout. Check desktop export and import alongside.
+Resolve the **0.55** duration target review and implement **0.57** before the
+final human playtests. Tune from the results, with **0.44** native persistence
+checks alongside. Evaluate optional music once the sound effects work. Finish
+with the full checks and desktop mission acceptance run.

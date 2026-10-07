@@ -37,11 +37,20 @@ state, grant resources, or weaken wolves.
 
 The same mouse strategy passes at normal speed with the app's own timers and
 render loop in about six minutes of wall time, including input handling and
-the post-victory production check. First-time human pacing remains unmeasured.
+the post-victory production check.
 
-This efficient strategy finishes below the intended 10–15 minute familiar
-replay. The 15–25 minute first-success target still needs first-time human
-playtests. Pacing needs a separate tuning pass informed by those playtests.
+A familiar human replay reported by the project's developer finishes in just
+under four minutes. Its speed setting and timing method are not recorded.
+The developer estimates a new player's run might take roughly twice as long,
+around eight minutes. That is an estimate; first-time completion times and
+unaided completion remain unrecorded.
+
+The automated and reported human runs are below the intended 10–15 minute
+familiar replay. The current mission has one economy buildup and two combat
+encounters, so reaching the 15–25 minute first-success target may require more
+content than this slice owns.
+[The roadmap audit](roadmap-audit.md#duration-target-review) tracks the target
+review.
 
 ## Reproduce
 

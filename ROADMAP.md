@@ -26,6 +26,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.5 Establish small module boundaries for simulation, rendering, and
       platform services.
 - [x] 0.6 Add the basic development, type-checking, and build commands.
+- [x] 0.56 Preserve owed simulation ticks through long timer or renderer
+      stalls, with bounded catch-up work and regression checks for low render
+      rates and stalls beyond five seconds.
 
 ### Proof of concept
 
@@ -131,7 +134,7 @@ base-building RTS loop, its technical architecture, and its player interface.
       detection, and regeneration.
 - [x] 0.43 Implement the sidebar, top bar, radial context menu, objectives,
       alerts, notifications, explanatory popups, and victory or defeat results.
-- [x] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
+- [ ] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
       autosave, version validation, and paused inspection after loading.
 - [x] 0.45 Expose every core action through on-screen controls that work in
       compact phone and tablet landscape browser profiles without hover or
@@ -152,6 +155,9 @@ base-building RTS loop, its technical architecture, and its player interface.
       leaving no mission-specific rules in session code.
 - [ ] 0.55 Tune M0 costs, timings, encounters, and layout from human playtests
       toward a 15 to 25 minute first run and a 10 to 15 minute familiar replay.
+- [ ] 0.57 Add essential gameplay sound effects and on-screen volume and mute
+      controls, with committed-event playback, fog-safe world audio, and
+      browser, desktop, and compact touch verification. Record asset provenance.
 
 ### Playable-slice verification
 
@@ -169,8 +175,8 @@ base-building RTS loop, its technical architecture, and its player interface.
   Command Center through gathering, construction, production, exploration, and
   the six-wolf victory condition.
 - Movement, weighted pathfinding, dynamic blockers, fog, combat, interface
-  feedback, animation, minimap, and touch-accessible controls satisfy the M0
-  rules in [DESIGN.md](DESIGN.md).
+  feedback, animation, essential sound effects, minimap, and touch-accessible
+  controls satisfy the M0 rules in [DESIGN.md](DESIGN.md).
 - Manual save/load, quicksave, autosave, and restart round-trip authoritative
   mission state or reject incompatible data clearly.
 - The mission supports post-victory free play, hard defeat, and player-judged

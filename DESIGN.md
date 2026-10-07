@@ -613,6 +613,25 @@ story.
   preserves a visible damage cue during emission gaps, and shows collapsed
   debris at once.
 
+## Audio
+
+- M0 requires essential sound effects for accepted commands, invalid actions,
+  attacks, damage, alerts, objective completion, victory, and defeat. Sounds
+  reinforce the visual feedback; every core action remains usable when muted.
+- Gameplay sounds follow committed simulation events without changing
+  simulation state or timing. Loading rebuilds current audio activity without
+  replaying past events. Group commands and repeated combat events must not
+  produce an overwhelming stack of sounds.
+- World sounds respect fog and detection and must not reveal hidden hostiles.
+  Player alerts remain audible for events involving the player's own actors.
+- Sound volume and mute have on-screen controls usable in compact touch
+  layouts. Playback starts after player interaction in the browser; unavailable
+  or blocked audio must not prevent the mission from running.
+- A background music loop is optional for M0. If included, it has separate
+  volume and mute controls and stays below gameplay cues in the mix.
+- Use original or appropriately licensed audio and document asset provenance.
+  Voice acting and a final soundtrack remain outside M0.
+
 ## Fog, stealth, and detection
 
 - Terrain is **Unexplored**, **Explored**, or currently **Visible**. Actor
@@ -1157,6 +1176,8 @@ a later tutorial could be made.
   compact landscape browser UI checks, and two explanatory popups: **Support
   Network** when the first Refinery placement begins, and **Harvester
   Operations** when the first Harvester completes.
+- Essential gameplay sound effects are required as defined in [Audio](#audio).
+  Background music is optional.
 - M0 excludes the Circle, Everwake, rare and exotic resources, repair, healing,
   upgrades, veterancy, stealth, special movement layers, oversized deployables,
   multiplayer, native mobile builds, a map editor, mod management, and the
@@ -1238,7 +1259,8 @@ a later tutorial could be made.
   - World-event cadence and escalation.
   - Whether corruption spreads, and how players counter or exploit it.
 - **Interface and presentation**
-  - Accessibility tuning, art direction, and audio direction.
+  - Accessibility tuning, art direction, audio style, and whether M0 includes
+    background music.
 - **Future systems**
   - Technology-tree and permanent-research design.
   - Script conflict precedence, missing-target policies, and mission-driven
