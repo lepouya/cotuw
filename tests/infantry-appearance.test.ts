@@ -71,6 +71,8 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
         graphics.clips.turn!.right,
         graphics.clips.attack,
         graphics.clips.death,
+        graphics.clips.hit,
+        graphics.clips.aim,
       ]
         .filter((name) => name !== undefined)
         .map((name) => `first-${name}`)

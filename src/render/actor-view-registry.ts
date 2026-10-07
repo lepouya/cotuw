@@ -18,7 +18,12 @@ import {
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
-import type { ActorAppearance, ActorPose, ActorTrigger } from "./actor";
+import type {
+  ActorAnimationState,
+  ActorAppearance,
+  ActorPose,
+  ActorTrigger,
+} from "./actor";
 import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 
@@ -47,12 +52,13 @@ export type ActorViewRegistry = {
   /**
    * Creates and removes views to match `actors`, then draws each one
    * `tickProgress` of the way from its previous pose to its current one.
+   * Without `stateOf`, appearances keep their previous animation state.
    */
   update: (
     actors: readonly ActorRenderState[],
     tickProgress: number,
-    workingActorIds?: ReadonlySet<string>,
     seconds?: number,
+    stateOf?: (actor: ActorRenderState) => ActorAnimationState,
   ) => void;
 };
 
@@ -131,6 +137,9 @@ export function createActorViewRegistry(
         : undefined;
     },
     capturePreviousPoses: (actors) => {
+      const present = new Set(actors.map(({ id }) => id));
+      for (const id of previousPoses.keys())
+        if (!present.has(id)) previousPoses.delete(id);
       for (const { id, worldPosition, facing } of actors) {
         const previous = previousPoses.get(id);
         if (previous) {
@@ -195,12 +204,12 @@ export function createActorViewRegistry(
       }
       return ids;
     },
-    update: (actors, tickProgress, workingActorIds, seconds = 0) => {
+    update: (actors, tickProgress, seconds = 0, stateOf) => {
       renderers.sync(actors);
       for (const actor of actors) {
         interpolatePose(previousPoses.get(actor.id), actor, tickProgress, pose);
         const renderer = renderers.get(actor.id)!;
-        renderer.update(pose, workingActorIds?.has(actor.id), seconds);
+        renderer.update(pose, seconds, stateOf?.(actor));
         for (const trigger of pendingTriggers.get(actor.id) ?? [])
           renderer.play(trigger);
       }

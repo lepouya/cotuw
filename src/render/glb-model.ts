@@ -56,6 +56,8 @@ export type ModelInstance = {
 export type ModelAsset = {
   /** Highest point above the origin at rest, in model units. */
   topHeight?: number;
+  /** Duration of the idle loop, when the asset has one. */
+  loopSeconds?: number;
   /** Instances share materials; clone a material before editing it. */
   instantiate: (name: string) => ModelInstance;
   dispose: () => void;
@@ -194,32 +196,61 @@ export function findRestClip(
   invalid: (problem: string) => Error,
 ): AnimationGroup {
   const clip = findTimedClip(assets, name, invalid);
-  const components = (
-    value: number | { asArray?: () => number[] } | null | undefined,
-  ): number[] =>
-    typeof value === "number" ? [value] : (value?.asArray?.() ?? []);
   for (const { target, animation } of clip.targetedAnimations) {
-    const rest = components(
-      animation.targetPropertyPath.reduce((value, key) => value?.[key], target),
+    const rest = animation.targetPropertyPath.reduce(
+      (value, key) => value?.[key],
+      target,
     );
-    const atRest = (frame: number) => {
-      const value = components(animation.evaluate(frame));
-      const matches = (sign: number) =>
-        rest.length > 0 &&
-        value.length === rest.length &&
-        value.every(
-          (each, index) => Math.abs(each * sign - rest[index]!) <= 1e-5,
-        );
-      // Opposite quaternion signs describe the same rotation.
-      return (
-        matches(1) ||
-        (animation.targetProperty === "rotationQuaternion" && matches(-1))
+    const atRest = (frame: number) =>
+      sameAnimationValue(
+        rest,
+        animation.evaluate(frame),
+        animation.targetProperty === "rotationQuaternion",
       );
-    };
     if (!atRest(clip.from) || !atRest(clip.to))
       throw invalid(`clip ${name} must start and end at rest`);
   }
   return clip;
+}
+
+/** A layered one-shot must remove its offset before its weight drops. */
+export function findReturningClip(
+  assets: AssetContainer,
+  name: string,
+  invalid: (problem: string) => Error,
+): AnimationGroup {
+  const clip = findTimedClip(assets, name, invalid);
+  for (const { animation } of clip.targetedAnimations)
+    if (
+      !sameAnimationValue(
+        animation.evaluate(clip.from),
+        animation.evaluate(clip.to),
+        animation.targetProperty === "rotationQuaternion",
+      )
+    )
+      throw invalid(`clip ${name} must return to its starting pose`);
+  return clip;
+}
+
+type AnimationValue = number | { asArray?: () => number[] } | null | undefined;
+
+function sameAnimationValue(
+  left: AnimationValue,
+  right: AnimationValue,
+  quaternion: boolean,
+) {
+  const components = (value: AnimationValue): number[] =>
+    typeof value === "number" ? [value] : (value?.asArray?.() ?? []);
+  const expected = components(left);
+  const actual = components(right);
+  const matches = (sign: number) =>
+    expected.length > 0 &&
+    actual.length === expected.length &&
+    actual.every(
+      (value, index) => Math.abs(value * sign - expected[index]!) <= 1e-5,
+    );
+  // Opposite quaternion signs describe the same rotation.
+  return matches(1) || (quaternion && matches(-1));
 }
 
 /** The node properties a clip keys, as comparable strings. */
@@ -349,6 +380,7 @@ export async function loadModelAsset(
   const sources = assets.animationGroups.filter((each) => used.includes(each));
   return {
     topHeight: prepared.topHeight,
+    loopSeconds: idle && clipSeconds(idle),
     instantiate: (name) => {
       const { root, entries, dispose } = instantiateContainer(
         assets,
@@ -404,6 +436,7 @@ export function modelBuildingDetails(
     instance.pose(0);
     return {
       update: instance.pose,
+      loopSeconds: asset.loopSeconds,
       activities: instance.activities,
       dispose: instance.dispose,
     };

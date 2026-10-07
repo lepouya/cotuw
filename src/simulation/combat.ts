@@ -26,6 +26,7 @@ import {
 import type {
   Actor,
   ActorDefinition,
+  ActorRenderState,
   MovementOrder,
   RouteBounds,
   RouteRetryState,
@@ -490,7 +491,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       const end = destination(actor, target.worldPosition);
       return (
         !!end &&
-        reach(
+        weaponReach(
           { ...actor, worldPosition: end },
           target,
           definitions,
@@ -600,7 +601,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     const target = ordered ? followOrder(actor) : context.recentAttacker(actor);
     if (!target) continue;
     if (
-      reach(actor, target, definitions, world.map) > weapon.range ||
+      weaponReach(actor, target, definitions, world.map) > weapon.range ||
       !lineOfFire(actor, target, world)
     ) {
       // Answering fire never leaves the current route; armed buildings
@@ -703,9 +704,9 @@ function canTarget(
 }
 
 /** Distance from the attacker's center to the target's footprint or body. */
-function reach(
-  attacker: Actor,
-  target: Actor,
+export function weaponReach(
+  attacker: ActorRenderState,
+  target: ActorRenderState,
   definitions: ReadonlyMap<string, ActorDefinition>,
   map: TerrainGrid | undefined,
 ): number {

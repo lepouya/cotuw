@@ -521,7 +521,7 @@ describe("Materials economy", () => {
     expect(worker(simulation).cargo).toBe(0);
     expect(simulation.economy!.depositedMaterials).toBe(100);
     expect(simulation.buildingActivity).toEqual([
-      { buildingId: "refinery", kind: "delivery" },
+      { buildingId: "refinery", kind: "delivery", actorId: "worker" },
     ]);
     expect(
       command(simulation, {

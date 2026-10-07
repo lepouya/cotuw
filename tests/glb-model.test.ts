@@ -122,6 +122,56 @@ test.each(["walk", "death"])(
   },
 );
 
+test("layered actor clips must use channels the base pose restores", async () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const { model } = BASE_CONTENT.presentation["arc-trooper"];
+    if (!model || !("glb" in model)) throw new Error("Expected GLB");
+    const url = editedGlbDataUrl(model.glb.url, (gltf) => {
+      const hit = gltf.animations.find((clip: any) => clip.name === "hit");
+      const target = hit.channels[0].target.node;
+      for (const name of ["idle", "walk"]) {
+        const clip = gltf.animations.find((clip: any) => clip.name === name);
+        clip.channels = clip.channels.filter(
+          ({ target: each }: any) => each.node !== target,
+        );
+      }
+    });
+    await expect(
+      loadSkinnedActorAppearance(scene, {
+        ...model.glb,
+        url,
+        clips: { idle: "idle", locomotion: "walk", hit: "hit" },
+      }),
+    ).rejects.toThrow("keys a channel that idle does not restore");
+    expect(scene.meshes).toHaveLength(0);
+    expect(scene.animationGroups).toHaveLength(0);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("trigger clips must return to their starting pose", async () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const { model } = BASE_CONTENT.presentation["arc-trooper"];
+    if (!model || !("glb" in model)) throw new Error("Expected GLB");
+    const url = editedGlbDataUrl(model.glb.url, () => {});
+    await expect(
+      loadSkinnedActorAppearance(scene, {
+        ...model.glb,
+        url,
+        clips: { idle: "idle", locomotion: "walk", hit: "death" },
+      }),
+    ).rejects.toThrow("must return to its starting pose");
+    expect(scene.meshes).toHaveLength(0);
+  } finally {
+    engine.dispose();
+  }
+});
+
 test("rejects a nominal skin without vertex weights", async () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);

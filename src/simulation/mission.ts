@@ -1616,10 +1616,11 @@ export function createMissionSimulation({
               support: () => supportFor(working.actors),
               spawn: (actor, producerId) =>
                 stageProducedActor(working, actor, producerId),
-              deliver: (refineryId) =>
+              deliver: (refineryId, actorId) =>
                 working.activity.push({
                   buildingId: refineryId,
                   kind: "delivery",
+                  actorId,
                 }),
             });
 

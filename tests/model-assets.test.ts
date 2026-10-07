@@ -37,8 +37,8 @@ test.each(["wolf", "alpha-wolf", "arc-harvester"])(
         )!;
         expect(head.rotationQuaternion!.x).toBeLessThan(-0.1);
       } else {
-        first.setWorking!(true);
-        second.setWorking!(false);
+        first.setAnimationState!({ working: true });
+        second.setAnimationState!({ working: false });
         first.animate!({ distance: 0, seconds: 0.1, turn: 0 });
         scene.animate();
         const drill = scene.getTransformNodeByName("first-harvester-drill")!;

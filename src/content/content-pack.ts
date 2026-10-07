@@ -50,6 +50,7 @@ export type ActorPresentation = {
   attackEffect?: AttackEffectStyle;
   /** How damage shows once health drops; absent shows none. */
   damageEffect?: DamageEffectStyle;
+  regenerationEffect?: boolean;
   model?: ActorModel;
   frameEffects?: FrameEffects;
   building?: {
@@ -86,6 +87,7 @@ export const PROP_IDS = [
   "fire",
   "wound",
   "bird",
+  "regeneration",
 ] as const;
 
 export type PropId = (typeof PROP_IDS)[number];
@@ -191,6 +193,8 @@ export function parseContentPack(source: string): ContentPack {
       !isOneOf(DAMAGE_EFFECT_STYLES, presentation.damageEffect)
     )
       throw invalid(`gives ${actor.id} an unknown damage effect`);
+    if (!isOptionalBoolean(presentation.regenerationEffect))
+      throw invalid(`gives ${actor.id} an invalid regeneration effect`);
     const model = presentation.model;
     if (model !== undefined) {
       if (!isRecord(model)) throw invalid(`gives ${actor.id} an invalid model`);
@@ -201,6 +205,7 @@ export function parseContentPack(source: string): ContentPack {
       if ("glb" in model) validateActorGraphics(model.glb as ActorGraphics);
       else {
         if (
+          !isId(model.builtin) ||
           !Object.prototype.hasOwnProperty.call(
             BUILTIN_ACTOR_MODELS,
             model.builtin as string,
@@ -233,10 +238,11 @@ export function parseContentPack(source: string): ContentPack {
         throw invalid(`gives ${actor.id} invalid building colors or height`);
       if (
         building.details !== undefined &&
-        !Object.prototype.hasOwnProperty.call(
-          BUILTIN_BUILDING_DETAILS,
-          building.details,
-        )
+        (!isId(building.details) ||
+          !Object.prototype.hasOwnProperty.call(
+            BUILTIN_BUILDING_DETAILS,
+            building.details,
+          ))
       )
         throw invalid(
           `gives ${actor.id} unknown building details "${building.details}"`,

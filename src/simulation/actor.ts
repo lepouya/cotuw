@@ -307,6 +307,7 @@ export type ActorRenderState = DeepReadonly<
     | "health"
     | "combat"
     | "orders"
+    | "territory"
   >
 >;
 

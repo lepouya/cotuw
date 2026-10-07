@@ -314,7 +314,9 @@
               "right": "turn-right"
             },
             "attack": "fire",
-            "death": "death"
+            "death": "death",
+            "hit": "hit",
+            "aim": "aim"
           },
           "cycleDistance": 2.1
         }
@@ -351,7 +353,8 @@
               "left": "turn-left",
               "right": "turn-right"
             },
-            "death": "death"
+            "death": "death",
+            "hit": "hit"
           },
           "cycleDistance": 1.5
         }
@@ -439,7 +442,11 @@
             "idle": "idle",
             "locomotion": "transit",
             "work": "harvest",
-            "death": "death"
+            "death": "death",
+            "hit": "hit",
+            "deploy": "deploy",
+            "stow": "stow",
+            "unload": "unload"
           },
           "cycleDistance": 1.25
         }
@@ -462,12 +469,19 @@
             "idle": "idle",
             "locomotion": "walk",
             "attack": "bite",
-            "death": "death"
+            "death": "death",
+            "hit": "hit",
+            "run": "run",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            }
           },
           "cycleDistance": 1.1,
           "scale": 1
         }
-      }
+      },
+      "regenerationEffect": true
     },
     "alpha-wolf": {
       "name": "Alpha wolf",
@@ -486,12 +500,19 @@
             "idle": "idle",
             "locomotion": "walk",
             "attack": "bite",
-            "death": "death"
+            "death": "death",
+            "hit": "hit",
+            "run": "run",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            }
           },
           "cycleDistance": 1.375,
           "scale": 1.25
         }
-      }
+      },
+      "regenerationEffect": true
     }
   },
   "clips": {
@@ -808,6 +829,10 @@
     "bird": {
       "url": "/assets/models/bird.glb",
       "idle": "flap"
+    },
+    "regeneration": {
+      "url": "/assets/models/regeneration.glb",
+      "idle": "pulse"
     }
   }
 }

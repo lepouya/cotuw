@@ -144,7 +144,7 @@ test("generated models render with their exported clips", async ({
       const appearance = await loadSkinnedActorAppearance(scene, model.glb);
       const actor = appearance.instantiate(id, 0);
       actor.root.position.set(-6 + index * 3, 0, 2);
-      actor.setWorking?.(true);
+      actor.setAnimationState?.({ working: true });
       actor.animate?.({ seconds: 0.1, distance: 0.15, turn: 0 });
       actor.play?.("attack");
     }

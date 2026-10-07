@@ -555,6 +555,7 @@ function regenerate(actor: Actor, context: CombatContext): void {
   const territory = definition.territory!;
   if (
     actor.health === undefined ||
+    territory.regenerationPerSecond === 0 ||
     actor.combat?.attack ||
     actor.combat?.returning ||
     state.investigation ||

@@ -9,15 +9,16 @@ clips match their generators, and reject unregistered files in `public/assets`.
 ## Inventory
 
 - `npm run assets:infantry`: `scripts/infantry-model.ts` exports Trooper and
-  Scout meshes, materials, skeletons, idle, walk, turn, and death clips. The
-  Trooper uses the fire clip for combat.
+  Scout meshes, materials, skeletons, idle, walk, turn, hit, and death clips.
+  The Trooper also uses aim and fire clips for combat.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, and Barracks meshes with idle machinery and activity clips; a
-  skinned wolf with idle, walk, bite, and death; a rigid Harvester with idle,
-  transit, harvest, and death; crystal resource mounds; animated salvage;
-  foundations; construction scaffolds; debris rubble; tracers; bite marks;
-  smoke puffs; flickering fire; wound drops; and a bird with a wing-beat
-  clip. The alpha wolf scales the generated wolf asset.
+  skinned wolf with idle, walk, run, turn, bite, hit, and death; a rigid
+  Harvester with idle, transit, deploy, harvest, stow, unload, hit, and death;
+  crystal resource mounds; animated salvage; foundations; construction
+  scaffolds; debris rubble; tracers; bite marks;
+  smoke puffs; flickering fire; wound drops; a pulsing regeneration halo; and
+  a bird with a wing-beat clip. The alpha wolf scales the generated wolf asset.
 - Building and vehicle geometry builders in `src/render` supply the export
   script. A building's details declare `loopSeconds`, the period of their
   motion, which becomes the exported idle clip, and `activities`, whose
@@ -55,21 +56,32 @@ A generated model must keep:
   one full gait cycle.
 - Optionally, left and right turn clips. The runtime layers each one over the
   others as the difference from its first frame, so each starts at the neutral
-  pose, ends at the full lean, and keys only the joints that lean.
+  pose, ends at the full lean, and keys only channels that idle also keys.
+- Optionally, a `run` clip with the same pose channels and cycle distance as
+  locomotion, selected during pursuit, and an additive `aim` clip whose final
+  frame holds while the actor aims.
 - Optionally, a looping `work` clip that replaces idle and locomotion while
   gathering and keys the same pose channels as idle. Optional `idle-signal`
   and `working-signal` meshes switch with this state and turn off on remains.
-- Optionally, a clip per trigger, such as `attack`, layered the same way. It
-  plays once each time the trigger fires, so it starts and ends at the
-  neutral pose and keys only the joints that move.
+- Optional `deploy` and `stow` clips come as a pair with `work`, key the
+  same pose channels as idle, and bridge idle to work and back. Their
+  collector positions must match at complementary progress values so a
+  reversed transition stays continuous. The first work state settles without
+  replaying deployment; reduced motion settles all transitions.
+- Optionally, a clip per trigger, such as `attack`, `hit`, or `unload`,
+  layered the same way. It plays once each time the trigger fires, so it
+  starts and ends at the neutral pose and keys only channels that idle also
+  keys. Loading checks the matching endpoints and base channels for layers.
 - Optionally, a death clip that remains play once and hold at its last frame.
   It replaces the other clips, so it keys every pose channel idle keys and
   ends lying on the ground.
 - Clips that animate only model nodes or attached morph targets and use one
   positive frame rate per clip, with ordered finite keys, values, and tangents.
-  Each role names a distinct clip. Locomotion, turn, trigger, work, and death
-  clips need more than one frame. Loading rejects a model that breaks this or
-  lacks a named clip.
+  Each role names a distinct clip. Every role except idle needs more than one
+  frame. Loading rejects a model that breaks this or lacks a named clip.
+
+Generated clips sample the exact duration endpoint, including durations
+between sample frames, so one-shots finish without a residual offset.
 
 The runtime starts with stand-ins, then replaces them as their GLBs load. A
 failed asset keeps its stand-in. Remains refresh when a model loads. Sessions
@@ -105,8 +117,8 @@ dimming and construction-stage clipping clone the materials they change.
 Preview opacity stays on the meshes.
 
 The pack's `props` names foundations, scaffolds, rubble, mounds, salvage,
-tracers, bite marks, smoke, fire, wound drops, and birds by URL, with an
-optional idle clip. Salvage plays its exported hover and rotation clip, fire
-its flicker, and birds their wing beat. The scaffold is a unit cube that
-construction stages scale around the footprint. Mounds shrink in depletion
-stages without changing navigation.
+tracers, bite marks, smoke, fire, wound drops, regeneration, and birds by URL,
+with an optional idle clip. Salvage plays its exported hover and rotation
+clip, fire its flicker, regeneration its pulse, and birds their wing beat. The
+scaffold is a unit cube that construction stages scale around the footprint.
+Mounds shrink in depletion stages without changing navigation.

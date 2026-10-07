@@ -28,10 +28,24 @@ export const DEFAULT_ACTOR_COLOR: Rgb = [0.871, 0.345, 0.122];
 
 /**
  * Committed simulation events an actor's appearance can respond to, such as
- * with a clip or a frame effect. `attack` is each hit the actor deals.
+ * with a clip or a frame effect. `attack` is each hit the actor deals, `hit`
+ * each hit it survives, and `unload` each cargo delivery.
  */
-export const ACTOR_TRIGGERS = ["attack"] as const;
+export const ACTOR_TRIGGERS = ["attack", "hit", "unload"] as const;
 export type ActorTrigger = (typeof ACTOR_TRIGGERS)[number];
+
+/**
+ * Committed simulation state an actor's appearance shows while it lasts.
+ * Absent flags are false.
+ */
+export type ActorAnimationState = {
+  /** Gathering, as a Harvester at a Materials patch. */
+  working?: boolean;
+  /** Holding a detected target within weapon range. */
+  aiming?: boolean;
+  /** Pursuing, as a wolf chasing an intruder. */
+  running?: boolean;
+};
 
 /** How one kind of actor looks. */
 export type ActorAppearance = {
@@ -53,7 +67,7 @@ export type ActorInstance = {
   root: TransformNode;
   /** Present when the appearance animates. */
   animate?: (motion: Readonly<ActorMotion>) => void;
-  setWorking?: (working: boolean) => void;
+  setAnimationState?: (state: Readonly<ActorAnimationState>) => void;
   /** Plays the actor's response to a trigger. */
   play?: (trigger: ActorTrigger) => void;
   /** Poses remains `seconds` after destruction; replaces animate. */
@@ -74,7 +88,11 @@ export type ActorRenderer = {
   selectionPoint: () => Vector3;
   setSelected: (selected: boolean) => void;
   /** `seconds` is real time since the previous update. */
-  update: (pose: ActorPose, working?: boolean, seconds?: number) => void;
+  update: (
+    pose: ActorPose,
+    seconds?: number,
+    state?: Readonly<ActorAnimationState>,
+  ) => void;
   play: (trigger: ActorTrigger) => void;
   dispose: () => void;
 };
@@ -168,12 +186,21 @@ export function createActorRenderer(
 
   const motion: ActorMotion = { distance: 0, turn: 0, seconds: 0 };
   let last: ActorPose | undefined;
+  const place = ({ worldPosition, facing }: ActorPose) => {
+    root.position.x = worldPosition.x;
+    root.position.z = worldPosition.z;
+    root.position.y =
+      map.heightAtWorldPosition(worldPosition.x, worldPosition.z) +
+      GROUND_CLEARANCE;
+    root.rotation.y = facing;
+  };
   const update = (
-    { worldPosition, facing }: ActorPose,
-    working = false,
+    pose: ActorPose,
     seconds = 0,
+    state?: Readonly<ActorAnimationState>,
   ) => {
-    instance.setWorking?.(working);
+    const { worldPosition, facing } = pose;
+    if (state) instance.setAnimationState?.(state);
     if (instance.animate) {
       if (last) {
         motion.distance = Math.hypot(
@@ -187,18 +214,15 @@ export function createActorRenderer(
         last.worldPosition.z = worldPosition.z;
         last.facing = facing;
       } else {
+        // The first drawn pose may be interpolated or use newly loaded art.
+        instance.animate(motion);
         last = { worldPosition: { ...worldPosition }, facing };
       }
     }
-    root.position.x = worldPosition.x;
-    root.position.z = worldPosition.z;
-    root.position.y =
-      map.heightAtWorldPosition(worldPosition.x, worldPosition.z) +
-      GROUND_CLEARANCE;
-    root.rotation.y = facing;
+    place(pose);
   };
 
-  update(initialState);
+  place(initialState);
   return {
     actorId: id,
     selectionPoint: () => root.position.add(new Vector3(0, height / 2, 0)),

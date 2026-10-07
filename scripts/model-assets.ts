@@ -56,7 +56,8 @@ function clip(
       node.rotation.copyFrom(rest[index]!.rotation);
       node.scaling.copyFrom(rest[index]!.scaling);
     });
-  const frames = Math.round(seconds * FRAMES_PER_SECOND);
+  const endFrame = seconds * FRAMES_PER_SECOND;
+  const frames = Math.ceil(endFrame);
   const keys = nodes.map(() => ({
     position: [] as { frame: number; value: Vector3 }[],
     rotationQuaternion: [] as { frame: number; value: Quaternion }[],
@@ -64,14 +65,22 @@ function clip(
   }));
   for (let frame = 0; frame <= frames; frame++) {
     restore();
-    pose(frame / FRAMES_PER_SECOND);
+    // Include the exact endpoint between sample frames.
+    const keyFrame = Math.min(frame, endFrame);
+    pose(keyFrame / FRAMES_PER_SECOND);
     nodes.forEach((node, index) => {
-      keys[index]!.position.push({ frame, value: node.position.clone() });
+      keys[index]!.position.push({
+        frame: keyFrame,
+        value: node.position.clone(),
+      });
       keys[index]!.rotationQuaternion.push({
-        frame,
+        frame: keyFrame,
         value: Quaternion.FromEulerVector(node.rotation),
       });
-      keys[index]!.scaling.push({ frame, value: node.scaling.clone() });
+      keys[index]!.scaling.push({
+        frame: keyFrame,
+        value: node.scaling.clone(),
+      });
     });
   }
   const group = new AnimationGroup(name, root.getScene());
@@ -238,6 +247,40 @@ function wolf(scene: Scene, name: string) {
         ) * 0.55;
     });
   });
+  clip(root, "run", 1, (seconds) => {
+    const phase = seconds * Math.PI * 2;
+    hips.forEach((hip, index) => {
+      hip.rotation.x = Math.sin(phase + (index < 2 ? 0 : Math.PI)) * 0.85;
+    });
+    root.position.y = (1 - Math.cos(phase * 2)) * 0.035;
+    head.rotation.x = -0.15 - Math.sin(phase) * 0.08;
+  });
+  for (const [name, sign] of [
+    ["turn-left", -1],
+    ["turn-right", 1],
+  ] as const)
+    clip(
+      root,
+      name,
+      0.3,
+      (seconds) => {
+        const amount = seconds / 0.3;
+        root.rotation.z = -sign * amount * 0.12;
+        head.rotation.y = sign * amount * 0.18;
+      },
+      false,
+    );
+  clip(
+    root,
+    "hit",
+    0.35,
+    (seconds) => {
+      const flinch = Math.sin((seconds / 0.35) * Math.PI);
+      head.rotation.x = -0.15 + flinch * 0.3;
+      root.rotation.z = flinch * 0.12;
+    },
+    false,
+  );
   clip(
     root,
     "bite",
@@ -266,6 +309,18 @@ function harvester(scene: Scene, name: string) {
   amber.name = "idle-signal";
   const green = amber.clone("working-signal", root)!;
   green.material = surface(scene, "working-light", [0.2, 1, 0.65], true);
+  const hopper = MeshBuilder.CreateBox(
+    "harvester-hopper",
+    {
+      width: 0.5,
+      height: 0.28,
+      depth: 0.42,
+    },
+    scene,
+  );
+  hopper.parent = root;
+  hopper.position.set(0, 0.73, -0.35);
+  hopper.material = scene.getMaterialByName("harvester-steel");
   clip(root, "idle", 2, () => {});
   clip(root, "transit", 1, (seconds) => {
     root.position.y = Math.sin(seconds * Math.PI * 4) * 0.018;
@@ -274,6 +329,32 @@ function harvester(scene: Scene, name: string) {
     drill.position.y = 0.3 + Math.sin(seconds * Math.PI * 12) * 0.035;
     drill.rotation.z = seconds * Math.PI * 4;
   });
+  clip(root, "deploy", 0.6, (seconds) => {
+    drill.position.y = 0.65 - (0.35 * seconds) / 0.6;
+  });
+  clip(root, "stow", 0.6, (seconds) => {
+    drill.position.y = 0.3 + (0.35 * seconds) / 0.6;
+  });
+  clip(
+    root,
+    "unload",
+    0.8,
+    (seconds) => {
+      const tip = Math.sin((seconds / 0.8) * Math.PI);
+      hopper.rotation.x = -tip * 0.65;
+      hopper.position.y = 0.73 + tip * 0.1;
+    },
+    false,
+  );
+  clip(
+    root,
+    "hit",
+    0.35,
+    (seconds) => {
+      root.rotation.z = Math.sin((seconds / 0.35) * Math.PI) * 0.1;
+    },
+    false,
+  );
   clip(root, "death", 0.8, (seconds) => {
     const fall = (seconds / 0.8) ** 2;
     root.rotation.z = -fall * 0.5;
@@ -657,6 +738,51 @@ function wound(scene: Scene, name: string) {
   drop.material = surface(scene, "wound", [0.5, 0.04, 0.05]);
 }
 
+/** A healing halo and rising marks, distinct from wound drops. */
+function regeneration(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const material = unlit(scene, "regeneration", new Color3(0.25, 1, 0.65));
+  const halo = MeshBuilder.CreateTorus(
+    "healing-halo",
+    {
+      diameter: 1.1,
+      thickness: 0.025,
+      tessellation: 24,
+    },
+    scene,
+  );
+  halo.parent = root;
+  halo.position.y = 0.06;
+  halo.material = material;
+  const marks = [0, 1, 2].map((index) => {
+    const mark = new TransformNode(`healing-mark-${index}`, scene);
+    mark.parent = root;
+    const angle = (index * Math.PI * 2) / 3;
+    mark.position.set(Math.sin(angle) * 0.4, 0.3, Math.cos(angle) * 0.4);
+    for (const [width, height] of [
+      [0.14, 0.04],
+      [0.04, 0.14],
+    ]) {
+      const bar = MeshBuilder.CreateBox(
+        "healing-cross",
+        { width, height, depth: 0.04 },
+        scene,
+      );
+      bar.parent = mark;
+      bar.material = material;
+    }
+    return mark;
+  });
+  clip(root, "pulse", 1.5, (seconds) => {
+    halo.scaling.setAll(1 + Math.sin((seconds * Math.PI * 2) / 1.5) * 0.08);
+    marks.forEach((mark, index) => {
+      const progress = (seconds / 1.5 + index / 3) % 1;
+      mark.position.y = 0.2 + progress * 0.65;
+      mark.scaling.setAll(0.7 + Math.sin(progress * Math.PI) * 0.3);
+    });
+  });
+}
+
 /** A dark bird facing +Z whose wings beat in its idle clip. */
 function bird(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
@@ -715,6 +841,7 @@ const BUILDERS = {
   fire,
   wound,
   bird,
+  regeneration,
 } satisfies Record<string, (scene: Scene, name: string) => void>;
 
 export type ModelAsset = keyof typeof BUILDERS;

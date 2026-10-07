@@ -23,13 +23,15 @@ import {
   damageSeverity,
 } from "./render/damage-effects";
 import type { DamagedActor } from "./render/damage-effects";
+import { createRegenerationEffectsView } from "./render/regeneration-effects";
+import type { RegeneratingActor } from "./render/regeneration-effects";
 import { createAmbientBirdsView } from "./render/ambient-birds";
 import { createWreckView } from "./render/wrecks";
 import {
   createFrameEffectsView,
   withFrameEffects,
 } from "./render/frame-effects";
-import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
+import { WRECK_SECONDS, wreckTiles, weaponReach } from "./simulation/combat";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { contentPack } from "./content/packs";
 import {
@@ -78,11 +80,13 @@ import { createUnitTraining } from "./ui/unit-training";
 import type { UnitTrainingControls } from "./ui/unit-training";
 import type { DefinitionButton, SidebarState } from "./ui/sidebar";
 import type { MissionSimulation } from "./simulation/mission";
+import type { BuildingActivityKind } from "./simulation/production";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import { createMissionSimulation } from "./simulation/mission";
 
 import type { Scene } from "@babylonjs/core";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
+import type { ActorAnimationState, ActorTrigger } from "./render/actor";
 import type { Rgb } from "./render/color";
 import type { ActorDefinition, ActorRenderState } from "./simulation/actor";
 import type { TileCoord } from "./simulation/grid";
@@ -113,6 +117,10 @@ const CAMERA_FRONTIER_MARGIN = 4;
 const UNIT_BAR_CLEARANCE = 0.3;
 /** Clears a construction progress bar below it. */
 const BUILDING_BAR_HEIGHT = 2.9;
+/** The trigger a building activity plays on the actor taking part. */
+const ACTIVITY_TRIGGERS: Partial<Record<BuildingActivityKind, ActorTrigger>> = {
+  delivery: "unload",
+};
 
 /** A parsed mission file with the content pack and definitions it uses. */
 export type LoadedMission = MissionFile & {
@@ -382,6 +390,11 @@ export async function createGameSession(
   const damageEffects = createDamageEffectsView(
     view.scene,
     (prop) => propAssets.get(prop),
+    () => reducedMotion.matches,
+  );
+  const regenerationEffects = createRegenerationEffectsView(
+    view.scene,
+    () => propAssets.get("regeneration"),
     () => reducedMotion.matches,
   );
   const birds = createAmbientBirdsView(map, mission.scenario.flocks ?? [], {
@@ -898,13 +911,14 @@ export async function createGameSession(
   let knownActorVersion = simulation.actorVersion;
   let knownWreckActorVersion = simulation.actorVersion;
   /**
-   * Selected actors and those in recent combat show health bars; damaged
-   * actors whose presentation names a damage effect show it.
+   * Selected actors and those in recent combat show health bars. Damaged and
+   * regenerating actors show the effects their presentation names.
    */
   const updateHealth = (frameSeconds: number) => {
     const selected = new Set(input.selectedActorIds);
     const bars: HealthBar[] = [];
     const damaged: DamagedActor[] = [];
+    const regenerating: RegeneratingActor[] = [];
     for (const actor of simulation.actors) {
       const maximum = definitionsById.get(actor.definitionId)?.health;
       if (!maximum || !player.shows(actor)) continue;
@@ -932,27 +946,55 @@ export async function createGameSession(
           fraction,
           opacity,
         });
-      const style = presentationOf(actor.definitionId)?.damageEffect;
+      const presentation = presentationOf(actor.definitionId);
+      const style = presentation?.damageEffect;
       const severity = damageSeverity(fraction);
-      if (!style || !severity) continue;
+      const healing =
+        presentation?.regenerationEffect &&
+        actor.territory?.mode === "regenerating";
+      if (!(style && severity) && !healing) continue;
       const { x, z } = worldPosition;
       const ground = map.heightAtWorldPosition(x, z);
+      const position = new Vector3(x, ground, z);
       const footprint = definitionsById.get(actor.definitionId)?.footprint;
-      damaged.push({
-        id: actor.id,
-        style,
-        severity,
-        position: new Vector3(x, ground, z),
-        height: placed
-          ? (tilePlacedViews.topHeight(actor.id) ?? ground + 1) - ground
-          : (bounds?.height ?? 1),
-        radius: footprint
-          ? (Math.sqrt(footprint.occupiedTiles.length) * map.tileSize) / 2
-          : (bounds?.radius ?? 0.5),
-      });
+      const radius = footprint
+        ? (Math.sqrt(footprint.occupiedTiles.length) * map.tileSize) / 2
+        : (bounds?.radius ?? 0.5);
+      if (healing) regenerating.push({ id: actor.id, position, radius });
+      if (style && severity)
+        damaged.push({
+          id: actor.id,
+          style,
+          severity,
+          position,
+          height: placed
+            ? (tilePlacedViews.topHeight(actor.id) ?? ground + 1) - ground
+            : (bounds?.height ?? 1),
+          radius,
+        });
     }
     healthBars.update(bars);
     damageEffects.update(damaged, frameSeconds);
+    regenerationEffects.update(regenerating, frameSeconds);
+  };
+  /** What a shown mobile actor's appearance reflects from committed state. */
+  const animationStateOf = (
+    actor: ActorRenderState,
+    gathering: ReadonlySet<string>,
+  ): ActorAnimationState => {
+    const weapon = definitionsById.get(actor.definitionId)?.weapon;
+    const targetId = actor.combat?.attack?.targetId;
+    const target = targetId && actorsByKind().byId.get(targetId);
+    return {
+      working: gathering.has(actor.id),
+      // Undetected targets stay hidden, so aiming must not reveal them.
+      aiming:
+        !!weapon &&
+        !!target &&
+        simulation.detects(playerFaction, target) &&
+        weaponReach(actor, target, definitionsById, map) <= weapon.range,
+      running: actor.territory?.mode === "pursuing",
+    };
   };
   let knownSelectionTick = simulation.completedTicks;
 
@@ -1018,11 +1060,17 @@ export async function createGameSession(
         const attacker = simulation.actorById(hit.attackerId);
         if (attacker && player.shows(attacker))
           actorViews.play(hit.attackerId, "attack");
+        const target = simulation.actorById(hit.targetId);
+        if (target && player.shows(target)) actorViews.play(target.id, "hit");
       }
-      for (const { buildingId, kind } of simulation.buildingActivity) {
+      for (const { buildingId, kind, actorId } of simulation.buildingActivity) {
         const building = simulation.actorById(buildingId);
         if (building && player.shows(building))
           tilePlacedViews.play(buildingId, kind);
+        const trigger = ACTIVITY_TRIGGERS[kind];
+        const participant = actorId && simulation.actorById(actorId);
+        if (trigger && participant && player.shows(participant))
+          actorViews.play(participant.id, trigger);
       }
       minimap.refreshActors();
       const alerts = observeAlerts();
@@ -1124,15 +1172,13 @@ export async function createGameSession(
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
     birds.update(frameSeconds);
-    actorViews.update(
-      shownMobile,
-      loop.tickProgress(),
-      new Set(
-        simulation.economy?.harvesters
-          .filter((worker) => worker.phase === "gathering")
-          .map((worker) => worker.actorId),
-      ),
-      frameSeconds,
+    const gathering = new Set(
+      simulation.economy?.harvesters
+        .filter((worker) => worker.phase === "gathering")
+        .map((worker) => worker.actorId),
+    );
+    actorViews.update(shownMobile, loop.tickProgress(), frameSeconds, (actor) =>
+      animationStateOf(actor, gathering),
     );
     movementPath.update(shownMobile);
     // Other factions' queues would reveal their intent.
@@ -1182,6 +1228,7 @@ export async function createGameSession(
     healthBars.dispose();
     combatEffects.dispose();
     damageEffects.dispose();
+    regenerationEffects.dispose();
     birds.dispose();
     frameEffects.dispose();
     wreckView.dispose();
@@ -1237,6 +1284,9 @@ export async function createGameSession(
     },
     resume: () => {
       if (halted() || disposal) return;
+      if (playing) return;
+      // Paused rendering settles to committed poses; resume must not rewind.
+      actorViews.capturePreviousPoses(actorsByKind().mobile);
       playing = true;
       controlsDirty = true;
       loop.resume();

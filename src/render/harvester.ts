@@ -91,7 +91,8 @@ export function createHarvesterAppearance(
       let elapsed = seed * Math.PI * 2;
       return {
         root: instance.root,
-        setWorking: (next) => {
+        setAnimationState: (state) => {
+          const next = !!state.working;
           if (next === working) return;
           working = next;
           signal.diffuseColor.set(

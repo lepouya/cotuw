@@ -35,6 +35,8 @@ export type BuildingActivityKind = (typeof BUILDING_ACTIVITY_KINDS)[number];
 export type BuildingActivity = {
   buildingId: string;
   kind: BuildingActivityKind;
+  /** The mobile actor taking part, such as the delivering Harvester. */
+  actorId?: string;
 };
 
 export type TrainingEvaluation =

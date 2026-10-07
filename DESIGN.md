@@ -534,23 +534,32 @@ story.
   real time, never changes simulation state, and saves nothing; loading
   rebuilds it.
 - Triggers are committed simulation events an actor's appearance responds to.
-  `attack` fires with each hit the actor deals, as a shot or a bite.
+  `attack` fires with each hit the actor deals, as a shot or a bite. `hit`
+  fires on surviving targets after damage commits; lethal hits go directly to
+  death. `unload` fires on the Harvester that delivers cargo. Repeated triggers
+  between rendered frames coalesce, and another hit restarts the reaction.
 - An actor's GLB supplies skeletal or articulated clips by role: idle,
-  locomotion, optional left and right turn leans, work, one per trigger, and
-  death. Rendered movement
-  blends idle, locomotion, and leans. A trigger plays its clip once, layered
-  over the others as its difference from its first frame. Remains play the
-  death clip once from destruction and hold its last frame, so remains older
-  than the clip, as after loading, show that frame. Without a death clip,
-  remains lie on their side.
-  The Harvester's work clip replaces idle and transit while gathering; generated
-  amber and green lamps preserve its state when motion is reduced.
+  locomotion, optional run, left and right turn leans, aim, work, deploy,
+  stow, one per trigger, and death. Rendered movement blends idle, locomotion,
+  and leans. Wolves use their run clip during pursuit and trot otherwise.
+  Troopers hold the aim pose while their detected target is within rifle range.
+  A trigger plays its clip once, layered over the others as its difference
+  from its first frame. Remains play the death clip once from destruction and
+  hold its last frame, so remains older than the clip, as after loading, show
+  that frame. Without a death clip, remains lie on their side.
+  The Harvester lowers its collector into the work loop when gathering starts
+  and stows it when gathering ends. Reversing a transition keeps its current
+  collector position. Loading settles into the current work or idle pose.
+  Unloading tips its hopper without delaying delivery or the next route.
+  Generated amber and green lamps preserve its state when motion is reduced.
 - Frame effects play a content pack's texture clip once on a camera-facing
   square anchored in the actor's model space, so they turn with it. An actor's
   presentation names them by trigger. The Trooper's muzzle flash plays on
   `attack`.
-- Reduced motion skips trigger clips, holds frame effects on their first
-  frame, and shows death clips' last frame at once.
+- Reduced motion skips trigger clips, settles collector transitions, holds
+  locomotion on its first frame and aim at its held pose, suppresses turn
+  leans, holds frame effects on their first frame, and shows death clips' last
+  frame at once. Death overrides all live animation.
 
 ## Building and ambient presentation
 
@@ -580,6 +589,11 @@ story.
   Biological actors, which are infantry and wolves, drip occasional drops when
   moderately damaged and frequent ones when critical. Effect size, frequency,
   and fire, not color alone, convey severity.
+- Wolves whose presentation enables regeneration show a green halo with
+  rising cross marks while actively healing at home. The effect follows the
+  idle pose, stays still under reduced motion, and disappears when healing
+  stops, the wolf becomes hidden, or it is destroyed. Loading rebuilds it
+  from the wolf's current state.
 - Destroyed buildings collapse: their debris slumps from building height to
   rubble over 0.8 seconds.
 - Missions may author bird flocks that circle a point at a fixed altitude

@@ -150,6 +150,56 @@ describe("actor view registry", () => {
     engine.dispose();
   });
 
+  test("a loaded model starts at its drawn pose without inventing motion", () => {
+    const motions: ActorMotion[] = [];
+    const { appearances, engine, scene, views } = setup();
+    try {
+      views.update([actor("a")], 1);
+      views.capturePreviousPoses([actor("a")]);
+      appearances.set("trooper", {
+        bounds: { radius: 0.5, height: 1 },
+        instantiate: (name) => {
+          const root = new TransformNode(name, scene);
+          return {
+            root,
+            animate: (motion) => motions.push({ ...motion }),
+            dispose: () => root.dispose(),
+          };
+        },
+        dispose: () => {},
+      });
+      views.update([actor("a", 4)], 0.25, 0.1);
+      expect(views.groundPosition("a")!.x).toBe(1);
+      expect(motions[motions.length - 1]).toEqual({
+        distance: 0,
+        turn: 0,
+        seconds: 0,
+      });
+      views.update([actor("a", 4)], 0.5, 0.1);
+      expect(motions[motions.length - 1]).toEqual({
+        distance: 1,
+        turn: 0,
+        seconds: 0.1,
+      });
+    } finally {
+      views.dispose();
+      engine.dispose();
+    }
+  });
+
+  test("capturing a tick forgets actors removed before they were drawn", () => {
+    const { engine, views } = setup();
+    try {
+      views.capturePreviousPoses([actor("hidden")]);
+      views.capturePreviousPoses([]);
+      views.update([actor("hidden", 4)], 0.5);
+      expect(views.groundPosition("hidden")!.x).toBe(4);
+    } finally {
+      views.dispose();
+      engine.dispose();
+    }
+  });
+
   test("rebuilds a view when its appearance finishes loading", () => {
     const { appearances, engine, scene, views } = setup();
     views.update([actor("a")], 1);

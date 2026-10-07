@@ -142,8 +142,8 @@ test("working signals are per Harvester and reduced motion preserves the visible
     const appearance = createHarvesterAppearance(scene, () => reduced);
     const first = appearance.instantiate("first", 0);
     const second = appearance.instantiate("second", 0);
-    first.setWorking!(true);
-    second.setWorking!(false);
+    first.setAnimationState!({ working: true });
+    second.setAnimationState!({ working: false });
     const drill = scene.getTransformNodeByName("first-drill")!;
     const idleDrill = scene.getTransformNodeByName("second-drill")!;
     expect(drill.position.y).toBeLessThan(idleDrill.position.y);
@@ -154,7 +154,7 @@ test("working signals are per Harvester and reduced motion preserves the visible
     const rotation = drill.rotation.z;
     first.animate!({ seconds: 0.1, distance: 0, turn: 0 });
     expect(drill.rotation.z).toBe(rotation);
-    first.setWorking!(false);
+    first.setAnimationState!({ working: false });
     expect(drill.position.y).toBe(idleDrill.position.y);
     expect(scene.getMeshByName("first-work-beacon")!.scaling.y).toBe(1);
     first.dispose();

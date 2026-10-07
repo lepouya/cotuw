@@ -374,6 +374,29 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     },
     ["spine", "head"],
   );
+  clip(
+    "hit",
+    10,
+    (joint, phase) => {
+      const flinch = Math.sin(phase / 2);
+      return joint === "spine"
+        ? [0.22 * flinch, 0, -0.12 * flinch]
+        : [-0.15 * flinch, 0, 0];
+    },
+    ["spine", "head"],
+  );
+  if (role === "trooper")
+    clip(
+      "aim",
+      10,
+      (joint, phase) => {
+        const amount = phase / (Math.PI * 2);
+        if (joint.endsWith("forearm")) return [-0.65 * amount, 0, 0];
+        if (joint.endsWith("arm")) return [-0.25 * amount, 0, 0];
+        return [-0.08 * amount, 0, 0];
+      },
+      ["spine", "left-arm", "right-arm", "left-forearm", "right-forearm"],
+    );
   // Knees buckle, then the body falls back faster and faster and lies still.
   const fallen = (phase: number) => (phase / (Math.PI * 2)) ** 2;
   const death = clip("death", 24, (joint, phase) => {

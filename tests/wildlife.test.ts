@@ -570,6 +570,24 @@ describe("wolf movement and persistence", () => {
     tick(simulation, 6);
     expect(simulation.actorById("wolf")!.health).toBeGreaterThan(50);
   });
+  test("zero regeneration stays idle without reporting healing", () => {
+    const simulation = fixture(
+      [unit("wolf", 20)],
+      (state) => {
+        state.actors[0]!.health = 50;
+      },
+      tuning({ regenerationPerSecond: 0 }),
+    );
+    try {
+      tick(simulation, 20);
+      expect(simulation.actorById("wolf")!.health).toBe(50);
+      expect(simulation.actorById("wolf")!.territory?.mode).toBe(
+        "idle-at-home",
+      );
+    } finally {
+      simulation.dispose();
+    }
+  });
   test("unreachable hostiles are skipped and bounded routes find valid detours", () => {
     const units = [unit("wolf", 18), unit("player", 22, "arc-scout")];
     const simulation = fixture(units, (state) => {

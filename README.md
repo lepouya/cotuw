@@ -159,7 +159,11 @@ explains gathering, construction, and training; its counts show current forces
 and are separate from the win condition. Sandbox goals show practice counts.
 **Building idle animation** controls rooftop equipment. A gathering Harvester
 lowers and spins its drill with a green light; idle Harvesters raise it and
-show amber. Reduced motion keeps these status cues without animated motion.
+show amber. The collector lowers when gathering starts and stows when it
+stops; deliveries tip the Harvester's hopper. Troopers aim between shots,
+mobile actors flinch on surviving hits, and pursuing wolves use a running
+stride. Healing wolves show a green halo and rising crosses. Reduced motion
+keeps status cues while settling transitions and holding effects still.
 
 The visual tests start the Vite app in headless Chromium. They check the
 camera, terrain rendering, terrain editing, and texture behavior, some through

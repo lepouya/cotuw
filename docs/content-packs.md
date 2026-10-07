@@ -28,15 +28,19 @@ bundled packs through the same parser future mod packs will use.
   - `attackEffect` is `"tracer"` or `"bite"`.
   - `damageEffect` is `"mechanical"` smoke and fire or `"biological"` drops,
     shown once health falls to 60%; absent shows no damage effect.
+  - `regenerationEffect: true` shows the `regeneration` prop while a visible
+    wolf is actively healing. Its idle clip freezes under reduced motion.
   - `model` is a GLB with clips under `glb`, or a built-in procedural model
     under `builtin`, such as `"wolf"`, with an optional `scale`. GLB `clips`
-    name the `idle`, `locomotion`, optional `turn`, `work`, trigger, and `death`
-    clips, as [actor assets](actor-assets.md) describes. `rig` defaults to
+    name `idle`, `locomotion`, optional `run`, `turn`, `aim`, `work`,
+    `deploy`, `stow`, trigger, and `death` clips, as
+    [actor assets](actor-assets.md) describes. `rig` defaults to
     `"skeletal"`; `"rigid"` permits articulated models without a skin. An
     optional GLB `scale` changes the mesh size; bounds and cycle distance use
     final world units. The base pack uses generated GLBs for every actor.
   - `frameEffects` on mobile models maps a trigger to a clip played once on a
-    camera-facing square. `attack` plays with each hit. Each names its `clip`,
+    camera-facing square. Triggers are `attack` on dealt hits, `hit` on
+    surviving targets, and `unload` on cargo delivery. Each names its `clip`,
     the sheet at `url`, its `size` in world units, and an `anchor` in the
     actor's model space: `[x, y, z]` from its ground point, facing +Z.
   - `building` sets a tile-placed actor's height, colors, and optional
@@ -45,7 +49,7 @@ bundled packs through the same parser future mod packs will use.
     `exit` or `delivery`. A building cannot name both kinds of art.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
   `materials-mound`, `salvage`, `tracer`, `bite`, `smoke`, `fire`, `wound`,
-  and `bird` GLBs with `url` and an optional `idle` clip.
+  `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.
 - `clips` maps IDs to frame-sequenced textures. `columns` and `rows` divide a
   sprite sheet into equal cells numbered row by row from the top left.
   `frames` lists `{ cell, seconds }` in play order, and `playback` is

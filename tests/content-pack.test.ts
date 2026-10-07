@@ -14,6 +14,20 @@ const withEdit = (edit: (pack: any) => void) => {
 };
 
 describe("content packs", () => {
+  test("built-in references must be strings without implicit coercion", () => {
+    expect(
+      withEdit((pack) => {
+        pack.presentation.wolf.model = { builtin: ["wolf"] };
+      }),
+    ).toThrow("unknown built-in model");
+    expect(
+      withEdit((pack) => {
+        const building = pack.presentation["arc-field-barracks"].building;
+        delete building.glb;
+        building.details = ["barracks"];
+      }),
+    ).toThrow("unknown building details");
+  });
   test("the base pack presents every actor it defines", () => {
     for (const { id } of BASE_CONTENT.actors)
       expect(BASE_CONTENT.presentation[id]?.name, id).toBeTruthy();
@@ -275,4 +289,12 @@ test("rejects unknown and repeated actor animation roles before loading assets",
       clips.locomotion = clips.idle;
     }),
   ).toThrow("uses one clip for multiple animation roles");
+});
+
+test("rejects a non-boolean regeneration effect", () => {
+  expect(
+    withEdit((pack) => {
+      pack.presentation.wolf.regenerationEffect = "yes";
+    }),
+  ).toThrow("invalid regeneration effect");
 });
