@@ -191,13 +191,6 @@ the requirements.
   [Content pack tests](../tests/content-pack.test.ts) cover parsing, unknown
   references, and terrain styling.
 
-## Remaining scope
-
-- **Desktop persistence:** saving to and loading from the app data folder
-  work in the desktop app. Export file and Import file, which open the native
-  dialogs, still need a check there. Chromium and WebKit coverage includes the
-  [save checks](../e2e/saves.spec.ts).
-
 - **0.46, presentation:** skeletal infantry with attack and death clips,
   articulated machinery, tracers, muzzle flashes, bite effects, health bars,
   remains, staged resource markers, wolf attack and death, and Harvester
@@ -210,13 +203,29 @@ the requirements.
   [ambient birds](../src/render/ambient-birds.ts) circles the lake shore.
   Models, materials, skeletons, clips, textures, and sprite sheets have
   offline generators; runtime art loads their committed files. Unit tests
-  cover these views, a [browser check](../e2e/presentation.spec.ts) renders
-  them in Chromium and WebKit, and a full human playthrough showed them
-  working. Hit-reaction clips, the wolf regeneration effect, and Harvester
-  deploy, stow, and unloading clips remain.
+  cover these views, and [browser checks](../e2e/presentation.spec.ts) render
+  them in Chromium and WebKit. Troopers and Scouts share hit reactions;
+  Troopers hold an aim pose. Normal and alpha wolves share run, turn, bite,
+  hit, and death clips.
+  Visible regenerating wolves show a halo and rising crosses. Harvesters
+  deploy and stow their collectors, reverse interrupted transitions without
+  jumping, and tip their hoppers on committed delivery. Loading settles the
+  collector into its saved work state; lethal hits go directly to death.
+  Materials stages use content-pack thresholds and scales.
+  [Actor presentation tests](../tests/actor-presentation.test.ts) cover these
+  clips, independent instances, repeated hits, death priority, reversal,
+  loading, reduced motion, and regeneration cleanup. Browser presentation
+  checks cover committed combat and deliveries and loaded healing visibility.
+  A human visual playtest passes.
+
+## Remaining scope
+
+- **Desktop persistence:** saving to and loading from the app data folder
+  work in the desktop app. Export file and Import file, which open the native
+  dialogs, still need a check there. Chromium and WebKit coverage includes the
+  [save checks](../e2e/saves.spec.ts).
 
 ## Recommended next task
 
-Finish **0.46** with hit reactions, the wolf regeneration effect, and the
-remaining Harvester clips. Check desktop export and import, and run first-time human playtests for
-**0.55** alongside.
+Run first-time human playtests for **0.55** to tune M0 costs, timings,
+encounters, and layout. Check desktop export and import alongside.

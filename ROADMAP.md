@@ -136,7 +136,7 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.45 Expose every core action through on-screen controls that work in
       compact phone and tablet landscape browser profiles without hover or
       right-click.
-- [ ] 0.46 Integrate the required animated textures, skeletal actors,
+- [x] 0.46 Integrate the required animated textures, skeletal actors,
       articulated buildings, tracer and weapon effects, ambient objects, damage
       effects, construction stages, and resource-depletion visuals.
 - [x] 0.47 Replace the prototype bindings with the locked mouse, keyboard, and
