@@ -31,9 +31,10 @@ export function terrainLayers(
   const tileTypes = new Map(
     Object.entries(style.tileTypes).map(([id, type]) => [id, { ...type, id }]),
   );
+  const layers = new Map(Object.entries(style.layers));
   return (x, z, { typeId }, map) => {
     let depth: number | undefined;
-    return (style.layers[typeId] ?? []).flatMap((rule) => {
+    return (layers.get(typeId) ?? []).flatMap((rule) => {
       if (
         rule.coverage !== undefined &&
         !(Math.sin(x * 0.47 - z * 0.29) > Math.cos(Math.PI * rule.coverage))

@@ -14,6 +14,22 @@ const withEdit = (edit: (pack: any) => void) => {
 };
 
 describe("content packs", () => {
+  test.each(["constructor", "toString", "__proto__"])(
+    "unstyled terrain %s has no inherited layer rules",
+    (typeId) => {
+      const map = new TerrainGrid({
+        width: 1,
+        height: 1,
+        tileSize: 1,
+        terrainTypeIds: [typeId],
+        createTerrain: () => ({ typeId }),
+      });
+      expect(
+        terrainLayers(BASE_CONTENT.terrain)(0, 0, map.terrainAt(0, 0), map),
+      ).toEqual([]);
+    },
+  );
+
   test("built-in references must be strings without implicit coercion", () => {
     expect(
       withEdit((pack) => {
