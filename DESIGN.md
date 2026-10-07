@@ -87,6 +87,9 @@ ticks. Render interpolation holds at the latest committed pose while catching
 up. Pausing discards outstanding catch-up time; resuming starts from the
 current time, so inspection and paused time never advance the mission.
 
+See [runtime extension contracts](docs/runtime-boundaries.md) for behavior,
+clock, and resource ownership boundaries.
+
 ## Mission terminology
 
 - A campaign is a faction's long-form narrative and progression.

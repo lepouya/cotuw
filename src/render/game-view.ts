@@ -3,6 +3,7 @@ import { Color3, Color4, Engine, Scene } from "@babylonjs/core";
 import { createStrategyCamera } from "./camera";
 import { watchCanvasSize } from "./canvas-size";
 import { createLighting } from "./lighting";
+import { createLifetime } from "../lifetime";
 
 import type { TerrainMap } from "../map";
 import type { StrategyCamera } from "./camera";
@@ -27,34 +28,44 @@ export function createGameView(
   map: TerrainMap,
   { clearColor, lighting: lightingConfig }: GameViewOptions,
 ): GameView {
-  // Render at device pixels for HiDPI; camera and pointer math stay in CSS px.
-  const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
-  const scene = new Scene(engine);
-  scene.clearColor = Color4.FromColor3(clearColor);
+  const lifetime = createLifetime();
+  try {
+    // Render at device pixels for HiDPI; camera and pointer math stay in CSS px.
+    const engine = lifetime.own(
+      new Engine(canvas, true, { adaptToDeviceRatio: true }),
+    );
+    const scene = lifetime.own(new Scene(engine));
+    scene.clearColor = Color4.FromColor3(clearColor);
 
-  const suppressContextMenu = (event: Event) => event.preventDefault();
-  canvas.addEventListener("contextmenu", suppressContextMenu);
-  const canvasSize = watchCanvasSize(canvas);
+    const suppressContextMenu = (event: Event) => event.preventDefault();
+    canvas.addEventListener("contextmenu", suppressContextMenu);
+    lifetime.defer(() =>
+      canvas.removeEventListener("contextmenu", suppressContextMenu),
+    );
+    const canvasSize = lifetime.own(watchCanvasSize(canvas));
 
-  const camera = createStrategyCamera(scene, canvas, map);
-  const lighting = createLighting(scene, lightingConfig);
-  engine.runRenderLoop(() => {
-    if (canvasSize.takeChange()) {
-      engine.resize();
+    const camera = createStrategyCamera(scene, canvas, map);
+    const lighting = createLighting(scene, lightingConfig);
+    engine.runRenderLoop(() => {
+      if (canvasSize.takeChange()) {
+        engine.resize();
+      }
+      scene.render();
+    });
+
+    return {
+      engine,
+      scene,
+      camera,
+      lighting,
+      dispose: lifetime.dispose,
+    };
+  } catch (error) {
+    try {
+      lifetime.dispose();
+    } catch (cleanupError) {
+      console.error("View cleanup failed.", cleanupError);
     }
-    scene.render();
-  });
-
-  return {
-    engine,
-    scene,
-    camera,
-    lighting,
-    dispose: () => {
-      canvas.removeEventListener("contextmenu", suppressContextMenu);
-      canvasSize.dispose();
-      scene.dispose();
-      engine.dispose();
-    },
-  };
+    throw error;
+  }
 }

@@ -103,6 +103,7 @@ import type { MissionAlert } from "./ui/mission-alerts";
 import { duePopup } from "./ui/popups";
 import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
+import { createLifetime } from "./lifetime";
 import type { ScenarioPopup } from "./simulation/mission-file";
 import type { WorldPosition } from "./simulation/world";
 
@@ -249,19 +250,52 @@ export async function createGameSession(
 ): Promise<GameSession> {
   delete canvas.dataset.modelsReady;
   const { mission } = controls;
-  const { content, definitions } = mission;
+  const { content } = mission;
   const map = createSessionMap(
     { ...mission.scenario, terrain: mission.state.terrain },
     content.terrain,
   );
   const options = viewOptions(content.view);
   const view = createGameView(canvas, map, options);
+  try {
+    return await assembleGameSession(
+      canvas,
+      minimapCanvas,
+      controls,
+      map,
+      view,
+    );
+  } catch (error) {
+    try {
+      if (!view.scene.isDisposed) view.dispose();
+    } catch (cleanupError) {
+      console.error("Session cleanup failed.", cleanupError);
+    }
+    throw error;
+  }
+}
+
+async function assembleGameSession(
+  canvas: HTMLCanvasElement,
+  minimapCanvas: HTMLCanvasElement,
+  controls: GameSessionControls,
+  map: TerrainMap,
+  view: GameView,
+): Promise<GameSession> {
+  const { mission } = controls;
+  const { content, definitions } = mission;
+  const options = viewOptions(content.view);
+  const lifetime = createLifetime();
+  const { own } = lifetime;
+  view.scene.onDisposeObservable.add(() => lifetime.dispose());
+  lifetime.defer(() => controls.onDispose?.());
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   createTerrainMeshes(view.scene, map, {
     clips: content.clips,
     reducedMotion: () => reducedMotion.matches,
   });
   const simulation = createSessionSimulation(map, mission);
+  own(simulation);
   const presentationOf = (id: string) => content.presentation[id];
   const names = new Map(
     definitions.map(({ id }) => [id, presentationOf(id)?.name ?? id]),
@@ -287,6 +321,9 @@ export async function createGameSession(
   const propAssets = new Map<PropId, ModelAsset>();
   /** Every loaded prop and building model, released with the session. */
   const modelAssets: ModelAsset[] = [];
+  lifetime.defer(() => {
+    for (const asset of modelAssets) asset.dispose();
+  });
   const models = definitions.flatMap(({ id }) => {
     const model = presentationOf(id)?.model;
     return model ? [[id, model] as const] : [];
@@ -299,7 +336,11 @@ export async function createGameSession(
     content.clips ?? {},
     () => reducedMotion.matches,
   );
+  own(frameEffects);
   const appearances = new Map<string, ActorAppearance>();
+  lifetime.defer(() => {
+    for (const appearance of appearances.values()) appearance.dispose();
+  });
   /** Each appearance also plays its actor's frame effects. */
   const setAppearance = (id: string, appearance: ActorAppearance) => {
     const effects = presentationOf(id)?.frameEffects;
@@ -330,9 +371,11 @@ export async function createGameSession(
       simulation.economy,
       content.materialsStages,
     );
+  if (materialsView) own(materialsView);
   const explored = ({ x, z }: TileCoord) =>
     simulation.fog?.isExplored(x, z) ?? true;
   const fogOverlay = createFogOverlay(view.scene, map, options.clearColor);
+  own(fogOverlay);
   const fog = simulation.fog;
   if (fog)
     view.camera.setFocusLimit((point) =>
@@ -358,6 +401,7 @@ export async function createGameSession(
     appearances,
     (definitionId) => player.relationTo(definitionId) === "hostile",
   );
+  own(actorViews);
   const tilePlacedViews = createTilePlacedActorViewRegistry(
     view.scene,
     map,
@@ -365,10 +409,14 @@ export async function createGameSession(
     buildingAppearances,
     { reducedMotion: () => reducedMotion.matches },
   );
+  own(tilePlacedViews);
   const networkView = createSupportNetworkView(view.scene, map);
+  own(networkView);
   const disconnected = () => disconnectedBuildings(simulation.support);
   const rallyView = createRallyPointView(view.scene, map);
+  own(rallyView);
   const movementPath = createMovementPathView(view.scene, map);
+  own(movementPath);
   const queuedOrders = createQueuedOrderView(view.scene, map, (order) => {
     switch (order.kind) {
       case "move":
@@ -388,25 +436,31 @@ export async function createGameSession(
       }
     }
   });
+  own(queuedOrders);
   const healthBars = createHealthBarView(view.scene, map);
+  own(healthBars);
   const combatEffects = createCombatEffectsView(view.scene, map, (style) =>
     propAssets.get(style),
   );
+  own(combatEffects);
   const damageEffects = createDamageEffectsView(
     view.scene,
     (prop) => propAssets.get(prop),
     () => reducedMotion.matches,
   );
+  own(damageEffects);
   const regenerationEffects = createRegenerationEffectsView(
     view.scene,
     () => propAssets.get("regeneration"),
     () => reducedMotion.matches,
   );
+  own(regenerationEffects);
   const birds = createAmbientBirdsView(map, mission.scenario.flocks ?? [], {
     bird: () => propAssets.get("bird"),
     explored,
     reducedMotion: () => reducedMotion.matches,
   });
+  own(birds);
   const buildingModelTops = new Map<string, number>();
   const wreckView = createWreckView(view.scene, map, {
     appearanceFor: (id) => appearances.get(id),
@@ -435,6 +489,7 @@ export async function createGameSession(
     tilesFor: (wreck) =>
       wreckTiles(wreck, definitionsById.get(wreck.definitionId)!),
   });
+  own(wreckView);
   const updateWrecks = (seconds: number) =>
     wreckView.update(
       simulation.wrecks,
@@ -478,6 +533,7 @@ export async function createGameSession(
     if (actor) controls.showActor?.(actor.definitionId);
   };
   const radial = createRadialMenu(document.body, canvas);
+  own(radial);
   const isMobile = (actor: ActorRenderState) =>
     isMobileActor(actor, definitionsById.get(actor.definitionId));
   /** The rendered center of shown actors; undefined once none remain. */
@@ -621,6 +677,7 @@ export async function createGameSession(
       controlsDirty = true;
     },
   });
+  own(input);
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
     fog: () => simulation.fog,
     reducedMotion: () => reducedMotion.matches,
@@ -780,6 +837,7 @@ export async function createGameSession(
       },
     },
   );
+  own(placement);
   const removeSelected = () => {
     const actorId = input.selectedActorId;
     const actor = actorId ? simulation.actorById(actorId) : undefined;
@@ -805,6 +863,9 @@ export async function createGameSession(
     if (controls.remove) controls.remove.disabled = true;
   };
   controls.remove?.addEventListener("click", removeSelected);
+  lifetime.defer(() =>
+    controls.remove?.removeEventListener("click", removeSelected),
+  );
   const selectedOwnActorId = () => {
     const id = input.selectedActorId;
     return id && actorsByKind().ownIds.has(id) ? id : undefined;
@@ -815,6 +876,7 @@ export async function createGameSession(
     enabled: () => canCommand() && !placement.active,
     paused: () => !playing,
   });
+  own(training);
   const attackMove = createAttackMoveControls(simulation, controls, {
     selectedMobileIds: () =>
       input.selectedActorIds.filter((id) => {
@@ -836,6 +898,7 @@ export async function createGameSession(
       input.cancelGesture();
     },
   });
+  own(attackMove);
   const rally = createRallyControls(simulation, controls, {
     changed: () => {
       controlsDirty = true;
@@ -849,6 +912,7 @@ export async function createGameSession(
       input.setAdditiveMode(false);
     },
   });
+  own(rally);
   const network = createNetworkControls(simulation, controls, {
     selectedActorId: selectedOwnActorId,
     canControl: (id) => actorsByKind().ownIds.has(id),
@@ -871,6 +935,7 @@ export async function createGameSession(
           queueMode: () => input.queueMode,
         })
       : undefined;
+  if (economyControls) own(economyControls);
   view.camera.setTouchPanFilter(
     (event) =>
       !placement.active &&
@@ -892,9 +957,11 @@ export async function createGameSession(
       else followActors(input.selectedActorIds);
     },
   });
+  own(unitControls);
   const disposeCameraControls =
     controls.cameraControls &&
     bindCameraControls(controls.cameraControls, view.camera);
+  if (disposeCameraControls) lifetime.defer(disposeCameraControls);
   view.camera.onViewChangedObservable.add(() => {
     controlsDirty = true;
   });
@@ -1118,6 +1185,7 @@ export async function createGameSession(
       raisePopup();
     },
   });
+  lifetime.defer(() => loop.stop());
   showMissionResult();
   // Loading a mission records its state without raising alerts.
   observeAlerts();
@@ -1215,39 +1283,9 @@ export async function createGameSession(
         ?.rallyPoint,
     );
   });
-  view.scene.onDisposeObservable.add(() => {
-    loop.stop();
-    simulation.dispose();
-    input.dispose();
-    unitControls.dispose();
-    disposeCameraControls?.();
-    placement.dispose();
-    controls.remove?.removeEventListener("click", removeSelected);
-    training.dispose();
-    rally.dispose();
-    attackMove.dispose();
-    radial.dispose();
-    networkView.dispose();
-    rallyView.dispose();
-    fogOverlay.dispose();
-    healthBars.dispose();
-    combatEffects.dispose();
-    damageEffects.dispose();
-    regenerationEffects.dispose();
-    birds.dispose();
-    frameEffects.dispose();
-    wreckView.dispose();
-    economyControls?.dispose();
-    materialsView?.dispose();
-    controls.onDispose?.();
-    view.scene.onBeforeAnimationsObservable.remove(renderObserver);
-    actorViews.dispose();
-    tilePlacedViews.dispose();
-    movementPath.dispose();
-    queuedOrders.dispose();
-    for (const appearance of appearances.values()) appearance.dispose();
-    for (const asset of modelAssets) asset.dispose();
-  });
+  lifetime.defer(() =>
+    view.scene.onBeforeAnimationsObservable.remove(renderObserver),
+  );
 
   view.scene.onAfterRenderObservable.addOnce(() => {
     canvas.dataset.terrainReady = "true";
@@ -1427,7 +1465,16 @@ export async function createGameSession(
   ]).then(() => {
     if (!view.scene.isDisposed) canvas.dataset.modelsReady = "true";
   });
-  controls.onReady?.(session);
+  try {
+    controls.onReady?.(session);
+  } catch (error) {
+    try {
+      await session.disposeAsync();
+    } catch (cleanupError) {
+      console.error("Session cleanup failed.", cleanupError);
+    }
+    throw error;
+  }
   return session;
 }
 
