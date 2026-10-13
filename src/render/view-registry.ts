@@ -1,3 +1,5 @@
+import { createLifetime } from "../lifetime";
+
 /** Owns disposable views keyed by stable IDs, with adapter-defined revisions. */
 export function createViewRegistry<
   State extends { readonly id: string },
@@ -13,10 +15,19 @@ export function createViewRegistry<
   onReplace?: (id: string, previous: Key, next: Key) => void;
 }) {
   const views = new Map<string, { key: Key; view: View }>();
-  const remove = (id: string) => {
-    views.get(id)?.view.dispose();
+  let disposed = false;
+  /** Forgets the view before disposing it, so a failed cleanup still leaves. */
+  const release = (id: string, view: View, after?: () => void) => {
     views.delete(id);
-    adapter.onRemove?.(id);
+    try {
+      view.dispose();
+    } finally {
+      after?.();
+    }
+  };
+  const remove = (id: string) => {
+    const entry = views.get(id);
+    if (entry) release(id, entry.view, () => adapter.onRemove?.(id));
   };
   return {
     get: (id: string) => views.get(id)?.view,
@@ -25,20 +36,30 @@ export function createViewRegistry<
     sync: (states: readonly State[]) => {
       const present = new Set(states.map(({ id }) => id));
       for (const id of views.keys()) if (!present.has(id)) remove(id);
+      // Adapter callbacks may dispose the registry; check after each one.
       for (const state of states) {
+        if (disposed) return;
         const key = adapter.keyFor(state);
         const existing = views.get(state.id);
-        if (existing && !(adapter.sameKey ?? Object.is)(existing.key, key)) {
-          existing.view.dispose();
-          views.delete(state.id);
-          adapter.onReplace?.(state.id, existing.key, key);
-        }
-        if (!views.has(state.id))
-          views.set(state.id, { key, view: adapter.create(state, key) });
+        const unchanged =
+          existing && (adapter.sameKey ?? Object.is)(existing.key, key);
+        if (disposed) return;
+        if (existing && !unchanged)
+          release(state.id, existing.view, () =>
+            adapter.onReplace?.(state.id, existing.key, key),
+          );
+        if (disposed || views.has(state.id)) continue;
+        const view = adapter.create(state, key);
+        if (disposed) view.dispose();
+        else views.set(state.id, { key, view });
       }
     },
     dispose: () => {
-      for (const id of views.keys()) remove(id);
+      if (disposed) return;
+      disposed = true;
+      const cleanup = createLifetime();
+      for (const id of views.keys()) cleanup.defer(() => remove(id));
+      cleanup.dispose();
     },
   };
 }
