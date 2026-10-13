@@ -153,8 +153,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.54 Move actor rules, movement profiles, presentation, terrain styling,
       and lighting into a versioned JSON content pack that mission files name,
       leaving no mission-specific rules in session code.
-- [ ] 0.55 Tune M0 costs, timings, encounters, and layout from human playtests
-      toward a 15 to 25 minute first run and a 10 to 15 minute familiar replay.
+- [ ] 0.55 Confirm through human playtests that RTS-familiar first-time players
+      finish M0 unaided in about 5 to 10 minutes, and tune costs, timings,
+      encounters, and layout where they stall or get confused.
 - [x] 0.57 Add essential gameplay sound effects and on-screen volume and mute
       controls, with committed-event playback, fog-safe world audio, and
       browser, desktop, and compact touch verification. Record asset provenance.

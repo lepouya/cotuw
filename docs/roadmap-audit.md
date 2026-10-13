@@ -13,14 +13,25 @@ The mission loop has browser coverage from the authored opening through
 victory and free play. Milestone acceptance also requires recorded unaided
 first-time human completion and a desktop mission run.
 
+The implementation is ready for closeout testing. The October 13, 2026 review
+of the roadmap and locked design against the mission, content, clock,
+platform adapters, saves, interface, checks, and desktop configuration found no
+missing core M0 system. Automated checks and builds establish technical
+readiness, not unaided usability, pacing, or native runtime behavior.
+
 ## Verification baseline
 
 - `npm run check` passes: formatting, TypeScript and Rust linting and type
   checks, 990 unit tests, and 264 Chromium and WebKit browser checks.
   Two conditional Scout attack-animation tests are skipped because Scouts
   cannot attack. The Rust test harness has no tests.
+- Chromium checks run in full headless mode with GPU WebGL. The headless shell
+  renders with SwiftShader at about 25 frames per second, which made Chromium
+  checks about five times slower than WebKit and timed out touch selection
+  checks under parallel load.
 - `npm run build` and `npm run tauri build -- --debug --no-bundle` pass on
   macOS. This verifies compilation; desktop runtime acceptance remains open.
+  Windows CI compiles the Rust crate but never builds or launches the app.
 
 ## Completion evidence
 
@@ -265,50 +276,75 @@ first-time human completion and a desktop mission run.
 - **0.44, native persistence verification:** saving to and loading from the
   app data folder have desktop playtest evidence. Export and Import still need
   a check using the native dialogs; browser and mocked adapter tests do not
-  exercise their file access. Export a mid-mission save, change the mission,
-  import it, and verify paused inspection and restored progress. Check dialog
-  cancellation and invalid or incompatible imports preserve the session.
-  Exercise quicksave, objective autosave, and restart in the desktop app.
-  Record the platform, build, and results before marking the task complete.
-- **0.55, human playtesting and pacing:**
-  [the playthrough evidence](m0-playthrough.md#pacing) records automated and
-  familiar-replay times below the design's targets; first-time times and
-  unaided completion remain unrecorded. Resolve the
-  [duration target review](#duration-target-review) before tuning. Record
-  wall time, mission time, speed setting, pauses, losses, route choices,
-  confusion, stalls, and whether help was needed. A useful initial sample is
-  three RTS-familiar first-time players and at least one familiar replay. Tune
-  against the accepted pacing criteria and encounter rules, regenerate affected
-  assets or levels, and repeat the playtests.
+  exercise their file access. The desktop file scope covers only the app data
+  saves folder. The installed dialog plugin explicitly grants access to the
+  chosen file for both Open and Save; real-dialog verification remains required.
+  Quicksave, objective autosave, and restart also need desktop runs.
+- **0.55, human playtesting and pacing:** [DESIGN.md](../DESIGN.md) accepts the
+  current 5 to 10 minute run, and M0 is not lengthened by slowing the economy
+  or adding encounters.
+  [The playthrough evidence](m0-playthrough.md#pacing) records automated and
+  familiar-replay times; first-time times and unaided completion remain
+  unrecorded.
 
-## Duration target review
+## Closeout action plan
 
-The current duration targets remain in [DESIGN.md](../DESIGN.md). Slower
-gathering or production alone would lengthen waiting without adding decisions,
-and the mission's one economy buildup and two encounters may not fill the
-current targets. The proposed revision is to close **0.55** on recorded
-unaided first-time completion, clear economy and exploration guidance, useful
-decisions without prolonged idle waiting, and the locked lone-wolf and den
-difficulty. Record completion times as observations rather than requiring a
-minimum mission length. Adopting this proposal requires an explicit change to
-the design and roadmap duration targets.
+1. **Run unaided first-time playtests for 0.55.** A recommended initial sample
+   is three RTS-familiar players who have not played this mission, then one
+   familiar replay. Give players the game and its in-game guidance, without the
+   README walkthrough or scripted test strategy. Observe the economy bootstrap,
+   Harvester assignment, camera and selection, route discovery, army
+   preparation, and den assault. Record help or abandonment as a failed unaided
+   attempt rather than silently coaching the player. Repeated confusion becomes
+   a concrete fix.
+2. **Verify native persistence for 0.44 alongside playtesting.** In a built
+   desktop app, export a mid-mission save with active gathering, production, or
+   combat. Change progress, import the exported file through the native dialog,
+   and compare restored time, Materials, cargo, queues, orders, fog, and
+   objectives. Confirm paused inspection and successful resume. Cancel both
+   dialogs and reject malformed and incompatible files without replacing the
+   session. Verify named saves survive app relaunch; overwrite and reload the
+   quicksave; load an objective autosave; restart from the authored opening.
+3. **Fix observed blockers and retest affected paths.** Prioritize crashes,
+   lost or incorrect saves, blocked progression, and repeated confusion that
+   prevents unaided completion. Tune costs, timing, guidance, or layout only
+   where observations support a change. Preserve locked encounter rules and
+   regenerate affected content or assets. Repeat failed playtest paths and the
+   full mission after changes; avoid adding post-M0 systems to this pass.
+4. **Run final acceptance on one fixed revision.** Run `npm run check`,
+   `npm run build`, and the Tauri build, then complete the built desktop mission
+   through victory and free play. Exercise defeat, load, restart, and exit, and
+   confirm audio works throughout. Cover Windows and macOS explicitly; macOS
+   browser WebKit and a debug compilation do not establish Windows runtime or
+   packaged-app behavior. Inspect the default 800×600 desktop window and
+   resizing as well as the tested browser profiles. Record results and update
+   the completion evidence before checking off **0.44**, **0.55**, and the
+   milestone.
 
-## Final milestone acceptance
+Steps 1 and 2 can run together. Step 4 follows any resulting fixes.
 
-- Run `npm run check` after any pacing changes. The
-  authored mission, Chromium and WebKit checks, and compact phone and tablet
-  interactions must pass with the final content, including audio controls.
-- Build the browser and Tauri app. In the desktop app, run from the fixed
-  Command Center through victory and continued free play, and verify defeat,
-  load, and restart. Record Windows and macOS coverage; browser WebKit checks
-  do not prove native dialogs or packaged runtime behavior.
-- Record human playtest results in [the playthrough notes](m0-playthrough.md)
-  and update the completion evidence here. Keep the milestone open until the
-  three remaining tasks and the roadmap's completion conditions have evidence.
+## Evidence to record
 
-## Recommended next task
+Add results to [the playthrough notes](m0-playthrough.md), using one record per
+attempt or native test session:
 
-Resolve the **0.55** duration target review, then run the final human
-playtests with audio, including the **0.57** listening check. Tune from the
-results, with the **0.44** native persistence and **0.57** desktop audio checks
-alongside. Finish with the full checks and desktop mission acceptance run.
+- Revision or build identifier, date, platform and OS, browser or built app,
+  viewport, input method, and test scope.
+- For playtests: prior RTS experience and mission familiarity, outcome, wall
+  time, mission time, speed changes, pauses, losses, routes, idle waiting,
+  confusion, help, and the player's assessment of combat and pacing.
+- For persistence: save kind, exported file and restored-state comparison,
+  relaunch behavior, cancellation, invalid-file rejection, and any error shown.
+- Pass or fail, reproduction details for failures, and the revision that fixes
+  each blocker. Keep developer-guided and automated runs distinct from unaided
+  first-time completion.
+
+## Nonblocking follow-up
+
+- The browser production build warns about its roughly 5.8 MB main JavaScript
+  chunk, about 1.24 MB gzipped. Measure startup on intended hardware before
+  deciding whether to optimize it. This warning alone is not an M0 failure.
+- Record noticeable stalls during the desktop mission; deterministic catch-up
+  tests do not establish smooth rendering on player hardware.
+- The CI workflow is intentionally manual. Run the required checks locally on
+  the final revision; enabling automatic CI is not an M0 prerequisite.

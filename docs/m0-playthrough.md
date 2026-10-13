@@ -45,12 +45,8 @@ The developer estimates a new player's run might take roughly twice as long,
 around eight minutes. That is an estimate; first-time completion times and
 unaided completion remain unrecorded.
 
-The automated and reported human runs are below the intended 10–15 minute
-familiar replay. The current mission has one economy buildup and two combat
-encounters, so reaching the 15–25 minute first-success target may require more
-content than this slice owns.
-[The roadmap audit](roadmap-audit.md#duration-target-review) tracks the target
-review.
+These runs fit the design's 5 to 10 minute run. A familiar replay may finish
+below it.
 
 ## Reproduce
 

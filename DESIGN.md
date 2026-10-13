@@ -1186,8 +1186,8 @@ a later tutorial could be made.
   free play afterward.
 - Command Center destruction or a failed mandatory objective causes hard defeat.
   Economic or military dead ends remain player-judged soft defeats.
-- A first successful run should take about 15 to 25 minutes; a familiar replay
-  about 10 to 15 minutes. Neither is a hard timer.
+- A successful run takes about 5 to 10 minutes. M0 does not lengthen it by
+  slowing gathering, production, or movement, and it is not a hard timer.
 - M0 includes contextual notifications, full save/load/restart coverage,
   compact landscape browser UI checks, and two explanatory popups: **Support
   Network** when the first Refinery placement begins, and **Harvester
@@ -1275,8 +1275,7 @@ a later tutorial could be made.
   - World-event cadence and escalation.
   - Whether corruption spreads, and how players counter or exploit it.
 - **Interface and presentation**
-  - Accessibility tuning, art direction, audio style, and whether M0 includes
-    background music.
+  - Accessibility tuning and final art and audio direction.
 - **Future systems**
   - Technology-tree and permanent-research design.
   - Script conflict precedence, missing-target policies, and mission-driven
