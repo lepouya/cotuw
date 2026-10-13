@@ -1,6 +1,8 @@
 // Every bundled file under public/assets, with the code that generates it.
 import { PNG } from "pngjs";
 
+import { MUSIC_ASSETS, SOUND_ASSETS } from "../src/content/audio-assets.ts";
+import { buildAudioPreview, buildMusic, buildSound } from "./audio-assets.ts";
 import { buildGrassSheet, GRASS_CLIP, GRASS_SHEETS } from "./grass-sheet.ts";
 import { exportInfantry, INFANTRY_ROLES } from "./infantry-model.ts";
 import { exportModelAsset, MODEL_ASSETS } from "./model-assets.ts";
@@ -11,6 +13,7 @@ import {
 import { minimapColor } from "./sprite-sheet.ts";
 import { buildTerrainTexture, TERRAIN_TEXTURES } from "./terrain-textures.ts";
 
+import type { MusicId, SoundId } from "../src/content/audio-assets.ts";
 import type { TextureClip } from "../src/content/texture-clip.ts";
 import type { Rgba } from "./sprite-sheet.ts";
 
@@ -27,6 +30,19 @@ export type AssetFamily = {
 };
 
 export const ASSET_FAMILIES = {
+  audio: {
+    assets: [
+      ...(Object.keys(SOUND_ASSETS) as SoundId[]).map((id) => ({
+        path: `audio/${id}.wav`,
+        build: () => buildSound(id),
+      })),
+      ...(Object.keys(MUSIC_ASSETS) as MusicId[]).map((id) => ({
+        path: `audio/${id}.wav`,
+        build: () => buildMusic(id),
+      })),
+      { path: "audio/index.html", build: buildAudioPreview },
+    ],
+  },
   terrain: {
     assets: TERRAIN_TEXTURES.map((kind) => ({
       path: `terrain/${kind}.png`,

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unquiet World · Audio audition</title>
+<style>
+body { color: #dde8ea; background: #101c23; font: 16px system-ui;
+  max-width: 960px; margin: auto; padding: 24px; }
+h1, h2, h3 { font-weight: 600; } p { line-height: 1.5; }
+section { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; } article { background: #1a2b35; padding: 16px; border-radius: 8px; }
+audio { width: 100%; min-height: 48px; display: block; margin-bottom: 12px; }
+a { color: #9fe1e5; display: inline-block; padding: 8px 0; }
+button { font: inherit; padding: 12px 20px; cursor: pointer; margin-bottom: 12px; }
+</style>
+<h1>Unquiet World · Audio audition</h1>
+<p>Atmospheric synths, sparse percussion, crisp gameplay cues.
+Original synthesized audio. Music repeats every 48 seconds at 80 BPM.
+Play machinery and cues over either track to compare the mix.</p>
+<button type="button" id="stop">Stop all</button>
+<p id="status" role="status"></p>
+<h2>Background music</h2><section><article>
+<h3>Unquiet Frontier</h3>
+<p>Exploration: warm pads, glass notes, and a sparse low pulse.</p>
+<button type="button" data-play="unquiet-frontier">Play Unquiet Frontier</button>
+<p>48 seconds · loop</p>
+<audio id="unquiet-frontier" data-bus="music" controls preload="none" loop
+  aria-label="Unquiet Frontier" src="/assets/audio/unquiet-frontier.wav"></audio>
+<a href="/assets/audio/unquiet-frontier.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Beneath the Ridge</h3>
+<p>Tension: darker pads, a muted sequence, and restrained drums.</p>
+<button type="button" data-play="beneath-the-ridge">Play Beneath the Ridge</button>
+<p>48 seconds · loop</p>
+<audio id="beneath-the-ridge" data-bus="music" controls preload="none" loop
+  aria-label="Beneath the Ridge" src="/assets/audio/beneath-the-ridge.wav"></audio>
+<a href="/assets/audio/beneath-the-ridge.wav" download>Download WAV</a>
+</article></section>
+<h2>Machinery loops</h2><section><article>
+<h3>Harvester drilling</h3>
+
+<button type="button" data-play="harvester-work">Play Harvester drilling</button>
+<p>4 seconds · loop</p>
+<audio id="harvester-work" data-bus="machine" controls preload="none" loop
+  aria-label="Harvester drilling" src="/assets/audio/harvester-work.wav"></audio>
+<a href="/assets/audio/harvester-work.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Harvester moving engine</h3>
+
+<button type="button" data-play="harvester-engine">Play Harvester moving engine</button>
+<p>4 seconds · loop</p>
+<audio id="harvester-engine" data-bus="machine" controls preload="none" loop
+  aria-label="Harvester moving engine" src="/assets/audio/harvester-engine.wav"></audio>
+<a href="/assets/audio/harvester-engine.wav" download>Download WAV</a>
+</article></section>
+<h2>Gameplay cues</h2><section><article>
+<h3>Command accepted</h3>
+
+<button type="button" data-play="command-accepted">Play Command accepted</button>
+<p>0.25 seconds</p>
+<audio id="command-accepted" data-bus="cue" controls preload="none" 
+  aria-label="Command accepted" src="/assets/audio/command-accepted.wav"></audio>
+<a href="/assets/audio/command-accepted.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Invalid action</h3>
+
+<button type="button" data-play="command-invalid">Play Invalid action</button>
+<p>0.38 seconds</p>
+<audio id="command-invalid" data-bus="cue" controls preload="none" 
+  aria-label="Invalid action" src="/assets/audio/command-invalid.wav"></audio>
+<a href="/assets/audio/command-invalid.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Trooper rifle · variant 1</h3>
+
+<button type="button" data-play="rifle-1">Play Trooper rifle · variant 1</button>
+<p>0.65 seconds</p>
+<audio id="rifle-1" data-bus="cue" controls preload="none" 
+  aria-label="Trooper rifle · variant 1" src="/assets/audio/rifle-1.wav"></audio>
+<a href="/assets/audio/rifle-1.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Trooper rifle · variant 2</h3>
+
+<button type="button" data-play="rifle-2">Play Trooper rifle · variant 2</button>
+<p>0.65 seconds</p>
+<audio id="rifle-2" data-bus="cue" controls preload="none" 
+  aria-label="Trooper rifle · variant 2" src="/assets/audio/rifle-2.wav"></audio>
+<a href="/assets/audio/rifle-2.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Trooper rifle · variant 3</h3>
+
+<button type="button" data-play="rifle-3">Play Trooper rifle · variant 3</button>
+<p>0.65 seconds</p>
+<audio id="rifle-3" data-bus="cue" controls preload="none" 
+  aria-label="Trooper rifle · variant 3" src="/assets/audio/rifle-3.wav"></audio>
+<a href="/assets/audio/rifle-3.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Wolf attack</h3>
+
+<button type="button" data-play="wolf-attack">Play Wolf attack</button>
+<p>0.75 seconds</p>
+<audio id="wolf-attack" data-bus="cue" controls preload="none" 
+  aria-label="Wolf attack" src="/assets/audio/wolf-attack.wav"></audio>
+<a href="/assets/audio/wolf-attack.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Damage · variant 1</h3>
+
+<button type="button" data-play="damage-1">Play Damage · variant 1</button>
+<p>0.45 seconds</p>
+<audio id="damage-1" data-bus="cue" controls preload="none" 
+  aria-label="Damage · variant 1" src="/assets/audio/damage-1.wav"></audio>
+<a href="/assets/audio/damage-1.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Damage · variant 2</h3>
+
+<button type="button" data-play="damage-2">Play Damage · variant 2</button>
+<p>0.45 seconds</p>
+<audio id="damage-2" data-bus="cue" controls preload="none" 
+  aria-label="Damage · variant 2" src="/assets/audio/damage-2.wav"></audio>
+<a href="/assets/audio/damage-2.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Player alert</h3>
+
+<button type="button" data-play="alert">Play Player alert</button>
+<p>1.1 seconds</p>
+<audio id="alert" data-bus="cue" controls preload="none" 
+  aria-label="Player alert" src="/assets/audio/alert.wav"></audio>
+<a href="/assets/audio/alert.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Objective complete</h3>
+
+<button type="button" data-play="objective-complete">Play Objective complete</button>
+<p>2.4 seconds</p>
+<audio id="objective-complete" data-bus="cue" controls preload="none" 
+  aria-label="Objective complete" src="/assets/audio/objective-complete.wav"></audio>
+<a href="/assets/audio/objective-complete.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Victory</h3>
+
+<button type="button" data-play="victory">Play Victory</button>
+<p>4.8 seconds</p>
+<audio id="victory" data-bus="cue" controls preload="none" 
+  aria-label="Victory" src="/assets/audio/victory.wav"></audio>
+<a href="/assets/audio/victory.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Defeat</h3>
+
+<button type="button" data-play="defeat">Play Defeat</button>
+<p>4.8 seconds</p>
+<audio id="defeat" data-bus="cue" controls preload="none" 
+  aria-label="Defeat" src="/assets/audio/defeat.wav"></audio>
+<a href="/assets/audio/defeat.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Barracks training started</h3>
+
+<button type="button" data-play="training-start">Play Barracks training started</button>
+<p>0.9 seconds</p>
+<audio id="training-start" data-bus="cue" controls preload="none" 
+  aria-label="Barracks training started" src="/assets/audio/training-start.wav"></audio>
+<a href="/assets/audio/training-start.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Unit trained</h3>
+
+<button type="button" data-play="unit-trained">Play Unit trained</button>
+<p>1.4 seconds</p>
+<audio id="unit-trained" data-bus="cue" controls preload="none" 
+  aria-label="Unit trained" src="/assets/audio/unit-trained.wav"></audio>
+<a href="/assets/audio/unit-trained.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Refinery garage opening</h3>
+
+<button type="button" data-play="refinery-door-open">Play Refinery garage opening</button>
+<p>0.8 seconds</p>
+<audio id="refinery-door-open" data-bus="cue" controls preload="none" 
+  aria-label="Refinery garage opening" src="/assets/audio/refinery-door-open.wav"></audio>
+<a href="/assets/audio/refinery-door-open.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Refinery garage closing</h3>
+
+<button type="button" data-play="refinery-door-close">Play Refinery garage closing</button>
+<p>0.8 seconds</p>
+<audio id="refinery-door-close" data-bus="cue" controls preload="none" 
+  aria-label="Refinery garage closing" src="/assets/audio/refinery-door-close.wav"></audio>
+<a href="/assets/audio/refinery-door-close.wav" download>Download WAV</a>
+</article></section>
+<script>
+const players = [...document.querySelectorAll('audio')];
+for (const button of document.querySelectorAll('[data-play]')) {
+  button.addEventListener('click', () => {
+    document.querySelector('#status').textContent = '';
+    document.getElementById(button.dataset.play).play().catch(() => {
+      document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
+    });
+  });
+}
+for (const player of players) {
+  player.volume = player.dataset.bus === 'music' ? 0.4 :
+    player.dataset.bus === 'machine' ? 0.55 : 0.7;
+  player.addEventListener('play', () => {
+    for (const other of players)
+      if (other !== player && player.dataset.bus !== 'machine' &&
+          other.dataset.bus === player.dataset.bus) other.pause();
+  });
+}
+document.querySelector('#stop').addEventListener('click', () => {
+  for (const player of players) { player.pause(); player.currentTime = 0; }
+});
+</script>
+</html>

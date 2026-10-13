@@ -5,3 +5,5 @@ src-tauri/
 *.md
 # Mission files have their own layout; see docs/mission-files.md.
 src/content/levels/
+# Generated audition page; its layout is owned by the audio generator.
+public/assets/audio/index.html

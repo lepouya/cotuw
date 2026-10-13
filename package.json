@@ -13,6 +13,7 @@
     "tauri": "tauri",
     "levels": "node --no-experimental-webstorage scripts/generate-levels.ts",
     "assets": "node --no-experimental-webstorage scripts/generate-assets.ts",
+    "assets:audio": "node --no-experimental-webstorage scripts/generate-audio.ts",
     "assets:terrain": "node --no-experimental-webstorage scripts/generate-terrain.ts",
     "assets:grass": "node --no-experimental-webstorage scripts/generate-grass.ts",
     "assets:effects": "node --no-experimental-webstorage scripts/generate-effects.ts",
