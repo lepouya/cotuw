@@ -10,7 +10,7 @@ import {
 } from "@babylonjs/core";
 
 import { compileTextureClip } from "../content/texture-clip";
-import { isId, isPositive, isRecord } from "../simulation/validation";
+import { hasOwn, isId, isPositive, isRecord } from "../simulation/validation";
 import { ACTOR_TRIGGERS } from "./actor";
 import { loadClipFrames } from "./texture-clip";
 
@@ -45,7 +45,7 @@ export function validateFrameEffects(
       !ACTOR_TRIGGERS.includes(trigger as ActorTrigger) ||
       !isRecord(effect) ||
       !isId(effect.clip) ||
-      !Object.prototype.hasOwnProperty.call(clips, effect.clip) ||
+      !hasOwn(clips, effect.clip) ||
       !isId(effect.url) ||
       !isPositive(effect.size) ||
       !Array.isArray(effect.anchor) ||

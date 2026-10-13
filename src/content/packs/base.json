@@ -328,6 +328,15 @@
           "size": 0.6,
           "anchor": [0.12, 1.15, 1.15]
         }
+      },
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "rifle"
+            }
+          ]
+        }
       }
     },
     "arc-scout": {
@@ -397,6 +406,15 @@
             "exit": "exit"
           }
         }
+      },
+      "audio": {
+        "events": {
+          "production.start": [
+            {
+              "cue": "training-start"
+            }
+          ]
+        }
       }
     },
     "arc-materials-refinery": {
@@ -418,6 +436,33 @@
             "exit": "exit",
             "delivery": "delivery"
           }
+        }
+      },
+      "audio": {
+        "events": {
+          "production.start": [
+            {
+              "cue": "training-start"
+            }
+          ],
+          "activity.delivery": [
+            {
+              "cue": "refinery-door-open"
+            },
+            {
+              "cue": "refinery-door-close",
+              "at": 2.55
+            }
+          ],
+          "activity.exit": [
+            {
+              "cue": "refinery-door-open"
+            },
+            {
+              "cue": "refinery-door-close",
+              "at": 1.95
+            }
+          ]
         }
       }
     },
@@ -450,6 +495,12 @@
           },
           "cycleDistance": 1.25
         }
+      },
+      "audio": {
+        "loops": {
+          "working": "harvester-work",
+          "moving": "harvester-engine"
+        }
       }
     },
     "wolf": {
@@ -481,7 +532,16 @@
           "scale": 1
         }
       },
-      "regenerationEffect": true
+      "regenerationEffect": true,
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "wolf-attack"
+            }
+          ]
+        }
+      }
     },
     "alpha-wolf": {
       "name": "Alpha wolf",
@@ -512,7 +572,16 @@
           "scale": 1.25
         }
       },
-      "regenerationEffect": true
+      "regenerationEffect": true,
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "wolf-attack"
+            }
+          ]
+        }
+      }
     }
   },
   "clips": {
@@ -852,5 +921,270 @@
       "above": 0,
       "scale": 0.5125
     }
-  ]
+  ],
+  "audio": {
+    "clips": {
+      "command-accepted": {
+        "url": "/assets/audio/command-accepted.wav",
+        "loop": false
+      },
+      "command-invalid": {
+        "url": "/assets/audio/command-invalid.wav",
+        "loop": false
+      },
+      "rifle-1": {
+        "url": "/assets/audio/rifle-1.wav",
+        "loop": false
+      },
+      "rifle-2": {
+        "url": "/assets/audio/rifle-2.wav",
+        "loop": false
+      },
+      "rifle-3": {
+        "url": "/assets/audio/rifle-3.wav",
+        "loop": false
+      },
+      "wolf-attack": {
+        "url": "/assets/audio/wolf-attack.wav",
+        "loop": false
+      },
+      "damage-1": {
+        "url": "/assets/audio/damage-1.wav",
+        "loop": false
+      },
+      "damage-2": {
+        "url": "/assets/audio/damage-2.wav",
+        "loop": false
+      },
+      "alert": {
+        "url": "/assets/audio/alert.wav",
+        "loop": false
+      },
+      "objective-complete": {
+        "url": "/assets/audio/objective-complete.wav",
+        "loop": false
+      },
+      "victory": {
+        "url": "/assets/audio/victory.wav",
+        "loop": false
+      },
+      "defeat": {
+        "url": "/assets/audio/defeat.wav",
+        "loop": false
+      },
+      "training-start": {
+        "url": "/assets/audio/training-start.wav",
+        "loop": false
+      },
+      "unit-trained": {
+        "url": "/assets/audio/unit-trained.wav",
+        "loop": false
+      },
+      "refinery-door-open": {
+        "url": "/assets/audio/refinery-door-open.wav",
+        "loop": false
+      },
+      "refinery-door-close": {
+        "url": "/assets/audio/refinery-door-close.wav",
+        "loop": false
+      },
+      "harvester-work": {
+        "url": "/assets/audio/harvester-work.wav",
+        "loop": true
+      },
+      "harvester-engine": {
+        "url": "/assets/audio/harvester-engine.wav",
+        "loop": true
+      },
+      "unquiet-frontier": {
+        "url": "/assets/audio/unquiet-frontier.wav",
+        "loop": true
+      },
+      "beneath-the-ridge": {
+        "url": "/assets/audio/beneath-the-ridge.wav",
+        "loop": true
+      }
+    },
+    "cues": {
+      "command-accepted": {
+        "clips": ["command-accepted"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "command-invalid": {
+        "clips": ["command-invalid"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "wolf-attack": {
+        "clips": ["wolf-attack"],
+        "gain": 0.55,
+        "cooldown": 0.14,
+        "voices": 3,
+        "priority": 2,
+        "range": 45
+      },
+      "alert": {
+        "clips": ["alert"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "objective-complete": {
+        "clips": ["objective-complete"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "victory": {
+        "clips": ["victory"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 10
+      },
+      "defeat": {
+        "clips": ["defeat"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 10
+      },
+      "training-start": {
+        "clips": ["training-start"],
+        "gain": 0.6,
+        "cooldown": 0.15,
+        "voices": 3,
+        "priority": 2,
+        "range": 45
+      },
+      "unit-trained": {
+        "clips": ["unit-trained"],
+        "gain": 0.7,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "refinery-door-open": {
+        "clips": ["refinery-door-open"],
+        "gain": 0.6,
+        "cooldown": 0.15,
+        "voices": 3,
+        "priority": 2,
+        "range": 45
+      },
+      "refinery-door-close": {
+        "clips": ["refinery-door-close"],
+        "gain": 0.6,
+        "cooldown": 0.15,
+        "voices": 3,
+        "priority": 2,
+        "range": 45
+      },
+      "rifle": {
+        "clips": ["rifle-1", "rifle-2", "rifle-3"],
+        "gain": 0.65,
+        "cooldown": 0.08,
+        "voices": 4,
+        "priority": 2,
+        "range": 45
+      },
+      "damage": {
+        "clips": ["damage-1", "damage-2"],
+        "gain": 0.5,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 1,
+        "range": 45
+      },
+      "harvester-work": {
+        "clips": ["harvester-work"],
+        "gain": 0.4,
+        "unselectedGain": 0.15,
+        "cooldown": 0,
+        "voices": 6,
+        "priority": 0,
+        "range": 45
+      },
+      "harvester-engine": {
+        "clips": ["harvester-engine"],
+        "gain": 0.55,
+        "cooldown": 0,
+        "voices": 6,
+        "priority": 0,
+        "range": 45
+      },
+      "unquiet-frontier": {
+        "clips": ["unquiet-frontier"],
+        "gain": 1,
+        "cooldown": 0,
+        "voices": 1,
+        "priority": 0
+      },
+      "beneath-the-ridge": {
+        "clips": ["beneath-the-ridge"],
+        "gain": 1,
+        "cooldown": 0,
+        "voices": 1,
+        "priority": 0
+      }
+    },
+    "events": {
+      "command.accepted": [
+        {
+          "cue": "command-accepted"
+        }
+      ],
+      "command.invalid": [
+        {
+          "cue": "command-invalid"
+        }
+      ],
+      "alert": [
+        {
+          "cue": "alert"
+        }
+      ],
+      "objective.complete": [
+        {
+          "cue": "objective-complete"
+        }
+      ],
+      "victory": [
+        {
+          "cue": "victory"
+        }
+      ],
+      "defeat": [
+        {
+          "cue": "defeat"
+        }
+      ]
+    },
+    "defaults": {
+      "events": {
+        "damage": [
+          {
+            "cue": "damage"
+          }
+        ],
+        "trained": [
+          {
+            "cue": "unit-trained"
+          }
+        ]
+      }
+    },
+    "music": {
+      "default": "unquiet-frontier",
+      "combat": "beneath-the-ridge",
+      "holdSeconds": 8
+    }
+  }
 }

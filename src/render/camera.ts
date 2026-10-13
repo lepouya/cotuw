@@ -55,6 +55,7 @@ const PAN_KEYS: Readonly<Record<string, readonly [number, number]>> = {
 export type CameraPreset = "isometric" | "top-down" | "grid";
 
 export type StrategyCamera = {
+  readonly focusPoint: Readonly<{ x: number; z: number }>;
   /** Restores the starting pitch and heading, keeping focus and zoom. */
   resetView: () => void;
   /** Absent after a reset or a manual rotation or tilt. */
@@ -519,6 +520,9 @@ export function createStrategyCamera(
   frameStart();
 
   return {
+    get focusPoint() {
+      return { x: camera.target.x, z: camera.target.z };
+    },
     resetView,
     get preset() {
       return preset;

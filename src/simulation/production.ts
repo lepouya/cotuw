@@ -31,11 +31,11 @@ export type TrainingReason =
 export const BUILDING_ACTIVITY_KINDS = ["exit", "delivery"] as const;
 export type BuildingActivityKind = (typeof BUILDING_ACTIVITY_KINDS)[number];
 
-/** A building event during one tick that its appearance responds to. */
+/** Committed activity shared by visual, audio, and future presentation. */
 export type BuildingActivity = {
   buildingId: string;
   kind: BuildingActivityKind;
-  /** The mobile actor taking part, such as the delivering Harvester. */
+  /** The produced unit or delivering Harvester. */
   actorId?: string;
 };
 

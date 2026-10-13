@@ -509,6 +509,52 @@
     <dialog id="game-menu" aria-labelledby="game-menu-title">
       <h2 id="game-menu-title">Paused</h2>
       <p id="game-menu-description"></p>
+      <fieldset class="audio-controls" aria-label="Audio controls">
+        <legend>Audio</legend>
+        <label for="audio-master-volume">Master volume</label>
+        <input
+          id="audio-master-volume"
+          type="range"
+          min="0"
+          max="100"
+          value="50"
+        />
+        <button
+          id="audio-master-mute"
+          type="button"
+          aria-label="Mute all audio"
+          aria-pressed="false"
+        ></button>
+        <label for="audio-sound-volume">Sound volume</label>
+        <input
+          id="audio-sound-volume"
+          type="range"
+          min="0"
+          max="100"
+          value="70"
+        />
+        <button
+          id="audio-sound-mute"
+          type="button"
+          aria-label="Mute sound"
+          aria-pressed="false"
+        ></button>
+        <label for="audio-music-volume">Music volume</label>
+        <input
+          id="audio-music-volume"
+          type="range"
+          min="0"
+          max="100"
+          value="40"
+        />
+        <button
+          id="audio-music-mute"
+          type="button"
+          aria-label="Mute music"
+          aria-pressed="false"
+        ></button>
+        <p id="audio-status" role="status"></p>
+      </fieldset>
       <div id="game-menu-actions" class="building-controls">
         <button id="inspect-loaded-mission" type="button" hidden>
           Inspect

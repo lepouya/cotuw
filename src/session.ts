@@ -106,6 +106,10 @@ import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
 import type { ScenarioPopup } from "./simulation/mission-file";
 import type { WorldPosition } from "./simulation/world";
+import { createAudioScene } from "./audio/scene";
+import { createMissionAudio } from "./audio/mission";
+import { SILENT_AUDIO } from "./audio/mixer";
+import type { AudioMixer } from "./audio/mixer";
 
 const SITE_MINIMAP_COLOR: Rgb = [0.3, 0.66, 0.75];
 const SALVAGE_MINIMAP_COLOR: Rgb = [0.88, 0.65, 0.2];
@@ -157,6 +161,7 @@ export type GameSessionControls = BuildingPlacementControls &
   UnitControls &
   AttackMoveControls & {
     mission: LoadedMission;
+    audio?: AudioMixer;
     startPaused?: boolean;
     onResult?: (result: MissionResult) => void;
     buildings?: readonly DefinitionButton[];
@@ -496,7 +501,7 @@ async function assembleGameSession(
       (wreck) =>
         (simulation.completedTicks - wreck.tick) * simulation.tickSeconds,
       WRECK_SECONDS,
-      (wreck) => player.owns(wreck) || simulation.detects(playerFaction, wreck),
+      player.shows,
       seconds,
     );
   const partition = (actors: readonly ActorRenderState[]) => {
@@ -523,6 +528,24 @@ async function assembleGameSession(
   tilePlacedViews.update(actorsByKind().placed, disconnected());
   let simulationFaulted = false;
   let playing = !controls.startPaused;
+  const audioScene = own(
+    createAudioScene(
+      content.audio,
+      content.presentation,
+      controls.audio ?? SILENT_AUDIO,
+      () => view.camera.focusPoint,
+    ),
+  );
+  /** World sounds play only while the mission runs; music continues. */
+  const syncAudioActivity = () =>
+    audioScene.setActive(playing && !simulationFaulted);
+  syncAudioActivity();
+  const missionAudio = createMissionAudio(
+    audioScene,
+    simulation,
+    player,
+    content.audio?.music?.holdSeconds ?? 0,
+  );
   /** A fault or defeat leaves the session for inspection only. */
   const halted = () =>
     simulationFaulted || simulation.result?.kind === "defeat";
@@ -663,6 +686,7 @@ async function assembleGameSession(
       if (ids[0]) showActor(ids[0]);
     },
     onSelectionChanged: (ids) => {
+      audioScene.setSelection(ids);
       const actorId = ids.length === 1 ? ids[0] : undefined;
       actorViews.setSelectedActors(ids);
       tilePlacedViews.setSelectedActor(actorId);
@@ -835,6 +859,7 @@ async function assembleGameSession(
         input.select(undefined);
         raisePopup();
       },
+      onInvalid: () => audioScene.emit("command.invalid"),
     },
   );
   own(placement);
@@ -1091,6 +1116,7 @@ async function assembleGameSession(
     if (!result || result.kind === shownResult) return;
     shownResult = result.kind;
     playing = false;
+    syncAudioActivity();
     if (result.kind === "defeat") {
       loop.stop();
       haltControls();
@@ -1108,6 +1134,7 @@ async function assembleGameSession(
     beforeTick: () => actorViews.capturePreviousPoses(actorsByKind().mobile),
     onFault: () => {
       simulationFaulted = true;
+      syncAudioActivity();
       haltControls();
       canvas.dataset.simulationFault = "true";
     },
@@ -1146,6 +1173,7 @@ async function assembleGameSession(
       }
       minimap.refreshActors();
       const alerts = observeAlerts();
+      missionAudio.observe(outcomes, alerts);
       for (const alert of alerts)
         if (alert.pulse && alert.position) minimap.ping(alert.position);
       if (alerts.length) controls.onAlerts?.(alerts);
@@ -1194,6 +1222,7 @@ async function assembleGameSession(
     // Polled rather than evented: the query can change before its event fires.
     syncAnimationControl();
     loop.advance();
+    audioScene.update();
     // Hostiles can leave vision without any fog change, so check every tick.
     if (
       simulation.actorVersion !== knownActorVersion ||
@@ -1322,6 +1351,7 @@ async function assembleGameSession(
       else cancelInteractions();
       if (!playing) return;
       playing = false;
+      syncAudioActivity();
       controlsDirty = true;
       loop.pause();
     },
@@ -1331,6 +1361,7 @@ async function assembleGameSession(
       // Paused rendering settles to committed poses; resume must not rewind.
       actorViews.capturePreviousPoses(actorsByKind().mobile);
       playing = true;
+      syncAudioActivity();
       controlsDirty = true;
       loop.resume();
     },

@@ -12,6 +12,9 @@ export const isIdList = (ids: unknown): ids is string[] =>
 export const isPositive = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
+export const isNonnegative = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
 /** Whether a value is one of a fixed set, such as an authored enum. */
 export const isOneOf = <T>(values: readonly T[], value: unknown): value is T =>
   (values as readonly unknown[]).includes(value);
@@ -19,3 +22,7 @@ export const isOneOf = <T>(values: readonly T[], value: unknown): value is T =>
 /** A non-negative safe integer, such as a tick or an amount. */
 export const isCount = (value: unknown): value is number =>
   Number.isSafeInteger(value) && (value as number) >= 0;
+
+/** Ignores inherited names such as `constructor` in authored dictionaries. */
+export const hasOwn = (record: object, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(record, key);

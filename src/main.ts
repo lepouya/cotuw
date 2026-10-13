@@ -1,4 +1,6 @@
 import "./styles.css";
+import { createAudioMixer } from "./audio/mixer";
+import { bindAudioControls } from "./ui/audio-controls";
 import { LEVEL_SOURCES } from "./content/levels";
 import { createPlatform } from "./platform";
 import { worldInputAvailable } from "./render/input-focus";
@@ -115,6 +117,8 @@ const fileNameFor = (name: string) =>
   `${name.replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "mission"}.json`;
 
 const notifications = createNotifications(document);
+const audio = createAudioMixer();
+bindAudioControls(document, audio);
 
 const topBar = createTopBar(byId("top-bar"), {
   togglePause: () => {
@@ -245,6 +249,7 @@ async function start(next: LoadedMission, loaded = false) {
     session = await createGameSession(canvas, minimap, {
       ...activeSidebar.controls,
       mission: next,
+      audio,
       startPaused: loaded,
       cameraControls: byId("camera-controls"),
       onStateChanged: (state) => {

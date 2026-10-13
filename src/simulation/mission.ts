@@ -122,6 +122,7 @@ import type {
 import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import { playerRelation } from "./faction";
+import type { Detectable } from "./faction";
 import { isId, isIdList } from "./validation";
 import type { FogState, FogView, Vision } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
@@ -249,11 +250,7 @@ export type MissionSimulation = {
   readonly result: MissionResult | undefined;
   readonly objectives: readonly ObjectiveView[];
   /** Whether a faction currently sees any tile of the actor. */
-  detects: (
-    faction: string | undefined,
-    actor: Pick<ActorRenderState, "worldPosition" | "definitionId"> &
-      Partial<Pick<ActorRenderState, "id" | "tilePlacement">>,
-  ) => boolean;
+  detects: (faction: string | undefined, actor: Detectable) => boolean;
   /** Whether a faction currently sees the tile under a point. */
   sees: (faction: string | undefined, point: WorldPosition) => boolean;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
@@ -766,7 +763,11 @@ export function createMissionSimulation({
     const rally = working.actorsById.get(producerId)?.rallyPoint;
     if (rally) moveActor(actor, rally);
     stageActor(working, actor);
-    working.activity.push({ buildingId: producerId, kind: "exit" });
+    working.activity.push({
+      buildingId: producerId,
+      kind: "exit",
+      actorId: actor.id,
+    });
   };
   /** Starts a route for automated work; returns whether it was accepted. */
   const moveActor = (

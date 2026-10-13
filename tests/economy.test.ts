@@ -542,7 +542,7 @@ describe("Materials economy", () => {
     ).toBe(true);
     until(simulation, () => simulation.actorById("trooper") !== undefined);
     expect(simulation.buildingActivity).toEqual([
-      { buildingId: "barracks", kind: "exit" },
+      { buildingId: "barracks", kind: "exit", actorId: "trooper" },
     ]);
     simulation.tick();
     expect(simulation.buildingActivity).toEqual([]);

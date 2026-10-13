@@ -16,6 +16,8 @@ awaken the deathless Everwake, eventually requiring an uneasy alliance.
   alternatives, and queued design questions.
 - [Actor assets](docs/actor-assets.md) — generated models, textures, and
   animation contracts.
+- [Audio assets](docs/audio-assets.md) — generated sounds, music loops,
+  audition, and provenance.
 - [Mission files](docs/mission-files.md) — the level and save format and how
   to edit it.
 - [Content packs](docs/content-packs.md) — shared actor rules and
@@ -31,7 +33,8 @@ npm run dev        # browser
 npm run tauri dev  # desktop
 npm run test:visual # browser screenshot checks
 npm run levels     # rebuild bundled levels, replacing hand edits
-npm run assets     # rebuild all bundled model and texture files
+npm run assets     # rebuild all bundled art and audio files
+npm run assets:audio # rebuild sounds, music, and the audition page
 npm run check      # required before completing a coding task
 ```
 
@@ -179,10 +182,15 @@ Install the browsers locally once with `npx playwright install chromium`, plus
 webview.
 Set `COTUW_TEST_PORT=1421` to run checks beside a server using the default port.
 
-Bundled models, rigs, animations, materials, and texture files come from code.
+Bundled models, rigs, animations, materials, textures, and audio come from code.
 Run `npm run assets` after changing their generators. The asset tests compare
 committed files with generated output and reject files without a generator.
 See [actor assets](docs/actor-assets.md) for the inventory and contracts.
+Open `/assets/audio/index.html` on the development server to audition the
+[audio assets](docs/audio-assets.md). In gameplay, open **Menu** for master,
+sound, and music volume sliders and mute icons. Master volume defaults to 50%.
+Preferences persist on this device. See [gameplay audio](docs/audio.md) for
+content assignments and extension points.
 
 ## Working principles
 

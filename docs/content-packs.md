@@ -47,6 +47,12 @@ bundled packs through the same parser future mod packs will use.
     built-in `details`, such as `"command-center"`, or a `glb` with `url`, an
     optional `idle` clip, and optional `activities` that name a clip for
     `exit` or `delivery`. A building cannot name both kinds of art.
+- Optional `audio` defines clips, cue variants, global event sequences, default
+  object bindings, and exploration and combat music.
+  `presentation[actorId].audio` assigns named events and state loops to one
+  actor definition, overriding the defaults. See [gameplay audio](audio.md) for
+  the schema, supported mission events, and extension points. Audio bindings
+  are validated even on unused presentation entries.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
   `materials-mound`, `salvage`, `tracer`, `bite`, `smoke`, `fire`, `wound`,
   `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.

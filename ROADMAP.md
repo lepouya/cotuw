@@ -26,9 +26,9 @@ base-building RTS loop, its technical architecture, and its player interface.
 - [x] 0.5 Establish small module boundaries for simulation, rendering, and
       platform services.
 - [x] 0.6 Add the basic development, type-checking, and build commands.
-- [x] 0.56 Preserve owed simulation ticks through long timer or renderer
-      stalls, with bounded catch-up work and regression checks for low render
-      rates and stalls beyond five seconds.
+- [x] 0.56 Preserve owed simulation ticks through long timer or renderer stalls,
+      with bounded catch-up work and regression checks for low render rates and
+      stalls beyond five seconds.
 
 ### Proof of concept
 
@@ -41,8 +41,8 @@ base-building RTS loop, its technical architecture, and its player interface.
 
 ### Terrain and map content
 
-- [x] 0.11 Define and test data-driven terrain-animation clips: frame
-      sequence, frame timing, playback mode, and per-layer texture source.
+- [x] 0.11 Define and test data-driven terrain-animation clips: frame sequence,
+      frame timing, playback mode, and per-layer texture source.
 - [x] 0.12 Render frame-based terrain texture animation without changing the
       deterministic terrain state.
 - [x] 0.13 Keep scrolling UV effects available independently for layers that
@@ -155,9 +155,13 @@ base-building RTS loop, its technical architecture, and its player interface.
       leaving no mission-specific rules in session code.
 - [ ] 0.55 Tune M0 costs, timings, encounters, and layout from human playtests
       toward a 15 to 25 minute first run and a 10 to 15 minute familiar replay.
-- [ ] 0.57 Add essential gameplay sound effects and on-screen volume and mute
+- [x] 0.57 Add essential gameplay sound effects and on-screen volume and mute
       controls, with committed-event playback, fog-safe world audio, and
       browser, desktop, and compact touch verification. Record asset provenance.
+  - [x] Generate original gameplay cues and exploration and tension music loops,
+        with a browser audition page and documented provenance.
+  - [x] Integrate playback, volume and mute controls, fog filtering, event
+        grouping, and lifecycle and platform verification.
 
 ### Playable-slice verification
 

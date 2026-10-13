@@ -19,14 +19,19 @@ export function playerRelation(
   return faction === undefined ? "neutral" : "hostile";
 }
 
+/** Anything with a definition and position, such as an actor or its remains. */
+export type Detectable = Pick<
+  ActorRenderState,
+  "worldPosition" | "definitionId"
+> &
+  Partial<Pick<ActorRenderState, "id" | "tilePlacement">>;
+
 /** Shared ownership and visibility rules for player presentation and controls. */
 export function createPlayerAccess(
   playerFaction: string | undefined,
   definitions: ReadonlyMap<string, ActorDefinition>,
-  detects: (
-    faction: string | undefined,
-    actor: ActorRenderState,
-  ) => boolean = () => true,
+  detects: (faction: string | undefined, actor: Detectable) => boolean = () =>
+    true,
 ) {
   const relationTo = (definitionId: string) =>
     playerRelation(playerFaction, definitions.get(definitionId)?.faction);
@@ -35,7 +40,8 @@ export function createPlayerAccess(
   return {
     relationTo,
     owns,
-    shows: (actor: ActorRenderState) =>
-      owns(actor) || detects(playerFaction, actor),
+    shows: (actor: Detectable) => owns(actor) || detects(playerFaction, actor),
   };
 }
+
+export type PlayerAccess = ReturnType<typeof createPlayerAccess>;

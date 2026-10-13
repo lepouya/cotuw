@@ -14,6 +14,20 @@ const withEdit = (edit: (pack: any) => void) => {
 };
 
 describe("content packs", () => {
+  test.each([
+    null,
+    { audio: { loops: { working: "missing" } } },
+    { audio: { events: { lift: [{ cue: "damage", at: -1 }] } } },
+  ])(
+    "unused presentation entries cannot bypass audio validation: %j",
+    (entry) => {
+      expect(
+        withEdit((pack) => {
+          pack.presentation.unused = entry;
+        }),
+      ).toThrow(RangeError);
+    },
+  );
   test.each(["constructor", "toString", "__proto__"])(
     "unstyled terrain %s has no inherited layer rules",
     (typeId) => {

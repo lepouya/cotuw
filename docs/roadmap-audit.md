@@ -7,17 +7,16 @@ the requirements.
 
 ## Milestone 0 closeout
 
-54 of 57 tasks are complete. The remaining tasks are **0.44**, native
-persistence verification; **0.55**, human playtesting and pacing; and **0.57**,
-essential sound effects. The mission loop has browser coverage from the
-authored opening through victory and free play. Milestone acceptance also
-requires recorded unaided first-time human completion and a desktop mission
-run. Background music is optional.
+55 of 57 tasks are complete. The remaining tasks are **0.44**, native
+persistence verification, and **0.55**, human playtesting and pacing.
+The mission loop has browser coverage from the authored opening through
+victory and free play. Milestone acceptance also requires recorded unaided
+first-time human completion and a desktop mission run.
 
 ## Verification baseline
 
 - `npm run check` passes: formatting, TypeScript and Rust linting and type
-  checks, 881 unit tests, and 242 Chromium and WebKit browser checks.
+  checks, 990 unit tests, and 264 Chromium and WebKit browser checks.
   Two conditional Scout attack-animation tests are skipped because Scouts
   cannot attack. The Rust test harness has no tests.
 - `npm run build` and `npm run tauri build -- --debug --no-bundle` pass on
@@ -253,6 +252,14 @@ run. Background music is optional.
   checks cover committed combat and deliveries and loaded healing visibility.
   A human visual playtest passes.
 
+- **0.57, gameplay audio:** the required cues, exploration and combat music,
+  menu volume and mute controls, fog-filtered world audio, and grouped command
+  and combat feedback are implemented. [Gameplay audio](audio.md#verification)
+  lists the unit and Chromium and WebKit browser checks, and
+  [audio assets](audio-assets.md) records provenance. Human listening playtests
+  approved the cues and mix. A macOS Tauri smoke check verified device unlock,
+  volume and mute controls, and mission restart.
+
 ## Remaining scope
 
 - **0.44, native persistence verification:** saving to and loading from the
@@ -267,29 +274,12 @@ run. Background music is optional.
   [the playthrough evidence](m0-playthrough.md#pacing) records automated and
   familiar-replay times below the design's targets; first-time times and
   unaided completion remain unrecorded. Resolve the
-  [duration target review](#duration-target-review) before tuning. Human
-  feedback also identifies missing sound as a required improvement. Record
+  [duration target review](#duration-target-review) before tuning. Record
   wall time, mission time, speed setting, pauses, losses, route choices,
   confusion, stalls, and whether help was needed. A useful initial sample is
   three RTS-familiar first-time players and at least one familiar replay. Tune
   against the accepted pacing criteria and encounter rules, regenerate affected
   assets or levels, and repeat the playtests.
-- **0.57, essential sound effects:** the app has no audio playback or audio
-  assets. Implement the required cues and playback rules in
-  [the audio specification](../DESIGN.md#audio), including clear distinctions
-  between accepted and rejected actions and audible priority alerts. Verify
-  browser playback after interaction, desktop output, compact touch volume and
-  mute controls, group and combat sound limits, and loading without replaying
-  historical sounds. Confirm that hidden hostiles stay inaudible and muting or
-  unavailable audio leaves the mission playable. Record a human listening
-  check for cue clarity and mix levels, plus asset provenance.
-
-## Optional background music
-
-Evaluate one quiet looping track after essential sound effects are in place.
-Use human playtests to judge whether it improves the mission and leaves alerts
-and combat readable. If included, verify independent music volume and mute,
-loop transitions, and asset licensing. Music does not gate M0 completion.
 
 ## Duration target review
 
@@ -305,7 +295,7 @@ the design and roadmap duration targets.
 
 ## Final milestone acceptance
 
-- Run `npm run check` after audio implementation and any pacing changes. The
+- Run `npm run check` after any pacing changes. The
   authored mission, Chromium and WebKit checks, and compact phone and tablet
   interactions must pass with the final content, including audio controls.
 - Build the browser and Tauri app. In the desktop app, run from the fixed
@@ -318,7 +308,7 @@ the design and roadmap duration targets.
 
 ## Recommended next task
 
-Resolve the **0.55** duration target review and implement **0.57** before the
-final human playtests. Tune from the results, with **0.44** native persistence
-checks alongside. Evaluate optional music once the sound effects work. Finish
-with the full checks and desktop mission acceptance run.
+Resolve the **0.55** duration target review, then run the final human
+playtests with audio, including the **0.57** listening check. Tune from the
+results, with the **0.44** native persistence and **0.57** desktop audio checks
+alongside. Finish with the full checks and desktop mission acceptance run.

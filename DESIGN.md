@@ -616,21 +616,37 @@ story.
 ## Audio
 
 - M0 requires essential sound effects for accepted commands, invalid actions,
-  attacks, damage, alerts, objective completion, victory, and defeat. Sounds
-  reinforce the visual feedback; every core action remains usable when muted.
+  attacks, damage, alerts, objective completion, victory, defeat, training start
+  and completion, Harvester work and movement, and Refinery garage doors.
+  Sounds reinforce the visual feedback; every core action remains usable when
+  muted.
 - Gameplay sounds follow committed simulation events without changing
   simulation state or timing. Loading rebuilds current audio activity without
   replaying past events. Group commands and repeated combat events must not
   produce an overwhelming stack of sounds.
 - World sounds respect fog and detection and must not reveal hidden hostiles.
   Player alerts remain audible for events involving the player's own actors.
-- Sound volume and mute have on-screen controls usable in compact touch
-  layouts. Playback starts after player interaction in the browser; unavailable
-  or blocked audio must not prevent the mission from running.
-- A background music loop is optional for M0. If included, it has separate
-  volume and mute controls and stays below gameplay cues in the mix.
+- Master volume defaults to 50% and scales sound and music together. Volume
+  sliders and accessible mute icons work in compact touch layouts. Playback
+  starts after player interaction in the browser; unavailable or blocked audio
+  must not prevent the mission from running.
+- M0 includes looping exploration and combat music with separate volume and
+  mute controls. Music stays below gameplay cues in the mix and continues while
+  paused; world sounds stop and player feedback remains audible. Menu controls
+  save preferences on the device.
+- Content packs assign cue variants, cooldowns, voice limits, spatial ranges,
+  unselected gain multipliers, timed event sequences, and state loops.
+  Harvester work is quieter when unselected. Selected audible objects take
+  precedence within world loop limits. A presentation adapter translates
+  committed mission changes into generic named events and emitter states.
+  Audio playback remains outside deterministic simulation; see
+  [gameplay audio](docs/audio.md) for extension points.
 - Use original or appropriately licensed audio and document asset provenance.
   Voice acting and a final soundtrack remain outside M0.
+- The initial asset palette uses atmospheric synths, sparse percussion, and
+  crisp gameplay cues. Original offline generators produce PCM WAV cues and
+  looping exploration and tension music; see
+  [audio assets](docs/audio-assets.md) for inventory, provenance, and audition.
 
 ## Fog, stealth, and detection
 
@@ -1176,8 +1192,8 @@ a later tutorial could be made.
   compact landscape browser UI checks, and two explanatory popups: **Support
   Network** when the first Refinery placement begins, and **Harvester
   Operations** when the first Harvester completes.
-- Essential gameplay sound effects are required as defined in [Audio](#audio).
-  Background music is optional.
+- Essential gameplay sound effects and background music are included as defined
+  in [Audio](#audio).
 - M0 excludes the Circle, Everwake, rare and exotic resources, repair, healing,
   upgrades, veterancy, stealth, special movement layers, oversized deployables,
   multiplayer, native mobile builds, a map editor, mod management, and the

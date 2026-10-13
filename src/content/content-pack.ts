@@ -1,8 +1,12 @@
 import { deepFreeze } from "../simulation/actor";
+import { validateAudioBindings, validateAudioContent } from "./audio";
+import type { AudioBindings, AudioContent } from "./audio";
 import {
+  hasOwn,
   isCount,
   isId,
   isIdList,
+  isNonnegative,
   isOneOf,
   isPositive,
   isRecord,
@@ -45,6 +49,7 @@ export type ActorModel =
 
 /** How the player sees and commands one actor definition. */
 export type ActorPresentation = {
+  audio?: AudioBindings;
   name: string;
   description: string;
   build?: { id: string; label: string };
@@ -96,6 +101,7 @@ export type PropId = (typeof PROP_IDS)[number];
 
 /** Shared rules and presentation that mission files name by ID and version. */
 export type ContentPack = ContentReference & {
+  audio?: AudioContent;
   name: string;
   actors: readonly ActorDefinition[];
   movementProfiles: readonly MovementProfile[];
@@ -168,6 +174,18 @@ export function parseContentPack(source: string): ContentPack {
     );
 
   const buttonIds = new Set<string>();
+  if (pack.audio !== undefined) validateAudioContent(pack.audio, invalid);
+  for (const [id, presentation] of Object.entries(pack.presentation)) {
+    if (!isId(id) || !isRecord(presentation))
+      throw invalid(`gives ${id} invalid presentation`);
+    if (presentation.audio !== undefined)
+      validateAudioBindings(
+        presentation.audio as AudioBindings,
+        pack.audio,
+        invalid,
+        id,
+      );
+  }
   for (const actor of pack.actors) {
     const presentation = pack.presentation[actor.id] as ActorPresentation;
     if (
@@ -210,10 +228,7 @@ export function parseContentPack(source: string): ContentPack {
       else {
         if (
           !isId(model.builtin) ||
-          !Object.prototype.hasOwnProperty.call(
-            BUILTIN_ACTOR_MODELS,
-            model.builtin as string,
-          )
+          !hasOwn(BUILTIN_ACTOR_MODELS, model.builtin as string)
         )
           throw invalid(
             `gives ${actor.id} an unknown built-in model "${model.builtin}"`,
@@ -243,10 +258,7 @@ export function parseContentPack(source: string): ContentPack {
       if (
         building.details !== undefined &&
         (!isId(building.details) ||
-          !Object.prototype.hasOwnProperty.call(
-            BUILTIN_BUILDING_DETAILS,
-            building.details,
-          ))
+          !hasOwn(BUILTIN_BUILDING_DETAILS, building.details))
       )
         throw invalid(
           `gives ${actor.id} unknown building details "${building.details}"`,
@@ -276,8 +288,6 @@ export function parseContentPack(source: string): ContentPack {
   return deepFreeze(pack);
 }
 
-const isNonnegative = (value: unknown): value is number =>
-  typeof value === "number" && Number.isFinite(value) && value >= 0;
 const isAlpha = (value: unknown) => isNonnegative(value) && value <= 1;
 const isRgba = (value: unknown) =>
   Array.isArray(value) &&
@@ -321,8 +331,7 @@ function validateTerrainStyle(
         !isOptionalBoolean(graphics.layerAlphaOnly) ||
         !isRgba(graphics.minimapColor) ||
         (graphics.clip !== undefined &&
-          (!isId(graphics.clip) ||
-            !Object.prototype.hasOwnProperty.call(clips, graphics.clip))) ||
+          (!isId(graphics.clip) || !hasOwn(clips, graphics.clip))) ||
         (graphics.clipPhase !== undefined && graphics.clip === undefined)
       )
         throw invalid(`has invalid graphics for terrain tile type "${id}"`);
@@ -358,7 +367,7 @@ function validateTerrainStyle(
       if (
         !rule ||
         !isId(rule.tileType) ||
-        !Object.prototype.hasOwnProperty.call(style.tileTypes, rule.tileType)
+        !hasOwn(style.tileTypes, rule.tileType)
       )
         throw invalid(
           `styles ${typeId} with unknown tile type "${rule?.tileType}"`,

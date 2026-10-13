@@ -141,8 +141,8 @@ describe("unit production", () => {
     expect(first.worldPosition).not.toEqual(second.worldPosition);
     expect(simulation.actorVersion).toBe(2);
     expect(simulation.buildingActivity).toEqual([
-      { buildingId: "barracks-1", kind: "exit" },
-      { buildingId: "barracks-1", kind: "exit" },
+      { buildingId: "barracks-1", kind: "exit", actorId: first.id },
+      { buildingId: "barracks-1", kind: "exit", actorId: second.id },
     ]);
     expect(Object.isFrozen(simulation.buildingActivity)).toBe(true);
     simulation.submitCommand({

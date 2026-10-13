@@ -1,5 +1,6 @@
 import { clampToBounds, isFinitePosition } from "./world";
 import { deepFreeze, insideRouteBounds } from "./actor";
+import { hasOwn } from "./validation";
 
 import type { DeepReadonly, RouteBounds } from "./actor";
 
@@ -88,9 +89,7 @@ export function traversalCostAt(
   if (terrain.outOfBounds) {
     return undefined;
   }
-  if (
-    !Object.prototype.hasOwnProperty.call(profile.terrainCosts, terrain.typeId)
-  ) {
+  if (!hasOwn(profile.terrainCosts, terrain.typeId)) {
     throw new RangeError(
       `Movement profile ${profile.id} has no cost for terrain ${terrain.typeId}.`,
     );
@@ -148,7 +147,7 @@ export class NavigationGrid {
       throw new RangeError("Invalid navigation route bounds.");
     this.bounds = bounds && deepFreeze(structuredClone(bounds));
     for (const typeId of map.terrainTypeIds) {
-      if (!Object.prototype.hasOwnProperty.call(profile.terrainCosts, typeId)) {
+      if (!hasOwn(profile.terrainCosts, typeId)) {
         throw new RangeError(
           `Movement profile ${profile.id} has no cost for terrain ${typeId}.`,
         );

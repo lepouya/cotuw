@@ -66,6 +66,7 @@ export type BuildingPlacementOptions = {
   pointerEnabled?: () => boolean;
   onPlaced: (actorId: string) => void;
   onStart: () => void;
+  onInvalid?: () => void;
 };
 
 type ScreenPoint = { clientX: number; clientY: number };
@@ -84,6 +85,7 @@ export function createBuildingPlacement(
     pointerEnabled = () => true,
     onPlaced,
     onStart,
+    onInvalid,
   }: BuildingPlacementOptions,
 ) {
   const controller = new AbortController();
@@ -303,6 +305,7 @@ export function createBuildingPlacement(
     if (!active || pendingId || faulted || !enabled()) return;
     const candidate = placement();
     if (!candidate || !simulation.evaluatePlacement(candidate).accepted) {
+      onInvalid?.();
       update();
       return;
     }

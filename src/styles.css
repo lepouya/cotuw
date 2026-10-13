@@ -590,6 +590,43 @@ button:disabled {
   background: rgb(0 0 0 / 65%);
 }
 
+.audio-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem 0.75rem;
+  margin: 0 0 1rem;
+  border: 1px solid #354c48;
+}
+.audio-controls label,
+.audio-controls p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.audio-controls input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.audio-controls button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem;
+  display: grid;
+  place-items: center;
+}
+.audio-controls button svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.audio-controls p:empty {
+  display: none;
+}
+
 .save-form {
   display: grid;
   gap: 0.5rem;
