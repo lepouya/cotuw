@@ -19,7 +19,9 @@ export default defineConfig({
   // macOS builds run in WKWebView, so WebKit is checked there too. Windows uses
   // WebView2, which Chromium covers.
   projects: [
-    { name: "chromium", use: { browserName: "chromium" } },
+    // Full headless Chromium uses the GPU; the headless shell falls back to
+    // software WebGL, which slows its checks enough to time out.
+    { name: "chromium", use: { browserName: "chromium", channel: "chromium" } },
     ...(process.platform === "darwin"
       ? [{ name: "webkit", use: { browserName: "webkit" as const } }]
       : []),
