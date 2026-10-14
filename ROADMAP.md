@@ -134,7 +134,7 @@ base-building RTS loop, its technical architecture, and its player interface.
       detection, and regeneration.
 - [x] 0.43 Implement the sidebar, top bar, radial context menu, objectives,
       alerts, notifications, explanatory popups, and victory or defeat results.
-- [ ] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
+- [x] 0.44 Implement manual save/load, restart, rolling quicksave, rolling
       autosave, version validation, and paused inspection after loading.
 - [x] 0.45 Expose every core action through on-screen controls that work in
       compact phone and tablet landscape browser profiles without hover or

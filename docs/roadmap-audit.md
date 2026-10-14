@@ -7,8 +7,9 @@ the requirements.
 
 ## Milestone 0 closeout
 
-55 of 57 tasks are complete. The remaining tasks are **0.44**, native
-persistence verification, and **0.55**, human playtesting and pacing.
+56 of 57 tasks are complete. The remaining task is **0.55**, human
+playtesting and pacing. Native persistence has developer-reported playtest
+evidence on Windows and macOS.
 The mission loop has browser coverage from the authored opening through
 victory and free play. Milestone acceptance also requires recorded unaided
 first-time human completion and a desktop mission run.
@@ -27,9 +28,16 @@ readiness, not unaided usability, pacing, or native runtime behavior.
   cannot attack. The Rust test harness has no tests. Playwright teardown needed
   its temporary Vite server stopped manually before the command exited
   successfully.
-- The recorded macOS baseline passes 990 unit tests and 264 Chromium and
-  WebKit browser checks. The Windows asset normalization still needs a macOS
-  check to confirm generated files match on both platforms.
+- `npm run check` passes on macOS at revision 8e13dff with 991 unit tests and
+  264 Chromium and WebKit browser checks. Regenerating every asset and level
+  there leaves the committed files unchanged, so generated output matches on
+  both platforms.
+- The October 14 macOS workspace with upgraded npm dependencies also passes
+  `npm run check`, `npm run build`, and the debug Tauri build: 991 unit tests
+  and 264 Chromium and WebKit checks. Babylon core, loaders, and serializers
+  are 9.30.0; the npm and Rust filesystem plugins are both 2.7.0. All 19
+  regenerated GLBs differ only in the exporter version; their other JSON and
+  binary data match revision 8e13dff.
 - Chromium checks run in full headless mode with GPU WebGL. The headless shell
   renders with SwiftShader at about 25 frames per second, which made Chromium
   checks about five times slower than WebKit and timed out touch selection
@@ -184,8 +192,14 @@ readiness, not unaided usability, pacing, or native runtime behavior.
   rejects other versions, tick rates, and content pack versions clearly.
   [Codec](../tests/mission-file.test.ts) and
   [save library](../tests/saves.test.ts) tests pass, and a manual browser
-  playthrough saved and loaded successfully. Native file exchange verification
-  remains open below.
+  playthrough saved and loaded successfully.
+  [Desktop sessions](m0-playthrough.md#desktop-sessions) verify native Import
+  and Export, cancellation, and save/load on Windows and macOS. The Windows
+  built debug app also passed malformed and incompatible file rejection,
+  named-save persistence after relaunch, repeated quicksave overwrite and
+  quickload, objective autosave loading, and restart. The desktop file scope
+  covers the app data saves folder; the dialog plugin grants access to the
+  chosen file.
 - **0.45, on-screen actions:** construction, production, economy, rally points,
   selection, movement, camera views, Focus, Follow, Attack Move, pause, and
   speed actions have on-screen controls that work with compact touch input,
@@ -280,22 +294,12 @@ readiness, not unaided usability, pacing, or native runtime behavior.
 
 ## Remaining scope
 
-- **0.44, native persistence verification:** saving to and loading from the
-  app data folder have desktop playtest evidence. A
-  [Windows session](m0-playthrough.md#desktop-sessions) exported a mid-mission
-  save and imported it through the native dialogs, then completed the mission
-  from it. A built Windows debug app passed dialog cancellation, malformed and
-  incompatible file rejection, named-save persistence after relaunch, repeated
-  quicksave overwrite and quickload, objective autosave loading, and restart.
-  Equivalent native persistence checks remain on macOS. The desktop file scope
-  covers only the app data saves folder; the dialog plugin grants access to the
-  chosen file.
 - **0.55, human playtesting and pacing:** [DESIGN.md](../DESIGN.md) accepts the
   current 5 to 10 minute run, and M0 is not lengthened by slowing the economy
   or adding encounters.
   [The playthrough evidence](m0-playthrough.md#pacing) records automated and
-  familiar-replay times; first-time times and unaided completion remain
-  unrecorded.
+  familiar-replay times. Feedback from other human playtesters is being
+  collected; first-time times and unaided outcomes remain unrecorded here.
 
 ## Closeout action plan
 
@@ -307,31 +311,20 @@ readiness, not unaided usability, pacing, or native runtime behavior.
    preparation, and den assault. Record help or abandonment as a failed unaided
    attempt rather than silently coaching the player. Repeated confusion becomes
    a concrete fix.
-2. **Verify native persistence on macOS for 0.44.** In a built desktop app,
-   export a mid-mission save with active gathering, production, or
-   combat. Change progress, import the exported file through the native dialog,
-   and compare restored time, Materials, cargo, queues, orders, fog, and
-   objectives. Confirm paused inspection and successful resume. Cancel both
-   dialogs and reject malformed and incompatible files without replacing the
-   session. Verify named saves survive app relaunch; overwrite and reload the
-   quicksave; load an objective autosave; restart from the authored opening.
-3. **Fix observed blockers and retest affected paths.** Prioritize crashes,
+2. **Fix observed blockers and retest affected paths.** Prioritize crashes,
    lost or incorrect saves, blocked progression, and repeated confusion that
    prevents unaided completion. Tune costs, timing, guidance, or layout only
    where observations support a change. Preserve locked encounter rules and
    regenerate affected content or assets. Repeat failed playtest paths and the
    full mission after changes; avoid adding post-M0 systems to this pass.
-4. **Run final acceptance on one fixed revision.** Run `npm run check`,
+3. **Run final acceptance on one fixed revision.** Run `npm run check`,
    `npm run build`, and the Tauri build, then complete the built desktop mission
    through victory and free play. Exercise defeat, load, restart, and exit, and
    confirm audio works throughout. Cover Windows and macOS explicitly; macOS
    browser WebKit and a debug compilation do not establish Windows runtime or
    packaged-app behavior. Inspect the default 800×600 desktop window and
    resizing as well as the tested browser profiles. Record results and update
-   the completion evidence before checking off **0.44**, **0.55**, and the
-   milestone.
-
-Steps 1 and 2 can run together. Step 4 follows any resulting fixes.
+   the completion evidence before checking off **0.55** and the milestone.
 
 ## Evidence to record
 

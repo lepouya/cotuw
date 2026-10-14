@@ -42,8 +42,9 @@ the post-victory production check.
 A familiar human replay reported by the project's developer finishes in just
 under four minutes. Its speed setting and timing method are not recorded.
 The developer estimates a new player's run might take roughly twice as long,
-around eight minutes. That is an estimate; first-time completion times and
-unaided completion remain unrecorded.
+around eight minutes. That is an estimate. Feedback from other human
+playtesters is being collected; first-time completion times and unaided
+outcomes remain unrecorded here.
 
 These runs fit the design's 5 to 10 minute run. A familiar replay may finish
 below it.
@@ -70,6 +71,12 @@ below it.
   - The default 800x600 window, resizing, audio, and returning after Alt-Tab
     passed.
   - Result: pass. Installer and release-build acceptance remain open.
+- **macOS persistence playtest, reported October 14, 2026.** Native desktop
+  app, developer-run and reported. The exact tested revision, macOS version,
+  and build mode are not recorded.
+  - Scope: full M0 persistence playtesting, including save and load, native
+    Import and Export dialogs, and cancellation.
+  - Result: pass.
 
 ## Reproduce
 
