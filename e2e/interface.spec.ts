@@ -133,6 +133,18 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   await expect(
     menu.locator('[data-context-action="attack-move"]'),
   ).toBeVisible();
+  // Windows fires contextmenu on release, over the menu that just opened.
+  const nativeMenu = (selector: string) =>
+    page
+      .locator(selector)
+      .evaluate(
+        (element) =>
+          !element.dispatchEvent(
+            new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+          ),
+      );
+  expect(await nativeMenu(".radial-menu .radial-default")).toBe(true);
+  expect(await nativeMenu("#save-name")).toBe(false);
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   await expect(page.locator("#game-canvas")).toHaveAttribute(

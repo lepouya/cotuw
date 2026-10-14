@@ -21,17 +21,24 @@ readiness, not unaided usability, pacing, or native runtime behavior.
 
 ## Verification baseline
 
-- `npm run check` passes: formatting, TypeScript and Rust linting and type
-  checks, 990 unit tests, and 264 Chromium and WebKit browser checks.
+- `npm run check` passes on Windows 10: formatting, TypeScript and Rust linting
+  and type checks, 991 unit tests, and 132 Chromium browser checks.
   Two conditional Scout attack-animation tests are skipped because Scouts
-  cannot attack. The Rust test harness has no tests.
+  cannot attack. The Rust test harness has no tests. Playwright teardown needed
+  its temporary Vite server stopped manually before the command exited
+  successfully.
+- The recorded macOS baseline passes 990 unit tests and 264 Chromium and
+  WebKit browser checks. The Windows asset normalization still needs a macOS
+  check to confirm generated files match on both platforms.
 - Chromium checks run in full headless mode with GPU WebGL. The headless shell
   renders with SwiftShader at about 25 frames per second, which made Chromium
   checks about five times slower than WebKit and timed out touch selection
   checks under parallel load.
 - `npm run build` and `npm run tauri build -- --debug --no-bundle` pass on
-  macOS. This verifies compilation; desktop runtime acceptance remains open.
-  Windows CI compiles the Rust crate but never builds or launches the app.
+  Windows and macOS. A [Windows session](m0-playthrough.md#desktop-sessions)
+  verifies the development app's mission and native file exchange, plus built
+  debug-app persistence, input, window sizing, audio, and Alt-Tab. Installer
+  and release-build acceptance remain open.
 
 ## Completion evidence
 
@@ -274,12 +281,15 @@ readiness, not unaided usability, pacing, or native runtime behavior.
 ## Remaining scope
 
 - **0.44, native persistence verification:** saving to and loading from the
-  app data folder have desktop playtest evidence. Export and Import still need
-  a check using the native dialogs; browser and mocked adapter tests do not
-  exercise their file access. The desktop file scope covers only the app data
-  saves folder. The installed dialog plugin explicitly grants access to the
-  chosen file for both Open and Save; real-dialog verification remains required.
-  Quicksave, objective autosave, and restart also need desktop runs.
+  app data folder have desktop playtest evidence. A
+  [Windows session](m0-playthrough.md#desktop-sessions) exported a mid-mission
+  save and imported it through the native dialogs, then completed the mission
+  from it. A built Windows debug app passed dialog cancellation, malformed and
+  incompatible file rejection, named-save persistence after relaunch, repeated
+  quicksave overwrite and quickload, objective autosave loading, and restart.
+  Equivalent native persistence checks remain on macOS. The desktop file scope
+  covers only the app data saves folder; the dialog plugin grants access to the
+  chosen file.
 - **0.55, human playtesting and pacing:** [DESIGN.md](../DESIGN.md) accepts the
   current 5 to 10 minute run, and M0 is not lengthened by slowing the economy
   or adding encounters.
@@ -297,8 +307,8 @@ readiness, not unaided usability, pacing, or native runtime behavior.
    preparation, and den assault. Record help or abandonment as a failed unaided
    attempt rather than silently coaching the player. Repeated confusion becomes
    a concrete fix.
-2. **Verify native persistence for 0.44 alongside playtesting.** In a built
-   desktop app, export a mid-mission save with active gathering, production, or
+2. **Verify native persistence on macOS for 0.44.** In a built desktop app,
+   export a mid-mission save with active gathering, production, or
    combat. Change progress, import the exported file through the native dialog,
    and compare restored time, Materials, cargo, queues, orders, fog, and
    objectives. Confirm paused inspection and successful resume. Cancel both

@@ -48,6 +48,29 @@ unaided completion remain unrecorded.
 These runs fit the design's 5 to 10 minute run. A familiar replay may finish
 below it.
 
+## Desktop sessions
+
+- **Windows, October 13, 2026.** Windows 10 Home 22H2 (build 19045),
+  `npm run tauri dev` on revision 3b782f7 with uncommitted Windows fixes,
+  mouse input, developer-run.
+  - Scope: the full mission from the authored opening through victory, then
+    Import of an earlier Export taken before the den was cleared, followed by
+    a second run through victory. Manual save and load also worked.
+  - Result: pass.
+- **Windows built-app smoke test, October 13, 2026.** Windows 10 Home 22H2
+  (build 19045), `npm run tauri build -- --debug --no-bundle` on revision
+  3b782f7 with uncommitted Windows fixes, mouse and keyboard input,
+  developer-run and reported.
+  - Right-click radial menus, secondary-drag panning, Shift-secondary
+    rotation, and native clipboard menus in text fields passed.
+  - Cancelling Export and Import and rejecting malformed and incompatible
+    files preserved the current session.
+  - Named saves survived closing and relaunching the app. Two quicksave
+    overwrites, quickload, loading an objective autosave, and restart passed.
+  - The default 800x600 window, resizing, audio, and returning after Alt-Tab
+    passed.
+  - Result: pass. Installer and release-build acceptance remain open.
+
 ## Reproduce
 
 Run the normal automated mouse and touch checks with:

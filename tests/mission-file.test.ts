@@ -136,6 +136,17 @@ describe("mission files", () => {
     ).toThrow("actors list");
   });
 
+  test("the bundled levels match their generator", () => {
+    const generated = buildLevels();
+    expect([...generated.keys()].sort()).toEqual(
+      [...LEVEL_SOURCES.keys()].sort(),
+    );
+    for (const [id, source] of generated)
+      expect(LEVEL_SOURCES.get(id), "Regenerate with `npm run levels`.").toBe(
+        `${source}\n`,
+      );
+  });
+
   test("bundled and generated levels load into the simulation", () => {
     for (const source of [...LEVEL_SOURCES.values(), ...buildLevels().values()])
       expect(loadMission(source).state.tick).toBe(0);

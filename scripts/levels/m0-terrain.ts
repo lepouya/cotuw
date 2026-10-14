@@ -116,7 +116,9 @@ function prototypeHeightAt(x: number, z: number): number {
   // Peaks rise only from walls, so they never narrow a pass.
   const peak = mountain ? landmarkRiseAt(x, z) : 0;
   const rolling = Math.sin(x * 0.13) * 0.08 + Math.cos(z * 0.11) * 0.07;
-  return Math.round((hill + wall + peak + rolling) * 100) / 100;
+  // Adding 0 turns -0 into 0. The sign means nothing for terrain, but the
+  // level file writes it and it has differed across platforms.
+  return Math.round((hill + wall + peak + rolling) * 100) / 100 + 0;
 }
 
 export const PROTOTYPE_TERRAIN = {

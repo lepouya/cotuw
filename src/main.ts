@@ -3,7 +3,7 @@ import { createAudioMixer } from "./audio/mixer";
 import { bindAudioControls } from "./ui/audio-controls";
 import { LEVEL_SOURCES } from "./content/levels";
 import { createPlatform } from "./platform";
-import { worldInputAvailable } from "./render/input-focus";
+import { isTextEntry, worldInputAvailable } from "./render/input-focus";
 import { createGameSession, loadMission } from "./session";
 import { createSaveLibrary } from "./saves";
 import { createSidebar } from "./ui/sidebar";
@@ -504,6 +504,11 @@ window.addEventListener("keydown", (event) => {
   if (!action) return;
   event.preventDefault();
   if (!event.repeat && library && worldInputAvailable(document)) void action();
+});
+// Windows fires contextmenu after release, once the radial menu is under the
+// cursor. Text fields keep the native menu for clipboard actions.
+document.addEventListener("contextmenu", (event) => {
+  if (!isTextEntry(event.target)) event.preventDefault();
 });
 
 async function init() {

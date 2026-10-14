@@ -247,6 +247,8 @@ test("a close, low-angle view keeps foreground terrain visible", async ({
   await page.mouse.move(640, 40, { steps: 12 });
   await page.mouse.up({ button: "right" });
   await page.keyboard.up("Shift");
+  // The drag can end over the top bar, whose height depends on system fonts.
+  await page.mouse.move(640, 360);
   await page.mouse.wheel(0, -1600);
   await page.evaluate(
     () =>
