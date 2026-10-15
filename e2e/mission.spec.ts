@@ -37,6 +37,7 @@ for (const profile of [MOUSE_PROFILE, TOUCH_PROFILES[0]]) {
       await mission.press("#train-scout");
       await mission.press("#train-trooper");
       await mission.advance(7);
+      await mission.explanation("Scouting & Combat");
 
       await mission.select("Scout");
       await mission.focus(24, 42);
@@ -83,8 +84,12 @@ for (const profile of [MOUSE_PROFILE, TOUCH_PROFILES[0]]) {
 
       await mission.focus(16, 54);
       await mission.press("#tab-units");
-      await mission.press('#producer-roster button:has-text("Field Barracks")');
+      await mission.ground(16, 54);
       await mission.materials(125);
+      const training = page.locator("#train-trooper");
+      await training.scrollIntoViewIfNeeded();
+      // Allow fractional scroll rounding while keeping the touch target clear.
+      await expect(training).toBeInViewport({ ratio: 0.99 });
       for (let i = 0; i < 5; i++) await mission.press("#train-trooper");
       await mission.advance(20);
       await expect(
@@ -135,7 +140,7 @@ for (const profile of [MOUSE_PROFILE, TOUCH_PROFILES[0]]) {
       ).toHaveCount(2);
       await mission.focus(16, 54);
       await mission.press("#tab-units");
-      await mission.press('#producer-roster button:has-text("Field Barracks")');
+      await mission.ground(16, 54);
       await mission.materials(25);
       const units = await page.locator("#unit-roster button").count();
       await mission.press("#train-trooper");

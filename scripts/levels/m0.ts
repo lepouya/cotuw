@@ -90,6 +90,12 @@ export const ECONOMY_SCENARIO = defineScenario({
   ],
   popups: [
     {
+      id: "command-basics",
+      title: "Welcome, Commander",
+      text: "Build a base, gather Materials, and train a force to clear the wolves while protecting your Command Center. Use Buildings in the upper sidebar to place a Materials Refinery near your base first. Units lets you train from a selected production building. The lower sidebar always explains your selection and its actions. Click a unit to select it, then click clear ground to move it; drag a box to select several. Use the camera's Pan button to explore the map, and open Goals for your objectives. Take your time: Pause stops the mission while you look around.",
+      trigger: { kind: "actor", definitionId: "arc-command-center-prototype" },
+    },
+    {
       id: "support-network",
       title: "Support Network",
       text: "ARC buildings draw support from a connected network rooted at the Command Center. Place each blueprint inside the support radius of a completed, connected building. If a building loses its path back to the Command Center, its construction, production, and cargo delivery pause until the connection returns.",
@@ -98,8 +104,20 @@ export const ECONOMY_SCENARIO = defineScenario({
     {
       id: "harvester-operations",
       title: "Harvester Operations",
-      text: "Select the Harvester and choose a Materials patch to gather. It fills its 100-Materials cargo, returns it to its Refinery, and repeats automatically. When the patch is exhausted, it delivers its last load and waits; choose a new patch to reassign it.",
+      text: "Select the Harvester, then click the blue Materials patch on the map or choose Gather in the lower selection panel. It fills its 100-Materials cargo, returns it to its Refinery, and repeats automatically. When the patch is exhausted, it delivers its last load and waits; choose a new patch to reassign it.",
       trigger: { kind: "actor", definitionId: "arc-harvester" },
+    },
+    {
+      id: "barracks-training",
+      title: "Barracks & Training",
+      text: "Your Field Barracks trains Troopers and Scouts. Select it to open Units in the upper sidebar, then choose a unit picture to pay for a training order. Troopers fight; Scouts reveal more terrain but cannot attack. Orders train one at a time, and the selected building's lower panel lets you cancel for a full refund. Set Rally Point there, then click clear ground to send new units to a meeting point. Keep gathering Materials to grow your force.",
+      trigger: { kind: "actor", definitionId: "arc-field-barracks" },
+    },
+    {
+      id: "scouting",
+      title: "Scouting & Combat",
+      text: "Select your Scout and click unexplored ground to reveal the route south toward the wolves. Dark terrain is unexplored; dim terrain has been explored but is outside your units' current sight. Scouts are unarmed, so keep them away from wolves and bring Troopers before advancing. Drag a box around your Troopers, choose Attack Move in the lower sidebar, then click a destination to move and fight along the route. Click a visible wolf to attack it directly. Goals tracks the enemies you must defeat.",
+      trigger: { kind: "actor", definitionId: "arc-scout" },
     },
   ],
   // Circles the lake shore beyond the near patch, visible early on.

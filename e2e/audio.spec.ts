@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { MissionDriver } from "./mission-driver";
 import { PROFILES } from "./profiles";
-import { activate } from "./prototype-helpers";
+import { activate, openOpening, dismissExplanation } from "./prototype-helpers";
 
 declare global {
   interface Window {
@@ -17,7 +17,7 @@ for (const profile of PROFILES) {
     test("master, sound, and music preferences persist through restart and reload", async ({
       page,
     }, info) => {
-      await page.goto("/");
+      await openOpening(page, profile.touch);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-terrain-ready",
         "true",
@@ -67,6 +67,7 @@ for (const profile of PROFILES) {
       ).toBe(true);
       await activate(page.locator("#restart-mission"), profile.touch);
       await page.reload();
+      await dismissExplanation(page, "Welcome, Commander", profile.touch);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-terrain-ready",
         "true",
@@ -128,8 +129,9 @@ test("committed gameplay drives music, training, machinery, doors, and pause cle
     };
   });
   const mission = new MissionDriver(page, false, false);
-  await mission.opening();
+  await mission.opening(false);
   expect(await page.evaluate(() => window.audioStarts)).toEqual([]);
+  await mission.explanation("Welcome, Commander");
   await mission.press("#open-menu");
   await expect
     .poll(() =>

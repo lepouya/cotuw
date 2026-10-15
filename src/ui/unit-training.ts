@@ -1,10 +1,14 @@
 import { isOutcomeOf } from "../simulation/command";
 import { PRODUCTION_QUEUE_LIMIT } from "../simulation/economy";
+import { productionBlocker, setActionAvailability } from "./production-action";
 
 import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome, TrainUnitCommand } from "../simulation/command";
-import type { TrainingReason } from "../simulation/production";
-import type { DefinitionButton } from "./sidebar";
+import type {
+  TrainingEvaluation,
+  TrainingReason,
+} from "../simulation/production";
+import type { DefinitionButton } from "./production-action";
 
 export type UnitTrainingControls = {
   train?: readonly DefinitionButton[];
@@ -15,7 +19,7 @@ const REASONS: Record<TrainingReason, string> = {
   disconnected: "Disconnected. Restore a support path to the Command Center.",
   "invalid-actor": "Invalid unit request.",
   "used-id": "Unit request changed. Try again.",
-  "missing-producer": "Select a production building to train units.",
+  "missing-producer": "Select a production building on the map to train units.",
   "unsupported-unit": "This building cannot train these units.",
   "exit-blocked":
     "Exit blocked. Move units or clear ground beside the building.",
@@ -27,11 +31,19 @@ const REASONS: Record<TrainingReason, string> = {
 
 /** Local pending feedback; the simulation rechecks every submitted request. */
 export function createUnitTraining(
-  simulation: MissionSimulation,
+  simulation: Pick<
+    MissionSimulation,
+    | "result"
+    | "economy"
+    | "unusedActorId"
+    | "evaluateTraining"
+    | "submitCommand"
+  >,
   controls: UnitTrainingControls,
   options: {
     names: ReadonlyMap<string, string>;
     selectedActorId: () => string | undefined;
+    unitDefinitionIds: () => readonly string[];
     enabled: () => boolean;
     paused?: () => boolean;
   },
@@ -57,33 +69,46 @@ export function createUnitTraining(
     simulation.evaluateTraining(commandFor(definitionId));
   const refresh = () => {
     if (faulted || !options.enabled()) {
-      for (const { button } of buttons) button.disabled = true;
-      message(
-        simulation.result?.kind === "defeat"
-          ? "Mission ended in defeat."
-          : faulted
-            ? "Simulation stopped. Restart or load a mission from the menu."
-            : options.paused?.()
-              ? "Resume the mission to train units."
-              : "Finish or cancel building placement to train units.",
+      // Placement is the remaining reason `enabled` can be false.
+      const reason = productionBlocker(
+        {
+          defeated: simulation.result?.kind === "defeat",
+          faulted,
+          paused: !!options.paused?.(),
+          placing: true,
+        },
+        "train units",
       );
+      for (const action of buttons) setActionAvailability(action, reason);
+      message(reason);
       return;
     }
-    const evaluations = new Map(
-      buttons.map(({ definitionId }) => [definitionId, evaluate(definitionId)]),
-    );
-    for (const { definitionId, button } of buttons)
-      button.disabled = !!pending || !evaluations.get(definitionId)!.accepted;
-    const values = [...evaluations.values()];
-    const availability =
-      values.find(({ accepted }) => accepted) ??
-      values.find(
+    const trainable = new Set(options.unitDefinitionIds());
+    // Units the selection cannot train are not evaluated or reported.
+    const relevant: TrainingEvaluation[] = [];
+    for (const action of buttons) {
+      const evaluation = trainable.has(action.definitionId)
+        ? evaluate(action.definitionId)
+        : undefined;
+      if (evaluation) relevant.push(evaluation);
+      setActionAvailability(
+        action,
+        pending
+          ? "Waiting for the training order to be confirmed."
+          : !evaluation
+            ? REASONS["unsupported-unit"]
+            : evaluation.accepted
+              ? ""
+              : REASONS[evaluation.reason],
+      );
+    }
+    const availability: TrainingEvaluation = relevant.find(
+      ({ accepted }) => accepted,
+    ) ??
+      relevant.find(
         (value) => !value.accepted && value.reason === "exit-blocked",
       ) ??
-      values.find(
-        (value) => !value.accepted && value.reason !== "unsupported-unit",
-      ) ??
-      values[0];
+      relevant[0] ?? { accepted: false, reason: "missing-producer" };
     const currentResult =
       result && result.producerId === options.selectedActorId()
         ? result.text
@@ -91,7 +116,7 @@ export function createUnitTraining(
     message(
       pending && pending.producerId === options.selectedActorId()
         ? `Training ${options.names.get(pending.definitionId) ?? pending.definitionId}…`
-        : availability && !availability.accepted
+        : !availability.accepted
           ? REASONS[availability.reason]
           : (currentResult ??
             (simulation.economy

@@ -78,7 +78,9 @@ import { createRallyPointView } from "./render/rally-point";
 import { createQueuedOrderView } from "./render/queued-orders";
 import { createUnitTraining } from "./ui/unit-training";
 import type { UnitTrainingControls } from "./ui/unit-training";
-import type { DefinitionButton, SidebarState } from "./ui/sidebar";
+import type { SidebarState } from "./ui/sidebar";
+import type { DefinitionButton } from "./ui/production-action";
+import { trainableUnitIds } from "./simulation/production";
 import type { MissionSimulation } from "./simulation/mission";
 import type { BuildingActivityKind } from "./simulation/production";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
@@ -142,7 +144,7 @@ export type GameSession = Omit<GameView, "dispose"> & {
   /** Simulated seconds per real second. */
   speed: () => number;
   setSpeed: (speed: number) => void;
-  /** Records a popup's dismissal in the mission state. */
+  /** Records a scenario popup's dismissal; rejects unknown popup IDs. */
   dismissPopup: (id: string) => void;
   /** Eases the camera to a world point. */
   focus: (point: Readonly<WorldPosition>) => void;
@@ -789,6 +791,7 @@ async function assembleGameSession(
     raisePopup();
   };
   const popups = mission.scenario.popups ?? [];
+  const popupIds = new Set(popups.map(({ id }) => id));
   const dismissedPopups = new Set(mission.state.dismissedPopups);
   let raisedPopup: string | undefined;
   const raisePopup = () => {
@@ -898,6 +901,11 @@ async function assembleGameSession(
   const training = createUnitTraining(simulation, controls, {
     names,
     selectedActorId: selectedOwnActorId,
+    unitDefinitionIds: () =>
+      trainableUnitIds(
+        actorsByKind().byId.get(selectedOwnActorId() ?? ""),
+        definitionsById,
+      ),
     enabled: () => canCommand() && !placement.active,
     paused: () => !playing,
   });
@@ -1371,6 +1379,8 @@ async function assembleGameSession(
       controlsDirty = true;
     },
     dismissPopup: (id) => {
+      if (!popupIds.has(id))
+        throw new RangeError(`Unknown scenario popup: ${id}.`);
       dismissedPopups.add(id);
       controlsDirty = true;
     },

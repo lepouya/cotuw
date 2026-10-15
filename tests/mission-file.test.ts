@@ -497,8 +497,11 @@ test("dismissed popups and bird flocks survive saving and loading", () => {
   const mission = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
   expect(mission.scenario.flocks).toHaveLength(1);
   expect(mission.scenario.popups?.map(({ id }) => id)).toEqual([
+    "command-basics",
     "support-network",
     "harvester-operations",
+    "barracks-training",
+    "scouting",
   ]);
   const source = serializeMission(
     mission.scenario,

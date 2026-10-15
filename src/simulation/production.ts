@@ -44,6 +44,16 @@ export type TrainingEvaluation =
   | { accepted: true; queued: true }
   | { accepted: false; reason: TrainingReason };
 
+/** Units a currently deployed production building can train. */
+export function trainableUnitIds(
+  actor: Pick<Actor, "definitionId" | "tilePlacement"> | undefined,
+  definitions: ReadonlyMap<string, ActorDefinition>,
+): readonly string[] {
+  return actor && isTilePlacedActor(actor)
+    ? (definitions.get(actor.definitionId)?.production?.unitDefinitionIds ?? [])
+    : [];
+}
+
 export function validateProductionDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,
   behaviors: ReadonlyMap<string, ActorBehavior>,

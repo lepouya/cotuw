@@ -4,6 +4,7 @@ import {
 } from "./group-movement";
 import {
   evaluateTraining as evaluateUnitTraining,
+  trainableUnitIds,
   validateProductionDefinitions,
 } from "./production";
 import type { BuildingActivity, TrainingEvaluation } from "./production";
@@ -705,19 +706,15 @@ export function createMissionSimulation({
     }
     return evaluation;
   };
-  const rallyUnitIds = (actor: Actor | undefined) =>
-    actor && isTilePlacedActor(actor)
-      ? definitionFor(actor).production?.unitDefinitionIds
-      : undefined;
   const evaluateRallyPoint = (
     producer: Actor | undefined,
     target: WorldPosition,
   ) => {
-    const unitIds = rallyUnitIds(producer);
+    const unitIds = trainableUnitIds(producer, definitionsById);
     if (
       !map ||
       !occupancy ||
-      !unitIds ||
+      !unitIds.length ||
       !target ||
       !isFinitePosition(target) ||
       !withinBounds(target, worldBounds)
@@ -1164,7 +1161,7 @@ export function createMissionSimulation({
       const actor = working.actorsById.get(applied.actorId);
       const accepted =
         applied.target === undefined
-          ? !!rallyUnitIds(actor)
+          ? trainableUnitIds(actor, definitionsById).length > 0
           : evaluateRallyPoint(actor, applied.target);
       if (accepted) {
         if (applied.target) actor!.rallyPoint = { ...applied.target };

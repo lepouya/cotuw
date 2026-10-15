@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { importMission, placeBuilding } from "./prototype-helpers";
+import { openOpening, importMission, placeBuilding } from "./prototype-helpers";
 import { MissionDriver } from "./mission-driver";
 import { TOUCH_PROFILES } from "./profiles";
 
@@ -16,7 +16,7 @@ async function openLoadPanel(page: Page) {
 test("manual saves and the quicksave restore earlier progress", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openOpening(page);
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await page.locator("#open-menu").click();
@@ -63,7 +63,7 @@ test("manual saves and the quicksave restore earlier progress", async ({
 });
 
 test("completing an objective writes the autosave", async ({ page }) => {
-  await page.goto("/");
+  await openOpening(page);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
@@ -135,7 +135,7 @@ test("export writes the current mission as a readable file", async ({
 test("a tick-zero save does not replace the authored restart level", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openOpening(page);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
@@ -163,7 +163,7 @@ test("a tick-zero save does not replace the authored restart level", async ({
 test("invalid scenario metadata leaves the current session intact", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openOpening(page);
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   const source = await page.evaluate(async () => {

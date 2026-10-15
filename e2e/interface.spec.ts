@@ -7,6 +7,37 @@ import type { Page } from "@playwright/test";
 
 const time = (page: Page) => page.locator("#mission-time");
 
+test("the opening guide pauses, survives saving, and repeats on restart", async ({
+  page,
+}) => {
+  const mission = new MissionDriver(page, false, false);
+  await mission.opening(false);
+  await expect(page.locator("#explanation-title")).toHaveText(
+    "Welcome, Commander",
+  );
+  await expect(page.locator("#explanation-text")).toContainText(
+    "lower sidebar",
+  );
+  await mission.advance(15);
+  await expect(time(page)).toHaveText("0:00");
+  await mission.explanation("Welcome, Commander");
+  await mission.advance(1);
+  await expect(time(page)).toHaveText("0:01");
+  await page.keyboard.press("F5");
+  await expect(page.locator("#notifications")).toContainText(
+    "Quick save complete",
+  );
+  await page.keyboard.press("F9");
+  await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+  await mission.press("#inspect-loaded-mission");
+  await expect(page.locator("#explanation")).toBeHidden();
+  await mission.press("#open-menu");
+  await mission.press("#restart-mission");
+  await expect(page.locator("#explanation-title")).toHaveText(
+    "Welcome, Commander",
+  );
+});
+
 async function rightClick(page: Page, x: number, z: number) {
   const point = await terrainPoint(page, x, z);
   await page.mouse.click(point.x, point.y, { button: "right" });
@@ -17,6 +48,15 @@ test("a ten-second stall catches up while rendering is stopped", async ({
 }) => {
   const mission = new MissionDriver(page, false, false);
   await mission.opening();
+  await page.keyboard.press("F5");
+  await expect(page.locator("#notifications")).toContainText(
+    "Quick save complete",
+  );
+  const initialTick = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("cotuw.save.quicksave")!).state
+        .tick as number,
+  );
   await page.evaluate(() => {
     window.missionClock += 10_000;
   });
@@ -30,7 +70,7 @@ test("a ten-second stall catches up while rendering is stopped", async ({
         return source ? JSON.parse(source).state.tick : 0;
       });
     })
-    .toBe(600);
+    .toBe(initialTick + 600);
   await expect(page.locator("#game-canvas")).not.toHaveAttribute(
     "data-simulation-fault",
     "true",

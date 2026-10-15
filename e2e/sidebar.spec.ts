@@ -1,9 +1,140 @@
 import { expect, test } from "@playwright/test";
-import { TOUCH_PROFILES } from "./profiles";
+import { PROFILES, TOUCH_PROFILES } from "./profiles";
 
-import { placeBuilding, terrainPoint } from "./prototype-helpers";
+import { activate, placeBuilding, terrainPoint } from "./prototype-helpers";
 
 import type { GameSession, GameSessionControls } from "../src/session";
+
+test("partial sidebar setup releases its tooltip and listeners", async ({
+  page,
+}) => {
+  await page.goto("/?level=sandbox");
+  const result = await page.evaluate(async () => {
+    const path: string = "/src/ui/sidebar.ts";
+    const { createSidebar } = await import(path);
+    const root = document
+      .querySelector("#game-sidebar")!
+      .cloneNode(true) as HTMLElement;
+    root.id = "failed-sidebar";
+    root.querySelector("#scenario-goals")!.remove();
+    document.body.append(root);
+    const count = () => document.querySelectorAll(".production-tooltip").length;
+    const before = count();
+    let failed = false;
+    try {
+      createSidebar(root, {
+        definitions: [],
+        presentations: new Map(),
+        goals: [],
+        selectActor: () => {},
+      });
+    } catch {
+      failed = true;
+    }
+    const after = count();
+    root.remove();
+    return { failed, before, after };
+  });
+  expect(result.failed).toBe(true);
+  expect(result.after).toBe(result.before);
+});
+
+for (const profile of PROFILES) {
+  test(`orders stay visible while panels scroll with ${profile.name}`, async ({
+    browser,
+  }, info) => {
+    const context = await browser.newContext({
+      viewport: profile.viewport,
+      hasTouch: profile.touch,
+    });
+    const page = await context.newPage();
+    try {
+      await page.goto("/?level=sandbox");
+      await placeBuilding(
+        page,
+        "build-barracks",
+        55,
+        39,
+        undefined,
+        profile.touch,
+      );
+      await activate(page.locator("#train-trooper"), profile.touch);
+      await activate(page.locator("#unit-roster button"), profile.touch);
+      await page.evaluate(() => {
+        const list = document.createElement("ul");
+        for (let index = 0; index < 40; index++) {
+          const item = document.createElement("li");
+          item.textContent = `Selection detail ${index + 1}`;
+          list.append(item);
+        }
+        document.querySelector("#panel-selection")!.append(list);
+      });
+      const orders = page.locator(".unit-controls");
+      const before = await orders.boundingBox();
+      for (const button of await orders.locator("button:visible").all())
+        await expect(button).toBeInViewport({ ratio: 1 });
+      const scroll = await page.evaluate(() => {
+        const panel = document.querySelector<HTMLElement>(".selection-pane")!;
+        panel.scrollTop = panel.scrollHeight;
+        return panel.scrollTop;
+      });
+      expect(scroll).toBeGreaterThan(0);
+      expect(await orders.boundingBox()).toEqual(before);
+      await activate(page.locator("#stop-units"), profile.touch);
+      await activate(page.locator("#tab-buildings"), profile.touch);
+      await expect(page.locator("#stop-units")).toBeInViewport({ ratio: 1 });
+      await info.attach(`pinned-orders-${profile.name}`, {
+        body: await page.screenshot({
+          path: info.outputPath(`pinned-orders-${profile.name}.png`),
+        }),
+        contentType: "image/png",
+      });
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("production pictures explain disabled cards and keep selection visible", async ({
+  page,
+}) => {
+  await page.goto("/?level=sandbox");
+  await expect(page.locator("#building-options .actor-portrait")).toHaveCount(
+    2,
+  );
+  await page.locator("#build-barracks").focus();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Trains Trooper & Scout",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).toBeHidden();
+  await placeBuilding(page, "build-barracks", 55, 39);
+  await expect(page.locator("#train-scout")).toBeEnabled();
+  await page.locator("#pause-mission").click();
+  await expect(page.locator("#train-scout")).toBeDisabled();
+  const card = page.locator(".production-card", {
+    has: page.locator("#train-scout"),
+  });
+  await card.focus();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Resume the mission to train units",
+  );
+  await page.locator("#pause-mission").click();
+  await expect(page.locator("#panel-units")).toBeVisible();
+  await expect(page.locator("#panel-selection")).toBeVisible();
+  const goals = page.locator("#tab-goals");
+  await goals.click();
+  await expect(goals).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#panel-goals")).toBeVisible();
+  await goals.click();
+  await expect(goals).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#panel-units")).toBeVisible();
+  await page.locator("#tab-buildings").click();
+  await expect(page.locator("#selection-details")).toContainText(
+    "Field Barracks",
+  );
+  await expect(page.locator("[data-rally-controls]")).toBeVisible();
+});
 
 test("goal lists reconcile changed content, order, and failure status", async ({
   page,
@@ -94,10 +225,9 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
   await expect(page.locator("#selection-details")).toHaveText(
     "Command Center · 2 × 2 · 0°",
   );
-  // Production buildings open training whether placed, picked, or listed.
+  // Selecting a production building opens its training options.
   await placeBuilding(page, "build-barracks", 55, 39);
   await expect(page.locator("#panel-units")).toBeVisible();
-  await page.locator("#tab-selection").click();
   await expect(page.locator("#selection-details")).toHaveText(
     "Field Barracks · 3 × 2 · 0°",
   );
@@ -106,10 +236,6 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
     await page.locator(`#train-${unit}`).click();
     await expect(page.locator("#unit-roster button")).toHaveCount(index + 1);
   }
-  await expect(page.locator("#producer-roster button")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
   await page.locator("#unit-roster button").nth(1).click();
   await expect(page.locator("#selection-details")).toHaveText("Scout");
   await expect(page.locator("#selection-info")).toContainText(
@@ -131,25 +257,18 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
   ]);
   await page.locator("#tab-units").click();
   await expect(page.locator("#train-scout")).toBeDisabled();
-  await page.locator("#producer-roster button").click();
-  await expect(page.locator("#panel-units")).toBeVisible();
-  await expect(page.locator("#train-scout")).toBeEnabled();
-  const producer = page.locator("#producer-roster button");
-  await producer.focus();
-  await page.keyboard.press("Enter");
-  await expect(producer).toBeFocused();
-  await expect(page.locator("#panel-units")).toBeVisible();
-  await page.locator("#train-scout").click();
-  await expect(page.locator("#unit-roster button")).toHaveCount(4);
-  await producer.focus();
-  await page.locator("#unit-roster button").nth(1).focus();
-  await page.keyboard.press("Enter");
-  await expect(page.locator("#tab-selection")).toBeFocused();
-  await expect(page.locator("#panel-selection")).toBeVisible();
   const barracks = await terrainPoint(page, 55, 39);
   await page.mouse.click(barracks.x, barracks.y);
   await expect(page.locator("#panel-units")).toBeVisible();
-  await expect(producer).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#train-scout")).toBeEnabled();
+  await page.locator("#train-scout").click();
+  await expect(page.locator("#unit-roster button")).toHaveCount(4);
+  await page.locator("#unit-roster button").nth(1).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#unit-roster button").nth(1)).toBeFocused();
+  await expect(page.locator("#panel-selection")).toBeVisible();
+  await page.mouse.click(barracks.x, barracks.y);
+  await expect(page.locator("#panel-units")).toBeVisible();
   await testInfo.attach("sidebar-desktop", {
     body: await page.screenshot(),
     contentType: "image/png",
@@ -159,7 +278,7 @@ test("starts empty with a reserved sidebar and builds and trains through its tab
   await expect(page.locator("#scenario-goals")).toContainText(
     "Train a Trooper (2)",
   );
-  await page.locator("#tab-selection").focus();
+  await page.locator("#tab-units").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator("#tab-buildings")).toBeFocused();
   await expect(page.locator("#panel-buildings")).toBeVisible();
@@ -190,7 +309,25 @@ test("blocked exits disable training until a unit moves away", async ({
     "accepted",
   );
   await page.locator("#tab-units").click();
-  await page.locator("#producer-roster button").click();
+  const barracks = await page.evaluate(async () => {
+    const path: string = "/e2e/harness.ts";
+    const { EngineStore, projectToCanvas } = await import(path);
+    const scene = EngineStore.Instances[0].scenes[0];
+    const root = scene.getTransformNodeByName(
+      "tile-placed-actor-arc-field-barracks-1-root",
+    )!;
+    const roof = root
+      .getChildMeshes()
+      .find((mesh: { name: string }) => mesh.name.endsWith("-roof"))!;
+    roof.computeWorldMatrix(true);
+    const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
+    return projectToCanvas(
+      scene,
+      canvas,
+      roof.getBoundingInfo().boundingBox.centerWorld,
+    );
+  });
+  await page.mouse.click(barracks.x, barracks.y);
   await expect(page.locator("#train-trooper")).toBeEnabled();
   await page.locator("#train-trooper").click();
   await expect(page.locator("#unit-roster button")).toHaveCount(11);
@@ -212,6 +349,19 @@ for (const profile of TOUCH_PROFILES)
         "true",
       );
       await page.locator("#build-barracks").tap();
+      await expect(page.locator("#placement-panel")).toBeVisible();
+      for (const button of await page
+        .locator(".unit-controls button:visible")
+        .all())
+        await expect(button).toBeInViewport({ ratio: 1 });
+      await expect(page.locator("#cancel-building")).toBeInViewport({
+        ratio: 1,
+      });
+      const placement = (await page.locator("#placement-panel").boundingBox())!;
+      const selection = (await page.locator(".selection-pane").boundingBox())!;
+      expect(placement.y).toBeGreaterThanOrEqual(
+        selection.y + selection.height,
+      );
       const point = await terrainPoint(page, 55, 39);
       await page.touchscreen.tap(point.x, point.y);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
@@ -225,6 +375,7 @@ for (const profile of TOUCH_PROFILES)
       await expect(page.locator("#panel-units")).toBeVisible();
       await page.locator("#train-trooper").tap();
       await expect(page.locator("#unit-roster button")).toHaveCount(1);
+      await expect(page.getByRole("tooltip")).toBeHidden();
       await page.locator("#train-scout").tap();
       await expect(page.locator("#unit-roster button")).toHaveCount(2);
       // The world fills the space the reserved sidebar leaves.
@@ -333,26 +484,30 @@ test("sidebar derives custom content and can be disposed and recreated", async (
     try {
       sidebar.update(state);
       const title = root.querySelector("#selection-details")!.textContent;
-      const buildText = root.querySelector("#build-foundry")!.textContent;
-      const trainText = root.querySelector("#train-runner")!.textContent;
+      const descriptionFor = (id: string) =>
+        document.getElementById(
+          root.querySelector(`#${id}`)!.getAttribute("aria-describedby")!,
+        )!.textContent;
+      const buildText = descriptionFor("build-foundry");
+      const trainText = descriptionFor("train-runner");
       (root.querySelector("#tab-units") as HTMLButtonElement).click();
-      const producer = root.querySelector<HTMLButtonElement>(
-        "#producer-roster button",
+      const listedUnit = root.querySelector<HTMLButtonElement>(
+        "#unit-roster button",
       )!;
-      producer.focus();
+      listedUnit.focus();
       sidebar.update({
         ...state,
         selectedActorIds: ["unit"],
         canRemove: false,
       });
-      const retainedFocus = document.activeElement === producer;
+      const retainedFocus = document.activeElement === listedUnit;
       const retainedNode =
-        root.querySelector("#producer-roster button") === producer;
-      producer.click();
+        root.querySelector("#unit-roster button") === listedUnit;
+      listedUnit.click();
       const selectedByClick = selected;
       sidebar.dispose();
       selected = "";
-      producer.click();
+      listedUnit.click();
       const disposed = selected === "";
       sidebar = createSidebar(root, options);
       sidebar.update(state);
@@ -367,7 +522,6 @@ test("sidebar derives custom content and can be disposed and recreated", async (
         buildings: root.querySelectorAll("#building-options button").length,
         units: root.querySelectorAll("#training-options button").length,
         goals: root.querySelectorAll("#scenario-goals li").length,
-        producers: root.querySelectorAll("#producer-roster button").length,
       };
     } finally {
       sidebar.dispose();
@@ -378,12 +532,11 @@ test("sidebar derives custom content and can be disposed and recreated", async (
     title: "Foundry · 1 × 2 · 90°",
     retainedFocus: true,
     retainedNode: true,
-    selectedByClick: "building",
+    selectedByClick: "unit",
     disposed: true,
     buildings: 1,
     units: 1,
     goals: 1,
-    producers: 1,
   });
   expect(result.buildText).toContain("Trains Runner · 2 × 1 tiles");
   expect(result.trainText).toContain("Speed 9");
@@ -415,7 +568,7 @@ test("prototype controls skip unchanged frames and removal works without a sideb
     const build = document.createElement("button");
     const cancel = document.createElement("button");
     const train = document.createElement("button");
-    const definitionId = "arc-command-center-prototype";
+    const definitionId = "arc-field-barracks";
     let updates = 0;
     const controls: GameSessionControls = {
       mission,

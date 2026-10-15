@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { importMission } from "./prototype-helpers";
+import { openOpening, importMission } from "./prototype-helpers";
 
 declare global {
   interface Window {
@@ -9,7 +9,7 @@ declare global {
 
 for (const action of ["restart", "exit", "newer load"] as const) {
   test(`a pending file read cannot override ${action}`, async ({ page }) => {
-    await page.goto("/");
+    await openOpening(page);
     const canvas = page.locator("#game-canvas");
     await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
     const source = await page.evaluate(async () => {

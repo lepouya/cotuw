@@ -199,6 +199,7 @@ test("selects a constructed building and freezes idle equipment when disabled", 
     "arc-command-center-prototype-1",
   );
   await page.locator("#tab-buildings").click();
+  await page.locator("#tab-goals").click();
   await page.locator("#animate-building").uncheck();
   const angle = () =>
     page.evaluate(async () => {

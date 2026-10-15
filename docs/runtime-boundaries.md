@@ -31,6 +31,8 @@ These contracts describe where new behaviors, views, and services attach.
 - A game view owns its engine, scene, canvas listeners, and size watcher. A
   session owns its simulation, controls, views, and loaded assets through the
   scene's lifetime. Model instances release before their shared assets.
+- Sidebar setup releases partial controls after failure. Production cards own
+  their tooltip and listeners; disposal or parent cancellation releases both.
 - `disposeAsync` pauses the session and waits for pending model and BRDF loads
   before releasing the engine. A failing `onReady` follows this same path.
   Initialization failures release the partial view and session.

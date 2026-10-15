@@ -19,56 +19,101 @@
           <p class="muted">
             <span id="scenario-label"></span>
           </p>
-        </header>
-        <div class="sidebar-tabs" role="tablist" aria-label="Command panels">
-          <button
-            id="tab-selection"
-            type="button"
-            role="tab"
-            aria-controls="panel-selection"
-            aria-selected="false"
-            tabindex="-1"
-          >
-            Selection
-          </button>
-          <button
-            id="tab-buildings"
-            type="button"
-            role="tab"
-            aria-controls="panel-buildings"
-            aria-selected="true"
-          >
-            Buildings
-          </button>
-          <button
-            id="tab-units"
-            type="button"
-            role="tab"
-            aria-controls="panel-units"
-            aria-selected="false"
-            tabindex="-1"
-          >
-            Units
-          </button>
-          <button
-            id="tab-goals"
-            type="button"
-            role="tab"
-            aria-controls="panel-goals"
-            aria-selected="false"
-            tabindex="-1"
-          >
+          <button id="tab-goals" type="button" aria-controls="panel-goals">
             Goals
           </button>
+        </header>
+        <div class="production-pane">
+          <div class="sidebar-tabs" role="tablist" aria-label="Command panels">
+            <button
+              id="tab-buildings"
+              type="button"
+              role="tab"
+              aria-controls="panel-buildings"
+              aria-selected="true"
+            >
+              Buildings
+            </button>
+            <button
+              id="tab-units"
+              type="button"
+              role="tab"
+              aria-controls="panel-units"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              Units
+            </button>
+          </div>
+          <div class="sidebar-content">
+            <section
+              id="panel-buildings"
+              role="tabpanel"
+              aria-labelledby="tab-buildings"
+            >
+              <p class="muted">Choose a structure to place.</p>
+              <div id="building-options" class="production-grid"></div>
+              <div
+                id="construction-queue"
+                class="actor-list"
+                aria-label="Paid building construction"
+              ></div>
+            </section>
+            <section
+              id="panel-units"
+              role="tabpanel"
+              aria-labelledby="tab-units"
+              hidden
+            >
+              <div
+                id="training-options"
+                class="production-grid"
+                role="group"
+                aria-label="Unit training"
+              ></div>
+              <p id="production-status" class="muted" role="status"></p>
+              <details id="economy-overview" hidden open>
+                <summary>Materials sites &amp; salvage</summary>
+                <p id="economy-alert" class="muted" role="status"></p>
+                <div id="resource-overview" class="actor-list"></div>
+              </details>
+              <details class="roster-disclosure" open>
+                <summary>Field units</summary>
+                <div
+                  id="unit-roster"
+                  class="actor-list"
+                  aria-label="Field units"
+                ></div>
+              </details>
+            </section>
+            <section
+              id="panel-goals"
+              role="region"
+              aria-labelledby="tab-goals"
+              hidden
+            >
+              <p class="eyebrow">Scenario goals</p>
+              <h2 id="scenario-title"></h2>
+              <p class="muted"><span id="scenario-description"></span></p>
+              <p id="mission-directive" class="muted" role="status" hidden></p>
+              <ul id="mission-objectives" class="scenario-goals" hidden></ul>
+              <h3 id="preparation-heading"></h3>
+              <ul id="scenario-goals" class="scenario-goals"></ul>
+              <p id="scenario-goals-note" class="muted"></p>
+              <p id="scenario-rules" class="muted"></p>
+              <label id="network-view-control" class="animation-control" hidden
+                ><input id="network-view" type="checkbox" /> Network View</label
+              >
+              <label class="animation-control"
+                ><input id="animate-building" type="checkbox" checked />
+                Building idle animation</label
+              >
+            </section>
+          </div>
         </div>
-        <div class="sidebar-content">
-          <section
-            id="panel-selection"
-            role="tabpanel"
-            aria-labelledby="tab-selection"
-            hidden
-          >
-            <p class="eyebrow">Current selection</p>
+        <div class="selection-pane">
+          <section id="panel-selection" aria-label="Current selection">
+            <p id="selection-heading" class="eyebrow">Current selection</p>
             <h2 id="selection-details">Nothing selected</h2>
             <p id="selection-health" hidden></p>
             <p data-network-status class="muted" hidden></p>
@@ -99,104 +144,42 @@
               </button>
               <p data-rally-status class="muted" role="status"></p>
             </section>
-            <button id="open-training" type="button" hidden>Train units</button>
-            <button id="remove-building" type="button" disabled>
-              Remove selected building
-            </button>
-          </section>
-          <section
-            id="panel-buildings"
-            role="tabpanel"
-            aria-labelledby="tab-buildings"
-          >
-            <p class="eyebrow">Establish your base</p>
-            <h2>Construction</h2>
-            <p class="muted">
-              Choose a structure, then place it on clear terrain.
-            </p>
-            <div id="building-options"></div>
-            <label id="network-view-control" class="animation-control" hidden
-              ><input id="network-view" type="checkbox" /> Network View</label
-            >
-            <label class="animation-control"
-              ><input id="animate-building" type="checkbox" checked /> Building
-              idle animation</label
-            >
-          </section>
-          <section
-            id="panel-units"
-            role="tabpanel"
-            aria-labelledby="tab-units"
-            hidden
-          >
-            <p class="eyebrow">Assemble your forces</p>
-            <h2>Unit production</h2>
-            <p class="muted">
-              Select a production building below or on the map.
-            </p>
-            <div
-              id="producer-roster"
-              class="actor-list"
-              aria-label="Production buildings"
-            ></div>
-            <div
-              id="training-options"
-              class="training-controls"
-              role="group"
-              aria-label="Unit training"
-            ></div>
-            <div
-              id="construction-queue"
-              class="actor-list"
-              aria-label="Paid building construction"
-            ></div>
-            <section data-rally-controls hidden aria-label="Rally point">
-              <button type="button" data-rally-action="set">
-                Set Rally Point
-              </button>
-              <button type="button" data-rally-action="clear">
-                Clear Rally Point
-              </button>
-              <button type="button" data-rally-action="cancel" hidden>
-                Cancel rally point
-              </button>
-              <p data-rally-status class="muted" role="status"></p>
-            </section>
-            <p data-network-status class="muted" hidden></p>
-            <p id="production-status" class="muted" role="status"></p>
             <div
               id="production-queue"
               class="actor-list"
               aria-label="Paid production orders"
             ></div>
-            <section id="economy-overview" hidden>
-              <h3>Materials sites &amp; salvage</h3>
-              <p id="economy-alert" class="muted" role="status"></p>
-              <div id="resource-overview" class="actor-list"></div>
-            </section>
-            <h3>Field units</h3>
-            <div
-              id="unit-roster"
-              class="actor-list"
-              aria-label="Field units"
-            ></div>
-          </section>
-          <section
-            id="panel-goals"
-            role="tabpanel"
-            aria-labelledby="tab-goals"
-            hidden
-          >
-            <p class="eyebrow">Scenario goals</p>
-            <h2 id="scenario-title"></h2>
-            <p class="muted"><span id="scenario-description"></span></p>
-            <p id="mission-directive" class="muted" role="status" hidden></p>
-            <ul id="mission-objectives" class="scenario-goals" hidden></ul>
-            <h3 id="preparation-heading"></h3>
-            <ul id="scenario-goals" class="scenario-goals"></ul>
-            <p id="scenario-goals-note" class="muted"></p>
+            <button id="open-training" type="button" hidden>Train units</button>
+            <button id="remove-building" type="button" disabled>
+              Remove selected building
+            </button>
           </section>
         </div>
+        <section
+          id="placement-panel"
+          class="placement-panel"
+          aria-label="Building placement"
+          hidden
+        >
+          <div
+            id="placement-actions"
+            class="building-controls"
+            hidden
+            role="group"
+            aria-label="Placement actions"
+          >
+            <button id="rotate-building" type="button" disabled>
+              Rotate 90° (R)
+            </button>
+            <button id="confirm-building" type="button" disabled>
+              Place building
+            </button>
+            <button id="cancel-building" type="button" disabled>
+              Cancel (Esc)
+            </button>
+          </div>
+          <p id="placement-status" class="muted" role="status"></p>
+        </section>
         <section class="unit-controls" aria-label="Unit controls">
           <div
             class="building-controls"
@@ -232,35 +215,6 @@
           </div>
           <p id="movement-status" class="muted" role="status"></p>
         </section>
-        <section class="placement-panel" aria-label="Building placement">
-          <div
-            id="placement-actions"
-            class="building-controls"
-            hidden
-            role="group"
-            aria-label="Placement actions"
-          >
-            <button id="rotate-building" type="button" disabled>
-              Rotate 90° (R)
-            </button>
-            <button id="confirm-building" type="button" disabled>
-              Place building
-            </button>
-            <button id="cancel-building" type="button" disabled>
-              Cancel (Esc)
-            </button>
-          </div>
-          <p id="placement-status" class="muted" role="status"></p>
-        </section>
-        <footer class="sidebar-footer">
-          <p id="scenario-rules" class="muted"></p>
-          <p class="controls">
-            Click to select or move · Shift-click to add or queue orders ·
-            Right-click for actions<br />Drag to select · Pan mode: drag or
-            scroll · Space-drag to pan<br />Arrow keys pan the focused world ·
-            Scroll to zoom · Shift-right-drag to rotate
-          </p>
-        </footer>
       </aside>
       <div class="game-viewport">
         <header id="top-bar" class="top-bar" aria-label="Mission status">

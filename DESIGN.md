@@ -366,9 +366,27 @@ story.
 - Camera zoom is measured in visible tile rows so framing is independent of map
   and tile size. New views show roughly 24 rows or fit a smaller map; resizing
   preserves the player's zoom.
-- The left sidebar uses Selection, Buildings, Units, and Goals tabs. It owns
-  selection details, contextual actions, construction and production, queues,
-  and a keyboard-free Cancel action.
+- The left sidebar splits its available height between production above and
+  selection below, with independent scrolling. Buildings and Units tabs use
+  illustrated cards with names and Materials costs; hover or keyboard focus
+  reveals descriptions, footprint or speed, work duration, and unavailable
+  reasons. Disabled cards still expose their explanations. Card focus follows
+  changes in availability. Unavailable cards also explain themselves on touch.
+  Explanations stay within the viewport and consume Escape before world
+  commands. The lower panel always shows selection details, health, contextual
+  actions, and that building's production queue. Construction queues belong to
+  Buildings. Active placement controls occupy their own row above the orders
+  toolbar; idle placement controls stay hidden. Construction cards follow the
+  content pack's build order, with the Materials Refinery before the Field
+  Barracks. Units shows only the selected friendly building's trainable units,
+  including unavailable orders with explanations. With no production building
+  selected, it prompts selection on the map. Units also provides collapsible
+  field unit and resource lists. The sidebar header's Goals button toggles
+  Goals in place of the production tabs, and the top bar's objective opens it.
+  Selecting a friendly production building opens Units without hiding
+  selection details. The orders toolbar stays below both scrolling panels and
+  remains visible as their content grows. Tab arrows, Home, and End navigate
+  the production tabs.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed mission
   time, and single-player pause and speed controls. The left holds Menu, Pause,
   and ½×, 1×, and 2× speed. The center shows the first unfinished victory
@@ -391,7 +409,11 @@ story.
   popup pauses single-player until dismissed and keeps an active placement.
   Actor triggers are checked after committed ticks, independently of rendering.
   Dismissals are mission state, so loading never repeats one and restarting
-  shows them again.
+  shows them again. The opening explains basic goals, selection, movement,
+  camera controls, and the sidebar when the starting Command Center is owned.
+  It explains support at first Refinery placement, gathering at the first
+  Harvester, training and rally points at the first completed Barracks, and
+  fog, scouting, and combat at the first Scout.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
   Load, Restart, and Exit; its Load panel lists saves and imports files. F5
   quicksaves, F9 loads the quicksave, and F10 opens the menu.
@@ -912,9 +934,9 @@ Deterministic acceptance checks cover:
   Previewing does not reserve IDs; rejected requests leave theirs available.
 - Selection shows the actor's type, building footprint and orientation, or unit
   movement speed. Sidebar options and details derive from content definitions
-  and presentation data. The Units tab lists production buildings and field
-  units for selection. Selecting or placing a production building opens the
-  Units tab; selecting any other actor opens Selection.
+  and presentation data. The Units tab trains from the selected production
+  building and lists field units for selection. Selecting or placing a friendly
+  production building opens Units; selection details remain visible below.
 - Goals show current building and unit counts for construction and training
   practice. The sandbox has no victory or defeat condition.
 - The sidebar reserves screen width beside the world canvas. Its content
@@ -1013,7 +1035,7 @@ Deterministic acceptance checks cover:
   selected mobile units to its tile. Both marker types follow terrain edits
   and appear on the minimap. Exhaustion, missing assignments,
   blocked routes, and unaffordable harvesting recovery have explanatory
-  feedback. Building timers show in Units and Selection, with a progress bar
+  feedback. Building timers show in Buildings and Selection, with a progress bar
   over translucent, staged blueprints.
   Gathering Harvesters lower and spin a drill with a green light; idle workers
   raise the drill and show amber. Completed Refineries turn a rooftop fan and
@@ -1189,9 +1211,8 @@ a later tutorial could be made.
 - A successful run takes about 5 to 10 minutes. M0 does not lengthen it by
   slowing gathering, production, or movement, and it is not a hard timer.
 - M0 includes contextual notifications, full save/load/restart coverage,
-  compact landscape browser UI checks, and two explanatory popups: **Support
-  Network** when the first Refinery placement begins, and **Harvester
-  Operations** when the first Harvester completes.
+  compact landscape browser UI checks, and contextual guides for command
+  basics, support coverage, harvesting, Barracks training, and scouting.
 - Essential gameplay sound effects and background music are included as defined
   in [Audio](#audio).
 - M0 excludes the Circle, Everwake, rare and exotic resources, repair, healing,

@@ -321,7 +321,7 @@ test("edge panning stops over UI, during box drags, on blur, and in dialogs", as
   await expect
     .poll(async () => (await pose(page)).target)
     .not.toEqual(before.target);
-  await page.locator("#tab-selection").hover();
+  await page.locator("#selection-heading").hover();
   const sidebar = await pose(page);
   await page.waitForTimeout(300);
   expect((await pose(page)).target).toEqual(sidebar.target);

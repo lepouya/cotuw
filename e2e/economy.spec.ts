@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { PROFILES } from "./profiles";
-import { importMission, terrainPoint } from "./prototype-helpers";
+import {
+  openOpening,
+  dismissExplanation,
+  importMission,
+  terrainPoint,
+} from "./prototype-helpers";
 import type { Page } from "@playwright/test";
 import type { GameSession } from "../src/session";
 import type { ActorPlacement } from "../src/simulation/placement";
@@ -131,6 +136,29 @@ async function controlledOpening(
   ).toEqual([]);
 }
 
+test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  const result = await page.evaluate(async () => {
+    const path: string = "/src/session.ts";
+    const { loadMission } = await import(path);
+    const { view } = window.economyHarness;
+    view.dismissPopup("support-network");
+    let rejected = false;
+    try {
+      view.dismissPopup("missing-guide");
+    } catch (error) {
+      rejected = error instanceof RangeError;
+    }
+    const restored = loadMission(
+      view.save({ name: "Tutorial review", savedAt: "2026-10-15T12:00:00Z" }),
+    );
+    return { rejected, dismissed: restored.state.dismissedPopups };
+  });
+  expect(result).toEqual({ rejected: true, dismissed: ["support-network"] });
+});
+
 test("paused inspection allows selection but blocks orders and placement", async ({
   page,
 }) => {
@@ -160,6 +188,13 @@ test("paused inspection allows selection but blocks orders and placement", async
     return hiddenSelection;
   });
   expect(hiddenSelection).toBe("[]");
+  await expect(page.locator("#build-barracks")).toBeDisabled();
+  await expect(page.locator("#build-barracks")).toHaveAccessibleDescription(
+    /Resume the mission to build\./,
+  );
+  await expect(page.locator("#production-status")).toHaveText(
+    "Resume the mission to train units.",
+  );
   await expect(page.locator("#selection-details")).toHaveText("Trooper");
   await expect(page.locator("#stop-units")).toBeDisabled();
   await page.keyboard.press("s");
@@ -182,6 +217,12 @@ test("paused inspection allows selection but blocks orders and placement", async
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-placement-active",
     "true",
+  );
+  await expect(page.locator("#build-refinery")).toHaveAccessibleDescription(
+    /Finish or cancel the current building placement\./,
+  );
+  await expect(page.locator("#production-status")).toHaveText(
+    "Finish or cancel the current building placement.",
   );
 });
 
@@ -247,7 +288,6 @@ test("scouting reveals the mountain den and its larger alpha", async ({
   const alpha = revealed.find((actor) => actor.id === "den-alpha-wolf")!;
   const normal = revealed.find((actor) => actor.id === "den-wolf-1")!;
   expect(alpha.height / normal.height).toBeCloseTo(1.25);
-  await page.locator("#tab-selection").click();
   await expect(page.locator("#selection-details")).toContainText("Alpha wolf");
   await testInfo.attach("wolf-den", {
     body: await page.screenshot(),
@@ -295,23 +335,72 @@ async function place(
 test("default opening shows the Command Center, starting Materials, and paid content", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openOpening(page);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-tile-placed-actor-count",
     "1",
   );
   await expect(page.locator("#materials-counter")).toHaveText("150");
   await expect(page.locator("#build-command-center")).toBeDisabled();
-  await expect(page.locator("#build-command-center")).toHaveAttribute(
-    "title",
-    "Need 300 Materials; available 150.",
-  );
+  await expect(
+    page.locator("#build-command-center"),
+  ).toHaveAccessibleDescription(/Need 300 Materials; available 150\.$/);
   await expect(page.locator("#build-refinery")).toContainText("100 Materials");
   await expect(page.locator("#train-harvester")).toContainText("50 Materials");
   await page.locator("#tab-units").click();
   await expect(page.locator("#economy-alert")).toContainText(
     "Build a Refinery",
   );
+});
+
+test("construction order and training cards follow the selected building", async ({
+  page,
+}) => {
+  await controlledOpening(page, 500, "arc", [
+    {
+      actorId: "test-refinery",
+      definitionId: "arc-materials-refinery",
+      origin: { x: 12, z: 49 },
+    },
+    {
+      actorId: "test-barracks",
+      definitionId: "arc-field-barracks",
+      origin: { x: 16, z: 54 },
+    },
+  ]);
+  expect(
+    await page
+      .locator("#building-options button")
+      .evaluateAll((buttons) => buttons.map(({ id }) => id)),
+  ).toEqual(["build-command-center", "build-refinery", "build-barracks"]);
+  await page.locator("#tab-units").click();
+  const cards = page.locator("#training-options button:visible");
+  await expect(cards).toHaveCount(0);
+  await expect(page.locator("#production-status")).toContainText("on the map");
+  const select = async (id: string) => {
+    await page.evaluate((id) => window.economyHarness.view.selectActor(id), id);
+    await advance(page, 0.1);
+  };
+  await select("test-refinery");
+  await expect(cards).toHaveAttribute("id", "train-harvester");
+  await expect(cards).toBeInViewport({ ratio: 1 });
+  await page.locator("#train-harvester").click();
+  await advance(page, 0.1);
+  await expect(cards).toHaveCount(1);
+  await expect(cards).toBeDisabled();
+  await select("test-barracks");
+  await expect(cards).toHaveCount(2);
+  expect(
+    await cards.evaluateAll((buttons) => buttons.map(({ id }) => id)),
+  ).toEqual(["train-trooper", "train-scout"]);
+  await select("starting-command-center");
+  await expect(cards).toHaveCount(0);
+  await expect(page.locator("#production-status")).toContainText("on the map");
+  await select("test-refinery");
+  await expect(cards).toHaveAttribute("id", "train-harvester");
+  await page.locator("#clear-selection").click();
+  await advance(page, 0.1);
+  await expect(cards).toHaveCount(0);
 });
 
 test("recreating economy controls lists only discovered resources once", async ({
@@ -355,7 +444,6 @@ test("building timers disable production, and cancelling a blueprint fully refun
   await expect(page.locator("#construction-queue button")).toContainText(
     "5s remaining",
   );
-  await page.locator("#tab-selection").click();
   await expect(page.locator("#construction-details")).toContainText(
     "5s remaining",
   );
@@ -379,7 +467,6 @@ test("spending the bootstrap funds shows a stalled-economy recovery hint", async
   await place(page, "#build-barracks", 16, 54);
   await expect(page.locator("#materials-counter")).toHaveText("50");
   await expect(page.locator("#economy-alert")).toContainText("Economy stalled");
-  await page.locator("#tab-selection").click();
   await page.locator("#remove-building").click();
   await advance(page, 0.1);
   await expect(page.locator("#materials-counter")).toHaveText("100");
@@ -660,17 +747,21 @@ for (const { touch, ...profile } of PROFILES) {
     try {
       await controlledOpening(page);
       await place(page, "#build-refinery", 12, 49, touch);
-      const panel = page.locator("#panel-units");
-      await action(page, '#panel-units [data-rally-action="set"]', touch);
+      const panel = page.locator("#panel-selection");
+      await action(page, '#panel-selection [data-rally-action="set"]', touch);
       const occupied = await terrainPoint(page, 8, 50);
       if (touch) await page.touchscreen.tap(occupied.x, occupied.y);
       else await page.mouse.click(occupied.x, occupied.y);
       await expect(panel.locator("[data-rally-status]")).toContainText(
         "passable ground",
       );
-      await action(page, '#panel-units [data-rally-action="cancel"]', touch);
+      await action(
+        page,
+        '#panel-selection [data-rally-action="cancel"]',
+        touch,
+      );
       await expect(panel.locator('[data-rally-action="cancel"]')).toBeHidden();
-      await action(page, '#panel-units [data-rally-action="set"]', touch);
+      await action(page, '#panel-selection [data-rally-action="set"]', touch);
       const destination = await terrainPoint(page, 17, 52);
       if (!touch) {
         const selected = await page
@@ -695,7 +786,7 @@ for (const { touch, ...profile } of PROFILES) {
         await expect(
           panel.locator('[data-rally-action="cancel"]'),
         ).toBeHidden();
-        await action(page, '#panel-units [data-rally-action="set"]');
+        await action(page, '#panel-selection [data-rally-action="set"]');
       }
 
       if (touch) await page.touchscreen.tap(destination.x, destination.y);
@@ -727,7 +818,7 @@ for (const { touch, ...profile } of PROFILES) {
         };
       });
       expect(result.position).toEqual(result.target);
-      await action(page, '#panel-units [data-rally-action="clear"]', touch);
+      await action(page, '#panel-selection [data-rally-action="clear"]', touch);
       await advance(page, 0.1);
       expect(
         await page.evaluate(
@@ -764,7 +855,6 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     bridgeId,
   );
   await advance(page, 0.1);
-  await page.locator("#tab-selection").click();
   await page.locator("#remove-building").click();
   await advance(page, 0.1);
   const networkAlerts = page
@@ -785,7 +875,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   await page.locator("#tab-units").click();
   await expect(page.locator("#train-trooper")).toBeDisabled();
   await expect(
-    page.locator("#panel-units [data-network-status]"),
+    page.locator("#panel-selection [data-network-status]"),
   ).toContainText("Disconnected");
   await expect(page.locator("#production-queue button")).toContainText(
     "Paused",
@@ -928,7 +1018,6 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   expect(result.health).toBeGreaterThan(0);
   expect(result.health).toBeLessThan(100);
   await page.evaluate(() => window.economyHarness.view.selectActor("duelist"));
-  await page.locator("#tab-selection").click();
   await expect(page.locator("#selection-health")).toHaveText(
     `Health ${result.health} / 100`,
   );
@@ -969,7 +1058,6 @@ test("hostile buildings require detection and expose inspection without player c
   });
   expect(initiallyHidden).toEqual({ rendered: false, selected: "[]" });
   await advance(page, 0.1);
-  await expect(page.locator("#producer-roster button")).toHaveCount(0);
   await expect(page.locator("#building-options button")).toHaveCount(0);
   await expect(page.locator("#training-options button")).toHaveCount(0);
   await page.evaluate(() => {
@@ -986,7 +1074,6 @@ test("hostile buildings require detection and expose inspection without player c
     view.selectActor("enemy-barracks");
   });
   await advance(page, 0.1);
-  await page.locator("#tab-selection").click();
   await expect(page.locator("#selection-details")).toContainText(
     "Field Barracks",
   );
@@ -995,7 +1082,6 @@ test("hostile buildings require detection and expose inspection without player c
   await expect(page.locator("#remove-building")).toBeDisabled();
   await expect(page.locator("#open-training")).toBeHidden();
   await expect(page.locator("[data-rally-controls]").first()).toBeHidden();
-  await expect(page.locator("#producer-roster button")).toHaveCount(0);
   await expect(page.locator("#construction-queue button")).toHaveCount(0);
   await expect(page.locator("#production-queue button")).toHaveCount(0);
   const rendered = await page.evaluate(() => {
@@ -1048,7 +1134,6 @@ test("damaged building sale feedback matches the credited refund", async ({
     window.economyHarness.view.selectActor("damaged-command-center");
   });
   await advance(page, 0.1);
-  await page.locator("#tab-selection").click();
   await expect(page.locator("#remove-building")).toHaveText(
     "Sell building (+123 Materials)",
   );
@@ -1165,7 +1250,7 @@ for (const profile of PROFILES) {
     });
     const page = await context.newPage();
     try {
-      await page.goto("/");
+      await openOpening(page);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-terrain-ready",
         "true",
@@ -1304,6 +1389,7 @@ for (const profile of PROFILES) {
       await upload(saves.victory);
       await expect(page.locator("#game-menu-title")).toHaveText("Victory");
       await action(page, "#restart-mission", profile.touch);
+      await dismissExplanation(page, "Welcome, Commander", profile.touch);
       await action(page, "#tab-goals", profile.touch);
       await expect(
         page.locator("#mission-objectives .goal-complete"),
@@ -1322,7 +1408,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
 }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await openOpening(page);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
     "true",
@@ -1374,6 +1460,12 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   await expect(page.locator("#production-status")).toContainText(
     "Mission ended in defeat",
   );
+  await expect(page.locator("#build-barracks")).toHaveAccessibleDescription(
+    /Mission ended in defeat\./,
+  );
+  await expect(page.locator("#train-trooper")).toHaveAccessibleDescription(
+    /Mission ended in defeat\./,
+  );
   await expect(page.locator("#restart-mission")).toBeVisible();
   await expect(page.locator("#load-mission")).toBeVisible();
   await testInfo.attach("defeat", {
@@ -1390,6 +1482,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await expect(page.locator("#resume-mission")).toBeHidden();
   await page.locator("#restart-mission").click();
+  await dismissExplanation(page, "Welcome, Commander");
   await expect(page.locator("#game-menu")).not.toBeVisible();
   await expect(page.locator("#materials-counter")).toHaveText("150");
   await expect(page.locator("#game-canvas")).not.toHaveAttribute(
@@ -1401,6 +1494,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   await page.locator("#exit-mission").click();
   await expect(page.locator("#game-menu-title")).toHaveText("Mission ended");
   await page.locator("#restart-mission").click();
+  await dismissExplanation(page, "Welcome, Commander");
   await expect(page.locator("#materials-counter")).toHaveText("150");
   expect(errors).toEqual([]);
 });

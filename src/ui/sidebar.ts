@@ -7,17 +7,17 @@ import { footprintSize } from "../simulation/grid";
 import { materialsCost } from "../simulation/economy";
 import { createPlayerAccess } from "../simulation/faction";
 import { createGoalList } from "./goals";
+import { createProductionCards } from "./production-card";
+import { productionBlocker, setActionAvailability } from "./production-action";
+import { trainableUnitIds } from "../simulation/production";
+import { createLifetime } from "../lifetime";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { MissionResult, ObjectiveView } from "../simulation/objectives";
 import type { ScenarioGoal } from "../simulation/mission-file";
 import type { ActorPresentation } from "../content/content-pack";
+import type { ProductionCard } from "./production-card";
 
-/** A sidebar action for one actor definition. */
-export type DefinitionButton = {
-  definitionId: string;
-  button: HTMLButtonElement;
-};
 export type SidebarState = {
   actors: readonly ActorRenderState[];
   actorVersion: number;
@@ -41,33 +41,44 @@ const RESULT_DIRECTIVES: Record<MissionResult["kind"], string> = {
   defeat: "Mission failed. Restart or load a saved mission.",
 };
 
+export type SidebarOptions = {
+  definitions: readonly ActorDefinition[];
+  economy?: boolean;
+  presentations: ReadonlyMap<string, ActorPresentation>;
+  goals: readonly ScenarioGoal[];
+  selectActor: (id: string, additive?: boolean) => void;
+  /** The player's faction; rosters list only its actors. */
+  playerFaction?: string;
+};
+
 /** Tabs and actor lists present committed simulation state only. */
-export function createSidebar(
+export function createSidebar(root: HTMLElement, options: SidebarOptions) {
+  const lifetime = createLifetime();
+  try {
+    return buildSidebar(root, options, lifetime);
+  } catch (error) {
+    lifetime.dispose();
+    throw error;
+  }
+}
+
+function buildSidebar(
   root: HTMLElement,
-  options: {
-    definitions: readonly ActorDefinition[];
-    economy?: boolean;
-    presentations: ReadonlyMap<string, ActorPresentation>;
-    goals: readonly ScenarioGoal[];
-    selectActor: (id: string, additive?: boolean) => void;
-    /** The player's faction; rosters list only its actors. */
-    playerFaction?: string;
-  },
+  options: SidebarOptions,
+  lifetime: ReturnType<typeof createLifetime>,
 ) {
   const { definitions, presentations, goals, selectActor } = options;
   const controller = new AbortController();
+  lifetime.defer(() => controller.abort());
   const signal = controller.signal;
   const element = <T extends HTMLElement>(id: string) =>
     root.querySelector<T>(`#${id}`)!;
-  for (const id of [
-    "building-options",
-    "training-options",
-    "unit-roster",
-    "producer-roster",
-  ])
+  for (const id of ["building-options", "training-options", "unit-roster"])
     element(id).replaceChildren();
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-  const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+  const panels = [
+    ...root.querySelectorAll<HTMLElement>(".sidebar-content > section"),
+  ];
   const definitionById = new Map(
     definitions.map((definition) => [definition.id, definition]),
   );
@@ -81,6 +92,7 @@ export function createSidebar(
   const selectionHealth = element("selection-health");
   const trainingLink = element<HTMLButtonElement>("open-training");
   const placementActions = element("placement-actions");
+  const placementPanel = element("placement-panel");
   const remove = element<HTMLButtonElement>("remove-building");
   const boxSelect = element<HTMLButtonElement>("box-select");
   const addSelection = element<HTMLButtonElement>("add-selection");
@@ -89,65 +101,90 @@ export function createSidebar(
   const clearSelection = element<HTMLButtonElement>("clear-selection");
   const focusSelection = element<HTMLButtonElement>("focus-selection");
   const followSelection = element<HTMLButtonElement>("follow-selection");
+  const cards = createProductionCards(root, signal);
+  const goalsButton = element<HTMLButtonElement>("tab-goals");
+  // Goals temporarily replaces production; closing it restores this tab.
+  let productionPanel = "panel-buildings";
   const showTab = (id: string) => {
+    if (id !== "panel-goals") productionPanel = id;
     root.querySelector<HTMLElement>(".sidebar-content")!.scrollTop = 0;
     const focusedPanel = panels.find((panel) =>
       panel.contains(document.activeElement),
     );
     for (const tab of tabs) {
-      const selected = tab.getAttribute("aria-controls") === id;
-      tab.setAttribute("aria-selected", String(selected));
-      tab.tabIndex = selected ? 0 : -1;
+      const current = tab.getAttribute("aria-controls") === productionPanel;
+      tab.setAttribute(
+        "aria-selected",
+        String(current && id !== "panel-goals"),
+      );
+      tab.tabIndex = current ? 0 : -1;
     }
     for (const panel of panels) panel.hidden = panel.id !== id;
+    goalsButton.setAttribute("aria-expanded", String(id === "panel-goals"));
+    cards.hide();
     if (focusedPanel && focusedPanel.id !== id)
-      tabs.find((tab) => tab.getAttribute("aria-controls") === id)?.focus();
+      (
+        tabs.find((tab) => tab.getAttribute("aria-controls") === id) ??
+        goalsButton
+      ).focus();
   };
-  const optionButton = (
-    container: HTMLElement,
+  const addCard = (
+    container: string,
     action: { id: string; label: string },
+    definition: ActorDefinition,
     details: string,
-  ) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.id = action.id;
-    button.className = "build-option";
-    const label = document.createElement("strong");
-    const description = document.createElement("span");
-    label.textContent = action.label;
-    description.textContent = details;
-    button.append(label, description);
-    container.append(button);
-    return button;
-  };
-  const buildings: DefinitionButton[] = [];
-  const train: DefinitionButton[] = [];
+    seconds = 0,
+  ) =>
+    cards.create(element(container), action, definition, {
+      name: nameFor(definition.id),
+      details: [
+        presentations.get(definition.id)?.description,
+        details,
+        ...(options.economy
+          ? [`${materialsCost(definition)} Materials`, `${seconds}s`]
+          : []),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      cost: options.economy ? materialsCost(definition) : undefined,
+    });
+  const buildings: ProductionCard[] = [];
+  const train: ProductionCard[] = [];
+  const buildOrder = (id: string) => presentations.get(id)?.build?.order ?? 0;
   for (const definition of definitions) {
     if (!friendly({ definitionId: definition.id })) continue;
     const presentation = presentations.get(definition.id);
     if (presentation?.build && definition.footprint) {
-      const description = definition.production
-        ? `Trains ${namesFor(definition).join(" & ")}`
-        : presentation.description;
-      buildings.push({
-        definitionId: definition.id,
-        button: optionButton(
-          element("building-options"),
+      const trains = definition.production
+        ? `Trains ${namesFor(definition).join(" & ")} · `
+        : "";
+      buildings.push(
+        addCard(
+          "building-options",
           presentation.build,
-          `${description} · ${footprintSize(definition.footprint.occupiedTiles)} tiles${options.economy ? ` · ${materialsCost(definition)} Materials` : ""}`,
+          definition,
+          `${trains}${footprintSize(definition.footprint.occupiedTiles)} tiles`,
+          definition.constructionSeconds,
         ),
-      });
+      );
     }
     if (presentation?.train && definition.movement) {
-      const button = optionButton(
-        element("training-options"),
+      const card = addCard(
+        "training-options",
         presentation.train,
-        `${presentation.description} · Speed ${definition.movement.speed}${options.economy ? ` · ${materialsCost(definition)} Materials · ${definition.trainingSeconds ?? 0}s` : ""}`,
+        definition,
+        `Speed ${definition.movement.speed}`,
+        definition.trainingSeconds,
       );
-      button.disabled = true;
-      train.push({ definitionId: definition.id, button });
+      card.button.disabled = true;
+      card.card.hidden = true;
+      train.push(card);
     }
   }
+  buildings.sort(
+    (a, b) => buildOrder(a.definitionId) - buildOrder(b.definitionId),
+  );
+  element("building-options").append(...buildings.map(({ card }) => card));
   const createActorList = (container: HTMLElement, emptyText: string) => {
     const buttons = new Map<string, HTMLButtonElement>();
     // Labels number each type separately and keep a unit's number for life.
@@ -200,10 +237,6 @@ export function createSidebar(
     element("unit-roster"),
     "No units yet. Select a production building to train your first unit.",
   );
-  const producers = createActorList(
-    element("producer-roster"),
-    "No production buildings yet. Open Buildings to place one.",
-  );
   const preparation = createGoalList(element("scenario-goals"));
   const objectiveList = element("mission-objectives");
   const missionGoals = createGoalList(objectiveList, true);
@@ -214,13 +247,14 @@ export function createSidebar(
   let actorVersion: number | undefined;
   let selectionKey = "";
   let disabled: boolean | undefined;
-  /** Production buildings open their training panel; others their details. */
-  const showActor = (definitionId: string) =>
-    showTab(
+  /** Selecting a friendly production building opens its training cards. */
+  const showActor = (definitionId: string) => {
+    if (
+      friendly({ definitionId }) &&
       definitionById.get(definitionId)?.production
-        ? "panel-units"
-        : "panel-selection",
-    );
+    )
+      showTab("panel-units");
+  };
   root.addEventListener(
     "click",
     (event) => {
@@ -229,6 +263,12 @@ export function createSidebar(
       if (!button || button.disabled) return;
       if (button.getAttribute("role") === "tab")
         showTab(button.getAttribute("aria-controls")!);
+      else if (button === goalsButton)
+        showTab(
+          goalsButton.getAttribute("aria-expanded") === "true"
+            ? productionPanel
+            : "panel-goals",
+        );
       else if (button === trainingLink) showTab("panel-units");
       else if (button.dataset.actorId) {
         const actor = actorsById.get(button.dataset.actorId);
@@ -261,6 +301,7 @@ export function createSidebar(
     },
     { signal },
   );
+  showTab("panel-buildings");
   return {
     controls: {
       rallyRoot: root,
@@ -299,19 +340,26 @@ export function createSidebar(
         missionDirective.textContent = directiveText;
       missionGoals.update(objectives);
       placementActions.hidden = !state.placementActive;
+      placementPanel.hidden = !state.placementActive && !state.faulted;
       remove.disabled = !state.canRemove;
-      for (const { definitionId, button } of buildings) {
-        const cost = materialsCost(definitionById.get(definitionId)!);
-        const unaffordable =
-          state.materials !== undefined && state.materials < cost;
-        button.disabled =
-          state.placementActive ||
-          state.faulted ||
-          !!state.paused ||
-          unaffordable;
-        button.title = unaffordable
-          ? `Need ${cost} Materials; available ${state.materials}.`
-          : "";
+      const blocker = productionBlocker(
+        {
+          defeated: state.result?.kind === "defeat",
+          faulted: state.faulted,
+          paused: !!state.paused,
+          placing: state.placementActive,
+        },
+        "build",
+      );
+      for (const action of buildings) {
+        const cost = materialsCost(definitionById.get(action.definitionId)!);
+        setActionAvailability(
+          action,
+          blocker ||
+            (state.materials !== undefined && state.materials < cost
+              ? `Need ${cost} Materials; available ${state.materials}.`
+              : ""),
+        );
       }
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
@@ -354,6 +402,16 @@ export function createSidebar(
         ids.length === 1
           ? state.actors.find((actor) => actor.id === ids[0])
           : undefined;
+      const trainable =
+        inspected && friendly(inspected)
+          ? trainableUnitIds(inspected, definitionById)
+          : [];
+      for (const { definitionId, card } of train) {
+        card.hidden = !trainable.includes(definitionId);
+        if (!card.hidden) continue;
+        cards.hide(card);
+        if (card.contains(document.activeElement)) element("tab-units").focus();
+      }
       const maximum =
         inspected && definitionById.get(inspected.definitionId)?.health;
       selectionHealth.hidden = !maximum;
@@ -382,13 +440,6 @@ export function createSidebar(
         roster.sync(
           state.actors.filter(
             (actor) => !isTilePlacedActor(actor) && friendly(actor),
-          ),
-        );
-        producers.sync(
-          state.actors.filter(
-            (actor) =>
-              friendly(actor) &&
-              definitionById.get(actor.definitionId)?.production,
           ),
         );
         const counts = new Map<string, number>();
@@ -420,7 +471,6 @@ export function createSidebar(
         const selectedActorId = ids.length === 1 ? ids[0] : undefined;
         disabled = nextDisabled;
         roster.updateSelection(selected, disabled);
-        producers.updateSelection(selected, disabled);
         const actor = selectedActorId
           ? actorsById.get(selectedActorId)
           : undefined;
@@ -454,7 +504,7 @@ export function createSidebar(
             : nameFor(actor.definitionId)
           : "Nothing selected";
         selectionInfo.textContent = !actor
-          ? "Choose a unit or building on the map or in the Units tab."
+          ? "Choose a unit or building on the map, or a field unit in Units."
           : player.relationTo(actor.definitionId) === "hostile"
             ? `${presentation?.description ?? "Hostile"} · Select your units, then click or tap it to attack.`
             : !friendly(actor)
@@ -466,6 +516,6 @@ export function createSidebar(
                   : `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · ${moveHint}`;
       }
     },
-    dispose: () => controller.abort(),
+    dispose: lifetime.dispose,
   };
 }

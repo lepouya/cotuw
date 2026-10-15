@@ -42,6 +42,12 @@ export async function dismissExplanation(
   await expect(page.locator("#explanation")).toBeHidden();
 }
 
+/** Starts the authored opening and acknowledges its introductory guide. */
+export async function openOpening(page: Page, touch = false) {
+  await page.goto("/");
+  await dismissExplanation(page, "Welcome, Commander", touch);
+}
+
 export async function placeBuilding(
   page: Page,
   buttonId: string,

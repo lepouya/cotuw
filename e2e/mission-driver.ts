@@ -18,7 +18,7 @@ export class MissionDriver {
     readonly realTime: boolean,
   ) {}
 
-  async opening() {
+  async opening(dismissGuide = true) {
     await this.page.addInitScript((realTime) => {
       window.missionClock = 0;
       if (realTime) return;
@@ -32,6 +32,7 @@ export class MissionDriver {
       "data-terrain-ready",
       "true",
     );
+    if (dismissGuide) await this.explanation("Welcome, Commander");
     await this.page.evaluate(async (realTime) => {
       if (!realTime) {
         const path: string = "/e2e/harness.ts";
@@ -167,6 +168,7 @@ export class MissionDriver {
       "false",
     );
     await this.advance(8);
+    if (type === "barracks") await this.explanation("Barracks & Training");
   }
 
   async materials(minimum: number) {

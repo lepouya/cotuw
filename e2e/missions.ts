@@ -54,8 +54,27 @@ export function simulateMission(
   return createSessionSimulation(missionMap(next), next);
 }
 
+const INTRODUCTORY_POPUPS = ["command-basics", "barracks-training", "scouting"];
+
 export const missionSource = (
   mission: LoadedMission,
   state: MissionState = mission.state,
   save?: SaveInfo,
-) => serializeMission(mission.scenario, state, SIMULATION_TICK_SECONDS, save);
+) =>
+  serializeMission(
+    mission.scenario,
+    {
+      ...state,
+      // Scripted saves focus on their scenario rather than introductory guides.
+      dismissedPopups: [
+        ...new Set([
+          ...(state.dismissedPopups ?? []),
+          ...INTRODUCTORY_POPUPS.filter((id) =>
+            mission.scenario.popups?.some((popup) => popup.id === id),
+          ),
+        ]),
+      ],
+    },
+    SIMULATION_TICK_SECONDS,
+    save,
+  );

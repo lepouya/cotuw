@@ -57,11 +57,11 @@ route. Paid production orders show remaining time and a Cancel action with
 a full refund. A Refinery has one Harvester slot; a Barracks has five
 outstanding orders. Blocked exits hold finished production until a tile is
 cleared. Buildings sell for half cost. Buildings share one construction slot;
-**Units** shows building timers and cancellation for a full refund.
+**Buildings** shows building timers and cancellation for a full refund.
 
-Select a production building and use **Set Rally Point** in **Units** or
-**Selection**, then click or tap clear, passable ground. New units exit and
-move to its flag, which is visible while the building is selected. **Clear
+Select a production building and use **Set Rally Point** in the lower
+**Selection** panel, then click or tap clear, passable ground. New units exit
+and move to its flag, which is visible while the building is selected. **Clear
 Rally Point** restores exit-and-idle behavior; **Cancel rally point** or `Esc`
 exits targeting.
 
@@ -100,10 +100,10 @@ The top bar holds **Menu**, **Pause**, and ½×, 1×, and 2× speed on the left;
 the next objective, which opens **Goals**, in the center; and Materials, mission
 time, and the alert history on the right. Alerts for attacks, losses, completed
 work, blocked units, network changes, and objectives appear briefly over the
-map and stay in the history; select one to move the camera there. The first
-Refinery placement and first Harvester each show a short explanation that
-pauses the mission until dismissed. Right-click the map for a radial menu of
-the target's actions; the highlighted one matches a left click.
+map and stay in the history; select one to move the camera there. Short guides
+at mission start, first Refinery placement, first Harvester, first completed
+Barracks, and first Scout pause until dismissed. Right-click the map for a
+radial menu of the target's actions; the highlighted one matches a left click.
 
 **Menu** or `F10` pauses the mission and opens the game menu. **Save** stores a
 named save or exports it as a file; **Quicksave** or `F5` replaces the single
@@ -154,12 +154,22 @@ corners pan diagonally. This preserves selection and stops while dragging or
 using controls. Turn off **Edge panning** in the camera controls to disable it.
 Touch and pen input do not trigger edge panning.
 
-**Selection** shows the selected actor or group and building actions.
-**Units** also lists buildings that train units and the units in the field.
-**Goals** shows the opening's wolf objectives, defeat counts, route and combat
-directives, and the Command Center protection rule. Recommended preparation
-explains gathering, construction, and training; its counts show current forces
-and are separate from the win condition. Sandbox goals show practice counts.
+The sidebar's upper half has **Buildings** and **Units** production tabs.
+Picture buttons show names and costs; hover or keyboard focus explains their
+roles, requirements, and work duration. Tap an unavailable card to inspect it
+by touch. The lower **Selection** panel always shows the selected actor or
+group, health, contextual actions, and production orders. **Units** shows only
+the selected building's trainable units, followed by collapsible lists of
+field units and resource sites. Select production buildings on the map. The
+orders toolbar stays visible below both scrolling panels. Active placement
+controls appear just above the orders toolbar. **Buildings** lists the
+Materials Refinery before the Field Barracks.
+**Goals** in the sidebar header toggles the goals panel, and the top bar's
+objective opens it. It shows the opening's wolf objectives, defeat counts,
+route and combat directives, and the Command Center protection rule.
+Recommended preparation explains gathering, construction, and training; its
+counts show current forces and are separate from the win condition. Sandbox
+goals show practice counts.
 **Building idle animation** controls rooftop equipment. A gathering Harvester
 lowers and spins its drill with a green light; idle Harvesters raise it and
 show amber. The collector lowers when gathering starts and stows when it

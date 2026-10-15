@@ -1,0 +1,184 @@
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import type { ProductionCard } from "../src/ui/production-card";
+import type { createProductionCards } from "../src/ui/production-card";
+
+declare global {
+  interface Window {
+    cardFixture: {
+      root: HTMLElement;
+      card: ProductionCard;
+      factory: ReturnType<typeof createProductionCards>;
+      parent: AbortController;
+      setReason: (reason: string) => void;
+      clicks: number;
+    };
+  }
+}
+
+async function setupCard(page: Page) {
+  await page.goto("/?level=sandbox");
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-terrain-ready",
+    "true",
+  );
+  await page.evaluate(async () => {
+    const cardsPath: string = "/src/ui/production-card.ts";
+    const actionPath: string = "/src/ui/production-action.ts";
+    const { createProductionCards } = await import(cardsPath);
+    const { setActionAvailability } = await import(actionPath);
+    const root = document.createElement("section");
+    root.id = "card-review";
+    Object.assign(root.style, {
+      position: "fixed",
+      left: "340px",
+      top: `${Math.max(8, innerHeight - 240)}px`,
+      width: "180px",
+      zIndex: "20",
+    });
+    document.body.append(root);
+    const parent = new AbortController();
+    const factory = createProductionCards(root, parent.signal);
+    const card = factory.create(
+      root,
+      { id: "review-unit", label: "Train Runner" },
+      { id: "runner", behaviorId: "idle", movement: { speed: 1 } },
+      { name: "Runner", details: "A fast reconnaissance unit", cost: 20 },
+    );
+    window.cardFixture = {
+      root,
+      card,
+      factory,
+      parent,
+      setReason: (reason) => setActionAvailability(card, reason),
+      clicks: 0,
+    };
+    card.button.addEventListener("click", () => window.cardFixture.clicks++);
+    window.cardFixture.setReason("Need 20 Materials.");
+  });
+}
+
+test.beforeEach(async ({ page }) => setupCard(page));
+
+test("disabled cards keep accessible focus as availability changes", async ({
+  page,
+}) => {
+  const card = page.locator("#card-review .production-card");
+  const button = page.locator("#review-unit");
+  await card.focus();
+  await expect(card).toHaveAccessibleName("Train Runner");
+  await expect(card).toHaveAccessibleDescription(/Need 20 Materials/);
+  await card.hover();
+  await page.mouse.move(700, 450);
+  await expect(page.getByRole("tooltip")).toBeVisible();
+  await page.evaluate(() => window.cardFixture.setReason(""));
+  await expect(button).toBeFocused();
+  await button.press("Enter");
+  expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(1);
+  await page.evaluate(() =>
+    window.cardFixture.setReason("Production queue full."),
+  );
+  await expect(card).toBeFocused();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Production queue full",
+  );
+});
+
+test("activation hides its tooltip when the action immediately disables itself", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const { card, setReason } = window.cardFixture;
+    setReason("");
+    card.button.addEventListener("click", () => setReason("Order pending."));
+  });
+  const button = page.locator("#review-unit");
+  await button.focus();
+  await expect(page.getByRole("tooltip")).toBeVisible();
+  await button.press("Enter");
+  await expect(button).toBeDisabled();
+  await expect(page.locator("#card-review .production-card")).toBeFocused();
+  await expect(page.getByRole("tooltip")).toBeHidden();
+});
+
+test("tooltip content stays within the viewport and Escape consumes only its own dismissal", async ({
+  page,
+}) => {
+  await page.evaluate(() => window.cardFixture.card.card.focus());
+  await page.evaluate(() =>
+    window.cardFixture.setReason("Restore the support network. ".repeat(120)),
+  );
+  await expect(page.getByRole("tooltip")).toBeInViewport({ ratio: 1 });
+  const dismissal = await page.evaluate(() => {
+    let bubbled = 0;
+    const observe = () => bubbled++;
+    window.addEventListener("keydown", observe);
+    const key = () =>
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+    const first = window.cardFixture.card.card.dispatchEvent(key());
+    const second = window.cardFixture.card.card.dispatchEvent(key());
+    window.removeEventListener("keydown", observe);
+    return { first, second, bubbled };
+  });
+  expect(dismissal).toEqual({ first: false, second: true, bubbled: 1 });
+  await expect(page.getByRole("tooltip")).toBeHidden();
+  await page.locator("#card-review .production-card").hover();
+  await expect(page.getByRole("tooltip")).toBeVisible();
+  const bounds = (await page.getByRole("tooltip").boundingBox())!;
+  await page.mouse.move(bounds.x + 10, bounds.y + 10);
+  await expect(page.getByRole("tooltip")).toBeVisible();
+});
+
+for (const end of ["dispose", "abort"] as const) {
+  test(`${end} releases the tooltip and all event listeners`, async ({
+    page,
+  }) => {
+    const tooltipCount = await page.locator(".production-tooltip").count();
+    await page.locator("#card-review .production-card").focus();
+    await page.evaluate((end) => {
+      const { factory, parent } = window.cardFixture;
+      if (end === "dispose") factory.dispose();
+      else parent.abort();
+    }, end);
+    await expect(page.locator(".production-tooltip")).toHaveCount(
+      tooltipCount - 1,
+    );
+    await page.locator("#card-review .production-card").hover();
+    expect(
+      await page.evaluate(() =>
+        window.cardFixture.card.card.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Escape",
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      ),
+    ).toBe(true);
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+  });
+}
+
+test("touch can inspect an unavailable card without activating it", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 844, height: 390 },
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  try {
+    await setupCard(page);
+    await page.locator("#card-review .production-card").tap();
+    await expect(page.getByRole("tooltip")).toContainText("Need 20 Materials");
+    expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(0);
+    await page.locator("#tab-goals").tap();
+    await expect(page.getByRole("tooltip")).toBeHidden();
+  } finally {
+    await context.close();
+  }
+});

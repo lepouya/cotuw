@@ -2588,26 +2588,20 @@ viewport with touch-style input and no keyboard, hover, or right-click.
   what an important object or mechanic is and does.
 - These popups prove the notification and modal interface paths. They do not
   gate actions, enforce a tutorial sequence, or attempt final onboarding polish.
-- M0 uses two explanatory popups:
-  - **Support Network** appears when the player first begins placing the
-    Materials Refinery. It explains valid proximity and that disconnected
-    buildings pause.
-  - **Harvester Operations** appears when the first Harvester is produced. It
-    explains patch assignment, automatic return trips, depletion, and
-    reassignment.
+- [Controls and interface](../DESIGN.md#controls-and-interface) defines the
+  opening's contextual guides and their triggers.
 - Combat, objective, attack, completion, and economy events use the normal
   notification and alert system instead of additional explanatory popups.
 
 #### Resolved follow-up: How do popups differ from notifications?
 
 - Ordinary notifications and alerts are non-modal and never pause simulation.
-- The two explanatory popups pause single-player until the player dismisses
-  them.
+- Explanatory popups pause single-player until the player dismisses them.
 - Whether each popup has been dismissed is authoritative mission state and is
   included in manual, quick, and automatic mission saves.
 - Loading does not repeat a popup that had already been dismissed in that
   snapshot.
-- Restarting reconstructs the pristine mission state, so both popups may appear
+- Restarting reconstructs the pristine mission state, so the popups may appear
   again during the new run.
 
 #### Resolved M0 acceptance checklist

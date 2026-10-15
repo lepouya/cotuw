@@ -8,6 +8,7 @@ import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createUnitTraining } from "../src/ui/unit-training";
+import { trainableUnitIds } from "../src/simulation/production";
 
 import type { ActorDefinition } from "../src/simulation/actor";
 import type { MissionState } from "../src/simulation/mission";
@@ -75,6 +76,8 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
   const scout = new ElementStub();
   const status = new ElementStub();
   let selected = "one";
+  let paused = false;
+  let placing = false;
   const controller = createUnitTraining(
     simulation,
     {
@@ -96,7 +99,13 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
         ["scout", "Scout"],
       ]),
       selectedActorId: () => selected,
-      enabled: () => true,
+      unitDefinitionIds: () =>
+        trainableUnitIds(
+          simulation.actorById(selected),
+          new Map(definitions.map((definition) => [definition.id, definition])),
+        ),
+      enabled: () => !paused && !placing,
+      paused: () => paused,
     },
   );
   const tick = () => {
@@ -110,6 +119,11 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
     trooper,
     status,
     tick,
+    setBlocked: (state: { paused?: boolean; placing?: boolean }) => {
+      paused = state.paused ?? false;
+      placing = state.placing ?? false;
+      controller.refresh();
+    },
     select: (id: string) => {
       selected = id;
       controller.refresh();
@@ -123,6 +137,35 @@ test("availability follows the selected producer's roster instead of the first u
   expect(trooper.disabled).toBe(true);
   expect(scout.disabled).toBe(false);
   expect(status.textContent).toContain("Train a unit");
+});
+
+test("a selection without production cannot inherit errors from unrelated unit types", () => {
+  const { simulation, controller, select, status } = fixture();
+  const evaluate = simulation.evaluateTraining;
+  let evaluations = 0;
+  simulation.evaluateTraining = (command) => {
+    evaluations++;
+    return evaluate(command);
+  };
+  select("missing");
+  expect(evaluations).toBe(0);
+  expect(status.textContent).toContain("Select a production building");
+  controller.dispose();
+  simulation.dispose();
+});
+
+test("plain training buttons expose pending and unavailable explanations", () => {
+  const { simulation, controller, scout, trooper, tick } = fixture();
+  controller.refresh();
+  expect((trooper as unknown as HTMLButtonElement).title).toContain(
+    "cannot train",
+  );
+  scout.click();
+  expect((scout as unknown as HTMLButtonElement).title).toContain("confirmed");
+  tick();
+  expect((scout as unknown as HTMLButtonElement).title).toBe("");
+  controller.dispose();
+  simulation.dispose();
 });
 
 test("training skips retired IDs and prevents a second pending request", () => {
@@ -145,6 +188,40 @@ test("training skips retired IDs and prevents a second pending request", () => {
   controller.dispose();
   scout.click();
   expect(simulation.snapshot().commands).toHaveLength(0);
+});
+
+test("blocking training preserves pending orders and reports the current session condition", () => {
+  const { simulation, controller, scout, status, tick, setBlocked } = fixture();
+  try {
+    scout.click();
+    setBlocked({ paused: true, placing: true });
+    expect(status.textContent).toBe("Resume the mission to train units.");
+    expect((scout as unknown as HTMLButtonElement).title).toBe(
+      status.textContent,
+    );
+    scout.click();
+    expect(simulation.snapshot().commands).toHaveLength(1);
+    setBlocked({});
+    expect(scout.disabled).toBe(true);
+    expect(status.textContent).toBe("Training Scout…");
+    tick();
+    expect(scout.disabled).toBe(false);
+    setBlocked({ placing: true });
+    expect(status.textContent).toBe(
+      "Finish or cancel the current building placement.",
+    );
+    scout.click();
+    expect(simulation.snapshot().commands).toEqual([]);
+    setBlocked({ paused: true });
+    controller.fault();
+    expect(status.textContent).toContain("Simulation stopped");
+    expect(scout.disabled).toBe(true);
+    setBlocked({});
+    expect(scout.disabled).toBe(true);
+  } finally {
+    controller.dispose();
+    simulation.dispose();
+  }
 });
 
 test("success feedback belongs to its producer and cannot leak into another selection", () => {
