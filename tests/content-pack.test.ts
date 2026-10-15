@@ -14,6 +14,35 @@ const withEdit = (edit: (pack: any) => void) => {
 };
 
 describe("content packs", () => {
+  test("production buttons require actors that support their actions", () => {
+    expect(
+      withEdit((pack) => {
+        pack.presentation["arc-scout"].build = {
+          id: "build-scout",
+          label: "Build Scout",
+        };
+      }),
+    ).toThrow("build action without a footprint");
+    expect(
+      withEdit((pack) => {
+        pack.presentation["arc-field-barracks"].train = {
+          id: "train-barracks",
+          label: "Train Barracks",
+        };
+      }),
+    ).toThrow("train action without a mobile unit");
+  });
+  test.each([-1, "first", null])(
+    "rejects invalid building order %j",
+    (order) => {
+      expect(
+        withEdit((pack) => {
+          pack.presentation["arc-materials-refinery"].build.order = order;
+        }),
+      ).toThrow("invalid building order");
+    },
+  );
+
   test.each([
     null,
     { audio: { loops: { working: "missing" } } },

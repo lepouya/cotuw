@@ -392,7 +392,8 @@
       "description": "Infantry production",
       "build": {
         "id": "build-barracks",
-        "label": "Build Field Barracks"
+        "label": "Build Field Barracks",
+        "order": 2
       },
       "damageEffect": "mechanical",
       "building": {
@@ -422,7 +423,8 @@
       "description": "One assigned Harvester",
       "build": {
         "id": "build-refinery",
-        "label": "Build Materials Refinery"
+        "label": "Build Materials Refinery",
+        "order": 1
       },
       "damageEffect": "mechanical",
       "building": {

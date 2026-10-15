@@ -25,6 +25,10 @@ bundled packs through the same parser future mod packs will use.
 - `movementProfiles` prices each terrain type and slope for ground movement.
 - `presentation` maps actor IDs to what the player sees:
   - `name`, `description`, and optional `build` or `train` button labels.
+    `build.order` optionally sets the construction card's nonnegative sort
+    order; omitted values use zero, and ties retain actor definition order.
+    Build actions require a footprint; train actions require movement and no
+    footprint. Construction ordering does not reorder unit cards.
   - `attackEffect` is `"tracer"` or `"bite"`.
   - `damageEffect` is `"mechanical"` smoke and fire or `"biological"` drops,
     shown once health falls to 60%; absent shows no damage effect.

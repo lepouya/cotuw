@@ -52,7 +52,7 @@ export type ActorPresentation = {
   audio?: AudioBindings;
   name: string;
   description: string;
-  build?: { id: string; label: string };
+  build?: { id: string; label: string; order?: number };
   train?: { id: string; label: string };
   attackEffect?: AttackEffectStyle;
   /** How damage shows once health drops; absent shows none. */
@@ -205,6 +205,15 @@ export function parseContentPack(source: string): ContentPack {
         throw invalid(`gives ${actor.id} an invalid or duplicate button ID`);
       if (action) buttonIds.add(action.id);
     }
+    if (
+      presentation.build?.order !== undefined &&
+      !isNonnegative(presentation.build.order)
+    )
+      throw invalid(`gives ${actor.id} an invalid building order`);
+    if (presentation.build && !actor.footprint)
+      throw invalid(`gives ${actor.id} a build action without a footprint`);
+    if (presentation.train && (!actor.movement || actor.footprint))
+      throw invalid(`gives ${actor.id} a train action without a mobile unit`);
     if (
       presentation.attackEffect !== undefined &&
       !isOneOf(ATTACK_EFFECT_STYLES, presentation.attackEffect)
