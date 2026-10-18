@@ -167,6 +167,42 @@ const gather = (siteId = "site"): MissionCommand => ({
   siteId,
 });
 
+test.each([
+  { capacity: 7, loadSeconds: 10, cargo: [0, 1, 2, 2, 3, 4, 4, 5, 6, 7] },
+  { capacity: 1_000_000_000, loadSeconds: 1, cargo: [1_000_000_000] },
+])(
+  "harvesting conserves Materials with capacity $capacity and load time $loadSeconds",
+  ({ capacity, loadSeconds, cargo }) => {
+    const { simulation: opening, map } = workerFixture();
+    const state = opening.snapshot();
+    const actor = state.actors.find(({ id }) => id === "worker")!;
+    actor.worldPosition = map.tileCenter(14, 6);
+    const worker = state.economy!.harvesters[0]!;
+    worker.phase = "gathering";
+    worker.targetSiteId = worker.activeSiteId = "site";
+    const site = state.economy!.sites.find(({ id }) => id === "site")!;
+    site.initialMaterials = site.remainingMaterials = capacity + 2;
+    const content = definitions.map((definition) =>
+      definition.harvesting
+        ? {
+            ...definition,
+            harvesting: { ...definition.harvesting, capacity, loadSeconds },
+          }
+        : definition,
+    );
+    const { simulation } = fixture(state, 1, false, content);
+    for (const expected of cargo) {
+      simulation.tick();
+      expect(simulation.economy!.harvesters[0]!.cargo).toBe(expected);
+      expect(simulation.economy!.sites[0]!.remainingMaterials + expected).toBe(
+        capacity + 2,
+      );
+    }
+    expect(simulation.economy!.harvesters[0]!.phase).toBe("returning");
+    expect(simulation.economy!.harvesters[0]!.gatherProgress).toBe(0);
+  },
+);
+
 describe("Materials economy", () => {
   test("an armed Harvester's attack interrupts gathering", () => {
     const rifle = definitions.find(

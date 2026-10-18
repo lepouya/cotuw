@@ -619,15 +619,15 @@ export function updateEconomy(
     worker.phase = "gathering";
     const loadTicks = secondsToTicks(gathering.loadSeconds, tickSeconds);
     worker.gatherProgress += gathering.capacity;
-    while (
-      worker.gatherProgress >= loadTicks &&
-      site.remainingMaterials > 0 &&
-      worker.cargo < gathering.capacity
-    ) {
-      worker.gatherProgress -= loadTicks;
-      site.remainingMaterials -= 1;
-      worker.cargo += 1;
-    }
+    // Large cargo values must not add one loop iteration per Material.
+    const collected = Math.min(
+      Math.floor(worker.gatherProgress / loadTicks),
+      site.remainingMaterials,
+      gathering.capacity - worker.cargo,
+    );
+    worker.gatherProgress -= collected * loadTicks;
+    site.remainingMaterials -= collected;
+    worker.cargo += collected;
     if (worker.cargo === gathering.capacity) {
       worker.gatherProgress = 0;
       worker.phase = "returning";

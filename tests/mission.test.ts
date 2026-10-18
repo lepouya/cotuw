@@ -133,6 +133,35 @@ test.each(["move", "attack-move", "group-move", "group-attack-move"] as const)(
   },
 );
 
+test.each(["handleCommand", "update"] as const)(
+  "a behavior cannot change occupancy layer during %s",
+  (hook) => {
+    const simulation = createMissionSimulation({
+      state: createMissionState([actor()]),
+      definitions,
+      bounds,
+      tickSeconds: 0.5,
+      behaviorRegistry: new Map([
+        [
+          "walk",
+          {
+            ...walkBehavior,
+            [hook]: (current: Actor) => {
+              current.occupancyLayer = "air";
+              return true;
+            },
+          },
+        ],
+      ]),
+    });
+    simulation.submitCommand(move("trooper", 3, 0));
+    const before = simulation.snapshot();
+    expect(() => simulation.tick()).toThrow("layer");
+    expect(simulation.snapshot()).toEqual(before);
+    expect(() => simulation.tick()).toThrow("faulted");
+  },
+);
+
 test.each([null, {}, { target: null }])(
   "rejects malformed saved movement %j before starting",
   (movement) => {

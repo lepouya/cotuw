@@ -6,6 +6,7 @@ import type { WorldPosition } from "./world";
 
 export type SupportNode = {
   actorId: string;
+  faction?: string;
   center: Readonly<WorldPosition>;
   radius: number;
   complete: boolean;
@@ -70,11 +71,13 @@ export function createSupportNetwork(
 ): SupportNetwork {
   const nodes: SupportNode[] = actors
     .flatMap((actor) => {
-      const support = definitions.get(actor.definitionId)?.support;
+      const definition = definitions.get(actor.definitionId);
+      const support = definition?.support;
       return actor.tilePlacement && support
         ? [
             {
               actorId: actor.id,
+              faction: definition?.faction,
               center: { ...actor.worldPosition },
               radius: support.radius,
               complete: !actor.construction,
@@ -93,6 +96,7 @@ export function createSupportNetwork(
       if (
         a.complete &&
         b.complete &&
+        a.faction === b.faction &&
         distance(a.center, b.center) <= Math.max(a.radius, b.radius)
       )
         edges.push([a, b]);
@@ -108,7 +112,7 @@ export function createSupportNetwork(
   }
   for (const node of nodes)
     if (!node.complete)
-      node.connected = supportsPosition({ nodes }, node.center);
+      node.connected = supportsPosition({ nodes }, node.center, node.faction);
   return {
     nodes,
     links: edges.map(([a, b]) => ({
@@ -119,13 +123,15 @@ export function createSupportNetwork(
   };
 }
 
-/** New blueprints must place their center inside operational coverage. */
+/** New blueprints need operational coverage from their own faction. */
 export function supportsPosition(
   network: Pick<SupportView, "nodes">,
   point: Readonly<WorldPosition>,
+  faction: string | undefined,
 ) {
   return network.nodes.some(
     (node) =>
+      node.faction === faction &&
       node.complete &&
       node.connected &&
       distance(node.center, point) <= node.radius,

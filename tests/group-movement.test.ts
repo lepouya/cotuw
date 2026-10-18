@@ -11,6 +11,7 @@ import { startSimulationLoop } from "../src/simulation/loop";
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
+import type { WorldBounds } from "../src/simulation/world";
 
 const definitions: ActorDefinition[] = [
   {
@@ -48,7 +49,7 @@ const profiles = [
     terrainCosts: { plain: null, rough: null, water: 1 },
   },
 ];
-function fixture(actors?: Actor[], saved?: MissionState) {
+function fixture(actors?: Actor[], saved?: MissionState, bounds?: WorldBounds) {
   const map = new TerrainGrid({
     width: 20,
     height: 12,
@@ -80,7 +81,7 @@ function fixture(actors?: Actor[], saved?: MissionState) {
     behaviorRegistry: new Map([
       ["move", createTerrainMoveBehavior(map, occupancy, profiles)],
     ]),
-    bounds: map.worldBounds,
+    bounds: bounds ?? map.worldBounds,
     definitions,
     tickSeconds: 1 / 60,
     map,
@@ -94,6 +95,39 @@ const sortedActors = (state: MissionState) =>
   state.actors.sort((a, b) => (a.id < b.id ? -1 : 1));
 
 describe("group movement", () => {
+  test("formations and contact correction stay inside mission bounds", () => {
+    const bounds = { minX: -8, maxX: -4, minZ: -4, maxZ: 4 };
+    const actors = [0, 0.1, 0.2].map((offset, index) =>
+      createActor({
+        id: `unit-${index}`,
+        definitionId: "trooper",
+        worldPosition: { x: -8 + offset, z: 0 },
+      }),
+    );
+    const { simulation } = fixture(actors, undefined, bounds);
+    expect(() => simulation.tick()).not.toThrow();
+    simulation.submitCommand({
+      kind: "group-move",
+      actorIds: actors.map(({ id }) => id),
+      target: { x: -8, z: -4 },
+    });
+    const outcomes = simulation.tick();
+    expect(outcomes.every(({ accepted }) => accepted)).toBe(true);
+    for (const { command } of outcomes) {
+      expect(command.kind).toBe("move");
+      if (command.kind === "move") {
+        expect(command.target.x).toBeGreaterThanOrEqual(bounds.minX);
+        expect(command.target.z).toBeGreaterThanOrEqual(bounds.minZ);
+      }
+    }
+    for (let tick = 0; tick < 200; tick++) simulation.tick();
+    for (const actor of simulation.actors) {
+      expect(actor.worldPosition.x).toBeGreaterThanOrEqual(bounds.minX);
+      expect(actor.worldPosition.x).toBeLessThanOrEqual(bounds.maxX);
+      expect(actor.worldPosition.z).toBeGreaterThanOrEqual(bounds.minZ);
+      expect(actor.worldPosition.z).toBeLessThanOrEqual(bounds.maxZ);
+    }
+  });
   test("blocked move receipts survive arrival in the command's tick", () => {
     const { simulation, map } = fixture([]);
     const start = map.tileCenter(9, 4);

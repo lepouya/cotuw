@@ -68,7 +68,7 @@ for (const distance of [20, 15]) {
         x: (points[0]! + points[3]!) / 2,
         z: (points[2]! + points[5]!) / 2,
       };
-      expect(supportsPosition(network, center)).toBe(false);
+      expect(supportsPosition(network, center, undefined)).toBe(false);
       if (distance === 20) expect(center.x).toBeGreaterThan(12);
     }
     view.update(network, true);

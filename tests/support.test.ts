@@ -16,7 +16,7 @@ import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { createTilePlacedActor } from "../src/simulation/placement";
-import type { Actor } from "../src/simulation/actor";
+import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
 import { exploredScenarioState } from "./helpers/scenario";
 
@@ -59,6 +59,7 @@ const scenario = defineScenario({
 });
 function fixture(
   state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
+  actorDefinitions: readonly ActorDefinition[] = ARC_ACTOR_DEFINITIONS,
 ) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
@@ -66,7 +67,7 @@ function fixture(
     state,
     map,
     occupancy,
-    definitions: ARC_ACTOR_DEFINITIONS,
+    definitions: actorDefinitions,
     tickSeconds: 1,
     bounds: map.worldBounds,
     behaviorRegistry: new Map([
@@ -108,6 +109,38 @@ function blueprint(id: string, x: number, z: number): Actor {
 }
 
 describe("construction support", () => {
+  test("another faction's root cannot power buildings or authorize placement", () => {
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const enemyRoot = {
+      ...definitions.get("arc-command-center-prototype")!,
+      id: "enemy-command-center",
+      faction: "enemy",
+    };
+    state.actors.find(({ id }) => id === "cc")!.definitionId = enemyRoot.id;
+    state.actors.push(blueprint("construction", 7, 10));
+    const { simulation } = fixture(state, [
+      ...ARC_ACTOR_DEFINITIONS,
+      enemyRoot,
+    ]);
+    expect(simulation.support!.links).toEqual([
+      { from: "bridge", to: "remote", active: false },
+    ]);
+    expect(
+      simulation
+        .support!.nodes.filter(({ connected }) => connected)
+        .map(({ actorId }) => actorId),
+    ).toEqual(["cc"]);
+    expect(
+      simulation.evaluatePlacement({
+        actorId: "new",
+        definitionId: "arc-field-barracks",
+        origin: { x: 8, z: 14 },
+      }),
+    ).toMatchObject({ accepted: false, reason: "outside-support" });
+    const before = simulation.actorById("construction")!.construction;
+    simulation.tick();
+    expect(simulation.actorById("construction")!.construction).toEqual(before);
+  });
   test("a legally built branch depends on its bridge and can gain a redundant path", () => {
     const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     state.actors = state.actors.filter((actor) => actor.id === "cc");
@@ -202,10 +235,12 @@ describe("construction support", () => {
     const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     const network = createSupportNetwork(state.actors, definitions);
     expect(network.nodes.every((node) => node.connected)).toBe(true);
-    expect(supportsPosition(network, contentMap.tileCenter(23, 10))).toBe(true);
-    expect(supportsPosition(network, contentMap.tileCenter(50, 10))).toBe(
-      false,
-    );
+    expect(
+      supportsPosition(network, contentMap.tileCenter(23, 10), "arc"),
+    ).toBe(true);
+    expect(
+      supportsPosition(network, contentMap.tileCenter(50, 10), "arc"),
+    ).toBe(false);
     expect(
       createSupportNetwork([...state.actors].reverse(), definitions),
     ).toEqual(network);
@@ -225,9 +260,9 @@ describe("construction support", () => {
     expect(
       network.nodes.find((node) => node.actorId === "remote")!.connected,
     ).toBe(false);
-    expect(supportsPosition(network, contentMap.tileCenter(18, 10))).toBe(
-      false,
-    );
+    expect(
+      supportsPosition(network, contentMap.tileCenter(18, 10), "arc"),
+    ).toBe(false);
     expect(
       createSupportNetwork(
         state.actors.filter((actor) => actor.id !== "cc"),

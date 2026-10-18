@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { createMissionSimulation } from "../src/simulation/mission";
@@ -16,6 +16,18 @@ import { visibleTiles } from "../src/simulation/vision";
 import type { MissionState } from "../src/simulation/mission";
 import type { ActorDefinition } from "../src/simulation/actor";
 import type { TerrainGridOptions } from "../src/simulation/terrain";
+
+test("sight queries scan map tiles instead of the unbounded vision circle", () => {
+  const map = new TerrainGrid({ width: 3, height: 2, tileSize: 1 });
+  const contains = vi.spyOn(map, "containsTile");
+  expect(visibleTiles(map, map.tileCenter(1, 1), 100)).toEqual([
+    0, 1, 2, 3, 4, 5,
+  ]);
+  expect(contains.mock.calls.length).toBeLessThan(100);
+  expect(visibleTiles(map, map.tileCenter(1, 1), Number.MAX_VALUE)).toEqual([
+    0, 1, 2, 3, 4, 5,
+  ]);
+});
 
 const definitions = new Map(
   ARC_ACTOR_DEFINITIONS.map((definition) => [definition.id, definition]),

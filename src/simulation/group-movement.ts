@@ -5,7 +5,7 @@ import { compareIds } from "./actor";
 import type { Actor, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
 import { distance, withinBounds } from "./world";
-import type { WorldPosition } from "./world";
+import type { WorldBounds, WorldPosition } from "./world";
 
 export type DefinedActor = {
   actor: Actor;
@@ -38,6 +38,7 @@ export function assignGroupDestinations(
   movers: readonly NavigatingActor[],
   actors: readonly DefinedActor[],
   target: WorldPosition,
+  bounds?: WorldBounds,
 ): GroupDestination[] {
   const selected = new Set(movers.map(({ actor }) => actor.id));
   const reserved = actors
@@ -60,6 +61,7 @@ export function assignGroupDestinations(
         for (let x = 0; x < map.width; x += 1) {
           if (grid.regionAt(x, z) !== region) continue;
           const point = map.tileCenter(x, z);
+          if (bounds && !withinBounds(point, bounds)) continue;
           slots.push({ point, nearTarget: squaredDistance(point, target) });
         }
       }

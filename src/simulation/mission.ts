@@ -129,12 +129,16 @@ import type { FogState, FogView, Vision } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
 /** Actor state that behaviors must leave unchanged. */
-type ActorIdentity = Pick<Actor, "id" | "definitionId" | "tilePlacement">;
+type ActorIdentity = Pick<
+  Actor,
+  "id" | "definitionId" | "tilePlacement" | "occupancyLayer"
+>;
 
 function actorIdentity(actor: Actor): ActorIdentity {
   return {
     id: actor.id,
     definitionId: actor.definitionId,
+    occupancyLayer: actor.occupancyLayer,
     tilePlacement: actor.tilePlacement && structuredClone(actor.tilePlacement),
   };
 }
@@ -523,10 +527,11 @@ export function createMissionSimulation({
     if (
       actor.id !== before.id ||
       actor.definitionId !== before.definitionId ||
+      actor.occupancyLayer !== before.occupancyLayer ||
       !sameTilePlacement(actor.tilePlacement, before.tilePlacement)
     ) {
       throw new RangeError(
-        `Actor ${before.id} changed its identity or placement.`,
+        `Actor ${before.id} changed its identity, layer, or placement.`,
       );
     }
     ensureValidActor(actor);
@@ -642,7 +647,11 @@ export function createMissionSimulation({
         return { ...reject("resource-site"), tiles: evaluation.tiles };
       if (
         definition.support &&
-        !supportsPosition(supportFor(actors), actor.worldPosition)
+        !supportsPosition(
+          supportFor(actors),
+          actor.worldPosition,
+          definition.faction,
+        )
       )
         return { ...reject("outside-support"), tiles: evaluation.tiles };
     }
@@ -1114,6 +1123,7 @@ export function createMissionSimulation({
           definition: definitionFor(actor),
         })),
         target,
+        worldBounds,
       ).map((destination) => [destination.actorId, destination]),
     );
     return ids.map((actorId) => {
@@ -1642,6 +1652,7 @@ export function createMissionSimulation({
             tickSeconds,
             previousPositions,
             ({ actor, definition }, point) =>
+              withinBounds(point, worldBounds) &&
               leashAllows(actor, definition, point),
           );
         }

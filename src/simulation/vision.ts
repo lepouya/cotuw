@@ -197,11 +197,14 @@ export function visibleTiles(
   const observer = eye(map, origin);
   const center = map.tileAtWorldPosition(origin.x, origin.z);
   const reach = Math.ceil(radius / map.tileSize);
+  const minX = Math.max(0, center.x - reach);
+  const maxX = Math.min(map.width - 1, center.x + reach);
+  const minZ = Math.max(0, center.z - reach);
+  const maxZ = Math.min(map.height - 1, center.z + reach);
   const tiles: number[] = [];
-  for (let z = center.z - reach; z <= center.z + reach; z += 1) {
-    for (let x = center.x - reach; x <= center.x + reach; x += 1) {
-      if (map.containsTile(x, z) && seesTile(map, observer, radius, x, z))
-        tiles.push(z * map.width + x);
+  for (let z = minZ; z <= maxZ; z += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (seesTile(map, observer, radius, x, z)) tiles.push(z * map.width + x);
     }
   }
   return tiles;
