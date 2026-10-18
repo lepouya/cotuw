@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { WEBKIT } from "./tags";
 
 test("refreshes footprint geometry and in-place color changes at the same center", async ({
   page,
@@ -149,54 +150,58 @@ test("clicking the minimap glides the camera to that point", async ({
   expect(target.z).toBeCloseTo(destination.z, 1);
 });
 
-test("dragging the outline pans without jumping to the pointer", async ({
-  page,
-}) => {
-  await openMinimapView(page);
-  await page.mouse.click(100, 100);
-  await settle(page);
-  const before = await cameraTarget(page);
-  const outline = await viewportOutline(page);
-  // Hit the middle of the visible edge, not merely the viewport interior.
-  const startPoint = {
-    x: (outline[0].x + outline[1].x) / 2,
-    y: (outline[0].y + outline[1].y) / 2,
-  };
-  const endPoint = { x: startPoint.x - 20, y: startPoint.y + 20 };
-  const start = await worldAt(page, startPoint.x, startPoint.y);
-  const end = await worldAt(page, endPoint.x, endPoint.y);
+test(
+  "dragging the outline pans without jumping to the pointer",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openMinimapView(page);
+    await page.mouse.click(100, 100);
+    await settle(page);
+    const before = await cameraTarget(page);
+    const outline = await viewportOutline(page);
+    // Hit the middle of the visible edge, not merely the viewport interior.
+    const startPoint = {
+      x: (outline[0].x + outline[1].x) / 2,
+      y: (outline[0].y + outline[1].y) / 2,
+    };
+    const endPoint = { x: startPoint.x - 20, y: startPoint.y + 20 };
+    const start = await worldAt(page, startPoint.x, startPoint.y);
+    const end = await worldAt(page, endPoint.x, endPoint.y);
 
-  // Grabs the outline off-center; the view must keep that grip.
-  await page.mouse.move(startPoint.x, startPoint.y);
-  await page.mouse.down();
-  await page.mouse.move(
-    (startPoint.x + endPoint.x) / 2,
-    (startPoint.y + endPoint.y) / 2,
-    { steps: 4 },
-  );
-  await page.mouse.move(endPoint.x, endPoint.y, { steps: 4 });
-  await page.mouse.up();
-  await page.evaluate(() => harness.frames(2));
+    // Grabs the outline off-center; the view must keep that grip.
+    await page.mouse.move(startPoint.x, startPoint.y);
+    await page.mouse.down();
+    await page.mouse.move(
+      (startPoint.x + endPoint.x) / 2,
+      (startPoint.y + endPoint.y) / 2,
+      { steps: 4 },
+    );
+    await page.mouse.move(endPoint.x, endPoint.y, { steps: 4 });
+    await page.mouse.up();
+    await page.evaluate(() => harness.frames(2));
 
-  const after = await cameraTarget(page);
-  expect(after.x - before.x).toBeCloseTo(end.x - start.x, 1);
-  expect(after.z - before.z).toBeCloseTo(end.z - start.z, 1);
-});
+    const after = await cameraTarget(page);
+    expect(after.x - before.x).toBeCloseTo(end.x - start.x, 1);
+    expect(after.z - before.z).toBeCloseTo(end.z - start.z, 1);
+  },
+);
 
-test("scrolling over the minimap never zooms the main view", async ({
-  page,
-}) => {
-  await openMinimapView(page);
-  const viewHeight = () =>
-    page.evaluate(() => harness.viewHeight(testView.camera));
-  const heightBefore = await viewHeight();
+test(
+  "scrolling over the minimap never zooms the main view",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openMinimapView(page);
+    const viewHeight = () =>
+      page.evaluate(() => harness.viewHeight(testView.camera));
+    const heightBefore = await viewHeight();
 
-  await page.mouse.move(100, 100);
-  await page.mouse.wheel(0, 2_000);
-  await page.evaluate(() => harness.frames(2));
+    await page.mouse.move(100, 100);
+    await page.mouse.wheel(0, 2_000);
+    await page.evaluate(() => harness.frames(2));
 
-  expect(await viewHeight()).toBe(heightBefore);
-});
+    expect(await viewHeight()).toBe(heightBefore);
+  },
+);
 
 test("actor markers redraw at their current world positions", async ({
   page,
@@ -266,78 +271,82 @@ test("actor markers redraw at their current world positions", async ({
   expect(pixels.second).toEqual([222, 88, 31, 255]);
 });
 
-test("minimap commands wait for a click and ignore drags and cancelled capture", async ({
-  page,
-}) => {
-  await page.goto("/?level=sandbox");
-  await page.evaluate(async () => {
-    const harnessPath: string = "/e2e/harness.ts";
-    const loaded: typeof harness = await import(harnessPath);
-    const view = loaded.createTestView({ size: { width: 200, height: 200 } });
-    const canvas = document.createElement("canvas");
-    canvas.id = "command-minimap";
-    canvas.style.cssText =
-      "position:fixed;top:0;left:0;width:200px;height:200px;z-index:20;touch-action:none";
-    document.body.append(canvas);
-    const targets: { x: number; z: number; shiftKey: boolean }[] = [];
-    loaded.createMinimap(view.scene, view.map, view.view.camera, canvas, {
-      commandMode: () => true,
-      onCommand: (target: { x: number; z: number }, shiftKey: boolean) => {
-        targets.push({ ...target, shiftKey });
-        return true;
-      },
+test(
+  "minimap commands wait for a click and ignore drags and cancelled capture",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/?level=sandbox");
+    await page.evaluate(async () => {
+      const harnessPath: string = "/e2e/harness.ts";
+      const loaded: typeof harness = await import(harnessPath);
+      const view = loaded.createTestView({ size: { width: 200, height: 200 } });
+      const canvas = document.createElement("canvas");
+      canvas.id = "command-minimap";
+      canvas.style.cssText =
+        "position:fixed;top:0;left:0;width:200px;height:200px;z-index:20;touch-action:none";
+      document.body.append(canvas);
+      const targets: { x: number; z: number; shiftKey: boolean }[] = [];
+      loaded.createMinimap(view.scene, view.map, view.view.camera, canvas, {
+        commandMode: () => true,
+        onCommand: (target: { x: number; z: number }, shiftKey: boolean) => {
+          targets.push({ ...target, shiftKey });
+          return true;
+        },
+      });
+      Object.assign(window, { commandTargets: targets });
+      await loaded.frames(2);
     });
-    Object.assign(window, { commandTargets: targets });
-    await loaded.frames(2);
-  });
-  const count = () =>
-    page.evaluate(() => Reflect.get(window, "commandTargets").length);
-  await page.mouse.move(150, 60);
-  await page.mouse.down();
-  expect(await count()).toBe(0);
-  await page.mouse.up();
-  expect(await count()).toBe(1);
+    const count = () =>
+      page.evaluate(() => Reflect.get(window, "commandTargets").length);
+    await page.mouse.move(150, 60);
+    await page.mouse.down();
+    expect(await count()).toBe(0);
+    await page.mouse.up();
+    expect(await count()).toBe(1);
 
-  await page.mouse.down();
-  await page.mouse.move(170, 80, { steps: 4 });
-  await page.mouse.move(150, 60, { steps: 4 });
-  await page.mouse.up();
-  expect(await count()).toBe(1);
+    await page.mouse.down();
+    await page.mouse.move(170, 80, { steps: 4 });
+    await page.mouse.move(150, 60, { steps: 4 });
+    await page.mouse.up();
+    expect(await count()).toBe(1);
 
-  await page.mouse.down();
-  await page.evaluate(() => {
-    document
-      .querySelector("#command-minimap")!
-      .dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 }));
-  });
-  await page.mouse.up();
-  expect(await count()).toBe(1);
-  await page.mouse.click(150, 60);
-  expect(await count()).toBe(2);
+    await page.mouse.down();
+    await page.evaluate(() => {
+      document
+        .querySelector("#command-minimap")!
+        .dispatchEvent(
+          new PointerEvent("lostpointercapture", { pointerId: 1 }),
+        );
+    });
+    await page.mouse.up();
+    expect(await count()).toBe(1);
+    await page.mouse.click(150, 60);
+    expect(await count()).toBe(2);
 
-  await page.keyboard.down("Shift");
-  await page.mouse.click(150, 60);
-  await page.keyboard.up("Shift");
-  expect(
-    await page.evaluate(() =>
-      Reflect.get(window, "commandTargets").map(
-        (target: { shiftKey: boolean }) => target.shiftKey,
+    await page.keyboard.down("Shift");
+    await page.mouse.click(150, 60);
+    await page.keyboard.up("Shift");
+    expect(
+      await page.evaluate(() =>
+        Reflect.get(window, "commandTargets").map(
+          (target: { shiftKey: boolean }) => target.shiftKey,
+        ),
       ),
-    ),
-  ).toEqual([false, false, true]);
+    ).toEqual([false, false, true]);
 
-  await page.mouse.down();
-  await page.evaluate(() => {
-    const dialog = document.createElement("dialog");
-    dialog.id = "minimap-dialog";
-    document.body.append(dialog);
-    dialog.showModal();
-  });
-  await page.mouse.up();
-  expect(await count()).toBe(3);
-  await page.evaluate(() =>
-    document.querySelector("#minimap-dialog")!.remove(),
-  );
-  await page.mouse.click(150, 60);
-  expect(await count()).toBe(4);
-});
+    await page.mouse.down();
+    await page.evaluate(() => {
+      const dialog = document.createElement("dialog");
+      dialog.id = "minimap-dialog";
+      document.body.append(dialog);
+      dialog.showModal();
+    });
+    await page.mouse.up();
+    expect(await count()).toBe(3);
+    await page.evaluate(() =>
+      document.querySelector("#minimap-dialog")!.remove(),
+    );
+    await page.mouse.click(150, 60);
+    expect(await count()).toBe(4);
+  },
+);

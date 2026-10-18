@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { openOpening, importMission, placeBuilding } from "./prototype-helpers";
 import { MissionDriver } from "./mission-driver";
-import { TOUCH_PROFILES } from "./profiles";
+import { forEachProfile, PHONE_PROFILE } from "./profiles";
+import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
 
@@ -79,54 +80,56 @@ async function openLoadPanel(page: Page) {
   await expect(page.locator("#save-entries li").first()).toBeVisible();
 }
 
-test("manual saves and the quicksave restore earlier progress", async ({
-  page,
-}) => {
-  await openOpening(page);
-  const canvas = page.locator("#game-canvas");
-  await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
-  await page.locator("#open-menu").click();
-  await expect(page.locator("#game-menu-title")).toHaveText("Paused");
-  await page.locator("#save-mission").click();
-  await page.locator("#save-name").fill("Opening");
-  await page.locator("#confirm-save").click();
-  await expect(page.locator("#game-menu-status")).toHaveText(
-    "Manual save complete: Opening",
-  );
-  await page.locator("#resume-mission").click();
-  await page.keyboard.press("F5");
-  await expect(page.locator("#notifications")).toContainText(
-    "Quick save complete: Quicksave",
-  );
-  await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
-  await expect(materials(page)).toHaveText("50");
+test(
+  "manual saves and the quicksave restore earlier progress",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openOpening(page);
+    const canvas = page.locator("#game-canvas");
+    await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+    await page.locator("#open-menu").click();
+    await expect(page.locator("#game-menu-title")).toHaveText("Paused");
+    await page.locator("#save-mission").click();
+    await page.locator("#save-name").fill("Opening");
+    await page.locator("#confirm-save").click();
+    await expect(page.locator("#game-menu-status")).toHaveText(
+      "Manual save complete: Opening",
+    );
+    await page.locator("#resume-mission").click();
+    await page.keyboard.press("F5");
+    await expect(page.locator("#notifications")).toContainText(
+      "Quick save complete: Quicksave",
+    );
+    await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
+    await expect(materials(page)).toHaveText("50");
 
-  await page.keyboard.press("F9");
-  await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
-  await expect(materials(page)).toHaveText("150");
-  await page.locator("#resume-mission").click();
-  await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
-  await expect(materials(page)).toHaveText("50");
+    await page.keyboard.press("F9");
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+    await expect(materials(page)).toHaveText("150");
+    await page.locator("#resume-mission").click();
+    await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
+    await expect(materials(page)).toHaveText("50");
 
-  await openLoadPanel(page);
-  const entries = page.locator("#save-entries li");
-  await expect(entries).toHaveCount(2);
-  await expect(entries.nth(0)).toContainText("Quick · Quicksave");
-  await expect(entries.nth(1)).toContainText("Manual · Opening");
-  await expect(entries.nth(1)).toContainText("Clear the wolf threat");
-  await entries.nth(1).getByRole("button", { name: "Load" }).click();
-  await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
-  await expect(materials(page)).toHaveText("150");
+    await openLoadPanel(page);
+    const entries = page.locator("#save-entries li");
+    await expect(entries).toHaveCount(2);
+    await expect(entries.nth(0)).toContainText("Quick · Quicksave");
+    await expect(entries.nth(1)).toContainText("Manual · Opening");
+    await expect(entries.nth(1)).toContainText("Clear the wolf threat");
+    await entries.nth(1).getByRole("button", { name: "Load" }).click();
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+    await expect(materials(page)).toHaveText("150");
 
-  await page.locator("#load-mission").click();
-  const quick = page.locator("#save-entries li", { hasText: "Quicksave" });
-  await quick.getByRole("button", { name: "Delete" }).click();
-  await quick.getByRole("button", { name: "Confirm" }).click();
-  await expect(entries).toHaveCount(1);
-  await entries.first().getByRole("button", { name: "Delete" }).click();
-  await entries.first().getByRole("button", { name: "Confirm" }).click();
-  await expect(entries).toHaveText(["No saved missions yet."]);
-});
+    await page.locator("#load-mission").click();
+    const quick = page.locator("#save-entries li", { hasText: "Quicksave" });
+    await quick.getByRole("button", { name: "Delete" }).click();
+    await quick.getByRole("button", { name: "Confirm" }).click();
+    await expect(entries).toHaveCount(1);
+    await entries.first().getByRole("button", { name: "Delete" }).click();
+    await entries.first().getByRole("button", { name: "Confirm" }).click();
+    await expect(entries).toHaveText(["No saved missions yet."]);
+  },
+);
 
 test("completing an objective writes the autosave", async ({ page }) => {
   await openOpening(page);
@@ -171,32 +174,34 @@ test("completing an objective writes the autosave", async ({ page }) => {
   ]);
 });
 
-test("export writes the current mission as a readable file", async ({
-  page,
-}) => {
-  await page.goto("/?level=sandbox");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
-  await page.locator("#open-menu").click();
-  await page.locator("#save-mission").click();
-  await page.locator("#save-name").fill("Sandbox base");
-  const download = page.waitForEvent("download");
-  await page.locator("#export-mission").click();
-  const file = await download;
-  expect(file.suggestedFilename()).toBe("Sandbox-base.json");
-  const stream = await file.createReadStream();
-  let source = "";
-  for await (const chunk of stream) source += chunk;
-  const saved = JSON.parse(source);
-  expect(saved.save.name).toBe("Sandbox base");
-  expect(saved.scenario.id).toBe("sandbox");
-  expect(saved.state.terrain.tiles[0]).toMatch(/^#+$/);
-  await page.locator("#cancel-save").click();
-  await importMission(page, source);
-  await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
-});
+test(
+  "export writes the current mission as a readable file",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/?level=sandbox");
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-terrain-ready",
+      "true",
+    );
+    await page.locator("#open-menu").click();
+    await page.locator("#save-mission").click();
+    await page.locator("#save-name").fill("Sandbox base");
+    const download = page.waitForEvent("download");
+    await page.locator("#export-mission").click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe("Sandbox-base.json");
+    const stream = await file.createReadStream();
+    let source = "";
+    for await (const chunk of stream) source += chunk;
+    const saved = JSON.parse(source);
+    expect(saved.save.name).toBe("Sandbox base");
+    expect(saved.scenario.id).toBe("sandbox");
+    expect(saved.state.terrain.tiles[0]).toMatch(/^#+$/);
+    await page.locator("#cancel-save").click();
+    await importMission(page, source);
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+  },
+);
 
 test("a tick-zero save does not replace the authored restart level", async ({
   page,
@@ -282,12 +287,11 @@ test("opening and closing the menu during inspection preserves a way to resume",
   await expect(page.locator("#resume-mission")).toHaveText("Resume");
 });
 
-for (const profile of TOUCH_PROFILES)
-  test.describe(profile.name, () => {
-    test.use({ viewport: profile.viewport, hasTouch: true });
-    test("the game menu saves, quicksaves, loads, and deletes by touch", async ({
-      page,
-    }) => {
+forEachProfile([PHONE_PROFILE], () => {
+  test(
+    "the game menu saves, quicksaves, loads, and deletes by touch",
+    { tag: WEBKIT },
+    async ({ page }) => {
       const mission = new MissionDriver(page, true, false);
       await mission.opening();
       await mission.press("#open-menu");
@@ -303,7 +307,9 @@ for (const profile of TOUCH_PROFILES)
         page.getByText("Quick save complete: Quicksave").first(),
       ).toBeVisible();
       await mission.press("#resume-mission");
-      await mission.place("refinery", 12, 49, "Support Network");
+      await mission.place("refinery", 12, 49, {
+        placement: "Support Network",
+      });
       await expect(materials(page)).toHaveText("50");
 
       await mission.press("#open-menu");
@@ -324,5 +330,6 @@ for (const profile of TOUCH_PROFILES)
         await entry.getByRole("button", { name: "Confirm" }).tap();
       }
       await expect(entries).toHaveText(["No saved missions yet."]);
-    });
-  });
+    },
+  );
+});

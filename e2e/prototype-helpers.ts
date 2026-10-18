@@ -1,6 +1,20 @@
 import { expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
+/** Records uncaught page errors, plus console errors when requested. */
+export function collectPageErrors(page: Page, { console = false } = {}) {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  if (console)
+    page.on("console", (message) => {
+      const { url } = message.location();
+      // The app ships no favicon, so the browser's automatic request 404s.
+      if (message.type() === "error" && !url.endsWith("/favicon.ico"))
+        errors.push(`${message.text()} (${url})`);
+    });
+  return errors;
+}
+
 /** Uses the same input modality throughout a browser flow. */
 export async function activate(locator: Locator, touch = false) {
   if (touch) await locator.tap();

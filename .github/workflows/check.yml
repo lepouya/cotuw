@@ -30,7 +30,7 @@ jobs:
       - if: runner.os == 'macOS'
         run: npx playwright install chromium webkit
       - if: runner.os == 'macOS'
-        run: npm run check
+        run: npm run check:full
       - if: runner.os != 'macOS'
         run: npm run format:check && npm run lint && npm run typecheck && npm run test:ts && npm run test:rs
       - if: failure() && runner.os == 'macOS'

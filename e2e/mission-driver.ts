@@ -158,10 +158,15 @@ export class MissionDriver {
     await expect(this.page.locator("#explanation")).toBeHidden();
   }
 
-  async place(type: string, x: number, z: number, explanation?: string) {
+  async place(
+    type: string,
+    x: number,
+    z: number,
+    guides: { placement?: string; completion?: string } = {},
+  ) {
     await this.press("#tab-buildings");
     await this.press(`#build-${type}`);
-    if (explanation) await this.explanation(explanation);
+    if (guides.placement) await this.explanation(guides.placement);
     await this.ground(x, z);
     if (this.touch) await this.press("#confirm-building");
     await expect(this.page.locator("#game-canvas")).toHaveAttribute(
@@ -169,7 +174,7 @@ export class MissionDriver {
       "false",
     );
     await this.advance(8);
-    if (type === "barracks") await this.explanation("Barracks & Training");
+    if (guides.completion) await this.explanation(guides.completion);
   }
 
   async materials(minimum: number) {

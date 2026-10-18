@@ -49,4 +49,5 @@
   necessary local refactoring, but preserve unrelated work.
 - Verify changes in proportion to their risk and scope.
 - Run `npm run check` before considering a coding task complete.
+- Run `npm run check:full` before committing.
 - Use original or appropriately licensed code, assets, and content.

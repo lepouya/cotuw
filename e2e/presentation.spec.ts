@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { withoutApp } from "./prototype-helpers";
+import { collectPageErrors, withoutApp } from "./prototype-helpers";
+import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
 import type { GameSession } from "../src/session";
@@ -16,11 +17,7 @@ async function openPresentation(
   levelId = "arc-economy-opening",
   variant?: "healing" | "harvester",
 ) {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = collectPageErrors(page, { console: true });
   // The spec owns the session on the production HTML.
   await withoutApp(page);
   await page.goto("/");
@@ -157,38 +154,41 @@ async function openPresentation(
   return errors;
 }
 
-test("blueprints, damage, and birds render with their generated props", async ({
-  page,
-}) => {
-  const errors = await openPresentation(page);
-  const shown = await page.evaluate(() => {
-    const { scene } = window.presentation;
-    const node = (name: string) => scene.getTransformNodeByName(name);
-    const quarters = scene.getMeshByName(
-      "tile-placed-actor-blueprint-root-model-barracks-quarters",
-    );
-    return {
-      scaffold: !!node("tile-placed-actor-blueprint-root-scaffold"),
-      clipped: !!quarters?.material?.clipPlane,
-      smoke: scene.transformNodes.filter(
-        ({ name }) =>
-          name.startsWith("damage-starting-command-center-smoke-") &&
-          name.split("-").length === 6,
-      ).length,
-      fire: !!node("damage-starting-command-center-fire"),
-      birds: scene.transformNodes.filter(({ name }) => /^bird-0-\d$/.test(name))
-        .length,
-    };
-  });
-  expect(shown).toEqual({
-    scaffold: true,
-    clipped: true,
-    smoke: 12,
-    fire: true,
-    birds: 4,
-  });
-  expect(errors).toEqual([]);
-});
+test(
+  "blueprints, damage, and birds render with their generated props",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = await openPresentation(page);
+    const shown = await page.evaluate(() => {
+      const { scene } = window.presentation;
+      const node = (name: string) => scene.getTransformNodeByName(name);
+      const quarters = scene.getMeshByName(
+        "tile-placed-actor-blueprint-root-model-barracks-quarters",
+      );
+      return {
+        scaffold: !!node("tile-placed-actor-blueprint-root-scaffold"),
+        clipped: !!quarters?.material?.clipPlane,
+        smoke: scene.transformNodes.filter(
+          ({ name }) =>
+            name.startsWith("damage-starting-command-center-smoke-") &&
+            name.split("-").length === 6,
+        ).length,
+        fire: !!node("damage-starting-command-center-fire"),
+        birds: scene.transformNodes.filter(({ name }) =>
+          /^bird-0-\d$/.test(name),
+        ).length,
+      };
+    });
+    expect(shown).toEqual({
+      scaffold: true,
+      clipped: true,
+      smoke: 12,
+      fire: true,
+      birds: 4,
+    });
+    expect(errors).toEqual([]);
+  },
+);
 
 test("a building placed and producing in one tick plays its generated exit clip", async ({
   page,

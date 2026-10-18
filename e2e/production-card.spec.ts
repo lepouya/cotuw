@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { forEachProfile, PHONE_PROFILE } from "./profiles";
+import { WEBKIT } from "./tags";
 import type { Page } from "@playwright/test";
 import type { ProductionCard } from "../src/ui/production-card";
 import type { createProductionCards } from "../src/ui/production-card";
@@ -98,29 +100,31 @@ test("descriptions avoid existing elements and authored button IDs", async ({
   ).toHaveAccessibleDescription("A scouting unit");
 });
 
-test("disabled cards keep accessible focus as availability changes", async ({
-  page,
-}) => {
-  const card = page.locator("#card-review .production-card");
-  const button = page.locator("#review-unit");
-  await card.focus();
-  await expect(card).toHaveAccessibleName("Train Runner");
-  await expect(card).toHaveAccessibleDescription(/Need 20 Materials/);
-  await card.hover();
-  await page.mouse.move(700, 450);
-  await expect(page.getByRole("tooltip")).toBeVisible();
-  await page.evaluate(() => window.cardFixture.setReason(""));
-  await expect(button).toBeFocused();
-  await button.press("Enter");
-  expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(1);
-  await page.evaluate(() =>
-    window.cardFixture.setReason("Production queue full."),
-  );
-  await expect(card).toBeFocused();
-  await expect(page.getByRole("tooltip")).toContainText(
-    "Production queue full",
-  );
-});
+test(
+  "disabled cards keep accessible focus as availability changes",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const card = page.locator("#card-review .production-card");
+    const button = page.locator("#review-unit");
+    await card.focus();
+    await expect(card).toHaveAccessibleName("Train Runner");
+    await expect(card).toHaveAccessibleDescription(/Need 20 Materials/);
+    await card.hover();
+    await page.mouse.move(700, 450);
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    await page.evaluate(() => window.cardFixture.setReason(""));
+    await expect(button).toBeFocused();
+    await button.press("Enter");
+    expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(1);
+    await page.evaluate(() =>
+      window.cardFixture.setReason("Production queue full."),
+    );
+    await expect(card).toBeFocused();
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Production queue full",
+    );
+  },
+);
 
 test("activation hides its tooltip when the action immediately disables itself", async ({
   page,
@@ -139,37 +143,39 @@ test("activation hides its tooltip when the action immediately disables itself",
   await expect(page.getByRole("tooltip")).toBeHidden();
 });
 
-test("tooltip content stays within the viewport and Escape consumes only its own dismissal", async ({
-  page,
-}) => {
-  await page.evaluate(() => window.cardFixture.card.card.focus());
-  await page.evaluate(() =>
-    window.cardFixture.setReason("Restore the support network. ".repeat(120)),
-  );
-  await expect(page.getByRole("tooltip")).toBeInViewport({ ratio: 1 });
-  const dismissal = await page.evaluate(() => {
-    let bubbled = 0;
-    const observe = () => bubbled++;
-    window.addEventListener("keydown", observe);
-    const key = () =>
-      new KeyboardEvent("keydown", {
-        key: "Escape",
-        bubbles: true,
-        cancelable: true,
-      });
-    const first = window.cardFixture.card.card.dispatchEvent(key());
-    const second = window.cardFixture.card.card.dispatchEvent(key());
-    window.removeEventListener("keydown", observe);
-    return { first, second, bubbled };
-  });
-  expect(dismissal).toEqual({ first: false, second: true, bubbled: 1 });
-  await expect(page.getByRole("tooltip")).toBeHidden();
-  await page.locator("#card-review .production-card").hover();
-  await expect(page.getByRole("tooltip")).toBeVisible();
-  const bounds = (await page.getByRole("tooltip").boundingBox())!;
-  await page.mouse.move(bounds.x + 10, bounds.y + 10);
-  await expect(page.getByRole("tooltip")).toBeVisible();
-});
+test(
+  "tooltip content stays within the viewport and Escape consumes only its own dismissal",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.evaluate(() => window.cardFixture.card.card.focus());
+    await page.evaluate(() =>
+      window.cardFixture.setReason("Restore the support network. ".repeat(120)),
+    );
+    await expect(page.getByRole("tooltip")).toBeInViewport({ ratio: 1 });
+    const dismissal = await page.evaluate(() => {
+      let bubbled = 0;
+      const observe = () => bubbled++;
+      window.addEventListener("keydown", observe);
+      const key = () =>
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        });
+      const first = window.cardFixture.card.card.dispatchEvent(key());
+      const second = window.cardFixture.card.card.dispatchEvent(key());
+      window.removeEventListener("keydown", observe);
+      return { first, second, bubbled };
+    });
+    expect(dismissal).toEqual({ first: false, second: true, bubbled: 1 });
+    await expect(page.getByRole("tooltip")).toBeHidden();
+    await page.locator("#card-review .production-card").hover();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    const bounds = (await page.getByRole("tooltip").boundingBox())!;
+    await page.mouse.move(bounds.x + 10, bounds.y + 10);
+    await expect(page.getByRole("tooltip")).toBeVisible();
+  },
+);
 
 for (const end of ["dispose", "abort"] as const) {
   test(`${end} releases the tooltip and all event listeners`, async ({
@@ -201,22 +207,19 @@ for (const end of ["dispose", "abort"] as const) {
   });
 }
 
-test("touch can inspect an unavailable card without activating it", async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: { width: 844, height: 390 },
-    hasTouch: true,
-  });
-  const page = await context.newPage();
-  try {
-    await setupCard(page);
-    await page.locator("#card-review .production-card").tap();
-    await expect(page.getByRole("tooltip")).toContainText("Need 20 Materials");
-    expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(0);
-    await page.locator("#tab-goals").tap();
-    await expect(page.getByRole("tooltip")).toBeHidden();
-  } finally {
-    await context.close();
-  }
+forEachProfile([PHONE_PROFILE], () => {
+  test(
+    "touch can inspect an unavailable card without activating it",
+    { tag: WEBKIT },
+    async ({ page }) => {
+      await setupCard(page);
+      await page.locator("#card-review .production-card").tap();
+      await expect(page.getByRole("tooltip")).toContainText(
+        "Need 20 Materials",
+      );
+      expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(0);
+      await page.locator("#tab-goals").tap();
+      await expect(page.getByRole("tooltip")).toBeHidden();
+    },
+  );
 });

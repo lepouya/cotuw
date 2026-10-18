@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { TOUCH_PROFILES } from "./profiles";
+import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import { terrainPoint, trainTestUnits } from "./prototype-helpers";
+import { WEBKIT } from "./tags";
 import type { Page } from "@playwright/test";
 
 async function groupBounds(page: Page) {
@@ -93,125 +94,126 @@ async function advanceSimulationTime(page: Page, milliseconds: number) {
 
 test.use({ deviceScaleFactor: 2 });
 
-test("box and additive selection control a mixed group with routes, separate destinations, Stop, and Clear", async ({
-  page,
-}, testInfo) => {
-  await page.goto("/?level=sandbox");
-  await trainTestUnits(page, [
-    "trooper",
-    "scout",
-    "trooper",
-    "scout",
-    "trooper",
-    "scout",
-    "trooper",
-    "scout",
-  ]);
-  await page.locator("#unit-roster button").first().click();
-  await page.locator("#tab-units").click();
-  await page
-    .locator("#unit-roster button")
-    .nth(1)
-    .click({ modifiers: ["Shift"] });
-  await expect
-    .poll(() => selected(page))
-    .toEqual(["trained-unit-1", "trained-unit-2"]);
-  await expect(page.locator("#selection-details")).toHaveText(
-    "2 units selected",
-  );
-  await expect(page.locator("#selection-info")).toContainText(
-    "Trooper × 1 · Scout × 1",
-  );
-  const bounds = await groupBounds(page);
-  const cameraBefore = await cameraPose(page);
-  await page.mouse.move(bounds.left, bounds.top);
-  await page.mouse.down();
-  await page.mouse.move(bounds.right, bounds.bottom, { steps: 8 });
-  await expect(page.locator(".selection-box")).toBeVisible();
-  await page.mouse.up();
-  await expect.poll(async () => (await selected(page)).length).toBe(8);
-  expect(await cameraPose(page)).toEqual(cameraBefore);
-  await expect(page.locator("#selection-details")).toHaveText(
-    "8 units selected",
-  );
-  // Routes must be inspected before the independently timed units arrive.
-  await advanceSimulationTime(page, 0);
-  const point = await terrainPoint(page, 54, 45);
-  await page.mouse.click(point.x, point.y);
-  await advanceSimulationTime(page, 34);
-  await expect(page.locator("#movement-status")).toHaveText(
-    "8 move orders accepted.",
-  );
-  await expect
-    .poll(() =>
-      page.evaluate(async () => {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = (await import(
-          path
-        )) as typeof import("./harness");
-        return EngineStore.Instances[0].scenes[0].meshes.filter(
-          (mesh) => mesh.name === "movement-path-route",
-        ).length;
-      }),
-    )
-    .toBe(8);
-  await testInfo.attach("selected-group-routes", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
-  await page.locator("#stop-units").click();
-  await advanceSimulationTime(page, 34);
-  await expect(page.locator("#movement-status")).toHaveText(
-    "Selected units stopped.",
-  );
-  await expect
-    .poll(() =>
-      page.evaluate(async () => {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = (await import(
-          path
-        )) as typeof import("./harness");
-        return EngineStore.Instances[0].scenes[0].meshes.filter(
-          (mesh) => mesh.name === "movement-path-route",
-        ).length;
-      }),
-    )
-    .toBe(0);
-  await expect.poll(async () => (await selected(page)).length).toBe(8);
-  await page.locator("#clear-selection").click();
-  await advanceSimulationTime(page, 34);
-  await expect.poll(() => selected(page)).toEqual([]);
-  await expect(page.locator("#stop-units")).toBeDisabled();
-});
-
-test("cancelled drags never select or move units", async ({ page }) => {
-  await page.goto("/?level=sandbox");
-  await trainTestUnits(page);
-  await page.locator("#unit-roster button").first().click();
-  const bounds = await groupBounds(page);
-  await page.mouse.move(bounds.left, bounds.top);
-  await page.mouse.down();
-  await page.mouse.move(bounds.right, bounds.bottom);
-  await expect(page.locator(".selection-box")).toBeVisible();
-  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await expect(page.locator(".selection-box")).toBeHidden();
-  await page.mouse.up();
-  await expect.poll(() => selected(page)).toEqual(["trained-unit-1"]);
-  await expect(page.locator("#game-canvas")).not.toHaveAttribute(
-    "data-actor-target",
-  );
-});
-
-for (const profile of TOUCH_PROFILES)
-  test(`${profile.name} touch controls support additive and box selection, movement, and camera actions`, async ({
-    browser,
-  }, testInfo) => {
-    const context = await browser.newContext({
-      viewport: profile.viewport,
-      hasTouch: true,
+test(
+  "box and additive selection control a mixed group with routes, separate destinations, Stop, and Clear",
+  { tag: WEBKIT },
+  async ({ page }, testInfo) => {
+    await page.goto("/?level=sandbox");
+    await trainTestUnits(page, [
+      "trooper",
+      "scout",
+      "trooper",
+      "scout",
+      "trooper",
+      "scout",
+      "trooper",
+      "scout",
+    ]);
+    await page.locator("#unit-roster button").first().click();
+    await page.locator("#tab-units").click();
+    await page
+      .locator("#unit-roster button")
+      .nth(1)
+      .click({ modifiers: ["Shift"] });
+    await expect
+      .poll(() => selected(page))
+      .toEqual(["trained-unit-1", "trained-unit-2"]);
+    await expect(page.locator("#selection-details")).toHaveText(
+      "2 units selected",
+    );
+    await expect(page.locator("#selection-info")).toContainText(
+      "Trooper × 1 · Scout × 1",
+    );
+    const bounds = await groupBounds(page);
+    const cameraBefore = await cameraPose(page);
+    await page.mouse.move(bounds.left, bounds.top);
+    await page.mouse.down();
+    await page.mouse.move(bounds.right, bounds.bottom, { steps: 8 });
+    await expect(page.locator(".selection-box")).toBeVisible();
+    await page.mouse.up();
+    await expect.poll(async () => (await selected(page)).length).toBe(8);
+    expect(await cameraPose(page)).toEqual(cameraBefore);
+    await expect(page.locator("#selection-details")).toHaveText(
+      "8 units selected",
+    );
+    // Routes must be inspected before the independently timed units arrive.
+    await advanceSimulationTime(page, 0);
+    const point = await terrainPoint(page, 54, 45);
+    await page.mouse.click(point.x, point.y);
+    await advanceSimulationTime(page, 34);
+    await expect(page.locator("#movement-status")).toHaveText(
+      "8 move orders accepted.",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const path: string = "/e2e/harness.ts";
+          const { EngineStore } = (await import(
+            path
+          )) as typeof import("./harness");
+          return EngineStore.Instances[0].scenes[0].meshes.filter(
+            (mesh) => mesh.name === "movement-path-route",
+          ).length;
+        }),
+      )
+      .toBe(8);
+    await testInfo.attach("selected-group-routes", {
+      body: await page.screenshot(),
+      contentType: "image/png",
     });
-    const page = await context.newPage();
-    try {
+    await page.locator("#stop-units").click();
+    await advanceSimulationTime(page, 34);
+    await expect(page.locator("#movement-status")).toHaveText(
+      "Selected units stopped.",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const path: string = "/e2e/harness.ts";
+          const { EngineStore } = (await import(
+            path
+          )) as typeof import("./harness");
+          return EngineStore.Instances[0].scenes[0].meshes.filter(
+            (mesh) => mesh.name === "movement-path-route",
+          ).length;
+        }),
+      )
+      .toBe(0);
+    await expect.poll(async () => (await selected(page)).length).toBe(8);
+    await page.locator("#clear-selection").click();
+    await advanceSimulationTime(page, 34);
+    await expect.poll(() => selected(page)).toEqual([]);
+    await expect(page.locator("#stop-units")).toBeDisabled();
+  },
+);
+
+test(
+  "cancelled drags never select or move units",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/?level=sandbox");
+    await trainTestUnits(page);
+    await page.locator("#unit-roster button").first().click();
+    const bounds = await groupBounds(page);
+    await page.mouse.move(bounds.left, bounds.top);
+    await page.mouse.down();
+    await page.mouse.move(bounds.right, bounds.bottom);
+    await expect(page.locator(".selection-box")).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await expect(page.locator(".selection-box")).toBeHidden();
+    await page.mouse.up();
+    await expect.poll(() => selected(page)).toEqual(["trained-unit-1"]);
+    await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+      "data-actor-target",
+    );
+  },
+);
+
+forEachProfile([PHONE_PROFILE], (profile) => {
+  test(
+    `touch controls support additive and box selection, movement, and camera actions`,
+    { tag: WEBKIT },
+    async ({ page }, testInfo) => {
       await page.goto("/?level=sandbox");
       // Use the same on-screen production controls without secondary clicks.
       await page.locator("#build-barracks").tap();
@@ -272,7 +274,6 @@ for (const profile of TOUCH_PROFILES)
         body: await page.screenshot(),
         contentType: "image/png",
       });
-    } finally {
-      await context.close();
-    }
-  });
+    },
+  );
+});

@@ -1,14 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 import { MissionDriver } from "./mission-driver";
-import { openOpening } from "./prototype-helpers";
+import { collectPageErrors, openOpening } from "./prototype-helpers";
 
 for (const action of ["exit-mission", "restart-mission"]) {
   test(`a cleanup failure during ${action} leaves a usable title screen`, async ({
     page,
   }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
+    const errors = collectPageErrors(page);
     await openOpening(page);
     await page.evaluate(async () => {
       const path: string = "/e2e/harness.ts";

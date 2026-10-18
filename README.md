@@ -33,7 +33,8 @@ Install Node.js 26 and Rust for desktop development, then run:
 npm install
 npm run dev         # browser
 npm run tauri dev   # desktop
-npm run check       # required before completing a coding task
+npm run check       # quick checks during development and before finishing work
+npm run check:full  # full checks before committing
 npm run build       # production browser build
 npm run tauri build # desktop app and bundles
 ```
@@ -43,7 +44,8 @@ Open `/?level=sandbox` for free construction and training. Explicit
 
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all
-art and audio. Asset tests verify that committed files match their generators.
+art and audio. The full check verifies that committed assets match their
+generators. See [verification](docs/verification.md) for focused and watch runs.
 
 ## Documentation
 

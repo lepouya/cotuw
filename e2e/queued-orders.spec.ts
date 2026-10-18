@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { TOUCH_PROFILES } from "./profiles";
+import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import type { Page } from "@playwright/test";
 import { activate, trainTestUnits } from "./prototype-helpers";
+import { WEBKIT } from "./tags";
 
 /**
  * Legs in tiles to the screen's right and down from the centered trooper. At
@@ -138,10 +139,11 @@ test("Shift-click queues moves behind the current one with a route preview", asy
   await expect.poll(() => preview(page)).toBe(false);
 });
 
-for (const profile of TOUCH_PROFILES) {
-  test.describe(profile.name, () => {
-    test.use({ viewport: profile.viewport, hasTouch: true });
-    test("Queue Orders mode chains taps until Done", async ({ page }) => {
+forEachProfile([PHONE_PROFILE], () => {
+  test(
+    "Queue Orders mode chains taps until Done",
+    { tag: WEBKIT },
+    async ({ page }) => {
       await opening(page, true);
       const queue = page.locator("#queue-orders");
       const status = page.locator("#movement-status");
@@ -161,23 +163,23 @@ for (const profile of TOUCH_PROFILES) {
       await page.touchscreen.tap(replacement!.x, replacement!.y);
       await expect(status).toContainText("1 move order accepted");
       await expect.poll(() => preview(page)).toBe(false);
-    });
+    },
+  );
 
-    test("queued minimap Attack Move remains active until an unqueued target", async ({
-      page,
-    }) => {
-      await opening(page, true);
-      const target = await minimapTarget(page);
-      await page.locator("#queue-orders").tap();
-      await page.locator("#attack-move").tap();
-      await page.touchscreen.tap(target.x, target.y);
-      await expect(page.locator("#movement-status")).toContainText(
-        /Attack Move order (accepted|queued)/,
-      );
-      await expect(page.locator("#cancel-attack-move")).toBeVisible();
-      await page.locator("#queue-orders").tap();
-      await page.touchscreen.tap(target.x, target.y);
-      await expect(page.locator("#cancel-attack-move")).toBeHidden();
-    });
+  test("queued minimap Attack Move remains active until an unqueued target", async ({
+    page,
+  }) => {
+    await opening(page, true);
+    const target = await minimapTarget(page);
+    await page.locator("#queue-orders").tap();
+    await page.locator("#attack-move").tap();
+    await page.touchscreen.tap(target.x, target.y);
+    await expect(page.locator("#movement-status")).toContainText(
+      /Attack Move order (accepted|queued)/,
+    );
+    await expect(page.locator("#cancel-attack-move")).toBeVisible();
+    await page.locator("#queue-orders").tap();
+    await page.touchscreen.tap(target.x, target.y);
+    await expect(page.locator("#cancel-attack-move")).toBeHidden();
   });
-}
+});

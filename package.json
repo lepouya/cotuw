@@ -31,11 +31,17 @@
     "typecheck": "npm run typecheck:ts && npm run typecheck:rs",
     "typecheck:ts": "tsc --noEmit",
     "typecheck:rs": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
-    "test": "npm run test:ts && npm run test:rs && npm run test:visual",
-    "test:ts": "vitest run --passWithNoTests",
+    "test": "npm run test:quick",
+    "test:quick": "npm run test:ts:quick && npm run test:visual:quick",
+    "test:full": "npm run test:ts && npm run test:rs && npm run test:visual",
+    "test:ts": "vitest run",
+    "test:ts:quick": "vitest run --project=unit",
+    "test:watch": "vitest --project=unit",
     "test:rs": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
     "test:visual": "playwright test",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test"
+    "test:visual:quick": "playwright test --project=chromium --grep @quick",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:quick",
+    "check:full": "npm run format:check && npm run lint && npm run typecheck && npm run test:full"
   },
   "dependencies": {
     "@babylonjs/core": "^9",

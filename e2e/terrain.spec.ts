@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { PNG } from "pngjs";
+import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
 
@@ -123,71 +124,75 @@ test("zoom limits span a handful of tiles to the whole map", async ({
   }
 });
 
-test("wheel zoom normalizes line and page deltas to pixels", async ({
-  page,
-}) => {
-  await openHarness(page);
+test(
+  "wheel zoom normalizes line and page deltas to pixels",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openHarness(page);
 
-  const zooms = await page.evaluate(() => {
-    const { createTestView, viewHeight, wheel } = harness;
-    const { canvas, camera, dispose } = createTestView();
-    /** How much one wheel event scales the visible height. */
-    const zoomFactor = (deltaY: number, deltaMode: number) => {
-      const before = viewHeight(camera);
-      wheel(canvas, deltaY, deltaMode);
-      return viewHeight(camera) / before;
-    };
+    const zooms = await page.evaluate(() => {
+      const { createTestView, viewHeight, wheel } = harness;
+      const { canvas, camera, dispose } = createTestView();
+      /** How much one wheel event scales the visible height. */
+      const zoomFactor = (deltaY: number, deltaMode: number) => {
+        const before = viewHeight(camera);
+        wheel(canvas, deltaY, deltaMode);
+        return viewHeight(camera) / before;
+      };
 
-    const zooms = {
-      pixels: zoomFactor(-160, WheelEvent.DOM_DELTA_PIXEL),
-      lines: zoomFactor(-10, WheelEvent.DOM_DELTA_LINE),
-      pages: zoomFactor(-0.2, WheelEvent.DOM_DELTA_PAGE),
-    };
+      const zooms = {
+        pixels: zoomFactor(-160, WheelEvent.DOM_DELTA_PIXEL),
+        lines: zoomFactor(-10, WheelEvent.DOM_DELTA_LINE),
+        pages: zoomFactor(-0.2, WheelEvent.DOM_DELTA_PAGE),
+      };
 
-    dispose();
-    return zooms;
-  });
+      dispose();
+      return zooms;
+    });
 
-  const zoomFor = (pixels: number) => Math.exp(-pixels * 0.0015);
-  expect(zooms.pixels).toBeCloseTo(zoomFor(160));
-  // Ten lines are 16 px each, so they match the 160 px step exactly.
-  expect(zooms.lines).toBeCloseTo(zoomFor(160));
-  // A fifth of the 720 px viewport height is 144 px.
-  expect(zooms.pages).toBeCloseTo(zoomFor(144));
-});
+    const zoomFor = (pixels: number) => Math.exp(-pixels * 0.0015);
+    expect(zooms.pixels).toBeCloseTo(zoomFor(160));
+    // Ten lines are 16 px each, so they match the 160 px step exactly.
+    expect(zooms.lines).toBeCloseTo(zoomFor(160));
+    // A fifth of the 720 px viewport height is 144 px.
+    expect(zooms.pages).toBeCloseTo(zoomFor(144));
+  },
+);
 
-test("dragging carries the ground with the pointer at every zoom", async ({
-  page,
-}) => {
-  await openHarness(page);
+test(
+  "dragging carries the ground with the pointer at every zoom",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openHarness(page);
 
-  const drags = await page.evaluate(async () => {
-    const { createTestView, frames, pointer, viewHeight, wheel } = harness;
-    const { canvas, camera, dispose } = createTestView();
-    /** World units the ground travels per dragged pixel. */
-    const measureDrag = async (zoomDelta: number) => {
-      wheel(canvas, zoomDelta);
-      await frames(1);
-      const { x, z } = camera.target;
-      const worldPerPixel = viewHeight(camera) / canvas.clientHeight;
+    const drags = await page.evaluate(async () => {
+      const { createTestView, frames, pointer, viewHeight, wheel } = harness;
+      const { canvas, camera, dispose } = createTestView();
+      /** World units the ground travels per dragged pixel. */
+      const measureDrag = async (zoomDelta: number) => {
+        wheel(canvas, zoomDelta);
+        await frames(1);
+        const { x, z } = camera.target;
+        const worldPerPixel = viewHeight(camera) / canvas.clientHeight;
 
-      pointer(canvas, "pointerdown", { button: 2, x: 500, y: 360 });
-      pointer(canvas, "pointermove", { button: 2, x: 700, y: 360 });
-      pointer(canvas, "pointerup", { button: 2, x: 700, y: 360 });
-      await frames(2);
-      const moved = Math.hypot(camera.target.x - x, camera.target.z - z);
-      return moved / 200 / worldPerPixel;
-    };
+        pointer(canvas, "pointerdown", { button: 2, x: 500, y: 360 });
+        pointer(canvas, "pointermove", { button: 2, x: 700, y: 360 });
+        pointer(canvas, "pointerup", { button: 2, x: 700, y: 360 });
+        await frames(2);
+        const moved = Math.hypot(camera.target.x - x, camera.target.z - z);
+        return moved / 200 / worldPerPixel;
+      };
 
-    const close = await measureDrag(-10_000);
-    const far = await measureDrag(20_000);
-    dispose();
-    return { close, far };
-  });
+      const close = await measureDrag(-10_000);
+      const far = await measureDrag(20_000);
+      dispose();
+      return { close, far };
+    });
 
-  expect(drags.close).toBeCloseTo(1, 2);
-  expect(drags.far).toBeCloseTo(1, 2);
-});
+    expect(drags.close).toBeCloseTo(1, 2);
+    expect(drags.far).toBeCloseTo(1, 2);
+  },
+);
 
 test("primary drag leaves the camera fixed, secondary pans, and Shift-secondary rotates", async ({
   page,
@@ -407,52 +412,54 @@ test("terraforming refreshes height and layer geometry", async ({ page }) => {
   });
 });
 
-test("a feathered layer fades to clear at the tiles that lack it", async ({
-  page,
-}) => {
-  await openHarness(page);
+test(
+  "a feathered layer fades to clear at the tiles that lack it",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openHarness(page);
 
-  const water = await page.evaluate(() => {
-    const { color, createTestView, TEST_TILE_TYPES } = harness;
-    // One row of three tiles, with water only in the middle one.
-    const { scene, dispose } = createTestView({
-      map: {
-        width: 3,
-        height: 1,
-        tileSize: 1,
-        createLayers: (x) => [
-          { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
-          ...(x === 1
-            ? [{ type: TEST_TILE_TYPES.water, color: color(1, 1, 1, 1) }]
-            : []),
-        ],
-      },
-      size: { width: 240, height: 240 },
-      terrain: true,
+    const water = await page.evaluate(() => {
+      const { color, createTestView, TEST_TILE_TYPES } = harness;
+      // One row of three tiles, with water only in the middle one.
+      const { scene, dispose } = createTestView({
+        map: {
+          width: 3,
+          height: 1,
+          tileSize: 1,
+          createLayers: (x) => [
+            { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
+            ...(x === 1
+              ? [{ type: TEST_TILE_TYPES.water, color: color(1, 1, 1, 1) }]
+              : []),
+          ],
+        },
+        size: { width: 240, height: 240 },
+        terrain: true,
+      });
+      const colors =
+        scene
+          .getMeshByName("terrain-0-0-layer-1-tile-water")
+          ?.getVerticesData("color") ?? [];
+      const dirtColors =
+        scene
+          .getMeshByName("terrain-0-0-layer-0-tile-dirt")
+          ?.getVerticesData("color") ?? [];
+      const alphas = [];
+      for (let index = 3; index < colors.length; index += 4) {
+        alphas.push(colors[index]);
+      }
+
+      dispose();
+      return { alphas, dirtAlphas: [dirtColors[3], dirtColors[7]] };
     });
-    const colors =
-      scene
-        .getMeshByName("terrain-0-0-layer-1-tile-water")
-        ?.getVerticesData("color") ?? [];
-    const dirtColors =
-      scene
-        .getMeshByName("terrain-0-0-layer-0-tile-dirt")
-        ?.getVerticesData("color") ?? [];
-    const alphas = [];
-    for (let index = 3; index < colors.length; index += 4) {
-      alphas.push(colors[index]);
-    }
 
-    dispose();
-    return { alphas, dirtAlphas: [dirtColors[3], dirtColors[7]] };
-  });
-
-  // Every corner of the lone water tile touches a dry tile, and the two
-  // neighbors off the one-row map are skipped: one contributor of two.
-  expect(water.alphas).toEqual([0.5, 0.5, 0.5, 0.5]);
-  // Layers that do not opt in keep their flat tile alpha.
-  expect(water.dirtAlphas).toEqual([1, 1]);
-});
+    // Every corner of the lone water tile touches a dry tile, and the two
+    // neighbors off the one-row map are skipped: one contributor of two.
+    expect(water.alphas).toEqual([0.5, 0.5, 0.5, 0.5]);
+    // Layers that do not opt in keep their flat tile alpha.
+    expect(water.dirtAlphas).toEqual([1, 1]);
+  },
+);
 
 test("feathering invalidates the neighboring chunk at a tile edit", async ({
   page,
@@ -500,146 +507,152 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
   expect(alpha.after).toBe(1);
 });
 
-test("loads layered terrain textures and advances both water passes", async ({
-  page,
-}) => {
-  await openHarness(page);
+test(
+  "loads layered terrain textures and advances both water passes",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openHarness(page);
 
-  const textureState = await page.evaluate(async () => {
-    const { color, createTestView, frames, TEST_TILE_TYPES } = harness;
-    const { scene, dispose } = createTestView({
-      map: {
-        width: 3,
-        height: 3,
-        tileSize: 1,
-        createLayers: (x) => [
-          { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
-          ...(x === 1
-            ? [
-                {
-                  type: TEST_TILE_TYPES.water,
-                  color: color(1, 1, 1, 0.82),
-                },
-                {
-                  type: TEST_TILE_TYPES.waterRipples,
-                  color: color(1, 1, 1, 0.3),
-                },
-              ]
-            : []),
-          ...(x === 2
-            ? [{ type: TEST_TILE_TYPES.clutter, color: color(1, 1, 1, 1) }]
-            : []),
-        ],
-      },
-      size: { width: 720, height: 720 },
-      terrain: true,
-    });
-    await scene.whenReadyAsync();
-    await frames(2);
+    const textureState = await page.evaluate(async () => {
+      const { color, createTestView, frames, TEST_TILE_TYPES } = harness;
+      const { scene, dispose } = createTestView({
+        map: {
+          width: 3,
+          height: 3,
+          tileSize: 1,
+          createLayers: (x) => [
+            { type: TEST_TILE_TYPES.dirt, color: color(1, 1, 1, 1) },
+            ...(x === 1
+              ? [
+                  {
+                    type: TEST_TILE_TYPES.water,
+                    color: color(1, 1, 1, 0.82),
+                  },
+                  {
+                    type: TEST_TILE_TYPES.waterRipples,
+                    color: color(1, 1, 1, 0.3),
+                  },
+                ]
+              : []),
+            ...(x === 2
+              ? [{ type: TEST_TILE_TYPES.clutter, color: color(1, 1, 1, 1) }]
+              : []),
+          ],
+        },
+        size: { width: 720, height: 720 },
+        terrain: true,
+      });
+      await scene.whenReadyAsync();
+      await frames(2);
 
-    const activeTexture = (name: string) =>
-      scene
-        .getMaterialByName(`terrain-material-tile-${name}`)
-        ?.getActiveTextures()[0] as
-        | {
-            hasAlpha: boolean;
-            isReady: () => boolean;
-            uOffset: number;
-            uScale: number;
-            wrapU: number;
-            wrapV: number;
+      const activeTexture = (name: string) =>
+        scene
+          .getMaterialByName(`terrain-material-tile-${name}`)
+          ?.getActiveTextures()[0] as
+          | {
+              hasAlpha: boolean;
+              isReady: () => boolean;
+              uOffset: number;
+              uScale: number;
+              wrapU: number;
+              wrapV: number;
+            }
+          | undefined;
+      const dirt = activeTexture("dirt");
+      const clutter = activeTexture("clutter");
+      const water = activeTexture("water");
+      const ripples = activeTexture("water-ripples");
+      const initialOffset = water?.uOffset;
+      const initialRippleOffset = ripples?.uOffset;
+      const baseMesh = scene.getMeshByName("terrain-0-0-layer-0-tile-dirt");
+      const baseNormalY = baseMesh?.getVerticesData("normal")?.[1];
+      const firstTwoTileUvs = baseMesh?.getVerticesData("uv")?.slice(0, 16);
+      const waterMoved = await new Promise<boolean>((resolve) => {
+        const deadline = performance.now() + 5_000;
+        const waitForMovement = () => {
+          if (
+            initialOffset !== water?.uOffset &&
+            initialRippleOffset !== ripples?.uOffset
+          ) {
+            resolve(true);
+          } else if (performance.now() >= deadline) {
+            resolve(false);
+          } else {
+            requestAnimationFrame(waitForMovement);
           }
-        | undefined;
-    const dirt = activeTexture("dirt");
-    const clutter = activeTexture("clutter");
-    const water = activeTexture("water");
-    const ripples = activeTexture("water-ripples");
-    const initialOffset = water?.uOffset;
-    const initialRippleOffset = ripples?.uOffset;
-    const baseMesh = scene.getMeshByName("terrain-0-0-layer-0-tile-dirt");
-    const baseNormalY = baseMesh?.getVerticesData("normal")?.[1];
-    const firstTwoTileUvs = baseMesh?.getVerticesData("uv")?.slice(0, 16);
-    const waterMoved = await new Promise<boolean>((resolve) => {
-      const deadline = performance.now() + 5_000;
-      const waitForMovement = () => {
-        if (
-          initialOffset !== water?.uOffset &&
-          initialRippleOffset !== ripples?.uOffset
-        ) {
-          resolve(true);
-        } else if (performance.now() >= deadline) {
-          resolve(false);
-        } else {
-          requestAnimationFrame(waitForMovement);
-        }
+        };
+        requestAnimationFrame(waitForMovement);
+      });
+
+      const state = {
+        texturesReady:
+          dirt?.isReady() &&
+          clutter?.isReady() &&
+          water?.isReady() &&
+          ripples?.isReady(),
+        alphaChannels:
+          dirt?.hasAlpha === false &&
+          clutter?.hasAlpha === true &&
+          water?.hasAlpha === true &&
+          ripples?.hasAlpha === true,
+        waterMoved,
+        rippleScale: ripples?.uScale,
+        wrapModes: [water?.wrapU, water?.wrapV, ripples?.wrapU, ripples?.wrapV],
+        firstTwoTileUvs,
+        opaqueBase: baseMesh?.hasVertexAlpha === false,
+        upwardNormal: typeof baseNormalY === "number" && baseNormalY > 0,
+        // Blend order must follow the layer stack, not camera distance.
+        alphaIndices: [
+          "terrain-0-0-layer-1-tile-water",
+          "terrain-0-0-layer-2-tile-water-ripples",
+          "terrain-0-0-layer-3-tile-clutter",
+        ].map((name) => scene.getMeshByName(name)?.alphaIndex),
       };
-      requestAnimationFrame(waitForMovement);
+      dispose();
+      return state;
     });
 
-    const state = {
-      texturesReady:
-        dirt?.isReady() &&
-        clutter?.isReady() &&
-        water?.isReady() &&
-        ripples?.isReady(),
-      alphaChannels:
-        dirt?.hasAlpha === false &&
-        clutter?.hasAlpha === true &&
-        water?.hasAlpha === true &&
-        ripples?.hasAlpha === true,
-      waterMoved,
-      rippleScale: ripples?.uScale,
-      wrapModes: [water?.wrapU, water?.wrapV, ripples?.wrapU, ripples?.wrapV],
-      firstTwoTileUvs,
-      opaqueBase: baseMesh?.hasVertexAlpha === false,
-      upwardNormal: typeof baseNormalY === "number" && baseNormalY > 0,
-      // Blend order must follow the layer stack, not camera distance.
-      alphaIndices: [
-        "terrain-0-0-layer-1-tile-water",
-        "terrain-0-0-layer-2-tile-water-ripples",
-        "terrain-0-0-layer-3-tile-clutter",
-      ].map((name) => scene.getMeshByName(name)?.alphaIndex),
-    };
-    dispose();
-    return state;
-  });
+    expect(textureState).toEqual({
+      texturesReady: true,
+      alphaChannels: true,
+      waterMoved: true,
+      rippleScale: 1.37,
+      // Babylon's WRAP_ADDRESSMODE constant is 1.
+      wrapModes: [1, 1, 1, 1],
+      firstTwoTileUvs: [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 2, 0, 2, 1],
+      opaqueBase: true,
+      upwardNormal: true,
+      alphaIndices: [1, 2, 3],
+    });
+  },
+);
 
-  expect(textureState).toEqual({
-    texturesReady: true,
-    alphaChannels: true,
-    waterMoved: true,
-    rippleScale: 1.37,
-    // Babylon's WRAP_ADDRESSMODE constant is 1.
-    wrapModes: [1, 1, 1, 1],
-    firstTwoTileUvs: [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 2, 0, 2, 1],
-    opaqueBase: true,
-    upwardNormal: true,
-    alphaIndices: [1, 2, 3],
-  });
-});
+test(
+  "water animation changes rendered pixels",
+  { tag: WEBKIT },
+  async ({ page }, testInfo) => {
+    await page.goto("/?level=sandbox");
+    const canvas = page.locator("#game-canvas");
 
-test("water animation changes rendered pixels", async ({ page }, testInfo) => {
-  await page.goto("/?level=sandbox");
-  const canvas = page.locator("#game-canvas");
-
-  await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
-  const before = PNG.sync.read(
-    await canvas.screenshot({
+    await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+    const before = PNG.sync.read(
+      await canvas.screenshot({
+        style: ".camera-controls { visibility: hidden; }",
+      }),
+    );
+    await page.waitForTimeout(500);
+    const afterBuffer = await canvas.screenshot({
       style: ".camera-controls { visibility: hidden; }",
-    }),
-  );
-  await page.waitForTimeout(500);
-  const afterBuffer = await canvas.screenshot({
-    style: ".camera-controls { visibility: hidden; }",
-  });
-  const after = PNG.sync.read(afterBuffer);
+    });
+    const after = PNG.sync.read(afterBuffer);
 
-  await testInfo.attach("animated-water", {
-    body: afterBuffer,
-    contentType: "image/png",
-  });
-  expect(countChangedPixels(before, after)).toBeGreaterThan(1_000);
-});
+    await testInfo.attach("animated-water", {
+      body: afterBuffer,
+      contentType: "image/png",
+    });
+    expect(countChangedPixels(before, after)).toBeGreaterThan(1_000);
+  },
+);
 
 function countChangedPixels(before: PNG, after: PNG): number {
   expect(after.width).toBe(before.width);

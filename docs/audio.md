@@ -128,7 +128,7 @@ recovery, decoding, and cleanup.
 `e2e/audio.spec.ts` checks actual browser playback, pause and exit,
 blocked devices, repeated sequence cues, gain hold fallback, and mouse, phone,
 and tablet controls with saved preferences. Chromium and WebKit run through
-`npm run check`. Asset generation and decoding
+`npm run check:full`. Asset generation and decoding
 checks are described in [audio assets](audio-assets.md).
 
 The macOS Tauri app also receives a manual smoke check for device unlock,

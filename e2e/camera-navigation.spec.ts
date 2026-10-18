@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { TOUCH_PROFILES } from "./profiles";
+import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import type { Page } from "@playwright/test";
 import { activate, terrainPoint, trainTestUnits } from "./prototype-helpers";
+import { WEBKIT } from "./tags";
 
 async function opening(page: Page, touch = false) {
   await page.goto("/?level=sandbox");
@@ -74,93 +75,97 @@ function preserved(
   expect(after.unit).toEqual(before.unit);
 }
 
-test("Pan mode reserves clicks, drags, and trackpad scrolling without losing troops", async ({
-  page,
-}) => {
-  await opening(page);
-  const pan = page.getByRole("button", { name: "Pan mode", exact: true });
-  await pan.click();
-  await expect(pan).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Escape");
-  await expect(pan).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-selected-actors",
-    '["trained-unit-1"]',
-  );
-  await pan.click();
-  await expect(page.locator("#game-canvas")).toHaveCSS("cursor", "grab");
-  const before = await pose(page);
-  await mouseDrag(page, before.point);
-  const dragged = await pose(page);
-  preserved(before, dragged);
-  await page.mouse.click(before.point.x, before.point.y);
-  expect((await pose(page)).selected).toBe(before.selected);
-  await page.mouse.wheel(140, 80);
-  await expect
-    .poll(async () => (await pose(page)).target)
-    .not.toEqual(dragged.target);
-  const scrolled = await pose(page);
-  preserved(dragged, scrolled);
-  await page.keyboard.down("Control");
-  await page.mouse.wheel(0, -100);
-  await page.keyboard.up("Control");
-  await expect
-    .poll(async () => (await pose(page)).zoom)
-    .toBeLessThan(before.zoom);
-  await page.keyboard.press("Escape");
-  await expect(pan).toHaveAttribute("aria-pressed", "false");
-  expect((await pose(page)).selected).toBe(before.selected);
-  await focusUnit(page);
-  const { point } = await pose(page);
-  await page.mouse.click(point.x + 80, point.y + 40);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-move-status",
-    "accepted",
-  );
-});
+test(
+  "Pan mode reserves clicks, drags, and trackpad scrolling without losing troops",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await opening(page);
+    const pan = page.getByRole("button", { name: "Pan mode", exact: true });
+    await pan.click();
+    await expect(pan).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(pan).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-selected-actors",
+      '["trained-unit-1"]',
+    );
+    await pan.click();
+    await expect(page.locator("#game-canvas")).toHaveCSS("cursor", "grab");
+    const before = await pose(page);
+    await mouseDrag(page, before.point);
+    const dragged = await pose(page);
+    preserved(before, dragged);
+    await page.mouse.click(before.point.x, before.point.y);
+    expect((await pose(page)).selected).toBe(before.selected);
+    await page.mouse.wheel(140, 80);
+    await expect
+      .poll(async () => (await pose(page)).target)
+      .not.toEqual(dragged.target);
+    const scrolled = await pose(page);
+    preserved(dragged, scrolled);
+    await page.keyboard.down("Control");
+    await page.mouse.wheel(0, -100);
+    await page.keyboard.up("Control");
+    await expect
+      .poll(async () => (await pose(page)).zoom)
+      .toBeLessThan(before.zoom);
+    await page.keyboard.press("Escape");
+    await expect(pan).toHaveAttribute("aria-pressed", "false");
+    expect((await pose(page)).selected).toBe(before.selected);
+    await focusUnit(page);
+    const { point } = await pose(page);
+    await page.mouse.click(point.x + 80, point.y + 40);
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-move-status",
+      "accepted",
+    );
+  },
+);
 
-test("Space-drag and arrow keys preserve Box selection and stop on release or blur", async ({
-  page,
-}) => {
-  await opening(page);
-  await page.locator("#box-select").click();
-  const canvas = page.locator("#game-canvas");
-  await canvas.focus();
-  const before = await pose(page);
-  await page.keyboard.down("Space");
-  await mouseDrag(page, before.point);
-  await page.keyboard.up("Space");
-  preserved(before, await pose(page));
-  await expect(page.locator("#box-select")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  const from = await pose(page);
-  await page.keyboard.down("ArrowRight");
-  await expect
-    .poll(async () => (await pose(page)).target)
-    .not.toEqual(from.target);
-  await page.keyboard.up("ArrowRight");
-  const stopped = await pose(page);
-  await page.waitForTimeout(150);
-  expect((await pose(page)).target).toEqual(stopped.target);
-  expect(stopped.selected).toBe(before.selected);
-  await page.keyboard.down("Space");
-  await page.keyboard.down("ArrowDown");
-  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await page.keyboard.up("Space");
-  await page.keyboard.up("ArrowDown");
-  const blurred = await pose(page);
-  await page.waitForTimeout(150);
-  expect((await pose(page)).target).toEqual(blurred.target);
-  await expect(canvas).not.toHaveAttribute("data-camera-pan-active", "true");
-  await page.getByRole("button", { name: "Camera views" }).focus();
-  const unfocused = await pose(page);
-  await page.keyboard.down("ArrowRight");
-  await page.waitForTimeout(150);
-  await page.keyboard.up("ArrowRight");
-  expect((await pose(page)).target).toEqual(unfocused.target);
-});
+test(
+  "Space-drag and arrow keys preserve Box selection and stop on release or blur",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await opening(page);
+    await page.locator("#box-select").click();
+    const canvas = page.locator("#game-canvas");
+    await canvas.focus();
+    const before = await pose(page);
+    await page.keyboard.down("Space");
+    await mouseDrag(page, before.point);
+    await page.keyboard.up("Space");
+    preserved(before, await pose(page));
+    await expect(page.locator("#box-select")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const from = await pose(page);
+    await page.keyboard.down("ArrowRight");
+    await expect
+      .poll(async () => (await pose(page)).target)
+      .not.toEqual(from.target);
+    await page.keyboard.up("ArrowRight");
+    const stopped = await pose(page);
+    await page.waitForTimeout(150);
+    expect((await pose(page)).target).toEqual(stopped.target);
+    expect(stopped.selected).toBe(before.selected);
+    await page.keyboard.down("Space");
+    await page.keyboard.down("ArrowDown");
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await page.keyboard.up("Space");
+    await page.keyboard.up("ArrowDown");
+    const blurred = await pose(page);
+    await page.waitForTimeout(150);
+    expect((await pose(page)).target).toEqual(blurred.target);
+    await expect(canvas).not.toHaveAttribute("data-camera-pan-active", "true");
+    await page.getByRole("button", { name: "Camera views" }).focus();
+    const unfocused = await pose(page);
+    await page.keyboard.down("ArrowRight");
+    await page.waitForTimeout(150);
+    await page.keyboard.up("ArrowRight");
+    expect((await pose(page)).target).toEqual(unfocused.target);
+  },
+);
 
 test("Pan mode preserves an active building preview without placing from world taps", async ({
   page,
@@ -461,12 +466,11 @@ test("camera views dismiss on Escape before clearing selection and on outside pr
   ).toHaveAttribute("aria-expanded", "false");
 });
 
-for (const profile of TOUCH_PROFILES) {
-  test.describe(profile.name, () => {
-    test.use({ viewport: profile.viewport, hasTouch: true });
-    test("one-finger Pan drags over troops preserve selection and work without keyboard", async ({
-      page,
-    }) => {
+forEachProfile([PHONE_PROFILE], () => {
+  test(
+    "one-finger Pan drags over troops preserve selection and work without keyboard",
+    { tag: WEBKIT },
+    async ({ page }) => {
       await opening(page, true);
       const pan = page.getByRole("button", { name: "Pan mode", exact: true });
       await pan.tap();
@@ -507,11 +511,13 @@ for (const profile of TOUCH_PROFILES) {
       });
       await page.waitForTimeout(350);
       expect((await pose(page)).target).toEqual(stopped.target);
-    });
+    },
+  );
 
-    test("camera views, Focus, and Follow work by touch alone", async ({
-      page,
-    }) => {
+  test(
+    "camera views, Focus, and Follow work by touch alone",
+    { tag: WEBKIT },
+    async ({ page }) => {
       await opening(page, true);
       await page.getByRole("button", { name: "Camera views" }).tap();
       await page.getByRole("button", { name: "Top-down" }).tap();
@@ -527,6 +533,6 @@ for (const profile of TOUCH_PROFILES) {
       await expect(follow).toHaveAttribute("aria-pressed", "true");
       await follow.tap();
       await expect(follow).toHaveAttribute("aria-pressed", "false");
-    });
-  });
-}
+    },
+  );
+});

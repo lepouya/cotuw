@@ -1,53 +1,60 @@
 import { expect, test } from "@playwright/test";
-import { PROFILES } from "./profiles";
+import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
+import { WEBKIT } from "./tags";
 import {
   MUSIC_ASSETS,
   SOUND_ASSETS,
   soundLoops,
 } from "../src/content/audio-assets";
 
-test("the browser decodes every audio asset", async ({ page }) => {
-  await page.goto("/assets/audio/index.html");
-  const decoded = await page.evaluate(async () => {
-    const context = new OfflineAudioContext(2, 1, 32_000);
-    const result = [];
-    for (const audio of document.querySelectorAll("audio")) {
-      const response = await fetch(audio.src);
-      if (!response.ok) throw new Error(`Cannot fetch ${audio.src}`);
-      const buffer = await context.decodeAudioData(
-        await response.arrayBuffer(),
-      );
-      result.push({
-        id: audio.id,
-        seconds: buffer.duration,
-        channels: buffer.numberOfChannels,
-        loop: audio.loop,
-      });
-    }
-    return result;
-  });
-  expect(decoded).toHaveLength(
-    Object.keys(MUSIC_ASSETS).length + Object.keys(SOUND_ASSETS).length,
-  );
-  for (const asset of decoded) {
-    const music = Object.prototype.hasOwnProperty.call(MUSIC_ASSETS, asset.id);
-    const definition = music
-      ? MUSIC_ASSETS[asset.id as keyof typeof MUSIC_ASSETS]
-      : SOUND_ASSETS[asset.id as keyof typeof SOUND_ASSETS];
-    expect(asset.seconds).toBeCloseTo(definition.seconds, 4);
-    expect(asset.channels).toBe(music ? 2 : 1);
-    expect(asset.loop).toBe(
-      music || soundLoops(asset.id as keyof typeof SOUND_ASSETS),
+test(
+  "the browser decodes every audio asset",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/assets/audio/index.html");
+    const decoded = await page.evaluate(async () => {
+      const context = new OfflineAudioContext(2, 1, 32_000);
+      const result = [];
+      for (const audio of document.querySelectorAll("audio")) {
+        const response = await fetch(audio.src);
+        if (!response.ok) throw new Error(`Cannot fetch ${audio.src}`);
+        const buffer = await context.decodeAudioData(
+          await response.arrayBuffer(),
+        );
+        result.push({
+          id: audio.id,
+          seconds: buffer.duration,
+          channels: buffer.numberOfChannels,
+          loop: audio.loop,
+        });
+      }
+      return result;
+    });
+    expect(decoded).toHaveLength(
+      Object.keys(MUSIC_ASSETS).length + Object.keys(SOUND_ASSETS).length,
     );
-  }
-});
+    for (const asset of decoded) {
+      const music = Object.prototype.hasOwnProperty.call(
+        MUSIC_ASSETS,
+        asset.id,
+      );
+      const definition = music
+        ? MUSIC_ASSETS[asset.id as keyof typeof MUSIC_ASSETS]
+        : SOUND_ASSETS[asset.id as keyof typeof SOUND_ASSETS];
+      expect(asset.seconds).toBeCloseTo(definition.seconds, 4);
+      expect(asset.channels).toBe(music ? 2 : 1);
+      expect(asset.loop).toBe(
+        music || soundLoops(asset.id as keyof typeof SOUND_ASSETS),
+      );
+    }
+  },
+);
 
-for (const profile of PROFILES)
-  test.describe(profile.name, () => {
-    test.use({ viewport: profile.viewport, hasTouch: profile.touch });
-    test("audio audition plays music and cues together and stops", async ({
-      page,
-    }) => {
+forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
+  test(
+    "audio audition plays music and cues together and stops",
+    { tag: WEBKIT },
+    async ({ page }) => {
       await page.goto("/assets/audio/index.html");
       const press = async (selector: string) => {
         const button = page.locator(selector);
@@ -91,5 +98,6 @@ for (const profile of PROFILES)
           () => document.documentElement.scrollWidth <= window.innerWidth,
         ),
       ).toBe(true);
-    });
-  });
+    },
+  );
+});
