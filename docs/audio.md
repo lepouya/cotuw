@@ -1,7 +1,8 @@
 # Gameplay audio
 
-Open **Menu** for master, sound, and music volume sliders and mute icons. Master
-volume defaults to 50% and scales both buses without changing their levels.
+Open title-screen **Options** or the in-game **Menu** for master, sound, and
+music volume sliders and mute icons. Master volume defaults to 50% and scales
+both buses without changing their levels.
 Preferences are saved on this device, outside mission saves; invalid saved
 values restore the defaults. Icon buttons have accessible names, pressed
 states, and action tooltips. A click, tap, or key press unlocks playback.
@@ -63,6 +64,8 @@ registration in the [asset inventory](audio-assets.md).
   after loading finishes. `isLoaded(url)` exposes clip readiness independently
   of device suspension. Ready notifications restore current loops. Files that
   fail to load are not refetched. Unchanged mixes do not add automation events.
+  Device failures while mixing or stopping a voice release it and report
+  unavailable audio without propagating into gameplay.
   Each voice separates its mix level from its fade envelope, so mix changes
   preserve loop fade-ins. Fade-outs hold the current level before retargeting;
   a fallback supports devices without the hold operation. `SILENT_AUDIO` plays

@@ -7,200 +7,59 @@ damaged world and encounters the elven Circle of Repose. Their struggle over
 its citadels and lost technology begins humanity's first contact and helps
 awaken the deathless Everwake, eventually requiring an uneasy alliance.
 
-## Documentation
+## Play the prototype
 
-- [Design](DESIGN.md) — vision, requirements, technical direction, decisions,
-  and game specifications.
-- [Roadmap](ROADMAP.md) — milestones and implementation work.
-- [Design questionnaire](docs/design-questionnaire.md) — detailed rationale,
-  alternatives, and queued design questions.
-- [Actor assets](docs/actor-assets.md) — generated models, textures, and
-  animation contracts.
-- [Audio assets](docs/audio-assets.md) — generated sounds, music loops,
-  audition, and provenance.
-- [Mission files](docs/mission-files.md) — the level and save format and how
-  to edit it.
-- [Content packs](docs/content-packs.md) — shared actor rules and
-  presentation that missions name.
+The title screen offers **New mission**, **Load**, **Options**, and **Exit**.
+Options provides master, sound, and music volume and mute controls; preferences
+persist on this device. Leaving a mission through **Main menu** returns to the
+title screen. Exit closes the desktop app; browsers show a close-tab message.
+
+Start a new mission and follow the in-game guides. Build a Materials Refinery
+and its Harvester, gather Materials, then build a Field Barracks and train
+Troopers and Scouts. Defeat the lone wolf and all five den wolves while
+protecting your Command Center. Victory allows continued free play.
+
+Click or tap to select and command. Drag a box to select units; touch uses
+**Box select**. **Pan** enables camera dragging, and **View** offers camera
+presets. **Goals** shows objectives and preparation. **Menu** or `F10` opens
+save, load, restart, audio, and Main menu controls; `F5` quicksaves and `F9`
+quickloads. Loading starts paused for inspection.
 
 ## Development
 
-Install Node.js 26 and Rust before starting desktop development.
+Install Node.js 26 and Rust for desktop development, then run:
 
 ```sh
 npm install
-npm run dev        # browser
-npm run tauri dev  # desktop
-npm run test:visual # browser screenshot checks
-npm run levels     # rebuild bundled levels, replacing hand edits
-npm run assets     # rebuild all bundled art and audio files
-npm run assets:audio # rebuild sounds, music, and the audition page
-npm run check      # required before completing a coding task
+npm run dev         # browser
+npm run tauri dev   # desktop
+npm run check       # required before completing a coding task
+npm run build       # production browser build
+npm run tauri build # desktop app and bundles
 ```
 
-The default browser opening starts with a fixed **Command Center** and 150
-**Materials**. Build a **Materials Refinery** for 100, wait eight seconds, then
-select it and produce its **Harvester** for 50. Select the Harvester in
-**Units**, then use **Gather Near Materials** in **Selection** or click a blue
-resource tile. It gathers 100 Materials in 60 seconds, returns to its Refinery,
-deposits, and repeats. Build a **Field Barracks** for 100, then train
-**Troopers** for 25 or **Scouts** for 20. The top bar shows available Materials;
-cargo counts separately.
+Open `/?level=sandbox` for free construction and training. Explicit
+`?level=<scenario ID>` links open a bundled level directly for development.
 
-**Selection** provides Return cargo and Refinery assignment. Move and Stop
-interrupt gathering and keep cargo. Exhausted patches prompt reassignment.
-**Units** lists resource sites and salvage: select a mobile unit, then use
-**Collect salvage** or click the hovering gift box to collect it without a
-delivery. Two boxes beyond the lone wolf provide Materials for two more
-Troopers. The ridge's split summit and the den's twin mountain teeth mark the
-route. Paid production orders show remaining time and a Cancel action with
-a full refund. A Refinery has one Harvester slot; a Barracks has five
-outstanding orders. Blocked exits hold finished production until a tile is
-cleared. Buildings sell for half cost. Buildings share one construction slot;
-**Buildings** shows building timers and cancellation for a full refund.
+Levels and assets are generated from source and committed. `npm run levels`
+rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all
+art and audio. Asset tests verify that committed files match their generators.
 
-Select a production building and use **Set Rally Point** in the lower
-**Selection** panel, then click or tap clear, passable ground. New units exit
-and move to its flag, which is visible while the building is selected. **Clear
-Rally Point** restores exit-and-idle behavior; **Cancel rally point** or `Esc`
-exits targeting.
+## Documentation
 
-Paid buildings must place their center within connected support coverage.
-Completed Command Centers provide a 12-tile radius; Refineries and Barracks
-provide six. Completed buildings link when one center lies within the other's
-coverage, forming a chain back to a Command Center. Blueprints do not extend
-coverage. Selecting a building, placing one, or enabling **Network View** shows
-coverage and connection paths.
-Disconnected buildings dim, stop machinery, and show a crossed power badge.
-Construction and production pause without losing progress; paused construction
-releases the slot for connected work. Offline Refineries hold cargo delivery
-until reconnection. Broken links use dashed lines, and grouped alerts focus the
-camera on affected buildings. Cancellation and sale remain available offline.
-
-A lone wolf guards the southern path. Four wolves and a larger alpha occupy a
-mountain den beyond the ridge's nearby crossing. Follow the path south through
-its narrow entrance; the den pack shares a territory with separate homes. Wolves
-attack on personal sight, return home when they lose sight, and heal there after
-combat. Wolves relay alerts through sight and investigate the originating wolf's
-position. Idle Troopers engage nearby hostiles; to attack directly, select units
-and click or tap a visible wolf. Scouts cannot attack. **Attack Move** in the
-unit controls enters destination targeting; click or tap terrain to advance and
-engage along the way. Cancel or `Esc` exits targeting. Groups spread their
-destinations; unarmed units keep moving. Orange dashes and a diamond mark the
-order. Units search a lost target's last-known position, then resume their
-destination. Health bars appear on selected and fighting actors, and
-**Selection** shows exact health. Destroyed actors leave remains that clear
-after a minute; building debris blocks construction until then. Damaged
-buildings sell for less.
-
-Combat destruction of the starting Command Center ends this opening in defeat
-and pauses immediately. The results panel provides Restart, Load, and Exit.
-
-The top bar holds **Menu**, **Pause**, and ½×, 1×, and 2× speed on the left;
-the next objective, which opens **Goals**, in the center; and Materials, mission
-time, and the alert history on the right. Alerts for attacks, losses, completed
-work, blocked units, network changes, and objectives appear briefly over the
-map and stay in the history; select one to move the camera there. Short guides
-at mission start, first Refinery placement, first Harvester, first completed
-Barracks, and first Scout pause until dismissed. Right-click the map for a
-radial menu of the target's actions; the highlighted one matches a left click.
-
-**Menu** or `F10` pauses the mission and opens the game menu. **Save** stores a
-named save or exports it as a file; **Quicksave** or `F5` replaces the single
-quicksave, and `F9` loads it. Completing an objective replaces the autosave.
-**Load** lists every save and can import a mission file. Loading begins
-paused; Inspect allows selection and camera inspection, and **Paused** in the
-top bar starts the clock. Invalid files leave the current session intact.
-
-Defeat the lone wolf and all five den wolves to win. The Victory panel pauses
-the mission and offers **Continue free play**, Restart, Load, and Exit.
-Continuing restores construction, training, and exploration. Objective
-progress and victory survive saving and loading.
-
-Open `/?level=sandbox` for the empty, free construction and infantry sandbox.
-Use **Buildings** to place structures on clear terrain. Use **Rotate** or `R` to
-rotate and **Cancel** or `Esc` to exit placement. A yellow preview arrow marks
-the preferred unit exit; blocked exits can use another side. Touch uses a
-terrain tap followed by **Place building**. Construction and training in this
-sandbox are instant and have no resource or power requirements.
-
-Click or tap to select an actor. Shift-click or **Add units** toggles units in
-and out of the selection. Primary drag selects mobile units; touch uses **Box
-select**, which must be turned off before tapping a movement destination.
-Click or tap terrain to move selected units to separate nearby positions.
-**Stop** or `S` cancels their routes; **Clear** or `Esc` clears selection.
-Shift-commands or **Queue orders** append destinations and targets. **Done**
-ends Queue orders mode; accepted ordinary commands and Stop clear the queue.
-Selected units show queued destinations on the ground. Gather continues until
-its patch is depleted before the next order starts.
-
-Turn on **Pan** in the camera controls to drag anywhere with a normal touchpad
-click or one finger, including over troops. Pan mode preserves selection and
-pending commands; turn it off to select or issue orders. Two-finger scrolling
-pans in this mode, while Ctrl-scroll zooms. `Esc` exits Pan mode without
-clearing selection.
-
-With the world focused, hold `Space` and primary-drag to pan temporarily, or
-hold the arrow keys to pan continuously. Secondary drag also pans;
-Shift-secondary drag rotates. Touch drags on empty terrain pan when Box select
-is off. Camera pan, rotation, zoom, and reset also have on-screen buttons.
-**View** offers Isometric, Top-down, Grid, and Reset View while keeping the
-current focus and zoom. **Focus** centers the selection; **Follow** tracks the
-mobile actors it starts with until panning, another focus, or `Esc`. Reduced
-motion makes focus and view changes immediate.
-
-Rest the mouse cursor near an edge of the world view to pan without clicking;
-corners pan diagonally. This preserves selection and stops while dragging or
-using controls. Turn off **Edge panning** in the camera controls to disable it.
-Touch and pen input do not trigger edge panning.
-
-The sidebar's upper half has **Buildings** and **Units** production tabs.
-Picture buttons show names and costs; hover or keyboard focus explains their
-roles, requirements, and work duration. Tap an unavailable card to inspect it
-by touch. The lower **Selection** panel always shows the selected actor or
-group, health, contextual actions, and production orders. **Units** shows only
-the selected building's trainable units, followed by collapsible lists of
-field units and resource sites. Select production buildings on the map. The
-orders toolbar stays visible below both scrolling panels. Active placement
-controls appear just above the orders toolbar. **Buildings** lists the
-Materials Refinery before the Field Barracks.
-**Goals** in the sidebar header toggles the goals panel, and the top bar's
-objective opens it. It shows the opening's wolf objectives, defeat counts,
-route and combat directives, and the Command Center protection rule.
-Recommended preparation explains gathering, construction, and training; its
-counts show current forces and are separate from the win condition. Sandbox
-goals show practice counts.
-**Building idle animation** controls rooftop equipment. A gathering Harvester
-lowers and spins its drill with a green light; idle Harvesters raise it and
-show amber. The collector lowers when gathering starts and stows when it
-stops; deliveries tip the Harvester's hopper. Troopers aim between shots,
-mobile actors flinch on surviving hits, and pursuing wolves use a running
-stride. Healing wolves show a green halo and rising crosses. Reduced motion
-keeps status cues while settling transitions and holding effects still.
-
-The visual tests start the Vite app in headless Chromium. They check the
-camera, terrain rendering, terrain editing, and texture behavior, some through
-canvas screenshots and some through in-page helpers in `e2e/harness.ts`. They
-write an HTML report to `playwright-report/`. The GitHub Actions Check workflow
-is disabled to conserve the monthly quota. Its only configured trigger is a
-manual request; enable it explicitly when remote checks are needed. The
-workflow runs visual tests on macOS, whose runners have a GPU, and uploads that
-report after a failed check. Run `npm run check` locally before completing a
-coding task.
-Install the browsers locally once with `npx playwright install chromium`, plus
-`webkit` on macOS, where the tests also run against WebKit to match the Tauri
-webview.
-Set `COTUW_TEST_PORT=1421` to run checks beside a server using the default port.
-
-Bundled models, rigs, animations, materials, textures, and audio come from code.
-Run `npm run assets` after changing their generators. The asset tests compare
-committed files with generated output and reject files without a generator.
-See [actor assets](docs/actor-assets.md) for the inventory and contracts.
-Open `/assets/audio/index.html` on the development server to audition the
-[audio assets](docs/audio-assets.md). In gameplay, open **Menu** for master,
-sound, and music volume sliders and mute icons. Master volume defaults to 50%.
-Preferences persist on this device. See [gameplay audio](docs/audio.md) for
-content assignments and extension points.
+- [Design](DESIGN.md): vision, locked rules, prototype scope, and open
+  decisions.
+- [Design questionnaire](docs/design-questionnaire.md): supporting rationale,
+  future systems, and unresolved design questions.
+- [Verification](docs/verification.md): automated checks and demo acceptance.
+- [Runtime boundaries](docs/runtime-boundaries.md): simulation and resource
+  ownership contracts.
+- [Mission files](docs/mission-files.md): level and save format and hand
+  editing.
+- [Content packs](docs/content-packs.md): shared rules and presentation data.
+- [Actor assets](docs/actor-assets.md): model, texture, and animation contracts.
+- [Audio assets](docs/audio-assets.md): inventory, generators, and provenance.
+- [Gameplay audio](docs/audio.md): playback, settings, and extension points.
 
 ## Working principles
 

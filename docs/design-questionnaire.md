@@ -1,10 +1,9 @@
 # Design Questionnaire
 
 This is the retained questionnaire and decision journal for the game's design.
-It supports Roadmap tasks 0.1-0.3 while also recording game-wide decisions
-uncovered while defining the first playable slice. It preserves the discussion,
-alternatives, rejected options, and deferred questions that explain how the
-design developed.
+It records the first playable slice's definition and the game-wide decisions
+uncovered while defining it. It preserves the discussion, alternatives,
+rejected options, and deferred questions that explain how the design developed.
 
 `DESIGN.md` remains the source of truth for locked game specifications. Record
 decision dates here and summarize current requirements there without dated
@@ -158,12 +157,8 @@ The project-level synchronization pass is complete:
   identities rather than the earlier generic coalition premise.
 - `DESIGN.md` incorporates the resolved decisions into their owning sections,
   including M0 persistence as an architecture gate.
-- `ROADMAP.md` now schedules the expanded economy, construction, production,
-  fog, combat, wolf AI, interface, persistence, responsive-browser, and
-  verification work required for the playable slice. Early selection and
-  movement spikes are distinguished from their production implementations.
-- M0's starting Materials and roadmap both account for the Refinery and its
-  separately paid first Harvester, avoiding an initial economy deadlock.
+- M0's starting Materials account for the Refinery and its separately paid
+  first Harvester, avoiding an initial economy deadlock.
 - The locked input design supersedes the prototype camera bindings for future
   implementation.
 

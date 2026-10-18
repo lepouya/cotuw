@@ -8,6 +8,8 @@ These contracts describe where new behaviors, views, and services attach.
 - Actor behaviors modify their staged actor through `handleCommand` and
   `update`. They cannot call mission mutation, tick, or disposal methods during
   a tick. A violation faults the mission without publishing staged changes.
+- Behaviors preserve actor identity, tile placement, and occupancy layer.
+  Layer transitions require explicit mission commands.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates
   the current batch even if its hook immediately resumes.
@@ -18,6 +20,7 @@ These contracts describe where new behaviors, views, and services attach.
   catalog. Terrain edits use the validated command and mutation APIs.
 - A mission may restrict its playable bounds within the map. Its bounds cannot
   extend outside the terrain used by navigation and vision.
+- Support links and placement coverage use only the building's own faction.
 
 ## Resource ownership
 
@@ -33,9 +36,13 @@ These contracts describe where new behaviors, views, and services attach.
   scene's lifetime. Model instances release before their shared assets.
 - Sidebar setup releases partial controls after failure. Production cards own
   their tooltip and listeners; disposal or parent cancellation releases both.
+- Asset collections release after their views; a failed cleanup cannot skip
+  the remaining assets.
 - `disposeAsync` pauses the session and waits for pending model and BRDF loads
   before releasing the engine. A failing `onReady` follows this same path.
   Initialization failures release the partial view and session.
+- Releasing a mission clears application references even if disposal fails.
+  Application Exit waits for requested save-library writes and deletions.
 
 ## Content lookup
 

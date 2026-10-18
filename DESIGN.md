@@ -288,10 +288,18 @@ story.
 
 ## Controls and interface
 
+- Normal launch opens a title screen with New mission, Load, Options, and Exit.
+  No mission runs until the player starts or loads one. Options shares the
+  in-game audio settings. Main menu releases the current mission and returns
+  to this screen. Exit closes the desktop app; browsers show a close-tab
+  message. The title screen shows the game version.
+  Explicit `?level=<scenario ID>` links open bundled levels for development.
 - Primary click selects or issues the contextual default command. Clicking a
   selected actor keeps it selected. Primary drag box-selects friendly mobile
   units. Shift-click toggles individual units; Shift-drag adds boxed units.
   Buildings remain individually selected and cannot join a mobile group.
+  Box selection tests stable ground-level anchors, independent of animated
+  model bounds, weapons, and effects.
 - Stop cancels selected mobile actors' orders without clearing selection.
   Clear removes selection without changing orders. Selection is client UI state.
 - Shift-commands, and commands in the touch Queue Orders mode, append Move,
@@ -415,7 +423,7 @@ story.
   Harvester, training and rally points at the first completed Barracks, and
   fog, scouting, and combat at the first Scout.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
-  Load, Restart, and Exit; its Load panel lists saves and imports files. F5
+  Load, Restart, and Main menu; its Load panel lists saves and imports files. F5
   quicksaves, F9 loads the quicksave, and F10 opens the menu.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
@@ -1152,8 +1160,8 @@ Deterministic acceptance checks cover:
 - Combat destruction of the opening's authored starting Command Center records
   a defeat at that tick. All simultaneous hits resolve, then movement and
   economy stop. Further ticks leave the state unchanged. The result survives
-  saving, and the results panel offers Restart, Load, and Exit. Restart reloads
-  the level; Exit releases the session and offers a new mission. Load lists
+  saving, and the results panel offers Restart, Load, and Main menu. Restart
+  reloads the level; Main menu releases the session. Load lists
   saves and imports files, validates the mission before releasing the current
   session, and begins paused, with Inspect and Resume actions. Inspection allows
   selection and camera movement; commands require resuming. A loaded defeat
@@ -1173,9 +1181,9 @@ Deterministic acceptance checks cover:
   Command Center protection rule. Recommended preparation explains the economy
   and army buildup with current actor counts; it is not a victory requirement.
   Victory pauses at the interface and offers Continue free play, Restart, Load,
-  and Exit. Continuing restores all ordinary actions. A loaded victory opens
-  the same paused results panel. Command Center destruction still causes defeat
-  in free play.
+  and Main menu. Continuing restores all ordinary actions. A loaded victory
+  opens the same paused results panel. Command Center destruction still causes
+  defeat in free play.
 - Saves preserve health, weapon cooldowns, building aim, attack destinations,
   returns and their retry state, route bounds, remains, and the complete
   [wolf and alert state](#m0-wolf-implementation-contract).
@@ -1185,8 +1193,7 @@ Deterministic acceptance checks cover:
 
 M0 is a canon-compatible standalone ARC prototype, not the canonical first
 campaign mission or a literal tutorial. It is the minimum viable mission from
-which
-a later tutorial could be made.
+which a later tutorial could be made.
 
 - A fixed **Command Center** starts in a safe map-edge pocket.
 - Starting Materials cover a **Materials Refinery** and its separately paid
@@ -1210,6 +1217,7 @@ a later tutorial could be made.
   Economic or military dead ends remain player-judged soft defeats.
 - A successful run takes about 5 to 10 minutes. M0 does not lengthen it by
   slowing gathering, production, or movement, and it is not a hard timer.
+  RTS-familiar first-time players can finish using only the in-game guidance.
 - M0 includes contextual notifications, full save/load/restart coverage,
   compact landscape browser UI checks, and contextual guides for command
   basics, support coverage, harvesting, Barracks training, and scouting.
@@ -1297,6 +1305,7 @@ a later tutorial could be made.
   - Whether corruption spreads, and how players counter or exploit it.
 - **Interface and presentation**
   - Accessibility tuning and final art and audio direction.
+  - Control groups and double-click selection beyond the prototype.
 - **Future systems**
   - Technology-tree and permanent-research design.
   - Script conflict precedence, missing-target policies, and mission-driven
