@@ -223,21 +223,29 @@ export function createAudioMixer({
           },
           setMix: (value, position) => {
             if (ended) return;
-            if (value !== mixedGain) {
-              gain.gain.setTargetAtTime(value, device.currentTime, 0.04);
-              mixedGain = value;
-            }
-            if (position !== mixedPan) {
-              pan.pan.setTargetAtTime(position, device.currentTime, 0.04);
-              mixedPan = position;
+            try {
+              if (value !== mixedGain) {
+                gain.gain.setTargetAtTime(value, device.currentTime, 0.04);
+                mixedGain = value;
+              }
+              if (position !== mixedPan) {
+                pan.pan.setTargetAtTime(position, device.currentTime, 0.04);
+                mixedPan = position;
+              }
+            } catch {
+              failVoice();
             }
           },
           stop: () => {
             if (ended) return;
             ended = true;
-            holdGain(fade.gain, device.currentTime);
-            fade.gain.setTargetAtTime(0, device.currentTime, 0.01);
-            source.stop(device.currentTime + 0.06);
+            try {
+              holdGain(fade.gain, device.currentTime);
+              fade.gain.setTargetAtTime(0, device.currentTime, 0.01);
+              source.stop(device.currentTime + 0.06);
+            } catch {
+              failVoice();
+            }
           },
         };
         let released = false;
@@ -248,6 +256,15 @@ export function createAudioMixer({
           source.onended = null;
           voices.delete(voice);
           for (const node of nodes) node.disconnect();
+        };
+        const failVoice = () => {
+          try {
+            source.stop();
+          } catch {
+            // A failed device may no longer accept source commands.
+          }
+          release();
+          publish("unavailable");
         };
         source.onended = release;
         source.start(now);

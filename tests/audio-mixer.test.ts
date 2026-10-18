@@ -181,6 +181,38 @@ test("blocked resume can retry and failed files do not prevent other playback", 
   mixer.dispose();
 });
 
+test.each(["mix", "stop"] as const)(
+  "a device failure during %s releases its voice without escaping to gameplay",
+  async (operation) => {
+    const backend = device();
+    const mixer = createAudioMixer(backend);
+    const status = vi.fn();
+    mixer.onStatus(status);
+    mixer.preload(["engine"]);
+    await mixer.unlock();
+    await flush();
+    const voice = mixer.play("engine", options)!;
+    const other = mixer.play("engine", options)!;
+    const fail = () => {
+      throw new Error("Device failure");
+    };
+    if (operation === "mix")
+      backend.gains[3]!.gain.setTargetAtTime.mockImplementation(fail);
+    else backend.sources[0]!.stop.mockImplementation(fail);
+    expect(() => {
+      if (operation === "mix") voice.setMix(0.1, 0);
+      else voice.stop();
+    }).not.toThrow();
+    expect(voice.ended).toBe(true);
+    expect(status).toHaveBeenLastCalledWith("unavailable");
+    expect(backend.sources[0]!.stop).toHaveBeenCalled();
+    expect(backend.sources[0]!.disconnect).toHaveBeenCalledOnce();
+    mixer.dispose();
+    expect(other.ended).toBe(true);
+    expect(backend.context.close).toHaveBeenCalledOnce();
+  },
+);
+
 test("late decodes after disposal do not notify or restore playback", async () => {
   const backend = device();
   let finish!: (buffer: ArrayBuffer) => void;

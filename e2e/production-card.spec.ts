@@ -60,6 +60,44 @@ async function setupCard(page: Page) {
 
 test.beforeEach(async ({ page }) => setupCard(page));
 
+test("descriptions avoid existing elements and authored button IDs", async ({
+  page,
+}) => {
+  const result = await page.evaluate(() => {
+    const prefix = "production-description-";
+    const lastId = Math.max(
+      0,
+      ...Array.from(document.querySelectorAll(`[id^="${prefix}"]`), (node) =>
+        Number(node.id.slice(prefix.length)),
+      ),
+    );
+    const reserved = document.createElement("span");
+    reserved.id = `${prefix}${lastId + 1}`;
+    reserved.textContent = "Unrelated description";
+    document.body.append(reserved);
+    const { root, factory } = window.cardFixture;
+    const card = factory.create(
+      root,
+      { id: `${prefix}${lastId + 2}`, label: "Train Scout" },
+      { id: "scout", behaviorId: "idle", movement: { speed: 1 } },
+      { name: "Scout", details: "A scouting unit" },
+    );
+    const descriptionId = card.button.getAttribute("aria-describedby")!;
+    return {
+      buttonId: card.button.id,
+      descriptionId,
+      reservedId: reserved.id,
+      matches: document.querySelectorAll(`[id="${descriptionId}"]`).length,
+    };
+  });
+  expect(result.descriptionId).not.toBe(result.reservedId);
+  expect(result.descriptionId).not.toBe(result.buttonId);
+  expect(result.matches).toBe(1);
+  await expect(
+    page.getByRole("button", { name: "Train Scout" }),
+  ).toHaveAccessibleDescription("A scouting unit");
+});
+
 test("disabled cards keep accessible focus as availability changes", async ({
   page,
 }) => {

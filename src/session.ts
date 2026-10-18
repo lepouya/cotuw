@@ -327,10 +327,7 @@ async function assembleGameSession(
   );
   const propAssets = new Map<PropId, ModelAsset>();
   /** Every loaded prop and building model, released with the session. */
-  const modelAssets: ModelAsset[] = [];
-  lifetime.defer(() => {
-    for (const asset of modelAssets) asset.dispose();
-  });
+  const modelAssets = own(createLifetime());
   const models = definitions.flatMap(({ id }) => {
     const model = presentationOf(id)?.model;
     return model ? [[id, model] as const] : [];
@@ -346,7 +343,9 @@ async function assembleGameSession(
   own(frameEffects);
   const appearances = new Map<string, ActorAppearance>();
   lifetime.defer(() => {
-    for (const appearance of appearances.values()) appearance.dispose();
+    const cleanup = createLifetime();
+    for (const appearance of appearances.values()) cleanup.own(appearance);
+    cleanup.dispose();
   });
   /** Each appearance also plays its actor's frame effects. */
   const setAppearance = (id: string, appearance: ActorAppearance) => {
@@ -1338,19 +1337,22 @@ async function assembleGameSession(
     simulation,
     disposeAsync: () =>
       (disposal ??= (async () => {
-        session.pause();
         try {
-          await modelsReady;
-          // Babylon's BRDF decode outlives the model load and uses the engine.
-          while (
-            !view.scene.isDisposed &&
-            view.scene.environmentBRDFTexture &&
-            !view.scene.environmentBRDFTexture.loadingError &&
-            !view.scene.environmentBRDFTexture.isReady()
-          )
-            await new Promise((resolve) => setTimeout(resolve, 16));
+          session.pause();
         } finally {
-          if (!view.scene.isDisposed) disposeView();
+          try {
+            await modelsReady;
+            // Babylon's BRDF decode outlives the model load and uses the engine.
+            while (
+              !view.scene.isDisposed &&
+              view.scene.environmentBRDFTexture &&
+              !view.scene.environmentBRDFTexture.loadingError &&
+              !view.scene.environmentBRDFTexture.isReady()
+            )
+              await new Promise((resolve) => setTimeout(resolve, 16));
+          } finally {
+            if (!view.scene.isDisposed) disposeView();
+          }
         }
       })()),
     playing: () => playing,
@@ -1461,7 +1463,7 @@ async function assembleGameSession(
       label,
       () => loadModelAsset(view.scene, graphics),
       (asset) => {
-        modelAssets.push(asset);
+        modelAssets.own(asset);
         use(asset);
       },
     );

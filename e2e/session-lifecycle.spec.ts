@@ -1,9 +1,48 @@
 import { expect, test } from "@playwright/test";
 
 import { MissionDriver } from "./mission-driver";
+import { openOpening } from "./prototype-helpers";
 
-for (const failure of ["simulation", "ready"] as const)
-  test(`failed ${failure} setup releases the session and its controls`, async ({
+for (const action of ["exit-mission", "restart-mission"]) {
+  test(`a cleanup failure during ${action} leaves a usable title screen`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await openOpening(page);
+    await page.evaluate(async () => {
+      const path: string = "/e2e/harness.ts";
+      const { EngineStore } = await import(path);
+      const engine = EngineStore.Instances[0];
+      const dispose = engine.dispose.bind(engine);
+      engine.dispose = () => {
+        dispose();
+        throw new Error("Cleanup regression");
+      };
+    });
+    await page.locator("#open-menu").click();
+    await page.locator(`#${action}`).click();
+    await expect(page.locator("#new-mission")).toBeEnabled();
+    await expect(page.locator("#game-menu-title")).toHaveText(
+      "Citadels of the Unquiet World",
+    );
+    expect(
+      await page.evaluate(async () => {
+        const path: string = "/e2e/harness.ts";
+        const { EngineStore } = await import(path);
+        return EngineStore.Instances.length;
+      }),
+    ).toBe(0);
+    await page.locator("#new-mission").click();
+    await expect(page.locator("#explanation-title")).toHaveText(
+      "Welcome, Commander",
+    );
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const failure of ["simulation", "ready", "disposal"] as const)
+  test(`${failure} failure releases the session and its controls`, async ({
     page,
   }) => {
     const mission = new MissionDriver(page, false, false);
@@ -39,9 +78,14 @@ for (const failure of ["simulation", "ready"] as const)
           onDispose: () => disposed++,
           onReady: (session: any) => {
             created = session;
-            throw new Error("ready failed");
+            if (failure === "disposal")
+              created.pause = () => {
+                throw new Error("pause failed");
+              };
+            else throw new Error("ready failed");
           },
         });
+        if (failure === "disposal") await created.disposeAsync();
       } catch (fault) {
         error = (fault as Error).message;
       }
@@ -67,13 +111,18 @@ for (const failure of ["simulation", "ready"] as const)
       };
     }, failure);
     expect(result.error).toContain(
-      failure === "simulation" ? "state tick" : "ready failed",
+      failure === "simulation"
+        ? "state tick"
+        : failure === "ready"
+          ? "ready failed"
+          : "pause failed",
     );
     expect(result.disposed).toBe(1);
     expect(result.extraEngines).toBe(0);
     expect(result.extraControls).toBe(0);
     expect(result.prevented).toBe(false);
-    if (failure === "ready") expect(result.mutationError).toContain("disposed");
+    if (failure !== "simulation")
+      expect(result.mutationError).toContain("disposed");
     await mission.advance(1);
     await expect(page.locator("#mission-time")).toHaveText("0:01");
   });

@@ -146,7 +146,10 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
       description.className = "sr-only";
       do {
         description.id = `production-description-${++nextDescriptionId}`;
-      } while (document.getElementById(description.id));
+      } while (
+        description.id === button.id ||
+        document.getElementById(description.id)
+      );
       description.textContent = content.details;
       button.setAttribute("aria-describedby", description.id);
       card.setAttribute("role", "group");

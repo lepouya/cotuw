@@ -83,6 +83,12 @@ function buildSidebar(
     definitions.map((definition) => [definition.id, definition]),
   );
   const nameFor = (id: string) => presentations.get(id)?.name ?? id;
+  const countByDefinition = (actors: Iterable<ActorRenderState>) => {
+    const counts = new Map<string, number>();
+    for (const { definitionId } of actors)
+      counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);
+    return counts;
+  };
   const player = createPlayerAccess(options.playerFaction, definitionById);
   const friendly = player.owns;
   const namesFor = (definition: ActorDefinition) =>
@@ -442,12 +448,7 @@ function buildSidebar(
             (actor) => !isTilePlacedActor(actor) && friendly(actor),
           ),
         );
-        const counts = new Map<string, number>();
-        for (const actor of state.actors.filter(friendly))
-          counts.set(
-            actor.definitionId,
-            (counts.get(actor.definitionId) ?? 0) + 1,
-          );
+        const counts = countByDefinition(state.actors.filter(friendly));
         preparation.update(
           goals.map(({ definitionId, label, directive }) => {
             const current = counts.get(definitionId) ?? 0;
@@ -461,15 +462,14 @@ function buildSidebar(
           }),
         );
       }
-      const nextDisabled = unavailable;
       if (
         membershipChanged ||
         selectionKey !== nextSelectionKey ||
-        disabled !== nextDisabled
+        disabled !== unavailable
       ) {
         selectionKey = nextSelectionKey;
         const selectedActorId = ids.length === 1 ? ids[0] : undefined;
-        disabled = nextDisabled;
+        disabled = unavailable;
         roster.updateSelection(selected, disabled);
         const actor = selectedActorId
           ? actorsById.get(selectedActorId)
@@ -485,15 +485,9 @@ function buildSidebar(
             ? `Turn off Box select to move ${moveSubject}.`
             : `Tap or click terrain to move ${moveSubject}.`;
         if (ids.length > 1) {
-          const counts = new Map<string, number>();
-          for (const id of ids) {
-            const unit = actorsById.get(id);
-            if (unit)
-              counts.set(
-                unit.definitionId,
-                (counts.get(unit.definitionId) ?? 0) + 1,
-              );
-          }
+          const counts = countByDefinition(
+            ids.flatMap((id) => actorsById.get(id) ?? []),
+          );
           selectionDetails.textContent = `${ids.length} units selected`;
           selectionInfo.textContent = `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. ${moveHint}`;
           return;
