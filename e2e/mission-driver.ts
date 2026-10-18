@@ -28,6 +28,7 @@ export class MissionDriver {
       });
     }, this.realTime);
     await this.page.goto("/");
+    await activate(this.page.locator("#new-mission"), this.touch);
     await expect(this.page.locator("#game-canvas")).toHaveAttribute(
       "data-terrain-ready",
       "true",

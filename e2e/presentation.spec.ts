@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { withoutApp } from "./prototype-helpers";
 
 import type { Page } from "@playwright/test";
 import type { GameSession } from "../src/session";
@@ -21,14 +22,7 @@ async function openPresentation(
   });
   page.on("pageerror", (error) => errors.push(error.message));
   // The spec owns the session on the production HTML.
-  await page.route(
-    (url) => url.pathname === "/src/main.ts",
-    (route) =>
-      route.fulfill({
-        contentType: "text/javascript",
-        body: 'import "/src/styles.css";',
-      }),
-  );
+  await withoutApp(page);
   await page.goto("/");
   await page.evaluate(
     async ({ levelId, variant }) => {

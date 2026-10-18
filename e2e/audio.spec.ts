@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { MissionDriver } from "./mission-driver";
 import { PROFILES } from "./profiles";
-import { activate, openOpening, dismissExplanation } from "./prototype-helpers";
+import {
+  activate,
+  openOpening,
+  dismissExplanation,
+  withoutApp,
+} from "./prototype-helpers";
 
 declare global {
   interface Window {
@@ -67,6 +72,7 @@ for (const profile of PROFILES) {
       ).toBe(true);
       await activate(page.locator("#restart-mission"), profile.touch);
       await page.reload();
+      await activate(page.locator("#new-mission"), profile.touch);
       await dismissExplanation(page, "Welcome, Commander", profile.touch);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-terrain-ready",
@@ -130,7 +136,14 @@ test("committed gameplay drives music, training, machinery, doors, and pause cle
   });
   const mission = new MissionDriver(page, false, false);
   await mission.opening(false);
-  expect(await page.evaluate(() => window.audioStarts)).toEqual([]);
+  // The New mission press unlocks audio, so only music may start yet.
+  expect(
+    await page.evaluate(() =>
+      window.audioStarts.filter(
+        (voice) => !voice.loop || voice.duration !== 48,
+      ),
+    ),
+  ).toEqual([]);
   await mission.explanation("Welcome, Commander");
   await mission.press("#open-menu");
   await expect
@@ -267,14 +280,7 @@ for (const nativeHold of [true, false]) {
       missingRequests++;
       return route.fulfill({ status: 404 });
     });
-    await page.route(
-      (url) => url.pathname === "/src/main.ts",
-      (route) =>
-        route.fulfill({
-          contentType: "text/javascript",
-          body: 'import "/src/styles.css";',
-        }),
-    );
+    await withoutApp(page);
     if (!nativeHold)
       await page.addInitScript(() => {
         Reflect.set(AudioParam.prototype, "cancelAndHoldAtTime", undefined);

@@ -20,11 +20,14 @@ const METADATA_READERS = 4;
 
 /** Mission files in storage, described by the metadata they carry. */
 export function createSaveLibrary(storage: SaveStorage) {
-  let pending: Promise<unknown> = Promise.resolve();
+  let pending: Promise<void> = Promise.resolve();
   const mutate = <T>(action: () => Promise<T>): Promise<T> => {
     const result = pending.then(action);
     // A failed write must not prevent later saves or deletions.
-    pending = result.catch(() => {});
+    pending = result.then(
+      () => {},
+      () => {},
+    );
     return result;
   };
   const read = async (id: string) => {
@@ -32,6 +35,8 @@ export function createSaveLibrary(storage: SaveStorage) {
     return storage.read(id);
   };
   return {
+    /** Waits for requested writes and deletions; their callers handle errors. */
+    flush: () => pending,
     /** Newest first. */
     list: async (): Promise<SaveEntry[]> => {
       await pending;

@@ -12,6 +12,7 @@ export function createBrowserPlatform(): Platform {
     }
   };
   return {
+    exit: async () => false,
     saves: {
       list: async () =>
         Object.keys(storage())

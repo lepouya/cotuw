@@ -31,6 +31,18 @@ export async function terrainPoint(page: Page, x: number, z: number) {
   );
 }
 
+/** Serves the production HTML and styles without the app, out of the title. */
+export async function withoutApp(page: Page) {
+  await page.route(
+    (url) => url.pathname === "/src/main.ts",
+    (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: 'import "/src/styles.css"; document.body.classList.remove("at-title");',
+      }),
+  );
+}
+
 /** Checks a scenario popup's title, then dismisses it. */
 export async function dismissExplanation(
   page: Page,
@@ -45,6 +57,7 @@ export async function dismissExplanation(
 /** Starts the authored opening and acknowledges its introductory guide. */
 export async function openOpening(page: Page, touch = false) {
   await page.goto("/");
+  await activate(page.locator("#new-mission"), touch);
   await dismissExplanation(page, "Welcome, Commander", touch);
 }
 

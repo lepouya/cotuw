@@ -136,6 +136,31 @@ test("a failed write does not poison later writes", async () => {
   expect(await library.readQuicksave()).toBe("success");
 });
 
+test("flush waits for queued mutations even after a failed request", async () => {
+  const storage = memoryStorage();
+  let finish!: () => void;
+  const held = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const write = storage.write;
+  storage.write = async (id, source) => {
+    if (source === "fail") throw new Error("Disk full");
+    await held;
+    await write(id, source);
+  };
+  const library = createSaveLibrary(storage);
+  const failure = library.write("quick", "fail");
+  const success = library.write("quick", "saved");
+  const flushed = vi.fn();
+  const flush = library.flush().then(flushed);
+  await expect(failure).rejects.toThrow("Disk full");
+  expect(flushed).not.toHaveBeenCalled();
+  finish();
+  await Promise.all([success, flush]);
+  expect(flushed).toHaveBeenCalledOnce();
+  expect(await library.readQuicksave()).toBe("saved");
+});
+
 test("sorts timestamps chronologically across offsets and sanitizes metadata", async () => {
   const storage = memoryStorage();
   storage.files.set(

@@ -8,6 +8,8 @@ export type Platform = {
   exportFile: (name: string, source: string) => Promise<boolean>;
   /** Resolves `undefined` when the player cancels. */
   importFile: () => Promise<string | undefined>;
+  /** Closes the host window; returns false when the browser owns the tab. */
+  exit: () => Promise<boolean>;
 };
 
 /** IDs are safe file names. Failures reject with a message for the player. */

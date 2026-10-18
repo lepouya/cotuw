@@ -1,4 +1,5 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   BaseDirectory,
   mkdir,
@@ -24,6 +25,10 @@ export function createTauriPlatform(): Platform {
   const ensureDirectory = () =>
     mkdir(DIRECTORY, { ...IN_APP_DATA, recursive: true });
   return {
+    exit: async () => {
+      await getCurrentWindow().close();
+      return true;
+    },
     saves: {
       list: async () => {
         await ensureDirectory();

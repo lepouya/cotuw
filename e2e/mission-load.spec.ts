@@ -65,7 +65,7 @@ for (const action of ["restart", "exit", "newer load"] as const) {
     });
     if (action === "exit") {
       await expect(page.locator("#game-menu-title")).toHaveText(
-        "Mission ended",
+        "Citadels of the Unquiet World",
       );
     } else {
       await expect(page.locator("#game-menu")).not.toBeVisible();

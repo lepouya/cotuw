@@ -87,7 +87,7 @@ test("the base pack loads its generated model files", async ({ page }) => {
   page.on("console", (message) => {
     if (message.type() === "error") failures.push(message.text());
   });
-  await page.goto("/");
+  await page.goto("/?level=arc-economy-opening");
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-models-ready",
     "true",

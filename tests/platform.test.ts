@@ -10,6 +10,12 @@ const disk = vi.hoisted(() => ({
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
+const { closeWindow } = vi.hoisted(() => ({
+  closeWindow: vi.fn(async () => {}),
+}));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ close: closeWindow }),
+}));
 vi.mock("@tauri-apps/plugin-fs", () => ({
   BaseDirectory: { AppData: 14 },
   mkdir: vi.fn(async () => {}),
@@ -38,10 +44,18 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
 }));
 
 beforeEach(() => {
+  vi.clearAllMocks();
   disk.files.clear();
   disk.failWrite = false;
   disk.failRename = false;
   vi.unstubAllGlobals();
+});
+
+test("only the desktop host closes its window on exit", async () => {
+  expect(await createBrowserPlatform().exit()).toBe(false);
+  expect(closeWindow).not.toHaveBeenCalled();
+  expect(await createTauriPlatform().exit()).toBe(true);
+  expect(closeWindow).toHaveBeenCalledOnce();
 });
 
 test("desktop saves replace an existing file after writing the new content", async () => {

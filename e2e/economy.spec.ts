@@ -5,6 +5,7 @@ import {
   dismissExplanation,
   importMission,
   terrainPoint,
+  withoutApp,
 } from "./prototype-helpers";
 import type { Page } from "@playwright/test";
 import type { GameSession } from "../src/session";
@@ -33,14 +34,7 @@ async function controlledOpening(
     );
   });
   // The harness owns one session and its controls on the production HTML.
-  await page.route(
-    (url) => url.pathname === "/src/main.ts",
-    (route) =>
-      route.fulfill({
-        contentType: "text/javascript",
-        body: 'import "/src/styles.css";',
-      }),
-  );
+  await withoutApp(page);
   await page.goto("/");
   const hiddenUnitsAtLoad = await page.evaluate(
     async ({ materials, playerFaction, extraBuildings, startPaused }) => {
@@ -1492,8 +1486,10 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   await upload(saves.defeated);
   await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await page.locator("#exit-mission").click();
-  await expect(page.locator("#game-menu-title")).toHaveText("Mission ended");
-  await page.locator("#restart-mission").click();
+  await expect(page.locator("#game-menu-title")).toHaveText(
+    "Citadels of the Unquiet World",
+  );
+  await page.locator("#new-mission").click();
   await dismissExplanation(page, "Welcome, Commander");
   await expect(page.locator("#materials-counter")).toHaveText("150");
   expect(errors).toEqual([]);

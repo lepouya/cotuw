@@ -7,6 +7,72 @@ import type { Page } from "@playwright/test";
 
 const materials = (page: Page) => page.locator("#materials-counter");
 
+test("a failed manual save preserves the form and name for retry", async ({
+  page,
+}) => {
+  await openOpening(page);
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith("cotuw.save."))
+        throw new DOMException("Full", "QuotaExceededError");
+      setItem.call(this, key, value);
+    };
+  });
+  await page.locator("#open-menu").click();
+  await page.locator("#save-mission").click();
+  await page.locator("#save-name").fill("Keep this name");
+  await page.locator("#confirm-save").click();
+  await expect(page.locator("#game-menu-status")).toContainText(
+    "storage is full",
+  );
+  await expect(page.locator("#save-form")).toBeVisible();
+  await expect(page.locator("#save-name")).toHaveValue("Keep this name");
+});
+
+test("Exit waits for a save still writing after returning to the title", async ({
+  page,
+}) => {
+  await page.route(
+    (url) => url.pathname === "/src/platform/browser.ts" && !url.search,
+    (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: `
+        import { createBrowserPlatform as original } from "/src/platform/browser.ts?original";
+        export function createBrowserPlatform() {
+          const platform = original();
+          const write = platform.saves.write;
+          platform.saves.write = async (...args) => {
+            await new Promise(resolve => { window.finishSave = resolve; });
+            await write(...args);
+          };
+          return platform;
+        }
+      `,
+      }),
+  );
+  await openOpening(page);
+  await page.keyboard.press("F5");
+  await page.waitForFunction(
+    () => typeof Reflect.get(window, "finishSave") === "function",
+  );
+  await page.locator("#open-menu").click();
+  await page.locator("#exit-mission").click();
+  await page.locator("#quit-game").click();
+  await expect(page.locator("#quit-game")).toBeDisabled();
+  await expect(page.locator("#game-menu-title")).toHaveText(
+    "Citadels of the Unquiet World",
+  );
+  await page.evaluate(() => Reflect.get(window, "finishSave")());
+  await expect(page.locator("#game-menu-title")).toHaveText(
+    "Thanks for playing",
+  );
+  expect(
+    await page.evaluate(() => localStorage.getItem("cotuw.save.quicksave")),
+  ).not.toBeNull();
+});
+
 async function openLoadPanel(page: Page) {
   await page.locator("#open-menu").click();
   await page.locator("#load-mission").click();

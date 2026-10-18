@@ -1,4 +1,5 @@
 import "./styles.css";
+import { version } from "../package.json";
 import { createAudioMixer } from "./audio/mixer";
 import { bindAudioControls } from "./ui/audio-controls";
 import { LEVEL_SOURCES } from "./content/levels";
@@ -42,6 +43,15 @@ const saveForm = byId<HTMLFormElement>("save-form");
 const saveName = byId<HTMLInputElement>("save-name");
 const loadPanel = byId("load-panel");
 const saveEntries = byId("save-entries");
+const newMission = byId<HTMLButtonElement>("new-mission");
+const options = byId<HTMLButtonElement>("open-options");
+const quit = byId<HTMLButtonElement>("quit-game");
+const audioControls = byId("audio-controls");
+const optionsBack = byId<HTMLButtonElement>("cancel-options");
+const titleBack = byId<HTMLButtonElement>("return-to-title");
+const versionLabel = byId("game-version");
+const DEFAULT_LEVEL = LEVEL_SOURCES.keys().next().value!;
+versionLabel.textContent = `Prototype demo · v${version}`;
 
 /** Level sources by scenario ID; loading a level file adds or replaces one. */
 const levels = new Map(LEVEL_SOURCES);
@@ -56,7 +66,8 @@ let saveListRequest = 0;
 /** Objectives already complete, so only new completions autosave. */
 let completed = new Set<string>();
 let resumeOnClose = false;
-let menuMode: keyof typeof MENU_TEXT = "exit";
+let menuMode: keyof typeof MENU_TEXT = "home";
+let menuPanel: MenuPanel = "actions";
 let sidebar: ReturnType<typeof createSidebar> | undefined;
 /** A popup waiting for the game menu to close. */
 let pendingPopup: ScenarioPopup | undefined;
@@ -82,10 +93,25 @@ const MENU_TEXT = {
     title: "Mission loaded",
     description: "Inspect the saved mission, then resume when ready.",
   },
-  exit: {
-    title: "Mission ended",
-    description: "Start a new mission or load a saved mission.",
+  home: {
+    title: "Citadels of the Unquiet World",
+    description:
+      "Establish an ARC foothold, explore the frontier, and clear the wolves from the mountain den.",
   },
+  quit: {
+    title: "Thanks for playing",
+    description: "You can close this browser tab when you’re ready.",
+  },
+};
+type MenuPanel = "actions" | "save" | "load" | "options";
+/** The control each menu panel focuses when it opens or becomes enabled. */
+const PANEL_FOCUS: Record<MenuPanel, () => HTMLElement> = {
+  actions: () =>
+    actions.querySelector<HTMLElement>("button:not([hidden]):not(:disabled)") ??
+    dialog,
+  save: () => saveName,
+  load: () => byId("import-mission"),
+  options: () => byId("audio-master-volume"),
 };
 const BRIEFING_ELEMENTS: Record<keyof ScenarioBriefing, string> = {
   label: "scenario-label",
@@ -161,16 +187,27 @@ function dismissPopup() {
   canvas.focus({ preventScroll: true });
 }
 
-function showPanel(panel: "actions" | "save" | "load") {
+function showPanel(panel: MenuPanel) {
   saveListRequest++;
+  menuPanel = panel;
   actions.hidden = panel !== "actions";
   saveForm.hidden = panel !== "save";
   loadPanel.hidden = panel !== "load";
+  // In a mission, audio settings stay beside every panel.
+  audioControls.hidden = panel !== "options" && !session;
+  optionsBack.hidden = panel !== "options";
+  description.hidden = panel === "options";
+  title.textContent =
+    panel === "options" ? "Options" : MENU_TEXT[menuMode].title;
+  focusPanel();
+}
+
+function focusPanel() {
+  if (dialog.open) PANEL_FOCUS[menuPanel]().focus();
 }
 
 function showMenu(mode: keyof typeof MENU_TEXT, result?: MissionResult) {
   menuMode = mode;
-  title.textContent = MENU_TEXT[mode].title;
   const failure =
     result?.kind === "defeat" &&
     mission?.scenario.objectives?.find(({ id }) => id === result.objectiveId);
@@ -188,12 +225,16 @@ function showMenu(mode: keyof typeof MENU_TEXT, result?: MissionResult) {
         : "Resume";
   inspect.hidden = mode !== "loaded";
   save.hidden = quicksave.hidden = !canSave();
-  restart.textContent = mode === "exit" ? "Start mission" : "Restart";
-  restart.hidden = !levels.has(mission?.scenario.id ?? "");
-  exit.hidden = mode === "exit";
+  restart.hidden = !session || !levels.has(mission?.scenario.id ?? "");
+  exit.hidden = !session;
+  newMission.hidden = options.hidden = quit.hidden = mode !== "home";
+  load.hidden = mode === "quit";
+  titleBack.hidden = mode !== "quit";
+  versionLabel.hidden = !!session;
+  dialog.classList.toggle("title-menu", !session);
   menuStatus.textContent = "";
-  showPanel("actions");
   if (!dialog.open) dialog.showModal();
+  showPanel("actions");
 }
 
 function openMenu() {
@@ -212,6 +253,27 @@ function setBusy(value: boolean) {
   busy = value;
   for (const button of dialog.querySelectorAll("button"))
     button.disabled = value;
+  // Disabling drops focus from the pressed button.
+  if (!value) focusPanel();
+}
+
+/** Releases the current mission and everything presented for it. */
+async function releaseMission() {
+  try {
+    await session?.disposeAsync();
+  } finally {
+    session = undefined;
+    sidebar = undefined;
+    mission = undefined;
+    pendingPopup = shownPopup = undefined;
+    explanation.close();
+    notifications.clear();
+  }
+}
+
+function showTitle() {
+  document.body.classList.add("at-title");
+  showMenu("home");
 }
 
 async function start(next: LoadedMission, loaded = false) {
@@ -219,12 +281,9 @@ async function start(next: LoadedMission, loaded = false) {
   loadRequest++;
   setBusy(true);
   try {
-    await session?.disposeAsync();
-    session = undefined;
+    await releaseMission();
     dialog.close();
-    pendingPopup = shownPopup = undefined;
-    explanation.close();
-    notifications.clear();
+    document.body.classList.remove("at-title");
     delete canvas.dataset.missionResult;
     delete canvas.dataset.terrainReady;
     delete canvas.dataset.simulationFault;
@@ -277,10 +336,12 @@ async function start(next: LoadedMission, loaded = false) {
     sidebar?.dispose();
     sidebar = undefined;
     session = undefined;
+    mission = undefined;
     updateTopBar();
     console.error("The mission failed to start.", error);
-    showMenu("exit");
-    menuStatus.textContent = "The mission could not start. Try restarting.";
+    showTitle();
+    menuStatus.textContent =
+      "The mission could not start. Try New mission or Load.";
     return;
   } finally {
     setBusy(false);
@@ -314,21 +375,24 @@ function startLevel(id: string) {
       throw new RangeError(`This build has no level named "${id}".`);
     void start(loadMission(source));
   } catch (error) {
-    showMenu("exit");
+    if (session) showMenu("menu");
+    else showTitle();
     menuStatus.textContent = `The level could not start: ${errorMessage(error)}`;
   }
 }
 
 async function writeSave(kind: SaveKind, name: string) {
-  if (!canSave()) return;
+  if (!canSave()) return false;
   const savedSession = session;
   try {
     await library.write(kind, saveSource(name));
     if (session === savedSession)
       report(`${KIND_LABELS[kind]} save complete: ${name}`);
+    return true;
   } catch (error) {
     if (session === savedSession)
       report(`Saving failed: ${errorMessage(error)}`);
+    return false;
   }
 }
 
@@ -419,9 +483,24 @@ const closeMenu = () => {
     showPopup();
   }
 };
+/** Escape backs out of a panel, then closes only the pause menu. */
+function cancelMenu() {
+  if (busy) return;
+  if (menuPanel !== "actions") {
+    loadRequest++;
+    showPanel("actions");
+  } else if (menuMode === "menu") closeMenu();
+}
+dialog.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  // Repeated native close requests can become non-cancelable.
+  event.preventDefault();
+  event.stopPropagation();
+  cancelMenu();
+});
 dialog.addEventListener("cancel", (event) => {
   event.preventDefault();
-  if (menuMode === "menu") closeMenu();
+  cancelMenu();
 });
 resume.addEventListener("click", closeMenu);
 inspect.addEventListener("click", () => {
@@ -437,17 +516,40 @@ explanation.addEventListener("cancel", (event) => {
   dismissPopup();
 });
 restart.addEventListener("click", () => startLevel(mission!.scenario.id));
+newMission.addEventListener("click", () => {
+  // An imported level file may have replaced the bundled default.
+  levels.set(DEFAULT_LEVEL, LEVEL_SOURCES.get(DEFAULT_LEVEL)!);
+  startLevel(DEFAULT_LEVEL);
+});
+options.addEventListener("click", () => showPanel("options"));
+optionsBack.addEventListener("click", () => showPanel("actions"));
+titleBack.addEventListener("click", showTitle);
+quit.addEventListener("click", async () => {
+  if (busy) return;
+  loadRequest++;
+  setBusy(true);
+  try {
+    await library.flush();
+    if (!(await platform.exit())) showMenu("quit");
+  } catch (error) {
+    report(`Could not exit: ${errorMessage(error)}`);
+  } finally {
+    setBusy(false);
+  }
+});
+
 exit.addEventListener("click", async () => {
   if (busy) return;
   loadRequest++;
   setBusy(true);
   try {
-    await session?.disposeAsync();
-    session = undefined;
-    notifications.clear();
-    sidebar = undefined;
+    await releaseMission();
     updateTopBar();
-    showMenu("exit");
+    showTitle();
+  } catch (error) {
+    updateTopBar();
+    showTitle();
+    report(`Mission cleanup failed: ${errorMessage(error)}`);
   } finally {
     setBusy(false);
   }
@@ -462,8 +564,8 @@ saveForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const savedSession = session;
   const request = saveListRequest;
-  await writeSave("manual", saveName.value.trim() || "Mission");
-  if (session === savedSession && request === saveListRequest)
+  const saved = await writeSave("manual", saveName.value.trim() || "Mission");
+  if (saved && session === savedSession && request === saveListRequest)
     showPanel("actions");
 });
 byId("export-mission").addEventListener("click", async () => {
@@ -512,12 +614,19 @@ document.addEventListener("contextmenu", (event) => {
 });
 
 async function init() {
-  platform = await createPlatform();
-  library = createSaveLibrary(platform.saves);
-  // `?level=<scenario ID>` opens another bundled level; the first is default.
-  startLevel(
-    new URLSearchParams(location.search).get("level") ??
-      LEVEL_SOURCES.keys().next().value!,
-  );
+  setBusy(true);
+  try {
+    platform = await createPlatform();
+    library = createSaveLibrary(platform.saves);
+    setBusy(false);
+    // Explicit level links remain available for authoring and browser checks.
+    const level = new URLSearchParams(location.search).get("level");
+    if (level !== null) startLevel(level);
+    else showTitle();
+  } catch (error) {
+    // Stays busy: saves, loads, and exit need the platform.
+    showTitle();
+    menuStatus.textContent = `The game could not initialize: ${errorMessage(error)}. Reload to try again.`;
+  }
 }
 void init();
