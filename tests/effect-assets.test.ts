@@ -1,31 +1,22 @@
-import { readFile } from "node:fs/promises";
-
-import { PNG } from "pngjs";
 import { expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
+import { readTexture, uniqueTextureSources } from "./helpers/textures";
 import { clipCellRect } from "../src/content/texture-clip";
 
-const effects = Object.entries(BASE_CONTENT.presentation).flatMap(
-  ([id, { frameEffects }]) =>
-    Object.entries(frameEffects ?? {}).map(
-      ([trigger, effect]) => [`${id} ${trigger}`, effect!] as const,
-    ),
+const effects = uniqueTextureSources(
+  Object.values(BASE_CONTENT.presentation).flatMap(({ frameEffects }) =>
+    Object.values(frameEffects ?? {}).map((effect) => effect!),
+  ),
 );
-
-async function readSheet(url: string): Promise<PNG> {
-  return PNG.sync.read(
-    await readFile(new URL(`../public${url}`, import.meta.url)),
-  );
-}
 
 // A frame effect's square shows the whole cell, so a visible edge would
 // draw a hard border around it.
 test.each(effects)(
-  "%s effect cells fade out before their edges",
-  async (_name, { clip: id, url }) => {
+  "$url effect cells for $clip fade out before their edges",
+  async ({ clip: id, url }) => {
     const clip = BASE_CONTENT.clips![id]!;
-    const sheet = await readSheet(url);
+    const sheet = await readTexture(url);
     expect(sheet.width % clip.columns).toBe(0);
     expect(sheet.height % clip.rows).toBe(0);
     for (const { cell } of clip.frames) {

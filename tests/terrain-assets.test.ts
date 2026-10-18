@@ -1,9 +1,8 @@
-import { readFile } from "node:fs/promises";
-
 import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
+import { readTexture, uniqueTextureSources } from "./helpers/textures";
 
 import { clipCellRect } from "../src/content/texture-clip";
 import { GRASS_SHEETS, TILES_PER_REPEAT } from "../scripts/grass-sheet";
@@ -15,29 +14,18 @@ const { tileTypes } = BASE_CONTENT.terrain;
 const tileGraphics = Object.entries(tileTypes).map(
   ([id, { graphics }]): [string, TileGraphics] => [id, graphics!],
 );
-// Several types can sample one file, so seams only need checking once per file.
-const texturePaths = [
-  ...new Map(
-    tileGraphics.map(([, { url, clip }]) => [
-      url,
-      clip ? BASE_CONTENT.clips![clip] : undefined,
-    ]),
-  ),
-];
-
-async function readTexture(url: string): Promise<PNG> {
-  return PNG.sync.read(
-    await readFile(new URL(`../public${url}`, import.meta.url)),
-  );
-}
+const textureSources = uniqueTextureSources(
+  tileGraphics.map(([, source]) => source),
+);
 
 describe("terrain texture assets", () => {
   // Terrain samples with WRAP_ADDRESSMODE, so a texture whose opposite edges
   // disagree shows a seam at every repeat.
   // Clips repeat each cell on its own, so each cell must tile.
-  test.each(texturePaths)(
-    "%s has matching opposite edges",
-    async (url, clip) => {
+  test.each(textureSources)(
+    "$url has matching opposite edges for $clip",
+    async ({ url, clip: id }) => {
+      const clip = id ? BASE_CONTENT.clips![id] : undefined;
       const png = await readTexture(url);
       const cells = clip
         ? clip.frames.map(({ cell }) => cropCell(png, clip, cell))
