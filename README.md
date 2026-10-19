@@ -54,6 +54,8 @@ generators. See [verification](docs/verification.md) for focused and watch runs.
 - [Design questionnaire](docs/design-questionnaire.md): supporting rationale,
   future systems, and unresolved design questions.
 - [Verification](docs/verification.md): automated checks and demo acceptance.
+- [Architecture review](docs/architecture-review.md): installed skills and the
+  milestone review workflow.
 - [Runtime boundaries](docs/runtime-boundaries.md): simulation and resource
   ownership contracts.
 - [Mission files](docs/mission-files.md): level and save format and hand

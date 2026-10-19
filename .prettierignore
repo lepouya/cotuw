@@ -7,3 +7,13 @@ src-tauri/
 src/content/levels/
 # Generated audition page; its layout is owned by the audio generator.
 public/assets/audio/index.html
+# Preserve pinned third-party skill resources byte for byte.
+.agents/skills/**/UPSTREAM.md
+.agents/skills/**/LICENSE
+.agents/skills/**/references/
+.agents/skills/**/agents/openai.yaml
+.agents/skills/**/HTML-REPORT.md
+.agents/skills/**/DEEPENING.md
+.agents/skills/**/DESIGN-IT-TWICE.md
+.agents/skills/**/ADR-FORMAT.md
+.agents/skills/**/GLOSSARY-FORMAT.md

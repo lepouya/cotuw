@@ -1,0 +1,3 @@
+interface:
+  display_name: "Seam Ripper"
+  short_description: "Challenge architectural seams and coupling"
