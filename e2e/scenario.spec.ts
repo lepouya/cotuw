@@ -11,6 +11,7 @@ test("a restored mission renders its own map and saved terrain", async ({
   const result = await page.evaluate(async () => {
     const harnessPath: string = "/e2e/harness.ts";
     const prototypePath: string = "/src/session.ts";
+    const loadingPath: string = "/src/mission-loading.ts";
     const contentPath: string = "/src/content/packs.ts";
     const scenarioPath: string = "/src/simulation/scenario.ts";
     const fileFormatPath: string = "/src/simulation/mission-file.ts";
@@ -18,9 +19,12 @@ test("a restored mission renders its own map and saved terrain", async ({
     const { frames } = (await import(
       harnessPath
     )) as typeof import("./harness");
-    const { createGameSession, loadMission } = (await import(
+    const { createGameSession } = (await import(
       prototypePath
     )) as typeof import("../src/session");
+    const { loadMission } = (await import(
+      loadingPath
+    )) as typeof import("../src/mission-loading");
     const { currentContentPack } = (await import(
       contentPath
     )) as typeof import("../src/content/packs");

@@ -136,7 +136,7 @@ test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
 }) => {
   await controlledOpening(page);
   const result = await page.evaluate(async () => {
-    const path: string = "/src/session.ts";
+    const path: string = "/src/mission-loading.ts";
     const { loadMission } = await import(path);
     const { view } = window.economyHarness;
     view.dismissPopup("support-network");

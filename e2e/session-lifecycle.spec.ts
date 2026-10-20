@@ -49,9 +49,11 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
     const result = await page.evaluate(async (failure) => {
       const harnessPath: string = "/e2e/harness.ts";
       const sessionPath: string = "/src/session.ts";
+      const loadingPath: string = "/src/mission-loading.ts";
       const levelsPath: string = "/src/content/levels.ts";
       const { EngineStore } = await import(harnessPath);
-      const { createGameSession, loadMission } = await import(sessionPath);
+      const { createGameSession } = await import(sessionPath);
+      const { loadMission } = await import(loadingPath);
       const { LEVEL_SOURCES } = await import(levelsPath);
       const loaded = loadMission(LEVEL_SOURCES.get("arc-economy-opening"));
       if (failure === "simulation") loaded.state.tick = -1;

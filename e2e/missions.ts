@@ -2,14 +2,15 @@
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import {
-  createSessionMap,
   createSessionSimulation,
   loadMission,
-} from "../src/session";
+  missionTerrain,
+} from "../src/mission-loading";
+import { createScenarioMap } from "../src/simulation/scenario";
 import { serializeMission } from "../src/simulation/mission-file";
 import { createTilePlacedActor } from "../src/simulation/placement";
 
-import type { LoadedMission } from "../src/session";
+import type { LoadedMission } from "../src/mission-loading";
 import type { MissionState } from "../src/simulation/mission";
 import type { ActorPlacement } from "../src/simulation/placement";
 import type { SaveInfo } from "../src/simulation/mission-file";
@@ -19,10 +20,7 @@ export const level = (id = "arc-economy-opening") =>
   loadMission(LEVEL_SOURCES.get(id)!);
 
 export const missionMap = (mission: LoadedMission) =>
-  createSessionMap(
-    { ...mission.scenario, terrain: mission.state.terrain },
-    mission.content.terrain,
-  );
+  createScenarioMap(missionTerrain(mission));
 
 /** Adds buildings after the authored ones, as if the level placed them. */
 export function placeBuildings(
@@ -51,7 +49,7 @@ export function simulateMission(
   state: MissionState = mission.state,
 ) {
   const next = { ...mission, state: state as LoadedMission["state"] };
-  return createSessionSimulation(missionMap(next), next);
+  return createSessionSimulation(next);
 }
 
 const INTRODUCTORY_POPUPS = ["command-basics", "barracks-training", "scouting"];

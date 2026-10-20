@@ -11,7 +11,7 @@ import type { Material, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
 import type { ActorMotion } from "./actor-gait";
-import type { Rgb } from "./color";
+import type { Rgb, ActorTrigger } from "../content/presentation";
 
 // Keep the actor visibly above the terrain's thin visual-layer offsets.
 const GROUND_CLEARANCE = 0.04;
@@ -25,14 +25,6 @@ const HOSTILE_MARKER_SEGMENTS = 8;
 export const ACTOR_PICK_KIND = "actor";
 /** Shared by the minimap and fallback model when an actor names no color. */
 export const DEFAULT_ACTOR_COLOR: Rgb = [0.871, 0.345, 0.122];
-
-/**
- * Committed simulation events an actor's appearance can respond to, such as
- * with a clip or a frame effect. `attack` is each hit the actor deals, `hit`
- * each hit it survives, and `unload` each cargo delivery.
- */
-export const ACTOR_TRIGGERS = ["attack", "hit", "unload"] as const;
-export type ActorTrigger = (typeof ACTOR_TRIGGERS)[number];
 
 /**
  * Committed simulation state an actor's appearance shows while it lasts.

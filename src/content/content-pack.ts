@@ -12,29 +12,33 @@ import {
   isRecord,
 } from "../simulation/validation";
 import { validateMovementProfile } from "../simulation/navigation";
-import { isRgb } from "../render/color";
 import {
-  BUILTIN_ACTOR_MODELS,
-  BUILTIN_BUILDING_DETAILS,
-} from "../render/builtin-models";
-import { validateActorGraphics } from "../render/skinned-actor-appearance";
-import { validateModelGraphics } from "../render/glb-model";
-import type { ModelGraphics } from "../render/glb-model";
-import { validateFrameEffects } from "../render/frame-effects";
-import { DAMAGE_EFFECT_STYLES } from "../render/damage-effects";
-import { ATTACK_EFFECT_STYLES } from "../render/combat-effects";
-import { validateMaterialsStages } from "../render/materials-sites";
-import type { MaterialsStage } from "../render/materials-sites";
+  isRgb,
+  BUILTIN_ACTOR_MODEL_IDS,
+  BUILTIN_BUILDING_DETAIL_IDS,
+  validateActorGraphics,
+  validateModelGraphics,
+  validateFrameEffects,
+  DAMAGE_EFFECT_STYLES,
+  ATTACK_EFFECT_STYLES,
+  validateMaterialsStages,
+} from "./presentation";
+import type {
+  ActorGraphics,
+  ModelGraphics,
+  FrameEffects,
+  DamageEffectStyle,
+  AttackEffectStyle,
+  MaterialsStage,
+  Rgb,
+  BuiltinActorModelId,
+  BuiltinBuildingDetailId,
+} from "./presentation";
 import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
 import type { MovementProfile } from "../simulation/navigation";
-import type { AttackEffectStyle } from "../render/combat-effects";
-import type { DamageEffectStyle } from "../render/damage-effects";
-import type { FrameEffects } from "../render/frame-effects";
-import type { Rgb } from "../render/color";
 import type { TerrainStyle } from "../render/terrain-style";
-import type { ActorGraphics } from "../render/skinned-actor-appearance";
 import type { TextureClip } from "./texture-clip";
 
 const FORMAT = "cotuw-content";
@@ -45,7 +49,7 @@ export type ContentReference = { id: string; version: number };
 
 /** A GLB asset, or a built-in procedural model at an optional scale. */
 export type ActorModel =
-  { glb: ActorGraphics } | { builtin: string; scale?: number };
+  { glb: ActorGraphics } | { builtin: BuiltinActorModelId; scale?: number };
 
 /** How the player sees and commands one actor definition. */
 export type ActorPresentation = {
@@ -65,7 +69,7 @@ export type ActorPresentation = {
     color: Rgb;
     minimapColor?: Rgb;
     /** A built-in set of articulated parts. */
-    details?: string;
+    details?: BuiltinBuildingDetailId;
     glb?: ModelGraphics;
   };
 };
@@ -233,12 +237,9 @@ export function parseContentPack(source: string): ContentPack {
       const isBuiltin = "builtin" in model;
       if (isGlb === isBuiltin)
         throw invalid(`gives ${actor.id} an invalid model`);
-      if ("glb" in model) validateActorGraphics(model.glb as ActorGraphics);
+      if ("glb" in model) validateActorGraphics(model.glb);
       else {
-        if (
-          !isId(model.builtin) ||
-          !hasOwn(BUILTIN_ACTOR_MODELS, model.builtin as string)
-        )
+        if (!isOneOf(BUILTIN_ACTOR_MODEL_IDS, model.builtin))
           throw invalid(
             `gives ${actor.id} an unknown built-in model "${model.builtin}"`,
           );
@@ -266,8 +267,7 @@ export function parseContentPack(source: string): ContentPack {
         throw invalid(`gives ${actor.id} invalid building colors or height`);
       if (
         building.details !== undefined &&
-        (!isId(building.details) ||
-          !hasOwn(BUILTIN_BUILDING_DETAILS, building.details))
+        !isOneOf(BUILTIN_BUILDING_DETAIL_IDS, building.details)
       )
         throw invalid(
           `gives ${actor.id} unknown building details "${building.details}"`,

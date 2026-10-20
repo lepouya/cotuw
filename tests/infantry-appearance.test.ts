@@ -6,11 +6,9 @@ import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
+import type { ActorGraphics } from "../src/content/presentation";
 import type { AbstractMesh, TransformNode } from "@babylonjs/core";
-import type {
-  ActorGraphics,
-  SkinnedActorOptions,
-} from "../src/render/skinned-actor-appearance";
+import type { SkinnedActorOptions } from "../src/render/skinned-actor-appearance";
 
 /** Loads through the real glTF loader, from the committed file. */
 async function load(graphics: ActorGraphics, options?: SkinnedActorOptions) {

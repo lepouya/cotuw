@@ -4,11 +4,10 @@ import { stableUnit } from "./actor";
 import { createViewRegistry } from "./view-registry";
 import { hierarchyMeshes } from "./glb-model";
 
+import type { DamageEffectStyle } from "../content/presentation";
 import type { Scene, Vector3 } from "@babylonjs/core";
 import type { ModelAsset, ModelInstance } from "./glb-model";
 
-export const DAMAGE_EFFECT_STYLES = ["mechanical", "biological"] as const;
-export type DamageEffectStyle = (typeof DAMAGE_EFFECT_STYLES)[number];
 export type DamageSeverity = "moderate" | "critical";
 export type DamageEffectProp = "smoke" | "fire" | "wound";
 

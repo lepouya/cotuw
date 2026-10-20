@@ -20,7 +20,7 @@ import { withFrameEffects } from "../src/render/frame-effects";
 import type { ActorAppearance, ActorPose } from "../src/render/actor";
 import type { ActorMotion } from "../src/render/actor-gait";
 import type { ActorRenderState } from "../src/simulation/actor";
-import type { FrameEffect } from "../src/render/frame-effects";
+import type { FrameEffect } from "../src/content/presentation";
 
 function pose(x: number, z: number, facing: number): ActorPose {
   return { worldPosition: { x, z }, facing };

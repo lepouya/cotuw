@@ -1,13 +1,15 @@
 // A playable session: the mission's simulation, its views, and its controls.
 // Every mission-specific rule and look comes from the mission's content pack.
+import { createSessionSimulation, missionTerrain } from "./mission-loading";
+import type { LoadedMission } from "./mission-loading";
 import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
-import type { TerrainGrid, TerrainGridOptions } from "./simulation/terrain";
+import type { TerrainGridOptions } from "./simulation/terrain";
 import type { MissionResult } from "./simulation/objectives";
 import { createScenarioMap } from "./simulation/scenario";
 import type { ScenarioTerrain } from "./simulation/scenario";
-import { parseMission, serializeMission } from "./simulation/mission-file";
-import type { MissionFile, SaveInfo } from "./simulation/mission-file";
+import { serializeMission } from "./simulation/mission-file";
+import type { SaveInfo } from "./simulation/mission-file";
 import { disconnectedBuildings } from "./simulation/support";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
@@ -33,7 +35,6 @@ import {
 } from "./render/frame-effects";
 import { WRECK_SECONDS, wreckTiles, weaponReach } from "./simulation/combat";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
-import { contentPack } from "./content/packs";
 import {
   Color3,
   MeshBuilder,
@@ -58,11 +59,16 @@ import {
   BUILTIN_BUILDING_DETAILS,
 } from "./render/builtin-models";
 import { terrainLayers } from "./render/terrain-style";
-import { OccupancyGrid } from "./simulation/occupancy";
 import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
 import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
 import { loadModelAsset, modelBuildingDetails } from "./render/glb-model";
-import type { ModelAsset, ModelGraphics } from "./render/glb-model";
+import type { ModelAsset } from "./render/glb-model";
+import type {
+  ModelGraphics,
+  ActorGraphics,
+  ActorTrigger,
+  Rgb,
+} from "./content/presentation";
 import { startSimulationLoop } from "./simulation/loop";
 import { createBuildingPlacement } from "./render/building-placement";
 import { createUnitControls } from "./ui/unit-controls";
@@ -79,21 +85,17 @@ import type { DefinitionButton } from "./ui/production-action";
 import { trainableUnitIds } from "./simulation/production";
 import type { MissionSimulation } from "./simulation/mission";
 import type { BuildingActivityKind } from "./simulation/production";
-import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
-import { createMissionSimulation } from "./simulation/mission";
 
 import type { Scene } from "@babylonjs/core";
 import type { ActorAppearance, GameView, GameViewOptions } from "./render";
-import type { ActorAnimationState, ActorTrigger } from "./render/actor";
-import type { Rgb } from "./render/color";
-import type { ActorDefinition, ActorRenderState } from "./simulation/actor";
+import type { ActorAnimationState } from "./render/actor";
+import type { ActorRenderState } from "./simulation/actor";
 import type { TileCoord } from "./simulation/grid";
 import type { BuildingPlacementControls } from "./render/building-placement";
 import type { HealthBar } from "./render/health-bars";
 import type { TilePlacedActorAppearance } from "./render/tile-placed-actor-view";
-import type { ActorGraphics } from "./render/skinned-actor-appearance";
 import type { TerrainStyle } from "./render/terrain-style";
-import type { ContentPack, PropId, ViewStyle } from "./content/content-pack";
+import type { PropId, ViewStyle } from "./content/content-pack";
 import { healthBarOpacity } from "./render/health-bars";
 import { createPlayerView } from "./simulation/player-view";
 import { createAlertTracker } from "./ui/mission-alerts";
@@ -123,12 +125,6 @@ const BUILDING_BAR_HEIGHT = 2.9;
 /** The trigger a building activity plays on the actor taking part. */
 const ACTIVITY_TRIGGERS: Partial<Record<BuildingActivityKind, ActorTrigger>> = {
   delivery: "unload",
-};
-
-/** A parsed mission file with the content pack and definitions it uses. */
-export type LoadedMission = MissionFile & {
-  content: ContentPack;
-  definitions: readonly ActorDefinition[];
 };
 
 export type GameSession = Omit<GameView, "dispose"> & {
@@ -181,73 +177,6 @@ export type GameSessionControls = BuildingPlacementControls &
     cameraControls?: HTMLElement;
   };
 
-export function createSessionSimulation(
-  map: TerrainGrid,
-  mission: LoadedMission,
-): MissionSimulation {
-  const occupancy = new OccupancyGrid(map);
-  return createMissionSimulation({
-    state: mission.state,
-    objectives: mission.scenario.objectives,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(
-          map,
-          occupancy,
-          mission.content.movementProfiles,
-        ),
-      ],
-      ["idle", { handleCommand: () => false, update: () => {} }],
-    ]),
-    bounds: map.worldBounds,
-    definitions: mission.definitions,
-    tickSeconds: SIMULATION_TICK_SECONDS,
-    map,
-    occupancy,
-  });
-}
-
-/** Parses a level or save, rejecting state the simulation would refuse. */
-export function loadMission(source: string): LoadedMission {
-  const file = parseMission(source, SIMULATION_TICK_SECONDS);
-  if (!file.scenario.content)
-    throw new RangeError("This mission file names no content pack.");
-  const content = contentPack(file.scenario.content);
-  const wanted = file.scenario.actors;
-  const definitions = wanted
-    ? wanted.map((id) => {
-        const definition = content.actors.find((actor) => actor.id === id);
-        if (!definition)
-          throw new RangeError(
-            `Content pack ${content.id} has no actor named "${id}".`,
-          );
-        return definition;
-      })
-    : content.actors;
-  const mission = { ...file, content, definitions };
-  const requireActor = (use: string, definitionId: string) => {
-    const definition = definitions.find(({ id }) => id === definitionId);
-    if (!definition)
-      throw new RangeError(
-        `Scenario ${use} uses unknown actor "${definitionId}".`,
-      );
-    return definition;
-  };
-  for (const goal of file.scenario.goals ?? [])
-    requireActor("goal", goal.definitionId);
-  for (const { trigger } of file.scenario.popups ?? []) {
-    const definition = requireActor("popup", trigger.definitionId);
-    if (trigger.kind === "placement" && !definition.footprint)
-      throw new RangeError("Placement popups require a building definition.");
-  }
-  createSessionSimulation(
-    createScenarioMap({ ...file.scenario, terrain: file.state.terrain }),
-    mission,
-  ).dispose();
-  return mission;
-}
-
 export async function createGameSession(
   canvas: HTMLCanvasElement,
   minimapCanvas: HTMLCanvasElement,
@@ -256,10 +185,7 @@ export async function createGameSession(
   delete canvas.dataset.modelsReady;
   const { mission } = controls;
   const { content } = mission;
-  const map = createSessionMap(
-    { ...mission.scenario, terrain: mission.state.terrain },
-    content.terrain,
-  );
+  const map = createSessionMap(missionTerrain(mission), content.terrain);
   const options = viewOptions(content.view);
   const view = createGameView(canvas, map, options);
   try {
@@ -299,7 +225,7 @@ async function assembleGameSession(
     clips: content.clips,
     reducedMotion: () => reducedMotion.matches,
   });
-  const simulation = createSessionSimulation(map, mission);
+  const simulation = createSessionSimulation(mission, map);
   own(simulation);
   const presentationOf = (id: string) => content.presentation[id];
   const names = new Map(

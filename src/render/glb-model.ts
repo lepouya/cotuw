@@ -8,11 +8,10 @@ import {
 import { RegisterSceneLoaderPlugin } from "@babylonjs/core/Loading/sceneLoader.js";
 import { GLTFFileLoaderMetadata } from "@babylonjs/loaders/glTF/glTFFileLoader.metadata.js";
 
-import { isId, isOneOf, isRecord } from "../simulation/validation";
-import { BUILDING_ACTIVITY_KINDS } from "../simulation/production";
+import { validateModelGraphics } from "../content/presentation";
+import type { ModelGraphics } from "../content/presentation";
 
 import type { AssetContainer, Material, Scene } from "@babylonjs/core";
-import type { BuildingActivityKind } from "../simulation/production";
 import type {
   BuildingMotions,
   TilePlacedActorDetailsFactory,
@@ -38,15 +37,6 @@ RegisterSceneLoaderPlugin({
   },
 });
 
-export type ModelGraphics = {
-  url: string;
-  idle?: string;
-  /**
-   * Clips that play once per building activity. Each starts and ends at rest
-   * and keys no channel that idle keys.
-   */
-  activities?: Partial<Record<BuildingActivityKind, string>>;
-};
 export type ModelInstance = {
   root: TransformNode;
   pose: (seconds: number) => void;
@@ -69,29 +59,6 @@ export function hierarchyMeshes(root: TransformNode): AbstractMesh[] {
     ...(root instanceof AbstractMesh ? [root] : []),
     ...root.getChildMeshes(),
   ];
-}
-
-export function validateModelGraphics(
-  graphics: unknown,
-): asserts graphics is ModelGraphics {
-  if (
-    !isRecord(graphics) ||
-    !isId(graphics.url) ||
-    (graphics.idle !== undefined && !isId(graphics.idle))
-  )
-    throw new RangeError("A model needs a URL and a valid idle clip name");
-  const activities = graphics.activities;
-  if (
-    activities !== undefined &&
-    (!isRecord(activities) ||
-      Object.entries(activities).some(
-        ([kind, clip]) =>
-          !isOneOf(BUILDING_ACTIVITY_KINDS, kind) || !isId(clip),
-      ))
-  )
-    throw new RangeError(
-      `Model ${graphics.url} needs activity clips named by activity kind`,
-    );
 }
 
 /** Loads a GLB and checks it with `prepare`, releasing it if that throws. */

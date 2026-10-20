@@ -4,6 +4,11 @@ import { createHarvesterAppearance } from "./harvester";
 import { createRefineryDetails } from "./refinery";
 import { createWolfAppearance } from "./wolf";
 
+import type {
+  BuiltinActorModelId,
+  BuiltinBuildingDetailId,
+} from "../content/presentation";
+
 import type { Scene } from "@babylonjs/core";
 import type { ActorAppearance } from "./actor";
 import type { TilePlacedActorDetailsFactory } from "./tile-placed-actor-view";
@@ -16,7 +21,7 @@ export type BuiltinModelOptions = {
 /** Procedural stand-ins that content names by ID until assets replace them. */
 export const BUILTIN_ACTOR_MODELS: Readonly<
   Record<
-    string,
+    BuiltinActorModelId,
     (scene: Scene, options: BuiltinModelOptions) => ActorAppearance
   >
 > = {
@@ -28,7 +33,7 @@ export const BUILTIN_ACTOR_MODELS: Readonly<
 
 /** Articulated building parts that content names by ID. */
 export const BUILTIN_BUILDING_DETAILS: Readonly<
-  Record<string, TilePlacedActorDetailsFactory>
+  Record<BuiltinBuildingDetailId, TilePlacedActorDetailsFactory>
 > = {
   barracks: createBarracksDetails,
   "command-center": createCommandCenterDetails,

@@ -15,15 +15,11 @@ import {
   DEFAULT_ACTOR_COLOR,
 } from "./actor";
 
+import type { ActorTrigger } from "../content/presentation";
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
-import type {
-  ActorAnimationState,
-  ActorAppearance,
-  ActorPose,
-  ActorTrigger,
-} from "./actor";
+import type { ActorAnimationState, ActorAppearance, ActorPose } from "./actor";
 import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 

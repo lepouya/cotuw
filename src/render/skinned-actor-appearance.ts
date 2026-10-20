@@ -1,9 +1,16 @@
 import { AnimationGroup, VertexBuffer } from "@babylonjs/core";
 
-import { isId, isOneOf, isPositive, isRecord } from "../simulation/validation";
-import { ACTOR_TRIGGERS } from "./actor";
+import { isOneOf } from "../simulation/validation";
+import {
+  ACTOR_TRIGGERS,
+  POSE_ROLES,
+  LAYERED_ROLES,
+  mapClips,
+  clipList,
+  validateActorGraphics,
+} from "../content/presentation";
+import type { ActorGraphics, ClipRoles } from "../content/presentation";
 import { createGaitState, stepGait } from "./actor-gait";
-import { isRgb } from "./color";
 import {
   clipChannels,
   clipSeconds,
@@ -16,72 +23,8 @@ import {
 
 import type { AssetContainer, Scene } from "@babylonjs/core";
 import type { ActorAppearance, ActorInstance } from "./actor";
-import type { Rgb } from "./color";
-
-/** Optional clips that replace idle and key exactly its pose channels. */
-const POSE_ROLES = ["run", "work", "deploy", "stow"] as const;
-/**
- * Optional clips layered over the others as their difference from their
- * first frame. A trigger's clip plays once each time the trigger fires.
- */
-const LAYERED_ROLES = ["aim", ...ACTOR_TRIGGERS] as const;
-/**
- * Every role that names one optional clip. Death plays once on the actor's
- * remains and holds its last frame.
- */
-const OPTIONAL_ROLES = [...POSE_ROLES, ...LAYERED_ROLES, "death"] as const;
-type OptionalRole = (typeof OPTIONAL_ROLES)[number];
-type ClipRole = "idle" | "locomotion" | "turn" | OptionalRole;
-
-/** Clips by animation role. */
-type ClipRoles<T> = {
-  idle: T;
-  locomotion: T;
-  turn?: { left: T; right: T };
-} & Partial<Record<OptionalRole, T>>;
-
-/** Renderer-owned GLB and animation configuration for one actor definition. */
-export type ActorGraphics = {
-  url: string;
-  minimapColor?: Rgb;
-  bounds: { radius: number; height: number };
-  /** Clip names in the GLB. */
-  clips: ClipRoles<string>;
-  /** Ground units traveled during one locomotion clip cycle. */
-  cycleDistance: number;
-  rig?: "skeletal" | "rigid";
-  scale?: number;
-};
 
 type ClipGroups = ClipRoles<AnimationGroup>;
-
-/** Maps every clip a model names, keeping its role. */
-function mapClips<T, U>(
-  clips: ClipRoles<T>,
-  map: (clip: T, role: ClipRole) => U,
-): ClipRoles<U> {
-  const mapped: ClipRoles<U> = {
-    idle: map(clips.idle, "idle"),
-    locomotion: map(clips.locomotion, "locomotion"),
-  };
-  if (clips.turn)
-    mapped.turn = {
-      left: map(clips.turn.left, "turn"),
-      right: map(clips.turn.right, "turn"),
-    };
-  for (const role of OPTIONAL_ROLES) {
-    const clip = clips[role];
-    if (clip !== undefined) mapped[role] = map(clip, role);
-  }
-  return mapped;
-}
-
-/** Every clip a model uses, in role order. */
-function clipList<T>(clips: ClipRoles<T>): T[] {
-  const list: T[] = [];
-  mapClips(clips, (clip) => list.push(clip));
-  return list;
-}
 
 export type SkinnedActorOptions = {
   /**
@@ -123,51 +66,6 @@ export async function loadSkinnedActorAppearance(
     },
     dispose: () => assets.dispose(),
   };
-}
-
-export function validateActorGraphics(graphics: ActorGraphics): void {
-  const { url, bounds, cycleDistance, minimapColor, clips } = graphics ?? {};
-  if (
-    !isId(url) ||
-    !isRecord(clips) ||
-    !isId(clips.idle) ||
-    !isId(clips.locomotion) ||
-    Object.keys(clips).some(
-      (role) =>
-        !["idle", "locomotion", "turn", ...OPTIONAL_ROLES].includes(role),
-    ) ||
-    (clips.turn !== undefined &&
-      !(isId(clips.turn?.left) && isId(clips.turn?.right))) ||
-    OPTIONAL_ROLES.some(
-      (role) => clips[role] !== undefined && !isId(clips[role]),
-    )
-  )
-    throw new RangeError(`Actor model ${url} needs a URL and named clips`);
-  if (!!clips.deploy !== !!clips.stow || (clips.deploy && !clips.work))
-    throw new RangeError(
-      `Actor model ${url} needs work, deploy, and stow together`,
-    );
-  const names = clipList(clips);
-  if (new Set(names).size !== names.length)
-    throw new RangeError(
-      `Actor model ${url} uses one clip for multiple animation roles`,
-    );
-  if (
-    graphics.rig !== undefined &&
-    !["skeletal", "rigid"].includes(graphics.rig)
-  )
-    throw new RangeError(`Actor model ${url} needs a valid rig type`);
-  if (graphics.scale !== undefined && !isPositive(graphics.scale))
-    throw new RangeError(`Actor model ${url} needs a positive model scale`);
-  if (!isPositive(cycleDistance)) {
-    throw new RangeError(`Actor model ${url} needs a positive cycle distance`);
-  }
-  if (!bounds || !isPositive(bounds.radius) || !isPositive(bounds.height)) {
-    throw new RangeError(`Actor model ${url} needs positive finite bounds`);
-  }
-  if (minimapColor !== undefined && !isRgb(minimapColor)) {
-    throw new RangeError(`Actor model ${url} needs a valid minimap color`);
-  }
 }
 
 function prepareClips(

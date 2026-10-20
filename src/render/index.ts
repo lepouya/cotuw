@@ -42,7 +42,6 @@ export {
   type MinimapOptions,
 } from "./minimap";
 export { createMovementPathView, type MovementPathView } from "./movement-path";
-export type { ActorGraphics } from "./skinned-actor-appearance";
 export {
   createTilePlacedActorViewRegistry,
   type TilePlacedActorAppearance,

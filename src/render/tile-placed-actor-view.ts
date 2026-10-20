@@ -10,7 +10,7 @@ import { createProductionExitMarker } from "./production-exit";
 import { occupiedTilesFor, tilePlacedPose } from "../simulation/placement";
 import { tileKey } from "../simulation/grid";
 import { createViewRegistry } from "./view-registry";
-import { isRgb } from "./color";
+import { isRgb } from "../content/presentation";
 import { createFootprintOverlay } from "./footprint-overlay";
 import { createScreenBar } from "./screen-bar";
 import { constructionStage, stageBlueprint } from "./construction-stage";
@@ -22,7 +22,7 @@ import type { TerrainMap, TileCoord } from "../map";
 import type { ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
 import type { BuildingActivityKind } from "../simulation/production";
-import type { Rgb } from "./color";
+import type { Rgb } from "../content/presentation";
 import type { ModelAsset, ModelInstance } from "./glb-model";
 
 /** Gap left on footprint sides that face unoccupied tiles. */

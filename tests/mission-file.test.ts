@@ -2,14 +2,13 @@ import { describe, expect, test } from "vitest";
 
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
-import { createSessionSimulation, loadMission } from "../src/session";
+import { createSessionSimulation, loadMission } from "../src/mission-loading";
 import { createMissionState } from "../src/simulation/mission";
 import {
   MISSION_FILE_VERSION,
   parseMission,
   serializeMission,
 } from "../src/simulation/mission-file";
-import { createScenarioMap } from "../src/simulation/scenario";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { buildLevels } from "../scripts/levels";
 
@@ -385,12 +384,7 @@ test("normalizes Unicode legend characters before round-tripping", () => {
 
 test("a complete mission file continues identically with queued commands and paid production", () => {
   const mission = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
-  const simulate = (loaded: typeof mission) =>
-    createSessionSimulation(
-      createScenarioMap({ ...loaded.scenario, terrain: loaded.state.terrain }),
-      loaded,
-    );
-  const original = simulate(mission);
+  const original = createSessionSimulation(mission);
   original.submitCommand({
     kind: "place-actor",
     actorId: "refinery",
@@ -404,7 +398,7 @@ test("a complete mission file continues identically with queued commands and pai
     producerId: "refinery",
     definitionId: "arc-harvester",
   });
-  const restored = simulate(
+  const restored = createSessionSimulation(
     loadMission(
       serializeMission(
         mission.scenario,

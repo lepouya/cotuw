@@ -1,15 +1,12 @@
 import { Color3, MeshBuilder, Vector3 } from "@babylonjs/core";
 import { groundCross, groundPoint, groundRing } from "./ground-marker";
 
+import type { AttackEffectStyle } from "../content/presentation";
 import type { AbstractMesh, LinesMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { AttackEvent } from "../simulation/combat";
 import type { WorldPosition } from "../simulation/world";
 import type { ModelAsset } from "./glb-model";
-
-/** How an attacker's hits are drawn. */
-export const ATTACK_EFFECT_STYLES = ["tracer", "bite"] as const;
-export type AttackEffectStyle = (typeof ATTACK_EFFECT_STYLES)[number];
 
 const LIFETIMES: Record<AttackEffectStyle | "target", number> = {
   tracer: 0.12,

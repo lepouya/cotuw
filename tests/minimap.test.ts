@@ -11,7 +11,7 @@ import {
 } from "../src/render/minimap";
 
 import type { TerrainMapOptions, TileType } from "../src/map";
-import type { Rgb } from "../src/render/minimap";
+import type { Rgb } from "../src/content/presentation";
 
 const BLACK: Rgb = [0, 0, 0];
 

@@ -10,52 +10,13 @@ import {
 } from "@babylonjs/core";
 
 import { compileTextureClip } from "../content/texture-clip";
-import { hasOwn, isId, isPositive, isRecord } from "../simulation/validation";
-import { ACTOR_TRIGGERS } from "./actor";
 import { loadClipFrames } from "./texture-clip";
 
 import type { Scene } from "@babylonjs/core";
 import type { TextureClip } from "../content/texture-clip";
-import type { ActorAppearance, ActorTrigger } from "./actor";
+import type { ActorAppearance } from "./actor";
+import type { FrameEffect, FrameEffects } from "../content/presentation";
 import type { ClipFrames } from "./texture-clip";
-
-/** A content pack clip shown once on a camera-facing square. */
-export type FrameEffect = {
-  clip: string;
-  /** The clip's sprite sheet. */
-  url: string;
-  /** Edge length in world units. */
-  size: number;
-  /** In the actor's model space: from its ground point, facing +Z. */
-  anchor: [number, number, number];
-};
-
-export type FrameEffects = Partial<Record<ActorTrigger, FrameEffect>>;
-
-/** Throws unless each effect names a trigger, a known clip, and a placement. */
-export function validateFrameEffects(
-  actorId: string,
-  effects: unknown,
-  clips: Readonly<Record<string, unknown>>,
-): asserts effects is FrameEffects {
-  if (!isRecord(effects))
-    throw new RangeError(`Frame effects for ${actorId} are invalid.`);
-  for (const [trigger, effect] of Object.entries(effects))
-    if (
-      !ACTOR_TRIGGERS.includes(trigger as ActorTrigger) ||
-      !isRecord(effect) ||
-      !isId(effect.clip) ||
-      !hasOwn(clips, effect.clip) ||
-      !isId(effect.url) ||
-      !isPositive(effect.size) ||
-      !Array.isArray(effect.anchor) ||
-      effect.anchor.length !== 3 ||
-      !effect.anchor.every(Number.isFinite)
-    )
-      throw new RangeError(
-        `The ${trigger} frame effect for ${actorId} is invalid.`,
-      );
-}
 
 export type FrameEffectsView = ReturnType<typeof createFrameEffectsView>;
 

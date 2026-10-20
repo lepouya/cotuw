@@ -1,0 +1,76 @@
+{
+  "plan_file": "refactor-plan.md",
+  "assessment_source": "m0-findings.md",
+  "revision": "8599f34cf4ccdc0a7ce76dd429a9b42cbac02df3",
+  "status": "complete",
+  "current_chunk": 2,
+  "baseline": {
+    "format_lint_types": "passed",
+    "unit": "908 passed, 2 skipped",
+    "browser": "4 passed outside sandbox; sandbox denies localhost binding"
+  },
+  "chunks": [
+    {
+      "id": 1,
+      "name": "Serializable presentation contracts",
+      "depends_on": [],
+      "status": "complete",
+      "verification": {
+        "tests": "162 passed, 2 skipped",
+        "typecheck": "passed",
+        "lint": "passed"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Mission preparation and closure",
+      "depends_on": [1],
+      "status": "complete",
+      "verification": {
+        "focused_tests": "173 passed",
+        "lint": "passed",
+        "typecheck": "passed",
+        "check": "passed: 910 unit tests, 2 skipped, 4 Chromium smoke checks",
+        "build": "passed with bundle-size warning",
+        "affected_browser": "60 passed: 53 Chromium, 7 WebKit",
+        "runtime_import_graph": "32 local modules; no render, platform, or external runtime edges"
+      }
+    }
+  ],
+  "next_action": "None; selected scope complete",
+  "commit": "Authorized; player-view and headless-preparation commits",
+  "included_working_files": {
+    "src/main.ts": "bb57678ff70ed600c6084eae8649f434f48c35341c572997803118254bcd9c28",
+    "src/session.ts": "b88e124bd9cc62a71c61147468449f237e095de1375ceac80eea193391f6fbc4",
+    "src/simulation/player-view.ts": "2a4a197d9ec8073f84f2e4df48f0031165e8e1d0b29031997b90eeeb383039c7",
+    "tests/player-view.test.ts": "435009c0b1eafdcc65fa97d1ae7c6636b12c49dcd11d36628a260c91a0b168c0"
+  },
+  "verification_commands": {
+    "chunk_1": [
+      "npm run test:ts:quick -- tests/content-pack.test.ts tests/infantry-appearance.test.ts tests/glb-model.test.ts tests/actor-view-registry.test.ts tests/economy-presentation.test.ts tests/damage-effects.test.ts tests/player-view.test.ts tests/mission-file.test.ts",
+      "npm run typecheck:ts",
+      "npm run lint:ts"
+    ],
+    "chunk_2": [
+      "npm run test:ts:quick -- tests/mission-loading.test.ts tests/mission-file.test.ts tests/content-pack.test.ts tests/scenario.test.ts tests/session.test.ts tests/mission.test.ts tests/wildlife.test.ts tests/player-view.test.ts",
+      "npm run typecheck:ts",
+      "npm run lint:ts"
+    ],
+    "closure": [
+      "npm run check",
+      "npm run build",
+      "npm run test:visual -- e2e/saves.spec.ts e2e/mission-load.spec.ts e2e/session-lifecycle.spec.ts e2e/scenario.spec.ts e2e/economy.spec.ts e2e/frame-effects.spec.ts e2e/presentation.spec.ts e2e/mission.spec.ts e2e/actor.spec.ts",
+      "git diff --check",
+      "npm run check:full"
+    ]
+  },
+  "precommit": {
+    "command": "npm run check:full",
+    "status": "passed",
+    "unit_and_asset_tests": "1014 passed, 2 existing skips",
+    "rust": "format, lint, types, and test harness passed",
+    "browser": "199 passed: 142 Chromium, 57 WebKit",
+    "build": "npm run build passed with bundle-size advisory",
+    "first_commit_intermediate": "Types, lint, and 55 focused tests passed in an isolated tree"
+  }
+}

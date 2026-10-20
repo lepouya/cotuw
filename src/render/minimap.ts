@@ -6,8 +6,7 @@ import { watchCanvasSize } from "./canvas-size";
 import { createPointerGesture } from "./pointer-gesture";
 import { worldInputAvailable } from "./input-focus";
 import { fogAlpha } from "./fog";
-import type { Rgb } from "./color";
-export type { Rgb } from "./color";
+import type { Rgb } from "../content/presentation";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainBounds, TerrainMap, TileCoord } from "../map";

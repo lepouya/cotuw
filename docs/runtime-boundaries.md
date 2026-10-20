@@ -44,6 +44,18 @@ These contracts describe where new behaviors, views, and services attach.
 - Releasing a mission clears application references even if disposal fails.
   Application Exit waits for requested save-library writes and deletions.
 
+## Headless preparation
+
+- Mission loading and simulation preparation live in `mission-loading.ts` and
+  run without initializing graphics, DOM, or platform services. Session assembly
+  consumes the prepared mission and supplies its rendered terrain.
+- `content/presentation.ts` owns serializable presentation contracts and their
+  validation. Renderer catalogs implement every accepted built-in identifier;
+  rendering owns loaded-asset checks, playback, and disposal.
+- The player view in `simulation/player-view.ts` owns ownership and
+  fog-limited actor lookups. Session views and controls use it instead of
+  querying simulation actors directly, so hidden actors stay hidden.
+
 ## Content lookup
 
 - Authored IDs identify entries in dictionaries; inherited object properties
