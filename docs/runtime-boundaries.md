@@ -38,6 +38,10 @@ These contracts describe where new behaviors, views, and services attach.
   their tooltip and listeners; disposal or parent cancellation releases both.
 - Asset collections release after their views; a failed cleanup cannot skip
   the remaining assets.
+- Session assets prepare stand-ins before loading starts. Views read their
+  catalogs without mutation; `load` starts once consumers exist and returns
+  shared completion. Disposal releases late arrivals without publishing them
+  or firing callbacks, even while the scene remains alive.
 - `disposeAsync` pauses the session and waits for pending model and BRDF loads
   before releasing the engine. A failing `onReady` follows this same path.
   Initialization failures release the partial view and session.

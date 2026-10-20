@@ -179,6 +179,10 @@ Finish when selected findings meet their completion criteria and required
 checks pass. Report results, remaining risks, and deferred findings. Reopen the
 design only for new evidence or an explicit scope change.
 
+Keep lasting decisions and contracts in DESIGN.md or their owning docs. Move
+actionable deferred work to its owning document, then remove completed review
+reports, plans, and progress manifests. Version control preserves review history.
+
 ## Full-workflow request
 
 > Follow docs/architecture-review.md through review, design, implementation,

@@ -1,7 +1,10 @@
 import { Color4 } from "@babylonjs/core";
 
+import { TerrainMap } from "../map";
 import type { TerrainMapOptions, TileType } from "../map";
-import type { TerrainView } from "../simulation/terrain";
+import { createScenarioMap } from "../simulation/scenario";
+import type { ScenarioTerrain } from "../simulation/scenario";
+import type { TerrainGridOptions, TerrainView } from "../simulation/terrain";
 
 /** One visual layer that tiles of a terrain type carry. */
 export type TerrainLayerRule = {
@@ -97,4 +100,21 @@ function shoreAlpha(
 ): number {
   const eased = depth * depth * (3 - 2 * depth);
   return shoreAlpha + (deepAlpha - shoreAlpha) * eased;
+}
+
+/** Builds a rendered terrain map with optional layer styles. */
+export function createSessionMap(
+  scenario: ScenarioTerrain,
+  style?: TerrainStyle,
+): TerrainMap {
+  const createLayers = style ? terrainLayers(style) : undefined;
+  return createScenarioMap(
+    scenario,
+    (options: TerrainGridOptions) =>
+      new TerrainMap({
+        ...options,
+        createLayers,
+        layerUpdateRadius: style?.shore?.depthTiles,
+      }),
+  );
 }

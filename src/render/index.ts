@@ -56,3 +56,25 @@ export {
   type TerrainMeshes,
   type TerrainMeshOptions,
 } from "./terrain-mesh";
+export {
+  createSessionMap,
+  terrainLayers,
+  type TerrainStyle,
+  type TerrainLayerRule,
+} from "./terrain-style";
+export {
+  actorAnimationState,
+  extractHealthAndDamageEffects,
+  UNIT_BAR_CLEARANCE,
+  BUILDING_BAR_HEIGHT,
+  type ExtractedEffects,
+  type EffectContext,
+} from "./session-effects";
+export {
+  createSessionAssets,
+  standInAppearances,
+  waitForEnvironmentReady,
+  type SessionAssets,
+  type SessionAssetOptions,
+  type SessionAssetCallbacks,
+} from "./session-assets";

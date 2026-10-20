@@ -4,10 +4,7 @@ import { createSessionSimulation, missionTerrain } from "./mission-loading";
 import type { LoadedMission } from "./mission-loading";
 import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
-import type { TerrainGridOptions } from "./simulation/terrain";
 import type { MissionResult } from "./simulation/objectives";
-import { createScenarioMap } from "./simulation/scenario";
-import type { ScenarioTerrain } from "./simulation/scenario";
 import { serializeMission } from "./simulation/mission-file";
 import type { SaveInfo } from "./simulation/mission-file";
 import { disconnectedBuildings } from "./simulation/support";
@@ -20,28 +17,14 @@ import { createEconomyControls } from "./ui/economy-controls";
 import { createMaterialsSitesView } from "./render/materials-sites";
 import { createHealthBarView } from "./render/health-bars";
 import { createCombatEffectsView } from "./render/combat-effects";
-import {
-  createDamageEffectsView,
-  damageSeverity,
-} from "./render/damage-effects";
-import type { DamagedActor } from "./render/damage-effects";
+import { createDamageEffectsView } from "./render/damage-effects";
 import { createRegenerationEffectsView } from "./render/regeneration-effects";
-import type { RegeneratingActor } from "./render/regeneration-effects";
 import { createAmbientBirdsView } from "./render/ambient-birds";
 import { createWreckView } from "./render/wrecks";
-import {
-  createFrameEffectsView,
-  withFrameEffects,
-} from "./render/frame-effects";
-import { WRECK_SECONDS, wreckTiles, weaponReach } from "./simulation/combat";
+import { createFrameEffectsView } from "./render/frame-effects";
+import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
-import {
-  Color3,
-  MeshBuilder,
-  StandardMaterial,
-  TransformNode,
-  Vector3,
-} from "@babylonjs/core";
+import { Color3, Vector3 } from "@babylonjs/core";
 import { TerrainMap } from "./map";
 import {
   createCommandInput,
@@ -50,25 +33,15 @@ import {
   createMovementPathView,
   createActorViewRegistry,
   createTilePlacedActorViewRegistry,
-  createMeshAppearance,
   createTerrainMeshes,
-  DEFAULT_ACTOR_COLOR,
+  createSessionMap,
+  actorAnimationState,
+  extractHealthAndDamageEffects,
+  createSessionAssets,
+  waitForEnvironmentReady,
 } from "./render";
-import {
-  BUILTIN_ACTOR_MODELS,
-  BUILTIN_BUILDING_DETAILS,
-} from "./render/builtin-models";
-import { terrainLayers } from "./render/terrain-style";
 import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
-import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
-import { loadModelAsset, modelBuildingDetails } from "./render/glb-model";
-import type { ModelAsset } from "./render/glb-model";
-import type {
-  ModelGraphics,
-  ActorGraphics,
-  ActorTrigger,
-  Rgb,
-} from "./content/presentation";
+import type { ActorTrigger, Rgb } from "./content/presentation";
 import { startSimulationLoop } from "./simulation/loop";
 import { createBuildingPlacement } from "./render/building-placement";
 import { createUnitControls } from "./ui/unit-controls";
@@ -86,17 +59,12 @@ import { trainableUnitIds } from "./simulation/production";
 import type { MissionSimulation } from "./simulation/mission";
 import type { BuildingActivityKind } from "./simulation/production";
 
-import type { Scene } from "@babylonjs/core";
-import type { ActorAppearance, GameView, GameViewOptions } from "./render";
+import type { GameView, GameViewOptions } from "./render";
 import type { ActorAnimationState } from "./render/actor";
 import type { ActorRenderState } from "./simulation/actor";
 import type { TileCoord } from "./simulation/grid";
 import type { BuildingPlacementControls } from "./render/building-placement";
-import type { HealthBar } from "./render/health-bars";
-import type { TilePlacedActorAppearance } from "./render/tile-placed-actor-view";
-import type { TerrainStyle } from "./render/terrain-style";
-import type { PropId, ViewStyle } from "./content/content-pack";
-import { healthBarOpacity } from "./render/health-bars";
+import type { ViewStyle } from "./content/content-pack";
 import { createPlayerView } from "./simulation/player-view";
 import { createAlertTracker } from "./ui/mission-alerts";
 import type { MissionAlert } from "./ui/mission-alerts";
@@ -118,10 +86,6 @@ const SIMULATION_PUMP_MILLISECONDS = 4;
 const MAX_CATCH_UP_SECONDS = 5;
 /** How far past explored tile centers the camera may look, in world units. */
 const CAMERA_FRONTIER_MARGIN = 4;
-/** Health bars sit this far above unit models and over buildings. */
-const UNIT_BAR_CLEARANCE = 0.3;
-/** Clears a construction progress bar below it. */
-const BUILDING_BAR_HEIGHT = 2.9;
 /** The trigger a building activity plays on the actor taking part. */
 const ACTIVITY_TRIGGERS: Partial<Record<BuildingActivityKind, ActorTrigger>> = {
   delivery: "unload",
@@ -231,68 +195,24 @@ async function assembleGameSession(
   const names = new Map(
     definitions.map(({ id }) => [id, presentationOf(id)?.name ?? id]),
   );
-  const buildingAppearances = new Map<string, TilePlacedActorAppearance>(
-    definitions.flatMap(({ id }) => {
-      const building = presentationOf(id)?.building;
-      if (!building) return [];
-      const { details, glb: _glb, ...appearance } = building;
-      return [
-        [
-          id,
-          {
-            ...appearance,
-            createDetails: details
-              ? BUILTIN_BUILDING_DETAILS[details]
-              : undefined,
-          },
-        ],
-      ];
+  const frameEffects = own(
+    createFrameEffectsView(
+      view.scene,
+      content.clips ?? {},
+      () => reducedMotion.matches,
+    ),
+  );
+  const assets = own(
+    createSessionAssets({
+      scene: view.scene,
+      content,
+      definitions,
+      reducedMotion: () => reducedMotion.matches,
+      frameEffects,
     }),
   );
-  const propAssets = new Map<PropId, ModelAsset>();
-  /** Every loaded prop and building model, released with the session. */
-  const modelAssets = own(createLifetime());
-  const models = definitions.flatMap(({ id }) => {
-    const model = presentationOf(id)?.model;
-    return model ? [[id, model] as const] : [];
-  });
-  const glbModels = models.flatMap(([id, model]) =>
-    "glb" in model ? [[id, model.glb] as const] : [],
-  );
-  const frameEffects = createFrameEffectsView(
-    view.scene,
-    content.clips ?? {},
-    () => reducedMotion.matches,
-  );
-  own(frameEffects);
-  const appearances = new Map<string, ActorAppearance>();
-  lifetime.defer(() => {
-    const cleanup = createLifetime();
-    for (const appearance of appearances.values()) cleanup.own(appearance);
-    cleanup.dispose();
-  });
-  /** Each appearance also plays its actor's frame effects. */
-  const setAppearance = (id: string, appearance: ActorAppearance) => {
-    const effects = presentationOf(id)?.frameEffects;
-    if (effects) frameEffects.prepare(effects);
-    appearances.set(
-      id,
-      effects
-        ? withFrameEffects(appearance, effects, frameEffects)
-        : appearance,
-    );
-  };
-  for (const [id, appearance] of standInAppearances(view.scene, glbModels))
-    setAppearance(id, appearance);
-  for (const [id, model] of models)
-    if ("builtin" in model)
-      setAppearance(
-        id,
-        BUILTIN_ACTOR_MODELS[model.builtin](view.scene, {
-          scale: model.scale,
-          reducedMotion: () => reducedMotion.matches,
-        }),
-      );
+  const { appearances, buildingAppearances, propAssets, buildingModelTops } =
+    assets;
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(
@@ -383,7 +303,6 @@ async function assembleGameSession(
     reducedMotion: () => reducedMotion.matches,
   });
   own(birds);
-  const buildingModelTops = new Map<string, number>();
   const wreckView = createWreckView(view.scene, map, {
     appearanceFor: (id) => appearances.get(id),
     rubble: () => propAssets.get("rubble"),
@@ -880,64 +799,21 @@ async function assembleGameSession(
    * regenerating actors show the effects their presentation names.
    */
   const updateHealth = (frameSeconds: number) => {
-    const selected = new Set(input.selectedActorIds);
-    const bars: HealthBar[] = [];
-    const damaged: DamagedActor[] = [];
-    const regenerating: RegeneratingActor[] = [];
-    for (const actor of simulation.actors) {
-      const maximum = definitionsById.get(actor.definitionId)?.health;
-      if (!maximum || !player.shows(actor)) continue;
-      const fraction = (actor.health ?? maximum) / maximum;
-      const placed = isTilePlacedActor(actor);
-      const worldPosition = placed
-        ? actor.worldPosition
-        : (actorViews.groundPosition(actor.id) ?? actor.worldPosition);
-      const bounds = appearances.get(actor.definitionId)?.bounds;
-      const activeTick = actor.combat?.activeTick;
-      const opacity = healthBarOpacity(
-        selected.has(actor.id),
-        activeTick === undefined
-          ? Infinity
-          : (simulation.completedTicks - activeTick) * simulation.tickSeconds,
-      );
-      if (opacity > 0)
-        bars.push({
-          actorId: actor.id,
-          worldPosition,
-          height: placed
-            ? BUILDING_BAR_HEIGHT
-            : (bounds?.height ?? 1) + UNIT_BAR_CLEARANCE,
-          width: placed ? 2 : 0.9,
-          fraction,
-          opacity,
-        });
-      const presentation = presentationOf(actor.definitionId);
-      const style = presentation?.damageEffect;
-      const severity = damageSeverity(fraction);
-      const healing =
-        presentation?.regenerationEffect &&
-        actor.territory?.mode === "regenerating";
-      if (!(style && severity) && !healing) continue;
-      const { x, z } = worldPosition;
-      const ground = map.heightAtWorldPosition(x, z);
-      const position = new Vector3(x, ground, z);
-      const footprint = definitionsById.get(actor.definitionId)?.footprint;
-      const radius = footprint
-        ? (Math.sqrt(footprint.occupiedTiles.length) * map.tileSize) / 2
-        : (bounds?.radius ?? 0.5);
-      if (healing) regenerating.push({ id: actor.id, position, radius });
-      if (style && severity)
-        damaged.push({
-          id: actor.id,
-          style,
-          severity,
-          position,
-          height: placed
-            ? (tilePlacedViews.topHeight(actor.id) ?? ground + 1) - ground
-            : (bounds?.height ?? 1),
-          radius,
-        });
-    }
+    const { bars, damaged, regenerating } = extractHealthAndDamageEffects(
+      simulation.actors,
+      {
+        definitions: definitionsById,
+        appearances,
+        presentationOf,
+        shows: player.shows,
+        groundPositionOf: (id) => actorViews.groundPosition(id),
+        buildingTopHeightOf: (id) => tilePlacedViews.topHeight(id),
+        map,
+        completedTicks: simulation.completedTicks,
+        tickSeconds: simulation.tickSeconds,
+        selectedActorIds: input.selectedActorIds,
+      },
+    );
     healthBars.update(bars);
     damageEffects.update(damaged, frameSeconds);
     regenerationEffects.update(regenerating, frameSeconds);
@@ -946,20 +822,15 @@ async function assembleGameSession(
   const animationStateOf = (
     actor: ActorRenderState,
     gathering: ReadonlySet<string>,
-  ): ActorAnimationState => {
-    const weapon = definitionsById.get(actor.definitionId)?.weapon;
-    const targetId = actor.combat?.attack?.targetId;
-    // Undetected targets stay hidden, so aiming must not reveal them.
-    const target = player.shownActor(targetId);
-    return {
-      working: gathering.has(actor.id),
-      aiming:
-        !!weapon &&
-        !!target &&
-        weaponReach(actor, target, definitionsById, map) <= weapon.range,
-      running: actor.territory?.mode === "pursuing",
-    };
-  };
+  ): ActorAnimationState =>
+    actorAnimationState(
+      actor,
+      gathering,
+      definitionsById,
+      player.shownActor(actor.combat?.attack?.targetId),
+      map,
+    );
+
   let knownSelectionTick = simulation.completedTicks;
 
   const cancelInteractions = () => {
@@ -1187,14 +1058,7 @@ async function assembleGameSession(
         } finally {
           try {
             await modelsReady;
-            // Babylon's BRDF decode outlives the model load and uses the engine.
-            while (
-              !view.scene.isDisposed &&
-              view.scene.environmentBRDFTexture &&
-              !view.scene.environmentBRDFTexture.loadingError &&
-              !view.scene.environmentBRDFTexture.isReady()
-            )
-              await new Promise((resolve) => setTimeout(resolve, 16));
+            await waitForEnvironmentReady(view.scene);
           } finally {
             if (!view.scene.isDisposed) disposeView();
           }
@@ -1258,95 +1122,21 @@ async function assembleGameSession(
       input.selectMany(ids.filter((id) => !!player.shownActor(id)));
     },
   };
-  /** Updates building appearances, then rebuilds the views that use them. */
-  const setBuildings = (
-    ids: Iterable<string>,
-    change: Partial<TilePlacedActorAppearance>,
-  ) => {
-    for (const id of ids)
-      buildingAppearances.set(id, {
-        ...buildingAppearances.get(id)!,
-        ...change,
-      });
-    tilePlacedViews.update(player.actors().placed, disconnected());
-  };
-  /** Props whose views swap stand-ins as they load; others are looked up. */
-  const propLoaded: Partial<Record<PropId, (asset: ModelAsset) => void>> = {
-    foundation: (asset) =>
-      setBuildings([...buildingAppearances.keys()], { foundation: asset }),
-    scaffold: (asset) =>
-      setBuildings([...buildingAppearances.keys()], { scaffold: asset }),
-    "materials-mound": (asset) => materialsView?.setMound(asset),
-    salvage: (asset) => materialsView?.setSalvage(asset),
-  };
-  /** Loaded assets arrive only while the scene lives; failures keep stand-ins. */
-  const loadAsset = async <T extends { dispose: () => void }>(
-    label: string,
-    load: () => Promise<T>,
-    use: (asset: T) => void,
-  ) => {
-    try {
-      const asset = await load();
-      if (view.scene.isDisposed) asset.dispose();
-      else use(asset);
-    } catch (error) {
-      if (!view.scene.isDisposed)
-        console.error(`${label} failed to load and keeps its stand-in.`, error);
-    }
-  };
-  const loadModel = (
-    label: string,
-    graphics: ModelGraphics,
-    use: (asset: ModelAsset) => void,
-  ) =>
-    loadAsset(
-      label,
-      () => loadModelAsset(view.scene, graphics),
-      (asset) => {
-        modelAssets.own(asset);
-        use(asset);
-      },
-    );
-  const modelsReady = Promise.all([
-    ...(Object.entries(content.props ?? {}) as [PropId, ModelGraphics][]).map(
-      ([id, graphics]) =>
-        loadModel(`Prop ${id}`, graphics, (asset) => {
-          propAssets.set(id, asset);
-          propLoaded[id]?.(asset);
-        }),
-    ),
-    ...definitions.flatMap(({ id }) => {
-      const graphics = presentationOf(id)?.building?.glb;
-      return graphics
-        ? [
-            loadModel(`Building ${id}`, graphics, (asset) => {
-              if (asset.topHeight !== undefined)
-                buildingModelTops.set(id, asset.topHeight);
-              setBuildings([id], {
-                createDetails: modelBuildingDetails(asset),
-              });
-            }),
-          ]
-        : [];
-    }),
-    ...glbModels.map(([id, graphics]) =>
-      loadAsset(
-        `Actor ${id}`,
-        () =>
-          loadSkinnedActorAppearance(view.scene, graphics, {
-            reducedMotion: () => reducedMotion.matches,
-          }),
-        (appearance) => {
-          const previous = appearances.get(id);
-          setAppearance(id, appearance);
-          actorViews.update(player.actors().shownMobile, loop.tickProgress());
-          updateWrecks(0);
-          previous?.dispose();
-        },
-      ),
-    ),
-  ]).then(() => {
-    if (!view.scene.isDisposed) canvas.dataset.modelsReady = "true";
+  const modelsReady = assets.load({
+    onBuildingUpdated: () => {
+      tilePlacedViews.update(player.actors().placed, disconnected());
+    },
+    onActorAppearanceUpdated: () => {
+      actorViews.update(player.actors().shownMobile, loop.tickProgress());
+      updateWrecks(0);
+    },
+    onPropLoaded: (id, asset) => {
+      if (id === "materials-mound") materialsView?.setMound(asset);
+      else if (id === "salvage") materialsView?.setSalvage(asset);
+    },
+    onModelsReady: () => {
+      canvas.dataset.modelsReady = "true";
+    },
   });
   try {
     controls.onReady?.(session);
@@ -1360,55 +1150,7 @@ async function assembleGameSession(
   }
   return session;
 }
-
-/** Boxes in each model's color stand in while its GLB loads. */
-function standInAppearances(
-  scene: Scene,
-  models: readonly (readonly [string, ActorGraphics])[],
-): Map<string, ActorAppearance> {
-  return new Map(
-    models.map(([id, graphics]) => {
-      const { radius, height } = graphics.bounds;
-      const mesh = MeshBuilder.CreateBox(
-        `actor-template-${id}`,
-        { width: radius * 1.4, height, depth: radius * 1.4 },
-        scene,
-      );
-      const root = new TransformNode(`actor-template-${id}-root`, scene);
-      mesh.parent = root;
-      mesh.position.y = height / 2;
-      const material = new StandardMaterial(
-        `actor-template-${id}-material`,
-        scene,
-      );
-      material.diffuseColor = new Color3(
-        ...(graphics.minimapColor ?? DEFAULT_ACTOR_COLOR),
-      );
-      material.specularColor = new Color3(0.12, 0.12, 0.12);
-      mesh.material = material;
-      return [
-        id,
-        createMeshAppearance(root, graphics.bounds, graphics.minimapColor),
-      ];
-    }),
-  );
-}
-
-export function createSessionMap(
-  scenario: ScenarioTerrain,
-  style: TerrainStyle,
-): TerrainMap {
-  const createLayers = terrainLayers(style);
-  return createScenarioMap(
-    scenario,
-    (options: TerrainGridOptions) =>
-      new TerrainMap({
-        ...options,
-        createLayers,
-        layerUpdateRadius: style.shore?.depthTiles,
-      }),
-  );
-}
+export { createSessionMap } from "./render";
 
 function viewOptions({ clearColor, lighting }: ViewStyle): GameViewOptions {
   return {
