@@ -59,11 +59,7 @@ import {
 } from "./render/builtin-models";
 import { terrainLayers } from "./render/terrain-style";
 import { OccupancyGrid } from "./simulation/occupancy";
-import {
-  isMobileActor,
-  isTilePlacedActor,
-  occupiedTilesFor,
-} from "./simulation/placement";
+import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
 import { loadSkinnedActorAppearance } from "./render/skinned-actor-appearance";
 import { loadModelAsset, modelBuildingDetails } from "./render/glb-model";
 import type { ModelAsset, ModelGraphics } from "./render/glb-model";
@@ -99,7 +95,7 @@ import type { ActorGraphics } from "./render/skinned-actor-appearance";
 import type { TerrainStyle } from "./render/terrain-style";
 import type { ContentPack, PropId, ViewStyle } from "./content/content-pack";
 import { healthBarOpacity } from "./render/health-bars";
-import { createPlayerAccess } from "./simulation/faction";
+import { createPlayerView } from "./simulation/player-view";
 import { createAlertTracker } from "./ui/mission-alerts";
 import type { MissionAlert } from "./ui/mission-alerts";
 import { duePopup } from "./ui/popups";
@@ -138,6 +134,8 @@ export type LoadedMission = MissionFile & {
 export type GameSession = Omit<GameView, "dispose"> & {
   simulation: MissionSimulation;
   playing: () => boolean;
+  /** A fault or defeat leaves the session for inspection only. */
+  halted: () => boolean;
   /** Pausing ends placement and targeting unless they are kept. */
   pause: (options?: { keepInteractions?: boolean }) => void;
   resume: () => void;
@@ -391,11 +389,7 @@ async function assembleGameSession(
     definitions.map((definition) => [definition.id, definition]),
   );
   const playerFaction = simulation.playerFaction;
-  const player = createPlayerAccess(
-    playerFaction,
-    definitionsById,
-    simulation.detects,
-  );
+  const player = createPlayerView(simulation, definitionsById);
   const startingActor = simulation.actors.find(player.owns);
   if (startingActor) {
     const { x, z } = startingActor.worldPosition;
@@ -434,12 +428,8 @@ async function assembleGameSession(
         );
         return site && map.tileCenter(site.tile.x, site.tile.z);
       }
-      case "attack": {
-        const target = actorsByKind().byId.get(order.targetId);
-        return target && player.shows(target)
-          ? target.worldPosition
-          : undefined;
-      }
+      case "attack":
+        return player.shownActor(order.targetId)?.worldPosition;
     }
   });
   own(queuedOrders);
@@ -505,28 +495,8 @@ async function assembleGameSession(
       player.shows,
       seconds,
     );
-  const partition = (actors: readonly ActorRenderState[]) => {
-    const mobile = actors.filter((actor) => !isTilePlacedActor(actor));
-    return {
-      actors,
-      byId: new Map(actors.map((actor) => [actor.id, actor])),
-      ownIds: new Set(actors.filter(player.owns).map((actor) => actor.id)),
-      mobile,
-      placed: actors.filter(isTilePlacedActor).filter(player.shows),
-      // Fog changes only when a tick commits, so this stays current.
-      shownMobile: mobile.filter(player.shows),
-    };
-  };
-  // Split once per committed tick; the simulation replaces its array each tick.
-  let partitioned = partition(simulation.actors);
-  const actorsByKind = () => {
-    if (partitioned.actors !== simulation.actors) {
-      partitioned = partition(simulation.actors);
-    }
-    return partitioned;
-  };
-  actorViews.update(actorsByKind().shownMobile, 1);
-  tilePlacedViews.update(actorsByKind().placed, disconnected());
+  actorViews.update(player.actors().shownMobile, 1);
+  tilePlacedViews.update(player.actors().placed, disconnected());
   let simulationFaulted = false;
   let playing = !controls.startPaused;
   const audioScene = own(
@@ -553,20 +523,18 @@ async function assembleGameSession(
   const canCommand = () => playing && !halted();
   let controlsDirty = true;
   const showActor = (actorId: string) => {
-    const actor = simulation.actorById(actorId);
+    const actor = player.actor(actorId);
     if (actor) controls.showActor?.(actor.definitionId);
   };
   const radial = createRadialMenu(document.body, canvas);
   own(radial);
-  const isMobile = (actor: ActorRenderState) =>
-    isMobileActor(actor, definitionsById.get(actor.definitionId));
   /** The rendered center of shown actors; undefined once none remain. */
   const cameraPointFor = (ids: readonly string[]) => {
     const points = ids.flatMap((id) => {
-      const actor = actorsByKind().byId.get(id);
-      if (!actor || !player.shows(actor)) return [];
+      const actor = player.shownActor(id);
+      if (!actor) return [];
       return [
-        (isMobile(actor) && actorViews.groundPosition(id)) ||
+        (player.isMobile(actor) && actorViews.groundPosition(id)) ||
           actor.worldPosition,
       ];
     });
@@ -581,8 +549,8 @@ async function assembleGameSession(
   };
   const followableIds = (ids: readonly string[]) =>
     ids.filter((id) => {
-      const actor = actorsByKind().byId.get(id);
-      return !!actor && isMobile(actor);
+      const actor = player.actor(id);
+      return !!actor && player.isMobile(actor);
     });
   const followActors = (ids: readonly string[]) => {
     const tracked = followableIds(ids);
@@ -593,8 +561,7 @@ async function assembleGameSession(
       const id =
         actorViews.actorIdForMesh(mesh) ?? tilePlacedViews.actorIdForMesh(mesh);
       // Committed state, since picking asks about every mesh.
-      const actor = id && actorsByKind().byId.get(id);
-      return actor && player.shows(actor) ? id : undefined;
+      return player.shownActor(id)?.id;
     },
     movementTargetForMesh: (mesh) => {
       const tile = materialsView?.lootTileForMesh(mesh);
@@ -604,24 +571,14 @@ async function assembleGameSession(
     enabled: () => !placement.active && !halted(),
     pointerEnabled: () => !view.camera.primaryPanActive,
     canCommand,
-    canSelect: (id) => {
-      const actor = actorsByKind().byId.get(id);
-      return !!actor && player.shows(actor);
-    },
+    canSelect: (id) => !!player.shownActor(id),
     groundTargetMode: () => rally.active || attackMove.active,
     onGroundTarget: (target, queued) =>
       attackMove.active
         ? attackMove.choose(target, queued)
         : rally.choose(target),
     cancelGroundTarget: () => attackMove.cancel() || rally.cancel(),
-    canMove: (actorId) => {
-      const actor = actorsByKind().byId.get(actorId);
-      return (
-        !!actor &&
-        player.owns(actor) &&
-        isMobileActor(actor, definitionsById.get(actor.definitionId))
-      );
-    },
+    canMove: (actorId) => !!player.ownMobileActor(actorId),
     moveLabel: (target) => {
       const tile = map.tileAtWorldPosition(target.x, target.z);
       const at = ({ x, z }: TileCoord) =>
@@ -648,12 +605,8 @@ async function assembleGameSession(
     cancelFocus: view.camera.cancelFocus,
     canAttack: (actorId) => {
       if (!canCommand()) return false;
-      const actor = actorsByKind().byId.get(actorId);
-      return (
-        !!actor &&
-        player.relationTo(actor.definitionId) === "hostile" &&
-        player.shows(actor)
-      );
+      const actor = player.shownActor(actorId);
+      return !!actor && player.relationTo(actor.definitionId) === "hostile";
     },
     submitCommand: (command) => {
       if (!canCommand()) return;
@@ -693,7 +646,7 @@ async function assembleGameSession(
       tilePlacedViews.setSelectedActor(actorId);
       // Other factions' routes would reveal their intent.
       movementPath.setSelectedActors(
-        ids.filter((id) => actorsByKind().ownIds.has(id)),
+        ids.filter((id) => player.actors().ownIds.has(id)),
       );
       minimap.refreshActors();
       canvas.dataset.actorSelected = String(ids.length > 0);
@@ -729,7 +682,7 @@ async function assembleGameSession(
           worldPosition: map.tileCenter(loot.tile.x, loot.tile.z),
           color: SALVAGE_MINIMAP_COLOR,
         })) ?? []),
-      ...actorsByKind().placed.map((actor) => ({
+      ...player.actors().placed.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
         tiles: occupiedTilesFor(
@@ -739,7 +692,7 @@ async function assembleGameSession(
         color: buildingAppearances.get(actor.definitionId)?.minimapColor,
         selected: input.selectedActorIds.includes(actor.id),
       })),
-      ...actorsByKind().shownMobile.map((actor) => ({
+      ...player.actors().shownMobile.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
         color: appearances.get(actor.definitionId)?.minimapColor,
@@ -751,12 +704,9 @@ async function assembleGameSession(
   let knownControlsTick = -1;
   let knownPlacementActive = false;
   const refreshControls = () => {
-    const actor = simulation.actors.find(
-      ({ id }) => id === input.selectedActorId,
-    );
+    const actor = player.ownActor(input.selectedActorId);
     const canRemove =
       !!actor &&
-      player.owns(actor) &&
       isTilePlacedActor(actor) &&
       !pendingRemovalId &&
       canCommand() &&
@@ -866,11 +816,9 @@ async function assembleGameSession(
   );
   own(placement);
   const removeSelected = () => {
-    const actorId = input.selectedActorId;
-    const actor = actorId ? simulation.actorById(actorId) : undefined;
+    const actor = player.ownActor(input.selectedActorId);
     if (
       !actor ||
-      !player.owns(actor) ||
       !isTilePlacedActor(actor) ||
       pendingRemovalId !== undefined ||
       !canCommand() ||
@@ -893,32 +841,19 @@ async function assembleGameSession(
   lifetime.defer(() =>
     controls.remove?.removeEventListener("click", removeSelected),
   );
-  const selectedOwnActorId = () => {
-    const id = input.selectedActorId;
-    return id && actorsByKind().ownIds.has(id) ? id : undefined;
-  };
+  const selectedOwnActorId = () => player.ownActor(input.selectedActorId)?.id;
   const training = createUnitTraining(simulation, controls, {
     names,
     selectedActorId: selectedOwnActorId,
     unitDefinitionIds: () =>
-      trainableUnitIds(
-        actorsByKind().byId.get(selectedOwnActorId() ?? ""),
-        definitionsById,
-      ),
+      trainableUnitIds(player.ownActor(input.selectedActorId), definitionsById),
     enabled: () => canCommand() && !placement.active,
     paused: () => !playing,
   });
   own(training);
   const attackMove = createAttackMoveControls(simulation, controls, {
     selectedMobileIds: () =>
-      input.selectedActorIds.filter((id) => {
-        const actor = simulation.actors.find((actor) => actor.id === id);
-        return (
-          !!actor &&
-          player.owns(actor) &&
-          isMobileActor(actor, definitionsById.get(actor.definitionId))
-        );
-      }),
+      input.selectedActorIds.filter((id) => !!player.ownMobileActor(id)),
     enabled: () => canCommand() && !placement.active,
     changed: () => {
       controlsDirty = true;
@@ -947,7 +882,7 @@ async function assembleGameSession(
   own(rally);
   const network = createNetworkControls(simulation, controls, {
     selectedActorId: selectedOwnActorId,
-    canControl: (id) => actorsByKind().ownIds.has(id),
+    canControl: (id) => !!player.ownActor(id),
   });
   const economyRoot = controls.economyRoot;
   const economyControls =
@@ -1088,14 +1023,13 @@ async function assembleGameSession(
   ): ActorAnimationState => {
     const weapon = definitionsById.get(actor.definitionId)?.weapon;
     const targetId = actor.combat?.attack?.targetId;
-    const target = targetId && actorsByKind().byId.get(targetId);
+    // Undetected targets stay hidden, so aiming must not reveal them.
+    const target = player.shownActor(targetId);
     return {
       working: gathering.has(actor.id),
-      // Undetected targets stay hidden, so aiming must not reveal them.
       aiming:
         !!weapon &&
         !!target &&
-        simulation.detects(playerFaction, target) &&
         weaponReach(actor, target, definitionsById, map) <= weapon.range,
       running: actor.territory?.mode === "pursuing",
     };
@@ -1138,7 +1072,7 @@ async function assembleGameSession(
     paused: controls.startPaused,
     pumpMilliseconds: SIMULATION_PUMP_MILLISECONDS,
     maxCatchUpSeconds: MAX_CATCH_UP_SECONDS,
-    beforeTick: () => actorViews.capturePreviousPoses(actorsByKind().mobile),
+    beforeTick: () => actorViews.capturePreviousPoses(player.actors().mobile),
     onFault: () => {
       simulationFaulted = true;
       syncAudioActivity();
@@ -1153,7 +1087,7 @@ async function assembleGameSession(
       }
       // Completion and activity can share a tick; pose the committed building.
       if (simulation.buildingActivity.length)
-        tilePlacedViews.update(actorsByKind().placed, disconnected());
+        tilePlacedViews.update(player.actors().placed, disconnected());
       const markedTargets = new Set<string>();
       for (const hit of simulation.attacks) {
         const style = presentationOf(hit.attackerDefinitionId)?.attackEffect;
@@ -1163,20 +1097,17 @@ async function assembleGameSession(
             simulation.sees(playerFaction, hit.to))
         )
           combatEffects.hit(hit, style);
-        const attacker = simulation.actorById(hit.attackerId);
-        if (attacker && player.shows(attacker))
+        if (player.shownActor(hit.attackerId))
           actorViews.play(hit.attackerId, "attack");
-        const target = simulation.actorById(hit.targetId);
-        if (target && player.shows(target)) actorViews.play(target.id, "hit");
+        if (player.shownActor(hit.targetId))
+          actorViews.play(hit.targetId, "hit");
       }
       for (const { buildingId, kind, actorId } of simulation.buildingActivity) {
-        const building = simulation.actorById(buildingId);
-        if (building && player.shows(building))
+        if (player.shownActor(buildingId))
           tilePlacedViews.play(buildingId, kind);
         const trigger = ACTIVITY_TRIGGERS[kind];
-        const participant = actorId && simulation.actorById(actorId);
-        if (trigger && participant && player.shows(participant))
-          actorViews.play(participant.id, trigger);
+        if (trigger && actorId && player.shownActor(actorId))
+          actorViews.play(actorId, trigger);
       }
       minimap.refreshActors();
       const alerts = observeAlerts();
@@ -1196,7 +1127,7 @@ async function assembleGameSession(
           canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
         if (command.kind === "attack") {
           canvas.dataset.attackStatus = accepted ? "accepted" : "rejected";
-          const target = simulation.actorById(command.targetId);
+          const target = player.actor(command.targetId);
           if (accepted && target && !markedTargets.has(target.id)) {
             markedTargets.add(target.id);
             combatEffects.markTarget(target.worldPosition);
@@ -1236,18 +1167,12 @@ async function assembleGameSession(
       simulation.completedTicks !== knownSelectionTick
     ) {
       knownSelectionTick = simulation.completedTicks;
-      const actors = new Map(
-        simulation.actors.map((actor) => [actor.id, actor]),
-      );
-      input.retainSelection((id) => {
-        const actor = actors.get(id);
-        return !!actor && player.shows(actor);
-      });
+      input.retainSelection((id) => !!player.shownActor(id));
     }
     if (simulation.actorVersion !== knownActorVersion) {
       knownActorVersion = simulation.actorVersion;
       controlsDirty = true;
-      const { placed } = actorsByKind();
+      const { placed } = player.actors();
       tilePlacedViews.update(placed, disconnected());
       canvas.dataset.tilePlacedActorCount = String(placed.length);
       minimap.refreshActors();
@@ -1259,7 +1184,7 @@ async function assembleGameSession(
     if (simulation.economy) {
       materialsView?.update(simulation.economy, explored);
       if (simulation.completedTicks !== knownControlsTick)
-        tilePlacedViews.update(actorsByKind().placed, disconnected());
+        tilePlacedViews.update(player.actors().placed, disconnected());
     }
     if (
       controlsDirty ||
@@ -1276,7 +1201,7 @@ async function assembleGameSession(
     if (!reducedMotion.matches) pickupSeconds += frameSeconds;
     tilePlacedViews.animate(idleSeconds, frameSeconds);
     materialsView?.animate(pickupSeconds);
-    const { shownMobile } = actorsByKind();
+    const { shownMobile } = player.actors();
     combatEffects.update(frameSeconds);
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
@@ -1292,13 +1217,10 @@ async function assembleGameSession(
     movementPath.update(shownMobile);
     // Other factions' queues would reveal their intent.
     queuedOrders.update(
-      input.selectedActorIds.flatMap((id) => {
-        const actor = actorsByKind().byId.get(id);
-        return actor && player.owns(actor) ? [actor] : [];
-      }),
+      input.selectedActorIds.flatMap((id) => player.ownActor(id) ?? []),
     );
     updateHealth(frameSeconds);
-    const ownIds = actorsByKind().ownIds;
+    const ownIds = player.actors().ownIds;
     networkView.update(
       simulation.support && {
         nodes: simulation.support.nodes.filter((node) =>
@@ -1314,10 +1236,7 @@ async function assembleGameSession(
           (node) => node.actorId === input.selectedActorId,
         ),
     );
-    rallyView.update(
-      simulation.actors.find((actor) => actor.id === selectedOwnActorId())
-        ?.rallyPoint,
-    );
+    rallyView.update(player.ownActor(input.selectedActorId)?.rallyPoint);
   });
   lifetime.defer(() =>
     view.scene.onBeforeAnimationsObservable.remove(renderObserver),
@@ -1327,7 +1246,7 @@ async function assembleGameSession(
     canvas.dataset.terrainReady = "true";
     canvas.dataset.actorReady = "true";
     canvas.dataset.tilePlacedActorReady = "true";
-    canvas.dataset.tilePlacedActorCount = String(actorsByKind().placed.length);
+    canvas.dataset.tilePlacedActorCount = String(player.actors().placed.length);
   });
 
   let disposal: Promise<void> | undefined;
@@ -1356,6 +1275,7 @@ async function assembleGameSession(
         }
       })()),
     playing: () => playing,
+    halted,
     pause: ({ keepInteractions = false } = {}) => {
       if (keepInteractions) radial.close();
       else cancelInteractions();
@@ -1369,7 +1289,7 @@ async function assembleGameSession(
       if (halted() || disposal) return;
       if (playing) return;
       // Paused rendering settles to committed poses; resume must not rewind.
-      actorViews.capturePreviousPoses(actorsByKind().mobile);
+      actorViews.capturePreviousPoses(player.actors().mobile);
       playing = true;
       syncAudioActivity();
       controlsDirty = true;
@@ -1402,20 +1322,14 @@ async function assembleGameSession(
       ),
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;
-      const actor = actorId && simulation.actorById(actorId);
       input.select(
-        actor && player.shows(actor) ? actorId : undefined,
+        player.shownActor(actorId)?.id,
         additive || input.additiveMode,
       );
     },
     selectActors: (ids) => {
       if (simulationFaulted || placement.active) return;
-      input.selectMany(
-        ids.filter((id) => {
-          const actor = simulation.actorById(id);
-          return !!actor && player.shows(actor);
-        }),
-      );
+      input.selectMany(ids.filter((id) => !!player.shownActor(id)));
     },
   };
   /** Updates building appearances, then rebuilds the views that use them. */
@@ -1428,7 +1342,7 @@ async function assembleGameSession(
         ...buildingAppearances.get(id)!,
         ...change,
       });
-    tilePlacedViews.update(actorsByKind().placed, disconnected());
+    tilePlacedViews.update(player.actors().placed, disconnected());
   };
   /** Props whose views swap stand-ins as they load; others are looked up. */
   const propLoaded: Partial<Record<PropId, (asset: ModelAsset) => void>> = {
@@ -1499,7 +1413,7 @@ async function assembleGameSession(
         (appearance) => {
           const previous = appearances.get(id);
           setAppearance(id, appearance);
-          actorViews.update(actorsByKind().shownMobile, loop.tickProgress());
+          actorViews.update(player.actors().shownMobile, loop.tickProgress());
           updateWrecks(0);
           previous?.dispose();
         },

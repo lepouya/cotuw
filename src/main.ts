@@ -129,11 +129,7 @@ const elapsed = () =>
   session ? formatElapsed(topBarState(session).elapsedSeconds) : "";
 
 /** Rolling saves would otherwise replace good progress with a lost mission. */
-const canSave = () =>
-  !!session &&
-  !busy &&
-  session.simulation.result?.kind !== "defeat" &&
-  canvas.dataset.simulationFault !== "true";
+const canSave = () => !!session && !busy && !session.halted();
 
 const saveSource = (name: string) =>
   session!.save({ name, savedAt: new Date().toISOString() });
