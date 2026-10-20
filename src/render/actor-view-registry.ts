@@ -7,6 +7,7 @@ import {
 } from "@babylonjs/core";
 
 import { shortestTurn } from "../simulation/world";
+import { createLifetime } from "../lifetime";
 import { createViewRegistry } from "./view-registry";
 import {
   actorIdForPickMesh,
@@ -68,19 +69,19 @@ export function createActorViewRegistry(
   appearances: ActorAppearanceCatalog,
   isHostile: (definitionId: string) => boolean = () => false,
 ): ActorViewRegistry {
-  const selectionMaterial = new StandardMaterial(
-    "actor-selection-material",
-    scene,
+  const lifetime = createLifetime();
+  const selectionMaterial = lifetime.own(
+    new StandardMaterial("actor-selection-material", scene),
   );
   selectionMaterial.emissiveColor = SELECTION_COLOR;
   selectionMaterial.disableLighting = true;
-  const hostileSelectionMaterial = new StandardMaterial(
-    "actor-hostile-selection-material",
-    scene,
+  const hostileSelectionMaterial = lifetime.own(
+    new StandardMaterial("actor-hostile-selection-material", scene),
   );
   hostileSelectionMaterial.emissiveColor = HOSTILE_SELECTION_COLOR;
   hostileSelectionMaterial.disableLighting = true;
   let fallback: ActorAppearance | undefined;
+  lifetime.defer(() => fallback?.dispose());
   // A visible stand-in beats a crash in the render loop for unknown kinds.
   const appearanceFor = (definitionId: string) =>
     appearances.get(definitionId) ??
@@ -91,33 +92,40 @@ export function createActorViewRegistry(
   const pose: ActorPose = { worldPosition: { x: 0, z: 0 }, facing: 0 };
   let selectedActorIds = new Set<string>();
 
-  const renderers = createViewRegistry({
-    keyFor: (actor: ActorRenderState) => ({
-      definitionId: actor.definitionId,
-      appearance: appearanceFor(actor.definitionId),
+  const renderers = lifetime.own(
+    createViewRegistry({
+      keyFor: (actor: ActorRenderState) => ({
+        definitionId: actor.definitionId,
+        appearance: appearanceFor(actor.definitionId),
+      }),
+      sameKey: (left, right) =>
+        left.definitionId === right.definitionId &&
+        left.appearance === right.appearance,
+      onRemove: (id) => {
+        previousPoses.delete(id);
+      },
+      onReplace: (id, previous, next) => {
+        if (previous.definitionId !== next.definitionId)
+          previousPoses.delete(id);
+      },
+      create: (actor, { appearance }) => {
+        const hostile = isHostile(actor.definitionId);
+        const renderer = createActorRenderer(
+          scene,
+          map,
+          actor,
+          appearance,
+          hostile ? hostileSelectionMaterial : selectionMaterial,
+          hostile,
+        );
+        renderer.setSelected(selectedActorIds.has(actor.id));
+        return renderer;
+      },
     }),
-    sameKey: (left, right) =>
-      left.definitionId === right.definitionId &&
-      left.appearance === right.appearance,
-    onRemove: (id) => {
-      previousPoses.delete(id);
-    },
-    onReplace: (id, previous, next) => {
-      if (previous.definitionId !== next.definitionId) previousPoses.delete(id);
-    },
-    create: (actor, { appearance }) => {
-      const hostile = isHostile(actor.definitionId);
-      const renderer = createActorRenderer(
-        scene,
-        map,
-        actor,
-        appearance,
-        hostile ? hostileSelectionMaterial : selectionMaterial,
-        hostile,
-      );
-      renderer.setSelected(selectedActorIds.has(actor.id));
-      return renderer;
-    },
+  );
+  lifetime.defer(() => {
+    previousPoses.clear();
+    pendingTriggers.clear();
   });
 
   const setSelectedActors = (ids: readonly string[]) => {
@@ -150,14 +158,7 @@ export function createActorViewRegistry(
         }
       }
     },
-    dispose: () => {
-      renderers.dispose();
-      previousPoses.clear();
-      pendingTriggers.clear();
-      selectionMaterial.dispose();
-      hostileSelectionMaterial.dispose();
-      fallback?.dispose();
-    },
+    dispose: lifetime.dispose,
     setSelectedActors,
     groundPosition: (actorId) => {
       const point = renderers.get(actorId)?.selectionPoint();

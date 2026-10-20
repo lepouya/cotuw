@@ -109,27 +109,34 @@ describe("simulation loop", () => {
     }
   });
 
-  test("a broken time source faults instead of silently poisoning the clock", () => {
-    let now = 0;
-    const tick = vi.fn(() => []);
-    const onFault = vi.fn();
-    const loop = startSimulationLoop(
-      { tickSeconds: 0.1, tick },
-      {
-        pumpMilliseconds: 60_000,
-        maxCatchUpSeconds: 1,
-        now: () => now,
-        onFault,
-      },
-    );
-    now = NaN;
-    loop.advance();
-    expect(loop.faulted).toBe(true);
-    expect(onFault).toHaveBeenCalledOnce();
-    now = 1_000;
-    loop.advance();
-    expect(tick).not.toHaveBeenCalled();
-  });
+  test.each(["advance", "tickProgress", "resume", "setSpeed"] as const)(
+    "a broken time source faults during %s",
+    (operation) => {
+      let now = 0;
+      const tick = vi.fn(() => []);
+      const onFault = vi.fn();
+      const loop = startSimulationLoop(
+        { tickSeconds: 0.1, tick },
+        {
+          pumpMilliseconds: 60_000,
+          maxCatchUpSeconds: 1,
+          now: () => now,
+          onFault,
+        },
+      );
+      if (operation === "resume") loop.pause();
+      now = NaN;
+      if (operation === "setSpeed") loop.setSpeed(2);
+      else loop[operation]();
+      expect(loop.faulted).toBe(true);
+      expect(onFault).toHaveBeenCalledOnce();
+      now = 1_000;
+      loop.advance();
+      expect(tick).not.toHaveBeenCalled();
+      expect(loop.tickProgress()).toBe(1);
+      expect(onFault).toHaveBeenCalledOnce();
+    },
+  );
 
   test.each([0, -1, NaN, Infinity])(
     "rejects invalid pump and catch-up intervals %s",

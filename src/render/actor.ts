@@ -6,6 +6,7 @@ import {
 } from "@babylonjs/core";
 
 import { shortestTurn } from "../simulation/world";
+import { createLifetime } from "../lifetime";
 
 import type { Material, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
@@ -104,128 +105,137 @@ export function createActorRenderer(
 ): ActorRenderer {
   const { id } = initialState;
   const { radius, height } = appearance.bounds;
-  const root = new TransformNode(`actor-${id}-root`, scene);
-  const instance = appearance.instantiate(`actor-${id}`, stableUnit(id));
-  instance.root.parent = root;
-  for (const node of [instance.root, ...instance.root.getChildMeshes()]) {
-    if (node instanceof AbstractMesh && node.isVisible) {
-      node.isPickable = true;
-      node.metadata = {
-        ...node.metadata,
-        pickKind: ACTOR_PICK_KIND,
-        actorId: id,
-      };
+  const lifetime = createLifetime();
+  try {
+    const root = lifetime.own(new TransformNode(`actor-${id}-root`, scene));
+    const instance = lifetime.own(
+      appearance.instantiate(`actor-${id}`, stableUnit(id)),
+    );
+    instance.root.parent = root;
+    for (const node of [instance.root, ...instance.root.getChildMeshes()]) {
+      if (node instanceof AbstractMesh && node.isVisible) {
+        node.isPickable = true;
+        node.metadata = {
+          ...node.metadata,
+          pickKind: ACTOR_PICK_KIND,
+          actorId: id,
+        };
+      }
     }
-  }
-  // The cylinder also covers gaps in a model. The pick predicate sees it
-  // despite its invisibility.
-  const pick = MeshBuilder.CreateCylinder(
-    `actor-${id}-pick`,
-    { diameter: radius * 2, height, tessellation: PICK_TESSELLATION },
-    scene,
-  );
-  pick.parent = root;
-  pick.position.y = height / 2;
-  pick.isVisible = false;
-  pick.metadata = { pickKind: ACTOR_PICK_KIND, actorId: id };
+    // The cylinder also covers gaps in a model. The pick predicate sees it
+    // despite its invisibility.
+    const pick = MeshBuilder.CreateCylinder(
+      `actor-${id}-pick`,
+      { diameter: radius * 2, height, tessellation: PICK_TESSELLATION },
+      scene,
+    );
+    pick.parent = root;
+    pick.position.y = height / 2;
+    pick.isVisible = false;
+    pick.metadata = { pickKind: ACTOR_PICK_KIND, actorId: id };
 
-  let ring: TransformNode | undefined;
-  const setSelected = (selected: boolean) => {
-    if (selected && !ring) {
-      const ringRadius = radius + SELECTION_RING_MARGIN;
-      if (hostile) {
-        ring = new TransformNode(`actor-${id}-selection`, scene);
-        const arc = (Math.PI * ringRadius) / HOSTILE_MARKER_SEGMENTS;
-        for (let index = 0; index < HOSTILE_MARKER_SEGMENTS; index += 1) {
-          const angle = (index * Math.PI * 2) / HOSTILE_MARKER_SEGMENTS;
-          const segment = MeshBuilder.CreateBox(
-            `actor-${id}-selection-${index}`,
+    let ring: TransformNode | undefined;
+    const setSelected = (selected: boolean) => {
+      if (selected && !ring) {
+        const ringRadius = radius + SELECTION_RING_MARGIN;
+        if (hostile) {
+          ring = new TransformNode(`actor-${id}-selection`, scene);
+          const arc = (Math.PI * ringRadius) / HOSTILE_MARKER_SEGMENTS;
+          for (let index = 0; index < HOSTILE_MARKER_SEGMENTS; index += 1) {
+            const angle = (index * Math.PI * 2) / HOSTILE_MARKER_SEGMENTS;
+            const segment = MeshBuilder.CreateBox(
+              `actor-${id}-selection-${index}`,
+              {
+                width: arc,
+                height: SELECTION_RING_THICKNESS,
+                depth: SELECTION_RING_THICKNESS,
+              },
+              scene,
+            );
+            segment.parent = ring;
+            segment.position.set(
+              Math.cos(angle) * ringRadius,
+              0,
+              Math.sin(angle) * ringRadius,
+            );
+            segment.rotation.y = Math.PI / 2 - angle;
+            segment.material = selectionMaterial;
+            segment.isPickable = false;
+          }
+        } else {
+          const torus = MeshBuilder.CreateTorus(
+            `actor-${id}-selection`,
             {
-              width: arc,
-              height: SELECTION_RING_THICKNESS,
-              depth: SELECTION_RING_THICKNESS,
+              diameter: ringRadius * 2,
+              thickness: SELECTION_RING_THICKNESS,
+              tessellation: SELECTION_RING_TESSELLATION,
             },
             scene,
           );
-          segment.parent = ring;
-          segment.position.set(
-            Math.cos(angle) * ringRadius,
-            0,
-            Math.sin(angle) * ringRadius,
-          );
-          segment.rotation.y = Math.PI / 2 - angle;
-          segment.material = selectionMaterial;
-          segment.isPickable = false;
+          torus.material = selectionMaterial;
+          torus.isPickable = false;
+          ring = torus;
         }
-      } else {
-        const torus = MeshBuilder.CreateTorus(
-          `actor-${id}-selection`,
-          {
-            diameter: ringRadius * 2,
-            thickness: SELECTION_RING_THICKNESS,
-            tessellation: SELECTION_RING_TESSELLATION,
-          },
-          scene,
-        );
-        torus.material = selectionMaterial;
-        torus.isPickable = false;
-        ring = torus;
+        ring.parent = root;
       }
-      ring.parent = root;
-    }
-    ring?.setEnabled(selected);
-  };
+      ring?.setEnabled(selected);
+    };
 
-  const motion: ActorMotion = { distance: 0, turn: 0, seconds: 0 };
-  let last: ActorPose | undefined;
-  const place = ({ worldPosition, facing }: ActorPose) => {
-    root.position.x = worldPosition.x;
-    root.position.z = worldPosition.z;
-    root.position.y =
-      map.heightAtWorldPosition(worldPosition.x, worldPosition.z) +
-      GROUND_CLEARANCE;
-    root.rotation.y = facing;
-  };
-  const update = (
-    pose: ActorPose,
-    seconds = 0,
-    state?: Readonly<ActorAnimationState>,
-  ) => {
-    const { worldPosition, facing } = pose;
-    if (state) instance.setAnimationState?.(state);
-    if (instance.animate) {
-      if (last) {
-        motion.distance = Math.hypot(
-          worldPosition.x - last.worldPosition.x,
-          worldPosition.z - last.worldPosition.z,
-        );
-        motion.turn = shortestTurn(last.facing, facing);
-        motion.seconds = seconds;
-        instance.animate(motion);
-        last.worldPosition.x = worldPosition.x;
-        last.worldPosition.z = worldPosition.z;
-        last.facing = facing;
-      } else {
-        // The first drawn pose may be interpolated or use newly loaded art.
-        instance.animate(motion);
-        last = { worldPosition: { ...worldPosition }, facing };
+    const motion: ActorMotion = { distance: 0, turn: 0, seconds: 0 };
+    let last: ActorPose | undefined;
+    const place = ({ worldPosition, facing }: ActorPose) => {
+      root.position.x = worldPosition.x;
+      root.position.z = worldPosition.z;
+      root.position.y =
+        map.heightAtWorldPosition(worldPosition.x, worldPosition.z) +
+        GROUND_CLEARANCE;
+      root.rotation.y = facing;
+    };
+    const update = (
+      pose: ActorPose,
+      seconds = 0,
+      state?: Readonly<ActorAnimationState>,
+    ) => {
+      const { worldPosition, facing } = pose;
+      if (state) instance.setAnimationState?.(state);
+      if (instance.animate) {
+        if (last) {
+          motion.distance = Math.hypot(
+            worldPosition.x - last.worldPosition.x,
+            worldPosition.z - last.worldPosition.z,
+          );
+          motion.turn = shortestTurn(last.facing, facing);
+          motion.seconds = seconds;
+          instance.animate(motion);
+          last.worldPosition.x = worldPosition.x;
+          last.worldPosition.z = worldPosition.z;
+          last.facing = facing;
+        } else {
+          // The first drawn pose may be interpolated or use newly loaded art.
+          instance.animate(motion);
+          last = { worldPosition: { ...worldPosition }, facing };
+        }
       }
-    }
-    place(pose);
-  };
+      place(pose);
+    };
 
-  place(initialState);
-  return {
-    actorId: id,
-    selectionPoint: () => root.position.add(new Vector3(0, height / 2, 0)),
-    setSelected,
-    update,
-    play: (trigger) => instance.play?.(trigger),
-    dispose: () => {
-      instance.dispose();
-      root.dispose();
-    },
-  };
+    place(initialState);
+    return {
+      actorId: id,
+      selectionPoint: () => root.position.add(new Vector3(0, height / 2, 0)),
+      setSelected,
+      update,
+      play: (trigger) => instance.play?.(trigger),
+      dispose: lifetime.dispose,
+    };
+  } catch (error) {
+    try {
+      lifetime.dispose();
+    } catch (cleanupError) {
+      console.error("Actor view cleanup failed.", cleanupError);
+    }
+    throw error;
+  }
 }
 
 /**

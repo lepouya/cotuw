@@ -79,6 +79,22 @@ export function startSimulationLoop(
       clearInterval(timer);
     }
   };
+  const fail = (error: unknown) => {
+    if (faulted) return;
+    faulted = true;
+    fault = error;
+    stop();
+    onFault?.(error);
+  };
+  const readClock = <T>(read: (at: number) => T): T | undefined => {
+    if (faulted) return;
+    try {
+      return read(now());
+    } catch (error) {
+      fail(error);
+      return;
+    }
+  };
   const advance = () => {
     if (stopped || paused || advancing) {
       return;
@@ -94,10 +110,7 @@ export function startSimulationLoop(
         afterTick?.(outcomes);
       }
     } catch (error) {
-      faulted = true;
-      fault = error;
-      stop();
-      onFault?.(error);
+      fail(error);
     } finally {
       advancing = false;
     }
@@ -112,14 +125,17 @@ export function startSimulationLoop(
       return fault;
     },
     advance,
-    tickProgress: () => (stopped || paused ? 1 : clock.tickProgress(now())),
+    tickProgress: () =>
+      stopped || paused ? 1 : (readClock(clock.tickProgress) ?? 1),
     pause: () => {
       if (!paused) pauseGeneration++;
       paused = true;
     },
     resume: () => {
       if (!paused || stopped) return;
-      clock = newClock();
+      const nextClock = readClock((at) => newClock(speed, 0, at));
+      if (!nextClock) return;
+      clock = nextClock;
       paused = false;
     },
     get speed() {
@@ -130,8 +146,11 @@ export function startSimulationLoop(
         throw new RangeError("Simulation speed must be positive and finite.");
       if (next === speed) return;
       // Owed ticks are counted in ticks, so they carry over unchanged.
-      const at = now();
-      clock = newClock(next, clock.pendingTicks(at), at);
+      const nextClock = readClock((at) =>
+        newClock(next, clock.pendingTicks(at), at),
+      );
+      if (!nextClock) return;
+      clock = nextClock;
       speed = next;
     },
     stop,

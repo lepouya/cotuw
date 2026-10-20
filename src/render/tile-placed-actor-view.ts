@@ -10,6 +10,7 @@ import { createProductionExitMarker } from "./production-exit";
 import { occupiedTilesFor, tilePlacedPose } from "../simulation/placement";
 import { tileKey } from "../simulation/grid";
 import { createViewRegistry } from "./view-registry";
+import { createLifetime } from "../lifetime";
 import { isRgb } from "../content/presentation";
 import { createFootprintOverlay } from "./footprint-overlay";
 import { createScreenBar } from "./screen-bar";
@@ -134,7 +135,10 @@ export function createTilePlacedActorViewRegistry(
   const definitionsById = new Map(
     definitions.map((definition) => [definition.id, definition]),
   );
+  const lifetime = createLifetime();
+  const materialLifetime = lifetime.own(createLifetime());
   const materials = new Map<string, StandardMaterial>();
+  lifetime.defer(() => materials.clear());
   const actorIds = new WeakMap<TransformNode, string>();
   let actors: readonly TilePlacedActorState[] = [];
   let disconnectedIds: ReadonlySet<string> = new Set();
@@ -205,8 +209,14 @@ export function createTilePlacedActorViewRegistry(
           `tile-placed-actor-${definitionId}-${name}`,
           scene,
         );
-        configure(material);
-        materials.set(key, material);
+        try {
+          configure(material);
+        } catch (error) {
+          // Uncached, so a retried build would otherwise leak one per attempt.
+          material.dispose();
+          throw error;
+        }
+        materials.set(key, materialLifetime.own(material));
       }
       return material;
     };
@@ -232,199 +242,211 @@ export function createTilePlacedActorViewRegistry(
         `Unknown tile-placed actor definition: ${actor.definitionId}.`,
       );
     }
-    const root = new TransformNode(`tile-placed-actor-${actor.id}-root`, scene);
-    if (!preview) actorIds.set(root, actor.id);
-    const shared = materialFor(definition.id);
-    const body = shared("material", (material) => {
-      material.diffuseColor = new Color3(
-        ...(appearances.get(definition.id)?.color ?? DEFAULT_COLOR),
+    const lifetime = createLifetime();
+    try {
+      const materials = lifetime.own(
+        createMaterialCopies(`tile-placed-actor-${actor.id}-root`),
       );
-      material.specularColor = new Color3(0.16, 0.18, 0.19);
-    });
-    const tiles = occupiedTilesFor(actor, definition);
-    const occupied = new Set(tiles.map(tileKey));
-    const roof =
-      Math.max(...tiles.flatMap(cornerHeights)) +
-      (appearances.get(definition.id)?.height ?? DEFAULT_HEIGHT);
-    const foundations: ModelInstance[] = [];
-    for (const tile of tiles) {
-      const inset = (dx: number, dz: number) =>
-        occupied.has(tileKey({ x: tile.x + dx, z: tile.z + dz }))
-          ? 0
-          : EDGE_INSET_TILES * map.tileSize;
-      const low = map.worldPoint(
-        tile.x,
-        tile.z,
-        Math.min(...cornerHeights(tile)),
+      const root = lifetime.own(
+        new TransformNode(`tile-placed-actor-${actor.id}-root`, scene),
       );
-      const minX = low.x + inset(-1, 0);
-      const maxX = low.x + map.tileSize - inset(1, 0);
-      const minZ = low.z + inset(0, -1);
-      const maxZ = low.z + map.tileSize - inset(0, 1);
-      const foundation = unitCubeInstance(
-        appearances.get(definition.id)?.foundation,
-        `tile-placed-actor-${actor.id}-tile-${tile.x}-${tile.z}`,
-        body,
-        scene,
-      );
-      foundations.push(foundation);
-      const column = foundation.root;
-      for (const mesh of column.getChildMeshes()) mesh.material = body;
-      column.scaling.set(maxX - minX, roof - low.y, maxZ - minZ);
-      column.parent = root;
-      column.position.set(
-        (minX + maxX) / 2,
-        (low.y + roof) / 2,
-        (minZ + maxZ) / 2,
-      );
-    }
-    const { worldPosition, facing } = tilePlacedPose(map, actor, definition);
-    const appearance = appearances.get(definition.id);
-    const details = appearance?.createDetails?.(
-      root,
-      {
-        center: new Vector3(worldPosition.x, roof, worldPosition.z),
-        roof,
-        tileSize: map.tileSize,
-        facing,
-      },
-      shared,
-    );
-    if (preview) {
-      for (const mesh of root.getChildMeshes()) {
-        mesh.isPickable = false;
-        mesh.visibility = 0.42;
-      }
-    }
-    const exit =
-      preview && definition.production
-        ? createProductionExitMarker(scene, map, root, tiles, facing)
-        : undefined;
-    const top = root.getHierarchyBoundingVectors(true).max.y;
-    // The view key includes the construction stage, so each stage rebuilds.
-    const disconnected = !preview && disconnectedIds.has(actor.id);
-    const constructing = !preview && actor.construction !== undefined;
-    const materials = createMaterialCopies(root.name);
-    let scaffold: ModelInstance | undefined;
-    if (constructing) {
-      for (const mesh of root.getChildMeshes()) mesh.visibility = 0.45;
-      const foundationMeshes = new Set(
-        foundations.flatMap(({ root }) => hierarchyMeshes(root)),
-      );
-      scaffold = stageBlueprint(
-        {
-          root,
-          parts: root
-            .getChildMeshes()
-            .filter((mesh) => !foundationMeshes.has(mesh)),
-          tiles,
-          roof,
-          top,
-        },
-        constructionStage(actor.construction!),
-        map,
-        materials,
-        appearance?.scaffold,
-      );
-    }
-    if (disconnected)
-      materials.edit(root.getChildMeshes(), "offline", (dimmed) => {
-        if (dimmed instanceof StandardMaterial)
-          dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
-        else dimmed.albedoColor = dimmed.albedoColor.scale(0.35);
-        dimmed.emissiveColor = Color3.Black();
-      });
-    if (disconnected) {
-      const badge = MeshBuilder.CreateLineSystem(
-        `${root.name}-offline`,
-        {
-          lines: [
-            [
-              new Vector3(-0.3, 0.55, 0),
-              new Vector3(0.15, 0, 0),
-              new Vector3(-0.15, 0, 0),
-              new Vector3(0.3, -0.55, 0),
-            ],
-            [new Vector3(-0.55, -0.55, 0), new Vector3(0.55, 0.55, 0)],
-            [new Vector3(-0.55, 0.55, 0), new Vector3(0.55, -0.55, 0)],
-          ],
-        },
-        scene,
-      );
-      badge.parent = root;
-      badge.position.set(worldPosition.x, roof + 1, worldPosition.z);
-      badge.billboardMode = TransformNode.BILLBOARDMODE_ALL;
-      badge.color = new Color3(1, 0.7, 0.15);
-      badge.isPickable = false;
-    }
-    let progress:
-      | { bar: ReturnType<typeof createScreenBar>; fill: StandardMaterial }
-      | undefined;
-    if (constructing) {
-      const bar = createScreenBar(scene, `${root.name}-construction`, {
-        width: 2 * map.tileSize,
-        frame: shared("construction-background", (material) => {
-          material.emissiveColor = new Color3(0.12, 0.16, 0.18);
-          material.disableLighting = true;
-        }),
-      });
-      bar.root.parent = root;
-      bar.root.position.set(
-        worldPosition.x,
-        roof + CONSTRUCTION_BAR_HEIGHT,
-        worldPosition.z,
-      );
-      const fill = shared("construction-fill", (material) => {
-        material.emissiveColor = new Color3(1, 0.78, 0.24);
-        material.disableLighting = true;
-      });
-      progress = { bar, fill };
-    }
-    const active = !constructing && !disconnected;
-    if (!active) playing.delete(actor.id);
-    return {
-      root,
-      top,
-      update: ({ construction }: TilePlacedActorState) => {
-        if (!progress || !construction) return;
-        progress.bar.setFill(
-          construction.completedTicks / construction.totalTicks,
-          progress.fill,
+      if (!preview) actorIds.set(root, actor.id);
+      const shared = materialFor(definition.id);
+      const body = shared("material", (material) => {
+        material.diffuseColor = new Color3(
+          ...(appearances.get(definition.id)?.color ?? DEFAULT_COLOR),
         );
-      },
-      animate: (seconds: number, frameSeconds: number) => {
-        details?.update(active ? seconds : 0);
-        const activity = playing.get(actor.id);
-        if (!activity) return;
-        const motion = details?.activities?.[activity.kind];
-        if (!motion) {
-          playing.delete(actor.id);
-          return;
+        material.specularColor = new Color3(0.16, 0.18, 0.19);
+      });
+      const tiles = occupiedTilesFor(actor, definition);
+      const occupied = new Set(tiles.map(tileKey));
+      const roof =
+        Math.max(...tiles.flatMap(cornerHeights)) +
+        (appearances.get(definition.id)?.height ?? DEFAULT_HEIGHT);
+      const foundations: ModelInstance[] = [];
+      for (const tile of tiles) {
+        const inset = (dx: number, dz: number) =>
+          occupied.has(tileKey({ x: tile.x + dx, z: tile.z + dz }))
+            ? 0
+            : EDGE_INSET_TILES * map.tileSize;
+        const low = map.worldPoint(
+          tile.x,
+          tile.z,
+          Math.min(...cornerHeights(tile)),
+        );
+        const minX = low.x + inset(-1, 0);
+        const maxX = low.x + map.tileSize - inset(1, 0);
+        const minZ = low.z + inset(0, -1);
+        const maxZ = low.z + map.tileSize - inset(0, 1);
+        const foundation = lifetime.own(
+          unitCubeInstance(
+            appearances.get(definition.id)?.foundation,
+            `tile-placed-actor-${actor.id}-tile-${tile.x}-${tile.z}`,
+            body,
+            scene,
+          ),
+        );
+        foundations.push(foundation);
+        const column = foundation.root;
+        for (const mesh of column.getChildMeshes()) mesh.material = body;
+        column.scaling.set(maxX - minX, roof - low.y, maxZ - minZ);
+        column.parent = root;
+        column.position.set(
+          (minX + maxX) / 2,
+          (low.y + roof) / 2,
+          (minZ + maxZ) / 2,
+        );
+      }
+      const { worldPosition, facing } = tilePlacedPose(map, actor, definition);
+      const appearance = appearances.get(definition.id);
+      const details = appearance?.createDetails?.(
+        root,
+        {
+          center: new Vector3(worldPosition.x, roof, worldPosition.z),
+          roof,
+          tileSize: map.tileSize,
+          facing,
+        },
+        shared,
+      );
+      if (details) lifetime.own(details);
+      if (preview) {
+        for (const mesh of root.getChildMeshes()) {
+          mesh.isPickable = false;
+          mesh.visibility = 0.42;
         }
-        activity.seconds += frameSeconds;
-        if (reducedMotion()) activity.seconds = motion.seconds;
-        motion.pose(Math.min(activity.seconds, motion.seconds));
-        if (activity.seconds >= motion.seconds) playing.delete(actor.id);
-      },
-      play: (kind: BuildingActivityKind) => {
-        const motion = details?.activities?.[kind];
-        if (!motion || !active || reducedMotion()) return;
-        // A new activity replaces one in progress.
-        const previous = playing.get(actor.id);
-        const previousMotion = previous && details?.activities?.[previous.kind];
-        previousMotion?.pose(previousMotion.seconds);
-        motion.pose(0);
-        playing.set(actor.id, { kind, seconds: 0 });
-      },
-      dispose: () => {
-        details?.dispose();
-        exit?.dispose();
-        scaffold?.dispose();
-        for (const foundation of foundations) foundation.dispose();
-        root.dispose();
-        materials.dispose();
-      },
-    };
+      }
+      const exit =
+        preview && definition.production
+          ? createProductionExitMarker(scene, map, root, tiles, facing)
+          : undefined;
+      if (exit) lifetime.own(exit);
+      const top = root.getHierarchyBoundingVectors(true).max.y;
+      // The view key includes the construction stage, so each stage rebuilds.
+      const disconnected = !preview && disconnectedIds.has(actor.id);
+      const constructing = !preview && actor.construction !== undefined;
+      if (constructing) {
+        for (const mesh of root.getChildMeshes()) mesh.visibility = 0.45;
+        const foundationMeshes = new Set(
+          foundations.flatMap(({ root }) => hierarchyMeshes(root)),
+        );
+        const scaffold = stageBlueprint(
+          {
+            root,
+            parts: root
+              .getChildMeshes()
+              .filter((mesh) => !foundationMeshes.has(mesh)),
+            tiles,
+            roof,
+            top,
+          },
+          constructionStage(actor.construction!),
+          map,
+          materials,
+          appearance?.scaffold,
+        );
+        if (scaffold) lifetime.own(scaffold);
+      }
+      if (disconnected)
+        materials.edit(root.getChildMeshes(), "offline", (dimmed) => {
+          if (dimmed instanceof StandardMaterial)
+            dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
+          else dimmed.albedoColor = dimmed.albedoColor.scale(0.35);
+          dimmed.emissiveColor = Color3.Black();
+        });
+      if (disconnected) {
+        const badge = MeshBuilder.CreateLineSystem(
+          `${root.name}-offline`,
+          {
+            lines: [
+              [
+                new Vector3(-0.3, 0.55, 0),
+                new Vector3(0.15, 0, 0),
+                new Vector3(-0.15, 0, 0),
+                new Vector3(0.3, -0.55, 0),
+              ],
+              [new Vector3(-0.55, -0.55, 0), new Vector3(0.55, 0.55, 0)],
+              [new Vector3(-0.55, 0.55, 0), new Vector3(0.55, -0.55, 0)],
+            ],
+          },
+          scene,
+        );
+        badge.parent = root;
+        badge.position.set(worldPosition.x, roof + 1, worldPosition.z);
+        badge.billboardMode = TransformNode.BILLBOARDMODE_ALL;
+        badge.color = new Color3(1, 0.7, 0.15);
+        badge.isPickable = false;
+      }
+      let progress:
+        | { bar: ReturnType<typeof createScreenBar>; fill: StandardMaterial }
+        | undefined;
+      if (constructing) {
+        const bar = createScreenBar(scene, `${root.name}-construction`, {
+          width: 2 * map.tileSize,
+          frame: shared("construction-background", (material) => {
+            material.emissiveColor = new Color3(0.12, 0.16, 0.18);
+            material.disableLighting = true;
+          }),
+        });
+        bar.root.parent = root;
+        bar.root.position.set(
+          worldPosition.x,
+          roof + CONSTRUCTION_BAR_HEIGHT,
+          worldPosition.z,
+        );
+        const fill = shared("construction-fill", (material) => {
+          material.emissiveColor = new Color3(1, 0.78, 0.24);
+          material.disableLighting = true;
+        });
+        progress = { bar, fill };
+      }
+      const active = !constructing && !disconnected;
+      if (!active) playing.delete(actor.id);
+      return {
+        root,
+        top,
+        update: ({ construction }: TilePlacedActorState) => {
+          if (!progress || !construction) return;
+          progress.bar.setFill(
+            construction.completedTicks / construction.totalTicks,
+            progress.fill,
+          );
+        },
+        animate: (seconds: number, frameSeconds: number) => {
+          details?.update(active ? seconds : 0);
+          const activity = playing.get(actor.id);
+          if (!activity) return;
+          const motion = details?.activities?.[activity.kind];
+          if (!motion) {
+            playing.delete(actor.id);
+            return;
+          }
+          activity.seconds += frameSeconds;
+          if (reducedMotion()) activity.seconds = motion.seconds;
+          motion.pose(Math.min(activity.seconds, motion.seconds));
+          if (activity.seconds >= motion.seconds) playing.delete(actor.id);
+        },
+        play: (kind: BuildingActivityKind) => {
+          const motion = details?.activities?.[kind];
+          if (!motion || !active || reducedMotion()) return;
+          // A new activity replaces one in progress.
+          const previous = playing.get(actor.id);
+          const previousMotion =
+            previous && details?.activities?.[previous.kind];
+          previousMotion?.pose(previousMotion.seconds);
+          motion.pose(0);
+          playing.set(actor.id, { kind, seconds: 0 });
+        },
+        dispose: lifetime.dispose,
+      };
+    } catch (error) {
+      try {
+        lifetime.dispose();
+      } catch (cleanupError) {
+        console.error("Building view cleanup failed.", cleanupError);
+      }
+      throw error;
+    }
   };
   // Restoration can reuse an ID at another placement or change its terrain.
   const roots = createViewRegistry({
@@ -452,6 +474,14 @@ export function createTilePlacedActorViewRegistry(
       if (previous.placement !== next.placement) playing.delete(id);
     },
     create,
+  });
+
+  lifetime.own(roots);
+  lifetime.defer(() => selection?.dispose());
+  lifetime.defer(() => {
+    map.onChangedObservable.remove(terrainObserver);
+    terrainRevisions.clear();
+    playing.clear();
   });
 
   const update = (
@@ -491,15 +521,6 @@ export function createTilePlacedActorViewRegistry(
       selectedActorId = actorId;
       refreshSelection();
     },
-    dispose: () => {
-      map.onChangedObservable.remove(terrainObserver);
-      terrainRevisions.clear();
-      selection?.dispose();
-      roots.dispose();
-      for (const material of materials.values()) {
-        material.dispose();
-      }
-      materials.clear();
-    },
+    dispose: lifetime.dispose,
   };
 }

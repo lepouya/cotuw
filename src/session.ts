@@ -967,14 +967,14 @@ async function assembleGameSession(
     ) {
       knownSelectionTick = simulation.completedTicks;
       input.retainSelection((id) => !!player.shownActor(id));
-    }
-    if (simulation.actorVersion !== knownActorVersion) {
-      knownActorVersion = simulation.actorVersion;
-      controlsDirty = true;
       const { placed } = player.actors();
       tilePlacedViews.update(placed, disconnected());
       canvas.dataset.tilePlacedActorCount = String(placed.length);
       minimap.refreshActors();
+    }
+    if (simulation.actorVersion !== knownActorVersion) {
+      knownActorVersion = simulation.actorVersion;
+      controlsDirty = true;
     }
     if (placement.active) placement.update();
     fogOverlay.update(simulation.fog);
@@ -982,8 +982,6 @@ async function assembleGameSession(
       canvas.dataset.exploredTiles = String(simulation.fog.exploredCount);
     if (simulation.economy) {
       materialsView?.update(simulation.economy, explored);
-      if (simulation.completedTicks !== knownControlsTick)
-        tilePlacedViews.update(player.actors().placed, disconnected());
     }
     if (
       controlsDirty ||

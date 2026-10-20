@@ -115,6 +115,64 @@ describe("actor view registry", () => {
     engine.dispose();
   });
 
+  test("a failed instance cleanup still releases nodes and shared materials", () => {
+    const fault = new Error("instance cleanup failed");
+    const { engine, scene, views } = setup((scene) => ({
+      bounds: { radius: 0.5, height: 1 },
+      instantiate: (name) => ({
+        root: new TransformNode(name, scene),
+        dispose: () => {
+          throw fault;
+        },
+      }),
+      dispose: () => {},
+    }));
+    try {
+      views.update(
+        [actor("a"), { ...actor("fallback"), definitionId: "odd" }],
+        1,
+      );
+      views.setSelectedActors(["a"]);
+      const ownedMaterials = scene.materials.filter((material) =>
+        [
+          "actor-selection-material",
+          "actor-hostile-selection-material",
+          "actor-fallback-material",
+        ].includes(material.name),
+      );
+      expect(ownedMaterials).toHaveLength(3);
+      expect(() => views.dispose()).toThrow(fault);
+      expect(scene.getTransformNodeByName("actor-a-root")).toBeNull();
+      expect(scene.getTransformNodeByName("actor-a")).toBeNull();
+      expect(scene.getMeshByName("actor-a-pick")).toBeNull();
+      expect(scene.getMeshByName("actor-fallback")).toBeNull();
+      expect(
+        ownedMaterials.every((material) => !scene.materials.includes(material)),
+      ).toBe(true);
+      expect(() => views.dispose()).not.toThrow();
+    } finally {
+      engine.dispose();
+    }
+  });
+
+  test("a failed appearance factory releases the partial actor root", () => {
+    const fault = new Error("appearance setup failed");
+    const { engine, scene, views } = setup(() => ({
+      bounds: { radius: 0.5, height: 1 },
+      instantiate: () => {
+        throw fault;
+      },
+      dispose: () => {},
+    }));
+    try {
+      expect(() => views.update([actor("a")], 1)).toThrow(fault);
+      expect(scene.getTransformNodeByName("actor-a-root")).toBeNull();
+    } finally {
+      views.dispose();
+      engine.dispose();
+    }
+  });
+
   test("rebuilds a view when its ID returns as another kind of actor", () => {
     const { engine, scene, template, views } = setup();
 

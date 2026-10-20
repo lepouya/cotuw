@@ -1,5 +1,120 @@
 import { expect, test } from "@playwright/test";
 
+test("building visibility follows fog in a mission without an economy", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const sessionPath: string = "/src/session.ts";
+    const missionsPath: string = "/e2e/missions.ts";
+    const harnessPath: string = "/e2e/harness.ts";
+    const missionPath: string = "/src/simulation/mission.ts";
+    const placementPath: string = "/src/simulation/placement.ts";
+    const terrainPath: string = "/src/simulation/terrain.ts";
+    const { createGameSession } = (await import(
+      sessionPath
+    )) as typeof import("../src/session");
+    const { level } = (await import(
+      missionsPath
+    )) as typeof import("./missions");
+    const { frames } = (await import(
+      harnessPath
+    )) as typeof import("./harness");
+    const { createMissionState } = (await import(
+      missionPath
+    )) as typeof import("../src/simulation/mission");
+    const { createTilePlacedActor } = (await import(
+      placementPath
+    )) as typeof import("../src/simulation/placement");
+    const { TerrainGrid } = (await import(
+      terrainPath
+    )) as typeof import("../src/simulation/terrain");
+    const mission = level("sandbox");
+    const definitions = mission.definitions;
+    const building = definitions.find(
+      ({ production, refinery }) => production && !refinery,
+    )!;
+    const hostile = { ...building, faction: "hostile" };
+    const scout = definitions.find(({ id }) => id === "arc-scout")!;
+    const map = new TerrainGrid({
+      width: 36,
+      height: 20,
+      tileSize: 1,
+      terrainTypeIds: ["plain", "path", "rough", "water"],
+    });
+    const state = {
+      ...createMissionState([
+        {
+          id: "scout",
+          definitionId: scout.id,
+          worldPosition: map.tileCenter(12, 10),
+          facing: 0,
+          occupancyLayer: "surface" as const,
+        },
+        createTilePlacedActor(map, hostile, {
+          actorId: "hostile-building",
+          origin: { x: 18, z: 10 },
+        }),
+      ]),
+      terrain: map.terrainState(),
+      playerFaction: "arc",
+      fog: { explored: "0".repeat(map.width * map.height) },
+    };
+    const canvas = document.createElement("canvas");
+    const minimap = document.createElement("canvas");
+    Object.assign(canvas.style, { width: "640px", height: "480px" });
+    document.body.append(canvas, minimap);
+    const view = await createGameSession(canvas, minimap, {
+      mission: {
+        ...mission,
+        scenario: { ...mission.scenario, tileSize: 1 },
+        state,
+        definitions: definitions.map((definition) =>
+          definition.id === hostile.id ? hostile : definition,
+        ),
+      },
+      startPaused: true,
+    });
+    try {
+      while (canvas.dataset.modelsReady !== "true") await frames(1);
+      view.engine.stopRenderLoop();
+      view.scene.render();
+      const drawn = () =>
+        !!view.scene.getTransformNodeByName(
+          "tile-placed-actor-hostile-building-root",
+        );
+      const initial = drawn();
+      const visit = (x: number) => {
+        view.simulation.submitCommand({
+          kind: "move",
+          actorId: "scout",
+          target: map.tileCenter(x, 10),
+        });
+        for (let tick = 0; tick < 180; tick++) view.simulation.tick();
+        view.scene.render();
+        return drawn();
+      };
+      const hidden = visit(1);
+      const detected = view.simulation.detects(
+        "arc",
+        view.simulation.actorById("hostile-building")!,
+      );
+      const returned = visit(12);
+      return { initial, hidden, detected, returned };
+    } finally {
+      await view.disposeAsync();
+      canvas.remove();
+      minimap.remove();
+    }
+  });
+  expect(result).toEqual({
+    initial: true,
+    hidden: false,
+    detected: false,
+    returned: true,
+  });
+});
+
 test("a restored mission renders its own map and saved terrain", async ({
   page,
 }) => {

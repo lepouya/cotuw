@@ -21,6 +21,122 @@ const definition: ActorDefinition = {
   placement: { terrainTypeIds: ["plain"], maxSlope: 1 },
 };
 
+test("failed building cleanup releases the remaining views and materials once", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
+  const fault = new Error("building cleanup failed");
+  let released = 0;
+  const views = createTilePlacedActorViewRegistry(
+    scene,
+    map,
+    [definition],
+    new Map([
+      [
+        definition.id,
+        {
+          height: 1,
+          color: [0.2, 0.4, 0.6],
+          createDetails: () => ({
+            update: () => {},
+            dispose: () => {
+              released++;
+              throw fault;
+            },
+          }),
+        },
+      ],
+    ]),
+  );
+  try {
+    views.update(
+      [1, 4].map((x) =>
+        createTilePlacedActor(map, definition, {
+          actorId: `building-${x}`,
+          origin: { x, z: 2 },
+        }),
+      ),
+    );
+    views.setSelectedActor("building-1");
+    const roots = scene.transformNodes.filter(({ name }) =>
+      name.startsWith("tile-placed-actor-"),
+    );
+    const materials = scene.materials.filter(({ name }) =>
+      name.startsWith("tile-placed-actor-"),
+    );
+    expect(materials.length).toBeGreaterThan(0);
+    expect(() => views.dispose()).toThrow(fault);
+    expect(released).toBe(2);
+    expect(roots.every((root) => root.isDisposed())).toBe(true);
+    expect(
+      materials.every((material) => !scene.materials.includes(material)),
+    ).toBe(true);
+    expect(scene.getMeshByName("building-selection-outline")).toBeNull();
+    expect(() => views.dispose()).not.toThrow();
+    expect(released).toBe(2);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("a failed detail setup releases partial geometry and owns its materials", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
+  const fault = new Error("material setup failed");
+  const views = createTilePlacedActorViewRegistry(
+    scene,
+    map,
+    [definition],
+    new Map([
+      [
+        definition.id,
+        {
+          height: 1,
+          color: [0.2, 0.4, 0.6],
+          createDetails: (_root, _placement, shared) => {
+            shared("broken", () => {
+              throw fault;
+            });
+            throw new Error("unreachable");
+          },
+        },
+      ],
+    ]),
+  );
+  try {
+    const update = () =>
+      views.update([
+        createTilePlacedActor(map, definition, {
+          actorId: "building",
+          origin: { x: 2, z: 2 },
+        }),
+      ]);
+    expect(update).toThrow(fault);
+    expect(update).toThrow(fault);
+    expect(
+      scene.materials.filter(({ name }) => name.endsWith("-broken")),
+    ).toEqual([]);
+    expect(
+      scene.getTransformNodeByName("tile-placed-actor-building-root"),
+    ).toBeNull();
+    expect(
+      scene.meshes.filter(({ name }) =>
+        name.startsWith("tile-placed-actor-building-"),
+      ),
+    ).toEqual([]);
+    views.dispose();
+    expect(
+      scene.materials.filter(({ name }) =>
+        name.startsWith("tile-placed-actor-"),
+      ),
+    ).toEqual([]);
+  } finally {
+    views.dispose();
+    engine.dispose();
+  }
+});
+
 test("draws irregular rotated footprints on slopes at small tile sizes", () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);

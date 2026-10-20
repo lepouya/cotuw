@@ -13,6 +13,28 @@ import {
 } from "./prototype-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
+test("title controls work before the mission renderer loads", async ({
+  page,
+}) => {
+  let rendererRequests = 0;
+  await page.route("**/src/session.ts", (route) => {
+    rendererRequests++;
+    return route.abort();
+  });
+  await page.goto("/");
+  await expect(page.locator("#new-mission")).toBeFocused();
+  await page.locator("#open-options").click();
+  await expect(page.locator("#game-menu-title")).toHaveText("Options");
+  await page.locator("#cancel-options").click();
+  expect(rendererRequests).toBe(0);
+  await page.locator("#new-mission").click();
+  await expect(page.locator("#game-menu-status")).toContainText(
+    "The mission could not start.",
+  );
+  await expect(page.locator("#new-mission")).toBeEnabled();
+  expect(rendererRequests).toBe(1);
+});
+
 forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
   test(
     "options, load, exit, and new mission work before a session exists",

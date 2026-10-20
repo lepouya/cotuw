@@ -5,7 +5,6 @@ import { bindAudioControls } from "./ui/audio-controls";
 import { LEVEL_SOURCES } from "./content/levels";
 import { createPlatform } from "./platform";
 import { isTextEntry, worldInputAvailable } from "./render/input-focus";
-import { createGameSession } from "./session";
 import { loadMission } from "./mission-loading";
 import { createSaveLibrary } from "./saves";
 import { createSidebar } from "./ui/sidebar";
@@ -285,6 +284,7 @@ async function start(next: LoadedMission, loaded = false) {
     delete canvas.dataset.missionResult;
     delete canvas.dataset.terrainReady;
     delete canvas.dataset.simulationFault;
+    const { createGameSession } = await import("./session");
     mission = next;
     completed = new Set(
       evaluateObjectives(next.scenario.objectives ?? [], next.state.objectives)
