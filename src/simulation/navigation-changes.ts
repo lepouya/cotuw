@@ -1,3 +1,5 @@
+import { isCount } from "./validation";
+
 import type { TerrainBounds } from "./grid";
 import type { OccupancyLayer } from "./occupancy";
 
@@ -45,7 +47,7 @@ export class NavigationChangeLog {
 
   /** Continues from `version` with no history, as after loading a save. */
   restart(version: number): void {
-    if (!Number.isSafeInteger(version) || version < 0) {
+    if (!isCount(version)) {
       throw new RangeError("Invalid navigation version.");
     }
     this.currentVersion = version;

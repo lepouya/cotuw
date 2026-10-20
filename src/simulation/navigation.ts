@@ -1,6 +1,6 @@
 import { clampToBounds, isFinitePosition } from "./world";
 import { deepFreeze, insideRouteBounds } from "./actor";
-import { hasOwn } from "./validation";
+import { hasOwn, isPositive } from "./validation";
 
 import type { DeepReadonly, RouteBounds } from "./actor";
 
@@ -65,7 +65,7 @@ export function validateMovementProfile(profile: MovementProfile): void {
     !Number.isFinite(profile.slopeCostAtLimit) ||
     profile.slopeCostAtLimit < 1 ||
     !costs.some((cost) => cost !== null) ||
-    costs.some((cost) => cost !== null && !(Number.isFinite(cost) && cost > 0))
+    costs.some((cost) => cost !== null && !isPositive(cost))
   ) {
     throw new RangeError(`Invalid movement profile: ${profile.id}.`);
   }
@@ -142,7 +142,7 @@ export class NavigationGrid {
       bounds !== undefined &&
       (!bounds ||
         !isFinitePosition(bounds.center) ||
-        !(Number.isFinite(bounds.radius) && bounds.radius > 0))
+        !isPositive(bounds.radius))
     )
       throw new RangeError("Invalid navigation route bounds.");
     this.bounds = bounds && deepFreeze(structuredClone(bounds));

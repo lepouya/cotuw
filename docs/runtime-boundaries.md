@@ -10,6 +10,10 @@ These contracts describe where new behaviors, views, and services attach.
   a tick. A violation faults the mission without publishing staged changes.
 - Behaviors preserve actor identity, tile placement, and occupancy layer.
   Layer transitions require explicit mission commands.
+- Each single-actor command kind has one mission handler; group moves expand
+  into per-member moves. Non-object submissions throw before queuing. Objects
+  without the structure saves require are rejected at their tick, left out of
+  snapshots, and do not reserve creation IDs.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates
   the current batch even if its hook immediately resumes.

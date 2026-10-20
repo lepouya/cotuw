@@ -13,8 +13,6 @@ import { clampToBounds, isFinitePosition, withinBounds } from "./world";
 import { clearCombatOrders, deepFreeze } from "./actor";
 import {
   ACTOR_ORDER_KINDS,
-  ACTOR_REMOVAL_KINDS,
-  ECONOMY_COMMAND_KINDS,
   isCommandOf,
   isMissionCommand,
   isQueuedOrder,
@@ -69,7 +67,7 @@ import {
   visionSources,
 } from "./vision";
 import {
-  applyEconomyCommand,
+  applyEconomyCommand as applyEconomy,
   createHarvesterState,
   materialsCost,
   PRODUCTION_QUEUE_LIMIT,
@@ -124,7 +122,14 @@ import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import { playerRelation } from "./faction";
 import type { Detectable } from "./faction";
-import { isId, isIdList } from "./validation";
+import {
+  isCount,
+  isId,
+  isIdList,
+  isNonnegative,
+  isPositive,
+  isRecord,
+} from "./validation";
 import type { FogState, FogView, Vision } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
@@ -267,7 +272,7 @@ export type MissionSimulation = {
   evaluateRallyPoint: (actorId: string, target: WorldPosition) => boolean;
   /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
   unusedActorId: (prefix: string) => string;
-  /** Queues a command for the next tick and returns that tick's number. */
+  /** Queues a command for the next tick; non-object submissions throw. */
   submitCommand: (command: MissionCommand) => number;
   /** Adds a copy of the actor, validated like the initial state. */
   spawnActor: (actor: Actor) => void;
@@ -295,7 +300,7 @@ export function createMissionSimulation({
   occupancy,
   objectives: authoredObjectives = [],
 }: MissionSimulationOptions): MissionSimulation {
-  if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) {
+  if (!isPositive(tickSeconds)) {
     throw new RangeError(
       "Simulation tick seconds must be a positive finite number.",
     );
@@ -310,7 +315,7 @@ export function createMissionSimulation({
   if (occupancy && (!map || !occupancy.isForTerrain(map))) {
     throw new RangeError("Mission occupancy must belong to its terrain map.");
   }
-  if (!Number.isSafeInteger(initialState.tick) || initialState.tick < 0) {
+  if (!isCount(initialState.tick)) {
     throw new RangeError("Mission state tick must be a non-negative integer.");
   }
   // Hand-edited saves reach here, so name the list rather than crash in it.
@@ -329,8 +334,7 @@ export function createMissionSimulation({
     state.commands.some(
       (scheduled) =>
         !scheduled ||
-        !Number.isSafeInteger(scheduled.tick) ||
-        scheduled.tick < 0 ||
+        !isCount(scheduled.tick) ||
         !isMissionCommand(scheduled.command),
     )
   )
@@ -359,10 +363,7 @@ export function createMissionSimulation({
   delete state.fog;
   if (savedFog !== undefined && (!map || !isValidFogState(savedFog, map)))
     throw new RangeError("Mission state has invalid fog.");
-  if (
-    state.playerFaction !== undefined &&
-    (typeof state.playerFaction !== "string" || !state.playerFaction)
-  )
+  if (state.playerFaction !== undefined && !isId(state.playerFaction))
     throw new RangeError("Mission state has an invalid player faction.");
   const worldBounds = { ...bounds };
   const behaviorsById = new Map(behaviorRegistry);
@@ -425,11 +426,7 @@ export function createMissionSimulation({
   const behaviorFor = (actor: Actor): ActorBehavior =>
     behaviorsById.get(definitionFor(actor).behaviorId)!;
   const ensureValidActor = (actor: Actor) => {
-    if (
-      typeof actor.id !== "string" ||
-      actor.id.length === 0 ||
-      !definitionsById.has(actor.definitionId)
-    ) {
+    if (!isId(actor.id) || !definitionsById.has(actor.definitionId)) {
       throw new RangeError("Actor has an invalid identity.");
     }
     const definition = definitionFor(actor);
@@ -480,8 +477,7 @@ export function createMissionSimulation({
         !state.economy ||
         !isTilePlacedActor(actor) ||
         construction.paidMaterials !== materialsCost(definition) ||
-        !Number.isSafeInteger(construction.completedTicks) ||
-        construction.completedTicks < 0 ||
+        !isCount(construction.completedTicks) ||
         construction.totalTicks !==
           secondsToTicks(definition.constructionSeconds, tickSeconds) ||
         construction.completedTicks >= construction.totalTicks)
@@ -598,8 +594,7 @@ export function createMissionSimulation({
     if (
       !map ||
       !occupancy ||
-      typeof actorId !== "string" ||
-      actorId.length === 0 ||
+      !isId(actorId) ||
       !isValidTilePlacement({ origin, quarterTurns })
     ) {
       return reject("invalid-actor");
@@ -990,20 +985,15 @@ export function createMissionSimulation({
     switch (command.kind) {
       case "move":
       case "attack-move":
-        if (!isFinitePosition(command.target)) return undefined;
         return {
           kind: command.kind,
           target: clampToBounds(command.target, worldBounds),
           ...(requestedTarget && { requestedTarget: { ...requestedTarget } }),
         };
       case "attack":
-        return isId(command.targetId)
-          ? { kind: "attack", targetId: command.targetId }
-          : undefined;
+        return { kind: "attack", targetId: command.targetId };
       case "gather":
-        return isId(command.siteId)
-          ? { kind: "gather", siteId: command.siteId }
-          : undefined;
+        return { kind: "gather", siteId: command.siteId };
       default:
         return undefined;
     }
@@ -1094,20 +1084,6 @@ export function createMissionSimulation({
     tick: number,
     working: WorkingActors,
   ): CommandOutcome[] => {
-    if (
-      !isFinitePosition(command.target) ||
-      !Array.isArray(command.actorIds) ||
-      command.actorIds.length === 0 ||
-      !command.actorIds.every((id) => typeof id === "string" && id.length > 0)
-    ) {
-      return [
-        {
-          tick,
-          command: structuredClone(command),
-          accepted: false,
-        } as CommandOutcome,
-      ];
-    }
     const target = clampToBounds(command.target, worldBounds);
     const ids = [...new Set(command.actorIds)].sort();
     const movers = ids.flatMap((id) => {
@@ -1149,24 +1125,112 @@ export function createMissionSimulation({
         : ({ tick, command: move, accepted: false } as CommandOutcome);
     });
   };
+  /** Group moves expand into one outcome per member. */
   const applyCommand = (
-    command: Exclude<MissionCommand, GroupMoveCommand | GroupAttackMoveCommand>,
+    command: MissionCommand,
     tick: number,
     working: WorkingActors,
-  ): CommandOutcome => {
+  ): CommandOutcome[] => {
+    // Submissions are untrusted; reject what a save could not hold.
+    if (!isMissionCommand(command)) {
+      const { kind } = command as { kind?: unknown };
+      return [
+        {
+          tick,
+          command: structuredClone(command),
+          accepted: false,
+          ...((kind === "place-actor" || kind === "train-unit") && {
+            reason: "invalid-actor",
+          }),
+        } as CommandOutcome,
+      ];
+    }
+    if (command.kind === "group-move" || command.kind === "group-attack-move")
+      return applyGroupMove(command, tick, working);
     if (!isCommandOf(command, ACTOR_ORDER_KINDS))
-      return executeCommand(command, tick, working);
-    return (
+      return [executeCommand(command, tick, working)];
+    return [
       sequence(command, queuedOrderOf(command), tick, working) ??
-      replaceQueue(executeCommand(command, tick, working), working)
-    );
+        replaceQueue(executeCommand(command, tick, working), working),
+    ];
   };
-  const executeCommand = (
-    command: Exclude<MissionCommand, GroupMoveCommand | GroupAttackMoveCommand>,
+  const applyEconomyCommand = (
+    command: EconomyCommand,
     tick: number,
     working: WorkingActors,
-  ): CommandOutcome => {
-    if (command.kind === "set-rally-point") {
+  ) => {
+    const applied = structuredClone(command);
+    if (!working.economy)
+      return {
+        tick,
+        command: applied,
+        accepted: false,
+      } as CommandOutcome<EconomyCommand>;
+    const site =
+      applied.kind === "gather" &&
+      working.economy.sites.find((site) => site.id === applied.siteId);
+    // Undiscovered sites are unknown to the player.
+    const reason =
+      site && fog && !fog.isExplored(site.tile.x, site.tile.z)
+        ? "missing-site"
+        : applyEconomy(
+            applied,
+            working.economy,
+            working.actors,
+            definitionsById,
+            (id) => working.retiredIds.push(id),
+          );
+    return {
+      tick,
+      command: applied,
+      accepted: !reason,
+      ...(reason && { reason }),
+    } as CommandOutcome<EconomyCommand>;
+  };
+  const applyRemoval = (
+    command: ActorRemovalCommand,
+    tick: number,
+    working: WorkingActors,
+  ) => {
+    const applied = structuredClone(command);
+    const outcome = (accepted: boolean) =>
+      ({ tick, command: applied, accepted }) as CommandOutcome;
+    const actor = working.actorsById.get(applied.actorId);
+    const economy = working.economy;
+    if (!actor) return outcome(false);
+    if (
+      command.kind === "sell-actor" &&
+      (!economy || !isTilePlacedActor(actor) || actor.construction)
+    )
+      return outcome(false);
+    if (
+      command.kind === "cancel-construction" &&
+      (!economy || !actor.construction)
+    )
+      return outcome(false);
+    if (economy && command.kind === "cancel-construction")
+      economy.materials += actor.construction!.paidMaterials;
+    if (economy && command.kind === "sell-actor")
+      economy.materials += saleMaterialsRefund(actor, definitionFor(actor));
+    retire(working, actor);
+    return outcome(true);
+  };
+  const applyMoveCommand = (
+    command: MoveCommand | AttackMoveCommand,
+    tick: number,
+    working: WorkingActors,
+  ) => {
+    // Rebuilt so a submitted move cannot carry mission-only fields.
+    const applied: MoveCommand | AttackMoveCommand = {
+      kind: command.kind,
+      actorId: command.actorId,
+      target: clampToBounds(command.target, worldBounds),
+    };
+    return applyMove(applied, tick, working);
+  };
+  /** One handler per single-actor command kind; adding a kind requires one. */
+  const handlers: CommandHandlers = {
+    "set-rally-point": (command, tick, working) => {
       const applied = structuredClone(command);
       const actor = working.actorsById.get(applied.actorId);
       const accepted =
@@ -1178,16 +1242,14 @@ export function createMissionSimulation({
         else delete actor!.rallyPoint;
       }
       return { tick, command: applied, accepted };
-    }
-    if (command.kind === "terrain") {
+    },
+    terrain: (command, tick) => {
       const edit = structuredClone(command);
-      if (!map || !map.isValidTerrainEdit(edit)) {
-        return { tick, command: edit, accepted: false };
-      }
-      map.editTerrain(edit);
-      return { tick, command: edit, accepted: true };
-    }
-    if (command.kind === "place-actor") {
+      const accepted = !!map && map.isValidTerrainEdit(edit);
+      if (accepted) map.editTerrain(edit);
+      return { tick, command: edit, accepted };
+    },
+    "place-actor": (command, tick, working) => {
       const applied = structuredClone(command);
       const evaluation = evaluatePlacement(
         applied,
@@ -1196,14 +1258,13 @@ export function createMissionSimulation({
         working.economy,
         debrisTiles,
       );
-      if (!evaluation.accepted) {
+      if (!evaluation.accepted)
         return {
           tick,
           command: applied,
           accepted: false,
           reason: evaluation.reason,
         };
-      }
       occupancy!.place(evaluation.footprint);
       if (working.economy) {
         const definition = definitionFor(evaluation.actor);
@@ -1220,8 +1281,8 @@ export function createMissionSimulation({
       }
       stageActor(working, evaluation.actor);
       return { tick, command: applied, accepted: true };
-    }
-    if (command.kind === "train-unit") {
+    },
+    "train-unit": (command, tick, working) => {
       const applied = structuredClone(command);
       const evaluation = evaluateTraining(
         applied,
@@ -1229,14 +1290,13 @@ export function createMissionSimulation({
         working.usedIds,
         working.economy,
       );
-      if (!evaluation.accepted) {
+      if (!evaluation.accepted)
         return {
           tick,
           command: applied,
           accepted: false,
           reason: evaluation.reason,
         };
-      }
       if (working.economy) {
         const definition = definitionsById.get(applied.definitionId)!;
         const cost = materialsCost(definition);
@@ -1255,70 +1315,15 @@ export function createMissionSimulation({
         stageProducedActor(working, evaluation.actor, applied.producerId);
       }
       return { tick, command: applied, accepted: true };
-    }
-    if (isCommandOf(command, ECONOMY_COMMAND_KINDS)) {
-      const applied = structuredClone(command);
-      if (!working.economy)
-        return {
-          tick,
-          command: applied,
-          accepted: false,
-        } as CommandOutcome<EconomyCommand>;
-      const site =
-        applied.kind === "gather" &&
-        working.economy.sites.find((site) => site.id === applied.siteId);
-      // Undiscovered sites are unknown to the player.
-      const reason =
-        site && fog && !fog.isExplored(site.tile.x, site.tile.z)
-          ? "missing-site"
-          : applyEconomyCommand(
-              applied,
-              working.economy,
-              working.actors,
-              definitionsById,
-              (id) => working.retiredIds.push(id),
-            );
-      return {
-        tick,
-        command: applied,
-        accepted: !reason,
-        ...(reason && { reason }),
-      } as CommandOutcome<EconomyCommand>;
-    }
-    if (isCommandOf(command, ACTOR_REMOVAL_KINDS)) {
-      const applied = structuredClone(command);
-      const outcome = (accepted: boolean) =>
-        ({
-          tick,
-          command: applied,
-          accepted,
-        }) as CommandOutcome<ActorRemovalCommand>;
-      const actor = working.actorsById.get(applied.actorId);
-      if (!actor) {
-        return outcome(false);
-      }
-      if (
-        command.kind === "sell-actor" &&
-        (!working.economy || !isTilePlacedActor(actor) || actor.construction)
-      )
-        return outcome(false);
-      if (
-        command.kind === "cancel-construction" &&
-        (!working.economy || !actor.construction)
-      )
-        return outcome(false);
-      if (working.economy) {
-        if (command.kind === "cancel-construction")
-          working.economy.materials += actor.construction!.paidMaterials;
-        if (command.kind === "sell-actor") {
-          const definition = definitionFor(actor);
-          working.economy.materials += saleMaterialsRefund(actor, definition);
-        }
-      }
-      retire(working, actor);
-      return outcome(true);
-    }
-    if (command.kind === "attack") {
+    },
+    gather: applyEconomyCommand,
+    "assign-refinery": applyEconomyCommand,
+    "return-cargo": applyEconomyCommand,
+    "cancel-production": applyEconomyCommand,
+    "remove-actor": applyRemoval,
+    "sell-actor": applyRemoval,
+    "cancel-construction": applyRemoval,
+    attack: (command, tick, working) => {
       const applied = structuredClone(command);
       const actor = working.actorsById.get(applied.actorId);
       const target = working.actorsById.get(applied.targetId);
@@ -1336,25 +1341,24 @@ export function createMissionSimulation({
         accepted: !reason,
         ...(reason && { reason }),
       };
-    }
-    if (command.kind === "move" || command.kind === "attack-move") {
-      if (!isFinitePosition(command.target))
-        return {
-          tick,
-          command: structuredClone(command),
-          accepted: false,
-        } as CommandOutcome;
-      // Rebuilt so a submitted move cannot carry mission-only fields.
-      const applied: MoveCommand | AttackMoveCommand = {
-        kind: command.kind,
-        actorId: command.actorId,
-        target: clampToBounds(command.target, worldBounds),
-      };
-      return applyMove(applied, tick, working);
-    }
-    const applied = structuredClone(command);
-    return { tick, command: applied, accepted: handle(working, applied) };
+    },
+    move: applyMoveCommand,
+    "attack-move": applyMoveCommand,
+    stop: (command, tick, working) => {
+      const applied = structuredClone(command);
+      return { tick, command: applied, accepted: handle(working, applied) };
+    },
   };
+  const executeCommand = (
+    command: SingleCommand,
+    tick: number,
+    working: WorkingActors,
+  ): CommandOutcome =>
+    (handlers[command.kind] as CommandHandler<SingleCommand>)(
+      command,
+      tick,
+      working,
+    );
 
   return {
     get actors() {
@@ -1429,12 +1433,18 @@ export function createMissionSimulation({
     },
     submitCommand: (command) => {
       ensureMutable();
+      const submitted = structuredClone(command);
+      if (!isRecord(submitted))
+        throw new RangeError("Mission command must be an object.");
       state.commands.push({
         tick: state.tick,
-        command: structuredClone(command),
+        command: submitted,
       });
-      if (command.kind === "place-actor" || command.kind === "train-unit")
-        queuedActorIds.add(command.actorId);
+      if (
+        isMissionCommand(submitted) &&
+        (submitted.kind === "place-actor" || submitted.kind === "train-unit")
+      )
+        queuedActorIds.add(submitted.actorId);
       return state.tick;
     },
     spawnActor: (actor) => {
@@ -1501,6 +1511,10 @@ export function createMissionSimulation({
     },
     snapshot: () => {
       const snapshot = structuredClone(state);
+      // Malformed commands only produce rejections, which loading refuses.
+      snapshot.commands = snapshot.commands.filter(({ command }) =>
+        isMissionCommand(command),
+      );
       if (map) {
         snapshot.terrain = map.terrainState();
       }
@@ -1530,9 +1544,7 @@ export function createMissionSimulation({
       try {
         const working = stageWorking();
         const outcomes = due.flatMap(({ command }) =>
-          command.kind === "group-move" || command.kind === "group-attack-move"
-            ? applyGroupMove(command, state.tick, working)
-            : [applyCommand(command, state.tick, working)],
+          applyCommand(command, state.tick, working),
         );
         for (const actor of working.actors)
           startQueuedOrders(actor, state.tick, working);
@@ -1755,6 +1767,24 @@ type ActorOrderCommand = Extract<
   { kind: (typeof ACTOR_ORDER_KINDS)[number] }
 >;
 
+/** A command for one actor or the mission as a whole, rather than a group. */
+type SingleCommand = Exclude<
+  MissionCommand,
+  GroupMoveCommand | GroupAttackMoveCommand
+>;
+
+type CommandHandler<C extends SingleCommand> = (
+  command: C,
+  tick: number,
+  working: WorkingActors,
+) => CommandOutcome;
+
+type CommandHandlers = {
+  [K in SingleCommand["kind"]]: CommandHandler<
+    Extract<SingleCommand, { kind: K }>
+  >;
+};
+
 function indexDefinitions(
   definitions: readonly ActorDefinition[],
   behaviorRegistry: ReadonlyMap<string, ActorBehavior>,
@@ -1772,19 +1802,14 @@ function indexDefinitions(
           `${definition.behaviorId}.`,
       );
     }
-    if (
-      definition.movement &&
-      (!Number.isFinite(definition.movement.speed) ||
-        definition.movement.speed < 0)
-    ) {
+    if (definition.movement && !isNonnegative(definition.movement.speed)) {
       throw new RangeError(
         `Actor definition ${definition.id} has an invalid movement speed.`,
       );
     }
     if (
       definition.movement?.radius !== undefined &&
-      (!Number.isFinite(definition.movement.radius) ||
-        definition.movement.radius <= 0)
+      !isPositive(definition.movement.radius)
     ) {
       throw new RangeError(
         `Actor definition ${definition.id} has an invalid movement radius.`,

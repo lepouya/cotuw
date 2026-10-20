@@ -1,3 +1,5 @@
+import { isCount, isId } from "./validation";
+
 /** How combat destruction of an objective's actors resolves it. */
 export type ObjectiveKind = "destroy" | "protect";
 
@@ -146,14 +148,11 @@ export function validateObjectives(
   for (const objective of objectives) {
     if (
       !objective ||
-      typeof objective.id !== "string" ||
-      !objective.id ||
+      !isId(objective.id) ||
       ids.has(objective.id) ||
       !Object.keys(RULES).includes(objective.kind) ||
-      typeof objective.label !== "string" ||
-      !objective.label ||
-      typeof objective.directive !== "string" ||
-      !objective.directive ||
+      !isId(objective.label) ||
+      !isId(objective.directive) ||
       !Array.isArray(objective.actorIds)
     )
       throw new RangeError("Mission has an invalid objective definition.");
@@ -162,10 +161,7 @@ export function validateObjectives(
       targets.size === 0 ||
       targets.size !== objective.actorIds.length ||
       [...targets].some(
-        (id) =>
-          typeof id !== "string" ||
-          !id ||
-          (!actorIds.has(id) && !retiredIds.has(id)),
+        (id) => !isId(id) || (!actorIds.has(id) && !retiredIds.has(id)),
       )
     )
       throw new RangeError("Mission has an invalid objective definition.");
@@ -189,9 +185,7 @@ export function validateObjectives(
           !targets.has(id) || !retiredIds.has(id) || actorIds.has(id),
       ) ||
       (state.resolvedTick !== undefined &&
-        (!Number.isSafeInteger(state.resolvedTick) ||
-          state.resolvedTick < 0 ||
-          state.resolvedTick >= tick)) ||
+        (!isCount(state.resolvedTick) || state.resolvedTick >= tick)) ||
       (state.resolvedTick !== undefined) !==
         (statusOf(objective, state) !== "active")
     )

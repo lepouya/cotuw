@@ -191,7 +191,11 @@ export function parseContentPack(source: string): ContentPack {
       );
   }
   for (const actor of pack.actors) {
-    const presentation = pack.presentation[actor.id] as ActorPresentation;
+    const presentation = (
+      hasOwn(pack.presentation, actor.id)
+        ? pack.presentation[actor.id]
+        : undefined
+    ) as ActorPresentation;
     if (
       !presentation ||
       !isId(presentation.name) ||

@@ -8,7 +8,7 @@ import type { EconomyReason } from "./economy";
 import type { AttackReason } from "./combat";
 import { isFinitePosition } from "./world";
 import { isTileCoord } from "./grid";
-import { isId } from "./validation";
+import { isId, isRecord } from "./validation";
 
 /**
  * Waits behind a busy actor's current order instead of replacing it and its
@@ -192,7 +192,7 @@ export function moveCommand<K extends "move" | "attack-move">(
 
 /** Checks saved command structure; gameplay legality is checked at its tick. */
 export function isMissionCommand(value: unknown): value is MissionCommand {
-  if (!value || typeof value !== "object") return false;
+  if (!isRecord(value)) return false;
   const command = value as Partial<MissionCommand>;
   if (
     "queued" in command &&
@@ -204,6 +204,7 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
       ]))
   )
     return false;
+  // Visit array holes too; JSON would serialize them as null.
   switch (command.kind) {
     case "move":
     case "attack-move":
@@ -213,7 +214,7 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
       return (
         Array.isArray(command.actorIds) &&
         command.actorIds.length > 0 &&
-        command.actorIds.every(isId) &&
+        Array.from(command.actorIds).every(isId) &&
         isFinitePosition(command.target)
       );
     case "attack":
@@ -252,13 +253,13 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
       return (
         (command.heights === undefined ||
           (Array.isArray(command.heights) &&
-            command.heights.every(
+            Array.from(command.heights).every(
               (change) =>
                 Number.isFinite(change?.height) && isTileCoord(change),
             ))) &&
         (command.tiles === undefined ||
           (Array.isArray(command.tiles) &&
-            command.tiles.every(
+            Array.from(command.tiles).every(
               (change) =>
                 isTerrainTileShape(change?.terrain) && isTileCoord(change),
             )))

@@ -7,7 +7,7 @@ import {
 import { findNavigationPath } from "./navigation";
 import { disconnectedBuildings } from "./support";
 import { secondsToTicks } from "./clock";
-import { isCount } from "./validation";
+import { isCount, isId, isNonnegative, isPositive } from "./validation";
 
 import type {
   Actor,
@@ -124,15 +124,12 @@ export function validateEconomyDefinitions(
       (definition.materialsCost !== undefined &&
         !isCount(definition.materialsCost)) ||
       (definition.trainingSeconds !== undefined &&
-        (!Number.isFinite(definition.trainingSeconds) ||
-          definition.trainingSeconds < 0))
+        !isNonnegative(definition.trainingSeconds))
     )
       throw new RangeError(`Invalid economy definition: ${definition.id}.`);
     if (
       definition.constructionSeconds !== undefined &&
-      (!definition.footprint ||
-        !Number.isFinite(definition.constructionSeconds) ||
-        definition.constructionSeconds < 0)
+      (!definition.footprint || !isNonnegative(definition.constructionSeconds))
     )
       throw new RangeError(
         `Invalid construction definition: ${definition.id}.`,
@@ -152,8 +149,7 @@ export function validateEconomyDefinitions(
       (!definition.movement ||
         !isCount(gathering.capacity) ||
         gathering.capacity === 0 ||
-        !Number.isFinite(gathering.loadSeconds) ||
-        gathering.loadSeconds <= 0 ||
+        !isPositive(gathering.loadSeconds) ||
         !isCount(gathering.patchRadius))
     )
       throw new RangeError(`Invalid harvesting definition: ${definition.id}.`);
@@ -198,8 +194,7 @@ export function validateEconomyState(
   for (const site of [...economy.sites, ...economy.loot]) {
     if (
       !site ||
-      typeof site.id !== "string" ||
-      !site.id ||
+      !isId(site.id) ||
       typeof site.name !== "string" ||
       !validTile(site.tile) ||
       ids.has(site.id) ||
@@ -281,8 +276,7 @@ export function validateEconomyState(
       !producer ||
       producer.construction !== undefined ||
       !unit ||
-      typeof job.actorId !== "string" ||
-      !job.actorId ||
+      !isId(job.actorId) ||
       jobIds.has(job.actorId) ||
       !definitions
         .get(producer.definitionId)

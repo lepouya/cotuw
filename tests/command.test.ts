@@ -1,6 +1,6 @@
 import { expect, expectTypeOf, test } from "vitest";
 
-import { isOutcomeOf } from "../src/simulation/command";
+import { isMissionCommand, isOutcomeOf } from "../src/simulation/command";
 
 import type {
   CommandOutcome,
@@ -9,6 +9,14 @@ import type {
   TrainUnitCommand,
 } from "../src/simulation/command";
 import type { TrainingReason } from "../src/simulation/production";
+
+test.each([
+  { kind: "group-move", actorIds: Array(1), target: { x: 0, z: 0 } },
+  { kind: "terrain", heights: Array(1) },
+  { kind: "terrain", tiles: Array(1) },
+])("commands with sparse arrays cannot be saved: %j", (command) => {
+  expect(isMissionCommand(command)).toBe(false);
+});
 
 test("outcomes pair each command with its own rejection reasons", () => {
   type Training = Extract<CommandOutcome, { command: TrainUnitCommand }>;

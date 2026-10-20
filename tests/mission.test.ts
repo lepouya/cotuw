@@ -349,6 +349,76 @@ describe("mission commands", () => {
     expect(simulation.actorById("post-1")).not.toHaveProperty("movement");
   });
 
+  test("rejects malformed commands without applying or saving them", () => {
+    const simulation = mission([actor()]);
+    simulation.submitCommand(move("trooper", 4, 0));
+    simulation.submitCommand({
+      kind: "dance",
+      actorId: "trooper",
+    } as unknown as MissionCommand);
+    simulation.submitCommand({
+      ...move("trooper", 0, 4),
+      queued: "yes",
+    } as unknown as MissionCommand);
+    const saved = simulation.snapshot();
+
+    const outcomes = simulation.tick();
+
+    expect(outcomes.map(({ accepted }) => accepted)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(simulation.actorById("trooper")).not.toHaveProperty("orders");
+    expect(saved.commands.map(({ command }) => command)).toEqual([
+      move("trooper", 4, 0),
+    ]);
+  });
+
+  test.each(
+    [null, undefined, false, 1, "stop", []].map((command) => ({ command })),
+  )(
+    "rejects a non-object submission $command without changing the queue",
+    ({ command }) => {
+      const simulation = mission([actor()]);
+      const before = simulation.snapshot();
+
+      expect(() =>
+        simulation.submitCommand(command as unknown as MissionCommand),
+      ).toThrow("command must be an object");
+      expect(simulation.snapshot()).toEqual(before);
+      simulation.submitCommand(move("trooper", 4, 0));
+      expect(simulation.tick()[0]!.accepted).toBe(true);
+    },
+  );
+
+  test.each(["place-actor", "train-unit"])(
+    "malformed %s requests do not reserve IDs omitted from saves",
+    (kind) => {
+      const simulation = mission([actor()]);
+      simulation.submitCommand({
+        kind,
+        actorId: "created-1",
+      } as MissionCommand);
+      const restored = createMissionSimulation({
+        state: simulation.snapshot(),
+        behaviorRegistry,
+        bounds,
+        definitions,
+        tickSeconds: 0.5,
+      });
+
+      expect(simulation.unusedActorId("created-")).toBe("created-1");
+      expect(restored.unusedActorId("created-")).toBe("created-1");
+      expect(simulation.tick()[0]).toMatchObject({
+        accepted: false,
+        reason: "invalid-actor",
+      });
+      restored.tick();
+      expect(simulation.snapshot()).toEqual(restored.snapshot());
+    },
+  );
+
   test("clamps move targets to the world bounds", () => {
     const simulation = mission([actor()], 10);
     simulation.submitCommand(move("trooper", 50, -50));

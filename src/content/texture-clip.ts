@@ -1,5 +1,10 @@
 // Texture clip data and timing, independent of rendering and simulation.
-import { isCount, isPositive, isRecord } from "../simulation/validation";
+import {
+  isCount,
+  isOneOf,
+  isPositive,
+  isRecord,
+} from "../simulation/validation";
 
 export const CLIP_PLAYBACK_MODES = ["loop", "ping-pong", "once"] as const;
 export type ClipPlayback = (typeof CLIP_PLAYBACK_MODES)[number];
@@ -23,7 +28,7 @@ export function validateTextureClip(id: string, clip: unknown): void {
     !isCount(clip.rows) ||
     clip.columns === 0 ||
     clip.rows === 0 ||
-    !CLIP_PLAYBACK_MODES.includes(clip.playback as ClipPlayback) ||
+    !isOneOf(CLIP_PLAYBACK_MODES, clip.playback) ||
     !Array.isArray(clip.frames) ||
     clip.frames.length === 0
   )

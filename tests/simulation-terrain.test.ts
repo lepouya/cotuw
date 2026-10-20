@@ -11,6 +11,7 @@ import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import type { ActorDefinition } from "../src/simulation/actor";
 import type { TerrainEdit, TerrainState } from "../src/simulation/terrain";
+import type { MissionCommand } from "../src/simulation/command";
 
 const ground = {
   id: "ground",
@@ -21,6 +22,54 @@ const ground = {
 const makeMap = () => new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
 
 describe("simulation terrain", () => {
+  test.each(["heights", "tiles"])(
+    "sparse %s edits leave the entire terrain unchanged",
+    (field) => {
+      const map = makeMap();
+      const changes = Array(2);
+      changes[0] =
+        field === "heights"
+          ? { x: 0, z: 0, height: 1 }
+          : { x: 0, z: 0, terrain: { typeId: "plain", outOfBounds: true } };
+      const edit: TerrainEdit = { [field]: changes };
+      const before = map.terrainState();
+
+      expect(() => map.editTerrain(edit)).toThrow();
+      expect(map.terrainState()).toEqual(before);
+      expect(map.isValidTerrainEdit(edit)).toBe(false);
+    },
+  );
+
+  test.each(["heights", "tiles"])(
+    "a sparse %s command is rejected without faulting the mission",
+    (field) => {
+      const map = makeMap();
+      const simulation = createMissionSimulation({
+        state: createMissionState([]),
+        definitions: [],
+        behaviorRegistry: new Map(),
+        map,
+        tickSeconds: 0.1,
+        bounds: map.worldBounds,
+      });
+      const before = map.terrainState();
+      simulation.submitCommand({
+        kind: "terrain",
+        [field]: Array(1),
+      } as MissionCommand);
+      expect(simulation.snapshot().commands).toEqual([]);
+      expect(simulation.tick()).toMatchObject([{ accepted: false }]);
+      expect(map.terrainState()).toEqual(before);
+      simulation.submitCommand({
+        kind: "terrain",
+        heights: [{ x: 0, z: 0, height: 1 }],
+      });
+      expect(simulation.tick()).toMatchObject([{ accepted: true }]);
+      expect(map.heightAt(0, 0)).toBe(1);
+      simulation.dispose();
+    },
+  );
+
   test.each([{ minX: -10 }, { maxX: 10 }, { minZ: -10 }, { maxZ: 10 }])(
     "rejects simulation bounds beyond the map: %j",
     (bounds) => {

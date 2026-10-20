@@ -2,6 +2,7 @@ import { withinBounds } from "./world";
 import type { WorldBounds } from "./world";
 import { createActor } from "./actor";
 import { tileKey } from "./grid";
+import { isId } from "./validation";
 import {
   adjacentTiles,
   isTilePlacedActor,
@@ -110,8 +111,7 @@ export function evaluateTraining(
     accepted: false,
     reason,
   });
-  if (typeof command.actorId !== "string" || command.actorId.length === 0)
-    return reject("invalid-actor");
+  if (!isId(command.actorId)) return reject("invalid-actor");
   if (usedIds.has(command.actorId)) return reject("used-id");
   const producer = actors.find(({ id }) => id === command.producerId);
   if (!producer || !isTilePlacedActor(producer))

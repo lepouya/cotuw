@@ -163,14 +163,16 @@ export type AttackOrder = RouteRetryState & {
 
 export type ReturnRoute = RouteRetryState & { point: WorldPosition };
 
-export type WolfMode =
-  | "idle-at-home"
-  | "alerted"
-  | "pursuing"
-  | "attacking"
-  | "investigating"
-  | "returning-home"
-  | "regenerating";
+export const WOLF_MODES = [
+  "idle-at-home",
+  "alerted",
+  "pursuing",
+  "attacking",
+  "investigating",
+  "returning-home",
+  "regenerating",
+] as const;
+export type WolfMode = (typeof WOLF_MODES)[number];
 
 export type TerritoryState = {
   home: WorldPosition;

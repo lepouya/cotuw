@@ -1,4 +1,5 @@
 import { containsGridPoint, isTileCoord, tileBounds, tileKey } from "./grid";
+import { isId, isOneOf } from "./validation";
 import type { TerrainBounds, TileCoord } from "./grid";
 import type { TerrainEdit, TerrainGrid } from "./terrain";
 
@@ -37,7 +38,7 @@ type PreparedPlacement = {
 };
 
 export function isOccupancyLayer(value: unknown): value is OccupancyLayer {
-  return OCCUPANCY_LAYERS.some((layer) => layer === value);
+  return isOneOf(OCCUPANCY_LAYERS, value);
 }
 
 export function isValidFootprint(value: unknown): value is Footprint {
@@ -163,8 +164,7 @@ export class OccupancyGrid {
     if (typeof placement !== "object" || placement === null) return undefined;
     const { ownerId, origin, footprint } = placement;
     if (
-      typeof ownerId !== "string" ||
-      ownerId.length === 0 ||
+      !isId(ownerId) ||
       !isTileCoord(origin) ||
       !isValidFootprint(footprint) ||
       this.placements.has(ownerId)

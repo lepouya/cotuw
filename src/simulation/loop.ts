@@ -126,7 +126,7 @@ export function startSimulationLoop(
       return speed;
     },
     setSpeed: (next) => {
-      if (!Number.isFinite(next) || next <= 0)
+      if (!isPositive(next))
         throw new RangeError("Simulation speed must be positive and finite.");
       if (next === speed) return;
       // Owed ticks are counted in ticks, so they carry over unchanged.

@@ -1,4 +1,4 @@
-import { isCount } from "./validation";
+import { isCount, isPositive } from "./validation";
 
 const BOUNDARY_TOLERANCE_TICKS = 1e-9;
 /** The game's fixed tick; mission files record it and load only at this rate. */
@@ -32,7 +32,7 @@ export function createFixedStepClock({
   startMilliseconds,
   maxCatchUpTicks,
 }: FixedStepClockOptions): FixedStepClock {
-  if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) {
+  if (!isPositive(tickSeconds)) {
     throw new RangeError(
       "Clock tick seconds must be a positive finite number.",
     );

@@ -2,6 +2,7 @@ import { deepFreeze } from "./actor";
 import type { ActorDefinition, ActorRenderState, DeepReadonly } from "./actor";
 import { compareIds } from "./actor";
 import { distance } from "./world";
+import { isPositive } from "./validation";
 import type { WorldPosition } from "./world";
 
 export type SupportNode = {
@@ -57,8 +58,7 @@ export function validateSupportDefinition(definition: ActorDefinition) {
   if (
     support &&
     (!definition.footprint ||
-      !Number.isFinite(support.radius) ||
-      support.radius <= 0 ||
+      !isPositive(support.radius) ||
       (support.root !== undefined && typeof support.root !== "boolean"))
   )
     throw new RangeError(`Invalid support definition: ${definition.id}.`);

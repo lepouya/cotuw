@@ -1,6 +1,7 @@
 import { occupiedTilesFor } from "./placement";
 import { disconnectedBuildings } from "./support";
 import { terrainSightlineClear } from "./terrain-sightline";
+import { isPositive } from "./validation";
 
 import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
 import type { SupportView } from "./support";
@@ -50,7 +51,7 @@ export type VisionSource = { origin: WorldPosition; radius: number };
 
 export function validateVisionDefinition(definition: ActorDefinition) {
   const vision = definition.vision;
-  if (vision && !(Number.isFinite(vision.radius) && vision.radius > 0))
+  if (vision && !isPositive(vision.radius))
     throw new RangeError(`Invalid vision definition: ${definition.id}.`);
 }
 

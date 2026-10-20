@@ -15,6 +15,7 @@ import {
 } from "./world";
 import { tileAreaBounds } from "./terrain";
 import { withinRouteBounds } from "./actor";
+import { isCount, isPositive } from "./validation";
 
 import type { TerrainBounds, TerrainView } from "./terrain";
 import type { OccupancyLayer, OccupancyView } from "./occupancy";
@@ -182,8 +183,7 @@ export function createTerrainMoveBehavior(
         (!bounds ||
           !bounds.center ||
           !onMap(bounds.center) ||
-          !(bounds.radius > 0) ||
-          !Number.isFinite(bounds.radius) ||
+          !isPositive(bounds.radius) ||
           !withinRouteBounds(bounds, [actor.worldPosition, ...waypoints]))
       ) {
         throw new RangeError(`Actor ${actor.id} has invalid route bounds.`);
@@ -542,8 +542,5 @@ function markBlocked(
 }
 
 function isOptionalCount(value: number | undefined, max: number): boolean {
-  return (
-    value === undefined ||
-    (Number.isSafeInteger(value) && value >= 0 && value <= max)
-  );
+  return value === undefined || (isCount(value) && value <= max);
 }

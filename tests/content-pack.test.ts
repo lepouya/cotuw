@@ -73,6 +73,17 @@ describe("content packs", () => {
     },
   );
 
+  test.each(["constructor", "toString"])(
+    "actor %s needs its own presentation, not an inherited one",
+    (id) => {
+      expect(
+        withEdit((pack) => {
+          pack.actors.push({ ...pack.actors[0], id });
+        }),
+      ).toThrow(`needs a name and description for ${id}`);
+    },
+  );
+
   test("built-in references must be strings without implicit coercion", () => {
     expect(
       withEdit((pack) => {

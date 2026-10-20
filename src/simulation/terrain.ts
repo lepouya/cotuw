@@ -1,5 +1,6 @@
 import { NavigationChangeLog } from "./navigation-changes";
 import { containsGridPoint, unionBounds } from "./grid";
+import { isCount, isPositive } from "./validation";
 
 import type { NavigationChangeView } from "./navigation-changes";
 import type { TerrainBounds, TileCoord } from "./grid";
@@ -135,8 +136,7 @@ export class TerrainGrid {
       width <= 0 ||
       !Number.isSafeInteger(height) ||
       height <= 0 ||
-      !Number.isFinite(tileSize) ||
-      tileSize <= 0 ||
+      !isPositive(tileSize) ||
       !Number.isFinite(width * tileSize) ||
       !Number.isFinite(height * tileSize)
     ) {
@@ -317,16 +317,17 @@ export class TerrainGrid {
   /** Whether `editTerrain` would accept this edit, which may be untrusted. */
   isValidTerrainEdit(edit: TerrainEdit): boolean {
     const { heights = [], tiles = [] } = edit;
+    // Validate holes too, before iteration can apply a partial edit.
     return (
       Array.isArray(heights) &&
       Array.isArray(tiles) &&
-      heights.every(
+      Array.from(heights).every(
         (change) =>
           change != null &&
           this.containsCorner(change.x, change.z) &&
           isValidHeight(change.height),
       ) &&
-      tiles.every(
+      Array.from(tiles).every(
         (change) =>
           change != null &&
           this.containsTile(change.x, change.z) &&
@@ -383,8 +384,7 @@ export class TerrainGrid {
       state.tiles.length !== this.terrain.length ||
       !state.heights.every(isValidHeight) ||
       !state.tiles.every((tile) => this.isValidTerrainTile(tile)) ||
-      !Number.isSafeInteger(state.navigationVersion) ||
-      state.navigationVersion < 0
+      !isCount(state.navigationVersion)
     ) {
       throw new RangeError("Terrain state does not fit this map.");
     }

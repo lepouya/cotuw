@@ -6,15 +6,20 @@ import {
   withinBounds,
 } from "./world";
 import { isTick, secondsToTicks } from "./clock";
-import { insideRouteBounds, withinRouteBounds } from "./actor";
-import { isIdList } from "./validation";
+import { insideRouteBounds, withinRouteBounds, WOLF_MODES } from "./actor";
+import {
+  isId,
+  isIdList,
+  isNonnegative,
+  isOneOf,
+  isPositive,
+} from "./validation";
 
 import type {
   Actor,
   ActorDefinition,
   RouteBounds,
   TerritoryState,
-  WolfMode,
 } from "./actor";
 import type { CombatContext, CombatController } from "./combat";
 import type { WorldBounds, WorldPosition } from "./world";
@@ -53,16 +58,6 @@ export function createTerritoryState(
   };
 }
 
-const modes: readonly WolfMode[] = [
-  "idle-at-home",
-  "alerted",
-  "pursuing",
-  "attacking",
-  "investigating",
-  "returning-home",
-  "regenerating",
-];
-
 export function validateTerritoryDefinition(definition: ActorDefinition): void {
   const t = definition.territory;
   if (
@@ -70,9 +65,7 @@ export function validateTerritoryDefinition(definition: ActorDefinition): void {
     (!definition.weapon ||
       !definition.movement ||
       !definition.vision ||
-      ![t.leashRadius, t.arrivalTolerance].every(
-        (value) => Number.isFinite(value) && value > 0,
-      ) ||
+      ![t.leashRadius, t.arrivalTolerance].every(isPositive) ||
       ![
         t.alertLifetimeSeconds,
         t.investigationSeconds,
@@ -80,7 +73,7 @@ export function validateTerritoryDefinition(definition: ActorDefinition): void {
         t.stalledSeconds,
         t.regenerationDelaySeconds,
         t.regenerationPerSecond,
-      ].every((value) => Number.isFinite(value) && value >= 0))
+      ].every(isNonnegative))
   )
     throw new RangeError(`Invalid territory definition: ${definition.id}.`);
 }
@@ -116,7 +109,7 @@ function validateTerritoryRoute(actor: Actor, territory: Territory): void {
     (routeBounds !== undefined &&
       (!routeBounds ||
         !isFinitePosition(routeBounds.center) ||
-        !(Number.isFinite(routeBounds.radius) && routeBounds.radius > 0) ||
+        !isPositive(routeBounds.radius) ||
         distance(leash.center, routeBounds.center) + routeBounds.radius >
           leash.radius))
   )
@@ -136,8 +129,7 @@ function isValidTerritoryState(
     !state ||
     !point(state.home) ||
     (state.center !== undefined && !point(state.center)) ||
-    (state.radius !== undefined &&
-      !(Number.isFinite(state.radius) && state.radius > 0))
+    (state.radius !== undefined && !isPositive(state.radius))
   )
     return false;
   const leash = leashBounds(state, definition.territory!);
@@ -146,7 +138,7 @@ function isValidTerritoryState(
     insideRouteBounds(leash, state.home) &&
     (state.encounterId === undefined ||
       (typeof state.encounterId === "string" && !!state.encounterId)) &&
-    (state.mode === undefined || modes.includes(state.mode)) &&
+    (state.mode === undefined || isOneOf(WOLF_MODES, state.mode)) &&
     (state.lastCombatTick === undefined || isTick(state.lastCombatTick)) &&
     (state.seenTargets === undefined || isIdList(state.seenTargets)) &&
     (investigation === undefined ||
@@ -166,15 +158,13 @@ function isValidTerritoryState(
         (progress.navigationVersion === undefined ||
           isTick(progress.navigationVersion)) &&
         (progress.remainingDistance === undefined ||
-          (Number.isFinite(progress.remainingDistance) &&
-            progress.remainingDistance >= 0)))) &&
+          isNonnegative(progress.remainingDistance)))) &&
     (failedTargets === undefined ||
       (Array.isArray(failedTargets) &&
         failedTargets.every(
           (failure) =>
             !!failure &&
-            typeof failure.targetId === "string" &&
-            failure.targetId.length > 0 &&
+            isId(failure.targetId) &&
             point(failure.position) &&
             isTick(failure.navigationVersion),
         )))

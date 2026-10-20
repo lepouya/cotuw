@@ -1,6 +1,7 @@
 import { isValidFootprint } from "./occupancy";
 import { isTileCoord, tileBounds, tileKey } from "./grid";
 import { withinBounds } from "./world";
+import { isNonnegative } from "./validation";
 
 import type { TerrainView, TileCoord } from "./terrain";
 import type { Actor, ActorDefinition } from "./actor";
@@ -115,8 +116,7 @@ export function validatePlacementDefinition(
   }
   if (
     !isValidFootprint(definition.footprint) ||
-    !Number.isFinite(definition.placement.maxSlope) ||
-    definition.placement.maxSlope < 0 ||
+    !isNonnegative(definition.placement.maxSlope) ||
     definition.placement.terrainTypeIds.length === 0 ||
     definition.placement.terrainTypeIds.some(
       (typeId) => !map.terrainTypeIds.has(typeId),
