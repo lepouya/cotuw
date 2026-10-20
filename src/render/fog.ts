@@ -7,7 +7,7 @@ import {
 } from "@babylonjs/core";
 
 import { clampToBounds, distance } from "../simulation/world";
-import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
+import { aboveTerrainLayers } from "./terrain-mesh";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
@@ -58,7 +58,7 @@ export function createFogOverlay(
       );
     }
   const positions = () => {
-    const offset = map.layerCount * TERRAIN_LAYER_OFFSET + FOG_OFFSET;
+    const offset = aboveTerrainLayers(map, FOG_OFFSET);
     const result: number[] = [];
     for (let z = 0; z <= map.height; z += 1)
       for (let x = 0; x <= map.width; x += 1) {

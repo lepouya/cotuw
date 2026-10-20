@@ -1,7 +1,7 @@
 import { Color4, MeshBuilder } from "@babylonjs/core";
 
 import { groundCross, groundPoint, groundRing } from "./ground-marker";
-import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
+import { aboveTerrainLayers } from "./terrain-mesh";
 import { distance } from "../simulation/world";
 
 import type { LinesMesh, Scene, Vector3 } from "@babylonjs/core";
@@ -37,9 +37,6 @@ export function createQueuedOrderView(
   const terrainObserver = map.onChangedObservable.add(() => {
     drawn = "";
   });
-  const offset = map.layerCount * TERRAIN_LAYER_OFFSET + MARKER_OFFSET;
-  const sample = (point: Readonly<WorldPosition>) =>
-    groundPoint(map, point, offset);
   const update = (actors: readonly ActorRenderState[]) => {
     if (disposed) return;
     const legs: {
@@ -67,6 +64,10 @@ export function createQueuedOrderView(
     mesh?.dispose();
     mesh = undefined;
     if (!legs.length) return;
+    // Scan once per rebuild, after all pending terrain edits.
+    const offset = aboveTerrainLayers(map, MARKER_OFFSET);
+    const sample = (point: Readonly<WorldPosition>) =>
+      groundPoint(map, point, offset);
     const lines: Vector3[][] = [];
     const colors: Color4[][] = [];
     const add = (line: Vector3[], color: Color4) => {

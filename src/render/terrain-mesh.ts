@@ -31,6 +31,14 @@ export const CLIP_PHASE_GROUPS = 8;
 export const TERRAIN_LAYER_OFFSET = 0.012;
 export const TERRAIN_PICK_KIND = "terrain";
 
+/** A height above the ground that clears every layer; scans every tile. */
+export function aboveTerrainLayers(
+  map: Pick<TerrainMap, "layerCount">,
+  clearance: number,
+): number {
+  return map.layerCount * TERRAIN_LAYER_OFFSET + clearance;
+}
+
 type LayerTile = {
   x: number;
   z: number;

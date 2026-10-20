@@ -1,7 +1,7 @@
 import { Color3, LinesMesh, MeshBuilder, Vector3 } from "@babylonjs/core";
 
 import { groundPoint, groundRing, groundCross } from "./ground-marker";
-import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
+import { aboveTerrainLayers } from "./terrain-mesh";
 
 import type { Observer, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
@@ -432,5 +432,5 @@ function createBlockedCross(
 
 /** Scans every tile, so call it only when geometry is rebuilt. */
 function groundOffset(map: TerrainMap): number {
-  return map.layerCount * TERRAIN_LAYER_OFFSET + MARKER_OFFSET;
+  return aboveTerrainLayers(map, MARKER_OFFSET);
 }

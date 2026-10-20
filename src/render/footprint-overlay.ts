@@ -7,7 +7,7 @@ import {
   VertexData,
 } from "@babylonjs/core";
 
-import { TERRAIN_LAYER_OFFSET } from "./terrain-mesh";
+import { aboveTerrainLayers } from "./terrain-mesh";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
@@ -16,7 +16,7 @@ const OVERLAY_OFFSET = 0.045;
 
 /** Height that clears every terrain layer; scans every tile, so cache it. */
 export function footprintOverlayOffset(map: TerrainMap): number {
-  return map.layerCount * TERRAIN_LAYER_OFFSET + OVERLAY_OFFSET;
+  return aboveTerrainLayers(map, OVERLAY_OFFSET);
 }
 
 /** Draws a ground-hugging footprint; blocked previews also carry crosses. */
