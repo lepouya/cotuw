@@ -57,7 +57,7 @@ export function createRallyControls(
     },
     cancel,
     choose: (target: WorldPosition) => {
-      if (!choosingFor) return;
+      if (!choosingFor || !options.enabled()) return;
       if (!simulation.evaluateRallyPoint(choosingFor, target)) {
         result = "Choose passable ground clear of buildings.";
         options.changed();

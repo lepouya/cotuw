@@ -5,6 +5,7 @@ import {
   refineryOccupied,
 } from "../simulation/economy";
 import { ECONOMY_COMMAND_KINDS, isOutcomeOf } from "../simulation/command";
+import { setText } from "./dom";
 import type {
   EconomyReason,
   EconomyView,
@@ -104,7 +105,7 @@ export function createEconomyControls(
         button.dataset.economyAction = entry.key;
         buttons.set(entry.key, button);
       }
-      if (button.textContent !== entry.text) button.textContent = entry.text;
+      setText(button, entry.text);
       button.disabled = entry.disabled;
       actions.set(entry.key, entry.action);
       if (container.children[index] !== button)
@@ -336,7 +337,7 @@ export function createEconomyControls(
       const remove = element("remove-building");
       remove.textContent = actor?.construction
         ? `Cancel construction (+${actor.construction.paidMaterials} Materials)`
-        : definition
+        : definition && actor!.tilePlacement
           ? `Sell building (+${saleMaterialsRefund(actor!, definition)} Materials)`
           : "Sell selected building";
       if (lastResult) element("harvester-status").textContent = lastResult;

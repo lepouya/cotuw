@@ -9,6 +9,8 @@ export function createNetworkControls(
     selectedActorId: () => string | undefined;
     /** Whether the player controls the actor with this ID. */
     canControl?: (actorId: string) => boolean;
+    /** World units per tile, for showing support radii in tiles. */
+    tileSize: number;
   },
 ) {
   const root = controls.networkRoot;
@@ -25,6 +27,8 @@ export function createNetworkControls(
           node.actorId === options.selectedActorId() &&
           canControl(node.actorId),
       );
+      const tiles = (radius: number) =>
+        Math.round((radius / options.tileSize) * 10) / 10;
       for (const status of root?.querySelectorAll<HTMLElement>(
         "[data-network-status]",
       ) ?? []) {
@@ -32,7 +36,7 @@ export function createNetworkControls(
         status.textContent = !node
           ? ""
           : node.connected
-            ? `Connected · ${node.complete ? `${node.radius} tile support radius` : "Blueprint does not extend coverage"}`
+            ? `Connected · ${node.complete ? `${tiles(node.radius)} tile support radius` : "Blueprint does not extend coverage"}`
             : "Disconnected: no support path reaches the Command Center. Construction, production, and cargo delivery pause until reconnected.";
       }
     },

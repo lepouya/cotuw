@@ -1,6 +1,7 @@
 import type { MissionResult, ObjectiveView } from "../simulation/objectives";
 import type { GameSession } from "../session";
 import type { SidebarState } from "./sidebar";
+import { setText } from "./dom";
 
 export type TopBarState = {
   /** Whether a mission is running and can resume. */
@@ -78,9 +79,6 @@ export function createTopBar(
   for (const { button, speed } of speeds)
     button.addEventListener("click", () => actions.setSpeed(speed));
   objective.addEventListener("click", actions.showObjectives);
-  const setText = (target: HTMLElement, text: string) => {
-    if (target.textContent !== text) target.textContent = text;
-  };
   return {
     update: (state: TopBarState) => {
       const paused = !state.playing;

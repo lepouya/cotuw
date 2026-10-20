@@ -1,6 +1,7 @@
 import { isOutcomeOf } from "../simulation/command";
 import { PRODUCTION_QUEUE_LIMIT } from "../simulation/economy";
 import { productionBlocker, setActionAvailability } from "./production-action";
+import { setText } from "./dom";
 
 import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome, TrainUnitCommand } from "../simulation/command";
@@ -52,13 +53,7 @@ export function createUnitTraining(
   let faulted = false;
   let pending: TrainUnitCommand | undefined;
   let result: { producerId: string; text: string } | undefined;
-  const message = (text: string) => {
-    if (
-      controls.productionStatus &&
-      controls.productionStatus.textContent !== text
-    )
-      controls.productionStatus.textContent = text;
-  };
+  const message = (text: string) => setText(controls.productionStatus, text);
   const commandFor = (definitionId: string): TrainUnitCommand => ({
     kind: "train-unit",
     actorId: simulation.unusedActorId("trained-unit-"),

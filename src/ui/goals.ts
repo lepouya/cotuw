@@ -1,4 +1,5 @@
 import type { ObjectiveStatus } from "../simulation/objectives";
+import { setText } from "./dom";
 
 export type GoalEntry = {
   id: string;
@@ -54,10 +55,9 @@ export function createGoalList(list: HTMLElement, emphasis = false) {
           (progress
             ? ` (${progress.current}${progress.total === undefined ? "" : `/${progress.total}`})`
             : "");
-        if (entry.label.textContent !== text) entry.label.textContent = text;
+        setText(entry.label, text);
         const directive = goal.directive ?? "";
-        if (entry.directive.textContent !== directive)
-          entry.directive.textContent = directive;
+        setText(entry.directive, directive);
         entry.directive.hidden = !directive;
         const className = CLASSES[goal.status];
         if (entry.item.className !== className)

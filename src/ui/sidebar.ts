@@ -11,6 +11,7 @@ import { createProductionCards } from "./production-card";
 import { productionBlocker, setActionAvailability } from "./production-action";
 import { trainableUnitIds } from "../simulation/production";
 import { createLifetime } from "../lifetime";
+import { setText } from "./dom";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { MissionResult, ObjectiveView } from "../simulation/objectives";
@@ -339,11 +340,10 @@ function buildSidebar(
       const objectives = state.objectives ?? [];
       objectiveList.hidden = objectives.length === 0;
       missionDirective.hidden = !state.result;
-      const directiveText = state.result
-        ? RESULT_DIRECTIVES[state.result.kind]
-        : "";
-      if (missionDirective.textContent !== directiveText)
-        missionDirective.textContent = directiveText;
+      setText(
+        missionDirective,
+        state.result ? RESULT_DIRECTIVES[state.result.kind] : "",
+      );
       missionGoals.update(objectives);
       placementActions.hidden = !state.placementActive;
       placementPanel.hidden = !state.placementActive && !state.faulted;
@@ -387,9 +387,10 @@ function buildSidebar(
         "aria-pressed",
         String(state.queueMode ?? false),
       );
-      const queueLabel = state.queueMode ? "✓ Done queuing" : "⋯ Queue orders";
-      if (queueOrders.textContent !== queueLabel)
-        queueOrders.textContent = queueLabel;
+      setText(
+        queueOrders,
+        state.queueMode ? "✓ Done queuing" : "⋯ Queue orders",
+      );
       boxSelect.setAttribute("aria-pressed", String(state.boxMode ?? false));
       addSelection.setAttribute(
         "aria-pressed",
@@ -421,11 +422,11 @@ function buildSidebar(
       const maximum =
         inspected && definitionById.get(inspected.definitionId)?.health;
       selectionHealth.hidden = !maximum;
-      if (inspected && maximum) {
-        const text = `Health ${Math.ceil(inspected.health ?? maximum)} / ${maximum}`;
-        if (selectionHealth.textContent !== text)
-          selectionHealth.textContent = text;
-      }
+      if (inspected && maximum)
+        setText(
+          selectionHealth,
+          `Health ${Math.ceil(inspected.health ?? maximum)} / ${maximum}`,
+        );
       clearSelection.disabled = unavailable || ids.length === 0;
       focusSelection.disabled = ids.length === 0;
       followSelection.setAttribute(

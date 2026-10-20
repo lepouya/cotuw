@@ -14,7 +14,10 @@ import { createNetworkControls } from "./ui/network-controls";
 import type { NetworkControls } from "./ui/network-controls";
 import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
-import { createMaterialsSitesView } from "./render/materials-sites";
+import {
+  createMaterialsSitesView,
+  MATERIALS_COLOR,
+} from "./render/materials-sites";
 import { createHealthBarView } from "./render/health-bars";
 import { createCombatEffectsView } from "./render/combat-effects";
 import { createDamageEffectsView } from "./render/damage-effects";
@@ -79,7 +82,7 @@ import { createMissionAudio } from "./audio/mission";
 import { SILENT_AUDIO } from "./audio/mixer";
 import type { AudioMixer } from "./audio/mixer";
 
-const SITE_MINIMAP_COLOR: Rgb = [0.3, 0.66, 0.75];
+const SITE_MINIMAP_COLOR = MATERIALS_COLOR.asArray() as Rgb;
 const SALVAGE_MINIMAP_COLOR: Rgb = [0.88, 0.65, 0.2];
 const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Bounds each pump's work while retaining longer stalls. */
@@ -150,8 +153,7 @@ export async function createGameSession(
   const { mission } = controls;
   const { content } = mission;
   const map = createSessionMap(missionTerrain(mission), content.terrain);
-  const options = viewOptions(content.view);
-  const view = createGameView(canvas, map, options);
+  const view = createGameView(canvas, map, viewOptions(content.view));
   try {
     return await assembleGameSession(
       canvas,
@@ -179,15 +181,16 @@ async function assembleGameSession(
 ): Promise<GameSession> {
   const { mission } = controls;
   const { content, definitions } = mission;
-  const options = viewOptions(content.view);
   const lifetime = createLifetime();
   const { own } = lifetime;
   view.scene.onDisposeObservable.add(() => lifetime.dispose());
   lifetime.defer(() => controls.onDispose?.());
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  // Polled, because the preference can change mid-session.
+  const reducedMotion = () => motionQuery.matches;
   createTerrainMeshes(view.scene, map, {
     clips: content.clips,
-    reducedMotion: () => reducedMotion.matches,
+    reducedMotion,
   });
   const simulation = createSessionSimulation(mission, map);
   own(simulation);
@@ -196,18 +199,14 @@ async function assembleGameSession(
     definitions.map(({ id }) => [id, presentationOf(id)?.name ?? id]),
   );
   const frameEffects = own(
-    createFrameEffectsView(
-      view.scene,
-      content.clips ?? {},
-      () => reducedMotion.matches,
-    ),
+    createFrameEffectsView(view.scene, content.clips ?? {}, reducedMotion),
   );
   const assets = own(
     createSessionAssets({
       scene: view.scene,
       content,
       definitions,
-      reducedMotion: () => reducedMotion.matches,
+      reducedMotion,
       frameEffects,
     }),
   );
@@ -224,7 +223,22 @@ async function assembleGameSession(
   if (materialsView) own(materialsView);
   const explored = ({ x, z }: TileCoord) =>
     simulation.fog?.isExplored(x, z) ?? true;
-  const fogOverlay = createFogOverlay(view.scene, map, options.clearColor);
+  /** An explored, unspent Materials site under a world point. */
+  const siteAt = (point: WorldPosition) => {
+    const { x, z } = map.tileAtWorldPosition(point.x, point.z);
+    return simulation.economy?.sites.find(
+      ({ tile, remainingMaterials }) =>
+        remainingMaterials > 0 &&
+        tile.x === x &&
+        tile.z === z &&
+        explored(tile),
+    );
+  };
+  const fogOverlay = createFogOverlay(
+    view.scene,
+    map,
+    new Color3(...content.view.clearColor),
+  );
   own(fogOverlay);
   const fog = simulation.fog;
   if (fog)
@@ -253,7 +267,7 @@ async function assembleGameSession(
     map,
     definitions,
     buildingAppearances,
-    { reducedMotion: () => reducedMotion.matches },
+    { reducedMotion },
   );
   own(tilePlacedViews);
   const networkView = createSupportNetworkView(view.scene, map);
@@ -288,25 +302,25 @@ async function assembleGameSession(
   const damageEffects = createDamageEffectsView(
     view.scene,
     (prop) => propAssets.get(prop),
-    () => reducedMotion.matches,
+    reducedMotion,
   );
   own(damageEffects);
   const regenerationEffects = createRegenerationEffectsView(
     view.scene,
     () => propAssets.get("regeneration"),
-    () => reducedMotion.matches,
+    reducedMotion,
   );
   own(regenerationEffects);
   const birds = createAmbientBirdsView(map, mission.scenario.flocks ?? [], {
     bird: () => propAssets.get("bird"),
     explored,
-    reducedMotion: () => reducedMotion.matches,
+    reducedMotion,
   });
   own(birds);
   const wreckView = createWreckView(view.scene, map, {
     appearanceFor: (id) => appearances.get(id),
     rubble: () => propAssets.get("rubble"),
-    reducedMotion: () => reducedMotion.matches,
+    reducedMotion,
     topHeightFor: (wreck) => {
       const drawn = tilePlacedViews.topHeight(wreck.actorId);
       if (drawn !== undefined) return drawn;
@@ -417,12 +431,9 @@ async function assembleGameSession(
     pointerEnabled: () => !view.camera.primaryPanActive,
     canCommand,
     canSelect: (id) => !!player.shownActor(id),
-    groundTargetMode: () => rally.active || attackMove.active,
-    onGroundTarget: (target, queued) =>
-      attackMove.active
-        ? attackMove.choose(target, queued)
-        : rally.choose(target),
-    cancelGroundTarget: () => attackMove.cancel() || rally.cancel(),
+    groundTargetMode: () => !!groundTarget(),
+    onGroundTarget: (target, queued) => groundTarget()?.choose(target, queued),
+    cancelGroundTarget: () => cancelGroundTargets(),
     canMove: (actorId) => !!player.ownMobileActor(actorId),
     moveLabel: (target) => {
       const tile = map.tileAtWorldPosition(target.x, target.z);
@@ -436,9 +447,7 @@ async function assembleGameSession(
       );
       if (
         input.selectedActorIds.some((id) => harvesters.has(id)) &&
-        economy?.sites.some(
-          (site) => site.remainingMaterials > 0 && at(site.tile),
-        )
+        siteAt(target)
       )
         return "Gather";
       return undefined;
@@ -460,21 +469,10 @@ async function assembleGameSession(
         (command.kind === "move" || command.kind === "group-move") &&
         economy
       ) {
-        const tile = map.tileAtWorldPosition(
-          command.target.x,
-          command.target.z,
-        );
-        const site = economy.sites.find(
-          (site) =>
-            site.remainingMaterials > 0 &&
-            site.tile.x === tile.x &&
-            site.tile.z === tile.z &&
-            explored(site.tile),
-        );
         for (const order of contextualMoveCommands(
           command,
           new Set(economy.harvesters.map(({ actorId }) => actorId)),
-          site?.id,
+          siteAt(command.target)?.id,
         ))
           simulation.submitCommand(order);
         return;
@@ -503,7 +501,7 @@ async function assembleGameSession(
   own(input);
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
     fog: () => simulation.fog,
-    reducedMotion: () => reducedMotion.matches,
+    reducedMotion,
     commandMode: () => attackMove.active,
     onCommand: (target, shiftKey) => {
       if (!explored(map.tileAtWorldPosition(target.x, target.z))) return false;
@@ -648,8 +646,7 @@ async function assembleGameSession(
         showActor(actorId);
       },
       onStart: () => {
-        rally.cancel();
-        attackMove.cancel();
+        cancelGroundTargets();
         input.setBoxMode(false);
         input.setAdditiveMode(false);
         input.setQueueMode(false);
@@ -725,9 +722,16 @@ async function assembleGameSession(
     },
   });
   own(rally);
+  /** Modes that claim the next ground click; at most one is active. */
+  const groundTargets = [attackMove, rally];
+  const groundTarget = () => groundTargets.find(({ active }) => active);
+  /** Returns whether any mode was active. */
+  const cancelGroundTargets = () =>
+    groundTargets.map((mode) => mode.cancel()).some(Boolean);
   const network = createNetworkControls(simulation, controls, {
     selectedActorId: selectedOwnActorId,
     canControl: (id) => !!player.ownActor(id),
+    tileSize: map.tileSize,
   });
   const economyRoot = controls.economyRoot;
   const economyControls =
@@ -753,9 +757,8 @@ async function assembleGameSession(
       !placement.active &&
       !halted() &&
       !input.boxMode &&
-      // Rally targeting ignores actors, so drags from them may pan too.
-      (rally.active ||
-        attackMove.active ||
+      // Ground targeting ignores actors, so drags from them may pan too.
+      (!!groundTarget() ||
         input.actorIdAt(event.clientX, event.clientY) === undefined),
   );
   const unitControls = createUnitControls(input, controls, {
@@ -782,9 +785,9 @@ async function assembleGameSession(
     placement.cancelGesture();
   });
   input.select(undefined);
-  if (controls.animate) controls.animate.checked = !reducedMotion.matches;
+  if (controls.animate) controls.animate.checked = !reducedMotion();
   const syncAnimationControl = () => {
-    const reduced = reducedMotion.matches;
+    const reduced = reducedMotion();
     if (controls.animate && controls.animate.disabled !== reduced)
       controls.animate.disabled = reduced;
   };
@@ -836,8 +839,7 @@ async function assembleGameSession(
   const cancelInteractions = () => {
     radial.close();
     input.cancelGesture();
-    attackMove.cancel();
-    rally.cancel();
+    cancelGroundTargets();
     placement.cancel();
     controlsDirty = true;
   };
@@ -924,7 +926,7 @@ async function assembleGameSession(
           canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
         if (command.kind === "attack") {
           canvas.dataset.attackStatus = accepted ? "accepted" : "rejected";
-          const target = player.actor(command.targetId);
+          const target = player.shownActor(command.targetId);
           if (accepted && target && !markedTargets.has(target.id)) {
             markedTargets.add(target.id);
             combatEffects.markTarget(target.worldPosition);
@@ -992,10 +994,10 @@ async function assembleGameSession(
     const frameTime = performance.now();
     const frameSeconds = (frameTime - previousFrameTime) / 1000;
     previousFrameTime = frameTime;
-    if (!reducedMotion.matches && (controls.animate?.checked ?? true)) {
+    if (!reducedMotion() && (controls.animate?.checked ?? true)) {
       idleSeconds += frameSeconds;
     }
-    if (!reducedMotion.matches) pickupSeconds += frameSeconds;
+    if (!reducedMotion()) pickupSeconds += frameSeconds;
     tilePlacedViews.animate(idleSeconds, frameSeconds);
     materialsView?.animate(pickupSeconds);
     const { shownMobile } = player.actors();
@@ -1111,14 +1113,14 @@ async function assembleGameSession(
         info,
       ),
     selectActor: (actorId, additive = false) => {
-      if (simulationFaulted || placement.active) return;
+      if (halted() || placement.active) return;
       input.select(
         player.shownActor(actorId)?.id,
         additive || input.additiveMode,
       );
     },
     selectActors: (ids) => {
-      if (simulationFaulted || placement.active) return;
+      if (halted() || placement.active) return;
       input.selectMany(ids.filter((id) => !!player.shownActor(id)));
     },
   };
@@ -1150,7 +1152,6 @@ async function assembleGameSession(
   }
   return session;
 }
-export { createSessionMap } from "./render";
 
 function viewOptions({ clearColor, lighting }: ViewStyle): GameViewOptions {
   return {

@@ -11,6 +11,7 @@ import { isOutcomeOf } from "../simulation/command";
 import { createTilePlacedActorViewRegistry } from "./tile-placed-actor-view";
 import { createPrimaryClick } from "./primary-click";
 import { isTextEntry, worldInputAvailable } from "./input-focus";
+import { setText } from "../ui/dom";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
@@ -118,10 +119,7 @@ export function createBuildingPlacement(
   let uiKey = "";
   let terrainRevision = 0;
   const size = () => footprintSize(definition!.footprint!.occupiedTiles);
-  const message = (text: string) => {
-    if (controls.status && controls.status.textContent !== text)
-      controls.status.textContent = text;
-  };
+  const message = (text: string) => setText(controls.status, text);
   const placement = (): ActorPlacement | undefined =>
     origin && definition
       ? {

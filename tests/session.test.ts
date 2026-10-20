@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { TerrainGrid } from "../src/simulation/terrain";
-import { createSessionMap } from "../src/session";
+import { createSessionMap } from "../src/render/terrain-style";
 import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import {
