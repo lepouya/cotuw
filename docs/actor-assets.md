@@ -72,7 +72,7 @@ A generated model must keep:
   layered the same way. It plays once each time the trigger fires, so it
   starts and ends at the neutral pose and keys only channels that idle also
   keys. Loading checks the matching endpoints and base channels for layers.
-- Optionally, a death clip that remains play once and hold at its last frame.
+- Optionally, a death clip that plays once and holds at its last frame.
   It replaces the other clips, so it keys every pose channel idle keys and
   ends lying on the ground.
 - Clips that animate only model nodes or attached morph targets and use one

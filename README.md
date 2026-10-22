@@ -7,7 +7,11 @@ damaged world and encounters the elven Circle of Repose. Their struggle over
 its citadels and lost technology begins humanity's first contact and helps
 awaken the deathless Everwake, eventually requiring an uneasy alliance.
 
-## Play the prototype
+The playable build contains ARC's M0 mission and a construction sandbox. M1
+targets an ARC-versus-Circle skirmish with a base-building AI opponent. Follow
+[TODO.md](TODO.md) for active tasks, dependencies, and progress.
+
+## Play the ARC prototype
 
 The title screen offers **New mission**, **Load**, **Options**, and **Exit**.
 Options provides master, sound, and music volume and mute controls; preferences
@@ -49,10 +53,12 @@ generators. See [verification](docs/verification.md) for focused and watch runs.
 
 ## Documentation
 
-- [Design](DESIGN.md): vision, locked rules, prototype scope, and open
+- [Design](DESIGN.md): vision, locked rules, milestone scope, and open
   decisions.
 - [Design questionnaire](docs/design-questionnaire.md): supporting rationale,
   future systems, and unresolved design questions.
+- [TODO](TODO.md): ordered milestone tasks, design decisions,
+  dependencies, and acceptance gates for the two-faction skirmish.
 - [Verification](docs/verification.md): automated checks and demo acceptance.
 - [Architecture review](docs/architecture-review.md): installed skills and the
   milestone review workflow.

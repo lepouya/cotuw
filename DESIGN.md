@@ -1,7 +1,12 @@
 # Design
 
 This is the living design source of truth. Keep entries concise; add detail only
-when it informs a prototype, implementation, or content decision.
+when it informs an implementation or content decision.
+
+The playable build contains the ARC M0 mission and construction sandbox. M1's
+two-faction skirmish is the active development target; [TODO.md](TODO.md) owns
+task order and progress. Game-wide rules below include accepted systems that
+are not yet implemented. The prototype sections describe the playable build.
 
 ## Vision
 
@@ -46,8 +51,8 @@ the crisis their conflict helped release.
 - 3D world with an isometric/top-down strategy camera.
 - Visual readability over photorealism.
 - Desktop first: Windows and macOS through Tauri.
-- The core remains browser-runnable. M0 also validates compact phone and tablet
-  landscape browser layouts with touch-style input.
+- The core remains browser-runnable, including compact phone and tablet
+  landscape layouts with touch-style input.
 - Linux/SteamOS and native Android and iOS builds are future targets.
 - Eventual small-session multiplayer, roughly 2-8 players; no massively
   multiplayer features.
@@ -135,7 +140,8 @@ the player as **Guide** or **Guide of the Circle**. Its campaign is intended for
 players with more RTS familiarity.
 
 Its selected parallel names are **Heartgrove**, **Lifebloom Conservatory**,
-**Cultivator**, **Sentinel**, **Wayfinder**, **Healer**, and **Artificer**.
+**Cultivator**, **Musterhall**, **Sentinel**, **Wayfinder**, **Healer**, and
+**Artificer**.
 
 ### The Everwake
 
@@ -157,6 +163,12 @@ story.
 - One worker gathers both common and rare yields from data-driven sites: ARC's
   **Harvester** returns to a **Materials Refinery**, while the Circle's
   **Cultivator** returns to a **Lifebloom Conservatory**.
+- ARC extracts faster but exhausts or permanently damages its sources. Circle
+  cultivation is slower and renewable, with limited throughput and temporary
+  dormancy and recovery under heavy use. Exact rates and capacities are tunable.
+- Sites have an internal common-to-rare yield ratio. Starting sites favor common
+  resources; richer rare yields encourage expansion. Exact ratios stay hidden;
+  players learn a site's value from collected output.
 - Resources use unlimited global faction stockpiles. Deposited resources are not
   tied to storage buildings and survive building loss.
 - ARC places paid blueprints directly within construction support. No builder
@@ -249,8 +261,8 @@ story.
   new limit, the oldest jobs continue and newer excess jobs pause with their
   progress, payment, and original priority preserved. A stable job ID resolves
   equal-time ties, and one grouped warning reports the capacity loss.
-- Upgrades are excluded from M0. Individual building tiers, effects, costs,
-  timing, and presentation remain later content and balance work.
+- Individual building tiers, effects, costs, timing, and presentation remain
+  content and balance decisions. M1 upgrade scope is tracked in TODO.md.
 
 ## Mod support
 
@@ -645,9 +657,10 @@ story.
 
 ## Audio
 
-- M0 requires essential sound effects for accepted commands, invalid actions,
-  attacks, damage, alerts, objective completion, victory, defeat, training start
-  and completion, Harvester work and movement, and Refinery garage doors.
+- Essential sound effects cover accepted commands, invalid actions, attacks,
+  damage, alerts, objective completion, victory, defeat, and training start and
+  completion. The ARC slice adds Harvester work and movement and Refinery
+  garage doors.
   Sounds reinforce the visual feedback; every core action remains usable when
   muted.
 - Gameplay sounds follow committed simulation events without changing
@@ -660,7 +673,7 @@ story.
   sliders and accessible mute icons work in compact touch layouts. Playback
   starts after player interaction in the browser; unavailable or blocked audio
   must not prevent the mission from running.
-- M0 includes looping exploration and combat music with separate volume and
+- Exploration and combat music loop with separate volume and
   mute controls. Music stays below gameplay cues in the mix and continues while
   paused; world sounds stop and player feedback remains audible. Menu controls
   save preferences on the device.
@@ -672,7 +685,7 @@ story.
   Audio playback remains outside deterministic simulation; see
   [gameplay audio](docs/audio.md) for extension points.
 - Use original or appropriately licensed audio and document asset provenance.
-  Voice acting and a final soundtrack remain outside M0.
+  Voice acting and a final soundtrack are deferred.
 - The initial asset palette uses atmospheric synths, sparse percussion, and
   crisp gameplay cues. Original offline generators produce PCM WAV cues and
   looping exploration and tension music; see
@@ -734,6 +747,8 @@ story.
   baseline. Other behavior is unchanged unless explicitly revised.
 - Difficulty may be overridden per mission. Changing it during play restarts
   the mission; existing mission saves retain their original difficulty.
+- A campaign mission's earned victory stays recorded for progression. Defeat
+  later in post-victory free play cannot revoke it.
 
 ## Combat and veterancy
 
@@ -814,6 +829,8 @@ Posture selection and spending follow these rules:
   fresh scouting. Hidden positions, enemy stockpiles, production queues, and
   unobserved destruction stay unknown. Operations can investigate remembered
   locations; attacks require current detection.
+- AI factions know the authored map: terrain, routes, and resource site
+  locations. Enemy actors and current site yields require observation.
 
 ### Faction operations
 
@@ -1191,9 +1208,9 @@ Deterministic acceptance checks cover:
 
 ## Milestone 0 playable slice
 
-M0 is a canon-compatible standalone ARC prototype, not the canonical first
-campaign mission or a literal tutorial. It is the minimum viable mission from
-which a later tutorial could be made.
+The M0 mission is the playable ARC introduction. It is canon-compatible and
+standalone, not the canonical first campaign mission or a scripted tutorial.
+Its rules remain the acceptance baseline for that mission during M1 work.
 
 - A fixed **Command Center** starts in a safe map-edge pocket.
 - Starting Materials cover a **Materials Refinery** and its separately paid
@@ -1228,6 +1245,29 @@ which a later tutorial could be made.
   multiplayer, native mobile builds, a map editor, mod management, and the
   modding console.
 
+## Milestone 1 planning direction
+
+M1 targets a small single-player ARC-versus-Circle skirmish with a
+base-building AI opponent. Either faction is playable, with enough buildings
+and units to establish and sustain a base. The Circle slice includes its core
+roster and a distinct construction or cultivation mechanic.
+
+- M0's mission remains ARC's introduction. A short Circle introductory
+  scenario teaches its economy and construction before the skirmish.
+- The AI is developed first as ARC against ARC on the existing roster. That
+  mirror matchup is a development harness, not a shipped option. It requires
+  an actor's controlling owner to be distinct from its definition's faction.
+- M1 adds control groups, an idle-worker control, double-click and
+  select-all-of-type selection, and keyboard bindings for Attack Move,
+  production, and building actions, each with a touch alternative.
+- UI work covers modular ownership of dialogs, sidebars, markup, and styles.
+- External playtesting and incorporating feedback are part of the milestone.
+
+The [M1 checklist](TODO.md#milestone-1) tracks design decisions, implementation,
+and acceptance. Exact rosters, Circle construction rules, the actor ownership
+model, opponent limits, default bindings, and the skirmish victory condition
+remain open.
+
 ## Persistence
 
 - Levels and mission saves share one human-readable JSON format, version 8. A
@@ -1257,9 +1297,9 @@ which a later tutorial could be made.
   progress must match the objective definitions in the same file.
 - Mission files carry their scenario popups and the IDs the player dismissed,
   and any ambient bird flocks.
-- Manual save, load, restart, one rolling quicksave, and one rolling autosave
-  are required in M0. Loading begins paused. Restart reloads the level with
-  the mission's scenario ID; loading a level file makes it that scenario's
+- Mission saving provides manual save, load, restart, one rolling quicksave,
+  and one rolling autosave. Loading begins paused. Restart reloads the level
+  with the mission's scenario ID; loading a level file makes it that scenario's
   restart level for the session. A tick-0 file with save metadata remains a
   save and does not replace that level.
 - Manual saves form a named list without a count limit. Each entry shows its
@@ -1289,23 +1329,24 @@ which a later tutorial could be made.
 - Implemented systems preserve passenger identities, occupancy transitions,
   deployment state and reservations, veterancy, temporary reveals, and
   authoritative sensor contacts or detection effects.
-- Incompatible saves fail with a clear explanation. Cross-build migration is not
-  required for M0.
+- Incompatible saves fail with a clear explanation. M0 guarantees same-build
+  round-tripping without requiring cross-build migration. M1's migration policy
+  remains an open decision tracked in TODO.md.
 
 ## Open decisions
 
 - **Factions and campaigns**
   - Full rosters, counters, faction motifs, technologies, and campaign missions.
   - Exact Everwake resource, citadel, cache, and reveal details.
-  - Alliance-only units or abilities and the later skirmish structure.
+  - Alliance-only units or abilities and skirmish modes beyond the M1 matchup.
 - **Maps and world systems**
   - Campaign map sizes, terrain palettes, resource placement, and neutral
-    systems beyond M0.
+    systems beyond the current playable slice.
   - World-event cadence and escalation.
   - Whether corruption spreads, and how players counter or exploit it.
 - **Interface and presentation**
   - Accessibility tuning and final art and audio direction.
-  - Control groups and double-click selection beyond the prototype.
+  - Default control-group, selection, and command bindings.
 - **Future systems**
   - Technology-tree and permanent-research design.
   - Script conflict precedence, missing-target policies, and mission-driven

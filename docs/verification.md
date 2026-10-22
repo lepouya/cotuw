@@ -1,7 +1,9 @@
 # Verification
 
-[DESIGN.md](../DESIGN.md#milestone-0-playable-slice) owns the prototype rules
-and acceptance targets. These checks cover the application, authored mission,
+[DESIGN.md](../DESIGN.md) owns game rules and milestone scope.
+[TODO.md](../TODO.md) tracks M1 implementation and acceptance work. Existing
+mission flows exercise the playable ARC M0 slice; they do not establish M1
+skirmish acceptance. These checks cover the application, authored mission,
 and desktop host. Automated runs establish correctness; human runs establish
 clarity, pacing, and usability.
 
@@ -111,7 +113,7 @@ before increasing worker counts or timeouts.
 
 ## Mission flow
 
-The full browser mission starts at the title screen and uses the authored
+The full ARC M0 browser mission starts at the title screen and uses the authored
 economy, actors, combat, and objectives through victory and free play. It runs
 with mouse and phone touch input in Chromium and WebKit. Its controlled clock
 accelerates waiting without granting resources or changing balance.
@@ -129,12 +131,13 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
 
 ## Human acceptance
 
-- Have RTS-familiar first-time players attempt the mission using only in-game
+- Have RTS-familiar first-time players attempt the ARC M0 mission using in-game
   guidance. Observe the economy bootstrap, Harvester assignment, controls,
   route discovery, army preparation, and den assault. Record completion time,
   pauses, speed changes, confusion, assistance, and abandonment. Fix recurring
   blockers and repeat the affected paths. Aim for the design's 5 to 10 minute
   successful run without slowing the economy or adding encounters to pad it.
+  M1 match-length and skirmish acceptance targets are separate tasks in TODO.md.
 - On a fixed revision, run the built Windows and macOS apps from the title
   screen through victory and continued free play. Exercise defeat, load,
   restart, Main menu, and Exit. Check the default 800×600 window and resizing,

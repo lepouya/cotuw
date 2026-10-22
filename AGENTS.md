@@ -5,8 +5,10 @@
 - `README.md` is the concise project introduction and working principles.
 - `DESIGN.md` is the source of truth for game vision, requirements, decisions,
   and game specifications.
+- `TODO.md` owns active milestone tasks, dependencies, and progress. Consult it
+  before milestone work and update task status as work is verified.
 - Put future focused documentation in `docs/`. Do not duplicate information
-  already owned by `README.md` or `DESIGN.md`.
+  already owned by `README.md`, `DESIGN.md`, or `TODO.md`.
 - When a design choice is locked, record it in `DESIGN.md`.
 
 ## Documentation

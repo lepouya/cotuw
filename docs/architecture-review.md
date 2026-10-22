@@ -48,6 +48,7 @@ These rules apply to every installed review skill and its upstream references:
 - Follow [AGENTS.md](../AGENTS.md), [README.md](../README.md),
   [DESIGN.md](../DESIGN.md), and the relevant runtime or content contracts.
   Locked decisions remain requirements. Surface conflicts as proposals.
+- Use [TODO.md](../TODO.md) for active milestone tasks and dependencies.
 - Apply the user's task scope and existing authorization before upstream
   defaults. Assessments leave implementation unchanged. Report generation and
   candidate discussion do not authorize a refactor or commit.
@@ -85,22 +86,23 @@ uncommitted changes. Identify relevant callers, tests, contracts, and concrete
 upcoming work. Record inspection gaps rather than treating them as a clean
 review. Give both assessors this same scope and code snapshot.
 
-For an end-of-M0 assessment:
+Set compatibility bounds for the selected task or subsystem:
 
 - Allow proposals that replace internal interfaces and reorganize ownership.
   Compare local repair with substantial redesign where the evidence warrants
   it; compatibility layers for obsolete internal callers need not be retained.
-- Apply the [persistence policy](../DESIGN.md#persistence). M0 does not require
-  cross-build save migration. A format change still needs a deliberate version
-  decision and matching content, validation, and documentation updates.
+- Apply the [persistence policy](../DESIGN.md#persistence) and the active
+  milestone's compatibility decision in TODO.md. M1's migration policy is open;
+  do not assume M0's migration exemption applies. A format change needs a
+  deliberate version decision and matching content, validation, and docs.
 - Preserve specified gameplay and locked technical requirements. Consult
   [runtime contracts](runtime-boundaries.md) for affected boundaries.
 - Justify generalization using existing friction or committed requirements.
   The possibility of future systems does not justify a speculative framework.
 
-At later milestones, assess compatibility by the consumers of each contract,
-including players, authored content, and mods, rather than milestone number
-alone. These assessment bounds do not authorize implementation.
+Assess compatibility by the consumers of each contract, including players,
+authored content, and mods, rather than milestone number alone. These
+assessment bounds do not authorize implementation.
 
 ### 2. Produce independent assessments
 
@@ -179,22 +181,23 @@ Finish when selected findings meet their completion criteria and required
 checks pass. Report results, remaining risks, and deferred findings. Reopen the
 design only for new evidence or an explicit scope change.
 
-Keep lasting decisions and contracts in DESIGN.md or their owning docs. Move
-actionable deferred work to its owning document, then remove completed review
-reports, plans, and progress manifests. Version control preserves review history.
+Keep lasting decisions and contracts in DESIGN.md or their owning docs. Track
+actionable deferred work in TODO.md or linked issues, then remove completed
+review reports, plans, and progress manifests. Version control preserves review
+history.
 
 ## Full-workflow request
 
 > Follow docs/architecture-review.md through review, design, implementation,
-> verification, and closure for the completed M0 slice. Account for existing
-> uncommitted work. Use $improve-codebase-architecture and $seam-ripper for
-> separate initial assessments of the same snapshot, then use
+> verification, and closure for the selected task or subsystem in TODO.md.
+> Account for existing uncommitted work. Use $improve-codebase-architecture
+> and $seam-ripper for separate assessments of the same snapshot. Use
 > $reviewing-code-modularity-skill to challenge and consolidate the findings.
 > Keep those assessment passes read-only and return concise Markdown findings.
 > Select and implement one coherent scope of high-value supported improvements;
 > you have permission to proceed without another approval of that plan.
-> Apply the M0 bounds: internal interfaces may change, while specified gameplay
-> and locked requirements remain binding. Preserve persisted formats unless I
+> Internal interfaces may change, while specified gameplay and locked
+> requirements remain binding. Preserve persisted formats unless I
 > authorize a format change. Pause for a conflict with a locked decision or a
 > material unresolved trade-off; continue independent authorized work.
 > Use companion skills, $architectural-refactor, and $code-simplifier only where
@@ -211,13 +214,13 @@ reports and implementation tracking proportional to the selected work.
 
 ## Assessment-only request
 
-> Follow docs/architecture-review.md stages 1 through 4 for the completed M0
-> slice at the current revision, accounting for uncommitted changes. Use
-> $improve-codebase-architecture and $seam-ripper for separate initial
-> assessments, then $reviewing-code-modularity-skill for the challenge. Apply
-> the M0 compatibility bounds. Return Markdown reports and leave game code
-> unchanged. Recommend one coherent scope. Use companion skills only as needed;
-> do not implement changes.
+> Follow docs/architecture-review.md stages 1 through 4 for the selected task
+> or subsystem in TODO.md at the current revision, accounting for uncommitted
+> changes. Use $improve-codebase-architecture and $seam-ripper for separate
+> initial assessments, then $reviewing-code-modularity-skill for the challenge.
+> Apply the compatibility bounds from stage 1. Return Markdown reports and
+> leave game code unchanged. Recommend one coherent scope. Use companion skills
+> only as needed; do not implement changes.
 
 [survey]: ../.agents/skills/improve-codebase-architecture/SKILL.md
 [seam]: ../.agents/skills/seam-ripper/SKILL.md

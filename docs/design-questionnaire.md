@@ -1,13 +1,13 @@
 # Design Questionnaire
 
-This is the retained questionnaire and decision journal for the game's design.
-It records the first playable slice's definition and the game-wide decisions
-uncovered while defining it. It preserves the discussion, alternatives,
-rejected options, and deferred questions that explain how the design developed.
+This questionnaire records resolved design answers, useful alternatives,
+rationale, and open questions. M0-only answers describe the playable ARC
+introduction; game-wide answers guide systems beyond that slice.
 
 `DESIGN.md` remains the source of truth for locked game specifications. Record
 decision dates here and summarize current requirements there without dated
 decision entries. Keep this document as supporting rationale and reference.
+Use [TODO.md](../TODO.md) for active M1 decisions, implementation, and progress.
 
 ## Table of contents
 
@@ -73,13 +73,14 @@ within their parent question.
 - **Resolved:** [Q27 — Building upgrades](
   #q27-how-do-building-upgrades-work)
 - **Deferred:** [Q28 — Mod support](#q28-how-does-modding-work)
-- **Current:** [Q29 — NPC AI](#q29-how-should-npc-ai-work)
-  M0 wildlife is resolved; remaining faction foundations are current.
+- **Resolved:** [Q29 — NPC AI](#q29-how-should-npc-ai-work)
+  Script conflicts and relationship changes remain open; M1 implementation and
+  tuning are tracked in TODO.md.
 
-## How we will use this
+## Working with questions
 
-- Work on only the current question unless an answer naturally settles a later
-  one.
+- Use TODO.md to select the next unresolved decision and follow its
+  dependencies. An answer may settle related questions too.
 - Treat answers as drafts until their question is marked resolved.
 - Add newly discovered choices under that question's follow-ups.
 - Record dependencies when one answer constrains another question.
@@ -96,6 +97,7 @@ Question states:
 - **Drafted:** has an answer but still has unresolved follow-ups that affect it.
 - **Resolved:** its main answer is ready to summarize in `DESIGN.md`; explicitly
   deferred adjacent questions may remain.
+- **Deferred:** deliberately left outside the current implementation scope.
 
 Decision scopes:
 
@@ -104,63 +106,6 @@ Decision scopes:
   the final design.
 - **Working assumption:** useful for current discussion but open to revision.
 - **Deferred:** deliberately left for a later design pass.
-
-## Consistency audit — 2026-09-21
-
-No known contradiction remains among the resolved questionnaire decisions.
-This audit corrected or clarified:
-
-- M0 is canon-compatible but remains a standalone prototype mission rather than
-  the canonical first campaign mission.
-- Defeating all six wolves is the exact victory trigger; revealing every map
-  tile is not an additional completion condition.
-- M0 must prove weighted movement with slow rough terrain rather than leaving
-  all terrain cost binary.
-- Single-player pause and result rules apply to the standalone M0 mission as
-  well as campaign missions.
-- The opening factions are the human ARC expedition and the elven Circle
-  pilgrimage. Older multi-peoples coalition language does not describe the
-  campaign opening.
-- Decorative water remains available for the UV-animation proof while water
-  traversal remains outside M0.
-- Finite M0 Materials tiles now match the resource-depletion stages.
-- Movement profiles and occupancy layers are separate, so watercraft remain on
-  the surface layer while air and subterranean actors use distinct layers.
-- Q10-Q17 now use actor detection rather than terrain vision wherever selection,
-  targeting, Follow, blocking, health bars, badges, or minimap icons require a
-  live non-allied actor.
-- Transport passengers retain stable identity, health, veterancy, and other
-  persistent state while outside world occupancy.
-- Mobile units and vehicles cannot be sold. Only eligible buildings and fully
-  deployed actors use the health-scaled resale formula, correcting the earlier
-  orphaned-Harvester sale option.
-- Q21-Q23 remain outside M0, but their movement, deployment, transport,
-  targeting, stealth, and detection models now define the required data
-  boundaries for later work.
-- Q26's repair and healing rules use the shared infrastructure-work pool
-  without placing recovery systems in M0.
-- Q27's mission-local building upgrades are distinct from campaign unlock caps
-  and permanent research. Upgrade spending affects resale but not repair price.
-- A completed building cannot repair and upgrade simultaneously, avoiding
-  ambiguous healing and queue behavior when multiple infrastructure slots
-  exist.
-- Q28's modding foundation and package format are retained as locked decisions,
-  while dependency, compatibility, and distribution details are explicitly
-  deferred for revision alongside evolving data schemas.
-- Q29 separates deterministic actor behavior, encounter coordination, and
-  future strategic planning. M0 uses only the actor and wolf-pack layers; base
-  building and attack planning remain deferred.
-
-The project-level synchronization pass is complete:
-
-- `DESIGN.md` and `README.md` now use the selected ARC, Circle, and Everwake
-  identities rather than the earlier generic coalition premise.
-- `DESIGN.md` incorporates the resolved decisions into their owning sections,
-  including M0 persistence as an architecture gate.
-- M0's starting Materials account for the Refinery and its separately paid
-  first Harvester, avoiding an initial economy deadlock.
-- The locked input design supersedes the prototype camera bindings for future
-  implementation.
 
 ## Established constraints
 
@@ -175,13 +120,9 @@ unless the vertical slice exposes a contradiction:
 - The world is rendered in 3D with an isometric/top-down strategy camera.
 - Simulation is deterministic and separate from rendering and platform APIs.
 - Content is data-driven.
-- The prototype already has tile-based heightfield terrain and strategy-camera
-  controls.
-- The existing Milestone 0 roadmap requires individual and group selection,
-  movement and pathfinding, terrain and structure blockers, a minimap, and the
-  planned animation techniques. This questionnaire is exploring a broader small
-  playable slice that also includes a minimal economy, construction, production,
-  fog of war, and combat.
+- The playable ARC slice includes heightfield terrain, strategy-camera
+  controls, selection, movement, pathfinding, blockers, a minimap, animation,
+  economy, construction, production, fog of war, and combat.
 
 ## Player and prototype direction
 
@@ -206,7 +147,7 @@ group are they commanding?
   non-canonical testing or training space?
 - How much of this identity must be communicated in the prototype itself?
 
-#### Draft answer
+#### Answer
 
 - The player is an abstract battlefield commander rather than a named
   protagonist.
@@ -229,7 +170,7 @@ group are they commanding?
   in response to a prophecy or similar mystical calling.
 - Their meeting is humanity's first known contact with another intelligent
   people.
-- Milestone 0 will focus on a small playable slice of one faction rather than
+- Milestone 0 focuses on a small playable slice of one faction rather than
   representing both playable factions.
 - ARC is the selected playable faction for Milestone 0.
 - That slice should contain only the small ARC roster needed to exercise its
@@ -279,7 +220,7 @@ design discussion; a later naming pass can refine them.
 What naming style should the three factions share: formal political names,
 evocative titles, setting-specific invented names, or a deliberate mixture?
 
-#### Draft answer
+#### Answer
 
 - **Anomaly Response Command (ARC):** Humanity is in the early stages of
   interstellar exploration when it detects an alarming signal or warning
@@ -336,10 +277,8 @@ evocative titles, setting-specific invented names, or a deliberate mixture?
 - What are the citadels, and why can ARC exploit them while the elven pilgrimage
   believes they are necessary to quiet the Unquiet?
 
-#### Relationship to the earlier coalition wording
+#### Opening faction composition
 
-- The newer first-contact premise supersedes the old description of the opening
-  factions as existing multi-peoples coalitions.
 - ARC begins as a human expedition. Humanity has not knowingly encountered
   another intelligent people before meeting the Circle.
 - The Circle begins as an elven pilgrimage rather than a broad magic-and-nature
@@ -350,7 +289,7 @@ evocative titles, setting-specific invented names, or a deliberate mixture?
 #### Civilization and expedition distinction
 
 - The human playable faction is ARC, not humanity as a whole.
-- The magic playable faction will be the prophecy-led elven expedition, not the
+- The magic playable faction is the prophecy-led elven expedition, not the
   entire elven civilization.
 - "Elves" is the clear player-facing species description.
 - The elven expedition's selected working name is the Circle of Repose, commonly
@@ -410,7 +349,7 @@ The player remains an abstract battlefield leader, but each faction can address
 that role in language that reflects its own culture and relationship to the
 player.
 
-#### Draft answer
+#### Answer
 
 - **ARC:** The player is addressed as "Commander." It describes functional
   authority at any force size without asserting the specific senior rank implied
@@ -481,7 +420,7 @@ express, such as commanding, scouting, route planning, or coordination.
 During this short ARC slice, what activity should make the player feel most like
 a battlefield commander?
 
-#### Draft answer
+#### Answer
 
 - Guiding directive: if this game had a tutorial mission, design the most
   minimal version of that mission that still showcases what the game is.
@@ -498,12 +437,6 @@ a battlefield commander?
 - The slice is experimental. Its units, buildings, and mechanics should help us
   discover what is worth developing further and what should be left out.
 
-#### Follow-ups discovered while answering
-
-- The present roadmap does not include economy, production, fog of war, or
-  combat in Milestone 0. Revise it after the questionnaire establishes the
-  slice boundary.
-
 **Depends on:** Q1.
 
 ### Q3. What is happening in the slice?
@@ -517,7 +450,7 @@ foothold, explore, and confront hostile native wildlife.
 
 Why has ARC arrived at this location, and what makes the area worth securing?
 
-#### Draft answer
+#### Answer
 
 - ARC establishes its first foothold in an unfamiliar landing region as the
   expedition begins operations on the world.
@@ -534,10 +467,6 @@ Why has ARC arrived at this location, and what makes the area worth securing?
 - The slice ends when the Commander has explored and secured the local map by
   defeating its hostile wildlife.
 
-#### Follow-ups discovered while answering
-
-_None yet._
-
 **Depends on:** Q1, Q1a, and Q2.
 
 ## Resolved decision
@@ -546,15 +475,11 @@ _None yet._
 
 **State:** Resolved
 
-#### Draft answer
+#### Answer
 
 - No. Citadels, lost caches, the Circle, and the Everwake remain outside M0.
 - M0 exploration reveals terrain, resources, obstacles, and native wildlife.
 - The first citadel's presentation is deferred to later campaign design.
-
-#### Follow-ups discovered while answering
-
-_None yet._
 
 **Depends on:** Q3.
 
@@ -571,7 +496,7 @@ the Everwake or introducing the Circle before first contact.
 
 What local threat lets M0 exercise combat without introducing another faction?
 
-#### Draft answer
+#### Answer
 
 - The M0 enemy is native wildlife, not the Everwake or anything controlled by
   them. Neither ARC nor the Circle discovers what the Unquiet are until the
@@ -583,10 +508,6 @@ What local threat lets M0 exercise combat without introducing another faction?
   connecting the encounter to the Everwake.
 - Wolves are the selected native wildlife for M0. A lone wolf provides the
   first hostile discovery before a larger pack is found at its den.
-
-#### Follow-ups discovered while answering
-
-_None yet._
 
 **Depends on:** Q3.
 
@@ -603,7 +524,7 @@ Define the visible task and the exact condition that completes the slice.
 After establishing a foothold, what must the Commander accomplish to finish the
 prototype?
 
-#### Draft answer
+#### Answer
 
 - The Commander completes the slice by securing the local map.
 - Securing the map means defeating all six hostile wolves. Exploration is the
@@ -613,10 +534,6 @@ prototype?
   to complete M0.
 - Completing the objective does not end the session. The player may continue
   building, training, and exploring in free play.
-
-#### Follow-ups discovered while answering
-
-_None yet._
 
 **Depends on:** Q3 and Q3b.
 
@@ -635,9 +552,10 @@ movement, and wildlife combat meaningful without overbuilding the MVP.
 
 Can the player formally lose Milestone 0, and if so, what event causes the loss?
 
-#### Draft answer
+#### Answer
 
-- There is no need for a timer or competitive enemy economy.
+- M0 has no mission timer or competing faction economy. M1 adds a base-building
+  opponent under the scope in DESIGN.md.
 - Native wildlife can damage and destroy ARC units.
 - ARC can train replacement combat units so losses do not leave the player
   unable to continue.
@@ -658,13 +576,14 @@ Can the player formally lose Milestone 0, and if so, what event causes the loss?
 - Soft defeat does not automatically end the mission. The player decides
   whether to search for an unconventional recovery, sell assets, or restart.
 
-#### Follow-ups discovered while answering
+#### Resolved follow-up: How does post-victory free play end?
 
-- Once mission success is earned, it remains recorded for that session and for
-  campaign progression where the mission belongs to a campaign.
-- Choosing post-victory free play cannot turn the recorded victory into defeat.
-- Destroying the Command Center after victory may end the free-play session but
-  does not revoke completion or replace it with a loss.
+- Victory pauses the mission and offers continued free play.
+- The starting Command Center remains a protected objective during free play.
+  Its destruction causes defeat, as specified in DESIGN.md.
+- Campaign progression is outside the standalone M0 mission.
+- Game-wide: a campaign mission's earned victory stays recorded for
+  progression. A later defeat in post-victory free play cannot revoke it.
 
 **Depends on:** Q3-Q4.
 
@@ -677,15 +596,15 @@ Can the player formally lose Milestone 0, and if so, what event causes the loss?
 Connect the MVP systems into one coherent loop rather than a series of unrelated
 feature demonstrations.
 
-#### Draft answer
+#### Answer
 
 1. Begin with the ARC Command Center operating at a fixed map location.
 2. Use the starting Materials to place the Materials Refinery within the Command
    Center's support area.
 3. Use its placement preview to choose a valid footprint and rotate the
    building before confirming construction.
-4. Wait for its short automatic construction timer to finish. About ten seconds
-   is the initial tuning target, not a locked duration.
+4. Wait for its short automatic construction timer to finish. Exact durations
+   are content tuning values specified in DESIGN.md.
 5. Select the completed Refinery and spend the remaining starting Materials to
    produce its Harvester as a separate action.
 6. Direct the deployed Harvester from the Refinery's garage to a nearby
@@ -712,10 +631,6 @@ then the Field Barracks. It also requires at least one resource trip,
 Trooper production, scouting, exploration, and combat. Exact costs, build
 times, training times, and enemy balance remain tuning values.
 
-#### Follow-ups discovered while answering
-
-_None yet._
-
 **Depends on:** Q2 and Q4-Q5.
 
 ## Resolved decision
@@ -740,19 +655,13 @@ ordinary building placement.
   standard building rules. This is traditional RTS behavior but introduces the
   full construction interaction immediately.
 
-#### Draft answer
+#### Answer
 
 - In M0, the Command Center is already operating at a fixed map location when
   play begins.
 - The first Materials Refinery introduces footprint placement, rotation, terrain
   validity, and proximity to the Command Center instead.
 - How the Command Center is established in the full game remains deferred.
-- This supersedes the earlier M0 direction in which the player placed a
-  prefabricated Command Center within a landing zone.
-
-#### Follow-ups discovered while answering
-
-_None yet._
 
 **Depends on:** Q3-Q6.
 
@@ -771,7 +680,7 @@ implemented in Milestone 0.
 
 Define the smallest version of ARC's common-resource loop needed to test M0.
 
-#### Draft answer
+#### Answer
 
 - Milestone 0 uses ARC's common resource, Industrial Materials, displayed in
   ordinary shorthand as "Materials."
@@ -780,9 +689,9 @@ Define the smallest version of ARC's common-resource loop needed to test M0.
 - A completed Materials Refinery begins with one empty Harvester slot. It may
   produce a new Harvester when that slot is empty; this costs Materials and
   takes time, including for the first Harvester.
-- Each Materials Refinery supports exactly one assigned Harvester. Its Harvester
-  slot must be empty before the center can construct a replacement, preventing
-  players from producing extra Harvesters from a single center.
+- Each Materials Refinery supports exactly one assigned Harvester. Its slot
+  must be empty before the Refinery can construct a replacement, preventing
+  players from producing extra Harvesters from one Refinery.
 - Increasing harvesting capacity therefore requires another Materials Refinery,
   tying economic growth to additional cost, space, and network support.
 - The player selects the Harvester and gives it a resource patch as its target.
@@ -846,9 +755,9 @@ sources of a visible exotic currency.
 - The Circle sends a **Cultivator** unit to nurture living sources and gather
   their renewable output without killing them. It returns that output to a
   **Lifebloom Conservatory**.
-- ARC Harvesters do not construct buildings. Repair capability and the
-  full-game scouting value of Harvesters and Cultivators remain undecided, as
-  does whether Cultivators participate in construction.
+- ARC Harvesters do not construct buildings. Q26 defines the separate recovery
+  roles. The full-game scouting value of workers remains open; Cultivator
+  participation in construction is an M1 decision in TODO.md.
 
 #### Q8c. Does training an M0 unit also spend Materials?
 
@@ -1046,16 +955,15 @@ yields or also by pressure on existing collection sites.
 - Without a player-defined rally point, completed units exit and idle beside
   the building.
 
-The following full-game questions remain explicitly deferred and do not block
-M0:
+Open economy details:
 
-- Whether Harvesters or Cultivators can repair or serve as useful scouts, and
-  whether Cultivators participate in construction.
+- Whether workers serve as useful scouts, and whether Cultivators participate
+  in construction. TODO.md tracks the M1 construction decision.
 - Whether the full game permits resource transfer or trading, formal ownership
   of collection sites, or a population or command cap.
 - The exotic resource's name, collection method, and uses after its reveal.
 - Exact mixed-yield ratios, site capacities, ARC depletion rates, and Circle
-  dormancy and recovery rates.
+  dormancy and recovery rates. M1 cultivation tuning is tracked in TODO.md.
 
 Costs, yields, travel distances, collection rates, and build or training times
 are M0 balance tuning rather than unresolved economy rules.
@@ -1086,8 +994,6 @@ construction, production, exploration, movement, and combat.
 - **Trooper:** Armed general-purpose soldier used for exploration and combat.
 - **Scout:** Fast exploration specialist with extended sight and very low
   health.
-
-All M0 ARC building and unit names are now selected.
 
 #### Q9a. How does ARC construct other structures?
 
@@ -1262,8 +1168,6 @@ All M0 ARC building and unit names are now selected.
 - **Alternative considered:** Muster Grove carried a stronger nature motif but
   overused "grove" within the small Circle structure set.
 
-The initial ARC and Circle counterpart names are now complete.
-
 **Depends on:** Q2-Q8.
 
 ## Controls and camera
@@ -1280,10 +1184,7 @@ commands coexist with camera pan, rotation, zoom, and minimap input.
 
 **Depends on:** Q6 and Q9.
 
-**Implementation note:** The prototype's current left-drag pan and right-drag
-rotation bindings must change to support this design.
-
-#### Draft input terminology
+#### Input terminology
 
 - A **click** presses and releases a button without moving beyond a small
   tolerance of a few pixels. The exact threshold remains a tuning and
@@ -1299,7 +1200,7 @@ rotation bindings must change to support this design.
   on-screen path so the interface remains usable on touch devices and with
   alternate input methods.
 
-#### Draft selection and command rules
+#### Selection and command rules
 
 - With no current selection, primary-clicking any friendly or currently
   detected non-allied unit or building selects it for inspection. The sidebar
@@ -1347,8 +1248,9 @@ rotation bindings must change to support this design.
 
 - Minimap behavior is tracked separately in Q17.
 - Queued-order behavior and its M0 scope are established in Q11.
-- Control groups and double-click selection are deferred beyond M0 to a later
-  control-design pass.
+- M1 adds control groups, double-click selection, select-all-of-type,
+  idle-worker controls, and command bindings. TODO.md tracks their design and
+  delivery.
 
 #### Resolved follow-up: How does friendly selection replacement work?
 
@@ -1419,8 +1321,8 @@ move command.
 
 #### Camera focus and follow
 
-- The existing `focusOnTile` behavior must change from an immediate retarget to
-  a smooth ease-in-out transition. Reduced-motion mode may make it immediate.
+- Focus uses a smooth ease-in-out transition. Reduced-motion mode makes it
+  immediate.
 - A one-shot **Focus** action can center the camera on a tile, unit, building,
   resource, loot item, or other world object without continuing to track it.
 - A persistent **Follow** action keeps the camera centered on a moving target
@@ -2172,13 +2074,12 @@ damage application understandable.
 - Objective changes produce a brief banner, sound, and alert-history entry in
   addition to updating the compact top-bar objective.
 - Victory pauses single-player and opens a results panel with **Continue
-  Playing**, **Restart**, and **Exit** actions.
-- Choosing Continue Playing permanently preserves the victory. Later events
-  cannot turn it into defeat.
+  free play**, **Restart**, **Load**, and **Main menu** actions.
 - A hard defeat pauses immediately and offers **Restart**, **Load**, and
-  **Exit**.
-- Command Center destruction after victory may end free play but does not
-  revoke recorded mission completion or campaign progress where applicable.
+  **Main menu**.
+- Command Center destruction after victory causes defeat during free play.
+  The standalone M0 mission has no campaign progression state; in campaign
+  missions, that defeat does not revoke the recorded victory.
 
 **Depends on:** Q4-Q15.
 
@@ -2566,9 +2467,9 @@ viewport with touch-style input and no keyboard, hover, or right-click.
 
 #### Resolved follow-up: How long should M0 take to play?
 
-- A first successful completion should take approximately 15 to 25 minutes.
-- A player familiar with the scenario and controls should be able to replay it
-  in roughly 10 to 15 minutes.
+- A successful completion should take about 5 to 10 minutes.
+- Meet that target through the compact scenario; do not slow gathering,
+  production, or movement to lengthen the mission.
 - These are experience targets rather than hard timers. M0 does not impose a
   mission time limit, and post-victory free play may continue indefinitely.
 
@@ -2642,12 +2543,11 @@ viewport with touch-style input and no keyboard, hover, or right-click.
   shell. Its core actions remain usable in compact phone and tablet landscape
   browser profiles with touch-style input and no keyboard, hover, or
   right-click. Portrait mode requests rotation.
-- **Outcome:** Victory pauses and offers Continue Playing, Restart, and Exit.
-  Command Center destruction before victory produces hard defeat, while soft
-  defeat conditions remain player-judged. A recorded victory cannot be revoked
-  during free play.
-- **Duration:** A first successful run normally takes 15 to 25 minutes; a
-  familiar replay normally takes 10 to 15 minutes. Neither is a hard timer.
+- **Outcome:** Victory pauses and offers Continue free play, Restart, Load, and
+  Main menu. Command Center destruction produces hard defeat, including during
+  free play, while soft defeat conditions remain player-judged.
+- **Duration:** A successful run takes about 5 to 10 minutes without slowing
+  the economy or padding encounters. This is not a hard timer.
 
 **Depends on:** Q19.
 
@@ -2660,10 +2560,10 @@ amphibious movement. Cover traversal, selection, targeting, fog of war,
 transitions between layers, carrying ground units, and interactions with ground
 actors and structures.
 
-These unit types are outside the M0/MVP scope and must not constrain its ground
-movement implementation prematurely.
+These unit types remain outside M1 scope. Their accepted rules guide data
+boundaries without requiring implementation in the ground-only slice.
 
-#### Consistency impact identified after M0 design
+#### Data boundaries
 
 - Q12 already separates the surface passability override from future air and
   subterranean passability and gives stationary objects per-layer blocking
@@ -2855,9 +2755,9 @@ crawler, transition between continuous movement and temporary building-like
 grid occupancy. Cover placement validity, deployment, blocking, support-network
 behavior, destruction, and whether the actor can operate while moving.
 
-These actors and rules are outside the M0/MVP scope.
+Oversized and deployable actors remain outside M1 scope.
 
-#### Consistency impact identified after M0 design
+#### Data boundaries
 
 - Pathfinding must account for an actor's physical clearance rather than assume
   every mobile unit fits through the same passages.
@@ -3005,11 +2905,12 @@ Define camouflage, invisibility, detectors, temporary reveals, and how hidden
 actors interact with line of sight, last-known information, targeting, and
 attacks.
 
-Stealth and detection are outside the M0/MVP scope.
+Concealment and specialized detectors remain outside M1 scope. Ordinary
+vision-based actor detection is part of the playable build.
 
-#### Consistency impact identified after M0 design
+#### Data boundaries
 
-- Terrain visibility and actor detection must become separate concepts. A tile
+- Terrain visibility and actor detection are separate concepts. A tile
   may be currently visible while a concealed actor on it remains undetected.
 - Targeting, automatic attacks, Follow, pathfinding around opposing actors,
   health bars, world badges, last-known information, and minimap icons must all
@@ -3255,8 +3156,7 @@ and a visible rank through repeated kills during a mission.
   the attack interval by the stated percentage, which would produce a larger
   and less intuitive cadence increase.
 - Damage and attack-speed multipliers then combine normally, producing the
-  approximate total DPS values above. These simple component steps supersede
-  the earlier exact +25%, +50%, +100%, +150%, and +200% total-DPS targets.
+  approximate total DPS values above.
 - Promotions retain their earlier bonuses; neither damage nor attack speed
   decreases when a unit advances.
 
@@ -3450,7 +3350,7 @@ separate reconstruction or resurrection mechanic.
 - Save data must preserve health, ongoing recovery work, its payer and provider,
   and any resources already committed.
 
-#### Draft direction: Separate unit support from building repair
+#### Unit support and building repair
 
 - Unit recovery uses dedicated support units rather than a general-purpose
   recovery-tag system.
@@ -3832,11 +3732,11 @@ platform services, and the later multiplayer architecture.
 
 ### Q29. How should NPC AI work?
 
-**State:** Resolved for M0 wildlife behavior; current for remaining faction
-strategic foundations. Shared control layers, strategic postures, mission
-profiles, priorities, observation and memory, operation rules, and campaign
-scripting support are resolved. Script conflicts and relationship changes
-remain current; detailed faction plans, schemas, and tuning are deferred.
+**State:** M0 wildlife behavior and shared strategic foundations are resolved,
+including control layers, postures, mission profiles, priorities, observation,
+memory, operations, and campaign scripting support. Script conflicts and
+relationship changes remain open. TODO.md tracks M1 faction plans, schemas,
+implementation, and tuning.
 
 Define the behavior and architecture for non-player-controlled actors. Separate
 local unit behavior, neutral wildlife, scripted mission actors, allied support,
@@ -3887,7 +3787,7 @@ recovery from losses.
 #### Resolved Q29 foundation: How do faction strategic activities overlap?
 
 **Decision date:** 2026-10-03. **Scope:** Game-wide.
-Faction strategic AI remains outside M0 and task 0.42.
+M1 introduces faction strategic AI; TODO.md tracks its implementation.
 
 - Strategic activities run concurrently. A faction can build and scout while
   defending or attacking; its current posture changes priorities and resource
@@ -4025,8 +3925,7 @@ a fixed progression.
 
 #### Resolved Q29 follow-up: Can mission events change faction behavior?
 
-**Decision date:** 2026-10-03. **Scope:** Game-wide. General mission scripting
-and faction strategic AI remain outside task 0.42.
+**Decision date:** 2026-10-03. **Scope:** Game-wide.
 
 - Mission events can change an AI faction's active behavior profile, permitted
   postures, and priorities, assign goals, and issue ordinary commands through
@@ -4114,8 +4013,8 @@ fields, presets, and values remain deferred content and implementation work.
   retreat thresholds, and planning cadence need concrete rosters and missions.
 - Faction personalities, allied coordination, and campaign-specific strategies
   need a later content and tuning pass using the agreed strategic foundations.
-- M0 has no strategic director, base-building opponent, or AI economy. These
-  foundations do not block implementation of its wildlife behavior.
+- TODO.md tracks M1's director, base-building opponent, AI economy, and bounded
+  build plans for the selected roster and map.
 
 #### Resolved Q29 follow-up: How do M0 wolves select and share targets?
 
