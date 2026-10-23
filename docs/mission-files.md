@@ -20,7 +20,10 @@ can be read, edited by hand, and loaded again.
 ## Layout
 
 - `format` is `"cotuw-mission"` and `version` is the current file version.
-  Loading rejects other formats and versions.
+  Loading rejects other formats and versions. Incompatible state, command, or
+  built-in simulation changes require a version increment under the
+  [persistence policy](../DESIGN.md#persistence). Change the version with its
+  implementation and regenerate bundled levels.
 - `ticksPerSecond` must match the build's simulation rate.
 - `save` holds a save's name and ISO timestamp. Levels omit it.
   A tick-0 save keeps its metadata and does not replace the restart level.

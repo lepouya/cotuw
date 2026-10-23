@@ -92,9 +92,11 @@ Set compatibility bounds for the selected task or subsystem:
   Compare local repair with substantial redesign where the evidence warrants
   it; compatibility layers for obsolete internal callers need not be retained.
 - Apply the [persistence policy](../DESIGN.md#persistence) and the active
-  milestone's compatibility decision in TODO.md. M1's migration policy is open;
-  do not assume M0's migration exemption applies. A format change needs a
-  deliberate version decision and matching content, validation, and docs.
+  milestone's compatibility decision in TODO.md. M1 development permits
+  compatibility breaks without migrations or legacy rulesets; same-build
+  round-tripping and deterministic continuation remain required. A format
+  change needs a deliberate version decision and matching content, validation,
+  and docs.
 - Preserve specified gameplay and locked technical requirements. Consult
   [runtime contracts](runtime-boundaries.md) for affected boundaries.
 - Justify generalization using existing friction or committed requirements.

@@ -111,6 +111,38 @@ machine without concurrent test suites. Review slow checks for repeated setup,
 asset decoding, progression, and assertions already owned by another test
 before increasing worker counts or timeouts.
 
+## M1 headless acceptance
+
+Use the matrix, pacing windows, and simulation-time cutoff in
+[M1 pacing and acceptance](../DESIGN.md#m1-pacing-and-acceptance).
+
+- Record the revision, factions, start positions, difficulty, effective
+  scaling, and AI profiles for each case. Report wall-clock runtime separately
+  from simulation time.
+- Evaluate the gameplay result before classifying a run at the cutoff.
+  Preserve an unfinished case's state, milestone report, and AI diagnostics;
+  report Incomplete / stalled as a failed completion check.
+- Compare Normal pacing against the agreed tuning windows, noting disruption.
+  Verify difficulty scaling, completed results, and save/load for Easy and
+  Hard. Run recovery and disruption cases separately from the baseline matrix.
+
+## M1 performance measurement
+
+Use the reference Mac, workloads, and budgets in
+[M1 pacing and acceptance](../DESIGN.md#m1-pacing-and-acceptance). These are
+planned M1 acceptance checks; current M0 browser checks do not establish them.
+
+- Use production browser and packaged macOS builds from the same revision.
+  Record macOS and runtime versions, graphics settings, actual render-buffer
+  dimensions, workload composition, and camera path.
+- Run on mains power with unrelated heavy work stopped. Use a repeatable scene
+  exercising movement, gathering, combat, vision, and AI.
+- Warm up for 10 seconds, then measure for 60 seconds. Repeat three times per
+  build and workload, reporting each run rather than selecting the fastest.
+- Report frame rate and frame-time percentiles, simulation tick-time
+  percentiles, and simulation backlog. Repeat at 2x to verify simulation pace
+  and report rendering performance. Measure stress-case degradation separately.
+
 ## Mission flow
 
 The full ARC M0 browser mission starts at the title screen and uses the authored
@@ -137,7 +169,8 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
   pauses, speed changes, confusion, assistance, and abandonment. Fix recurring
   blockers and repeat the affected paths. Aim for the design's 5 to 10 minute
   successful run without slowing the economy or adding encounters to pad it.
-  M1 match-length and skirmish acceptance targets are separate tasks in TODO.md.
+  Use the separate [M1 targets](../DESIGN.md#m1-pacing-and-acceptance) for
+  skirmish acceptance, tracked in TODO.md.
 - On a fixed revision, run the built Windows and macOS apps from the title
   screen through victory and continued free play. Exercise defeat, load,
   restart, Main menu, and Exit. Check the default 800×600 window and resizing,
@@ -145,6 +178,10 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
 - Verify named saves survive relaunch, repeated quicksave overwrite and
   quickload, objective autosave, native Import and Export, cancellation, and
   malformed or incompatible files preserving the current session.
+- For M1, verify incompatible saves stay listed with their mismatch reason and
+  deletion action. Rejected loads preserve the stored file and current mission;
+  compatible updates retain working saves. Same-build save/load continuation
+  remains deterministic under the policy in DESIGN.md.
 - Check Options before starting a mission and confirm settings persist through
   loads, restarts, and relaunch. Listen for the mix and loops throughout a run.
 - Test release bundles and installation when distributing the desktop demo.

@@ -74,14 +74,44 @@ within their parent question.
   #q27-how-do-building-upgrades-work)
 - **Deferred:** [Q28 — Mod support](#q28-how-does-modding-work)
 - **Resolved:** [Q29 — NPC AI](#q29-how-should-npc-ai-work)
-  Script conflicts and relationship changes remain open; M1 implementation and
-  tuning are tracked in TODO.md.
+  Script conflicts remain open; M1 implementation and tuning are tracked in
+  TODO.md.
+
+## M1 decision checklist
+
+These boxes track completed design decisions, not implemented features.
+Accepted rules remain locked when a follow-up is open. TODO.md owns delivery
+and acceptance work.
+
+- [x] **1.03:** [Circle construction](
+    #circle-construction-how-do-cultivators-grow-buildings)
+- [x] **1.04:** [Cultivation reserves and dormancy](
+    #m1-cultivation-how-do-reserves-output-and-dormancy-interact)
+- [x] **1.05:** [Roster and combat roles](
+    #m1-roster-what-should-the-additional-combat-roles-contribute)
+- [x] **1.06:** [Common resources and progression scope](
+    #m1-scope-which-resources-and-progression-systems-are-included)
+- [x] **1.07:** [Scenario starts and scripted expansion](
+    #m1-follow-up-how-do-sides-start-and-expand)
+- [x] **1.08:** [Ownership and relationships](
+    #resolved-q29-foundation-how-do-ownership-and-faction-type-relate)
+- [x] **1.09:** [Results and summary](
+    #m1-skirmish-what-eliminates-a-side-and-resolves-the-match)
+- [x] **1.10:** [Pacing and acceptance targets](
+    #m1-pacing-what-match-length-and-acceptance-targets-fit-the-slice)
+- [x] **1.11:** [Development save compatibility](
+    #resolved-follow-up-how-are-saves-versioned)
+- [x] **1.12:** [Controls and rebinding](
+    #m1-controls-how-do-control-groups-and-command-bindings-work)
+- [x] **1.13:** [Circle art and audio](
+    #m1-circle-presentation-what-should-living-technology-look-and-sound-like)
 
 ## Working with questions
 
 - Use TODO.md to select the next unresolved decision and follow its
   dependencies. An answer may settle related questions too.
-- Treat answers as drafts until their question is marked resolved.
+- Treat proposed answers as drafts until accepted. An open follow-up does not
+  reopen accepted rules in its parent question.
 - Add newly discovered choices under that question's follow-ups.
 - Record dependencies when one answer constrains another question.
 - Update the table of contents when a question's state changes.
@@ -564,8 +594,8 @@ Can the player formally lose Milestone 0, and if so, what event causes the loss?
 - If the player cannot afford a replacement, they must obtain Materials through
   another available source, such as loot, or sell an eligible completed
   building for up to its half-cost refund under Q8's health-scaled formula.
-- **Hard defeat:** Destruction of the player's Command Center immediately loses
-  the mission.
+- **M0 hard defeat:** Destruction of the player's protected starting Command
+  Center immediately loses the mission.
 - **Hard defeat:** Failure of a mission-specific mandatory objective, such as
   allowing a protected location to be destroyed, immediately loses the
   mission.
@@ -576,14 +606,195 @@ Can the player formally lose Milestone 0, and if so, what event causes the loss?
 - Soft defeat does not automatically end the mission. The player decides
   whether to search for an unconventional recovery, sell assets, or restart.
 
-#### Resolved follow-up: How does post-victory free play end?
+#### Resolved follow-up: When is post-result free play available?
 
-- Victory pauses the mission and offers continued free play.
-- The starting Command Center remains a protected objective during free play.
+- M0 victory pauses the mission and offers continued free play.
+- M0's starting Command Center remains protected during free play.
   Its destruction causes defeat, as specified in DESIGN.md.
 - Campaign progression is outside the standalone M0 mission.
 - Game-wide: a campaign mission's earned victory stays recorded for
   progression. A later defeat in post-victory free play cannot revoke it.
+- Single-player campaign missions offer optional free play after victory or
+  defeat, using the surviving forces and battlefield as they stand. After
+  defeat, label the action Continue free play - mission failed. The outcome
+  and summary stay fixed; later play cannot award campaign completion or
+  progression from a failed mission. Restarting or loading an earlier save is
+  required for a successful attempt. M1 skirmishes end at their result without
+  free play.
+
+#### M1 skirmish: What eliminates a side and resolves the match?
+
+**State:** Resolved; task 1.09 records the results, metrics, and save policy.
+
+- A side is eliminated when its owner has no qualifying completed buildings
+  remaining. If exactly one owner is eliminated, the other wins. Qualifying
+  buildings count even when disconnected or otherwise inactive, including
+  buildings completed during play and replacement or additional headquarters.
+- Evaluate both owners once at tick end after commands, simultaneous combat
+  damage, and construction updates. Count surviving qualifying buildings
+  completed by that checkpoint. If both owners have none, record a draw.
+  Latch the result and final statistics together, then freeze. One shared
+  checkpoint keeps actor-processing order from deciding the outcome.
+- ARC's qualifying types are Command Centers, Materials Refineries, Field
+  Barracks, and Sentry Turrets. Circle's are Heartgroves, Conservatories,
+  Musterhalls, Construct Nurseries, and Thornspires. Relay Stations do not
+  count. Walls are outside M1's roster.
+- Defensive buildings count because they can help stranded surviving forces
+  win. Their inclusion is a playtest decision that may be revisited.
+- Destroying the starting headquarters alone does not eliminate an owner with
+  another qualifying completed building. Surviving mobile units do not prevent
+  elimination. Requiring every unit to die would prolong a decided match
+  through searches for hidden or camouflaged survivors with no recovery
+  prospects.
+- Unfinished construction does not prevent elimination. A replacement
+  headquarters completed that tick can keep its owner alive even when the
+  last earlier qualifying building is lost in the same tick. Normal tending,
+  support, and infrastructure requirements still apply; a paused job receives
+  no free completion. Sales use the same end-of-tick checkpoint. Unfinished
+  blueprints cannot prolong a decided match.
+- Economic stalls and weak surviving forces remain player-judged soft defeats
+  while a qualifying completed building remains.
+- A surviving side that loses its last operational headquarters may run one
+  emergency replacement-headquarters construction job at a time without an
+  infrastructure slot. Normal resource costs and build time still apply;
+  other infrastructure work stays paused until a headquarters is operational.
+- ARC places the replacement Command Center within the usual support radius
+  of a surviving owned, completed building, even when disconnected. Circle
+  requires a surviving Cultivator to tend the replacement Heartgrove under
+  normal placement rules. Completion restores normal infrastructure operation.
+  This is a narrow M1 skirmish exception to headquarters-owned capacity.
+- Victory, defeat, and draw freeze the M1 skirmish at the result tick and
+  open its match summary. Camera movement and selection remain available for
+  inspection, with Save, Restart, Load, and Main menu actions. Named saves and
+  Quicksave remain available for every outcome. There is no skirmish free play;
+  post-result continuation belongs to single-player campaigns.
+- Results and summary statistics stay fixed at the result tick. Loading a
+  finished skirmish preserves the result; restarting begins a fresh match
+  with the same setup.
+- The summary milestones, histories, and totals are defined below.
+- M1 skirmishes autosave at match start and every five simulation minutes
+  during play. A tick ending the match never overwrites Autosave, preserving
+  the latest pre-result recovery checkpoint. Manual saves, Quicksave, and
+  Autosave remain separate. Loading a finished save restores frozen inspection;
+  loading an in-progress save permits another attempt.
+
+**Decision date:** 2026-10-22; end-of-tick results and save policy 2026-10-23.
+
+#### M1 summary: Which milestones and histories should be recorded?
+
+**State:** Resolved; task 1.09 in TODO.md records the metric definitions.
+
+- Record milestones once per owner using simulation ticks. Show Not reached
+  when a milestone never happens. Player summaries, AI reports, and playtest
+  timing use the same definitions.
+- First income is the first positive delivery of harvested or cultivated
+  resources, excluding starting stocks, refunds, sales, and loot.
+- Military production ready is the first operational Field Barracks,
+  Musterhall, or Construct Nursery. First combat unit is the first armed
+  mobile unit entering play through normal production, excluding workers,
+  scouts, and support units.
+- First expansion is the first positive delivery containing resources gathered
+  outside the owner's starting resource area. The map identifies starting
+  resource sites per start position; other sites qualify. Record the delivery
+  tick, preserving cargo sources through site changes and saves. This measures
+  productive expansion without requiring another headquarters or drop-off
+  building, supporting both factions' gathering routes.
+- First engagement is the first positive damage an owner deals to or receives
+  from the opposing owner. First base attack is the first positive damage it
+  deals to an opposing building, including defenses, relays, and unfinished
+  structures. Orders that never cause damage do not count; wildlife and neutral
+  actors do not trigger these opponent-specific milestones.
+- Record living mobile units and completed buildings over time, including
+  defenses and relays regardless of elimination eligibility. Also record
+  explored and currently visible tile counts: discovered terrain versus active
+  vision coverage. These are per-owner histories.
+- Sample every five seconds of simulation time, with initial and final-result
+  samples. Milestones retain exact ticks. Saves preserve histories. Post-match
+  graphs compare both owners; opponent histories remain hidden during play.
+- Resources gathered counts harvested or cultivated resources deposited into
+  stockpiles. Starting stocks, carried cargo, loot, sales, and refunds do not
+  count. Resources spent counts construction, training, and repair payments
+  minus cancellation refunds. Sale proceeds do not erase earlier spending.
+- Units produced counts normal production entering play, including workers
+  and support units. Buildings completed counts normal construction
+  completions, including replacement headquarters. Starting actors and direct
+  story grants do not count toward either total.
+- Combat losses counts owned units and buildings destroyed in combat,
+  including unfinished construction; sales and cancellations do not count.
+- Peak army size is the maximum simultaneous number of living, armed mobile
+  units, excluding defenses, workers, scouts, and support units. Counters and
+  peaks use exact simulation events and ticks, independently of graph samples.
+  All recorded metrics stop at the result tick.
+
+**Decision date:** 2026-10-22.
+
+#### M1 pacing: What match length and acceptance targets fit the slice?
+
+**State:** Resolved; task 1.10 in TODO.md records the acceptance targets.
+
+- Normal M1 skirmishes target 15 to 25 minutes of simulation time at 1x speed,
+  excluding pauses and loading, for both faction matchups. This leaves room
+  for income, scouting, expansion, specialists, and recovery.
+- The range is a balance target, not a mission timer. Longer matches can
+  continue; repeated stalemates prompt review of the map, AI, defenses, and
+  economy.
+- AI offensive operations have a four-minute opening grace period. Income,
+  force development, and scouting proceed normally; local defense is allowed
+  immediately.
+- Undisturbed Normal AI development uses whole-minute windows: first income
+  around minutes 1 to 2, military production ready around minutes 2 to 4,
+  first combat unit around minutes 3 to 5, and first expansion income around
+  minutes 5 to 8. Earlier development is acceptable; these are tuning windows
+  rather than waiting timers. Disruption may delay development, and factions
+  may reach different parts of the ranges. Keep exact milestone ticks while
+  using whole-minute targets for reporting.
+- Target first small raids against observed opportunities around minutes 4 to
+  6, and substantial base assaults around minutes 8 to 12, in normal,
+  undisrupted play. Both factions use normally produced forces and observed
+  targets. Losses, disrupted income, and urgent defense can delay attacks.
+  These windows guide tuning rather than forcing attacks regardless of state.
+- These operation targets are separate from the damage-based first engagement
+  and first base-attack metrics; an earlier raid may damage a building.
+- M1's skirmish mission-start dialog offers ARC or Circle and Easy, Normal,
+  or Hard difficulty. Both choices are independent. Apply existing enemy
+  health/damage scaling of sqrt(0.5), 1, or sqrt(2). Starting stocks, roster
+  availability, AI profiles, and opening grace stay the same across settings.
+  Normal is the pacing and balance baseline.
+- Resolved setup and saves preserve faction choice, effective difficulty,
+  and scaling. Restart uses those choices; existing saves keep their original
+  difficulty.
+- The headless baseline has 12 cases across the two player-faction choices,
+  two start positions, and three difficulties. Both sides use their standard
+  faction AI profile. One stands in for the player; the opposing AI receives
+  the selected enemy scaling.
+- Normal cases establish pacing. Easy and Hard verify scaling, completed
+  matches, and save/load behavior. Recovery and disruption tests are separate
+  from the baseline matrix.
+- Headless baseline cases stop at 30 simulation minutes if no result occurs.
+  Report Incomplete / stalled as a failed completion check and preserve the
+  state, milestones, and AI diagnostics. This is a test-runner cutoff;
+  player-controlled matches continue under their normal elimination rules.
+- Benchmark scenes use a 5:1 mobile-unit-to-building ratio across both owners:
+  200 units and 40 buildings normally, and 400 units and 80 buildings for
+  stress testing. Count workers, scouts, support, and combat units. Exercise
+  movement, pathfinding, gathering, combat, vision, and AI together.
+- The normal workload must meet performance budgets. The stress workload
+  measures degradation and bottlenecks. These counts specify benchmark scale;
+  gameplay population limits remain a separate decision.
+- The desktop performance reference is the development Mac laptop with Apple
+  M3 Pro and 18 GB memory. It is the M1 performance acceptance device.
+- Keep phone and tablet browser layout and touch-input checks in M1, deferring
+  physical mobile-device performance targets beyond M1.
+- Measure production browser and packaged macOS builds at 1920 x 1080 actual
+  render resolution with the normal workload. Target 60 FPS at 1x speed, with
+  95% of frames completing within 20 ms. Exercise active movement, gathering,
+  combat, vision, and AI.
+- Retain 60 ticks per simulation second. Target 95% of simulation ticks within
+  4 ms and 99% within 8 ms. At 2x, sustain 120 ticks per real second without
+  growing backlog and report rendering performance. Stress-case degradation
+  is diagnostic rather than subject to these same acceptance thresholds.
+
+**Decision date:** 2026-10-22.
 
 **Depends on:** Q3-Q4.
 
@@ -661,7 +872,55 @@ ordinary building placement.
   play begins.
 - The first Materials Refinery introduces footprint placement, rotation, terrain
   validity, and proximity to the Command Center instead.
-- How the Command Center is established in the full game remains deferred.
+- Headquarters establishment is scenario-specific. A mission may start with an
+  operational headquarters or a mobile base that must establish itself. Neither
+  is a universal default. Mobile starts follow the accepted deployment rules
+  from Q22; implementing those actors remains outside M1's selected scope.
+
+#### M1 follow-up: How do sides start and expand?
+
+**State:** Resolved; task 1.07 in TODO.md records the setup decision.
+
+- Scenario starting conditions are authored independently for each owner.
+  Support both sides establishing bases together and scenarios where one or
+  both sides start with completed or partially constructed bases. The scenario
+  also chooses between an established headquarters and a mobile-base start;
+  there is no universal headquarters starting state.
+- Mobile-base starts use the deployable-actor rules and remain outside M1's
+  implementation scope.
+- Missions may script aspects of base expansion alongside autonomous
+  base-building AI, respecting the shared mission behavior and simulation
+  rules from Q29.
+- Initial setup directly authors actors, stockpiles, and construction progress.
+  During play, ordinary scripted expansion uses normal resource costs, build
+  times, infrastructure queues, valid placement, and support. Free resources,
+  reinforcements, and completed installations are separate explicit story-event
+  actions through validated deterministic simulation boundaries.
+- Scripts may command only the AI-controlled owners declared by the scenario.
+  Direct commands to player-owned actors need explicit scenario permission,
+  optionally limited to particular actors or a scripted sequence. Story grants
+  are separately authorized and do not imply direct command permission.
+- M1's skirmish uses one authored battlefield with two fixed start areas that
+  accommodate either faction. At launch, assemble each owner's faction,
+  starting assets, resources, and AI profile for its assigned slot. Terrain,
+  routes, and expansion sites stay the same across assignments, and both
+  assignments are available for verification.
+- Assembly produces a resolved tick-0 mission file through ordinary validation
+  and loading. Preserve that pristine setup alongside saved runtime state so
+  loading and restarting reproduce the same assignments and starting assets.
+- For M1's skirmish, both owners begin at the same tick with one operational
+  Command Center or Heartgrove and enough resources to establish income through
+  normal play. No preplaced worker is required: ARC builds a Refinery and
+  produces its Harvester; Circle trains a Cultivator at its Heartgrove, then
+  grows a Conservatory. Economy buildings, production buildings, defenses, and
+  armies are developed during the match. This opening belongs to that skirmish,
+  not every mission.
+- Starting packages follow the common-resource amounts defined under M1 scope
+  below. They cover the first worker and drop-off building, are data-driven,
+  and are verified against normal costs during implementation.
+
+**Decision date:** 2026-10-22 for scenario-defined starting conditions and
+support for scripted aspects of expansion.
 
 **Depends on:** Q3-Q6.
 
@@ -757,7 +1016,7 @@ sources of a visible exotic currency.
   **Lifebloom Conservatory**.
 - ARC Harvesters do not construct buildings. Q26 defines the separate recovery
   roles. The full-game scouting value of workers remains open; Cultivator
-  participation in construction is an M1 decision in TODO.md.
+  construction tending is defined in Q9's Circle construction answer.
 
 #### Q8c. Does training an M0 unit also spend Materials?
 
@@ -770,9 +1029,11 @@ both structures and units. The rare and exotic tiers do not appear in M0.
 
 **Scope:** Game-wide
 
-- Each resource type uses a global faction stockpile and has no storage limit.
+- Each resource type uses a global stockpile per owner by default and has no
+  storage limit. A mixed-faction owner keeps Materials and Lifebloom separate,
+  with Catalysts and Resonance also distinct when available.
 - Once a worker delivers resources or a unit collects ordinary loot, those
-  resources are immediately available for spending anywhere the faction can
+  resources are immediately available for spending anywhere the owner can
   issue a valid purchase or construction order.
 - Refineries and other buildings do not create storage capacity.
 - Selling, disconnecting, or destroying a building never removes resources
@@ -780,6 +1041,17 @@ both structures and units. The rare and exotic tiers do not appear in M0.
 - The game will not add storage buildings or capacity management merely to cap
   accumulated resources; that upkeep would add annoyance without supporting
   the intended strategy.
+- Scenarios may explicitly enable shared resource pools, including for future
+  cooperative multiplayer. An alliance alone does not enable resource pooling.
+  Sharing combines balances of the same resource type only. Materials and
+  Lifebloom remain distinct and cannot fund one another's costs.
+- Separating a shared pool divides its remaining balance equally among owners
+  by default, with scenario-defined overrides. Earlier spending is not reversed.
+  Division preserves the remaining total; stable owner IDs resolve indivisible
+  remainders. This avoids tracking and reversing historical contributions.
+
+**Decision date:** 2026-10-22 for separate owner and resource-type balances and
+optional scenario-defined shared pools. Multiplayer remains outside M1.
 
 #### Q8d. What are the faction-facing names for the common resource?
 
@@ -851,6 +1123,34 @@ from the resources it actually returns.
 - M0 does not need this tip or mixed-yield feedback because its sites produce
   only Materials.
 
+#### M1 scope: Which resources and progression systems are included?
+
+**State:** Resolved; task 1.06 in TODO.md records the scope.
+
+- M1 uses Materials for ARC and Lifebloom for Circle. Every selected unit and
+  building costs its faction's common resource, including Demolition Troopers,
+  Briar Rams, and Construct Nurseries.
+- Catalysts, Resonance, and mixed-yield collection are deferred beyond M1.
+  Fresh deposits support ARC expansion as extraction exhausts existing sites;
+  spreading cultivation across renewable sites supports Circle expansion.
+- Selected units are available from their assigned operational producer under
+  normal costs, queue capacity, and worker-assignment rules. Building upgrades
+  and permanent research are deferred beyond M1. Progression comes from
+  investing in income, producers, expansion, and forces.
+- Each headquarters retains one baseline infrastructure slot. Another
+  headquarters provides its own queue and baseline capacity.
+- Task 1.58 records the optional-system deferral; no selected roster or AI
+  task requires rare resources, upgrades, or permanent research.
+- ARC starts the skirmish with 150 Materials: a Materials Refinery costs 100
+  and its Harvester costs 50. Circle starts with 150 Lifebloom: a Cultivator
+  costs 50 and a Conservatory costs 100.
+- Each starting stockpile covers exactly the first worker and drop-off
+  building. Player and AI receive the same package for their chosen faction.
+  These are initial data-driven tuning values; costs and starting amounts
+  change together to preserve an affordable income opening.
+
+**Decision date:** 2026-10-22.
+
 #### Q8g. Do resource sites deplete or recover?
 
 **Scope:** Game-wide
@@ -867,12 +1167,71 @@ yields or also by pressure on existing collection sites.
   Circle to cultivate multiple sites.
 - Both factions therefore need territory, but their pressure to expand reflects
   their contrasting relationship with the world.
-- Exact rates, capacities, recovery times, and balance remain deferred.
+- Initial M1 rates, capacities, thresholds, and recovery are defined below;
+  final balance is refined through playable-slice testing.
 - **M0 exception:** The prototype uses finite Materials tiles so harvesting can
   demonstrate the depletion stages selected in Q18. It does not
   need to model ARC's broader ecological damage rules or the Circle's dormancy
   and recovery cycle. Harvester loss can still create the soft-defeat state
   described in Q5.
+
+#### M1 cultivation: How do reserves, output, and dormancy interact?
+
+**State:** Resolved; initial tuning is refined with the playable Circle slice.
+
+- Circle sites have renewable reserves that replenish over time, including
+  during cultivation. Workers draw down those reserves. Modest use can be
+  sustainable; heavier use provides short-term income while draining the site
+  toward dormancy.
+- Output falls as reserves approach exhaustion. This gives players feedback
+  and an incentive to rest or rotate sites before full dormancy, complementing
+  worker allocation between cultivation and construction.
+- A low reserve threshold triggers dormancy and stops cultivation before the
+  site is completely exhausted.
+- Initial thresholds are 10% reserve to enter dormancy and 60% to reopen.
+  Regeneration continues during dormancy without workers or resource payment.
+  Reopening is automatic, with no manual activation or additional cooldown.
+  The distinct thresholds allow a useful rest instead of rapid state changes;
+  both are data-driven tuning values.
+- Initial cultivation speed is 100% at reserves from 60% to 100%, declining
+  linearly below 60% to 50% just above the 10% dormancy threshold. Workers fill
+  cargo more slowly; the site's common-to-rare yield ratio does not change.
+  Sites show Healthy, Strained, or Dormant states. Dormant sites retain that
+  state throughout recovery until they reopen at 60%.
+- Sites have no fixed worker limit or aggregate output cap. Each actively
+  cultivating worker contributes at the site's reserve-adjusted rate; all
+  workers draw from the same reserve. Spreading workers supports steadier
+  income, while concentration provides a burst that can force dormancy.
+- Initial site capacity is 100 reserve units, regenerating 1 unit per second
+  up to capacity. Each worker gathers 1 resource unit per second at full speed
+  and consumes reserve at the same rate. Cargo capacity is 30 resource units.
+  One Cultivator can cultivate sustainably, and dormant recovery from 10% to
+  60% takes 50 seconds. These are data-driven starting values to refine when
+  the Circle slice is playable, rather than final balance targets.
+- Cultivators retain their site assignment through dormancy. They deliver any
+  partial cargo to a Conservatory, then wait at a reachable position near the
+  assigned site and automatically resume when it reopens. Players redirect
+  them to another site manually; workers do not seek a replacement site.
+- Each delivery trip automatically selects the nearest reachable Conservatory
+  belonging to the worker's owner. Workers are not bound to one Conservatory,
+  so new or lost buildings change routing without reassignment. If none is
+  reachable, workers retain their cargo and show a blocked-delivery warning.
+- Selected sites show a reserve bar and percentage, current cultivation
+  efficiency, and Healthy, Strained, or Dormant state. During dormancy, they
+  show that recovery reopens the site at 60%. Workers waiting at a dormant site
+  show Waiting for site recovery rather than Idle. A worked site entering
+  dormancy produces one notification per transition, without repeated
+  reminders. Feedback uses normal visibility rules and keeps common-to-rare
+  yield ratios hidden.
+- Move, Stop, and construction orders interrupt cultivation immediately,
+  preserving cargo without a delivery detour. Gather at a new site delivers
+  existing cargo first. After an explicit interruption, resuming cultivation
+  requires a new Gather order. Dormancy keeps Gather active, so orders queued
+  behind it continue waiting through recovery.
+- Tasks 1.50 and 1.51 implement cultivation and feedback, 1.56 verifies save
+  continuation, and 1.57 refines tuning through playable-slice testing.
+
+**Decision date:** 2026-10-22.
 
 #### Resolved Q8 follow-up: How are harvesting problems communicated?
 
@@ -957,8 +1316,8 @@ yields or also by pressure on existing collection sites.
 
 Open economy details:
 
-- Whether workers serve as useful scouts, and whether Cultivators participate
-  in construction. TODO.md tracks the M1 construction decision.
+- Whether workers serve as useful scouts. Cultivators continuously tend new
+  Circle construction under the rules in Q9.
 - Whether the full game permits resource transfer or trading, formal ownership
   of collection sites, or a population or command cap.
 - The exotic resource's name, collection method, and uses after its reveal.
@@ -976,7 +1335,8 @@ are M0 balance tuning rather than unresolved economy rules.
 
 **State:** Resolved
 
-**Scope:** M0-only representatives of intended ARC roles
+**Scope:** The working roster is M0-only; the M1 follow-up defines its expanded
+two-faction roster.
 
 Choose the smallest ARC roster that exercises establishment, harvesting,
 construction, production, exploration, movement, and combat.
@@ -994,6 +1354,75 @@ construction, production, exploration, movement, and combat.
 - **Trooper:** Armed general-purpose soldier used for exploration and combat.
 - **Scout:** Fast exploration specialist with extended sight and very low
   health.
+
+#### M1 roster: What should the additional combat roles contribute?
+
+**State:** Resolved; task 1.05 in TODO.md records the roster decision.
+
+- Troopers are general-purpose ranged infantry. Sentinels are tougher ranged
+  infantry with shorter reach than Troopers. Troopers benefit from distance
+  and concentrated fire; Sentinels withstand more punishment while advancing
+  and protecting assault constructs. Both threaten exposed specialists and
+  support units. Relative cost, speed, and durability are match-tuning values.
+- Scouts and Wayfinders share the fast, fragile, unarmed scouting role, with
+  substantially more vision than basic infantry. Scouts train at the Field
+  Barracks; Wayfinders train at the Musterhall. Both use ordinary vision to
+  discover routes and sites, observe enemy expansion, and refresh reports of
+  enemy forces. Their speed, sight, health, and cost are independently tunable.
+- Both factions add a defense-breaking specialist. It threatens structures
+  but is inefficient against mobile troops, so basic troops must protect it.
+- Both specialists use ordinary single-target attacks with low damage against
+  mobile units and a data-driven damage bonus against buildings, including
+  defenses, producers, and economic structures. Exact damage, bonuses, and
+  cadence are tuned through matches. Splash damage, siege deployment modes,
+  and activated siege abilities are outside M1.
+- Basic troops threaten exposed specialists, while static defenses protect
+  economic sites against small raids. This creates a reason to field mixed
+  forces and a way to attack defended bases.
+- ARC's **Demolition Trooper** is fragile, slow-firing infantry carrying a
+  heavy launcher that outranges basic defenses. It is trained at the Field
+  Barracks, receives Medic support, and needs a Trooper screen. The name states
+  its role using ARC's plain military terminology.
+- The Circle's **Briar Ram** is a tougher, slower living assault construct
+  that approaches and batters structures. Sentinels protect its approach. The
+  name suggests an organic creature built to break structures. Its assault
+  requires more commitment than ARC's ranged approach. Both specialists use
+  ordinary attack orders.
+- Circle production is split between Heartgroves for Cultivators, Musterhalls
+  for Sentinels, Wayfinders, and Healers, and **Construct Nurseries** for Briar
+  Rams and Artificers. A Nursery grows Briar Rams and trains Artificers through
+  its own normal unit-production queue, shared by its two unit types. Its
+  construction is an investment before fielding a construct assault force.
+  The name communicates living production and permits future construct types.
+- M1 includes Artificers for Briar Ram repair under the normal support
+  rules. Healers serve biological units rather than living constructs.
+- M1 includes Mechanics so surviving Harvesters can recover from raid damage.
+  Medics heal ARC personnel, including Demolition Troopers. Both support units
+  train at the Field Barracks and compete with Troopers, Scouts, and Demolition
+  Troopers for its production queue. Mechanics follow the normal unarmed,
+  resource-free unit-repair rules; buildings use separate paid Repair jobs.
+- ARC's Sentry Turret uses rapid single-target fire at moderate range and is
+  relatively fragile. Overlapping coverage protects approaches. Circle's
+  Thornspire is a tougher living defense with shorter range and slower,
+  heavier single-target shots, protecting nearby workers and buildings.
+- Both defenses automatically engage detected hostiles and accept manual
+  attack targets. They use normal faction construction and repair rules,
+  including ARC support connections and Cultivator tending during growth.
+  Demolition Troopers outrange them; Briar Rams withstand their fire long
+  enough to approach and attack.
+- ARC's Relay Station is inexpensive and unarmed, with a larger support
+  radius than ordinary structures. It extends the connected network toward
+  resources and forward positions. Losing its upstream connection can disable
+  downstream buildings. It adds coverage rather than infrastructure slots.
+- Connected ARC expansion and worker-led Circle expansion are a core
+  play-style difference. Circle expansion uses Cultivators and existing
+  buildings without a dedicated expansion structure in M1. A new Heartgrove
+  provides an independent infrastructure queue when needed.
+- M1 uses common-resource costs and producer-based availability under the
+  scope in 1.06. Statistics and costs are refined through playable matches.
+  Tasks 1.39, 1.41, 1.42, 1.48, and 1.52 implement the selected roster.
+
+**Decision date:** 2026-10-22.
 
 #### Q9a. How does ARC construct other structures?
 
@@ -1024,12 +1453,62 @@ construction, production, exploration, movement, and combat.
 - The Harvester remains a resource-collection unit and does not construct
   buildings.
 
+#### Circle construction: How do Cultivators grow buildings?
+
+**State:** Resolved; task 1.03 in TODO.md records the construction decision.
+
+- A Cultivator must remain at a growing Circle building and continuously tend
+  it. While tending, that worker cannot gather. Growth advances only with a
+  Cultivator present and an available Heartgrove infrastructure slot. Only one
+  Cultivator tends a building at a time; extra workers do not accelerate growth.
+- If the worker leaves, dies, or cannot reach tending range, growth pauses with
+  payment and progress preserved and yields its infrastructure slot. Another
+  selected Cultivator can take over through a manual Tend order on the
+  unfinished building without paying again, subject to normal queue scheduling.
+  Completion releases the tending assignment.
+- A Cultivator may grow buildings on explored, valid terrain it can reach.
+  Normal footprint, terrain, and occupancy rules apply, without a growth-area
+  restriction or chain of supporting buildings.
+- Completed Circle buildings operate and provide vision independently of a
+  Heartgrove support chain. Construction, repair, and upgrades still use the
+  assigned eligible operational Heartgrove's slots. Losing that headquarters
+  triggers normal reassignment; without a replacement, infrastructure work
+  pauses while completed buildings continue their normal operations.
+  Q5 defines M1's emergency Heartgrove-recovery exception.
+- A Lifebloom Conservatory serves multiple Cultivators without a worker-slot
+  cap. Sustainable income depends on site throughput, travel, and dormancy,
+  whose details belong to task 1.04. More Conservatories improve delivery routes
+  and provide redundancy rather than unlocking another worker slot.
+- Heartgroves train Cultivators through paid, timed production on their own
+  unit-training queues, independently of infrastructure slots. Conservatories
+  accept cultivated resources and do not produce workers.
+- M1's Circle opening trains its first Cultivator at the Heartgrove, then grows
+  a Conservatory. Starting Lifebloom covers both. No preplaced worker is
+  required, while other scenarios may explicitly supply one. A surviving
+  Heartgrove can replace lost workers and restore a lost Conservatory if the
+  owner has enough resources.
+- This adds a workforce-allocation decision to the familiar construction loop.
+  The Circle's advanced learning curve also draws on renewable cultivation,
+  throughput limits, and dormancy from Q8.
+- Tasks 1.48 and 1.49 implement these rules; task 1.04 defines cultivation,
+  delivery behavior, throughput, and dormancy.
+
+**Decision date:** 2026-10-22 for continuous tending; explicit worker control
+and manual replacement 2026-10-23.
+
 #### Q9b. What happens when construction support is lost?
 
 **Scope:** Game-wide ARC rule; represented in M0
 
 - Every ARC building requires an unbroken chain of overlapping support areas
-  back to the player's Command Center.
+  back to its owner's Command Center by default. Scenarios may explicitly
+  enable support sharing between allied ARC owners, allowing links, placement
+  coverage, and support from an allied Command Center. Other faction types do
+  not supply ARC construction support.
+- An alliance alone does not share construction support. Enabling support
+  sharing does not grant control over allied actors or pool resources.
+- Support coverage sharing and access to allied headquarters' infrastructure
+  queues are separate scenario permissions; Q26 defines queue access.
 - A building without that connection stops operating and stops extending
   construction support. It cannot serve as a bridge for buildings farther down
   the chain.
@@ -1043,6 +1522,10 @@ construction, production, exploration, movement, and combat.
 - The interface must clearly show support coverage, broken connections, and
   disabled buildings so that shutdowns are understandable rather than
   surprising.
+
+**Decision date:** 2026-10-22 for owner-specific support and optional
+scenario-defined sharing between compatible allied networks. Circle
+construction rules are defined in the Circle construction follow-up above.
 
 #### Q9c. What happens to interrupted progress?
 
@@ -1252,6 +1735,87 @@ commands coexist with camera pan, rotation, zoom, and minimap input.
   idle-worker controls, and command bindings. TODO.md tracks their design and
   delivery.
 
+#### M1 controls: How do control groups and command bindings work?
+
+**State:** Resolved. Implementation is tracked in tasks 1.27, 1.44, 1.45, and
+1.49.
+
+- Provide ten manually assigned groups numbered 1 through 9 and 0. Each holds
+  owned mobile units; a unit may belong to more than one group. Buildings
+  retain individual selection and do not join control groups in M1.
+- Recall replaces selection without moving the camera. A quick repeated
+  recall focuses the camera on surviving members. Destroyed units drop out;
+  newly trained units require manual assignment.
+- An on-screen Groups panel provides numbered recall buttons and explicit
+  Assign, Add, and Clear actions for touch and pointer users.
+- Number keys recall; a quick repeated press selects and focuses.
+  Ctrl+Shift+number assigns the selected units, replacing group membership;
+  Shift+number adds selected units. Clear uses the Groups panel.
+- Use Control, including on Mac, with the same defaults in browser and desktop
+  builds. The assignment chord avoids browser tab shortcuts while Shift keeps
+  its additive role.
+- Save group membership with the mission as player interface state. Loading
+  restores surviving members still owned by the player; restarting or starting
+  a new mission clears groups. Groups do not affect simulation outcomes.
+  Loading keeps current keyboard preferences rather than restoring old keys.
+- Period selects and focuses the next owned idle Harvester or Cultivator;
+  repeated presses cycle. Shift+Period selects all idle workers without moving
+  the camera. An Idle workers button shows the count and cycles, with a Select
+  all action for touch and pointer users.
+- Idle means no active work assignment or pending orders. A Harvester's
+  Refinery affiliation alone does not make it busy. Stopped workers and those
+  finished with an exhausted ARC site qualify, even while carrying resources.
+  Workers waiting for site recovery, a delivery route, or assigned construction
+  to resume retain their assignment and show the specific waiting or blocked
+  status instead.
+- Double-clicking an owned mobile unit selects all owned units of that exact
+  type in the current view. Shift-double-click adds them to the selection.
+  Buildings retain individual selection.
+- The selection panel shows one entry per selected mobile-unit type with its
+  selected count. Each entry offers Same type in view and Same type across map
+  actions naming that exact type, including on touch. By default matches
+  replace selection; Add units adds matches while retaining other selected
+  types. Per-type entries make mixed-selection actions explicit. Map-wide
+  selection remains a deliberate action rather than part of double-click.
+- A enters Attack Move targeting; click or tap a destination to submit.
+  Shift-click queues the destination and keeps targeting open for more
+  waypoints. Escape or Cancel exits without issuing an order.
+- S stops selected mobile units, cancelling active and queued orders while
+  retaining selection. Attack Move, Stop, and Cancel remain available as
+  on-screen actions. Shortcuts yield to dialogs and text fields.
+- B opens construction; Q/W/E/R/T choose its first through fifth building
+  cards, followed by normal placement. Selecting a production building opens
+  training, where those keys queue one unit from the corresponding card.
+  Shortcuts act on the active production panel.
+- Circle construction requires a selected Cultivator; unavailable cards
+  explain this requirement. With several selected, assign the nearest selected
+  worker that can reach the site, breaking distance ties by stable actor ID.
+  Highlight that worker in the placement preview. It travels to the site and
+  tends under normal interruption and infrastructure rules.
+- If the worker dies or receives another order, construction pauses. Select
+  another Cultivator and issue Tend on the unfinished building to resume with
+  payment and progress preserved. Replacement is manual, making workforce
+  commitment deliberate. Tend has on-screen and radial-menu actions.
+- Both factions share the menu-position pattern. Cards display their keys and
+  retain positions when unavailable, avoiding separate name-based bindings for
+  each faction. Clicking and tapping remain available.
+- During placement, R rotates the footprint; card shortcuts wait until
+  placement finishes or is cancelled.
+- M1 includes basic keyboard rebinding in Options for gameplay actions and
+  production-card slots. European and other keyboard layouts must work
+  without switching the system layout.
+- Show current bindings on buttons and cards, flag conflicts between actions
+  available in the same context, and provide Reset to defaults. Store bindings
+  as player preferences shared across missions, independent of mission saves.
+- Defaults follow physical key positions. Names here use US QWERTY, while
+  displayed labels reflect the player's layout. Production shortcuts retain
+  their five adjacent positions; groups use the ten number-row positions
+  regardless of the characters produced. Other gameplay shortcuts also keep
+  their positions. Rebinding lets players choose letters or positions they
+  prefer.
+**Decision date:** 2026-10-22; construction-worker control and mixed-selection
+actions 2026-10-23.
+
 #### Resolved follow-up: How does friendly selection replacement work?
 
 - An unmodified primary click on a friendly actor replaces the current
@@ -1448,8 +2012,10 @@ surface movement profile and the surface occupancy layer.
   The player enables it, chooses multiple destinations or actions, and presses
   **Done** to leave the mode.
 - The queued route and actions have a visible preview.
-- M0 requires ordinary command replacement but may defer queued orders and
-  their interface.
+- M0 includes queued Move, Attack Move, Attack, Gather, and Collect orders and
+  their previews and touch Queue Orders mode. Stop clears active and queued
+  orders. ARC Gather waits for depletion; Circle Gather remains active through
+  dormancy and recovery under the M1 cultivation rules.
 
 #### Resolved follow-up: What happens when a destination is blocked?
 
@@ -1756,11 +2322,12 @@ move faster and reveal a larger area than Troopers but have very low health.
 #### Resolved follow-up: Which building states provide vision?
 
 - Blueprints and unfinished buildings provide no active vision.
-- A completed building provides vision only while operational and connected to
-  the Command Center.
-- A disconnected building remains visible and selectable to its owner but stops
-  revealing its surroundings.
-- Restoring its connection restores its vision immediately.
+- A completed building provides vision while operational. ARC buildings need a
+  support connection to an eligible Command Center; Circle buildings operate
+  independently of a support chain.
+- A disconnected ARC building remains visible and selectable to its owner but
+  stops revealing its surroundings. Restoring its connection restores vision
+  immediately.
 - The Command Center is the network root and provides vision while functioning.
 
 #### Resolved follow-up: Do allied players share vision?
@@ -1809,7 +2376,7 @@ in hard defeat.
   toward the chosen destination, engage detected hostiles encountered along the
   route, and resume moving after the immediate threat is resolved.
 - Attack Move must have an explicit on-screen or radial-menu action for touch
-  and keyboard-free input. Its keyboard binding remains to be chosen.
+  and keyboard-free input. M1 assigns A to enter targeting.
 
 #### Resolved follow-up: What happens when target detection is lost?
 
@@ -1878,8 +2445,8 @@ in hard defeat.
   prevent battlefield clutter. The exact duration remains tunable.
 - M0 corpses and wrecks cannot be selected, looted, reclaimed, or used as
   cover.
-- A destroyed building plays its collapse presentation and leaves non-blocking
-  visual debris that also clears automatically.
+- A destroyed building plays its collapse presentation and leaves debris that
+  does not block movement but reserves its former footprint until it clears.
 - Once building debris clears, its former footprint is buildable again.
 - Combat-wreck salvage remains a later game-wide decision rather than an M0
   mechanic.
@@ -2242,6 +2809,79 @@ Selected M0 examples include:
 
 **Depends on:** Q1, Q3, Q9, Q13, and Q15.
 
+#### M1 Circle presentation: What should living technology look and sound like?
+
+**State:** Resolved. Asset production and integration are tracked in task 1.53.
+
+- Use sculpted living architecture: deliberately grown arches, curved
+  structural ribs, layered bark or leaf plates, and clear entrances. Buildings
+  have purposeful silhouettes readable at the strategy camera's distance.
+- Cultivated precision expresses the Circle's advanced interstellar culture.
+- Use warm, pale living wood for structural ribs, darker roots and joints,
+  deep green foliage, and restrained violet magical light. Pale structure and
+  dark roots make arches and entrances readable and give buildings weight.
+  Reserve clear areas for owner colors independently of faction materials.
+- Building silhouettes express their roles: a tall branching Heartgrove with
+  a broad crown and root arches; a low, wide Conservatory canopy over a
+  collection basin; an elongated, vaulted Musterhall with a broad entrance;
+  a rounded Construct Nursery cradle within protective arches and an exit
+  large enough for a Briar Ram; and a narrow, sturdy Thornspire with thorn
+  plates around a violet focus. The Thornspire crown opens briefly to fire a
+  heavy magical bolt.
+- Personnel remain recognizable elven figures in fitted clothing and grown
+  armor, with pale plates and curved equipment tying them to the architecture.
+  Distinguish roles through clothing, equipment, and posture at gameplay scale:
+  broad, armored Sentinels; lightly equipped, compact Wayfinders; practical
+  Cultivators with carrying pods and tending tools; Healers with flowing
+  mantles and open-handed casting poses; and Artificers with work gear and
+  prominent tool harnesses for tending constructs.
+- Sentinels carry a grown focus weapon in both hands: a compact, curved pale
+  wood frame around a violet core. A braced firing pose releases brief,
+  concentrated magical bolts, expressing advanced living technology and the
+  Sentinel's tough, shorter-range role.
+- The Briar Ram is a low, broad heavy quadruped on four thick root-like legs.
+  Overlapping pale wood armor, dark flexible joints, and a partially sheltered
+  violet core share the faction palette. Curved thorns frame a reinforced
+  head. It walks deliberately, plants its feet, and delivers a short, forceful
+  melee head strike. Its silhouette conveys weight and durability and differs
+  clearly from infantry.
+- Circle construction uses three stages tied to thirds of progress: roots
+  establish and the central structure emerges; ribs and arches rise; then
+  armor plates, leaves, and canopy elements unfold into the mature form.
+- Active tending shows small growth motions and restrained violet pulses.
+  Pausing retains the form, stops growth motion, and shows a paused indicator.
+  Keep the full reserved footprint and progress bar visible even while the
+  building is small. Loading shows the stage matching saved progress.
+- Living buildings and the Briar Ram show cracked wood plates, occasional
+  falling leaves or fragments, and faint violet leaks at 60% health or below.
+  At 30% or below, deepen splits, droop foliage, increase fragments, and show
+  an unstable, flickering core. Shape and material cues convey severity along
+  with light. These cues recede as repair restores health.
+- Destroyed living buildings fold into broken wood and roots as light fades;
+  the Briar Ram buckles into an inert husk. Personnel retain biological hit
+  reactions and fallen-body presentation.
+- Sound effects combine wooden impacts, leaf-like rustling, and clear musical
+  tones. Orders and readiness use brief chimes; cultivation and growth use
+  soft rustling over a warm pulse. Sentinel fire has a sharp wooden crack and
+  short bright magical tail; Thornspire fire is deeper and heavier. Briar Ram
+  strikes use weighty wooden impacts and cracking fibers. Healing and repair
+  use soft harmonic patterns distinct from weapons; destruction uses splitting
+  wood and fading low resonance.
+- Brief sounds and limits on overlapping work loops keep busy bases
+  comfortable to hear. Voice acting remains deferred.
+- Share musical themes between factions, with one Circle exploration loop and
+  one combat loop. Circle arrangements use soft plucked tones, airy sustained
+  notes, and wooden percussion: spacious and contemplative in exploration,
+  with a stronger pulse and denser percussion in combat. The player's faction
+  selects the arrangement. Music remains below gameplay cues.
+- Existing offline geometry, humanoid and quadruped rigging, articulated GLB
+  clips, and audio synthesis can express the direction. Curved animated
+  geometry exports reproducibly through the current GLB pipeline. Task 1.53
+  adds asset recipes and presentation support for growth forms, living damage,
+  debris, and faction music, then verifies readability and the mix in play.
+
+**Decision date:** 2026-10-22.
+
 ### Q19. What is explicitly inside and outside the vertical slice?
 
 **State:** Resolved
@@ -2309,11 +2949,12 @@ not commit the final campaign to that exact content.
 
 #### Resolved follow-up: When and what does a manual save capture?
 
-- A single-player game may be saved manually at any point rather than only at
-  checkpoints.
+- Manual saving does not require checkpoints. M0 disables saving after defeat;
+  M1 skirmishes permit named saves and Quicksave after victory, defeat, or draw.
+  Saving a faulted simulation is unavailable.
 - Opening the save interface pauses simulation before the snapshot is taken.
 - A snapshot preserves the mission and map state, terrain mutations, remaining
-  resources, faction stockpiles, fog exploration, actors, stable identifiers,
+  resources, owner stockpiles, fog exploration, actors, stable identifiers,
   positions, health, and destroyed state.
 - It also preserves issued orders and targets, construction and production
   progress, production queues and rally points, Harvester assignment, cargo,
@@ -2324,23 +2965,55 @@ not commit the final campaign to that exact content.
   occupancy-layer transitions, transport passenger identities, deployment
   modes and footprint reservations, veterancy, concealment state, temporary
   reveals, and authoritative sensor contacts or detection effects.
-- Derived rendering objects, transient visual effects, cached paths, and
-  platform handles are not saved. Loading reconstructs those from authoritative
-  simulation data and re-plans active routes deterministically.
+- M1 also preserves resolved starting setup and difficulty, owner-scoped
+  relationships and economy, headquarters queues, tending assignments,
+  cultivation reserves and dormancy, cargo sources, and result metrics.
+  Control groups are saved player interface state outside the simulation;
+  keyboard preferences remain independent of mission saves.
+- Rendering objects, transient visual effects, navigation caches, and platform
+  handles are reconstructed. Active routes are authoritative simulation state
+  and are saved so loading continues them without recalculation.
 - Loading restores the saved simulation state but begins paused, allowing the
   player to inspect the situation before resuming.
 
 #### Resolved follow-up: How are saves versioned?
 
-- Every save uses a versioned envelope containing its save-schema version,
-  game or content version, scenario identifier and version, save timestamp,
-  and elapsed simulation time where applicable.
+- Levels and saves share versioned mission JSON containing the mission-file
+  version, content-pack ID and version, scenario ID, and runtime snapshot.
+  Saves also carry their name and timestamp; elapsed time comes from saved
+  ticks and tick rate. No separate application or scenario revision is a save
+  compatibility key.
 - M0 guarantees correct round-tripping within the same build.
 - Cross-build migration is not required for M0, but incompatible saves must be
   detected and rejected with a clear explanation rather than loaded partially
   or incorrectly.
 - Explicit schema versions provide a future migration boundary without forcing
   the initial prototype to support indefinite backward compatibility.
+- M1 does not require loading or migrating M0 saves, including distributed
+  playtest saves. M0's mission remains available as ARC's introduction through
+  bundled levels authored for the current build.
+- M1 development may invalidate earlier M1 saves without migrations, legacy
+  format support, or bundled older rulesets. Same-build round-tripping and
+  deterministic continuation remain required. Compatible updates preserve save
+  compatibility; a new application build alone does not invalidate saves.
+  This keeps early development free to change its state model and rules.
+- Increment the mission-file version for incompatible snapshot, command, or
+  built-in simulation changes. Content packs separately version incompatible
+  schema changes through `formatVersion` and gameplay-affecting rule or balance
+  changes through the pack's `version`. Compatible updates keep their existing
+  compatibility versions.
+- Version changes land with the corresponding implementation, validation,
+  documentation, and regenerated levels. Ownership requires a mission-file
+  version change when implemented. There is no need to retain older parsers,
+  content packs, or rulesets for development saves.
+- Incompatible saves remain visible with an **Incompatible** label, a reason,
+  and a deletion action. Loading rejects them without altering the current
+  mission or stored save. They are never deleted or rewritten merely for being
+  incompatible; normal rolling quicksave and autosave replacement still applies.
+- Task 1.11 records the completed policy. Tasks 1.23 and 1.27 implement and
+  verify save-library presentation, version changes, and load rejection.
+
+**Decision date:** 2026-10-22 for the M1 development compatibility policy.
 
 #### Resolved follow-up: Are mission and campaign saves separate?
 
@@ -3428,8 +4101,8 @@ separate reconstruction or resurrection mechanic.
   ending.
 - Its recorded target health, remaining repair amount, and progress are
   preserved.
-- The job resumes automatically as soon as the faction stockpile can pay its
-  next tick and no other pause condition applies.
+- The job resumes automatically as soon as its owner's available balance can
+  pay its next step and no other pause condition applies.
 - The player may still cancel the paused job manually without losing health
   already restored.
 - One grouped economy alert explains the pause. The game does not repeat that
@@ -3438,6 +4111,7 @@ separate reconstruction or resurrection mechanic.
 #### Resolved follow-up: How do simultaneous repair jobs spend resources?
 
 - Repair jobs receive payment priority in the order they were started.
+- This payment order applies to jobs drawing from the same resource balance.
 - At each one-second boundary, payable repair ticks are processed oldest first.
 - If the next priority job cannot afford its tick, that job and every
   lower-priority repair job pause for that second. Resources can therefore
@@ -3448,12 +4122,38 @@ separate reconstruction or resurrection mechanic.
 
 #### Resolved follow-up: How many infrastructure jobs can progress at once?
 
-- Construction and building repair share one faction-wide
-  **infrastructure-work** capacity pool.
-- A basic faction has one active infrastructure slot. Unit healing, mobile-unit
-  repair, unit production, and later research do not consume it.
-- Additional blueprints and building-repair orders may still be issued and wait
-  in a visible queue.
+- Each base's Command Center or Heartgrove owns its **infrastructure-work**
+  queue and capacity pool, shared by construction, building repair, and building
+  upgrades. An owner may control several independent bases.
+- Each headquarters has one baseline infrastructure slot. Unit healing,
+  mobile-unit repair, unit production, and later research do not consume it.
+  An operational headquarters roots its own base. An additional headquarters
+  uses an existing eligible base's construction queue until completion, then
+  provides its own independent queue and baseline capacity.
+- Training queues and their production capacity belong to individual production
+  buildings, independently of the headquarters' infrastructure pool.
+- New construction automatically joins the nearest eligible, operational
+  headquarters, with stable actor IDs resolving equal distances. The building
+  keeps that affiliation when coverage overlaps or a closer headquarters
+  becomes available. Repair and upgrade jobs use its assigned headquarters.
+- Eligible headquarters must meet faction compatibility and infrastructure
+  rules: ARC needs a support connection, while Circle buildings do not need a
+  support chain. Work uses the owner's headquarters by default. Scenarios may
+  separately allow compatible allied headquarters to accept the work,
+  independently of support coverage sharing. The building keeps its owner and
+  uses that owner's available resource balances; its jobs compete for slots in
+  the receiving headquarters' queue.
+- If the assigned headquarters is destroyed or becomes ineligible and the
+  mission continues, surviving buildings automatically join the nearest
+  eligible, operational
+  headquarters. Outstanding jobs retain their payment, progress, and original
+  priority, subject to the receiving headquarters' slot limits. Without an
+  eligible headquarters, infrastructure work pauses until one is available.
+- Training queues stay on surviving production buildings and follow their
+  normal operational requirements after headquarters loss.
+- An eligible headquarters with no free slot still accepts valid blueprints
+  and building-repair orders into its visible queue. Q5 defines M1's emergency
+  headquarters-recovery exception when no operational headquarters remains.
 - A blueprint pays its full cost and reserves its footprint when placed even if
   queued. It retains the existing full cancellation refund until construction
   completes.
@@ -3463,10 +4163,17 @@ separate reconstruction or resurrection mechanic.
   priority.
 - When that job becomes eligible again, it does not interrupt a job already
   using a slot. It resumes when a slot next becomes available.
-- Command Center upgrades may add parallel infrastructure slots. Individual
-  tiers and costs are later content and balance decisions.
+- Command Center upgrades may add parallel infrastructure slots to that
+  headquarters. Individual tiers and costs are later content and balance
+  decisions.
 - M0 uses one infrastructure slot and has no building repair or upgrades. Its
   Materials Refinery and Field Barracks construction is therefore sequential.
+
+**Decision date:** 2026-10-22 for headquarters-owned infrastructure queues and
+capacity, producer-owned training queues, and automatic, stable base
+affiliation with automatic reassignment after headquarters destruction.
+Compatible allied headquarters queue access is a separate scenario permission
+from support coverage sharing.
 
 #### Resolved follow-up: How are deployable actors repaired?
 
@@ -3512,7 +4219,7 @@ separate reconstruction or resurrection mechanic.
 
 ### Q27. How do building upgrades work?
 
-**State:** Resolved for game-wide design; excluded from M0.
+**State:** Resolved for game-wide design; excluded from M0 and M1.
 
 Define whether upgrades apply to one building, a building class, or the whole
 faction. Cover prerequisites, branching or mutually exclusive choices, costs,
@@ -3521,7 +4228,7 @@ changes, support-network behavior, destruction, resale, and save data.
 
 #### Existing constraints from resolved decisions
 
-- M0 excludes research, technology trees, and upgrades.
+- M0 and M1 exclude research, technology trees, and building upgrades.
 - Upgrade definitions should be data-driven and may use common, rare, or later
   exotic resources according to their technology tier.
 - An upgrade cannot bypass ordinary placement, occupancy-layer, or
@@ -3531,8 +4238,8 @@ changes, support-network behavior, destruction, resale, and save data.
 - Upgrade state and progress must be serializable and deterministic.
 - Detector upgrades may increase range or contact precision, extend supported
   occupancy layers or concealment categories, or add another detection kind.
-- A Command Center upgrade may add slots to the faction-wide infrastructure
-  pool shared by building construction and building repair. Individual tier
+- A Command Center upgrade may add slots to that headquarters' infrastructure
+  pool shared by building construction, repair, and upgrades. Individual tier
   values and costs remain later content and balance decisions.
 
 #### Resolved Q27 foundation: What owns an upgrade and how is it unlocked?
@@ -3551,13 +4258,14 @@ changes, support-network behavior, destruction, resale, and save data.
   says otherwise. A deployable building retains its installed upgrades while
   changing between its mobile and deployed modes.
 - An installed upgrade may improve the building itself or grant a
-  faction-wide capability while that building remains operational. Selling or
-  destroying it removes those installed effects.
-- Command Center upgrades may add infrastructure queue slots and extend
-  construction support. Barracks upgrades may unlock advanced units such as
-  Snipers, Medics, and Mechanics. Radar upgrades may increase detection range
-  and add detectable kinds. Other buildings define comparable, data-driven
-  effects.
+  capability to its owner's compatible actors while that building remains
+  operational. Matching faction types do not grant other owners that effect.
+  Selling or destroying it removes those installed effects.
+- Command Center upgrades may add infrastructure queue slots to that
+  headquarters and extend construction support. Barracks upgrades may unlock
+  advanced units such as Snipers, Medics, and Mechanics. Radar upgrades may
+  increase detection range and add detectable kinds. Other buildings define
+  comparable, data-driven effects.
 - Building upgrades are distinct from broader, permanent research and
   technology-tree progression.
 - Q8's sale basis includes the building's construction cost and every
@@ -3568,7 +4276,7 @@ changes, support-network behavior, destruction, resale, and save data.
 
 #### Resolved Q27 follow-up: How is an upgrade executed?
 
-- The full upgrade cost is paid when the upgrade enters the faction-wide
+- The full upgrade cost is paid when the upgrade enters its base headquarters'
   infrastructure queue. The player cannot queue it without enough resources.
 - An active upgrade consumes one infrastructure slot. Waiting upgrades occupy
   no slot, following the shared construction-and-repair queue rules from Q26.
@@ -3734,8 +4442,9 @@ platform services, and the later multiplayer architecture.
 
 **State:** M0 wildlife behavior and shared strategic foundations are resolved,
 including control layers, postures, mission profiles, priorities, observation,
-memory, operations, and campaign scripting support. Script conflicts and
-relationship changes remain open. TODO.md tracks M1 faction plans, schemas,
+memory, operations, campaign scripting support, and mission-driven changes to
+mutual owner relationships and the handling of shared services when alliances
+end. Script conflicts remain open. TODO.md tracks M1 faction plans, schemas,
 implementation, and tuning.
 
 Define the behavior and architecture for non-player-controlled actors. Separate
@@ -3783,6 +4492,62 @@ recovery from losses.
   combat, perception, or actor-state logic.
 - M0 wolves use these actor states: idle at home, alerted, pursuing, attacking,
   investigating an observed alert, returning, and regenerating.
+
+#### Resolved Q29 foundation: How do ownership and faction type relate?
+
+**Decision date:** 2026-10-22. **Scope:** Game-wide.
+Task 1.08 in TODO.md records the completed ownership design decision;
+implementation is tracked in phase B.
+
+- Ownership is independent of faction type. Two ARC owners may be opponents;
+  ARC and Circle owners may be allies.
+- One owner may control actors from multiple faction types. Cooperation may
+  also use separate allied owners, and a mission may combine both arrangements.
+  This supports reluctant allies, joint bases, and future team and cooperative
+  play without making faction type determine control.
+- Commands and private economic and queue state follow ownership. Construction
+  creates actors for its issuing owner; trained units inherit their producer's
+  owner. Allied headquarters supply infrastructure capacity without changing
+  the building's owner, payer, or command authority.
+- Vision, exploration, and observations are owner-scoped with allied sharing
+  under Q14 and Q23. Objectives identify relevant owners independently of
+  faction type and may also restrict types or name particular actor IDs.
+  Skirmish result conditions belong to task 1.09; scenario command authority
+  belongs to task 1.07.
+- Each pair of distinct owners has one mutual relationship: allied, neutral,
+  or hostile. Fixed teams can be represented through these owner-to-owner
+  relationships, while the same model also expresses selective alliances and
+  neutral parties. Attack restraint belongs to mission behavior; a hostile
+  force may be ordered not to initiate attacks without changing diplomacy.
+- Units never automatically engage neutral owners. Ordinary Attack orders
+  cannot provoke a neutral owner; a mission event or explicit mission decision
+  must first change the relationship to hostile. This keeps incidental orders
+  from disrupting negotiations or a mission's storyline.
+- Allied vision and detection sharing does not grant control over allied
+  actors, as established in Q14 and Q23.
+- Mission storyline events may form or break alliances and change a pair's
+  mutual relationship between allied, neutral, and hostile. Both directions
+  change together through the deterministic simulation boundary. Saves retain
+  the effective relationship; actors keep their owners and faction types.
+- Q8 defines separate owner and resource-type balances by default, with
+  scenario-defined sharing of same-resource balances available as an exception.
+- Q9 defines owner-specific construction support by default, with compatible
+  allied support sharing enabled explicitly by scenarios. Q26 assigns each
+  base's infrastructure queue and capacity to its headquarters, with training
+  queues belonging to individual production buildings and automatic, stable
+  base affiliation. Headquarters destruction triggers automatic reassignment
+  when the mission continues. Scenarios may separately permit compatible allied
+  headquarters queue access, with costs paid by the building's owner.
+- Ending an alliance stops shared live vision and detection, resource sharing,
+  construction support, and allied headquarters queue access between those
+  owners. Q8 defines equal division of separating resource pools by default,
+  with scenario overrides. Learned terrain remains explored. Buildings
+  automatically reassign when their headquarters becomes ineligible, preserving
+  paid work and progress within the receiving capacity, or pause infrastructure
+  work without an eligible headquarters. AI operations reassess under the
+  existing operation rules.
+- These decisions do not add multiplayer or allied missions to M1's playable
+  scope. Concrete sharing schemas and implementation are milestone work.
 
 #### Resolved Q29 foundation: How do faction strategic activities overlap?
 
@@ -3928,8 +4693,9 @@ a fixed progression.
 **Decision date:** 2026-10-03. **Scope:** Game-wide.
 
 - Mission events can change an AI faction's active behavior profile, permitted
-  postures, and priorities, assign goals, and issue ordinary commands through
-  the simulation boundary.
+  postures, and priorities, assign goals, change mutual owner relationships, and
+  issue ordinary commands through the simulation boundary. Relationship changes
+  are explicit effects, separate from changes to offensive pressure.
 - A negotiation outcome, objective state, region entry, or mission timer can
   trigger a behavior change through deterministic mission events and actions.
 - For example, a faction begins with pressure disabled and pursues its own
@@ -3942,8 +4708,9 @@ a fixed progression.
 - Event timing and ordering use simulation state. Negotiation results enter
   the mission through serializable commands rather than UI-owned state.
 - Saves preserve event progress, fired one-time triggers, timers, pending
-  actions, and effective AI behavior. Loading resumes the same mission without
-  repeating completed one-time events or restoring an outdated profile.
+  actions, effective relationships, and AI behavior. Loading resumes the same
+  mission without repeating completed one-time events or restoring an outdated
+  profile or relationship.
 - The event schema and conflicting action precedence remain open. Behavior
   changes reevaluate active operations under the resolved operation rules.
 
@@ -3957,12 +4724,13 @@ a fixed progression.
 - A mission can explicitly mark a goal mandatory when the story requires an
   operation. Its completion, failure, and cancellation conditions define the
   obligation; actors still obey normal simulation rules.
+- Scenarios declare the AI-controlled owners their scripts may command.
+  Direct orders to player-owned actors require explicit permission, optionally
+  scoped to certain actors or a scripted sequence. Normal command rules apply;
+  story grants are authorized separately and do not confer actor control.
 
 **Remaining script follow-ups:**
 
-- Diplomatic relationships and offensive pressure are separate decisions.
-  Define whether an event also changes who is hostile or allied, rather than
-  assuming that a posture change alone changes those relationships.
 - Resolve conflicting simultaneous actions and missing targets
   deterministically. Exact precedence and failure policies need a further
   decision.
@@ -3990,6 +4758,8 @@ a fixed progression.
 **Scope:** Game-wide candidate fields for the future profile schema. General
 posture permissions, priorities, and mission tuning are resolved above; exact
 fields, presets, and values remain deferred content and implementation work.
+M1's opening grace and pacing targets are settled under Q5; other profile
+values remain tuning work.
 
 - Posture permissions and relative priorities, including a distinct setting to
   disable offensive pressure rather than merely making attacks infrequent.

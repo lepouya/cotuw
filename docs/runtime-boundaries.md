@@ -24,7 +24,10 @@ These contracts describe where new behaviors, views, and services attach.
   catalog. Terrain edits use the validated command and mutation APIs.
 - A mission may restrict its playable bounds within the map. Its bounds cannot
   extend outside the terrain used by navigation and vision.
-- Support links and placement coverage use only the building's own faction.
+- M0 support links and placement coverage use the building's faction. M1
+  replaces this prototype boundary with owner-scoped support and explicit
+  scenario sharing under
+  [ownership rules](../DESIGN.md#ownership-and-relationships).
 
 ## Resource ownership
 

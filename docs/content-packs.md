@@ -17,7 +17,10 @@ bundled packs through the same parser future mod packs will use.
 ## Layout
 
 - `format` is `"cotuw-content"`; `formatVersion` is the schema version.
-- `id`, `version`, and `name` identify the pack.
+  Increment `formatVersion` for incompatible schema changes.
+- `id`, `version`, and `name` identify the pack. The pack's `version` tracks
+  gameplay compatibility independently of its schema version. Presentation-only
+  edits that preserve compatibility do not require a pack-version increment.
 - `actors` holds simulation actor definitions: stats, weapons, movement,
   footprints, costs, and timings. The simulation validates the ones a mission
   uses when it loads. Actor IDs must be unique, and every actor needs its
