@@ -1,6 +1,8 @@
 # JavaScript and Vite
 node_modules/
 dist/
+playtest/
+.playtest-build-*/
 coverage/
 *.tsbuildinfo
 

@@ -19,11 +19,15 @@ export default defineConfig(() => ({
         }
       : undefined,
     watch: {
-      // Rust sources and test output are not dev-server inputs.
+      // Generated output and Rust sources are not dev-server inputs.
       ignored: [
         "**/src-tauri/**",
         "**/playwright-report/**",
         "**/test-results/**",
+        "**/playtest",
+        "**/playtest/**",
+        "**/.playtest-build-*",
+        "**/.playtest-build-*/**",
       ],
     },
   },

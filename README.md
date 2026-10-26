@@ -35,12 +35,13 @@ Install Node.js 26 and Rust for desktop development, then run:
 
 ```sh
 npm install
-npm run dev         # browser
-npm run tauri dev   # desktop
-npm run check       # quick checks during development and before finishing work
-npm run check:full  # full checks before committing
-npm run build       # production browser build
-npm run tauri build # desktop app and bundles
+npm run dev            # browser
+npm run tauri dev      # desktop
+npm run check          # quick checks while developing and before finishing
+npm run check:full     # full checks before committing
+npm run build          # production browser build
+npm run tauri build    # desktop app and bundles
+npm run playtest:build # browser playtest bundle with build manifest
 ```
 
 Open `/?level=sandbox` for free construction and training. Explicit

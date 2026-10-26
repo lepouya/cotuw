@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "npm run typecheck:ts && vite build",
     "preview": "vite preview",
+    "playtest:build": "npm run typecheck:ts && node --no-experimental-webstorage scripts/prepare-playtest.ts",
     "tauri": "tauri",
     "levels": "node --no-experimental-webstorage scripts/generate-levels.ts",
     "assets": "node --no-experimental-webstorage scripts/generate-assets.ts",

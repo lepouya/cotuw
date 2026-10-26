@@ -35,7 +35,10 @@ roster choices are ready.
 
 - [ ] **1.01** Prepare a reproducible M0 playtest build and report template.
   Agree on distribution and recruit an initial five-to-eight-person cohort
-  spanning RTS-familiar and less experienced players.
+  spanning RTS-familiar and less experienced players. The browser bundle
+  command and [tester instructions](docs/playtest-instructions.md) include a
+  [report template](docs/playtest-report.md) and revision/file hashes.
+  Distribution, cohort recruitment, and fixed-revision acceptance remain.
 - [ ] **1.02** Run baseline M0 playtests using in-game guidance. Record
   controls, clarity, pacing, reliability, assistance, and abandonment; turn
   actionable findings into prioritized issues for the UI and onboarding work.

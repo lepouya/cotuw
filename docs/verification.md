@@ -161,6 +161,56 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
   --project=chromium --grep mouse
 ```
 
+## M0 baseline playtest preparation
+
+Task 1.01 uses a fixed revision so reports and saved reproductions identify
+one build. Recruit five to eight players spanning RTS-familiar and less
+experienced players. Agree on a host and report-return channel before sending
+the bundle. Recruitment and distribution are organizer actions.
+
+From a clean checkout of the selected revision, using Node.js 26:
+
+```sh
+npm ci
+npm run check:full
+npm run playtest:build
+```
+
+The command builds the production site and writes ignored `playtest/` with
+`site/`, `build.json`, tester instructions, and a report template. The manifest
+records the full revision, Node/npm versions, lockfile hash, and each bundled
+file's SHA-256 and byte count. Archive the entire directory and the acceptance
+results before distribution. Serve the exact `site/` files that were checked.
+Keep the hosting URL stable for the cohort; do not replace it with later M1
+builds during the baseline. Do not regenerate assets or levels for a playtest
+unless updating the selected source revision.
+
+For local review of uncommitted work, use
+`npm run playtest:build -- --allow-dirty`. Such bundles are marked
+`distributionReady: false`; they are not the fixed-revision cohort build.
+The clean-source marker does not run or record acceptance checks.
+The builder checks Git cleanliness before and after compilation, including
+untracked files even when Git's display settings hide them. Keep the checkout
+unchanged while building. Preparation uses a private output directory and
+leaves `dist/` intact. A failed build or packaging step preserves the previous
+`playtest/` bundle; publication failure attempts to restore it. If restoration
+also fails, the error identifies the retained backup's recovery path.
+
+Smoke-test the served production bundle from the title screen. Verify model
+and audio loading, the opening guide, one construction and training cycle,
+save/load, restart, and return to the title screen. Record browser and OS
+versions, build revision, URL, and results. Automated checks alone do not
+establish this distribution check or human mission clarity.
+
+Give participants the [instructions](playtest-instructions.md) and a copy of
+the [report template](playtest-report.md). Observe without teaching controls
+or strategy unless requested or blocked; record every intervention. Cover
+controls, clarity, pacing, reliability, assistance, and abandonment. Use
+participant codes and keep recruitment/contact details outside the repository.
+Turn actionable findings into prioritized issues linked to affected M1 tasks;
+record a disposition for observations that do not become issues. The actual
+sessions and triage satisfy task 1.02, not build preparation alone.
+
 ## Human acceptance
 
 - Have RTS-familiar first-time players attempt the ARC M0 mission using in-game
