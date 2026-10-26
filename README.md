@@ -46,6 +46,7 @@ npm run playtest:build # browser playtest bundle with build manifest
 
 Open `/?level=sandbox` for free construction and training. Explicit
 `?level=<scenario ID>` links open a bundled level directly for development.
+Use `/?level=skirmish-map` to inspect the rough M1 battlefield the same way.
 
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all

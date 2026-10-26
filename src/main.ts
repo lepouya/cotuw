@@ -51,7 +51,7 @@ const audioControls = byId("audio-controls");
 const optionsBack = byId<HTMLButtonElement>("cancel-options");
 const titleBack = byId<HTMLButtonElement>("return-to-title");
 const versionLabel = byId("game-version");
-const DEFAULT_LEVEL = LEVEL_SOURCES.keys().next().value!;
+const DEFAULT_LEVEL = "arc-economy-opening";
 versionLabel.textContent = `Prototype demo · v${version}`;
 
 /** Level sources by scenario ID; loading a level file adds or replaces one. */

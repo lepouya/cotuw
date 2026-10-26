@@ -8,11 +8,21 @@ can be read, edited by hand, and loaded again.
 ## Files
 
 - [`src/content/levels/`](../src/content/levels/) holds the bundled levels:
-  `arc-economy-opening.json` and `sandbox.json`.
+  `arc-economy-opening.json`, `sandbox.json`, and `skirmish-map.json`.
 - `npm run levels` rebuilds them from
   [`scripts/levels/`](../scripts/levels/), replacing hand edits. Edit the
   scripts to keep a change, or edit the JSON for quick experiments.
 - Prettier skips the level directory; the game writes its own layout.
+- Free-construction previews share `scripts/levels/sandbox-level.ts`. Each
+  can supply its own content reference and actor roster.
+- `skirmish-map` is a development terrain preview with free construction and
+  training. It has no economy, so its resource areas are not shown. The
+  authoring inputs in `scripts/levels/skirmish-map.ts` define mirrored
+  west/east start slots, flat base areas, three ridge crossings, resource
+  areas, and faction opening packages. Each slot names its starting resource
+  area for expansion attribution. `createSkirmishOpening` assembles one
+  faction's headless opening at a slot; owner and setup state are not yet part
+  of the mission format.
 - Saves live in browser local storage or, in the desktop build, in the app
   data folder's `saves` directory. **Export file** and **Import file** in the
   game menu move them between the game and ordinary files.

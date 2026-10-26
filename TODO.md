@@ -148,6 +148,14 @@ and bring up the rough skirmish map early for simulation and AI development.
   Identify starting resource sites per start position for expansion metrics.
   Resolve chosen faction and difficulty into setup, applying existing enemy
   health/damage scaling while keeping starting stocks and AI profiles intact.
+  The generated `skirmish-map` preview and authoring inputs provide both
+  slots, three independent crossings, home income, and expansion areas.
+  The rough-map preview is playtested and accepted.
+  Headless checks cover slot symmetry, flat base space, resource access, and
+  ARC's paid first-income opening from either slot through the single-faction
+  opening builder. Owner-based launch assembly,
+  difficulty, resolved restart setup, and Circle integration remain pending
+  their implementation dependencies.
 - [ ] **1.15** Implement the actor ownership model from 1.08 across hostility,
   support networks, vision and fog, economy, objectives, presentation, and
   saves. Verify that opposing owners of the same faction type fight and keep
