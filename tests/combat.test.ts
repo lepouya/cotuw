@@ -10,7 +10,13 @@ import { defineScenario } from "../src/simulation/scenario";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
-import { exploredScenarioState, playerOwners } from "./helpers/scenario";
+import {
+  balance,
+  exploredScenarioState,
+  playerOwners,
+  setBalance,
+  stockpiles,
+} from "./helpers/scenario";
 
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionState } from "../src/simulation/mission";
@@ -55,7 +61,7 @@ function scenario(
       },
     ],
     units,
-    materials: 0,
+    stockpiles: stockpiles(0),
     sites: [],
     loot: [],
   });
@@ -242,7 +248,7 @@ describe("combat", () => {
 
   test("destroyed buildings leave debris that blocks placement until it clears", () => {
     const { simulation } = fixture([], (state) => {
-      state.economy!.materials = 1000;
+      setBalance(state, 1000);
       state.actors.push(
         Object.assign(
           createActor({
@@ -285,13 +291,13 @@ describe("combat", () => {
 
   test("selling scales the half-cost refund by remaining health", () => {
     const { simulation } = fixture([], (state) => {
-      state.economy!.materials = 0;
+      setBalance(state, 0);
       // 150 × 1640 / 2000 is exactly 123, which dividing first misses.
       state.actors.find(({ id }) => id === "cc")!.health = 1640;
     });
     simulation.submitCommand({ kind: "sell-actor", actorId: "cc" });
     simulation.tick();
-    expect(simulation.economy!.materials).toBe(123);
+    expect(balance(simulation)).toBe(123);
   });
 
   test("an old hit does not reveal an attacker outside personal sight", () => {
@@ -813,7 +819,7 @@ describe("combat edge cases", () => {
     expect(simulation.actorById("refinery")).toBeUndefined();
     expect(simulation.actorById("barracks")).toBeUndefined();
     expect(simulation.economy!.production).toEqual([]);
-    expect(simulation.economy!.materials).toBe(0);
+    expect(balance(simulation)).toBe(0);
     expect(simulation.snapshot().retiredActorIds).toContain("paid-scout");
     expect(simulation.economy!.harvesters[0]).toMatchObject({
       cargo: 37,

@@ -192,6 +192,18 @@ and bring up the rough skirmish map early for simulation and AI development.
   work and priority within receiving capacity; training stays on its producer.
   Implement the M1 skirmish's single emergency headquarters job at normal cost
   and build time when no operational headquarters remains.
+  Owners hold separate stockpiles per resource, and payments, refunds,
+  deliveries, and stall checks use the actor's owner. Command Centers and
+  Heartgroves each supply a queue; work keeps its headquarters while eligible
+  and otherwise moves with payment, progress, and priority, or pauses. Base
+  affiliations persist after construction completes and through saves.
+  Allies granted `sharesResources` pool each resource and divide it equally
+  when sharing ends. The scenario flag `emergencyHeadquarters` enables the
+  replacement job independently of allied queues. Headless checks cover these
+  rules and save continuation;
+  browser specs cover owner-specific hints, construction, training, and
+  save/load/restart wiring. Playtest acceptance remains. Scenario-specified
+  pool divisions other than equal shares are not implemented.
 - [ ] **1.17** Add issuing-owner authority to commands and validate actor
   ownership, including between same-faction-type owners in the development
   harness. Implement the agreed mission-script authority and reject

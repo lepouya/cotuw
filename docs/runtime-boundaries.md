@@ -31,37 +31,46 @@ These contracts describe where new behaviors, views, and services attach.
   to both the covering node and its supplying root; presentation uses the
   same owner-specific projection.
 
-## Cultivation and growth
+## Economy, infrastructure, and growth
 
 - `simulation/cultivation.ts` owns renewable reserves, worker gathering,
   delivery, and interruptions. Regeneration and collection retain integer
   remainders; stable worker-ID ordering allocates the shared reserve without
   overdrawing. Movement, audio, and presentation never advance cultivation.
-- `simulation/growth.ts` owns infrastructure eligibility and worker tending.
-  Work retains its Heartgrove affiliation until that headquarters is lost.
-  Eligible active jobs keep their slots; blocked jobs yield without losing
-  payment, progress, or queue priority. Completed Circle buildings have no
+- `simulation/infrastructure.ts` owns headquarters queues for construction.
+  Growth uses its Heartgrove kind without a support chain; other
+  construction needs support rooted at the hosting headquarters. Buildings
+  retain their headquarters while eligible, including after completion.
+  Completed headquarters affiliate with themselves. Eligible active jobs keep
+  their slots; blocked jobs yield without losing payment, progress, or queue
+  priority. The scenario's emergency rule runs one replacement headquarters
+  per owner without capacity or support. Completed Circle buildings have no
   support-network dependency.
+- `simulation/growth.ts` owns tending: candidate workers, the tending route,
+  and releasing the worker when growth completes.
 - `simulation/worker-navigation.ts` resolves reachable building entrances and
   advances automatic routes for harvesting, cultivation, and tending. Callers
   choose arrival distance and work-specific blocked states. Reachability
   reads cached navigation regions; only route starts search for a path.
   Placement tests a prospective footprint through a read-only occupancy
   adapter, preserving the published navigation state.
-- `simulation/economy.ts` maps each common resource to its price field,
-  balance, and display name. Affordability, payment, refunds, and the sidebar
-  and top bar read that table; the top bar shows the player faction's
-  resource. An absent currency account cannot fund a job, even at zero cost.
+- `simulation/resources.ts` maps each common resource to its price field and
+  display name. Prices, the sidebar, and the top bar read that table; the top
+  bar shows the player faction's resource.
+- `simulation/stockpiles.ts` owns owner balances, deliveries, and pools.
+  Affordability, payment, and refunds use the paying owner's stockpile. An
+  owner without a stockpile of a resource cannot fund a job, even at zero
+  cost. Pools follow `sharesResources` and regroup whenever sharing changes.
+- `simulation/economy.ts` owns workers, sites, gifts, and production.
   `enrollWorker` creates worker state from an actor's definition. Shared
   queries expose sites, compatible workers, and outstanding automatic orders;
   explicit actor commands interrupt either worker type without losing cargo.
   Building loss cancels affected automatic routes. Cultivators retain delivery
   work and queued orders while selecting a replacement drop-off.
-- The prototype keeps Materials and Lifebloom separate in mission-wide
-  balances. Owner resource pools and command authority remain M1
-  prerequisites. Workers tend and deliver only to their owner's buildings;
-  training inherits the producer's owner. Resource-site knowledge follows the
-  worker owner's vision, with explored terrain retained only for the player.
+- Command authority remains an M1 prerequisite. Workers tend and deliver only
+  to their owner's buildings; training inherits the producer's owner.
+  Resource-site knowledge follows the worker owner's vision, with explored
+  terrain retained only for the player.
 
 ## Resource ownership
 

@@ -127,7 +127,7 @@ export const ECONOMY_SCENARIO = createWolfDenScenario({
   },
   crossingLoot: (tile, index) =>
     salvage(`salvage-${index + 2}`, "Crossing salvage", tile),
-  materials: 150,
+  stockpiles: [{ resource: "materials", owners: ["player"], amount: 150 }],
   sites: [
     ...patch("near-materials", "Near Materials", [
       { x: 20, z: 50 },

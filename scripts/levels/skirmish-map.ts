@@ -5,6 +5,7 @@ import { defineScenario } from "../../src/simulation/scenario.ts";
 import { TerrainGrid } from "../../src/simulation/terrain.ts";
 
 import type { MaterialsSite } from "../../src/simulation/economy.ts";
+import type { Resource } from "../../src/simulation/resources.ts";
 import type { TerrainBounds, TileCoord } from "../../src/simulation/grid.ts";
 import type { ScenarioDefinition } from "../../src/simulation/scenario.ts";
 import type { TerrainGridOptions } from "../../src/simulation/terrain.ts";
@@ -14,7 +15,7 @@ export type FactionOpening = {
   readonly headquarters: string;
   readonly worker: string;
   readonly dropoff: string;
-  readonly resource: string;
+  readonly resource: Resource;
   /** Pays for the first worker and drop-off building. */
   readonly stockpile: number;
 };
@@ -185,7 +186,8 @@ export const SKIRMISH_TERRAIN = {
 
 /**
  * One faction's opening, owned by its start slot, before two-owner assembly.
- * The economy holds Materials only, so other resources cannot assemble yet.
+ * Circle cultivation sites are not authored yet, so only Materials openings
+ * assemble.
  */
 export function createSkirmishOpening(
   start: SkirmishStart,
@@ -211,7 +213,13 @@ export function createSkirmishOpening(
         origin: start.headquartersOrigin,
       },
     ],
-    materials: opening.stockpile,
+    stockpiles: [
+      {
+        resource: opening.resource,
+        owners: [start.id],
+        amount: opening.stockpile,
+      },
+    ],
     sites: createSkirmishMaterialsSites(),
     loot: [],
   });

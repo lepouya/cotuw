@@ -302,8 +302,10 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   loss.
 - Scenarios may explicitly enable shared resource pools, including for future
   cooperative play. Each pool holds one resource type; Materials and Lifebloom
-  cannot fund one another's costs. An alliance alone does not pool resources.
-  Multiplayer remains outside M1.
+  cannot fund one another's costs. An alliance alone does not pool resources;
+  allies pool when the scenario also grants resource sharing between them.
+  Owners joined through sharing allies belong to the same pools, which cover
+  every resource type their members hold. Multiplayer remains outside M1.
 - When a shared resource pool separates, its remaining balance is divided
   equally among its owners by default. Scenarios may specify a different
   division. Previous spending is not reversed, and division preserves the
@@ -1631,13 +1633,13 @@ are tracked in the checklist.
   choices describe their playable opening. The setup screen will hold
   difficulty selection when implemented. Direct development links remain
   available.
-- Actors have owners, but the mission keeps one economy and commands carry no
-  issuing owner. Lifebloom and Materials are separate balances. Circle growth
-  has queues and slots per Heartgrove, but owner economies, shared pools,
-  command authority, emergency headquarters recovery, support units,
-  defenses, constructs, and faction AI remain pending. The complete base-loop
-  acceptance still requires the shared milestone foundations. Presentation
-  validation for the full roster remains open.
+- Actors have owners with their own Lifebloom and Materials stockpiles, but
+  commands carry no issuing owner. Infrastructure has queues and slots per
+  headquarters, and emergency headquarters recovery is available to scenarios
+  that enable it. Command authority, support units, defenses, constructs, and
+  faction AI remain pending. The complete base-loop acceptance still requires
+  the shared milestone foundations. Presentation validation for the full
+  roster remains open.
 - Wolves exercise movement, scouting, combat readability, durability, and
   basic recovery. They do not validate ARC matchups, defense-breaking counters,
   faction AI, skirmish pacing, or full-match balance. Add focused structure,

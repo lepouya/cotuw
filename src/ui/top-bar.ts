@@ -2,7 +2,7 @@ import type { MissionResult, ObjectiveView } from "../simulation/objectives";
 import type { GameSession } from "../session";
 import type { SidebarState } from "./sidebar";
 import { setText } from "./dom";
-import { resourceName } from "../simulation/economy";
+import { resourceName } from "../simulation/resources";
 
 export type TopBarState = {
   /** Whether a mission is running and can resume. */

@@ -1,4 +1,7 @@
-import { harvestingRecoveryCost } from "../src/simulation/economy";
+import {
+  harvestingRecoveryCost,
+  harvestingStalled,
+} from "../src/simulation/economy";
 import { createActor } from "../src/simulation/actor";
 import type { ActorDefinition } from "../src/simulation/actor";
 import { describe, expect, test } from "vitest";
@@ -6,7 +9,10 @@ import { ARC_ACTOR_DEFINITIONS, BASE_CONTENT } from "./helpers/content";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { createMissionSimulation } from "../src/simulation/mission";
-import { defineScenario } from "../src/simulation/scenario";
+import {
+  createScenarioState,
+  defineScenario,
+} from "../src/simulation/scenario";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
@@ -16,7 +22,14 @@ import type {
   MissionSimulation,
 } from "../src/simulation/mission";
 import type { MissionCommand } from "../src/simulation/command";
-import { exploredScenarioState, playerOwners } from "./helpers/scenario";
+import {
+  balance,
+  deposited,
+  exploredScenarioState,
+  playerOwners,
+  setBalance,
+  stockpiles,
+} from "./helpers/scenario";
 
 const definitions = ARC_ACTOR_DEFINITIONS;
 const mapOptions = {
@@ -39,7 +52,7 @@ const scenario = defineScenario({
       origin: { x: 2, z: 6 },
     },
   ],
-  materials: 150,
+  stockpiles: stockpiles(150),
   sites: [
     {
       id: "site",
@@ -330,7 +343,7 @@ describe("Materials economy", () => {
     );
     until(simulation, () => !simulation.actorById("worker")!.orders, 1000);
     expect(worker(simulation).cargo).toBe(0);
-    expect(simulation.economy!.depositedMaterials).toBe(190);
+    expect(deposited(simulation)).toBe(190);
     until(simulation, () => !simulation.actorById("worker")!.movement);
     expect(simulation.actorById("worker")!.worldPosition).toEqual(target);
   });
@@ -382,7 +395,7 @@ describe("Materials economy", () => {
         .filter((actor) => actor.definitionId.startsWith("arc-"))
         .map((actor) => actor.definitionId),
     ).toEqual(["arc-command-center-prototype"]);
-    expect(state.economy!.materials).toBe(150);
+    expect(balance(state)).toBe(150);
     const independent = level();
     state.economy!.sites[0].remainingMaterials = 0;
     expect(independent.economy!.sites[0].remainingMaterials).toBe(200);
@@ -390,7 +403,7 @@ describe("Materials economy", () => {
 
   test("paid blueprints reserve footprints and one construction slot before becoming operational", () => {
     const state = exploredScenarioState(scenario, definitions);
-    state.economy!.materials = 300;
+    setBalance(state, 300);
     const { simulation, occupancy } = fixture(state);
     simulation.submitCommand(build());
     simulation.submitCommand({
@@ -400,7 +413,7 @@ describe("Materials economy", () => {
       origin: { x: 9, z: 10 },
     });
     expect(simulation.tick().every((outcome) => outcome.accepted)).toBe(true);
-    expect(simulation.economy!.materials).toBe(100);
+    expect(balance(simulation)).toBe(100);
     expect(occupancy.ownerAt(6, 6, "surface")).toBe("refinery");
     expect(simulation.actorById("refinery")!.construction).toMatchObject({
       completedTicks: 1,
@@ -417,7 +430,7 @@ describe("Materials economy", () => {
         definitionId: "arc-harvester",
       }),
     ).toMatchObject({ accepted: false, reason: "under-construction" });
-    expect(simulation.economy!.materials).toBe(100);
+    expect(balance(simulation)).toBe(100);
     advance(simulation, 5);
     expect(simulation.actorById("refinery")!.construction!.completedTicks).toBe(
       7,
@@ -445,7 +458,7 @@ describe("Materials economy", () => {
 
   test("cancelling a blueprint refunds all spending, frees its footprint and advances the queue", () => {
     const state = exploredScenarioState(scenario, definitions);
-    state.economy!.materials = 300;
+    setBalance(state, 300);
     const { simulation, occupancy } = fixture(state);
     command(simulation, build());
     command(simulation, build("next", 9, 9));
@@ -456,7 +469,7 @@ describe("Materials economy", () => {
       command(simulation, { kind: "cancel-construction", actorId: "refinery" })
         .accepted,
     ).toBe(true);
-    expect(simulation.economy!.materials).toBe(200);
+    expect(balance(simulation)).toBe(200);
     expect(simulation.actorById("refinery")).toBeUndefined();
     expect(occupancy.ownerAt(6, 6, "surface")).toBeUndefined();
     expect(simulation.actorById("next")!.construction!.completedTicks).toBe(1);
@@ -465,15 +478,15 @@ describe("Materials economy", () => {
       command(simulation, { kind: "cancel-construction", actorId: "refinery" })
         .accepted,
     ).toBe(false);
-    expect(simulation.economy!.materials).toBe(200);
+    expect(balance(simulation)).toBe(200);
     simulation.removeActor("next");
-    expect(simulation.economy!.materials).toBe(200);
+    expect(balance(simulation)).toBe(200);
   });
 
   test("unfinished Refineries reject assignments without interrupting a worker", () => {
     const { simulation } = workerFixture();
     const state = simulation.snapshot();
-    state.economy!.materials = 100;
+    setBalance(state, 100);
     const restored = fixture(state).simulation;
     command(restored, build("next", 9, 9));
     expect(
@@ -551,10 +564,10 @@ describe("Materials economy", () => {
       true,
       false,
     ]);
-    expect(simulation.economy!.materials).toBe(50);
+    expect(balance(simulation)).toBe(50);
     expect(occupancy.ownerAt(9, 9, "surface")).toBeUndefined();
     const state = simulation.snapshot();
-    state.economy!.materials = 300;
+    setBalance(state, 300);
     const restored = fixture(state).simulation;
     expect(
       restored.evaluatePlacement({
@@ -578,7 +591,7 @@ describe("Materials economy", () => {
     command(simulation, build());
     finishBuilding(simulation);
     const state = simulation.snapshot();
-    state.economy!.materials = 100;
+    setBalance(state, 100);
     const restored = fixture(state).simulation;
     for (const actorId of ["worker", "extra"])
       restored.submitCommand({
@@ -591,7 +604,7 @@ describe("Materials economy", () => {
       { accepted: true },
       { accepted: false, reason: "refinery-occupied" },
     ]);
-    expect(restored.economy!.materials).toBe(50);
+    expect(balance(restored)).toBe(50);
     expect(restored.actorById("worker")).toBeUndefined();
     expect(restored.unusedActorId("worker")).toBe("worker1");
     advance(restored, 5);
@@ -612,13 +625,13 @@ describe("Materials economy", () => {
     until(simulation, () => worker(simulation).phase === "gathering");
     advance(simulation, 58);
     expect(worker(simulation).cargo).toBe(98);
-    expect(simulation.economy!.materials).toBe(0);
+    expect(balance(simulation)).toBe(0);
     simulation.tick();
     expect(worker(simulation).cargo).toBe(100);
     expect(worker(simulation).phase).toBe("returning");
-    until(simulation, () => simulation.economy!.materials === 100);
+    until(simulation, () => balance(simulation) === 100);
     expect(worker(simulation).cargo).toBe(0);
-    expect(simulation.economy!.depositedMaterials).toBe(100);
+    expect(deposited(simulation)).toBe(100);
     expect(simulation.buildingActivity).toEqual([
       { buildingId: "refinery", kind: "delivery", actorId: "worker" },
     ]);
@@ -630,7 +643,7 @@ describe("Materials economy", () => {
         origin: { x: 9, z: 10 },
       }).accepted,
     ).toBe(true);
-    until(simulation, () => simulation.economy!.materials >= 25);
+    until(simulation, () => balance(simulation) >= 25);
     expect(
       command(simulation, {
         kind: "train-unit",
@@ -651,13 +664,13 @@ describe("Materials economy", () => {
     const { simulation } = workerFixture();
     command(simulation, gather());
     until(simulation, () => worker(simulation).phase === "depleted");
-    expect(simulation.economy!.materials).toBe(190);
+    expect(balance(simulation)).toBe(190);
     expect(
       simulation.economy!.sites.map((site) => site.remainingMaterials),
     ).toEqual([0, 0, 100]);
     expect(worker(simulation).cargo).toBe(0);
     expect(command(simulation, gather("far")).accepted).toBe(true);
-    until(simulation, () => simulation.economy!.materials === 290);
+    until(simulation, () => balance(simulation) === 290);
   });
 
   test("Move and Stop preserve cargo; changing patches deposits before new collection", () => {
@@ -677,7 +690,7 @@ describe("Materials economy", () => {
     expect(worker(simulation).cargo).toBe(cargo);
     command(simulation, gather("far"));
     expect(worker(simulation).phase).toBe("returning");
-    until(simulation, () => simulation.economy!.materials === cargo);
+    until(simulation, () => balance(simulation) === cargo);
     expect(simulation.economy!.sites[2].remainingMaterials).toBe(100);
     expect(worker(simulation).targetSiteId).toBe("far");
   });
@@ -697,7 +710,7 @@ describe("Materials economy", () => {
     advance(simulation, 5);
     expect(simulation.actorById("worker")!.worldPosition).toEqual(position);
     const state = simulation.snapshot();
-    state.economy!.materials = 200;
+    setBalance(state, 200);
     const restored = fixture(state).simulation;
     command(restored, build("new-refinery", 6, 6));
     finishBuilding(restored, "new-refinery");
@@ -708,7 +721,7 @@ describe("Materials economy", () => {
         refineryId: "new-refinery",
       }).accepted,
     ).toBe(true);
-    until(restored, () => restored.economy!.materials === 100 + cargo);
+    until(restored, () => balance(restored) === 100 + cargo);
     expect(worker(restored).cargo).toBe(0);
   });
 
@@ -740,14 +753,14 @@ describe("Materials economy", () => {
     expect(
       command(simulation, { kind: "return-cargo", actorId: "worker" }).accepted,
     ).toBe(true);
-    until(simulation, () => simulation.economy!.materials === cargo);
+    until(simulation, () => balance(simulation) === cargo);
     expect(
       command(simulation, { kind: "sell-actor", actorId: "worker" }).accepted,
     ).toBe(false);
     expect(
       command(simulation, { kind: "sell-actor", actorId: "refinery" }).accepted,
     ).toBe(true);
-    expect(simulation.economy!.materials).toBe(cargo + 50);
+    expect(balance(simulation)).toBe(cargo + 50);
   });
 
   test("ordinary salvage is collected once by a mobile unit without a delivery", () => {
@@ -757,10 +770,10 @@ describe("Materials economy", () => {
       actorId: "worker",
       target: map.tileCenter(22, 10),
     });
-    until(simulation, () => simulation.economy!.materials === 25);
+    until(simulation, () => balance(simulation) === 25);
     expect(simulation.economy!.loot[0].collected).toBe(true);
     advance(simulation, 10);
-    expect(simulation.economy!.materials).toBe(25);
+    expect(balance(simulation)).toBe(25);
   });
 
   test("salvage ignores another owner's mobile actors", () => {
@@ -776,7 +789,7 @@ describe("Materials economy", () => {
     );
     simulation.tick();
     expect(simulation.economy!.loot[0].collected).toBe(false);
-    expect(simulation.economy!.materials).toBe(150);
+    expect(balance(simulation)).toBe(150);
     simulation.removeActor("visitor");
     simulation.spawnActor(
       createActor({
@@ -788,7 +801,7 @@ describe("Materials economy", () => {
     );
     simulation.tick();
     expect(simulation.economy!.loot[0].collected).toBe(true);
-    expect(simulation.economy!.materials).toBe(175);
+    expect(balance(simulation)).toBe(175);
   });
 
   test.each<MissionCommand>([
@@ -811,14 +824,14 @@ describe("Materials economy", () => {
     expect(command(restored, order).accepted).toBe(true);
     expect(restored.actorById("worker")!.attackMove).toBeUndefined();
     expect(restored.actorById("worker")!.movement?.target).not.toEqual(target);
-    until(restored, () => restored.economy!.depositedMaterials === cargo);
+    until(restored, () => deposited(restored) === cargo);
     const position = restored.actorById("worker")!.worldPosition;
     expect(position.x).toBeLessThan(map.tileCenter(10, 6).x);
   });
 
   test("five paid unit orders train in sequence; cancellation fully refunds and retires reserved identity", () => {
     const state = exploredScenarioState(scenario, definitions);
-    state.economy!.materials = 250;
+    setBalance(state, 250);
     const { simulation } = fixture(state);
     command(simulation, {
       kind: "place-actor",
@@ -842,12 +855,12 @@ describe("Materials economy", () => {
       true,
       false,
     ]);
-    expect(simulation.economy!.materials).toBe(25);
+    expect(balance(simulation)).toBe(25);
     expect(
       command(simulation, { kind: "cancel-production", actorId: "unit-1" })
         .accepted,
     ).toBe(true);
-    expect(simulation.economy!.materials).toBe(50);
+    expect(balance(simulation)).toBe(50);
     expect(simulation.snapshot().retiredActorIds).toContain("unit-1");
     expect(simulation.actorById("unit-2")).toBeUndefined();
     advance(simulation, 3);
@@ -861,7 +874,7 @@ describe("Materials economy", () => {
 
   test("completed training waits for a free exit and cancellation refunds that waiting order", () => {
     const state = exploredScenarioState(scenario, definitions);
-    state.economy!.materials = 1000;
+    setBalance(state, 1000);
     const { simulation } = fixture(state);
     command(simulation, build());
     finishBuilding(simulation);
@@ -897,7 +910,7 @@ describe("Materials economy", () => {
     const saved = simulation.snapshot();
     const cancelled = fixture(saved).simulation;
     command(cancelled, { kind: "cancel-production", actorId: "worker" });
-    expect(cancelled.economy!.materials).toBe(900);
+    expect(balance(cancelled)).toBe(900);
     command(simulation, {
       kind: "terrain",
       tiles: [{ x: 7, z: 8, terrain: { typeId: "plain" } }],
@@ -968,7 +981,7 @@ describe("Materials economy", () => {
   test("a late economy fault rolls back a completed unit and its paid queue", () => {
     const { simulation } = workerFixture();
     const saved = simulation.snapshot();
-    saved.economy!.materials = 125;
+    setBalance(saved, 125);
     const setup = fixture(saved).simulation;
     command(setup, {
       kind: "place-actor",
@@ -1050,7 +1063,7 @@ describe("economy persistence", () => {
 
   test("JSON preserves active and queued construction and resumes the same ticks", () => {
     const state = exploredScenarioState(scenario, definitions);
-    state.economy!.materials = 300;
+    setBalance(state, 300);
     const { simulation } = fixture(state, 0.1);
     command(simulation, build());
     command(simulation, build("next", 9, 9));
@@ -1068,7 +1081,7 @@ describe("economy persistence", () => {
       expect(restored.tick()).toEqual(simulation.tick());
     expect(restored.snapshot()).toEqual(simulation.snapshot());
     expect(restored.actorById("next")!.construction).toBeUndefined();
-    expect(restored.economy!.materials).toBe(200);
+    expect(balance(restored)).toBe(200);
   });
 
   test("saves carry their own resource content", () => {
@@ -1129,4 +1142,156 @@ test("gifts must name one positive resource available in their mission", () => {
     ] as NonNullable<typeof state.economy>["loot"];
     expect(() => fixture(state)).toThrow("invalid economy state");
   }
+});
+
+describe("owner economies", () => {
+  const rivalScenario = defineScenario({
+    id: "owner-economy-test",
+    tileSize: scenario.tileSize,
+    terrainTypeIds: scenario.terrainTypeIds,
+    terrain: scenario.terrain,
+    playerOwner: "player",
+    sites: scenario.sites!,
+    loot: [],
+    owners: [
+      { id: "player", faction: "arc" },
+      { id: "rival", faction: "arc" },
+    ],
+    relationships: [],
+    buildings: [
+      ...scenario.buildings,
+      {
+        actorId: "rival-cc",
+        definitionId: "arc-command-center-prototype",
+        origin: { x: 2, z: 13 },
+        owner: "rival",
+      },
+      {
+        actorId: "rival-refinery",
+        definitionId: "arc-materials-refinery",
+        origin: { x: 6, z: 13 },
+        owner: "rival",
+      },
+    ],
+    stockpiles: [...stockpiles(150), ...stockpiles(200, "materials", "rival")],
+  });
+  // Without fog every owner knows the sites.
+  const rivalState = (): MissionState => {
+    const { fog: _, ...state } = createScenarioState(
+      rivalScenario,
+      definitions,
+    );
+    return state;
+  };
+  const balances = (simulation: MissionSimulation) => [
+    balance(simulation),
+    balance(simulation, "materials", "rival"),
+  ];
+  const train = (actorId: string): MissionCommand => ({
+    kind: "train-unit",
+    producerId: "rival-refinery",
+    actorId,
+    definitionId: "arc-harvester",
+  });
+
+  test("spending, refunds, and deliveries stay with each owner", () => {
+    const { simulation } = fixture(rivalState());
+    expect(command(simulation, train("rival-worker")).accepted).toBe(true);
+    expect(balances(simulation)).toEqual([150, 150]);
+    command(simulation, { kind: "cancel-production", actorId: "rival-worker" });
+    expect(balances(simulation)).toEqual([150, 200]);
+    expect(command(simulation, build()).accepted).toBe(true);
+    expect(balances(simulation)).toEqual([50, 200]);
+    command(simulation, { kind: "cancel-construction", actorId: "refinery" });
+    expect(balances(simulation)).toEqual([150, 200]);
+
+    expect(command(simulation, train("rival-worker-2")).accepted).toBe(true);
+    until(simulation, () => !!simulation.actorById("rival-worker-2"), 10);
+    command(simulation, {
+      kind: "gather",
+      actorId: "rival-worker-2",
+      siteId: "site",
+    });
+    until(simulation, () => deposited(simulation, "materials", "rival") > 0);
+    const income = deposited(simulation, "materials", "rival");
+    expect(balances(simulation)).toEqual([150, 150 + income]);
+    expect(deposited(simulation)).toBe(0);
+
+    const sale = balance(simulation, "materials", "rival");
+    command(simulation, { kind: "sell-actor", actorId: "rival-cc" });
+    expect(balance(simulation)).toBe(150);
+    expect(balance(simulation, "materials", "rival")).toBe(sale + 150);
+
+    const restored = fixture(
+      JSON.parse(JSON.stringify(simulation.snapshot())),
+    ).simulation;
+    expect(restored.economy!.stockpiles).toEqual(
+      simulation.economy!.stockpiles,
+    );
+    expect(restored.economy!.deposited).toEqual(simulation.economy!.deposited);
+  });
+
+  test("stalls are judged from the owner's workers and balance", () => {
+    const state = rivalState();
+    setBalance(state, 0, "materials", "rival");
+    state.actors.push(
+      createActor({
+        id: "player-worker",
+        definitionId: "arc-harvester",
+        owner: "player",
+        worldPosition: contentMap.tileCenter(5, 5),
+      }),
+    );
+    state.economy!.harvesters.push({
+      actorId: "player-worker",
+      cargo: 0,
+      gatherProgress: 0,
+      phase: "unassigned",
+    });
+    const { simulation } = fixture(state);
+    const stalled = (owner: string) =>
+      harvestingStalled(
+        simulation.economy!,
+        owner,
+        simulation.actors,
+        new Map(definitions.map((definition) => [definition.id, definition])),
+      );
+    expect(stalled("rival")).toBe(true);
+    expect(stalled("player")).toBe(false);
+  });
+
+  test.each([
+    (state: MissionState) => {
+      state.economy!.stockpiles[0].amount = 0.5;
+    },
+    (state: MissionState) => {
+      state.economy!.stockpiles[0].owners = [];
+    },
+    (state: MissionState) => {
+      state.economy!.stockpiles[0].owners = ["stranger"];
+    },
+    (state: MissionState) => {
+      state.economy!.stockpiles[1].owners.push("player");
+    },
+    (state: MissionState) => {
+      Object.assign(state.economy!.stockpiles[0], { resource: "gold" });
+    },
+    (state: MissionState) => {
+      state.economy!.deposited.push({
+        owner: "stranger",
+        resource: "materials",
+        amount: 1,
+      });
+    },
+    (state: MissionState) => {
+      state.economy!.deposited.push(
+        { owner: "player", resource: "materials", amount: 1 },
+        { owner: "player", resource: "materials", amount: 1 },
+      );
+    },
+  ])("malformed stockpiles are rejected (%#)", (change) => {
+    const state = rivalState();
+    change(state);
+    expect(() => fixture(state)).toThrow("invalid economy state");
+  });
 });

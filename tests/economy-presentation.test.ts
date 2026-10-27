@@ -248,8 +248,8 @@ test("resource and gift markers follow edited terrain and release their observer
       createHeight: () => 0,
     });
     const economy: EconomyState = {
-      materials: 0,
-      depositedMaterials: 0,
+      stockpiles: [],
+      deposited: [],
       harvesters: [],
       production: [],
       sites: [
@@ -319,8 +319,8 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
       createHeight: () => 0,
     });
     const economy: EconomyState = {
-      materials: 0,
-      depositedMaterials: 0,
+      stockpiles: [],
+      deposited: [],
       sites: [],
       harvesters: [],
       production: [],
@@ -404,8 +404,8 @@ test("Materials stages obey pack thresholds at their boundaries and disappear on
   try {
     const map = new TerrainMap({ width: 4, height: 4, tileSize: 1 });
     const economy: EconomyState = {
-      materials: 0,
-      depositedMaterials: 0,
+      stockpiles: [],
+      deposited: [],
       harvesters: [],
       production: [],
       loot: [],

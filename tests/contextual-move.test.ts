@@ -22,8 +22,8 @@ test.each([
   "mixed gathering capabilities select compatible workers at $siteId",
   ({ siteId, workerId, otherId }) => {
     const economy: EconomyState = {
-      materials: 0,
-      depositedMaterials: 0,
+      stockpiles: [],
+      deposited: [],
       sites: [
         {
           id: "materials",
@@ -37,8 +37,6 @@ test.each([
       harvesters: [createHarvesterState("harvester", "refinery")],
       production: [],
       cultivation: {
-        lifebloom: 0,
-        depositedLifebloom: 0,
         sites: [
           createCultivationSite("lifebloom", "Lifebloom", { x: 2, z: 1 }),
         ],

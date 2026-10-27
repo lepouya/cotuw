@@ -1,4 +1,4 @@
-import { playerOwners } from "./helpers/scenario";
+import { playerOwners, stockpiles } from "./helpers/scenario";
 import { describe, expect, test } from "vitest";
 import { WILDLIFE_ACTOR_DEFINITIONS } from "./helpers/content";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
@@ -59,7 +59,7 @@ const scenario = (units: ScenarioUnit[]) =>
     ...playerOwners("arc"),
     buildings: [],
     units,
-    materials: 0,
+    stockpiles: stockpiles(0),
     sites: [],
     loot: [],
   });

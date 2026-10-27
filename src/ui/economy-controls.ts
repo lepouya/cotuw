@@ -3,15 +3,13 @@ import {
   cultivationStatus,
 } from "../simulation/cultivation";
 import {
-  costCurrency,
-  costLabel,
-  harvestingRecoveryCost,
+  harvestingStalled,
   lootAmount,
   lootResource,
   refineryOccupied,
-  resourceName,
   saleRefund,
 } from "../simulation/economy";
+import { costCurrency, costLabel, resourceName } from "../simulation/resources";
 import type {
   CultivationSite,
   CultivatorState,
@@ -85,7 +83,13 @@ export function createEconomyControls(
   root: HTMLElement,
   simulation: Pick<
     MissionSimulation,
-    "actors" | "economy" | "tickSeconds" | "submitCommand" | "support"
+    | "actors"
+    | "economy"
+    | "playerOwner"
+    | "playerFaction"
+    | "tickSeconds"
+    | "submitCommand"
+    | "support"
   >,
   options: {
     definitions: readonly ActorDefinition[];
@@ -105,7 +109,8 @@ export function createEconomyControls(
   const definitions = new Map(
     options.definitions.map((definition) => [definition.id, definition]),
   );
-  const canControl = options.canControl ?? (() => true);
+  const canControl =
+    options.canControl ?? ((actor) => actor.owner === simulation.playerOwner);
   const nameOf = (id: string | undefined) =>
     (id && options.names.get(id)) || "";
   const definitionWith = (has: (definition: ActorDefinition) => unknown) =>
@@ -121,6 +126,19 @@ export function createEconomyControls(
     nameOf(
       definitionWith(({ growth }) => growth)?.growth?.headquartersDefinitionId,
     ) || "headquarters";
+  /** The headquarters kind that hosts a building's construction. */
+  const headquartersFor = (definitionId: string) => {
+    const building = definitions.get(definitionId);
+    return (
+      nameOf(
+        building?.growth?.headquartersDefinitionId ??
+          definitionWith(
+            ({ infrastructure, faction }) =>
+              infrastructure && faction === building?.faction,
+          )?.id,
+      ) || "headquarters"
+    );
+  };
   const percent = (amount: number, total: number) =>
     Math.round((amount / total) * 100);
   const siteSummary = (site: CultivationSite) =>
@@ -222,13 +240,13 @@ export function createEconomyControls(
         cultivating ? "Cultivation controls" : "Harvesting controls",
       );
       if (cultivating) {
-        const tending = actors.get(cultivating.tendingId ?? "")?.construction;
+        const tending = actors.get(cultivating.tendingId ?? "");
         const phase =
           cultivating.phase === "no-dropoff"
             ? `Delivery blocked: no reachable ${dropoff}`
             : cultivating.phase !== "tending"
               ? CULTIVATOR_PHASES[cultivating.phase]
-              : tending?.active
+              : tending?.construction?.active
                 ? "Tending growth"
                 : !tending?.headquartersId
                   ? `Waiting for an operational ${headquarters}`
@@ -358,20 +376,23 @@ export function createEconomyControls(
         id,
         definitionId,
         construction,
+        headquartersId,
       }: ActorRenderState) =>
         definitions.get(definitionId)?.growth
-          ? !cultivation?.workers.some((worker) => worker.tendingId === id)
-            ? "Untended · Paused"
-            : !construction?.headquartersId
-              ? `No ${headquarters} capacity · Paused`
-              : construction.active
-                ? "Growing"
+          ? construction?.active
+            ? "Growing"
+            : !cultivation?.workers.some((worker) => worker.tendingId === id)
+              ? "Untended · Paused"
+              : !headquartersId
+                ? `No ${headquartersFor(definitionId)} · Paused`
                 : "Worker travelling or waiting for infrastructure"
-          : disconnected.has(id)
-            ? "Disconnected · Paused"
-            : construction?.active
-              ? "Building"
-              : "Queued";
+          : construction?.active
+            ? "Building"
+            : disconnected.has(id)
+              ? "Disconnected · Paused"
+              : !headquartersId
+                ? `No ${headquartersFor(definitionId)} · Paused`
+                : "Queued";
       sync(
         element("construction-queue"),
         construction.map((actor) => ({
@@ -437,43 +458,63 @@ export function createEconomyControls(
             submit({ kind: "cancel-production", actorId: job.actorId }),
         })),
       );
-      const warning = economy.harvesters.find((worker) =>
+      const controlled = (id: string) => {
+        const actor = actors.get(id);
+        return !!actor && canControl(actor);
+      };
+      const harvesters = economy.harvesters.filter(({ actorId }) =>
+        controlled(actorId),
+      );
+      const warning = harvesters.find((worker) =>
         ["depleted", "blocked", "unassigned"].includes(worker.phase),
       );
       const emptyRefinery = refineries.find(
         (actor) => !actor.construction && !refineryOccupied(economy, actor.id),
       );
-      const recoveryCost = harvestingRecoveryCost(
-        economy,
-        simulation.actors.filter(canControl),
-        definitions,
-      );
       // The selected, fielded, or paid Harvester explains the delivery cycle.
       const harvesting = [
         ...(worker ? [actor!.definitionId] : []),
-        ...economy.harvesters.map(
-          (worker) => actors.get(worker.actorId)!.definitionId,
-        ),
-        ...economy.production.map((job) => job.definitionId),
+        ...harvesters.map((worker) => actors.get(worker.actorId)!.definitionId),
+        ...economy.production
+          .filter((job) => controlled(job.producerId))
+          .map((job) => job.definitionId),
       ]
         .map((id) => definitions.get(id)?.harvesting)
         .find(Boolean);
-      const affordable = economy.materials >= recoveryCost;
-      const idleWorker = economy.harvesters.find(
+      const stalled = harvestingStalled(
+        economy,
+        simulation.playerOwner,
+        simulation.actors,
+        definitions,
+      );
+      const idleWorker = harvesters.find(
         (worker) =>
           worker.phase === "idle" && !actors.get(worker.actorId)?.movement,
       );
+      const cultivators =
+        cultivation?.workers.filter(({ actorId }) => controlled(actorId)) ?? [];
       let status: string;
-      if (cultivation) {
+      const ownsCultivation = simulation.actors.some(
+        (actor) =>
+          canControl(actor) && definitions.get(actor.definitionId)?.growth,
+      );
+      const playsCultivation =
+        simulation.playerFaction !== undefined &&
+        options.definitions.some(
+          (definition) =>
+            definition.faction === simulation.playerFaction &&
+            definition.cultivation,
+        );
+      if (cultivators.length || ownsCultivation || playsCultivation) {
         const hasPhase = (phase: string) =>
-          cultivation.workers.some((worker) => worker.phase === phase);
+          cultivators.some((worker) => worker.phase === phase);
         if (hasPhase("no-dropoff"))
           status = `Delivery blocked: grow a reachable ${dropoff}. Cargo is retained.`;
         else if (hasPhase("waiting"))
           status = `${cultivator}s are waiting for site recovery. Rotate sites for faster income.`;
         else if (hasPhase("blocked"))
           status = `A ${cultivator} route is blocked. Clear the route or issue a new order.`;
-        else if (cultivation.workers.length === 0) {
+        else if (cultivators.length === 0) {
           status = cultivatorDefinition
             ? `Select the ${headquarters} and train a ${cultivator} for ${costLabel(cultivatorDefinition)}.`
             : "No cultivation workers are available in this mission.";
@@ -508,7 +549,7 @@ export function createEconomyControls(
           : "Select the idle Harvester and choose Gather in Selection.";
       } else if (harvesting) {
         status = `A full load takes ${harvesting.loadSeconds} seconds, plus travel. Materials arrive on delivery.`;
-      } else if (affordable) {
+      } else if (!stalled) {
         status = emptyRefinery
           ? "Select an empty Refinery and produce its Harvester."
           : "Build a Refinery, then produce its Harvester.";

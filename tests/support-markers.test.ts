@@ -49,6 +49,7 @@ for (const distance of [20, 15]) {
           root: true,
           connected: true,
           rootOwners: ["player"],
+          rootIds: ["root"],
         },
         {
           actorId: "remote",
@@ -60,6 +61,7 @@ for (const distance of [20, 15]) {
           root: false,
           connected: false,
           rootOwners: [],
+          rootIds: [],
         },
       ],
       links: [],

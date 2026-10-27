@@ -202,6 +202,7 @@ describe("mission alerts", () => {
         root: false,
         connected: connected[id]!,
         rootOwners: connected[id] ? ["player"] : [],
+        rootIds: connected[id] ? ["root"] : [],
       })),
       links: [],
     });

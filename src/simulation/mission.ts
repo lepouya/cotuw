@@ -1,8 +1,8 @@
+import { growthCandidates, growthWorkerFor } from "./growth";
 import {
-  growthCandidates,
-  growthHeadquarters,
-  growthWorkerFor,
-} from "./growth";
+  headquarteredOwners,
+  infrastructureHeadquarters,
+} from "./infrastructure";
 import {
   assignGroupDestinations,
   separateMobileActors,
@@ -27,6 +27,7 @@ import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
 import {
   createSupportResolver,
   disconnectedBuildings,
+  ownedCoverage,
   supportsPosition,
   validateSupportDefinition,
 } from "./support";
@@ -77,10 +78,6 @@ import {
   economySites,
   interruptWorker,
   workerHasOrder,
-  canAfford,
-  chargeCost,
-  costAmount,
-  refundCost,
   PRODUCTION_QUEUE_LIMIT,
   refineryOccupied,
   removeEconomyActor,
@@ -89,6 +86,13 @@ import {
   validateEconomyDefinitions,
   validateEconomyState,
 } from "./economy";
+import { costAmount } from "./resources";
+import {
+  canAfford,
+  chargeCost,
+  refundCost,
+  regroupStockpiles,
+} from "./stockpiles";
 import type { EconomyState, EconomyView } from "./economy";
 import {
   createTilePlacedActor,
@@ -276,6 +280,8 @@ export type MissionSimulationOptions = {
   objectives?: readonly ObjectiveDefinition[];
   /** Authored mission logic; `state.firedEvents` records its progress. */
   events?: readonly MissionEventDefinition[];
+  /** Matches the scenario's emergency headquarters rule. */
+  emergencyHeadquarters?: boolean;
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -350,6 +356,7 @@ export function createMissionSimulation({
   occupancy,
   objectives: authoredObjectives = [],
   events: authoredEvents = [],
+  emergencyHeadquarters = false,
 }: MissionSimulationOptions): MissionSimulation {
   if (!isPositive(tickSeconds)) {
     throw new RangeError(
@@ -445,15 +452,22 @@ export function createMissionSimulation({
     tick: state.tick,
   });
   deepFreeze(state.wrecks);
-  if (state.economy)
-    validateEconomyState(
-      state.economy,
-      state.actors,
-      definitionsById,
+  const validateEconomy = (
+    economy: EconomyState,
+    actors: readonly Actor[],
+    retiredIds: readonly string[],
+  ) =>
+    validateEconomyState(economy, {
+      actors,
+      definitions: definitionsById,
       map,
       tickSeconds,
-      state.retiredActorIds,
-    );
+      retiredIds,
+      owners: ownerIds,
+      sharesResources: relations.sharesResources,
+    });
+  if (state.economy)
+    validateEconomy(state.economy, state.actors, state.retiredActorIds);
   if (state.economy) deepFreeze(state.economy);
   const supportResolver = createSupportResolver(definitionsById);
   const supportFor = (actors: readonly Actor[]) =>
@@ -701,7 +715,7 @@ export function createMissionSimulation({
     )
       return { ...reject("debris"), tiles: evaluation.tiles };
     if (evaluation.accepted && economy) {
-      if (!canAfford(economy, definition))
+      if (!canAfford(economy, owner, definition))
         return { ...reject("insufficient-resources"), tiles: evaluation.tiles };
       const resources = new Set(
         [
@@ -711,14 +725,18 @@ export function createMissionSimulation({
       );
       if (evaluation.tiles.some((tile) => resources.has(tileKey(tile))))
         return { ...reject("resource-site"), tiles: evaluation.tiles };
+      // An owner without a headquarters may place a replacement.
+      const emergency =
+        emergencyHeadquarters &&
+        !!definition.infrastructure &&
+        !headquarteredOwners(actors, definitionsById).has(owner);
       if (definition.growth) {
         if (
-          !growthHeadquarters(
-            actor,
-            actors,
-            definitionsById,
-            relations.sharesHeadquarters,
-          ).length
+          !emergency &&
+          !infrastructureHeadquarters(actor, actors, {
+            definitions: definitionsById,
+            sharesHeadquarters: relations.sharesHeadquarters,
+          }).length
         )
           return { ...reject("missing-headquarters"), tiles: evaluation.tiles };
         const workerIds = placement.workerIds ?? [];
@@ -733,14 +751,18 @@ export function createMissionSimulation({
           return { ...reject("unreachable-growth"), tiles: evaluation.tiles };
         workerId = tender.id;
       }
+      const network = supportFor(actors);
+      const recipient = { owner, faction: definition.faction };
       if (
         definition.support &&
         !supportsPosition(
-          supportFor(actors),
+          network,
           actor.worldPosition,
-          { owner, faction: definition.faction },
+          recipient,
           relations.sharesSupport,
-        )
+        ) &&
+        // A replacement may use a disconnected owned building's radius.
+        !(emergency && ownedCoverage(network, actor.worldPosition, recipient))
       )
         return { ...reject("outside-support"), tiles: evaluation.tiles };
     }
@@ -782,7 +804,8 @@ export function createMissionSimulation({
       (evaluation.accepted || evaluation.reason === "exit-blocked")
     ) {
       const definition = definitionsById.get(command.definitionId)!;
-      if (!canAfford(economy, definition))
+      const producer = actors.find(({ id }) => id === command.producerId)!;
+      if (!canAfford(economy, producer.owner, definition))
         return { accepted: false, reason: "insufficient-resources" };
       if (
         economy.production.filter(
@@ -839,10 +862,9 @@ export function createMissionSimulation({
       for (const id of interrupted) delete working.actorsById.get(id)!.movement;
     }
     for (const building of working.actors) {
-      const construction = building.construction;
-      if (construction?.headquartersId === actor.id) {
-        delete construction.headquartersId;
-        delete construction.active;
+      if (building.headquartersId === actor.id) {
+        delete building.headquartersId;
+        if (building.construction) delete building.construction.active;
       }
     }
     if (isTilePlacedActor(actor)) {
@@ -1253,10 +1275,16 @@ export function createMissionSimulation({
     )
       return outcome(false);
     if (economy && command.kind === "cancel-construction")
-      refundCost(economy, definitionFor(actor), actor.construction!.paidCost);
+      refundCost(
+        economy,
+        actor.owner,
+        definitionFor(actor),
+        actor.construction!.paidCost,
+      );
     if (economy && command.kind === "sell-actor")
       refundCost(
         economy,
+        actor.owner,
         definitionFor(actor),
         saleRefund(actor, definitionFor(actor)),
       );
@@ -1321,7 +1349,11 @@ export function createMissionSimulation({
       occupancy!.place(evaluation.footprint);
       if (working.economy) {
         const definition = definitionFor(evaluation.actor);
-        const cost = chargeCost(working.economy, definition);
+        const cost = chargeCost(
+          working.economy,
+          evaluation.actor.owner,
+          definition,
+        );
         evaluation.actor.construction = {
           paidCost: cost,
           completedTicks: 0,
@@ -1361,7 +1393,8 @@ export function createMissionSimulation({
         };
       if (working.economy) {
         const definition = definitionsById.get(applied.definitionId)!;
-        const cost = chargeCost(working.economy, definition);
+        const producer = working.actorsById.get(applied.producerId)!;
+        const cost = chargeCost(working.economy, producer.owner, definition);
         working.economy.production.push({
           actorId: applied.actorId,
           producerId: applied.producerId,
@@ -1718,6 +1751,7 @@ export function createMissionSimulation({
               actors: working.actors,
               playerOwner,
               sharesHeadquarters: relations.sharesHeadquarters,
+              emergencyHeadquarters,
               knowsTile: ownerVision.knowsTile,
               definitions: definitionsById,
               behaviors: behaviorsById,
@@ -1758,15 +1792,15 @@ export function createMissionSimulation({
             actor,
             actorIdentity(actorsById.get(actor.id) ?? actor),
           );
-        if (working.economy)
-          validateEconomyState(
+        if (working.economy) {
+          // Credits can open a stockpile for one member of a pool.
+          regroupStockpiles(
             working.economy,
-            working.actors,
-            definitionsById,
-            map,
-            tickSeconds,
-            working.retiredIds,
+            ownerIds,
+            relations.sharesResources,
           );
+          validateEconomy(working.economy, working.actors, working.retiredIds);
+        }
         validateWildlife(
           working.wildlife,
           working.actors,
@@ -1785,6 +1819,13 @@ export function createMissionSimulation({
                 objectiveStatus: (id) =>
                   verdict.views.find((view) => view.id === id)?.status,
               });
+        const nextRelations = fired && createRelations(fired.relationships);
+        if (nextRelations && working.economy)
+          regroupStockpiles(
+            working.economy,
+            ownerIds,
+            nextRelations.sharesResources,
+          );
         const previousWrecks = state.wrecks;
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
@@ -1824,7 +1865,7 @@ export function createMissionSimulation({
         usedActorIds = working.usedIds;
         if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
-        if (fired) relations = createRelations(state.relationships);
+        if (nextRelations) relations = nextRelations;
         updateFog();
         return outcomes;
       } catch (error) {

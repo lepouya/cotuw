@@ -180,7 +180,9 @@ test("a restored mission renders its own map and saved terrain", async ({
           origin: { x: 2, z: 4 },
         },
       ],
-      materials: 150,
+      stockpiles: [
+        { resource: "materials" as const, owners: ["player"], amount: 150 },
+      ],
       sites: [],
       loot: [],
     };

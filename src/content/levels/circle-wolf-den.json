@@ -1,10 +1,10 @@
 {
   "format": "cotuw-mission",
-  "version": 11,
+  "version": 12,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "circle-wolf-den",
-    "content": { "id": "base", "version": 2 },
+    "content": { "id": "base", "version": 3 },
     "actors": [
       "circle-heartgrove",
       "circle-conservatory",
@@ -117,7 +117,8 @@
         "worldPosition": { "x": -40.5, "z": 1.5 },
         "facing": 0,
         "occupancyLayer": "surface",
-        "tilePlacement": { "origin": { "x": 8, "z": 50 }, "quarterTurns": 0 }
+        "tilePlacement": { "origin": { "x": 8, "z": 50 }, "quarterTurns": 0 },
+        "headquartersId": "starting-heartgrove"
       },
       {
         "id": "lone-wolf",
@@ -467,8 +468,10 @@
       ]
     },
     "economy": {
-      "materials": 0,
-      "depositedMaterials": 0,
+      "stockpiles": [
+        { "resource": "lifebloom", "owners": ["player"], "amount": 150 }
+      ],
+      "deposited": [],
       "sites": [],
       "loot": [
         {
@@ -489,8 +492,6 @@
       "harvesters": [],
       "production": [],
       "cultivation": {
-        "lifebloom": 150,
-        "depositedLifebloom": 0,
         "sites": [
           {
             "id": "near-lifebloom",

@@ -11,7 +11,7 @@ import type { ResourceLoot } from "../../src/simulation/economy.ts";
 import type { TileCoord } from "../../src/simulation/grid.ts";
 
 type WolfDenOptions = Omit<
-  Extract<ScenarioDefinition, { materials: number }>,
+  Extract<ScenarioDefinition, { stockpiles: readonly unknown[] }>,
   | "content"
   | "terrain"
   | "tileSize"

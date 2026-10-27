@@ -405,7 +405,7 @@ test("a committed delivery unloads the Harvester, gathering deploys it, and Stop
       deployed: played.has("actor-present-worker-deploy"),
       harvested: played.has("actor-present-worker-harvest"),
       stowed: played.has("actor-present-worker-stow"),
-      deposited: session.simulation.economy!.depositedMaterials,
+      deposited: session.simulation.economy!.deposited[0]?.amount ?? 0,
       drillHeight: scene.getTransformNodeByName(
         "actor-present-worker-harvester-drill",
       )!.position.y,

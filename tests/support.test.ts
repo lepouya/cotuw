@@ -20,7 +20,13 @@ import { createTilePlacedActor } from "../src/simulation/placement";
 import { createActor } from "../src/simulation/actor";
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
-import { exploredScenarioState, playerOwners } from "./helpers/scenario";
+import {
+  balance,
+  exploredScenarioState,
+  playerOwners,
+  setBalance,
+  stockpiles,
+} from "./helpers/scenario";
 import { createRelations } from "../src/simulation/ownership";
 
 const arcPlayer = { owner: "player", faction: "arc" };
@@ -41,7 +47,7 @@ const scenario = defineScenario({
   tileSize: 1,
   terrainTypeIds: mapOptions.terrainTypeIds,
   terrain: contentMap.terrainState(),
-  materials: 2000,
+  stockpiles: stockpiles(2000),
   sites: [],
   loot: [],
   buildings: [
@@ -65,11 +71,13 @@ const scenario = defineScenario({
 function fixture(
   state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
   actorDefinitions: readonly ActorDefinition[] = ARC_ACTOR_DEFINITIONS,
+  emergencyHeadquarters = false,
 ) {
   const map = new TerrainGrid(mapOptions);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
     state,
+    emergencyHeadquarters,
     map,
     occupancy,
     definitions: actorDefinitions,
@@ -404,7 +412,7 @@ describe("construction support", () => {
 
   test("placement requires live coverage and rejected orders spend nothing", () => {
     const { simulation } = fixture();
-    const before = simulation.economy!.materials;
+    const before = balance(simulation);
     expect(
       command(simulation, {
         kind: "place-actor",
@@ -413,7 +421,7 @@ describe("construction support", () => {
         origin: { x: 50, z: 10 },
       }),
     ).toMatchObject({ accepted: false, reason: "outside-support" });
-    expect(simulation.economy!.materials).toBe(before);
+    expect(balance(simulation)).toBe(before);
     simulation.submitCommand({ kind: "sell-actor", actorId: "bridge" });
     simulation.submitCommand({
       kind: "place-actor",
@@ -490,14 +498,14 @@ describe("construction support", () => {
     expect(
       simulation.actorById("remote-work")!.construction!.completedTicks,
     ).toBe(3);
-    const materials = simulation.economy!.materials;
+    const materials = balance(simulation);
     expect(
       command(simulation, {
         kind: "cancel-construction",
         actorId: "remote-work",
       }).accepted,
     ).toBe(true);
-    expect(simulation.economy!.materials).toBe(materials + 100);
+    expect(balance(simulation)).toBe(materials + 100);
   });
 
   test("a disconnected Refinery holds delivered cargo until reconnection", () => {
@@ -522,16 +530,16 @@ describe("construction support", () => {
       phase: "returning",
     });
     const { simulation } = fixture(state);
-    const materials = simulation.economy!.materials;
+    const materials = balance(simulation);
     ticks(simulation, 20);
     expect(simulation.economy!.harvesters[0]).toMatchObject({
       cargo: 50,
       phase: "returning",
     });
-    expect(simulation.economy!.materials).toBe(materials);
+    expect(balance(simulation)).toBe(materials);
     simulation.spawnActor(building("replacement", 13, 10));
     ticks(simulation, 2);
-    expect(simulation.economy!.materials).toBe(materials + 50);
+    expect(balance(simulation)).toBe(materials + 50);
     expect(simulation.economy!.harvesters[0].cargo).toBe(0);
   });
 
@@ -539,6 +547,7 @@ describe("construction support", () => {
     const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     state.owners.push({ id: "rival", faction: "arc" });
     for (const actor of state.actors) actor.owner = "rival";
+    setBalance(state, 100, "materials", "rival");
     const { simulation } = fixture(state);
     expect(
       command(simulation, {
@@ -588,5 +597,307 @@ describe("construction support", () => {
     saved.economy!.harvesters[0]!.refineryId = "remote";
     saved.economy!.harvesters[0]!.phase = "idle";
     expect(() => fixture(saved)).toThrow("invalid economy state");
+  });
+});
+
+describe("Command Center infrastructure queues", () => {
+  function commandCenter(id: string, x: number, z: number, owner = "player") {
+    return createTilePlacedActor(
+      contentMap,
+      definitions.get("arc-command-center-prototype")!,
+      { actorId: id, origin: { x, z } },
+      owner,
+    );
+  }
+  const place = (
+    actorId: string,
+    x: number,
+    z: number,
+    definitionId = "arc-field-barracks",
+  ): MissionCommand => ({
+    kind: "place-actor",
+    actorId,
+    definitionId,
+    origin: { x, z },
+  });
+  const work = (simulation: MissionSimulation, id: string) => {
+    const actor = simulation.actorById(id)!;
+    return (
+      actor.construction && {
+        ...actor.construction,
+        headquartersId: actor.headquartersId,
+      }
+    );
+  };
+
+  test("each Command Center supplies an independent queue", () => {
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    state.actors.push(commandCenter("east-cc", 50, 10));
+    const { simulation } = fixture(state);
+    for (const order of [
+      place("west-1", 5, 14),
+      place("east-1", 46, 14),
+      place("west-2", 5, 17),
+    ])
+      expect(command(simulation, order).accepted).toBe(true);
+    expect(work(simulation, "west-1")).toMatchObject({
+      headquartersId: "cc",
+      active: true,
+    });
+    expect(work(simulation, "east-1")).toMatchObject({
+      headquartersId: "east-cc",
+      active: true,
+    });
+    expect(work(simulation, "west-2")).toMatchObject({ headquartersId: "cc" });
+    expect(work(simulation, "west-2")!.active).toBeUndefined();
+  });
+
+  test("a completed headquarters adds a queue without moving existing work", () => {
+    const { simulation } = fixture();
+    expect(
+      command(simulation, place("new-cc", 8, 4, "arc-command-center-prototype"))
+        .accepted,
+    ).toBe(true);
+    expect(command(simulation, place("queued", 10, 8)).accepted).toBe(true);
+    expect(work(simulation, "new-cc")!.headquartersId).toBe("cc");
+    expect(work(simulation, "queued")!.active).toBeUndefined();
+    ticks(simulation, 12);
+    expect(simulation.actorById("new-cc")!.construction).toBeUndefined();
+    expect(work(simulation, "queued")).toMatchObject({
+      headquartersId: "cc",
+      active: true,
+    });
+    expect(command(simulation, place("fresh", 12, 1)).accepted).toBe(true);
+    expect(work(simulation, "fresh")).toMatchObject({
+      headquartersId: "new-cc",
+      active: true,
+    });
+  });
+
+  test("completed buildings retain their base through completion, new roots, and saves", () => {
+    const { simulation } = fixture();
+    expect(simulation.actorById("bridge")!.headquartersId).toBe("cc");
+    expect(command(simulation, place("built", 10, 8)).accepted).toBe(true);
+    ticks(simulation, 8);
+    expect(simulation.actorById("built")!).toMatchObject({
+      headquartersId: "cc",
+    });
+    expect(work(simulation, "built")).toBeUndefined();
+    expect(
+      command(simulation, place("closer", 8, 4, "arc-command-center-prototype"))
+        .accepted,
+    ).toBe(true);
+    ticks(simulation, 12);
+    expect(simulation.actorById("closer")!.headquartersId).toBe("closer");
+    for (const id of ["bridge", "built"])
+      expect(simulation.actorById(id)!.headquartersId).toBe("cc");
+    const restored = fixture(
+      parseMission(serializeMission(scenario, simulation.snapshot(), 1), 1)
+        .state,
+    ).simulation;
+    expect(restored.snapshot()).toEqual(simulation.snapshot());
+    for (const current of [simulation, restored]) {
+      current.removeActor("cc");
+      current.tick();
+      for (const id of ["bridge", "built"])
+        expect(current.actorById(id)!.headquartersId).toBe("closer");
+      current.removeActor("closer");
+      current.tick();
+      for (const id of ["bridge", "built"])
+        expect(current.actorById(id)!.headquartersId).toBeUndefined();
+    }
+    expect(restored.snapshot()).toEqual(simulation.snapshot());
+  });
+
+  test.each(["missing", "bridge", "", null])(
+    "invalid saved base affiliations are rejected (%s)",
+    (headquartersId) => {
+      const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+      Object.assign(
+        state.actors.find(({ id }) => id === "remote")!,
+        { headquartersId },
+      );
+      expect(() => fixture(state)).toThrow("invalid infrastructure state");
+    },
+  );
+
+  test("losing a headquarters moves paid work by priority, or pauses it", () => {
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    state.actors.push(commandCenter("second-cc", 12, 4));
+    const { simulation } = fixture(state);
+    for (const order of [
+      place("a", 6, 7),
+      place("b1", 16, 2),
+      place("b2", 16, 6),
+    ])
+      expect(command(simulation, order).accepted).toBe(true);
+    ticks(simulation, 2);
+    expect(work(simulation, "a")).toMatchObject({
+      headquartersId: "cc",
+      active: true,
+    });
+    command(simulation, {
+      kind: "train-unit",
+      actorId: "trooper",
+      producerId: "bridge",
+      definitionId: "arc-trooper",
+    });
+    const before = balance(simulation);
+    const progress = work(simulation, "a")!.completedTicks;
+    simulation.removeActor("cc");
+    simulation.tick();
+    // Training stays on its producer.
+    expect(simulation.economy!.production).toMatchObject([
+      { actorId: "trooper", producerId: "bridge", completedTicks: 2 },
+    ]);
+    expect(work(simulation, "a")).toMatchObject({
+      headquartersId: "second-cc",
+      paidCost: 100,
+      completedTicks: progress,
+    });
+    // Reassigned work waits rather than preempting the receiving queue.
+    expect(work(simulation, "a")!.active).toBeUndefined();
+    expect(work(simulation, "b1")!.active).toBe(true);
+    for (let tick = 0; work(simulation, "b1") && tick < 10; tick++)
+      simulation.tick();
+    simulation.tick();
+    expect(work(simulation, "a")!.active).toBe(true);
+    expect(work(simulation, "b2")!.active).toBeUndefined();
+    simulation.removeActor("second-cc");
+    simulation.tick();
+    const paused = work(simulation, "a")!;
+    expect(paused.headquartersId).toBeUndefined();
+    ticks(simulation, 3);
+    expect(work(simulation, "a")).toEqual(paused);
+    expect(balance(simulation)).toBe(before);
+  });
+
+  test.each([
+    { sharesHeadquarters: false, headquartersId: undefined },
+    { sharesHeadquarters: true, headquartersId: "rival-cc" },
+  ])(
+    "an ally's Command Center hosts work only when it shares headquarters (%o)",
+    ({ sharesHeadquarters, headquartersId }) => {
+      const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+      state.owners.push({ id: "rival", faction: "arc" });
+      state.relationships.push({
+        owners: ["player", "rival"],
+        relationship: "allied",
+        sharesSupport: true,
+        ...(sharesHeadquarters && { sharesHeadquarters: true as const }),
+      });
+      // Out of link range, so only the ally's root powers the outpost.
+      state.actors.push(commandCenter("rival-cc", 30, 2, "rival"));
+      const { simulation } = fixture(state);
+      expect(command(simulation, place("outpost", 34, 6)).accepted).toBe(true);
+      simulation.tick();
+      expect(simulation.actorById("outpost")!.owner).toBe("player");
+      expect(work(simulation, "outpost")!.headquartersId).toBe(headquartersId);
+      expect(work(simulation, "outpost")!.active).toBe(
+        sharesHeadquarters || undefined,
+      );
+    },
+  );
+
+  describe("emergency headquarters", () => {
+    const replacement = (actorId: string, x: number, z: number) =>
+      place(actorId, x, z, "arc-command-center-prototype");
+    const emergencyFixture = () => {
+      const { simulation } = fixture(
+        exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
+        ARC_ACTOR_DEFINITIONS,
+        true,
+      );
+      expect(command(simulation, place("pending", 5, 14)).accepted).toBe(true);
+      simulation.removeActor("cc");
+      simulation.tick();
+      return simulation;
+    };
+
+    test("an emergency replacement does not wait for an allied queue", () => {
+      const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+      state.actors = state.actors.filter(({ id }) => id !== "cc");
+      for (const actor of state.actors) delete actor.headquartersId;
+      state.owners.push({ id: "ally", faction: "arc" });
+      state.relationships.push({
+        owners: ["player", "ally"],
+        relationship: "allied",
+        sharesSupport: true,
+        sharesHeadquarters: true,
+      });
+      const alliedWork = blueprint("allied-work", 6, 7);
+      alliedWork.owner = "ally";
+      state.actors.push(commandCenter("ally-cc", 2, 10, "ally"), alliedWork);
+      const { simulation } = fixture(state, ARC_ACTOR_DEFINITIONS, true);
+      simulation.tick();
+      expect(work(simulation, "allied-work")!.active).toBe(true);
+      expect(command(simulation, replacement("new-cc", 8, 4)).accepted).toBe(
+        true,
+      );
+      expect(work(simulation, "new-cc")).toMatchObject({
+        active: true,
+        completedTicks: 1,
+      });
+      expect(simulation.actorById("new-cc")!.headquartersId).toBeUndefined();
+      expect(work(simulation, "allied-work")).toMatchObject({
+        active: true,
+        headquartersId: "ally-cc",
+      });
+      const restored = fixture(
+        JSON.parse(JSON.stringify(simulation.snapshot())),
+        ARC_ACTOR_DEFINITIONS,
+        true,
+      ).simulation;
+      ticks(simulation, 12);
+      ticks(restored, 12);
+      expect(simulation.actorById("new-cc")!.construction).toBeUndefined();
+      expect(simulation.actorById("new-cc")!.headquartersId).toBe("new-cc");
+      expect(restored.snapshot()).toEqual(simulation.snapshot());
+    });
+
+    test("without the rule, losing every Command Center prevents recovery", () => {
+      const { simulation } = fixture();
+      simulation.removeActor("cc");
+      expect(command(simulation, replacement("new-cc", 17, 13))).toMatchObject({
+        accepted: false,
+        reason: "outside-support",
+      });
+    });
+
+    test("one disconnected replacement runs while other work pauses", () => {
+      const simulation = emergencyFixture();
+      expect(work(simulation, "pending")!.headquartersId).toBeUndefined();
+      expect(command(simulation, replacement("far-cc", 40, 14))).toMatchObject({
+        accepted: false,
+        reason: "outside-support",
+      });
+      const before = balance(simulation);
+      for (const order of [
+        replacement("new-cc", 17, 13),
+        replacement("spare-cc", 12, 14),
+      ])
+        expect(command(simulation, order).accepted).toBe(true);
+      expect(balance(simulation)).toBe(before - 600);
+      expect(simulation.support!.nodes).toContainEqual(
+        expect.objectContaining({ actorId: "new-cc", connected: false }),
+      );
+      expect(work(simulation, "new-cc")).toMatchObject({
+        active: true,
+        totalTicks: 12,
+      });
+      expect(work(simulation, "spare-cc")!.active).toBeUndefined();
+      expect(work(simulation, "pending")!.active).toBeUndefined();
+      while (work(simulation, "new-cc")) simulation.tick();
+      simulation.tick();
+      // Normal queues resume in placement order.
+      expect(work(simulation, "pending")).toMatchObject({
+        headquartersId: "new-cc",
+        active: true,
+      });
+      expect(work(simulation, "spare-cc")).toMatchObject({
+        headquartersId: "new-cc",
+      });
+      expect(work(simulation, "spare-cc")!.active).toBeUndefined();
+    });
   });
 });

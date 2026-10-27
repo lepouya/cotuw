@@ -102,11 +102,10 @@ export const CIRCLE_WOLF_DEN = createWolfDenScenario({
     lifebloom: 25,
     collected: false,
   }),
-  materials: 0,
+  stockpiles: [
+    { resource: "lifebloom", owners: ["player"], amount: LIFEBLOOM },
+  ],
   sites: [],
   loot: [],
-  cultivation: {
-    lifebloom: LIFEBLOOM,
-    sites,
-  },
+  cultivation: { sites },
 });

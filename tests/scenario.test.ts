@@ -1,6 +1,7 @@
-import { playerOwners } from "./helpers/scenario";
+import { playerOwners, stockpiles } from "./helpers/scenario";
 import { describe, expect, test } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
+import type { Stockpile } from "../src/simulation/stockpiles";
 import { TerrainGrid } from "../src/simulation/terrain";
 import {
   createScenarioMap,
@@ -26,7 +27,7 @@ describe("scenario terrain", () => {
       terrain: terrain.terrainState(),
       ...playerOwners("arc"),
       buildings: [],
-      materials: 0,
+      stockpiles: stockpiles(0),
       sites: [],
       loot: [],
     });
@@ -37,6 +38,43 @@ describe("scenario terrain", () => {
     restored.setTerrain(0, 0, { typeId: "water", surfacePassable: false });
     expect(scenario.terrain.tiles[0].surfacePassable).toBe(true);
   });
+});
+
+describe("scenario stockpiles", () => {
+  const terrain = new TerrainGrid({ width: 2, height: 2, tileSize: 1 });
+  test.each([
+    [{ resource: "materials", owners: ["stranger"], amount: 3 }],
+    [{ resource: "gold", owners: ["player"], amount: 3 }],
+    [{ resource: "materials", owners: [], amount: 3 }],
+    [{ resource: "materials", owners: ["player", "ally"], amount: 1.5 }],
+    [...stockpiles(1), ...stockpiles(2)],
+  ])(
+    "rejects malformed balances before pooling (%#)",
+    (...startingBalances) => {
+      const scenario = defineScenario({
+        id: "stockpiles",
+        tileSize: 1,
+        terrainTypeIds: [...terrain.terrainTypeIds],
+        terrain: terrain.terrainState(),
+        owners: [{ id: "player" }, { id: "ally" }],
+        playerOwner: "player",
+        relationships: [
+          {
+            owners: ["player", "ally"],
+            relationship: "allied",
+            sharesResources: true,
+          },
+        ],
+        buildings: [],
+        stockpiles: startingBalances as Stockpile[],
+        sites: [],
+        loot: [],
+      });
+      expect(() => createScenarioState(scenario, [])).toThrow(
+        "invalid stockpiles",
+      );
+    },
+  );
 });
 
 describe("scenario owners", () => {

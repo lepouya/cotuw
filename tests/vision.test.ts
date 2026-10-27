@@ -1,4 +1,4 @@
-import { playerOwners } from "./helpers/scenario";
+import { playerOwners, stockpiles } from "./helpers/scenario";
 import { describe, expect, test, vi } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
@@ -46,7 +46,7 @@ const scenario = defineScenario({
   tileSize: 1,
   terrainTypeIds: mapOptions.terrainTypeIds,
   terrain: contentMap.terrainState(),
-  materials: 1000,
+  stockpiles: stockpiles(1000),
   sites: [
     {
       id: "near",

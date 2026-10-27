@@ -20,10 +20,16 @@ export type OwnerRelationship = {
   sharesSupport?: true;
   /** Allies' buildings may use each other's headquarters queues. */
   sharesHeadquarters?: true;
+  /** Allies pool each resource type, together with their own sharing allies. */
+  sharesResources?: true;
 };
 
 /** Services a scenario may let allies share, independently of each other. */
-const SHARING = ["sharesSupport", "sharesHeadquarters"] as const;
+const SHARING = [
+  "sharesSupport",
+  "sharesHeadquarters",
+  "sharesResources",
+] as const;
 
 /** A requested relationship; `neutral` removes the pair's saved entry. */
 export type RelationshipChange = {
@@ -31,6 +37,7 @@ export type RelationshipChange = {
   readonly relationship: Relationship;
   readonly sharesSupport?: true;
   readonly sharesHeadquarters?: true;
+  readonly sharesResources?: true;
 };
 
 type OwnerPair = { readonly owners: readonly [string, string] };
@@ -70,6 +77,8 @@ export function createRelations(relationships: readonly OwnerRelationship[]) {
       left === right || !!entryFor(left, right)?.sharesSupport,
     sharesHeadquarters: (left: string, right: string) =>
       left === right || !!entryFor(left, right)?.sharesHeadquarters,
+    sharesResources: (left: string, right: string) =>
+      left === right || !!entryFor(left, right)?.sharesResources,
   };
 }
 

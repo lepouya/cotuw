@@ -4,9 +4,9 @@ import {
   occupiedTilesFor,
 } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
-import { costAmount, costLabel, costResource } from "../simulation/economy";
+import { costAmount, costLabel, costResource } from "../simulation/resources";
 import { growthCandidates } from "../simulation/growth";
-import type { Resource } from "../simulation/economy";
+import type { Resource } from "../simulation/resources";
 import { createPlayerAccess, rosterIncludes } from "../simulation/ownership";
 import type { Relations } from "../simulation/ownership";
 import { createGoalList } from "./goals";

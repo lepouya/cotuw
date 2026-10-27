@@ -1,8 +1,24 @@
 import {
-  updateGrowth,
-  validateGrowth,
-  validateGrowthDefinitions,
-} from "./growth";
+  updateInfrastructure,
+  validateInfrastructure,
+  validateInfrastructureDefinitions,
+} from "./infrastructure";
+import { validateGrowthDefinitions } from "./growth";
+import {
+  costAmount,
+  definedPrices,
+  materialsCost,
+  RESOURCE_IDS,
+} from "./resources";
+import {
+  balanceOf,
+  credit,
+  deposit,
+  isValidLedger,
+  refundCost,
+} from "./stockpiles";
+import type { Resource } from "./resources";
+import type { Ledger, SharesResources } from "./stockpiles";
 import {
   applyCultivationCommand,
   createCultivatorState,
@@ -34,7 +50,7 @@ import type { WorldPosition } from "./world";
 import type { TrainingEvaluation } from "./production";
 import type { EconomyCommand } from "./command";
 import type { SupportView } from "./support";
-import type { SharesHeadquarters } from "./growth";
+import type { SharesHeadquarters } from "./infrastructure";
 
 export type MaterialsSite = {
   id: string;
@@ -108,10 +124,8 @@ export type ProductionJob = {
   totalTicks: number;
   exitBlocked: boolean;
 };
-export type EconomyState = {
-  materials: number;
+export type EconomyState = Ledger & {
   cultivation?: CultivationState;
-  depositedMaterials: number;
   sites: MaterialsSite[];
   loot: ResourceLoot[];
   harvesters: HarvesterState[];
@@ -214,96 +228,10 @@ export type EconomyReason =
 /** Outstanding paid orders one producer may hold. */
 export const PRODUCTION_QUEUE_LIMIT = 5;
 
-type ResourceRules = {
-  name: string;
-  /** The price field an actor definition uses for this resource. */
-  cost: (definition: ActorDefinition) => number | undefined;
-  /** Absent when this economy does not hold the resource. */
-  balance: (economy: EconomyView) => number | undefined;
-  change: (economy: EconomyState, amount: number) => void;
-};
-/** Common resources; each definition prices itself in at most one. */
-const RESOURCES = {
-  materials: {
-    name: "Materials",
-    cost: (definition) => definition.materialsCost,
-    balance: (economy) => economy.materials,
-    change: (economy, amount) => {
-      economy.materials += amount;
-    },
-  },
-  lifebloom: {
-    name: "Lifebloom",
-    cost: (definition) => definition.lifebloomCost,
-    balance: (economy) => economy.cultivation?.lifebloom,
-    change: (economy, amount) => {
-      if (!economy.cultivation)
-        throw new RangeError("Lifebloom economy is unavailable.");
-      economy.cultivation.lifebloom += amount;
-    },
-  },
-} satisfies Record<string, ResourceRules>;
-export type Resource = keyof typeof RESOURCES;
-export const RESOURCE_IDS = Object.keys(RESOURCES) as Resource[];
 export const lootResource = (loot: Readonly<ResourceLoot>): Resource =>
   RESOURCE_IDS.find((id) => loot[id] !== undefined)!;
 export const lootAmount = (loot: Readonly<ResourceLoot>): number =>
   loot[lootResource(loot)]!;
-export const costResource = (definition: ActorDefinition): Resource =>
-  RESOURCE_IDS.find((id) => RESOURCES[id].cost(definition) !== undefined) ??
-  "materials";
-export const costAmount = (definition: ActorDefinition) =>
-  RESOURCES[costResource(definition)].cost(definition) ?? 0;
-export const resourceName = (resource: Resource) => RESOURCES[resource].name;
-export const costCurrency = (definition: ActorDefinition) =>
-  resourceName(costResource(definition));
-/** A price as players read it, such as "50 Lifebloom". */
-export const costLabel = (definition: ActorDefinition) =>
-  `${costAmount(definition)} ${costCurrency(definition)}`;
-export function canAfford(economy: EconomyView, definition: ActorDefinition) {
-  const balance = RESOURCES[costResource(definition)].balance(economy);
-  return balance !== undefined && balance >= costAmount(definition);
-}
-/** Balances of the resources this economy holds. */
-export const resourceBalances = (
-  economy: EconomyView,
-): Partial<Record<Resource, number>> =>
-  Object.fromEntries(
-    RESOURCE_IDS.flatMap((id) => {
-      const balance = RESOURCES[id].balance(economy);
-      return balance === undefined ? [] : [[id, balance]];
-    }),
-  );
-/** The resource that prices a faction's roster; each faction uses one. */
-export function factionResource(
-  definitions: Iterable<ActorDefinition>,
-  faction: string | undefined,
-): Resource | undefined {
-  for (const definition of definitions)
-    if (definition.faction === faction && costAmount(definition) > 0)
-      return costResource(definition);
-  return undefined;
-}
-/** Pays a definition's price and returns the amount retained by its job. */
-export function chargeCost(
-  economy: EconomyState,
-  definition: ActorDefinition,
-): number {
-  const cost = costAmount(definition);
-  RESOURCES[costResource(definition)].change(economy, -cost);
-  return cost;
-}
-/** Returns an amount in the resource that prices `definition`. */
-export function refundCost(
-  economy: EconomyState,
-  definition: ActorDefinition,
-  amount: number,
-) {
-  RESOURCES[costResource(definition)].change(economy, amount);
-}
-
-export const materialsCost = (definition: ActorDefinition) =>
-  definition.materialsCost ?? 0;
 
 /** Half the construction cost, scaled by remaining health and rounded down. */
 export function saleRefund(
@@ -320,8 +248,7 @@ export function validateEconomyDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,
 ): void {
   for (const definition of definitions.values()) {
-    const prices = RESOURCE_IDS.map((id) => RESOURCES[id].cost(definition));
-    const priced = prices.filter((cost) => cost !== undefined);
+    const priced = definedPrices(definition);
     if (
       priced.length > 1 ||
       !priced.every(isCount) ||
@@ -365,17 +292,30 @@ export function validateEconomyDefinitions(
       throw new RangeError(`Invalid refinery definition: ${definition.id}.`);
   }
   validateCultivationDefinitions(definitions);
+  validateInfrastructureDefinitions(definitions);
   validateGrowthDefinitions(definitions);
 }
 
 /** Validates saved state before any terrain or occupancy is published. */
 export function validateEconomyState(
   economy: EconomyState,
-  actors: readonly Actor[],
-  definitions: ReadonlyMap<string, ActorDefinition>,
-  map: TerrainView | undefined,
-  tickSeconds: number,
-  retiredIds: readonly string[],
+  {
+    actors,
+    definitions,
+    map,
+    tickSeconds,
+    retiredIds,
+    owners,
+    sharesResources,
+  }: {
+    actors: readonly Actor[];
+    definitions: ReadonlyMap<string, ActorDefinition>;
+    map: TerrainView | undefined;
+    tickSeconds: number;
+    retiredIds: readonly string[];
+    owners: ReadonlySet<string>;
+    sharesResources: SharesResources;
+  },
 ): void {
   const invalid = () => {
     throw new RangeError("Mission has invalid economy state.");
@@ -383,8 +323,7 @@ export function validateEconomyState(
   if (
     !map ||
     !economy ||
-    !isCount(economy.materials) ||
-    !isCount(economy.depositedMaterials) ||
+    !isValidLedger(economy, owners, sharesResources) ||
     !Array.isArray(economy.sites) ||
     !Array.isArray(economy.loot) ||
     !Array.isArray(economy.harvesters) ||
@@ -423,13 +362,15 @@ export function validateEconomyState(
       RESOURCE_IDS.filter((id) => loot[id] !== undefined).length !== 1 ||
       !isCount(lootAmount(loot)) ||
       lootAmount(loot) === 0 ||
-      RESOURCES[lootResource(loot)].balance(economy) === undefined ||
+      !economy.stockpiles.some(
+        ({ resource }) => resource === lootResource(loot),
+      ) ||
       typeof loot.collected !== "boolean"
     )
       return invalid();
   }
   validateCultivation(economy, actors, definitions, tickSeconds);
-  validateGrowth(actors, definitions);
+  validateInfrastructure(actors, definitions);
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const assigned = new Set<string>();
   const workers = new Set<string>();
@@ -550,11 +491,37 @@ export function harvestingRecoveryCost(
   return cost;
 }
 
+/**
+ * Whether an owner has no Harvester, fielded or paid, and too few Materials
+ * for the cheapest way to field one.
+ */
+export function harvestingStalled(
+  economy: EconomyView,
+  owner: string,
+  actors: readonly ActorRenderState[],
+  definitions: ReadonlyMap<string, ActorDefinition>,
+) {
+  const ownedActors = actors.filter((actor) => actor.owner === owner);
+  const owned = new Set(ownedActors.map((actor) => actor.id));
+  return (
+    !economy.harvesters.some((worker) => owned.has(worker.actorId)) &&
+    !economy.production.some(
+      (job) =>
+        owned.has(job.producerId) &&
+        definitions.get(job.definitionId)?.harvesting,
+    ) &&
+    (balanceOf(economy, owner, "materials") ?? 0) <
+      harvestingRecoveryCost(economy, ownedActors, definitions)
+  );
+}
+
 export type EconomyWorld = {
   actors: Actor[];
   playerOwner: string;
   /** Whether a building's owner may use a headquarters owner's queue. */
   sharesHeadquarters: SharesHeadquarters;
+  /** Whether an owner without a headquarters may run one replacement job. */
+  emergencyHeadquarters: boolean;
   /** Whether a worker's owner knows a resource site's tile. */
   knowsTile: (owner: string, tile: TileCoord) => boolean;
   definitions: ReadonlyMap<string, ActorDefinition>;
@@ -581,7 +548,13 @@ export function applyEconomyCommand(
     );
     if (index < 0) return "missing-order";
     const [job] = economy.production.splice(index, 1);
-    refundCost(economy, definitions.get(job.definitionId)!, job.paidCost);
+    const producer = actors.find((actor) => actor.id === job.producerId)!;
+    refundCost(
+      economy,
+      producer.owner,
+      definitions.get(job.definitionId)!,
+      job.paidCost,
+    );
     retire(job.actorId);
     return;
   }
@@ -686,8 +659,8 @@ export function updateEconomy(
   world: EconomyWorld,
 ): void {
   const { actors, definitions, map, tickSeconds } = world;
-  if (economy.cultivation) updateCultivation(economy.cultivation, world);
-  updateGrowth(economy, world);
+  if (economy.cultivation) updateCultivation(economy, world);
+  updateInfrastructure(economy, world);
   const disconnected = disconnectedBuildings(world.support());
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const producers = [
@@ -752,8 +725,7 @@ export function updateEconomy(
         block(worker);
       } else if (routeTo(actor, worker, destination)) {
         if (disconnected.has(worker.refineryId)) continue;
-        economy.materials += worker.cargo;
-        economy.depositedMaterials += worker.cargo;
+        deposit(economy, actor.owner, "materials", worker.cargo);
         world.deliver(worker.refineryId, worker.actorId);
         worker.cargo = 0;
         worker.phase = worker.targetSiteId ? "travelling" : "idle";
@@ -838,6 +810,6 @@ export function updateEconomy(
     )
       continue;
     loot.collected = true;
-    RESOURCES[lootResource(loot)].change(economy, lootAmount(loot));
+    credit(economy, world.playerOwner, lootResource(loot), lootAmount(loot));
   }
 }

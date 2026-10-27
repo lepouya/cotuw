@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 1,
   "id": "base",
-  "version": 2,
+  "version": 3,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -296,6 +296,9 @@
       },
       "materialsCost": 300,
       "constructionSeconds": 12,
+      "infrastructure": {
+        "slots": 1
+      },
       "behaviorId": "idle",
       "footprint": {
         "layer": "surface",

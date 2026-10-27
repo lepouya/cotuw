@@ -109,10 +109,11 @@ export type Actor = {
     /** Clockwise quarter turns around the placement origin. */
     quarterTurns: number;
   };
+  /** Persistent base affiliation; headquarters affiliate with themselves. */
+  headquartersId?: string;
   /** Paid blueprint progress; absent once the building is operational. */
   construction?: {
     paidCost: number;
-    headquartersId?: string;
     active?: boolean;
     completedTicks: number;
     totalTicks: number;
@@ -328,6 +329,7 @@ export type ActorRenderState = DeepReadonly<
     | "movement"
     | "attackMove"
     | "construction"
+    | "headquartersId"
     | "rallyPoint"
     | "health"
     | "combat"

@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { openOpening, importMission } from "./prototype-helpers";
+import type { MissionFile } from "../src/simulation/mission-file";
 
 declare global {
   interface Window {
@@ -18,7 +19,7 @@ for (const action of ["restart", "exit", "newer load"] as const) {
         missionsPath
       )) as typeof import("./missions");
       const mission = level();
-      mission.state.economy!.materials = 77;
+      mission.state.economy!.stockpiles[0].amount = 77;
       // A save, not a level, so loading it never replaces the restart level.
       mission.state.tick = 1;
       return missionSource(mission);
@@ -41,8 +42,8 @@ for (const action of ["restart", "exit", "newer load"] as const) {
     }, source);
     await upload("slow.json");
     if (action === "newer load") {
-      const newer = JSON.parse(source);
-      newer.state.economy.materials = 99;
+      const newer: MissionFile = JSON.parse(source);
+      newer.state.economy!.stockpiles[0].amount = 99;
       await upload("newer.json", JSON.stringify(newer));
       await expect(page.locator("#materials-counter")).toHaveText("99");
       await expect(page.locator("#restart-mission")).toBeEnabled();

@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
-import { advanceSeconds, untilSeconds } from "./helpers/scenario";
+import {
+  advanceSeconds,
+  balance,
+  stockpiles,
+  untilSeconds,
+} from "./helpers/scenario";
 import { createMissionSimulation } from "../src/simulation/mission";
 import { secondsToTicks } from "../src/simulation/clock";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
@@ -14,7 +19,12 @@ import { TerrainGrid } from "../src/simulation/terrain";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 
 import type { MissionEventDefinition } from "../src/simulation/events";
-import type { MaterialsSite } from "../src/simulation/economy";
+import { regroupStockpiles } from "../src/simulation/stockpiles";
+import type {
+  EconomyState,
+  EconomyView,
+  MaterialsSite,
+} from "../src/simulation/economy";
 import type { MissionState } from "../src/simulation/mission";
 import type { ObjectiveDefinition } from "../src/simulation/objectives";
 import type { OwnerRelationship } from "../src/simulation/ownership";
@@ -65,7 +75,10 @@ function scenario({
     objectives,
     buildings,
     units,
-    materials: 1000,
+    stockpiles: [
+      ...stockpiles(1000),
+      ...stockpiles(1000, "materials", "rival"),
+    ],
     sites,
     loot: [],
   });
@@ -276,7 +289,7 @@ describe("owner relationships", () => {
     expect(disconnected.has("barracks")).toBe(true);
   });
 
-  test("each owner's construction uses its own slot", () => {
+  test("each owner's construction uses its own Command Center queue", () => {
     const site = (actorId: string, x: number, owner: string) => [
       {
         actorId: `${actorId}-cc`,
@@ -306,9 +319,9 @@ describe("owner relationships", () => {
     });
     simulation.tick();
     for (const id of ["mine", "theirs"])
-      expect(simulation.actorById(id)!.construction).toMatchObject({
-        active: true,
-        completedTicks: 1,
+      expect(simulation.actorById(id)!).toMatchObject({
+        headquartersId: `${id}-cc`,
+        construction: { active: true, completedTicks: 1 },
       });
   });
 
@@ -501,5 +514,132 @@ describe("owner relationships", () => {
         ],
       }),
     ).toThrow("invalid event definition");
+  });
+});
+
+describe("shared resource pools", () => {
+  const sharing = {
+    ...rivals("allied"),
+    sharesResources: true as const,
+  };
+  const lifebloom = (amount: number) => (state: MissionState) =>
+    state.economy!.stockpiles.push(...stockpiles(amount, "lifebloom"));
+  const totals = (simulation: { economy?: EconomyView; playerOwner: string }) =>
+    ["player", "rival"].map((owner) => [
+      balance(simulation, "materials", owner),
+      balance(simulation, "lifebloom", owner),
+    ]);
+
+  test("sharing allies pool each resource type and divide it when sharing ends", () => {
+    const { simulation } = fixture({
+      explored: true,
+      buildings: [
+        {
+          actorId: "cc",
+          definitionId: "arc-command-center-prototype",
+          origin: { x: 2, z: 10 },
+          owner: "player",
+        },
+      ],
+      events: [at(1, [sharing]), at(3, [rivals("allied")])],
+      edit: lifebloom(31),
+    });
+    expect(totals(simulation)).toEqual([
+      [1000, 31],
+      [1000, 0],
+    ]);
+    advanceSeconds(simulation, 1);
+    expect(simulation.economy!.stockpiles).toEqual([
+      { resource: "materials", owners: ["player", "rival"], amount: 2000 },
+      { resource: "lifebloom", owners: ["player", "rival"], amount: 31 },
+    ]);
+    simulation.submitCommand({
+      kind: "place-actor",
+      actorId: "barracks",
+      definitionId: "arc-field-barracks",
+      origin: { x: 6, z: 10 },
+    });
+    simulation.tick();
+    expect(totals(simulation)).toEqual([
+      [1900, 31],
+      [1900, 31],
+    ]);
+    const restored = fixture(
+      { events: [at(1, [sharing]), at(3, [rivals("allied")])] },
+      JSON.parse(JSON.stringify(simulation.snapshot())),
+    ).simulation;
+    for (const current of [simulation, restored]) {
+      untilSeconds(current, () => current.economy!.stockpiles.length === 4, 3);
+      // Earlier owner IDs take indivisible remainders.
+      expect(totals(current)).toEqual([
+        [950, 16],
+        [950, 15],
+      ]);
+      expect(current.relations.relationship("player", "rival")).toBe("allied");
+    }
+  });
+
+  test("ending the alliance separates its pools", () => {
+    const { simulation } = fixture({
+      events: [at(1, [sharing]), at(2, [rivals("hostile")])],
+    });
+    advanceSeconds(simulation, 1.5);
+    expect(simulation.economy!.stockpiles).toHaveLength(1);
+    advanceSeconds(simulation, 1);
+    expect(totals(simulation)).toEqual([
+      [1000, 0],
+      [1000, 0],
+    ]);
+  });
+
+  test("pools join owners through shared allies and split by member shares", () => {
+    const owners = ["a", "b", "c"];
+    const economy = {
+      stockpiles: [
+        { resource: "materials" as const, owners: ["a"], amount: 10 },
+        { resource: "materials" as const, owners: ["c"], amount: 5 },
+        { resource: "lifebloom" as const, owners: ["b"], amount: 7 },
+      ],
+    } as EconomyState;
+    const linked = (pairs: string[]) => (left: string, right: string) =>
+      left === right ||
+      pairs.includes(`${left}${right}`) ||
+      pairs.includes(`${right}${left}`);
+    regroupStockpiles(economy, owners, linked(["ab", "bc"]));
+    expect(economy.stockpiles).toEqual([
+      { resource: "materials", owners: ["a", "b", "c"], amount: 15 },
+      { resource: "lifebloom", owners: ["a", "b", "c"], amount: 7 },
+    ]);
+    regroupStockpiles(economy, owners, linked(["ab"]));
+    expect(economy.stockpiles).toEqual([
+      { resource: "materials", owners: ["a", "b"], amount: 10 },
+      { resource: "materials", owners: ["c"], amount: 5 },
+      { resource: "lifebloom", owners: ["a", "b"], amount: 5 },
+      { resource: "lifebloom", owners: ["c"], amount: 2 },
+    ]);
+  });
+
+  test("owners that start sharing start pooled; saves must match sharing", () => {
+    const { simulation } = fixture({
+      relationships: [
+        {
+          owners: ["player", "rival"],
+          relationship: "allied",
+          sharesResources: true,
+        },
+      ],
+    });
+    expect(simulation.economy!.stockpiles).toEqual([
+      { resource: "materials", owners: ["player", "rival"], amount: 2000 },
+    ]);
+    expect(() =>
+      fixture({
+        edit: (state) => {
+          state.economy!.stockpiles = [
+            { resource: "materials", owners: ["player", "rival"], amount: 1 },
+          ];
+        },
+      }),
+    ).toThrow("invalid economy state");
   });
 });

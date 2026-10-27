@@ -5,10 +5,10 @@ import {
   activeSites,
   economySites,
   workersForSite,
-  factionResource,
-  resourceBalances,
   workingWorkerIds,
 } from "./simulation/economy";
+import { factionResource } from "./simulation/resources";
+import { resourceBalances } from "./simulation/stockpiles";
 import { createSessionSimulation, missionTerrain } from "./mission-loading";
 import type { LoadedMission } from "./mission-loading";
 import { createAttackMoveControls } from "./ui/attack-move-controls";
@@ -613,7 +613,7 @@ async function assembleGameSession(
       following: view.camera.following,
       canRemove,
       ...(simulation.economy && {
-        balances: resourceBalances(simulation.economy),
+        balances: resourceBalances(simulation.economy, playerOwner),
         resource: playerResource,
       }),
       objectives: simulation.objectives,

@@ -1,5 +1,6 @@
 import { clearCombatOrders, compareIds, nearestTo } from "./actor";
 import { secondsToTicks } from "./clock";
+import { deposit } from "./stockpiles";
 import { isCount, isPositive } from "./validation";
 import {
   advanceWorkerRoute,
@@ -50,8 +51,6 @@ export type CultivatorState = {
   phase: (typeof CULTIVATOR_PHASES)[number];
 };
 export type CultivationState = {
-  lifebloom: number;
-  depositedLifebloom: number;
   sites: CultivationSite[];
   workers: CultivatorState[];
 };
@@ -157,10 +156,8 @@ export function applyCultivationCommand(
 }
 
 /** Regenerate once, then allocate shared reserves in stable worker-ID order. */
-export function updateCultivation(
-  state: CultivationState,
-  world: EconomyWorld,
-) {
+export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
+  const state = economy.cultivation!;
   const { actors, definitions, map, tickSeconds } = world;
   const perSecond = secondsToTicks(1, tickSeconds);
   const navigation = workerNavigation(world);
@@ -233,8 +230,7 @@ export function updateCultivation(
       worker.dropoffId = destination.id;
       worker.phase = "returning";
       if (route(actor, worker, destination.point)) {
-        state.lifebloom += worker.cargo;
-        state.depositedLifebloom += worker.cargo;
+        deposit(economy, actor.owner, "lifebloom", worker.cargo);
         world.deliver(destination.id, worker.actorId);
         worker.cargo = 0;
         delete worker.dropoffId;
@@ -321,12 +317,7 @@ export function validateCultivation(
       return invalid();
     return;
   }
-  if (
-    !isCount(state.lifebloom) ||
-    !isCount(state.depositedLifebloom) ||
-    !Array.isArray(state.workers)
-  )
-    return invalid();
+  if (!Array.isArray(state.workers)) return invalid();
   for (const site of state.sites) {
     if (
       ![

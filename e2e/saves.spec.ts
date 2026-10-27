@@ -216,7 +216,7 @@ test("a tick-zero save does not replace the authored restart level", async ({
     const path: string = "/e2e/missions.ts";
     const { level } = (await import(path)) as typeof import("./missions");
     const mission = level();
-    mission.state.economy!.materials = 77;
+    mission.state.economy!.stockpiles[0].amount = 77;
     const serializerPath: string = "/src/simulation/mission-file.ts";
     const { serializeMission } = (await import(
       serializerPath

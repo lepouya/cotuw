@@ -1,10 +1,10 @@
 {
   "format": "cotuw-mission",
-  "version": 11,
+  "version": 12,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "arc-economy-opening",
-    "content": { "id": "base", "version": 2 },
+    "content": { "id": "base", "version": 3 },
     "name": "Clear the wolf threat",
     "tileSize": 1,
     "terrainTypeIds": ["plain", "path", "rough", "water"],
@@ -125,7 +125,8 @@
         "worldPosition": { "x": -41, "z": 1 },
         "facing": 0,
         "occupancyLayer": "surface",
-        "tilePlacement": { "origin": { "x": 8, "z": 50 }, "quarterTurns": 0 }
+        "tilePlacement": { "origin": { "x": 8, "z": 50 }, "quarterTurns": 0 },
+        "headquartersId": "starting-command-center"
       },
       {
         "id": "lone-wolf",
@@ -475,8 +476,10 @@
       ]
     },
     "economy": {
-      "materials": 150,
-      "depositedMaterials": 0,
+      "stockpiles": [
+        { "resource": "materials", "owners": ["player"], "amount": 150 }
+      ],
+      "deposited": [],
       "sites": [
         {
           "id": "near-materials-1",

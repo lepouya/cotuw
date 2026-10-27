@@ -9,7 +9,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 11;
+export const MISSION_FILE_VERSION = 12;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -64,6 +64,8 @@ export type MissionScenario = {
   readonly objectives?: readonly ObjectiveDefinition[];
   /** One-time triggers and actions, such as relationship changes. */
   readonly events?: readonly MissionEventDefinition[];
+  /** Lets an owner without a headquarters run one replacement job. */
+  readonly emergencyHeadquarters?: boolean;
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
   readonly popups?: readonly ScenarioPopup[];
@@ -280,6 +282,11 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     throw new RangeError("Scenario objectives must be a list.");
   if (scenario.events !== undefined && !Array.isArray(scenario.events))
     throw new RangeError("Scenario events must be a list.");
+  if (
+    scenario.emergencyHeadquarters !== undefined &&
+    typeof scenario.emergencyHeadquarters !== "boolean"
+  )
+    throw new RangeError("Scenario emergencyHeadquarters must be a boolean.");
   if (
     save !== undefined &&
     (!isRecord(save) ||

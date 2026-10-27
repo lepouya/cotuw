@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { ECONOMY_ACTOR_DEFINITIONS } from "./helpers/content";
-import { exploredScenarioState, playerOwners } from "./helpers/scenario";
+import {
+  exploredScenarioState,
+  playerOwners,
+  stockpiles,
+} from "./helpers/scenario";
 import { createMissionSimulation } from "../src/simulation/mission";
 import { isMissionCommand } from "../src/simulation/command";
 import { OccupancyGrid } from "../src/simulation/occupancy";
@@ -45,7 +49,7 @@ function scenario(units: ScenarioUnit[]) {
       },
     ],
     units,
-    materials: 0,
+    stockpiles: stockpiles(0),
     sites: [],
     loot: [],
   });

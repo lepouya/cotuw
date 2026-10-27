@@ -35,6 +35,7 @@ export function createSessionSimulation(
     state: mission.state,
     objectives: mission.scenario.objectives,
     events: mission.scenario.events,
+    emergencyHeadquarters: mission.scenario.emergencyHeadquarters,
     behaviorRegistry: new Map([
       [
         "terrain-move",

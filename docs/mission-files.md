@@ -21,12 +21,12 @@ can be read, edited by hand, and loaded again.
   Each opening supplies its economy, roster, guidance, and reward currency.
   `base-content.ts` resolves actor definitions and prices for authored text;
   neither introduction imports the other.
-- Fixed-force scenarios can omit the authoring fields `materials`, `sites`,
+- Fixed-force scenarios can omit the authoring fields `stockpiles`, `sites`,
   and `loot` together. `createScenarioState` then supplies fog and actor state
-  without an economy. The Circle level uses `materials: 0`, empty Materials
-  sites, Lifebloom gifts, and an authored `cultivation` with `lifebloom` and
-  `sites`. Worker states for harvesting and cultivating units derive from
-  their definitions, as they do for trained units.
+  without an economy. The Circle level gives the player only a Lifebloom
+  stockpile, with empty Materials sites, Lifebloom gifts, and an authored
+  `cultivation` with `sites`. Worker states for harvesting and cultivating
+  units derive from their definitions, as they do for trained units.
 - `skirmish-map` is a development terrain preview with free construction and
   training. It has no economy, so its resource areas are not shown. The
   authoring inputs in `scripts/levels/skirmish-map.ts` define mirrored
@@ -81,22 +81,33 @@ can be read, edited by hand, and loaded again.
 - Every actor and wreck has an `owner` naming one of `state.owners`.
 - `state.relationships` lists allied and hostile pairs as `{ "owners": [a,
   b], "relationship": "allied" | "hostile" }`; every other pair is neutral.
-  Each pair appears once. Allies may add `"sharesSupport": true` and
-  `"sharesHeadquarters": true` independently.
+  Each pair appears once. Allies may add `"sharesSupport": true`,
+  `"sharesHeadquarters": true`, and `"sharesResources": true` independently.
 - Only hostile owners attack each other; Attack orders against neutral or
   allied actors are rejected.
 - Support links connect same-faction buildings of owners that share support.
   A building is powered only by a linked root whose owner shares support with
   every relay along the path. Placement also requires sharing with both the
   covering relay and its root; a relay cannot lend a third owner's support.
-- Circle growth uses the nearest Heartgrove of its owner or of an ally that
-  shares headquarters. When sharing ends, the growth moves to the nearest
-  eligible Heartgrove on the next tick, or pauses with its payment and
-  progress until one is available. Construction without a headquarters queue,
-  such as ARC construction, has one slot per owner.
-- Harvesters deliver only to their owner's Refineries; the stockpiles are
-  still shared by the mission. Cultivators tend and deliver only to their
-  owner's buildings, including when restoring saved assignments.
+- Construction uses the infrastructure queue of the nearest eligible
+  headquarters, a definition with `infrastructure.slots`, of its owner or of
+  an ally that shares headquarters. Circle growth uses its definition's
+  Heartgrove; other construction uses a headquarters of its faction whose
+  support powers the blueprint. Buildings retain their affiliation after
+  completion and while their headquarters remains eligible. Otherwise they
+  move to the nearest eligible one on the next tick. Paid work keeps payment,
+  progress, and placement priority without its slot, or pauses until a
+  headquarters is available. Completed headquarters affiliate with themselves.
+- `scenario.emergencyHeadquarters: true` applies the skirmish recovery rule.
+  An owner without a completed headquarters may place one: ARC within the
+  support radius of any completed owned building, even a disconnected one,
+  and the Circle with a tending Cultivator. Such a job has no
+  `headquartersId`, ignores support, and does not use infrastructure capacity;
+  each owner runs one at a time in placement order, independently of allied
+  queues. Other work needs an eligible operational headquarters.
+- Harvesters deliver only to their owner's Refineries and Cultivators tend
+  and deliver only to their owner's buildings, including when restoring saved
+  assignments. Deliveries credit the worker's owner.
 - With `fog`, every owner sees what its own and its allies' actors see. Only
   the player owner keeps explored terrain, which remains after an alliance
   ends. Harvesters choose sites from their owner's known tiles: explored
@@ -120,27 +131,42 @@ can be read, edited by hand, and loaded again.
   "objectiveId": id }`.
 - The `set-relationship` action names two distinct `owners` and a
   `relationship` of `allied`, `neutral`, or `hostile`. An `allied` action may
-  add `sharesSupport` and `sharesHeadquarters`; sharing an action leaves out
-  is revoked.
+  add `sharesSupport`, `sharesHeadquarters`, and `sharesResources`; sharing an
+  action leaves out is revoked.
 - Events fire in authored order at the end of the tick their trigger first
   holds, and take effect from the next tick. A defeat stops them.
 
-## Circle economy state
+## Economy state
 
-- `state.economy.cultivation` owns Lifebloom, deposited Lifebloom, renewable
-  sites, and Cultivator states. Materials remain a separate balance.
+- `state.economy.stockpiles` lists balances as `{ "resource": "materials" |
+  "lifebloom", "owners": [id], "amount": n }`. Each owner holds at most one
+  stockpile per resource, and an owner without one cannot pay that resource's
+  prices. Placement, training, cancellation, and sale refunds use the owner of
+  the building or producer. A credit to an owner without a stockpile opens
+  one.
+- Owners linked by `sharesResources`, directly or through other members, form
+  a pool. Each pool holds one stockpile per resource any member holds, listing
+  every member in `owners`. Scenario authoring pools the starting stockpiles
+  of owners that start sharing. When sharing changes, a pool's balance divides
+  equally among its owners, earlier IDs taking indivisible remainders, and the
+  new pools sum their members' shares.
+- `state.economy.deposited` lists worker deliveries as `{ "owner",
+  "resource", "amount" }`, at most once per pair. Pickups and refunds are not
+  deliveries.
+- `state.economy.cultivation` owns renewable sites and Cultivator states.
 - Site reserves and regeneration use integer thousandths of a resource unit.
   Sites save capacity, reserve, thresholds, regeneration remainder, and
   dormancy. Workers save integer cargo, fractional collection and rate
   remainders, site and delivery targets, the building they tend, and phase.
   At most one worker tends each building.
 - Each `economy.loot` entry has exactly one positive `materials` or
-  `lifebloom` reward and a saved `collected` flag. The mission must hold that
-  resource. Pickups credit its stockpile once; they do not count as worker
-  deliveries. Materials and Lifebloom share the gift model and pickup rules.
+  `lifebloom` reward and a saved `collected` flag. Some owner must hold that
+  resource. Pickups credit the player's stockpile once. Materials and
+  Lifebloom share the gift model and pickup rules.
 - Paid construction and production save `paidCost`; their actor definition
-  identifies its currency. Circle construction also saves `headquartersId`;
-  any construction saves whether it holds an active slot.
+  identifies its currency. Buildings save `headquartersId` on the actor,
+  independently of construction. Construction saves whether it holds an active
+  slot.
   Growth layers derive from completed ticks and save no rendering state.
 - Placement commands can carry selected `workerIds`. Evaluation chooses the
   nearest reachable eligible worker against the prospective footprint. A

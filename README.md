@@ -64,9 +64,10 @@ Heartgrove and clear the wolves to win. Gift boxes beyond the lone wolf grant
 Lifebloom when a friendly unit walks over them.
 
 This development slice uses the existing single-player control model.
-Multi-owner economies and authority, emergency headquarters recovery, healing,
-defenses, constructs, faction AI, difficulty, and skirmish balance remain
-pending. See the [slice scope](DESIGN.md#circle-wolf-den-development-slice).
+Command authority, healing, defenses, constructs, faction AI, difficulty, and
+skirmish balance remain pending. Owner economies and headquarters queues are
+implemented; scenarios can enable emergency headquarters recovery. See the
+[slice scope](DESIGN.md#circle-wolf-den-development-slice).
 
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all

@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { balance, deposited } from "./helpers/scenario";
 import {
   SKIRMISH_CROSSINGS,
   SKIRMISH_OPENINGS,
@@ -12,7 +13,7 @@ import { BASE_CONTENT } from "./helpers/content";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { createSessionSimulation, loadMission } from "../src/mission-loading";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
-import { materialsCost } from "../src/simulation/economy";
+import { materialsCost } from "../src/simulation/resources";
 import { tileKey } from "../src/simulation/grid";
 import { serializeMission } from "../src/simulation/mission-file";
 import {
@@ -226,7 +227,7 @@ test.each(SKIRMISH_STARTS)(
         definitionId: opening.worker,
       });
       expect(simulation.tick()[0].accepted).toBe(true);
-      expect(simulation.economy!.materials).toBe(0);
+      expect(balance(simulation)).toBe(0);
       until(simulation, () => !!simulation.actorById("harvester"));
       simulation.submitCommand({
         kind: "gather",
@@ -234,8 +235,8 @@ test.each(SKIRMISH_STARTS)(
         siteId: `${start.startingResourceAreaId}-1`,
       });
       expect(simulation.tick()[0].accepted).toBe(true);
-      until(simulation, () => simulation.economy!.depositedMaterials > 0);
-      expect(simulation.economy!.materials).toBeGreaterThan(0);
+      until(simulation, () => deposited(simulation) > 0);
+      expect(balance(simulation)).toBeGreaterThan(0);
     } finally {
       simulation.dispose();
     }

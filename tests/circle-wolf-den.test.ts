@@ -10,7 +10,7 @@ import { createScenarioMap } from "../src/simulation/scenario";
 import { playerFactionOf } from "../src/simulation/ownership";
 import { serializeMission } from "../src/simulation/mission-file";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
-import { advanceSeconds } from "./helpers/scenario";
+import { advanceSeconds, balance, deposited } from "./helpers/scenario";
 import { BASE_CONTENT } from "./helpers/content";
 
 import type { MissionSimulation } from "../src/simulation/mission";
@@ -29,10 +29,8 @@ test("the Circle opening uses shared wildlife, a paid worker bootstrap, and norm
   expect(circle.state.actors.filter(({ territory }) => territory)).toEqual(
     arc.state.actors.filter(({ territory }) => territory),
   );
-  expect(circle.state.economy!.cultivation).toMatchObject({
-    lifebloom: 150,
-    workers: [],
-  });
+  expect(balance(circle.state, "lifebloom")).toBe(150);
+  expect(circle.state.economy!.cultivation!.workers).toEqual([]);
   expect(circle.state.economy!.cultivation!.sites).toHaveLength(2);
   expect(
     circle.state.actors.filter(({ tilePlacement }) => tilePlacement),
@@ -194,10 +192,10 @@ test("the authored paid opening delivers Lifebloom and reveals the second cultiv
       actorId: "worker",
       siteId: "near-lifebloom",
     });
-    until(() => sim.economy!.cultivation!.lifebloom >= 30);
+    until(() => balance(sim, "lifebloom") >= 30);
     const second = sim.economy!.cultivation!.sites[1]!;
-    expect(sim.economy!.cultivation!.lifebloom).toBe(30);
-    expect(sim.economy!.materials).toBe(0);
+    expect(balance(sim, "lifebloom")).toBe(30);
+    expect(balance(sim)).toBe(0);
     expect(sim.fog!.isExplored(second.tile.x, second.tile.z)).toBe(true);
   } finally {
     sim.dispose();
@@ -229,9 +227,9 @@ test("Circle gifts reward Lifebloom once and retain collection through a save", 
       }),
     );
     sim.tick();
-    expect(sim.economy!.cultivation!.lifebloom).toBe(175);
-    expect(sim.economy!.cultivation!.depositedLifebloom).toBe(0);
-    expect(sim.economy!.materials).toBe(0);
+    expect(balance(sim, "lifebloom")).toBe(175);
+    expect(deposited(sim, "lifebloom")).toBe(0);
+    expect(balance(sim)).toBe(0);
     expect(sim.economy!.loot[0]!.collected).toBe(true);
     restored = createSessionSimulation(
       loadMission(
@@ -245,7 +243,7 @@ test("Circle gifts reward Lifebloom once and retain collection through a save", 
     sim.tick();
     restored.tick();
     expect(restored.snapshot()).toEqual(sim.snapshot());
-    expect(restored.economy!.cultivation!.lifebloom).toBe(175);
+    expect(balance(restored, "lifebloom")).toBe(175);
   } finally {
     restored?.dispose();
     sim.dispose();

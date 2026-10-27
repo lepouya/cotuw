@@ -1,5 +1,5 @@
 import { currentContentPack } from "../../src/content/packs.ts";
-import { costAmount } from "../../src/simulation/economy.ts";
+import { costAmount } from "../../src/simulation/resources.ts";
 
 export const BASE_CONTENT = currentContentPack("base");
 

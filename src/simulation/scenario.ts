@@ -4,6 +4,10 @@ import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
 import { createFogState } from "./vision";
 import { enrollWorker } from "./economy";
+import { isValidLedger, regroupStockpiles } from "./stockpiles";
+import { createRelations } from "./ownership";
+import { assignInfrastructure } from "./infrastructure";
+import { createSupportNetwork } from "./support";
 import { createTerritoryState } from "./territory";
 import { createObjectiveStates } from "./objectives";
 import type { MissionScenario } from "./mission-file";
@@ -13,6 +17,7 @@ import type { TerritoryAssignment } from "./territory";
 import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
 import type { EconomyState, MaterialsSite, ResourceLoot } from "./economy";
+import type { Stockpile } from "./stockpiles";
 import type { MissionState } from "./mission";
 import type { Owner, OwnerRelationship } from "./ownership";
 import type { TerrainGridOptions, TerrainState } from "./terrain";
@@ -43,14 +48,14 @@ export type ScenarioDefinition = MissionScenario & {
   readonly units?: readonly ScenarioUnit[];
 } & (
     | {
-        readonly materials: number;
+        readonly stockpiles: readonly Stockpile[];
         /** Worker states derive from the scenario's units. */
-        readonly cultivation?: Pick<CultivationState, "lifebloom" | "sites">;
+        readonly cultivation?: Pick<CultivationState, "sites">;
         readonly sites: readonly MaterialsSite[];
         readonly loot: readonly ResourceLoot[];
       }
     | {
-        readonly materials?: never;
+        readonly stockpiles?: never;
         readonly cultivation?: never;
         readonly sites?: never;
         readonly loot?: never;
@@ -144,19 +149,17 @@ export function createScenarioState(
   });
   const actors = [...buildings, ...units];
   const economy: EconomyState | undefined =
-    scenario.materials === undefined
+    scenario.stockpiles === undefined
       ? undefined
       : {
-          materials: scenario.materials,
-          depositedMaterials: 0,
+          stockpiles: structuredClone([...scenario.stockpiles]),
+          deposited: [],
           sites: structuredClone([...scenario.sites]),
           loot: structuredClone([...scenario.loot]),
           harvesters: [],
           production: [],
           ...(scenario.cultivation && {
             cultivation: {
-              lifebloom: scenario.cultivation.lifebloom,
-              depositedLifebloom: 0,
               sites: structuredClone([...scenario.cultivation.sites]),
               workers: [],
             },
@@ -165,6 +168,24 @@ export function createScenarioState(
   for (const actor of units)
     if (economy)
       enrollWorker(economy, actor.id, definitionFor(actor.definitionId));
+  // Owners that start sharing resources start with pooled stockpiles.
+  if (economy) {
+    const owners = new Set(scenario.owners.map(({ id }) => id));
+    if (!isValidLedger(economy, owners))
+      throw new RangeError("Scenario has invalid stockpiles.");
+    const relations = createRelations(scenario.relationships ?? []);
+    regroupStockpiles(economy, owners, relations.sharesResources);
+    assignInfrastructure(actors, {
+      definitions: definitionsById,
+      sharesHeadquarters: relations.sharesHeadquarters,
+      emergencyHeadquarters: scenario.emergencyHeadquarters,
+      support: createSupportNetwork(
+        actors,
+        definitionsById,
+        relations.sharesSupport,
+      ),
+    });
+  }
   return {
     ...createMissionState(actors, scenario.owners, scenario.playerOwner),
     objectives: createObjectiveStates(scenario.objectives ?? []),

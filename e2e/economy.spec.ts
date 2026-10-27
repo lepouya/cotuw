@@ -64,8 +64,10 @@ async function controlledOpening(
       const mission = level();
       for (const id of ["network-view-control", "economy-overview"])
         document.getElementById(id)!.hidden = false;
-      mission.state.economy!.materials = materials;
       mission.state.playerOwner = playerOwner;
+      mission.state.economy!.stockpiles = [
+        { resource: "materials", owners: [playerOwner], amount: materials },
+      ];
       placeBuildings(mission, extraBuildings);
       let view: GameSession;
       const sidebar = createSidebar(
@@ -624,6 +626,8 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       {
         actors: snapshot.actors,
         economy: snapshot.economy,
+        playerOwner: "player",
+        playerFaction: "arc",
         support: undefined,
         tickSeconds: 1 / 60,
         submitCommand: (command) => {
@@ -716,12 +720,15 @@ test("worker controls share delivery actions and tolerate missions without culti
       economy: import("../src/simulation/economy").EconomyState,
       actors: import("../src/simulation/actor").Actor[],
       definitions = content.actors,
+      playerFaction = "arc",
     ) =>
       createEconomyControls(
         root,
         {
           economy,
           actors,
+          playerOwner: "player",
+          playerFaction,
           support: undefined,
           tickSeconds: 1 / 60,
           submitCommand: (
@@ -742,15 +749,13 @@ test("worker controls share delivery actions and tolerate missions without culti
         },
       );
     const empty = (): import("../src/simulation/economy").EconomyState => ({
-      materials: 0,
-      depositedMaterials: 0,
+      stockpiles: [],
+      deposited: [],
       sites: [],
       loot: [],
       harvesters: [],
       production: [],
       cultivation: {
-        lifebloom: 0,
-        depositedLifebloom: 0,
         sites: [],
         workers: [],
       },
@@ -788,6 +793,36 @@ test("worker controls share delivery actions and tolerate missions without culti
       );
       controls.dispose();
     }
+    const ownerHints: string[] = [];
+    for (const faction of ["arc", "circle"]) {
+      const economy = empty();
+      economy.stockpiles.push({
+        resource: "materials",
+        owners: ["player"],
+        amount: 150,
+      });
+      economy.cultivation!.workers.push({
+        ...createCultivatorState("rival-cultivator"),
+        phase: "no-dropoff",
+      });
+      economy.harvesters.push(createHarvesterState("rival-harvester"));
+      const rivalActors = ["circle-cultivator", "arc-harvester"].map(
+        (definitionId) =>
+          createActor({
+            id:
+              definitionId === "circle-cultivator"
+                ? "rival-cultivator"
+                : "rival-harvester",
+            owner: "rival",
+            definitionId,
+            worldPosition: { x: 0, z: 0 },
+          }),
+      );
+      const controls = setup(economy, rivalActors, content.actors, faction);
+      controls.refresh();
+      ownerHints.push(root.querySelector("#economy-alert")!.textContent!);
+      controls.dispose();
+    }
     const controls = setup(
       empty(),
       [],
@@ -796,7 +831,7 @@ test("worker controls share delivery actions and tolerate missions without culti
     controls.refresh();
     const hint = root.querySelector("#economy-alert")!.textContent;
     controls.dispose();
-    return { submitted, cleared, hint };
+    return { submitted, cleared, hint, ownerHints };
   });
   expect(result).toEqual({
     submitted: [
@@ -804,7 +839,11 @@ test("worker controls share delivery actions and tolerate missions without culti
       { kind: "return-cargo", actorId: "circle-cultivator" },
     ],
     cleared: [0, 0],
-    hint: "No cultivation workers are available in this mission.",
+    hint: "Economy stalled: find Materials salvage or sell a building to recover.",
+    ownerHints: [
+      "Build a Refinery, then produce its Harvester.",
+      "Select the Heartgrove and train a Cultivator for 50 Lifebloom.",
+    ],
   });
 });
 

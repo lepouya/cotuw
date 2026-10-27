@@ -7,9 +7,12 @@ import { expect, test } from "vitest";
 import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
 import {
   advanceSeconds,
+  balance,
   exploredScenarioState,
-  untilSeconds,
   playerOwners,
+  setBalance,
+  stockpiles,
+  untilSeconds,
 } from "./helpers/scenario";
 import {
   createCultivationSite,
@@ -52,23 +55,27 @@ const scenario = defineScenario({
       origin: { x: 2, z: 6 },
     },
   ],
-  materials: 500,
+  stockpiles: [...stockpiles(500), ...stockpiles(150, "lifebloom")],
   sites: [],
   loot: [],
   cultivation: {
-    lifebloom: 150,
     sites: [
       createCultivationSite("near", "Near Lifebloom", { x: 14, z: 6 }),
       createCultivationSite("far", "Far Lifebloom", { x: 23, z: 6 }),
     ],
   },
 });
-function fixture(state?: MissionState, events?: MissionEventDefinition[]) {
+function fixture(
+  state?: MissionState,
+  events?: MissionEventDefinition[],
+  emergencyHeadquarters = false,
+) {
   const map = new TerrainGrid(terrainOptions);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
     state: state ?? exploredScenarioState(scenario, definitions),
     events,
+    emergencyHeadquarters,
     definitions,
     map,
     occupancy,
@@ -136,13 +143,13 @@ function saved(sim: MissionSimulation) {
 test("paid opening trains its worker, tends a drop-off, cultivates, and funds production", () => {
   const { simulation: sim } = opening();
   try {
-    expect(sim.economy!.cultivation!.lifebloom).toBe(0);
-    expect(sim.economy!.materials).toBe(500);
+    expect(balance(sim, "lifebloom")).toBe(0);
+    expect(balance(sim)).toBe(500);
     expect(
       command(sim, { kind: "gather", actorId: "worker", siteId: "near" })
         .accepted,
     ).toBe(true);
-    untilSeconds(sim, () => sim.economy!.cultivation!.lifebloom >= 120);
+    untilSeconds(sim, () => balance(sim, "lifebloom") >= 120);
     expect(
       place(sim, "muster", 8, 10, "worker", "circle-musterhall").accepted,
     ).toBe(true);
@@ -151,7 +158,7 @@ test("paid opening trains its worker, tends a drop-off, cultivates, and funds pr
       command(sim, { kind: "gather", actorId: "worker", siteId: "near" })
         .accepted,
     ).toBe(true);
-    untilSeconds(sim, () => sim.economy!.cultivation!.lifebloom >= 55);
+    untilSeconds(sim, () => balance(sim, "lifebloom") >= 55);
     for (const [id, definitionId] of [
       ["sentinel", "circle-sentinel"],
       ["wayfinder", "circle-wayfinder"],
@@ -169,7 +176,7 @@ test("paid opening trains its worker, tends a drop-off, cultivates, and funds pr
     expect(sim.economy!.cultivation!.sites[0]!.reserve).toBeGreaterThanOrEqual(
       99000,
     );
-    expect(sim.economy!.materials).toBe(500);
+    expect(balance(sim)).toBe(500);
   } finally {
     sim.dispose();
   }
@@ -216,7 +223,7 @@ test("growth requires a selected worker, pauses without losing progress, and res
       }
       expect(restored.snapshot()).toEqual(sim.snapshot());
       expect(sim.actorById("conservatory")!.construction).toBeUndefined();
-      expect(sim.economy!.cultivation!.lifebloom).toBe(0);
+      expect(balance(sim, "lifebloom")).toBe(0);
     } finally {
       restored.dispose();
     }
@@ -234,8 +241,8 @@ test("cancelling growth refunds Lifebloom once and frees its worker", () => {
       command(sim, { kind: "cancel-construction", actorId: "conservatory" })
         .accepted,
     ).toBe(true);
-    expect(sim.economy!.cultivation!.lifebloom).toBe(100);
-    expect(sim.economy!.materials).toBe(500);
+    expect(balance(sim, "lifebloom")).toBe(100);
+    expect(balance(sim)).toBe(500);
     expect(sim.economy!.cultivation!.workers[0]).toMatchObject({
       phase: "idle",
     });
@@ -243,7 +250,7 @@ test("cancelling growth refunds Lifebloom once and frees its worker", () => {
       command(sim, { kind: "cancel-construction", actorId: "conservatory" })
         .accepted,
     ).toBe(false);
-    expect(sim.economy!.cultivation!.lifebloom).toBe(100);
+    expect(balance(sim, "lifebloom")).toBe(100);
   } finally {
     sim.dispose();
   }
@@ -268,7 +275,7 @@ test("cultivation preserves cargo on interruption and delivers before changing s
     expect(sim.economy!.cultivation!.workers[0]!.siteId).toBeUndefined();
     command(sim, { kind: "gather", actorId: "worker", siteId: "far" });
     expect(sim.economy!.cultivation!.workers[0]!.phase).toBe("returning");
-    untilSeconds(sim, () => sim.economy!.cultivation!.lifebloom >= cargo);
+    untilSeconds(sim, () => balance(sim, "lifebloom") >= cargo);
     expect(sim.economy!.cultivation!.sites[1]!.reserve).toBe(100000);
     expect(sim.economy!.cultivation!.workers[0]!.siteId).toBe("far");
     sim.removeActor("conservatory");
@@ -288,7 +295,7 @@ test("shared reserves enter dormancy deterministically, retain Gather and its qu
   const state = exploredScenarioState(scenario, definitions);
   const site = state.economy!.cultivation!.sites[0]!;
   site.reserve = 10500;
-  state.economy!.cultivation!.lifebloom = 500;
+  setBalance(state, 500, "lifebloom");
   const { simulation: sim, map } = fixture(state);
   try {
     for (const id of ["a", "b", "c", "d"]) train(sim, id);
@@ -374,7 +381,7 @@ test.each(["cancel", "remove"])(
 
 test("single-worker growth yields blocked slots without preempting active work", () => {
   const state = exploredScenarioState(scenario, definitions);
-  state.economy!.cultivation!.lifebloom = 2000;
+  setBalance(state, 2000, "lifebloom");
   const { simulation: sim } = fixture(state);
   try {
     train(sim, "a");
@@ -408,7 +415,7 @@ test("single-worker growth yields blocked slots without preempting active work",
         .accepted,
     ).toBe(true);
     untilSeconds(sim, () => !sim.actorById("first")!.construction);
-    expect(sim.economy!.cultivation!.lifebloom).toBe(1700);
+    expect(balance(sim, "lifebloom")).toBe(1700);
   } finally {
     sim.dispose();
   }
@@ -416,7 +423,7 @@ test("single-worker growth yields blocked slots without preempting active work",
 
 test("completed buildings operate without a Heartgrove while growth waits for reassignment", () => {
   const state = exploredScenarioState(scenario, definitions);
-  state.economy!.cultivation!.lifebloom = 2000;
+  setBalance(state, 2000, "lifebloom");
   const { simulation: sim, map } = fixture(state);
   try {
     train(sim);
@@ -464,7 +471,7 @@ test("completed buildings operate without a Heartgrove while growth waits for re
 
 test("each Heartgrove supplies an independent growth slot", () => {
   const state = exploredScenarioState(scenario, definitions);
-  state.economy!.cultivation!.lifebloom = 2000;
+  setBalance(state, 2000, "lifebloom");
   const { simulation: sim, map } = fixture(state);
   try {
     sim.spawnActor(
@@ -480,10 +487,8 @@ test("each Heartgrove supplies an independent growth slot", () => {
     expect(place(sim, "west", 7, 7, "a").accepted).toBe(true);
     expect(place(sim, "east", 20, 12, "b").accepted).toBe(true);
     untilSeconds(sim, () => !!sim.actorById("east")!.construction?.active);
-    expect(sim.actorById("west")!.construction?.headquartersId).toBe("heart");
-    expect(sim.actorById("east")!.construction?.headquartersId).toBe(
-      "east-heart",
-    );
+    expect(sim.actorById("west")!.headquartersId).toBe("heart");
+    expect(sim.actorById("east")!.headquartersId).toBe("east-heart");
     // Both affiliations remain stable through a save and continuation.
     const restored = fixture(saved(sim)).simulation;
     try {
@@ -495,6 +500,8 @@ test("each Heartgrove supplies an independent growth slot", () => {
     }
     expect(sim.actorById("east")!.construction).toBeUndefined();
     expect(sim.actorById("west")!.construction).toBeUndefined();
+    expect(sim.actorById("west")!.headquartersId).toBe("heart");
+    expect(sim.actorById("east")!.headquartersId).toBe("east-heart");
   } finally {
     sim.dispose();
   }
@@ -538,7 +545,7 @@ test("delivery uses the nearest reachable drop-off and restarts after an outage"
         (tile) => ({ ...tile, terrain: { typeId: "water" } }),
       ),
     });
-    untilSeconds(sim, () => sim.economy!.cultivation!.lifebloom >= 30);
+    untilSeconds(sim, () => balance(sim, "lifebloom") >= 30);
     expect(
       sim.buildingActivity.some(
         (activity) =>
@@ -590,10 +597,7 @@ test("a blocked partial delivery retains queued orders and reroutes after drop-o
             "player",
           ),
         );
-        untilSeconds(
-          current,
-          () => current.economy!.cultivation!.lifebloom >= cargo,
-        );
+        untilSeconds(current, () => balance(current, "lifebloom") >= cargo);
         current.tick();
         expect(current.actorById("worker")!.orders).toBeUndefined();
         expect(current.actorById("worker")!.movement!.target).toEqual(
@@ -645,9 +649,6 @@ test.each([
   (state: MissionState) => {
     state.economy!.cultivation!.sites[0]!.recoverAt = 0;
   },
-  (state: MissionState) => {
-    state.economy!.cultivation!.lifebloom = 0.5;
-  },
 ])(
   "malformed cultivation state is rejected before publication (%#)",
   (change) => {
@@ -659,7 +660,7 @@ test.each([
 
 test("placement selects the nearest reachable selected Cultivator without mutating navigation", () => {
   const state = exploredScenarioState(scenario, definitions);
-  state.economy!.cultivation!.lifebloom = 1000;
+  setBalance(state, 1000, "lifebloom");
   const { simulation: sim, map } = fixture(state);
   try {
     train(sim, "near-worker");
@@ -723,14 +724,14 @@ test("allied Heartgroves host growth until the alliance stops sharing them", () 
     expect(place(sim).accepted).toBe(true);
     const construction = () => sim.actorById("conservatory")!.construction!;
     untilSeconds(sim, () => construction().completedTicks > 0, 3.5);
-    expect(construction().headquartersId).toBe("heart");
+    expect(sim.actorById("conservatory")!.headquartersId).toBe("heart");
     untilSeconds(sim, () => sim.snapshot().firedEvents.length > 0, 4);
     // The revoked queue reassigns on the next tick; saves load meanwhile.
-    expect(construction().headquartersId).toBe("heart");
+    expect(sim.actorById("conservatory")!.headquartersId).toBe("heart");
     fixture(saved(sim), events).simulation.dispose();
     sim.tick();
     const paused = construction();
-    expect(paused.headquartersId).toBeUndefined();
+    expect(sim.actorById("conservatory")!.headquartersId).toBeUndefined();
     expect(paused.active).toBeUndefined();
     advanceSeconds(sim, 2);
     expect(construction()).toEqual(paused);
@@ -743,11 +744,13 @@ test("allied Heartgroves host growth until the alliance stops sharing them", () 
       ),
     );
     sim.tick();
-    expect(construction()).toMatchObject({
+    expect(sim.actorById("conservatory")!).toMatchObject({
       headquartersId: "own-heart",
-      active: true,
-      completedTicks: paused.completedTicks + 1,
-      paidCost: paused.paidCost,
+      construction: {
+        active: true,
+        completedTicks: paused.completedTicks + 1,
+        paidCost: paused.paidCost,
+      },
     });
   } finally {
     sim.dispose();
@@ -774,6 +777,47 @@ test.each(["tending", "returning"] as const)(
         worker.phase = "returning";
       }
       expect(() => fixture(state)).toThrow("invalid cultivation state");
+    } finally {
+      sim.dispose();
+    }
+  },
+);
+
+test.each([false, true])(
+  "a tended replacement Heartgrove grows without capacity only under the emergency rule (%s)",
+  (emergencyHeadquarters) => {
+    const state = exploredScenarioState(scenario, definitions);
+    setBalance(state, 1000, "lifebloom");
+    const { simulation: sim } = fixture(
+      state,
+      undefined,
+      emergencyHeadquarters,
+    );
+    try {
+      train(sim);
+      sim.removeActor("heart");
+      const outcome = place(
+        sim,
+        "new-heart",
+        8,
+        10,
+        "worker",
+        "circle-heartgrove",
+      );
+      if (!emergencyHeadquarters) {
+        expect(outcome).toMatchObject({
+          accepted: false,
+          reason: "missing-headquarters",
+        });
+        return;
+      }
+      expect(outcome.accepted).toBe(true);
+      untilSeconds(
+        sim,
+        () => !!sim.actorById("new-heart")!.construction?.active,
+      );
+      expect(sim.actorById("new-heart")!.headquartersId).toBeUndefined();
+      untilSeconds(sim, () => !sim.actorById("new-heart")!.construction, 30);
     } finally {
       sim.dispose();
     }

@@ -16,6 +16,8 @@ export type SupportNode = {
   connected: boolean;
   /** Owners of the operational roots supplying this node. */
   rootOwners: string[];
+  /** The operational roots supplying this node, by actor ID. */
+  rootIds: string[];
 };
 export type SupportNetwork = {
   nodes: SupportNode[];
@@ -108,6 +110,7 @@ export function createSupportNetwork(
               root: support.root === true,
               connected: false,
               rootOwners: [],
+              rootIds: [],
             },
           ]
         : [];
@@ -132,15 +135,15 @@ export function createSupportNetwork(
       }
     }
   const roots = nodes.filter((node) => node.complete && node.root);
+  const rootOwner = new Map(roots.map((node) => [node.actorId, node.owner]));
   // A root cannot route power through an owner it does not share with.
-  for (const owner of new Set(roots.map((node) => node.owner))) {
-    const queue = roots.filter((node) => node.owner === owner);
+  for (const root of roots) {
+    const queue = [root];
     const visited = new Set(queue);
     for (const node of queue) {
-      node.rootOwners.push(owner);
-      node.connected = true;
+      node.rootIds.push(root.actorId);
       for (const neighbor of neighbors.get(node)!) {
-        if (visited.has(neighbor) || !sharesSupport(owner, neighbor.owner))
+        if (visited.has(neighbor) || !sharesSupport(root.owner, neighbor.owner))
           continue;
         visited.add(neighbor);
         queue.push(neighbor);
@@ -149,22 +152,27 @@ export function createSupportNetwork(
   }
   for (const node of nodes)
     if (!node.complete) {
-      node.rootOwners = [
+      node.rootIds = [
         ...new Set(
           nodes.flatMap((source) =>
             source.complete &&
             source.faction === node.faction &&
             sharesSupport(source.owner, node.owner) &&
             distance(source.center, node.center) <= source.radius
-              ? source.rootOwners.filter((owner) =>
-                  sharesSupport(owner, node.owner),
+              ? source.rootIds.filter((id) =>
+                  sharesSupport(rootOwner.get(id)!, node.owner),
                 )
               : [],
           ),
         ),
-      ];
-      node.connected = node.rootOwners.length > 0;
+      ].sort(compareIds);
     }
+  for (const node of nodes) {
+    node.rootOwners = [
+      ...new Set(node.rootIds.map((id) => rootOwner.get(id)!)),
+    ];
+    node.connected = node.rootIds.length > 0;
+  }
   return {
     nodes,
     links: edges.map(([a, b]) => ({
@@ -192,11 +200,17 @@ export function supportForOwner(
   owner: string,
   sharesSupport: SharesSupport,
 ): SupportView {
+  const ownerOf = new Map(
+    network.nodes.map((node) => [node.actorId, node.owner]),
+  );
   const nodes = network.nodes
     .filter((node) => sharesSupport(node.owner, owner))
     .map((node) => ({
       ...node,
       rootOwners: node.rootOwners.filter((root) => sharesSupport(root, owner)),
+      rootIds: node.rootIds.filter((id) =>
+        sharesSupport(ownerOf.get(id)!, owner),
+      ),
       connected: supportAvailableTo(node, owner, sharesSupport),
     }));
   const byId = new Map(nodes.map((node) => [node.actorId, node]));
@@ -229,6 +243,21 @@ export function supportsPosition(
       node.complete &&
       node.faction === recipient.faction &&
       supportAvailableTo(node, recipient.owner, sharesSupport) &&
+      distance(node.center, point) <= node.radius,
+  );
+}
+
+/** Whether the recipient's own completed buildings cover a point, powered or not. */
+export function ownedCoverage(
+  network: Pick<SupportView, "nodes">,
+  point: Readonly<WorldPosition>,
+  recipient: Pick<SupportNode, "owner" | "faction">,
+) {
+  return network.nodes.some(
+    (node) =>
+      node.complete &&
+      node.owner === recipient.owner &&
+      node.faction === recipient.faction &&
       distance(node.center, point) <= node.radius,
   );
 }

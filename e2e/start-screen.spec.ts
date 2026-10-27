@@ -147,10 +147,12 @@ test(
     await expect(page.locator(".game-shell")).toBeHidden();
     await page.evaluate(async () => {
       const path: string = "/e2e/missions.ts";
-      const { level, missionSource } = await import(path);
+      const { level, missionSource } = (await import(
+        path
+      )) as typeof import("./missions");
       const mission = level();
       mission.state.tick = 60;
-      mission.state.economy.materials = 77;
+      mission.state.economy!.stockpiles[0].amount = 77;
       localStorage.setItem(
         "cotuw.save.manual-title",
         missionSource(mission, mission.state, {
