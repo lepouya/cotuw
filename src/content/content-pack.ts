@@ -14,6 +14,7 @@ import {
 import { validateMovementProfile } from "../simulation/navigation";
 import {
   isRgb,
+  PORTRAIT_IDS,
   BUILTIN_ACTOR_MODEL_IDS,
   BUILTIN_BUILDING_DETAIL_IDS,
   validateActorGraphics,
@@ -24,6 +25,7 @@ import {
   validateMaterialsStages,
 } from "./presentation";
 import type {
+  PortraitId,
   ActorGraphics,
   ModelGraphics,
   FrameEffects,
@@ -56,6 +58,7 @@ export type ActorPresentation = {
   audio?: AudioBindings;
   name: string;
   description: string;
+  portrait?: PortraitId;
   build?: { id: string; label: string; order?: number };
   train?: { id: string; label: string };
   attackEffect?: AttackEffectStyle;
@@ -91,22 +94,39 @@ export const PROP_IDS = [
   "scaffold",
   "rubble",
   "materials-mound",
+  "cultivation-site",
   "salvage",
   "tracer",
+  "bolt",
   "bite",
   "smoke",
   "fire",
   "wound",
+  "leaf",
   "bird",
   "regeneration",
 ] as const;
 
 export type PropId = (typeof PROP_IDS)[number];
 
+/** A faction's display name, if the pack provides one. */
+export function factionName(
+  pack: Pick<ContentPack, "factionNames">,
+  faction: string | undefined,
+): string | undefined {
+  return faction !== undefined &&
+    pack.factionNames &&
+    hasOwn(pack.factionNames, faction)
+    ? pack.factionNames[faction]
+    : undefined;
+}
+
 /** Shared rules and presentation that mission files name by ID and version. */
 export type ContentPack = ContentReference & {
   audio?: AudioContent;
   name: string;
+  /** Player-facing faction names, keyed by simulation faction ID. */
+  factionNames?: Readonly<Record<string, string>>;
   actors: readonly ActorDefinition[];
   movementProfiles: readonly MovementProfile[];
   presentation: Readonly<Record<string, ActorPresentation>>;
@@ -160,6 +180,14 @@ export function parseContentPack(source: string): ContentPack {
       "needs an id, version, actors, movementProfiles, presentation, terrain, and view",
     );
   for (const profile of pack.movementProfiles) validateMovementProfile(profile);
+  if (
+    pack.factionNames !== undefined &&
+    (!isRecord(pack.factionNames) ||
+      Object.entries(pack.factionNames).some(
+        ([id, name]) => !isId(id) || !isId(name),
+      ))
+  )
+    throw invalid("needs faction IDs with nonempty display names");
   const lighting = pack.view.lighting;
   if (
     !lighting ||
@@ -202,6 +230,11 @@ export function parseContentPack(source: string): ContentPack {
       typeof presentation.description !== "string"
     )
       throw invalid(`needs a name and description for ${actor.id}`);
+    if (
+      presentation.portrait !== undefined &&
+      !isOneOf(PORTRAIT_IDS, presentation.portrait)
+    )
+      throw invalid(`gives ${actor.id} an unknown portrait`);
     for (const action of [presentation.build, presentation.train]) {
       if (
         action !== undefined &&

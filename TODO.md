@@ -13,8 +13,9 @@ in the [design questionnaire](docs/design-questionnaire.md).
 
 ### Using this checklist
 
-- Work through the phases in order. Tasks within a phase may overlap when
-  their prerequisites are ready; explicit dependencies take precedence.
+- Work through the phases in order, except the Circle wolf-den slice below
+  may progress alongside phases B-D as its prerequisites become ready. Tasks
+  within a phase may overlap; explicit dependencies take precedence.
 - Task IDs are the milestone number and a task number, independent of phase
   letters. Keep them stable once work starts. Check a task only when its
   stated outcome is verified, including appropriate checks for implementation
@@ -42,6 +43,10 @@ roster choices are ready.
 - [ ] **1.02** Run baseline M0 playtests using in-game guidance. Record
   controls, clarity, pacing, reliability, assistance, and abandonment; turn
   actionable findings into prioritized issues for the UI and onboarding work.
+  ARC guides use short action prompts. Both slices offer 4× speed and Escape
+  opens the pause menu after canceling active tools and clearing selection.
+  Browser checks cover these controls, including compact touch layouts.
+  Both introductions share guide, time-control, save/load, and restart checks.
 - [x] **1.03** Settle Circle construction, placement, infrastructure,
   interruptions, and worker capacity.
   [Construction](DESIGN.md#economy-and-construction) defines single-Cultivator
@@ -246,9 +251,9 @@ ownership and information boundaries hold, and M0 still works.
 ### C. AI development harness
 
 Use ARC against ARC on the rough map and existing roster to prove the shared
-AI before Circle content. This matchup remains a development tool. Build the
-runner, overlay, and persistence first so later AI tasks are developed and
-verified with them.
+AI. Circle slice work can proceed alongside it. This matchup remains a
+development tool. Build the runner, overlay, and persistence first so later
+AI tasks are developed and verified with them.
 
 - [ ] **1.29** Add a deterministic director with mission profiles, concurrent
   priorities, shared spending and force allocation, and counted work limits
@@ -364,8 +369,54 @@ mixed forces under both player and AI control.
 ### E. Circle playable loop and introduction
 
 Use the construction, cultivation, roster, and presentation choices from
-phase A and the shared foundations from phases B and C. Use Lifebloom-only
-costs and producer-based availability for Circle content and AI.
+phase A and the required shared foundations from phase B. Develop the
+wolf-den slice alongside the ARC AI and roster; faction AI integration still
+requires phase C. Use Lifebloom-only costs and producer-based availability.
+
+#### Wolf-den slice delivery
+
+[Scope and limitations](DESIGN.md#circle-wolf-den-development-slice) define
+the staged target. Keep the task IDs below open until their full outcomes are
+verified; preview work is partial progress.
+
+- [x] Core infantry: 1.48 provides Sentinels and Wayfinders; 1.53 provides
+  their generated elven models, channeling, living bolts, sounds, and faction
+  music. Combat checks verify both encounters and saved continuation.
+- [x] Single-player cultivation slice: 1.48 provides Heartgrove, Cultivator,
+  Conservatory, and Musterhall content and the paid opening. 1.49 adds
+  selected-worker placement, single-worker tending, interruption, replacement,
+  slot yielding, and queues per Heartgrove. 1.50 adds renewable reserves,
+  declining output, dormancy, recovery, cargo, and reachable delivery.
+  1.51 supplies feedback and guidance. Partial 1.53 work includes living
+  structures, three growth layers, work animation and sound, and falling
+  leaves. 1.56 has deterministic growth, dormancy, and cargo-save checks.
+  Mouse and touch checks cover launch, worker production, growth, first
+  delivery, and restart. The chooser is partial progress on 1.60.
+  Circle guidance uses short action prompts. Its six production portraits
+  show elven roles and living structures; cultivation and growth have distinct
+  organic work loops. Two Lifebloom gifts reward scouting beyond the lone wolf
+  without funding the opening. Collection and saved continuation are checked.
+  ARC and Circle use shared wolf-den authoring, worker route handling,
+  interruption, and compatible-site queries. Regression checks cover tending
+  cancellation, drop-off loss, queued delivery, and the 60% slowdown threshold.
+- [ ] Base-loop integration: shared ownership, authority, information, and
+  persistence work in 1.15-1.18, 1.20, 1.24, and 1.27 remains required,
+  including owner balances in 1.16. The slice uses existing single-player
+  control and faction boundaries; it does not complete those prerequisites
+  or their dependent acceptance gates. Emergency Heartgrove recovery remains
+  in 1.49. Difficulty and skirmish launch remain in 1.60.
+- [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
+  and mechanic. Check interrupted work and deterministic saves under 1.56 as
+  each system lands. Run the cohort introduction and cultivation acceptance
+  in 1.57 once the real base loop is playable.
+- [ ] Extended roster: 1.52 adds support, defenses, and constructs with focused
+  encounters. Wolves alone cannot validate structure counters. Circle AI
+  remains 1.55; full skirmish integration and balance remain phases F and G.
+
+Next integration target: shared ownership, command authority, owner economies,
+and headquarters recovery through the common milestone foundations.
+
+#### Circle tasks
 
 - [ ] **1.48** Add Heartgrove, Lifebloom Conservatory, Cultivator, Musterhall,
   Sentinel, and Wayfinder as data-driven content with Circle-facing labels,
@@ -424,8 +475,8 @@ costs and producer-based availability for Circle content and AI.
   dormancy, recovery, and support work. Preserve site reserves and dormancy
   state, worker cargo, cultivation progress, assignments, and queued orders.
 - [ ] **1.57** Playtest the Circle introduction and base loop with the cohort,
-  launched through a development link or test-build entry until 1.60 adds the
-  menu flow. Verify that RTS-familiar newcomers understand its differences,
+  launched through the demo faction chooser or a development link. Verify
+  that RTS-familiar newcomers understand its differences,
   can establish and sustain a base, and can explain a useful cultivation
   decision. Refine cultivation rates, reserve capacity, cargo capacity, and
   dormancy thresholds using the playable slice. Fix and retest recurring
@@ -447,6 +498,9 @@ and producer-based progression scope from 1.06.
 - [ ] **1.60** Add the normal-menu flow for faction choice, introductions, and
   skirmish launch. The mission-start dialog offers ARC or Circle and Easy,
   Normal, or Hard difficulty.
+  The demo faction chooser launches ARC's introduction or the Circle
+  cultivation slice. Difficulty selection, the complete Circle introduction, and
+  skirmish launch remain pending.
 - [ ] **1.61** Wire the agreed objectives, victory, defeat, and post-result
   behavior into complete matches, including same-tick elimination draws.
   Freeze skirmishes for inspection after every result and offer Save, Restart,

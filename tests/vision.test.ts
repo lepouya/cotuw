@@ -155,7 +155,7 @@ describe("fog of war", () => {
       placed("offline", "arc-materials-refinery", 30, 10),
       {
         ...placed("blueprint", "arc-field-barracks", 40, 10),
-        construction: { paidMaterials: 100, completedTicks: 1, totalTicks: 8 },
+        construction: { paidCost: 100, completedTicks: 1, totalTicks: 8 },
       },
     );
     const { fog } = fixture(state);

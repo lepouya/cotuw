@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
+import { withoutApp } from "./prototype-helpers";
 import type { Page } from "@playwright/test";
 import type { ProductionCard } from "../src/ui/production-card";
 import type { createProductionCards } from "../src/ui/production-card";
@@ -19,11 +20,8 @@ declare global {
 }
 
 async function setupCard(page: Page) {
-  await page.goto("/?level=sandbox");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await withoutApp(page);
+  await page.goto("/");
   await page.evaluate(async () => {
     const cardsPath: string = "/src/ui/production-card.ts";
     const actionPath: string = "/src/ui/production-action.ts";
@@ -45,7 +43,11 @@ async function setupCard(page: Page) {
       root,
       { id: "review-unit", label: "Train Runner" },
       { id: "runner", behaviorId: "idle", movement: { speed: 1 } },
-      { name: "Runner", details: "A fast reconnaissance unit", cost: 20 },
+      {
+        name: "Runner",
+        details: "A fast reconnaissance unit",
+        cost: "20 Materials",
+      },
     );
     window.cardFixture = {
       root,

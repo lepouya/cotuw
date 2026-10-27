@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseContentPack } from "../src/content/content-pack";
+import { factionName, parseContentPack } from "../src/content/content-pack";
 import { terrainLayers } from "../src/render/terrain-style";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { BASE_CONTENT } from "./helpers/content";
@@ -14,6 +14,21 @@ const withEdit = (edit: (pack: any) => void) => {
 };
 
 describe("content packs", () => {
+  test.each([null, [], { circle: "" }, { circle: 42 }])(
+    "rejects invalid faction display names: %j",
+    (names) => {
+      expect(
+        withEdit((pack) => {
+          pack.factionNames = names;
+        }),
+      ).toThrow("needs faction IDs with nonempty display names");
+    },
+  );
+  test("faction names ignore unnamed factions and inherited keys", () => {
+    expect(factionName(BASE_CONTENT, "circle")).toBe("Circle of Repose");
+    expect(factionName(BASE_CONTENT, "toString")).toBeUndefined();
+    expect(factionName(BASE_CONTENT, undefined)).toBeUndefined();
+  });
   test("production buttons require actors that support their actions", () => {
     expect(
       withEdit((pack) => {
@@ -402,3 +417,14 @@ test("rejects a non-boolean regeneration effect", () => {
     }),
   ).toThrow("invalid regeneration effect");
 });
+
+test.each(["unknown", "", ["circle-sentinel"]])(
+  "rejects unknown portrait bindings: %j",
+  (portrait) => {
+    expect(
+      withEdit((pack) => {
+        pack.presentation["circle-sentinel"].portrait = portrait;
+      }),
+    ).toThrow("unknown portrait");
+  },
+);

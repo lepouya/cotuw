@@ -1,3 +1,4 @@
+import { workingWorkerIds } from "../simulation/economy";
 import type { AudioScene, AudioEmitter } from "./scene";
 import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome } from "../simulation/command";
@@ -48,14 +49,14 @@ export function createMissionAudio(
         .filter((job) => job.completedTicks < job.totalTicks)
         .map((job) => job.producerId),
     );
-    const workers = new Set(
-      simulation.economy?.harvesters
-        .filter((worker) => worker.phase === "gathering")
-        .map((worker) => worker.actorId),
-    );
+    const workers = workingWorkerIds(simulation.economy, simulation.actors);
     const offline = disconnectedBuildings(simulation.support);
     const emitters = simulation.actors.map((actor) => {
-      if (actor.construction || offline.has(actor.id)) return emitterOf(actor);
+      if (actor.construction || offline.has(actor.id))
+        return emitterOf(
+          actor,
+          actor.construction?.active ? ["constructing"] : [],
+        );
       const before = previous.get(actor.id);
       const moving = before
         ? actor.worldPosition.x !== before.worldPosition.x ||

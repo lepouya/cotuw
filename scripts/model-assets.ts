@@ -1,3 +1,6 @@
+import { createCircleStructure } from "./circle-models.ts";
+import type { CircleStructureId } from "./circle-models.ts";
+import { surface } from "./model-surface.ts";
 import {
   Animation,
   AnimationGroup,
@@ -19,7 +22,11 @@ import { createBarracksDetails } from "../src/render/barracks.ts";
 import { createRefineryDetails } from "../src/render/refinery.ts";
 import { createHarvesterAppearance } from "../src/render/harvester.ts";
 import { createWolfAppearance } from "../src/render/wolf.ts";
-import { BITE_COLOR, TRACER_COLOR } from "../src/render/combat-effects.ts";
+import {
+  BITE_COLOR,
+  BOLT_COLOR,
+  TRACER_COLOR,
+} from "../src/render/combat-effects.ts";
 import {
   MATERIALS_COLOR,
   SALVAGE_COLOR,
@@ -180,20 +187,6 @@ function skin(root: TransformNode) {
   for (const part of parts) part.dispose(false, false);
 }
 
-function surface(
-  scene: Scene,
-  name: string,
-  color: Color3 | readonly [number, number, number],
-  glow = false,
-) {
-  const material = new StandardMaterial(name, scene);
-  material.diffuseColor =
-    color instanceof Color3 ? color.clone() : new Color3(...color);
-  material.specularColor = Color3.Black();
-  if (glow) material.emissiveColor = material.diffuseColor.scale(0.25);
-  return material;
-}
-
 function unlit(scene: Scene, name: string, color: Color3) {
   const material = surface(scene, name, color);
   material.disableLighting = true;
@@ -308,7 +301,7 @@ function harvester(scene: Scene, name: string) {
   const amber = scene.getMeshByName("harvester-work-beacon")!;
   amber.name = "idle-signal";
   const green = amber.clone("working-signal", root)!;
-  green.material = surface(scene, "working-light", [0.2, 1, 0.65], true);
+  green.material = surface(scene, "working-light", [0.2, 1, 0.65], 0.25);
   const hopper = MeshBuilder.CreateBox(
     "harvester-hopper",
     {
@@ -406,6 +399,70 @@ function tracer(scene: Scene, name: string) {
   beam.material = material;
 }
 
+function bolt(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const violet = unlit(scene, name, BOLT_COLOR);
+  const core = unlit(scene, `${name}-core`, new Color3(0.9, 0.8, 1));
+  for (let strand = 0; strand < 3; strand++) {
+    const path = Array.from({ length: 17 }, (_, index) => {
+      const z = index / 16;
+      const wave = Math.sin(z * Math.PI);
+      return new Vector3(
+        wave * (Math.sin(z * 21 + strand * 2.1) * 0.08),
+        wave * (Math.cos(z * 17 + strand * 2.1) * 0.08),
+        z,
+      );
+    });
+    const vine = MeshBuilder.CreateTube(
+      `living-strand-${strand}`,
+      {
+        path,
+        radius: strand === 0 ? 0.018 : 0.01,
+        tessellation: 5,
+      },
+      scene,
+    );
+    vine.parent = root;
+    vine.material = strand === 0 ? core : violet;
+  }
+  for (let spark = 0; spark < 6; spark++) {
+    const angle = (spark * Math.PI) / 3;
+    const branch = MeshBuilder.CreateTube(
+      `seed-spark-${spark}`,
+      {
+        path: [
+          new Vector3(0, 0, 1),
+          new Vector3(Math.cos(angle) * 0.09, Math.sin(angle) * 0.09, 0.98),
+          new Vector3(
+            Math.cos(angle + 0.4) * 0.18,
+            Math.sin(angle + 0.4) * 0.18,
+            1,
+          ),
+        ],
+        radius: 0.012,
+        tessellation: 4,
+      },
+      scene,
+    );
+    branch.parent = root;
+    branch.material = violet;
+  }
+  const strands = root.getChildMeshes();
+  clip(
+    root,
+    "idle",
+    0.3,
+    (seconds) => {
+      strands.forEach((strand, index) => {
+        const pulse = 1 + 0.2 * Math.sin((seconds * Math.PI * 2) / 0.3 + index);
+        strand.scaling.x = pulse;
+        strand.scaling.y = pulse;
+      });
+    },
+    false,
+  );
+}
+
 /** Three slanted claw slashes across the strike direction. */
 function bite(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
@@ -492,7 +549,7 @@ function materialsMound(scene: Scene, name: string) {
     root,
     "crystal",
     shards,
-    surface(scene, "materials", MATERIALS_COLOR, true),
+    surface(scene, "materials", MATERIALS_COLOR, 0.25),
   );
   merge(
     root,
@@ -558,7 +615,7 @@ function rubble(scene: Scene, name: string) {
 /** A ribboned gift box that bobs and turns. */
 function salvage(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const gold = surface(scene, "salvage-box", SALVAGE_COLOR, true);
+  const gold = surface(scene, "salvage-box", SALVAGE_COLOR, 0.25);
   const ribbon = surface(scene, "salvage-ribbon", [0.8, 0.13, 0.24]);
   for (const [part, size, y, material] of [
     ["box", [0.65, 0.55, 0.65], 0, gold],
@@ -823,8 +880,40 @@ function bird(scene: Scene, name: string) {
   });
 }
 
+const circleBuilding =
+  (id: CircleStructureId) => (scene: Scene, name: string) => {
+    const { root, pose } = createCircleStructure(scene, id);
+    // Keep the animated focus separate; static parts batch by growth layer.
+    for (const layer of ["roots", "ribs", "canopy"]) {
+      const groups = new Map<StandardMaterial, Mesh[]>();
+      for (const mesh of root.getChildMeshes()) {
+        if (
+          !(mesh instanceof Mesh) ||
+          !mesh.name.includes(`growth-${layer}`) ||
+          mesh.name.endsWith("-focus")
+        )
+          continue;
+        const material = mesh.material as StandardMaterial;
+        const group = groups.get(material) ?? [];
+        group.push(mesh);
+        groups.set(material, group);
+      }
+      for (const [material, parts] of groups)
+        merge(
+          root,
+          `${name}-growth-${layer}-${material.name}`,
+          parts,
+          material,
+        );
+    }
+    clip(root, "idle", 2, pose, false);
+  };
 /** Each model's builder fills an empty scene with nodes, materials, and clips. */
 const BUILDERS = {
+  "circle-heartgrove": circleBuilding("circle-heartgrove"),
+  "circle-conservatory": circleBuilding("circle-conservatory"),
+  "circle-musterhall": circleBuilding("circle-musterhall"),
+  "cultivation-site": circleBuilding("cultivation-site"),
   "command-center": building(createCommandCenterDetails),
   barracks: building(createBarracksDetails),
   refinery: building(createRefineryDetails),
@@ -836,9 +925,19 @@ const BUILDERS = {
   foundation: cube([0.35, 0.42, 0.46]),
   scaffold,
   tracer,
+  bolt,
   bite,
   smoke,
   fire,
+  leaf: (scene, name) => {
+    const leaf = MeshBuilder.CreateSphere(
+      name,
+      { diameter: 1, segments: 4 },
+      scene,
+    );
+    leaf.scaling.set(0.35, 0.06, 0.16);
+    leaf.material = surface(scene, name, [0.24, 0.42, 0.19]);
+  },
   wound,
   bird,
   regeneration,

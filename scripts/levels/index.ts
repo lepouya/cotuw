@@ -1,9 +1,11 @@
 import { SIMULATION_TICK_SECONDS } from "../../src/simulation/clock.ts";
 import { createScenarioState } from "../../src/simulation/scenario.ts";
 import { serializeMission } from "../../src/simulation/mission-file.ts";
-import { BASE_CONTENT, ECONOMY_SCENARIO } from "./m0.ts";
+import { BASE_CONTENT } from "./base-content.ts";
+import { ECONOMY_SCENARIO } from "./m0.ts";
 import { SANDBOX_LEVEL } from "./sandbox.ts";
 import { SKIRMISH_PREVIEW } from "./skirmish-preview.ts";
+import { CIRCLE_WOLF_DEN } from "./circle-wolf-den.ts";
 
 import type { MissionState } from "../../src/simulation/mission.ts";
 import type { MissionScenario } from "../../src/simulation/mission-file.ts";
@@ -11,10 +13,10 @@ import type { MissionScenario } from "../../src/simulation/mission-file.ts";
 /** Level file contents by scenario ID. */
 export function buildLevels(): Map<string, string> {
   const levels: { scenario: MissionScenario; state: MissionState }[] = [
-    {
-      scenario: ECONOMY_SCENARIO,
-      state: createScenarioState(ECONOMY_SCENARIO, BASE_CONTENT.actors),
-    },
+    ...[ECONOMY_SCENARIO, CIRCLE_WOLF_DEN].map((scenario) => ({
+      scenario,
+      state: createScenarioState(scenario, BASE_CONTENT.actors),
+    })),
     SANDBOX_LEVEL,
     SKIRMISH_PREVIEW,
   ];

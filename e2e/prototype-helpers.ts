@@ -68,11 +68,17 @@ export async function dismissExplanation(
   await expect(page.locator("#explanation")).toBeHidden();
 }
 
+/** Chooses the ARC opening from the start menu and acknowledges its guide. */
+export async function startOpening(page: Page, touch = false) {
+  await activate(page.locator("#new-mission"), touch);
+  await activate(page.locator("#choose-arc"), touch);
+  await dismissExplanation(page, "Welcome, Commander", touch);
+}
+
 /** Starts the authored opening and acknowledges its introductory guide. */
 export async function openOpening(page: Page, touch = false) {
   await page.goto("/");
-  await activate(page.locator("#new-mission"), touch);
-  await dismissExplanation(page, "Welcome, Commander", touch);
+  await startOpening(page, touch);
 }
 
 export async function placeBuilding(

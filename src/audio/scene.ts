@@ -1,4 +1,4 @@
-import { AUDIO_VOICE_LIMIT } from "../content/audio";
+import { AUDIO_VOICE_LIMIT, musicForFaction } from "../content/audio";
 import type {
   AudioBindings,
   AudioContent,
@@ -79,7 +79,9 @@ export function createAudioScene(
   bindings: Readonly<Record<string, { audio?: AudioBindings }>>,
   mixer: AudioMixer,
   listener: () => Readonly<WorldPosition>,
+  playerFaction?: string,
 ) {
+  const music = musicForFaction(content, playerFaction);
   const cues = new Map(Object.entries(content?.cues ?? {}));
   const global = resolve({ events: content?.events });
   const defaults = resolve(content?.defaults);
@@ -95,13 +97,28 @@ export function createAudioScene(
   let selection = new Set<string>();
   let active = true;
   let disposed = false;
-  let musicCue = content?.music?.default;
+  let musicCue = music?.default;
   const playing: Playing[] = [];
   const pending = new Set<PendingStep>();
   const lastPlay = new Map<string, number>();
   const variants = new Map<string, number>();
-  if (content)
-    mixer.preload(Object.values(content.clips).map((clip) => clip.url));
+  if (content) {
+    const usedCues = new Set<string>();
+    for (const binding of [global, defaults, ...objects.values()]) {
+      for (const steps of binding.events.values())
+        for (const step of steps) usedCues.add(step.cue);
+      for (const cue of binding.loops.values()) if (cue) usedCues.add(cue);
+    }
+    if (music) {
+      usedCues.add(music.default);
+      if (music.combat) usedCues.add(music.combat);
+    }
+    const urls = new Set<string>();
+    for (const id of usedCues)
+      for (const clip of cues.get(id)?.clips ?? [])
+        urls.add(content.clips[clip]!.url);
+    mixer.preload([...urls]);
+  }
 
   /** Nonspatial cues keep their authored gain and center pan. */
   const spatial = (cue: AudioCue, emitter?: AudioEmitter) => {
@@ -310,9 +327,7 @@ export function createAudioScene(
       update();
     },
     setMusic: (combat: boolean) => {
-      const next = combat
-        ? (content?.music?.combat ?? content?.music?.default)
-        : content?.music?.default;
+      const next = combat ? (music?.combat ?? music?.default) : music?.default;
       if (next === musicCue) return;
       musicCue = next;
       update();

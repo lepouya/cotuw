@@ -36,6 +36,13 @@ without it remain silent. The parser validates references and playback policies.
 - `audio.music` names `default` and optional `combat` cues, plus `holdSeconds`
   of simulation time to retain combat music after visible combat or an attack
   on the player's actors. Music cues loop and have no spatial range.
+  Optional `factions` maps faction IDs to `{ default, combat? }` arrangements.
+  The player's faction selects its arrangement for the whole mission,
+  including loaded saves; unknown factions use the default arrangement.
+- Scenes preload the clips used by global and default bindings, the mission's
+  actor definitions, and its selected music arrangement. All variants of a
+  referenced cue are retained. Other arrangements and unrelated actor cues
+  are not requested by that scene.
 
 For example, a future crane can assign sounds without changing the mixer:
 
@@ -81,9 +88,13 @@ registration in the [asset inventory](audio-assets.md).
   interface. Add new gameplay event or state detection here, after a successful
   tick; simulation code never imports audio. Existing events are `attack`,
   `damage`, `production.start`, `trained`, and `activity.<kind>`. States are
-  `moving`, `working`, `training`, and `idle`. Construction and disconnected
-  buildings have no active loop states. A finished queue head waiting at a
-  blocked exit has no `training` state. Committed building activity identifies
+  `moving`, `working`, `training`, `constructing`, and `idle`. Active
+  construction of any faction uses `constructing`, which Circle buildings bind
+  to their growth loop; paused construction and disconnected buildings have no
+  active loop states. Cultivators use `working` while gathering or
+  actively tending, with the same committed worker set used by animation. A
+  finished queue head waiting at a blocked exit has no `training` state.
+  Committed building activity identifies
   the produced or delivering unit, so consumers share the same participant.
 - Global events are `command.accepted`, `command.invalid`, `alert`,
   `objective.complete`, `victory`, and `defeat`. Command batches produce one

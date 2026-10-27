@@ -26,13 +26,23 @@ export type AlertObservation = {
   wrecks: readonly Wreck[];
   support?: SupportView;
   objectives: readonly ObjectiveView[];
-  harvesterIds: readonly string[];
+  /** Economy workers; attacks on them are named and pulsed. */
+  workerIds: readonly string[];
+  /** Explored renewable sites. */
+  sites?: readonly SiteObservation[];
+};
+export type SiteObservation = {
+  id: string;
+  name: string;
+  dormant: boolean;
+  /** Reserve percentage at which a dormant site reopens. */
+  reopensAt: number;
+  position: WorldPosition;
 };
 
-type AttackKind = "harvester" | "building" | "unit";
+type AttackKind = "worker" | "building" | "unit";
 
-const ATTACK_TEXT: Record<AttackKind, string> = {
-  harvester: "Harvester under attack",
+const ATTACK_TEXT: Record<Exclude<AttackKind, "worker">, string> = {
   building: "Base under attack",
   unit: "Units under attack",
 };
@@ -71,16 +81,13 @@ export function createAlertTracker({
       const own = current.actors.filter(owns);
 
       // A lethal hit removes the worker from the committed economy state.
-      const harvesters = new Set([
-        ...before.harvesterIds,
-        ...current.harvesterIds,
-      ]);
+      const workers = new Set([...before.workerIds, ...current.workerIds]);
       const hits = new Map<AttackKind, ActorRenderState>();
       for (const { targetId } of current.attacks) {
         const target = byId.get(targetId) ?? beforeById.get(targetId);
         if (!target || !owns(target)) continue;
-        const kind = harvesters.has(targetId)
-          ? "harvester"
+        const kind = workers.has(targetId)
+          ? "worker"
           : target.tilePlacement
             ? "building"
             : "unit";
@@ -93,10 +100,13 @@ export function createAlertTracker({
         if (last !== undefined && current.tick - last <= window) continue;
         alerts.push({
           priority: "high",
-          text: ATTACK_TEXT[kind],
+          text:
+            kind === "worker"
+              ? `${nameOf(target.definitionId)} under attack`
+              : ATTACK_TEXT[kind],
           position: target.worldPosition,
-          // Losing a Harvester can stall the economy.
-          pulse: kind === "harvester",
+          // Losing a worker can stall the economy.
+          pulse: kind === "worker",
         });
       }
 
@@ -170,6 +180,17 @@ export function createAlertTracker({
           });
         }
       }
+
+      const dormantBefore = new Map(
+        before.sites?.map(({ id, dormant }) => [id, dormant]),
+      );
+      for (const site of current.sites ?? [])
+        if (site.dormant && dormantBefore.get(site.id) === false)
+          alerts.push({
+            priority: "normal",
+            text: `${site.name} is dormant. Workers deliver cargo and wait for recovery to ${site.reopensAt}%.`,
+            position: site.position,
+          });
 
       const statusBefore = new Map(
         before.objectives.map(({ id, status }) => [id, status]),

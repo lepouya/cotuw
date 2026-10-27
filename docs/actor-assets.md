@@ -8,17 +8,38 @@ clips match their generators, and reject unregistered files in `public/assets`.
 
 ## Inventory
 
-- `npm run assets:infantry`: `scripts/infantry-model.ts` exports Trooper and
-  Scout meshes, materials, skeletons, idle, walk, turn, hit, and death clips.
-  The Trooper also uses aim and fire clips for combat.
+- `npm run assets:infantry`: `scripts/infantry-model.ts` exports Trooper,
+  Scout, Sentinel, Wayfinder, and Cultivator meshes, materials, skeletons,
+  idle, walk, turn, hit, and death clips. Troopers use aim and fire;
+  Sentinels use aim and channeling clips. Circle personnel have slender
+  proportions, pointed ears, exposed faces, circlets, tunics, and mantles,
+  with blue owner markings.
+  Sentinels wear layered leaf armor and channel violet focus artifacts;
+  Wayfinders wear light hoods and carry wayfinding staves.
+  Each asset ID has one recipe owning its scale, palette, geometry, gait, arm
+  stance, and optional attack layer; only armed recipes export attack and aim
+  clips. The shared exporter does not infer factions from role names. The
+  unarmed ARC Scout omits rifle geometry. Cultivators carry a pod and a
+  growth tool; their full-pose cultivation loop blends through the shared
+  work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, and Barracks meshes with idle machinery and activity clips; a
   skinned wolf with idle, walk, run, turn, bite, hit, and death; a rigid
   Harvester with idle, transit, deploy, harvest, stow, unload, hit, and death;
   crystal resource mounds; animated salvage; foundations; construction
-  scaffolds; debris rubble; tracers; bite marks;
-  smoke puffs; flickering fire; wound drops; a pulsing regeneration halo; and
-  a bird with a wing-beat clip. The alpha wolf scales the generated wolf asset.
+  scaffolds; debris rubble; tracers; pulsing violet focus strands and sparks;
+  bite marks; smoke puffs; flickering fire; wound drops; a pulsing regeneration
+  halo; and a bird with a wing-beat clip. The alpha wolf scales the generated
+  wolf asset.
+- `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
+  Conservatory basin and canopy, vaulted Musterhall, and renewable bloom
+  markers. Each ID has one recipe naming its size, frame, focus height, and
+  basin. Owned buildings carry an owner marking; neutral sites do not. Named
+  `growth-roots`, `growth-ribs`, and `growth-canopy` meshes
+  define three construction layers without scaffolding. Active growth pulses;
+  untended or capacity-blocked work holds still with a grey progress bar.
+  Saved tick progress restores the layer. Static parts batch by layer and
+  material, keeping the animated focus separate. Falling leaves show damage.
 - Building and vehicle geometry builders in `src/render` supply the export
   script. A building's details declare `loopSeconds`, the period of their
   motion, which becomes the exported idle clip, and `activities`, whose
@@ -43,6 +64,15 @@ update matching content-pack graphics when changing the art.
 Generated terrain edges match by construction and need no reconciliation pass.
 Foundations and rubble are unit-cube models scaled to their placement.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
+
+## Production portraits
+
+`src/ui/actor-portrait.ts` draws original SVG card illustrations. Content's
+optional `portrait` binding selects one; otherwise the actor's gameplay role
+chooses a generic icon. Circle portraits show exposed elven faces, pointed
+ears, tunics, and role-specific gear: the Cultivator's pod and tending tool,
+Sentinel leaf armor and focus, and Wayfinder hood and stave. Building portraits
+match the Heartgrove crown, Conservatory basin, and vaulted Musterhall.
 
 ## Mobile model contract
 

@@ -5,6 +5,7 @@ import {
   dismissExplanation,
   importMission,
   openOpening,
+  startOpening,
   terrainPoint,
   withoutApp,
 } from "./prototype-helpers";
@@ -670,6 +671,137 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   await expect(root.locator("#harvester-status")).toHaveText("Order queued.");
 });
 
+test("worker controls share delivery actions and tolerate missions without cultivation roles", async ({
+  page,
+}) => {
+  await withoutApp(page);
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const controlsPath: string = "/src/ui/economy-controls.ts";
+    const contentPath: string = "/src/content/packs.ts";
+    const workersPath: string = "/src/simulation/economy.ts";
+    const cultivationPath: string = "/src/simulation/cultivation.ts";
+    const actorsPath: string = "/src/simulation/actor.ts";
+    const { createEconomyControls } = (await import(
+      controlsPath
+    )) as typeof import("../src/ui/economy-controls");
+    const { currentContentPack } = (await import(
+      contentPath
+    )) as typeof import("../src/content/packs");
+    const { createHarvesterState } = (await import(
+      workersPath
+    )) as typeof import("../src/simulation/economy");
+    const { createCultivatorState } = (await import(
+      cultivationPath
+    )) as typeof import("../src/simulation/cultivation");
+    const { createActor } = (await import(
+      actorsPath
+    )) as typeof import("../src/simulation/actor");
+    const content = currentContentPack("base");
+    const root = document.querySelector<HTMLElement>("#game-sidebar")!;
+    const names = new Map<string, string>(
+      Object.entries(content.presentation).map(([id, presentation]) => [
+        id,
+        presentation.name ?? id,
+      ]),
+    );
+    const submitted: import("../src/simulation/command").MissionCommand[] = [];
+    let selection: string | undefined;
+    const setup = (
+      economy: import("../src/simulation/economy").EconomyState,
+      actors: import("../src/simulation/actor").Actor[],
+      definitions = content.actors,
+    ) =>
+      createEconomyControls(
+        root,
+        {
+          economy,
+          actors,
+          support: undefined,
+          tickSeconds: 1 / 60,
+          submitCommand: (
+            command: import("../src/simulation/command").MissionCommand,
+          ) => {
+            submitted.push(command);
+            return 0;
+          },
+        },
+        {
+          definitions,
+          names,
+          selectedActorId: () => selection,
+          enabled: () => true,
+          focus: () => {},
+          explored: () => true,
+          positionForTile: () => ({ x: 0, z: 0 }),
+        },
+      );
+    const empty = (): import("../src/simulation/economy").EconomyState => ({
+      materials: 0,
+      depositedMaterials: 0,
+      sites: [],
+      loot: [],
+      harvesters: [],
+      production: [],
+      cultivation: {
+        lifebloom: 0,
+        depositedLifebloom: 0,
+        sites: [],
+        workers: [],
+      },
+    });
+    const cleared: number[] = [];
+    for (const definitionId of ["arc-harvester", "circle-cultivator"]) {
+      selection = definitionId;
+      const economy = empty();
+      if (definitionId === "arc-harvester")
+        economy.harvesters.push({
+          ...createHarvesterState(definitionId, "refinery"),
+          cargo: 5,
+        });
+      else
+        economy.cultivation!.workers.push({
+          ...createCultivatorState(definitionId),
+          cargo: 5,
+        });
+      const controls = setup(economy, [
+        createActor({
+          id: definitionId,
+          definitionId,
+          worldPosition: { x: 0, z: 0 },
+        }),
+      ]);
+      controls.refresh();
+      root
+        .querySelector<HTMLButtonElement>("#return-cargo-actions button")!
+        .click();
+      selection = undefined;
+      controls.refresh();
+      cleared.push(
+        root.querySelectorAll("#return-cargo-actions button").length,
+      );
+      controls.dispose();
+    }
+    const controls = setup(
+      empty(),
+      [],
+      content.actors.filter(({ faction }) => faction !== "circle"),
+    );
+    controls.refresh();
+    const hint = root.querySelector("#economy-alert")!.textContent;
+    controls.dispose();
+    return { submitted, cleared, hint };
+  });
+  expect(result).toEqual({
+    submitted: [
+      { kind: "return-cargo", actorId: "arc-harvester" },
+      { kind: "return-cargo", actorId: "circle-cultivator" },
+    ],
+    cleared: [0, 0],
+    hint: "No cultivation workers are available in this mission.",
+  });
+});
+
 test("Harvester training cancellation refunds and frees its slot", async ({
   page,
 }, testInfo) => {
@@ -889,7 +1021,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     );
     const totalTicks = Math.round(8 / simulation.tickSeconds);
     backup.construction = {
-      paidMaterials: 100,
+      paidCost: 100,
       totalTicks,
       completedTicks: totalTicks - 2,
     };
@@ -1407,8 +1539,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   await expect(page.locator("#game-menu-title")).toHaveText(
     "Citadels of the Unquiet World",
   );
-  await page.locator("#new-mission").click();
-  await dismissExplanation(page, "Welcome, Commander");
+  await startOpening(page);
   await expect(page.locator("#materials-counter")).toHaveText("150");
   expect(errors).toEqual([]);
 });

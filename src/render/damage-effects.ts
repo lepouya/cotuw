@@ -9,7 +9,7 @@ import type { Scene, Vector3 } from "@babylonjs/core";
 import type { ModelAsset, ModelInstance } from "./glb-model";
 
 export type DamageSeverity = "moderate" | "critical";
-export type DamageEffectProp = "smoke" | "fire" | "wound";
+export type DamageEffectProp = "smoke" | "fire" | "wound" | "leaf";
 
 /** Health fractions at or below which damage shows. */
 const MODERATE_DAMAGE = 0.6;
@@ -59,7 +59,7 @@ const falling: EmissionMotion = {
 
 /** Repeating emissions of one prop; each is a pure function of time. */
 type Emitter = {
-  prop: "smoke" | "wound";
+  prop: "smoke" | "wound" | "leaf";
   /** Seconds between emissions. */
   period: number;
   /** Seconds each emission stays visible. */
@@ -106,6 +106,32 @@ const EFFECTS: Record<
         opacity: 0.8,
       },
       fire: true,
+    },
+  },
+  living: {
+    moderate: {
+      emitter: {
+        prop: "leaf",
+        period: 0.8,
+        life: 1.2,
+        size: [0.4, 0.4],
+        motion: falling,
+        start: 0.8,
+        spread: 0.65,
+        opacity: 1,
+      },
+    },
+    critical: {
+      emitter: {
+        prop: "leaf",
+        period: 0.3,
+        life: 1.4,
+        size: [0.55, 0.55],
+        motion: falling,
+        start: 0.85,
+        spread: 0.8,
+        opacity: 1,
+      },
     },
   },
   biological: {

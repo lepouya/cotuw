@@ -6,6 +6,7 @@ import {
   Bone,
   Color3,
   Matrix,
+  Mesh,
   MeshBuilder,
   PBRMaterial,
   Quaternion,
@@ -19,39 +20,37 @@ import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
 
 import type { Scene } from "@babylonjs/core";
 
-export const INFANTRY_ROLES = ["trooper", "scout"] as const;
-export type InfantryRole = (typeof INFANTRY_ROLES)[number];
-
 type Vec3 = [number, number, number];
-type Finish = "armor" | "cloth" | "accent" | "visor" | "dark";
+type Finish = "armor" | "cloth" | "accent" | "visor" | "dark" | "skin";
 type Joint = { name: string; parent?: string; offset: Vec3 };
 type Part = {
   name: string;
   joint: string;
-  shape: "box" | "sphere" | "cylinder";
+  shape: "box" | "sphere" | "cylinder" | "torus" | "leaf";
   size: Vec3;
   position: Vec3;
   finish: Finish;
   tiltX?: number;
+  tiltZ?: number;
 };
 type Pose = (joint: string, phase: number) => Vec3;
 
 const KEY_STEP = 2;
-const ROLE_SCALE: Record<InfantryRole, number> = { trooper: 1, scout: 0.84 };
 const DARK: Vec3 = [0.09, 0.13, 0.15];
-const PALETTES: Record<InfantryRole, Record<Exclude<Finish, "dark">, Vec3>> = {
-  trooper: {
-    armor: [0.68, 0.34, 0.17],
-    cloth: [0.16, 0.21, 0.23],
-    accent: [0.97, 0.71, 0.26],
-    visor: [0.19, 0.72, 0.79],
-  },
-  scout: {
-    armor: [0.2, 0.55, 0.62],
-    cloth: [0.14, 0.24, 0.27],
-    accent: [0.64, 0.9, 0.82],
-    visor: [0.91, 0.76, 0.34],
-  },
+
+/** Resting arms: shoulder pitch and outward spread, mirrored on the right. */
+type Stance = { pitch: number; spread: number; forearm: number; swing: number };
+/** An additive layer that starts and ends at neutral for continuous blending. */
+type Attack = { clip: string; frames: number; joints: string[]; pose: Pose };
+type InfantryRecipe = {
+  scale: number;
+  palette: Record<Exclude<Finish, "dark">, Vec3>;
+  parts: readonly Part[];
+  stride: number;
+  stance: Stance;
+  work?: boolean;
+  /** Armed roles also get an aim layer. */
+  attack?: Attack;
 };
 
 /** Both sides of a symmetric feature. Left is negative X. */
@@ -207,6 +206,194 @@ const PARTS: Part[] = [
   ),
 ];
 
+/** The shared Circle body; `mantle` sizes each role's cloak. */
+function elvenParts(mantle: Vec3): Part[] {
+  return [
+    part("tunic", "spine", "sphere", [0.43, 0.58, 0.28], [0, 1.25, 0], "cloth"),
+    part("sash", "pelvis", "torus", [0.43, 0.12, 0.32], [0, 0.98, 0], "accent"),
+    part("face", "head", "sphere", [0.26, 0.39, 0.28], [0, 1.73, 0.05], "skin"),
+    part(
+      "hair-crown",
+      "head",
+      "sphere",
+      [0.3, 0.24, 0.3],
+      [0, 1.89, -0.025],
+      "dark",
+    ),
+    part(
+      "long-hair",
+      "head",
+      "leaf",
+      [0.28, 0.55, 0.3],
+      [0, 1.61, -0.14],
+      "dark",
+    ),
+    part("circlet", "head", "torus", [0.32, 0.07, 0.31], [0, 1.87, 0], "armor"),
+    part(
+      "brow-focus",
+      "head",
+      "leaf",
+      [0.09, 0.16, 0.08],
+      [0, 1.89, 0.16],
+      "visor",
+    ),
+    part("mantle", "spine", "leaf", mantle, [0, 1.12, -0.25], "cloth"),
+    ...mirrored((side, sign): Part[] => [
+      {
+        ...part(
+          `${side}-ear`,
+          "head",
+          "leaf",
+          [0.1, 0.46, 0.13],
+          [sign * 0.23, 1.87, 0.015],
+          "skin",
+        ),
+        tiltZ: -sign * 0.85,
+      },
+      part(
+        `${side}-arm-cloth`,
+        `${side}-arm`,
+        "sphere",
+        [0.14, 0.3, 0.16],
+        [sign * 0.35, 1.18, 0.03],
+        "cloth",
+      ),
+      part(
+        `${side}-sleeve`,
+        `${side}-forearm`,
+        "leaf",
+        [0.19, 0.36, 0.2],
+        [sign * 0.37, 0.98, 0.1],
+        "cloth",
+      ),
+      part(
+        `${side}-hand`,
+        `${side}-forearm`,
+        "sphere",
+        [0.12, 0.15, 0.13],
+        [sign * 0.38, 0.81, 0.15],
+        "skin",
+      ),
+      part(
+        `${side}-leg-cloth`,
+        `${side}-leg`,
+        "cylinder",
+        [0.15, 0.44, 0.15],
+        [sign * 0.15, 0.65, 0],
+        "cloth",
+      ),
+      part(
+        `${side}-soft-boot`,
+        `${side}-shin`,
+        "sphere",
+        [0.17, 0.46, 0.22],
+        [sign * 0.15, 0.24, 0.04],
+        "dark",
+      ),
+      part(
+        `${side}-tabard`,
+        `${side}-leg`,
+        "leaf",
+        [0.28, 0.76, 0.15],
+        [sign * 0.14, 0.65, 0.16],
+        "cloth",
+      ),
+      part(
+        `${side}-tabard-trim`,
+        `${side}-leg`,
+        "leaf",
+        [0.055, 0.59, 0.04],
+        [sign * 0.14, 0.67, 0.23],
+        "accent",
+      ),
+    ]),
+  ];
+}
+
+const SENTINEL_GEAR: Part[] = [
+  ...mirrored((side, sign): Part[] => [
+    {
+      ...part(
+        `${side}-leaf-pauldron`,
+        `${side}-arm`,
+        "leaf",
+        [0.29, 0.48, 0.24],
+        [sign * 0.34, 1.43, 0.02],
+        "armor",
+      ),
+      tiltZ: -sign * 0.6,
+    },
+    {
+      ...part(
+        `${side}-leaf-cuirass`,
+        "spine",
+        "leaf",
+        [0.24, 0.45, 0.12],
+        [sign * 0.12, 1.31, 0.18],
+        "armor",
+      ),
+      tiltZ: -sign * 0.3,
+    },
+    part(
+      `${side}-focus-grip`,
+      "spine",
+      "sphere",
+      [0.14, 0.11, 0.14],
+      [sign * 0.24, 1.12, 0.48],
+      "armor",
+    ),
+    {
+      ...part(
+        `${side}-focus-leaf`,
+        "spine",
+        "leaf",
+        [0.16, 0.44, 0.1],
+        [sign * 0.2, 1.23, 0.54],
+        "armor",
+      ),
+      tiltZ: -sign * 0.5,
+    },
+  ]),
+  part(
+    "focus-frame",
+    "spine",
+    "torus",
+    [0.48, 0.16, 0.46],
+    [0, 1.18, 0.5],
+    "armor",
+    Math.PI / 2,
+  ),
+  part(
+    "focus-core",
+    "spine",
+    "leaf",
+    [0.16, 0.29, 0.16],
+    [0, 1.18, 0.54],
+    "visor",
+  ),
+];
+
+const WAYFINDER_GEAR: Part[] = [
+  part("hood", "head", "leaf", [0.43, 0.57, 0.33], [0, 1.82, -0.14], "cloth"),
+  part("waystone", "spine", "leaf", [0.1, 0.2, 0.1], [0, 1.38, 0.17], "visor"),
+  part(
+    "walking-stave",
+    "spine",
+    "cylinder",
+    [0.045, 1.42, 0.045],
+    [0.38, 0.86, 0.3],
+    "armor",
+  ),
+  part(
+    "stave-seed",
+    "spine",
+    "leaf",
+    [0.12, 0.27, 0.12],
+    [0.38, 1.61, 0.3],
+    "visor",
+  ),
+];
+
 function part(
   name: string,
   joint: string,
@@ -219,15 +406,166 @@ function part(
   return { name, joint, shape, size, position, finish, tiltX };
 }
 
-/** Exports one role's model, skin, and clips as GLB bytes. */
-export function exportInfantry(role: InfantryRole): Promise<Uint8Array> {
-  return exportGlb(`arc-${role}`, (scene) => buildInfantry(scene, role));
+const ARMS_AT_SIDES: Stance = {
+  pitch: 0,
+  spread: 0.08,
+  forearm: 0,
+  swing: 0.19,
+};
+const FOCUS_HELD: Stance = {
+  pitch: -0.4,
+  spread: 0.18,
+  forearm: -0.6,
+  swing: 0,
+};
+// ARC parts show no skin, but every palette defines each finish.
+const ARC_SKIN: Vec3 = [0.83, 0.68, 0.53];
+const CIRCLE_TRIM = {
+  accent: [0.47, 0.68, 0.85],
+  visor: [0.68, 0.35, 0.95],
+  skin: [0.86, 0.73, 0.6],
+} satisfies Record<string, Vec3>;
+
+// The shoulders kick back early, then recover.
+const RIFLE_FIRE: Attack = {
+  clip: "fire",
+  frames: 8,
+  joints: ["spine", "head"],
+  pose: (joint, phase) => {
+    const kick = Math.sin(Math.PI * Math.sqrt(phase / (Math.PI * 2)));
+    return joint === "spine" ? [-0.12 * kick, 0, 0] : [0.06 * kick, 0, 0];
+  },
+};
+// Both arms push the focus forward and draw it back.
+const FOCUS_CHANNEL: Attack = {
+  clip: "channel",
+  frames: 24,
+  joints: [
+    "spine",
+    "head",
+    "left-arm",
+    "right-arm",
+    "left-forearm",
+    "right-forearm",
+  ],
+  pose: (joint, phase) => {
+    const release = Math.sin(phase / 2);
+    if (joint.endsWith("arm")) return [-0.25 * release, 0, 0];
+    return joint === "spine" ? [-0.12 * release, 0, 0] : [0.04 * release, 0, 0];
+  },
+};
+
+const INFANTRY_RECIPES = {
+  "circle-cultivator": {
+    work: true,
+    scale: 0.94,
+    palette: {
+      armor: [0.68, 0.56, 0.33],
+      cloth: [0.35, 0.4, 0.23],
+      ...CIRCLE_TRIM,
+    },
+    parts: [
+      ...elvenParts([0.55, 0.75, 0.25]),
+      part(
+        "cultivation-pod",
+        "pelvis",
+        "sphere",
+        [0.32, 0.4, 0.3],
+        [-0.3, 0.83, 0],
+        "accent",
+      ),
+      part(
+        "growth-tool-handle",
+        "right-forearm",
+        "cylinder",
+        [0.06, 0.75, 0.06],
+        [0.37, 0.83, 0.15],
+        "armor",
+      ),
+      part(
+        "growth-tool-crown",
+        "right-forearm",
+        "leaf",
+        [0.24, 0.24, 0.06],
+        [0.37, 1.2, 0.15],
+        "visor",
+      ),
+    ],
+    stride: 0.8,
+    stance: ARMS_AT_SIDES,
+  },
+  "arc-trooper": {
+    scale: 1,
+    palette: {
+      armor: [0.68, 0.34, 0.17],
+      cloth: [0.16, 0.21, 0.23],
+      accent: [0.97, 0.71, 0.26],
+      visor: [0.19, 0.72, 0.79],
+      skin: ARC_SKIN,
+    },
+    parts: PARTS,
+    stride: 1,
+    stance: ARMS_AT_SIDES,
+    attack: RIFLE_FIRE,
+  },
+  "arc-scout": {
+    scale: 0.84,
+    palette: {
+      armor: [0.2, 0.55, 0.62],
+      cloth: [0.14, 0.24, 0.27],
+      accent: [0.64, 0.9, 0.82],
+      visor: [0.91, 0.76, 0.34],
+      skin: ARC_SKIN,
+    },
+    parts: PARTS.filter(({ name }) => !name.startsWith("rifle-")),
+    stride: 1,
+    stance: ARMS_AT_SIDES,
+  },
+  "circle-sentinel": {
+    scale: 1.04,
+    palette: {
+      armor: [0.85, 0.8, 0.61],
+      cloth: [0.13, 0.29, 0.23],
+      ...CIRCLE_TRIM,
+    },
+    parts: [...elvenParts([0.8, 1.15, 0.32]), ...SENTINEL_GEAR],
+    stride: 0.8,
+    stance: FOCUS_HELD,
+    attack: FOCUS_CHANNEL,
+  },
+  "circle-wayfinder": {
+    scale: 0.88,
+    palette: {
+      armor: [0.72, 0.7, 0.51],
+      cloth: [0.12, 0.37, 0.28],
+      ...CIRCLE_TRIM,
+    },
+    parts: [...elvenParts([0.57, 0.85, 0.32]), ...WAYFINDER_GEAR],
+    stride: 0.8,
+    stance: ARMS_AT_SIDES,
+  },
+} satisfies Record<string, InfantryRecipe>;
+
+type InfantryId = keyof typeof INFANTRY_RECIPES;
+export const INFANTRY_IDS: readonly InfantryId[] = Object.keys(
+  INFANTRY_RECIPES,
+) as InfantryId[];
+
+/** Exports one recipe's model, skin, and clips as GLB bytes. */
+export function exportInfantry(id: InfantryId): Promise<Uint8Array> {
+  return exportGlb(id, (scene) =>
+    buildInfantry(scene, id, INFANTRY_RECIPES[id]),
+  );
 }
 
-function buildInfantry(scene: Scene, role: InfantryRole): void {
-  const name = `arc-${role}`;
+function buildInfantry(
+  scene: Scene,
+  name: string,
+  recipe: InfantryRecipe,
+): void {
+  const { parts, stance, attack } = recipe;
   const root = new TransformNode(name, scene);
-  root.scaling.setAll(ROLE_SCALE[role]);
+  root.scaling.setAll(recipe.scale);
   const skeleton = new Skeleton(`${name}-rig`, `${name}-rig`, scene);
   const bones = new Map<string, Bone>();
   for (const { name: label, parent, offset } of JOINTS) {
@@ -248,7 +586,7 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
 
   // glTF colors are linear. One vertex-colored body mesh plus the glowing
   // visor keeps each soldier to two draw calls.
-  const palette = { ...PALETTES[role], dark: DARK };
+  const palette = { ...recipe.palette, dark: DARK };
   const linear = (color: Vec3) => new Color3(...color).toLinearSpace();
   const body = new PBRMaterial(`${name}-body`, scene);
   body.albedoColor = Color3.White();
@@ -273,12 +611,12 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     );
   skinned(
     "body",
-    PARTS.filter(({ finish }) => finish !== "visor"),
+    parts.filter(({ finish }) => finish !== "visor"),
     body,
   );
   skinned(
     "visor",
-    PARTS.filter(({ finish }) => finish === "visor"),
+    parts.filter(({ finish }) => finish === "visor"),
     visor,
   );
 
@@ -314,8 +652,9 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     );
   };
   const neutral = (joint: string): Vec3 => {
-    if (joint === "left-arm") return [0, 0, -0.08];
-    if (joint === "right-arm") return [0, 0, 0.08];
+    if (joint.endsWith("forearm")) return [stance.forearm, 0, 0];
+    if (joint === "left-arm") return [stance.pitch, 0, -stance.spread];
+    if (joint === "right-arm") return [stance.pitch, 0, stance.spread];
     return [0, 0, 0];
   };
 
@@ -323,8 +662,18 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     joint === "head" ? [Math.sin(phase) * 0.025, 0, 0] : neutral(joint),
   );
   shift(idle, 60, (phase) => [0, (Math.cos(phase) - 1) * 0.004, 0]);
+  if (recipe.work) {
+    const work = clip("cultivate", 60, (joint, phase) => {
+      if (joint === "spine") return [0.18 + Math.sin(phase) * 0.04, 0, 0];
+      if (joint.endsWith("forearm"))
+        return [-0.6 - Math.sin(phase) * 0.2, 0, 0];
+      if (joint.endsWith("arm")) return [-0.4 + Math.sin(phase) * 0.12, 0, 0];
+      return neutral(joint);
+    });
+    shift(work, 60, () => [0, 0, 0]);
+  }
   const walk = clip("walk", 30, (joint, phase) => {
-    const stride = Math.sin(phase);
+    const stride = Math.sin(phase) * recipe.stride;
     switch (joint) {
       case "left-leg":
         return [stride * 0.62, 0, 0];
@@ -335,9 +684,9 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
       case "right-shin":
         return [-Math.max(0, -stride) * 0.52, 0, 0];
       case "left-arm":
-        return [-stride * 0.19, 0, -0.08];
+        return [stance.pitch - stride * stance.swing, 0, -stance.spread];
       case "right-arm":
-        return [stride * 0.19, 0, 0.08];
+        return [stance.pitch + stride * stance.swing, 0, stance.spread];
       case "spine":
         return [0, 0, Math.sin(phase * 2) * 0.035];
       default:
@@ -363,17 +712,7 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
       ["spine", "head"],
     );
   }
-  // The attack clip is also additive: the shoulders kick back early, then
-  // recover to neutral.
-  clip(
-    "fire",
-    8,
-    (joint, phase) => {
-      const kick = Math.sin(Math.PI * Math.sqrt(phase / (Math.PI * 2)));
-      return joint === "spine" ? [-0.12 * kick, 0, 0] : [0.06 * kick, 0, 0];
-    },
-    ["spine", "head"],
-  );
+  if (attack) clip(attack.clip, attack.frames, attack.pose, attack.joints);
   clip(
     "hit",
     10,
@@ -385,7 +724,7 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
     },
     ["spine", "head"],
   );
-  if (role === "trooper")
+  if (attack)
     clip(
       "aim",
       10,
@@ -411,10 +750,11 @@ function buildInfantry(scene: Scene, role: InfantryRole): void {
       case "left-shin":
       case "right-shin":
         return [0.6 * buckle, 0, 0];
+      // Held arms relax as the body falls.
       case "left-arm":
-        return [0, 0, -0.08 - 0.5 * fall];
+        return [stance.pitch * (1 - fall), 0, -stance.spread - 0.5 * fall];
       case "right-arm":
-        return [0, 0, 0.08 + 0.5 * fall];
+        return [stance.pitch * (1 - fall), 0, stance.spread + 0.5 * fall];
       case "head":
         return [-0.2 * fall, 0, 0];
       default:
@@ -451,7 +791,7 @@ function keyed(
 /** One part's vertices in the rest pose, colored per vertex. */
 function partVertices(
   scene: Scene,
-  { name, shape, size, position, tiltX = 0 }: Part,
+  { name, shape, size, position, tiltX = 0, tiltZ = 0 }: Part,
   color: Color3,
 ): VertexData {
   const mesh =
@@ -463,10 +803,19 @@ function partVertices(
             { height: 1, diameter: 1, tessellation: 10 },
             scene,
           )
-        : MeshBuilder.CreateBox(name, { size: 1 }, scene);
+        : shape === "torus"
+          ? MeshBuilder.CreateTorus(
+              name,
+              { diameter: 1, thickness: 0.16, tessellation: 16 },
+              scene,
+            )
+          : shape === "leaf"
+            ? leafMesh(scene, name)
+            : MeshBuilder.CreateBox(name, { size: 1 }, scene);
   mesh.scaling.set(...size);
   mesh.position.set(...position);
   mesh.rotation.x = tiltX;
+  mesh.rotation.z = tiltZ;
   mesh.bakeCurrentTransformIntoVertices();
   const vertices = VertexData.ExtractFromMesh(mesh);
   mesh.dispose();
@@ -478,4 +827,20 @@ function partVertices(
     1,
   ]).flat();
   return vertices;
+}
+
+function leafMesh(scene: Scene, name: string): Mesh {
+  const data = new VertexData();
+  data.positions = [
+    0, 0.5, 0, 0.5, 0, 0, 0, -0.5, 0, -0.5, 0, 0, 0, 0, 0.5, 0, 0, -0.5,
+  ];
+  data.indices = [
+    0, 4, 1, 1, 4, 2, 2, 4, 3, 3, 4, 0, 0, 1, 5, 1, 2, 5, 2, 3, 5, 3, 0, 5,
+  ];
+  data.normals = [];
+  data.uvs = [0.5, 1, 1, 0.5, 0.5, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5];
+  VertexData.ComputeNormals(data.positions, data.indices, data.normals);
+  const mesh = new Mesh(name, scene);
+  data.applyToMesh(mesh);
+  return mesh;
 }

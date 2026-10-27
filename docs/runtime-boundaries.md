@@ -29,6 +29,36 @@ These contracts describe where new behaviors, views, and services attach.
   scenario sharing under
   [ownership rules](../DESIGN.md#ownership-and-relationships).
 
+## Cultivation and growth
+
+- `simulation/cultivation.ts` owns renewable reserves, worker gathering,
+  delivery, and interruptions. Regeneration and collection retain integer
+  remainders; stable worker-ID ordering allocates the shared reserve without
+  overdrawing. Movement, audio, and presentation never advance cultivation.
+- `simulation/growth.ts` owns infrastructure eligibility and worker tending.
+  Work retains its Heartgrove affiliation until that headquarters is lost.
+  Eligible active jobs keep their slots; blocked jobs yield without losing
+  payment, progress, or queue priority. Completed Circle buildings have no
+  support-network dependency.
+- `simulation/worker-navigation.ts` resolves reachable building entrances and
+  advances automatic routes for harvesting, cultivation, and tending. Callers
+  choose arrival distance and work-specific blocked states. Reachability
+  reads cached navigation regions; only route starts search for a path.
+  Placement tests a prospective footprint through a read-only occupancy
+  adapter, preserving the published navigation state.
+- `simulation/economy.ts` maps each common resource to its price field,
+  balance, and display name. Affordability, payment, refunds, and the sidebar
+  and top bar read that table; the top bar shows the player faction's
+  resource. An absent currency account cannot fund a job, even at zero cost.
+  `enrollWorker` creates worker state from an actor's definition. Shared
+  queries expose sites, compatible workers, and outstanding automatic orders;
+  explicit actor commands interrupt either worker type without losing cargo.
+  Building loss cancels affected automatic routes. Cultivators retain delivery
+  work and queued orders while selecting a replacement drop-off.
+- The single-player prototype keeps Materials and Lifebloom separate. Shared
+  owner identities, command authority, and owner resource pools remain M1
+  prerequisites; faction equality currently bounds worker and building access.
+
 ## Resource ownership
 
 - [The resource lifetime](../src/lifetime.ts) owns disposable resources and
@@ -45,6 +75,10 @@ These contracts describe where new behaviors, views, and services attach.
   their tooltip and listeners; disposal or parent cancellation releases both.
 - Asset collections release after their views; a failed cleanup cannot skip
   the remaining assets.
+- Transient combat effects have a fixed instance budget. Bursts evict the
+  oldest effects; expiration and disposal release instances once. Disposed
+  views ignore new hits and markers. Loaded idle clips drive effect animation
+  and hold their first pose under reduced motion.
 - Session assets prepare stand-ins before loading starts. Views read their
   catalogs without mutation; `load` starts once consumers exist and returns
   shared completion. Disposal releases late arrivals without publishing them

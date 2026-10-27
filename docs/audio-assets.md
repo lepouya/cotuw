@@ -14,6 +14,10 @@ The page also ships in the browser build.
   signals for committed command results.
 - `rifle-1`, `rifle-2`, and `rifle-3`: percussive rifle reports with different
   seeded noise and metallic overtones.
+- `circle-cast-1` and `circle-cast-2`: soft wooden onsets, rising resonant
+  tones, and brief magical echoes for the Sentinel's living focus.
+- `living-hit`: leaf-like rustling, warm resonance, and a faint tonal tail
+  for Circle personnel and wildlife impacts.
 - `wolf-attack`: a synthesized growl and bite transient.
 - `damage-1` and `damage-2`: low impacts with different metallic resonances.
 - `alert`: a repeated descending two-note signal.
@@ -36,6 +40,10 @@ The page also ships in the browser build.
   sparse low pulse.
 - `beneath-the-ridge`: tension music with darker pads, a muted sequence, and
   restrained percussion.
+- `circle-frontier` and `circle-ridge`: Circle arrangements of the same
+  exploration and combat themes, using harmonic string plucks, breathy
+  woodwinds, and wooden percussion. Combat adds interwoven notes and a
+  stronger pulse. The player's faction selects the arrangement.
 
 ## Source and provenance
 
@@ -44,18 +52,18 @@ The page also ships in the browser build.
   libraries, third-party melodies, pretrained audio models, or external assets.
   The repository's [LICENSE](../LICENSE) applies; no additional attribution or
   sample license is required.
-- `src/content/audio-assets.ts` owns IDs, titles, durations, music moods, and
-  URLs. Each sound ID needs a recipe in `scripts/audio-assets.ts`; type
-  checking rejects a missing one. `scripts/assets.ts` registers the generated
-  WAVs and audition HTML. Generator tests compare committed bytes with fresh
-  output.
+- `src/content/audio-assets.ts` owns IDs, titles, durations, music moods,
+  instrument arrangements, and URLs. Each sound ID needs a recipe in
+  `scripts/audio-assets.ts`; type checking rejects a missing one.
+  `scripts/assets.ts` registers the generated WAVs and audition HTML.
+  Generator tests compare committed bytes with fresh output.
 - Files use uncompressed 16-bit little-endian PCM WAV at 32 kHz. Cues are mono
   for world positioning; music is stereo. The complete batch is about
-  14 MB, with no encoder or audio package dependency.
+  26 MB, with no encoder or audio package dependency.
 - Noise uses explicit seeds. Instruments combine sine oscillators, filtered
   noise, amplitude envelopes, and echoes. Changing a recipe or seed changes
   the committed output after regeneration.
-- Both music tracks contain sixteen bars at 80 BPM, lasting exactly 48 seconds.
+- All four music tracks contain sixteen bars at 80 BPM, lasting 48 seconds.
   Their shared D-minor palette uses slow chord changes. Voices and echo tails
   wrap across the loop boundary, preserving continuous ambience on repeat.
 - One-shot cues peak at 0.72 full scale; drilling peaks at 0.42, the engine at
@@ -65,6 +73,11 @@ The page also ships in the browser build.
 
 ## Gameplay integration
 
-All cues and both music tracks are assigned through the base content pack.
+All cues and music arrangements are assigned through the base content pack.
 See [gameplay audio](audio.md) for controls, content bindings, runtime extension
 points, and verification. [DESIGN.md](../DESIGN.md#audio) owns the requirements.
+
+The Circle's `circle-cultivation` loop uses sparse high plucks, airy swells,
+and leaf-like rustling. `circle-growth` uses a separate, warmer plucked phrase
+for active construction. Both cues permit three voices with reduced gain for
+unselected work.

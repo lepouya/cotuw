@@ -3,10 +3,11 @@
 This is the living design source of truth. Keep entries concise; add detail only
 when it informs an implementation or content decision.
 
-The playable build contains the ARC M0 mission and construction sandbox. M1's
-two-faction skirmish is the active development target; [TODO.md](TODO.md) owns
-task order and progress. Game-wide rules below include accepted systems that
-are not yet implemented. The prototype sections describe the playable build.
+The playable build contains the ARC M0 mission, construction sandbox, and
+Circle wolf-den cultivation slice. M1's two-faction skirmish is the active
+development target; [TODO.md](TODO.md) owns task order and progress. Game-wide
+rules below include accepted systems that are not yet implemented. The
+prototype sections describe the playable build.
 
 ## Vision
 
@@ -483,6 +484,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   to this screen. Exit closes the desktop app; browsers show a close-tab
   message. The title screen shows the game version.
   Explicit `?level=<scenario ID>` links open bundled levels for development.
+  New mission opens the wolf-den faction chooser described in the Circle
+  development slice; the same setup screen will support difficulty selection.
 - Primary click selects or issues the contextual default command. Clicking a
   selected actor keeps it selected. Primary drag box-selects friendly mobile
   units. Shift-click toggles individual units; Shift-drag adds boxed units.
@@ -587,7 +590,7 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   the production tabs.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed mission
   time, and single-player pause and speed controls. The left holds Menu, Pause,
-  and ½×, 1×, and 2× speed. The center shows the first unfinished victory
+  and ½×, 1×, 2×, and 4× speed. The center shows the first unfinished victory
   objective with progress, or the result, and opens Goals. The right shows
   Materials, elapsed simulation time, and the alert history toggle with its
   unread count. Compact screens reduce the objective and resource label to
@@ -607,14 +610,15 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   popup pauses single-player until dismissed and keeps an active placement.
   Actor triggers are checked after committed ticks, independently of rendering.
   Dismissals are mission state, so loading never repeats one and restarting
-  shows them again. The opening explains basic goals, selection, movement,
-  camera controls, and the sidebar when the starting Command Center is owned.
-  It explains support at first Refinery placement, gathering at the first
-  Harvester, training and rally points at the first completed Barracks, and
-  fog, scouting, and combat at the first Scout.
+  shows them again. Short action prompts guide ARC's opening: build a Refinery
+  and Harvester, connect support, gather Materials, train and rally units,
+  then scout and use Attack Move against the wolves.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
   Load, Restart, and Main menu; its Load panel lists saves and imports files. F5
-  quicksaves, F9 loads the quicksave, and F10 opens the menu.
+  quicksaves, F9 loads the quicksave, and F10 opens the menu. Escape opens the
+  menu after closing contextual UI, canceling active world tools, ending camera
+  modes, and clearing selection. In the menu, Escape backs out of a panel,
+  then closes the menu, preserving whether the mission was already paused.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
   an explicit command mode.
@@ -1574,6 +1578,10 @@ roster and a distinct construction or cultivation mechanic.
 
 - M0's mission remains ARC's introduction. A short Circle introductory
   scenario teaches its economy and construction before the skirmish.
+- Develop the Circle introduction as a wolf-den playable slice, reusing M0's
+  terrain and wildlife encounters with Circle-specific resources and guidance.
+  Bring it up as the required shared foundations become available, without
+  waiting for the ARC AI harness or expanded ARC roster to be complete.
 - The skirmish mission-start dialog selects ARC or Circle and Easy, Normal,
   or Hard difficulty. Faction choice and difficulty are independent.
 - The AI is developed first as ARC against ARC on the existing roster. That
@@ -1590,6 +1598,44 @@ and acceptance. Ownership, construction, cultivation, the roster, resource
 scope, results, summary metrics, pacing, acceptance targets, controls, and
 Circle presentation are defined here. Implementation and playable-slice tuning
 are tracked in the checklist.
+
+### Circle wolf-den development slice
+
+- The target opening starts with a Heartgrove and enough Lifebloom to train a
+  Cultivator and grow a Conservatory. Tend construction, cultivate renewable
+  sites, grow a Musterhall, then scout and clear the wolves with Sentinels and
+  Wayfinders. Use normal costs, timings, infrastructure, and dormancy rules.
+- Include a second cultivation site to test concentrated staffing, site
+  rotation, travel, and recovery. Adapt preparation goals and contextual
+  guidance to the Circle. Keep the ARC introduction available separately.
+- The playable cultivation slice starts with a Heartgrove and 150 Lifebloom,
+  without preplaced workers or troops. It includes paid Cultivator production,
+  worker-tended Conservatory and Musterhall growth, renewable Lifebloom,
+  dormancy, army production, normal fog, and the six-wolf objectives. Losing
+  the starting Heartgrove ends this introductory mission in defeat. Victory
+  allows continued free play; restart restores the authored opening.
+- Two gift boxes beyond the lone wolf grant 25 Lifebloom each. Any friendly
+  mobile unit collects one by walking over it; each pays once and remains
+  collected in saves. They do not replace cultivation in the paid opening.
+- New mission opens a faction chooser for the wolf-den demo. ARC launches its
+  base-building introduction; Circle launches its cultivation slice. Both
+  choices describe their playable opening. The setup screen will hold
+  difficulty selection when implemented. Direct development links remain
+  available.
+- Current simulation control and faction membership remain single-player
+  prototype boundaries. Lifebloom and Materials are separate balances. Circle
+  growth has queues and slots per Heartgrove, but owner identities, shared
+  pools, command authority, emergency headquarters recovery, support units,
+  defenses, constructs, and faction AI remain pending. The complete base-loop
+  acceptance still requires the shared milestone foundations. Presentation
+  validation for the full roster remains open.
+- Wolves exercise movement, scouting, combat readability, durability, and
+  basic recovery. They do not validate ARC matchups, defense-breaking counters,
+  faction AI, skirmish pacing, or full-match balance. Add focused structure,
+  defense, and support encounters as the extended roster becomes available.
+- The slice does not waive shared ownership, command authority, economy,
+  infrastructure, visibility, or persistence requirements. A working preview
+  does not complete the full Circle or skirmish acceptance gates.
 
 ### M1 roster
 
@@ -1671,14 +1717,18 @@ are tracked in the checklist.
   with an opening large enough for a Briar Ram.
 - The Thornspire is a narrow, sturdy column with thorn-like plates around a
   violet focus. Its crown opens briefly to fire a heavy magical bolt.
-- Personnel are recognizable elven figures in fitted clothing and deliberately
-  grown armor. Pale armor plates and curved equipment share the buildings'
-  style. Clothing, equipment, and posture distinguish roles at gameplay scale.
-- Sentinels have broad shoulders and substantial layered armor.
+- Personnel have slender elven proportions, visible pointed ears, exposed
+  faces, long tunics, flowing mantles, and circlets. Grown leaf-shaped armor
+  and curved artifacts share the buildings' style. Clothing, equipment, and
+  posture distinguish roles at gameplay scale.
+- Sentinels have broad layered leaf armor over split tunics and mantles.
   Their grown focus weapon is a compact, curved frame of pale living wood
   around a violet core, held in both hands. It releases brief, concentrated
-  magical bolts from a braced firing pose.
-- Wayfinders have light equipment and compact silhouettes suited to speed.
+  magical bolts from a two-handed channeling pose. Bolts have twisting violet
+  strands, branching sparks, and a brief living pulse. Reduced motion holds
+  their shape while the effect fades.
+- Wayfinders have light hooded mantles, tunics, and a slim wayfinding stave,
+  with compact silhouettes suited to speed. They remain unarmed.
 - Cultivators wear practical clothing and carry a visible pod and a
   growth-tending tool.
 - Healers have flowing mantles and open-handed casting poses.
@@ -1708,9 +1758,10 @@ are tracked in the checklist.
 - Circle sound effects combine wooden impacts, leaf-like rustling, and clear
   musical tones. Orders and readiness use brief, distinct chimes; cultivation
   and growth use soft rustling over a warm, gently pulsing tone.
-- Sentinel fire combines a sharp wooden crack with a short, bright magical
-  tail; Thornspire fire uses a deeper, heavier version. Briar Ram strikes use
-  weighty wooden impacts and cracking fibers. Healing and construct repair
+- Sentinel casting combines a soft wooden onset, rising harmonic bloom, and
+  short magical tail; Thornspire fire uses a deeper, heavier version.
+  Biological impacts use soft rustling and warm resonance. Briar Ram strikes
+  use weighty wooden impacts and cracking fibers. Healing and construct repair
   use soft harmonic patterns distinct from weapon sounds. Destruction uses
   splitting wood and fading low resonance.
 - Keep sounds brief and limit overlapping work loops so a busy base remains
@@ -1915,7 +1966,7 @@ are tracked in the checklist.
 
 ## Persistence
 
-- Levels and mission saves share one human-readable JSON format, version 8. A
+- Levels and mission saves share one human-readable JSON format, version 9. A
   level is a mission file at tick 0. Every mission starts by loading a file,
   including bundled levels, and [mission files](docs/mission-files.md)
   documents the layout for hand editing.

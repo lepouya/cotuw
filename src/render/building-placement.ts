@@ -1,4 +1,5 @@
-import { Color3 } from "@babylonjs/core";
+import { groundRing, groundPoint } from "./ground-marker";
+import { Color3, MeshBuilder } from "@babylonjs/core";
 
 import {
   createFootprintOverlay,
@@ -13,7 +14,7 @@ import { createPrimaryClick } from "./primary-click";
 import { isTextEntry, worldInputAvailable } from "./input-focus";
 import { setText } from "../ui/dom";
 
-import type { Scene } from "@babylonjs/core";
+import type { Scene, LinesMesh } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome } from "../simulation/command";
@@ -32,6 +33,9 @@ export type BuildingPlacementControls = {
 };
 
 const REASONS: Record<PlacementReason, string> = {
+  "missing-worker": "Select a worker that can tend this building.",
+  "missing-headquarters": "An operational headquarters is needed for growth.",
+  "unreachable-growth": "No selected worker can reach this building.",
   "outside-support":
     "Place the building center inside connected support coverage.",
   "invalid-actor": "Invalid building placement.",
@@ -44,8 +48,8 @@ const REASONS: Record<PlacementReason, string> = {
   "excessive-slope": "This slope is too steep for a building.",
   "actor-conflict": "A unit is standing in the footprint.",
   "occupancy-conflict": "Another structure occupies this footprint.",
-  "insufficient-materials": "Not enough Materials for this building.",
-  "resource-site": "Keep Materials sites and salvage clear of buildings.",
+  "insufficient-resources": "Not enough resources for this building.",
+  "resource-site": "Keep resource sites and salvage clear of buildings.",
   unexplored: "Explore the whole footprint before building there.",
   debris: "Wait for the debris to clear.",
 };
@@ -65,8 +69,9 @@ export type BuildingPlacementOptions = {
   controls: BuildingPlacementControls;
   enabled?: () => boolean;
   pointerEnabled?: () => boolean;
+  workerIds?: () => readonly string[];
   onPlaced: (actorId: string) => void;
-  onStart: () => void;
+  onStart: (definition: ActorDefinition) => void;
   onInvalid?: () => void;
 };
 
@@ -84,6 +89,7 @@ export function createBuildingPlacement(
     controls,
     enabled = () => true,
     pointerEnabled = () => true,
+    workerIds,
     onPlaced,
     onStart,
     onInvalid,
@@ -112,10 +118,12 @@ export function createBuildingPlacement(
   let rejection: { text: string; placement: string } | undefined;
   let overlay: ReturnType<typeof createFootprintOverlay> | undefined;
   let overlayOffset = 0;
+  let workerMarker: LinesMesh | undefined;
   let pickKey = "";
   let stateKey = "";
   let lastAppearance: TilePlacedActorAppearance | undefined;
   let overlayKey = "";
+  let markerKey = "";
   let uiKey = "";
   let terrainRevision = 0;
   const size = () => footprintSize(definition!.footprint!.occupiedTiles);
@@ -127,10 +135,17 @@ export function createBuildingPlacement(
           definitionId: definition.id,
           origin,
           quarterTurns,
+          ...(definition.growth && { workerIds: [...(workerIds?.() ?? [])] }),
         }
       : undefined;
   const placementKey = () => JSON.stringify([origin, quarterTurns]);
+  const clearMarker = () => {
+    workerMarker?.dispose();
+    workerMarker = undefined;
+    markerKey = "";
+  };
   const clearOverlay = () => {
+    clearMarker();
     overlay?.dispose();
     overlay = undefined;
     overlayKey = "";
@@ -177,6 +192,8 @@ export function createBuildingPlacement(
       origin,
       quarterTurns,
       rejection,
+      // Selected workers are growth tender candidates.
+      definition?.growth && workerIds?.(),
       simulation.completedTicks,
       simulation.actorVersion,
       map.navigationChanges.version,
@@ -199,6 +216,10 @@ export function createBuildingPlacement(
           ]
         : [],
     );
+    const tender =
+      evaluation?.accepted && evaluation.workerId
+        ? simulation.actorById(evaluation.workerId)
+        : undefined;
     const key = evaluation
       ? JSON.stringify([
           candidate,
@@ -221,6 +242,25 @@ export function createBuildingPlacement(
         });
       }
       overlayKey = key;
+    }
+    // The tender ring follows a moving worker without rebuilding the footprint.
+    const nextMarkerKey = JSON.stringify([tender?.worldPosition, key]);
+    if (nextMarkerKey !== markerKey) {
+      clearMarker();
+      if (tender) {
+        workerMarker = MeshBuilder.CreateLines(
+          "growth-worker-preview",
+          {
+            points: groundRing(tender.worldPosition, 0.55, 32, (point) =>
+              groundPoint(map, point, 0.08),
+            ),
+          },
+          scene,
+        );
+        workerMarker.color = new Color3(0.8, 0.5, 1);
+        workerMarker.isPickable = false;
+      }
+      markerKey = nextMarkerKey;
     }
     const nextUiKey = JSON.stringify([
       active,
@@ -282,7 +322,7 @@ export function createBuildingPlacement(
     quarterTurns = 0;
     // Layers rarely change, and counting them scans every tile.
     overlayOffset = footprintOverlayOffset(map);
-    onStart();
+    onStart(building.definition);
     update();
   };
   const cancel = () => {

@@ -1,10 +1,10 @@
 {
   "format": "cotuw-mission",
-  "version": 8,
+  "version": 9,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "sandbox",
-    "content": { "id": "base", "version": 1 },
+    "content": { "id": "base", "version": 2 },
     "actors": [
       "arc-trooper",
       "arc-scout",

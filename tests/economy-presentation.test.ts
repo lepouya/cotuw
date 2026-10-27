@@ -188,7 +188,7 @@ test("Refinery animation freezes during construction and progresses when operati
       origin: { x: 5, z: 5 },
     });
     actor.construction = {
-      paidMaterials: 100,
+      paidCost: 100,
       completedTicks: 4,
       totalTicks: 8,
     };

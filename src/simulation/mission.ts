@@ -1,4 +1,9 @@
 import {
+  growthCandidates,
+  growthHeadquarters,
+  growthWorkerFor,
+} from "./growth";
+import {
   assignGroupDestinations,
   separateMobileActors,
 } from "./group-movement";
@@ -68,17 +73,24 @@ import {
 } from "./vision";
 import {
   applyEconomyCommand as applyEconomy,
-  createHarvesterState,
-  materialsCost,
+  enrollWorker,
+  activeSites,
+  economySites,
+  interruptWorker,
+  workerHasOrder,
+  canAfford,
+  chargeCost,
+  costAmount,
+  refundCost,
   PRODUCTION_QUEUE_LIMIT,
   refineryOccupied,
   removeEconomyActor,
-  saleMaterialsRefund,
+  saleRefund,
   updateEconomy,
   validateEconomyDefinitions,
   validateEconomyState,
 } from "./economy";
-import type { EconomyState, EconomyView, HarvesterState } from "./economy";
+import type { EconomyState, EconomyView } from "./economy";
 import {
   createTilePlacedActor,
   evaluateFootprint,
@@ -270,6 +282,11 @@ export type MissionSimulation = {
   /** Checks paid queue capacity, or free exits in the construction sandbox. */
   evaluateTraining: (command: TrainUnitCommand) => TrainingEvaluation;
   evaluateRallyPoint: (actorId: string, target: WorldPosition) => boolean;
+  /** The nearest candidate that can reach and tend unfinished growth. */
+  tendWorker: (
+    buildingId: string,
+    workerIds: readonly string[],
+  ) => string | undefined;
   /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
   unusedActorId: (prefix: string) => string;
   /** Queues a command for the next tick; non-object submissions throw. */
@@ -476,7 +493,7 @@ export function createMissionSimulation({
       (!construction ||
         !state.economy ||
         !isTilePlacedActor(actor) ||
-        construction.paidMaterials !== materialsCost(definition) ||
+        construction.paidCost !== costAmount(definition) ||
         !isCount(construction.completedTicks) ||
         construction.totalTicks !==
           secondsToTicks(definition.constructionSeconds, tickSeconds) ||
@@ -610,6 +627,7 @@ export function createMissionSimulation({
       return reject("not-placeable");
     }
     const actor = createTilePlacedActor(map, definition, placement);
+    let workerId: string | undefined;
     const evaluation = evaluateFootprint(
       map,
       occupancy,
@@ -630,16 +648,34 @@ export function createMissionSimulation({
     )
       return { ...reject("debris"), tiles: evaluation.tiles };
     if (evaluation.accepted && economy) {
-      if (economy.materials < materialsCost(definition))
-        return { ...reject("insufficient-materials"), tiles: evaluation.tiles };
+      if (!canAfford(economy, definition))
+        return { ...reject("insufficient-resources"), tiles: evaluation.tiles };
       const resources = new Set(
         [
-          ...economy.sites.filter((site) => site.remainingMaterials > 0),
+          ...activeSites(economy),
           ...economy.loot.filter((loot) => !loot.collected),
         ].map((resource) => tileKey(resource.tile)),
       );
       if (evaluation.tiles.some((tile) => resources.has(tileKey(tile))))
         return { ...reject("resource-site"), tiles: evaluation.tiles };
+      if (definition.growth) {
+        if (!growthHeadquarters(actor, actors, definitionsById).length)
+          return { ...reject("missing-headquarters"), tiles: evaluation.tiles };
+        const workerIds = placement.workerIds ?? [];
+        if (
+          !growthCandidates(definition, workerIds, actors, definitionsById)
+            .length
+        )
+          return { ...reject("missing-worker"), tiles: evaluation.tiles };
+        const tender = growthWorkerFor(actor, workerIds, actors, {
+          definitions: definitionsById,
+          behaviors: behaviorsById,
+          map,
+        });
+        if (!tender)
+          return { ...reject("unreachable-growth"), tiles: evaluation.tiles };
+        workerId = tender.id;
+      }
       if (
         definition.support &&
         !supportsPosition(
@@ -657,7 +693,9 @@ export function createMissionSimulation({
         return { ...reject("invalid-actor"), tiles: evaluation.tiles };
       }
     }
-    return evaluation;
+    return evaluation.accepted && workerId
+      ? { ...evaluation, workerId }
+      : evaluation;
   };
 
   const evaluateTraining = (
@@ -686,8 +724,8 @@ export function createMissionSimulation({
       (evaluation.accepted || evaluation.reason === "exit-blocked")
     ) {
       const definition = definitionsById.get(command.definitionId)!;
-      if (economy.materials < materialsCost(definition))
-        return { accepted: false, reason: "insufficient-materials" };
+      if (!canAfford(economy, definition))
+        return { accepted: false, reason: "insufficient-resources" };
       if (
         economy.production.filter(
           (job) => job.producerId === command.producerId,
@@ -741,6 +779,13 @@ export function createMissionSimulation({
         working.retiredIds.push(id),
       );
       for (const id of interrupted) delete working.actorsById.get(id)!.movement;
+    }
+    for (const building of working.actors) {
+      const construction = building.construction;
+      if (construction?.headquartersId === actor.id) {
+        delete construction.headquartersId;
+        delete construction.active;
+      }
     }
     if (isTilePlacedActor(actor)) {
       occupancy!.remove(actor.id);
@@ -942,16 +987,6 @@ export function createMissionSimulation({
     const grid = behaviorFor(actor).navigationGrid?.(actor, definition);
     return grid && { actor, definition, grid };
   };
-  const interruptHarvesting = (actor: Actor, economy?: EconomyState) => {
-    const worker = economy?.harvesters.find(
-      (worker) => worker.actorId === actor.id,
-    );
-    if (!worker) return;
-    worker.phase = worker.refineryId ? "idle" : "unassigned";
-    delete worker.targetSiteId;
-    delete worker.activeSiteId;
-    delete worker.retryNavigationVersion;
-  };
   const handle = (working: WorkingActors, applied: AppliedActorCommand) => {
     const actor = working.actorsById.get(applied.actorId);
     if (!actor) return false;
@@ -963,7 +998,7 @@ export function createMissionSimulation({
     );
     if (accepted) {
       clearCombatOrders(actor);
-      interruptHarvesting(actor, working.economy);
+      interruptWorker(actor, working.economy);
     }
     validateUpdate(actor, before);
     return accepted;
@@ -974,10 +1009,7 @@ export function createMissionSimulation({
     (!!actor.attackMove && !actor.attackMove.blocked) ||
     !!actor.combat?.attack ||
     (!!actor.combat?.returning && !actor.combat.returning.blocked) ||
-    !!economy?.harvesters.some(
-      ({ actorId, phase }) =>
-        actorId === actor.id && HARVEST_TRIP_PHASES.includes(phase),
-    );
+    workerHasOrder(economy, actor.id);
   const queuedOrderOf = (
     command: ActorOrderCommand,
     requestedTarget?: WorldPosition,
@@ -1023,7 +1055,9 @@ export function createMissionSimulation({
         ? { queued: true }
         : order?.kind === "attack" && !definition.weapon
           ? { reason: "unarmed" }
-          : order?.kind === "gather" && !definition.harvesting
+          : order?.kind === "gather" &&
+              !definition.harvesting &&
+              !definition.cultivation
             ? { reason: "invalid-harvester" }
             : {}),
     } as CommandOutcome;
@@ -1168,7 +1202,7 @@ export function createMissionSimulation({
       } as CommandOutcome<EconomyCommand>;
     const site =
       applied.kind === "gather" &&
-      working.economy.sites.find((site) => site.id === applied.siteId);
+      economySites(working.economy).find((site) => site.id === applied.siteId);
     // Undiscovered sites are unknown to the player.
     const reason =
       site && fog && !fog.isExplored(site.tile.x, site.tile.z)
@@ -1209,9 +1243,13 @@ export function createMissionSimulation({
     )
       return outcome(false);
     if (economy && command.kind === "cancel-construction")
-      economy.materials += actor.construction!.paidMaterials;
+      refundCost(economy, definitionFor(actor), actor.construction!.paidCost);
     if (economy && command.kind === "sell-actor")
-      economy.materials += saleMaterialsRefund(actor, definitionFor(actor));
+      refundCost(
+        economy,
+        definitionFor(actor),
+        saleRefund(actor, definitionFor(actor)),
+      );
     retire(working, actor);
     return outcome(true);
   };
@@ -1265,13 +1303,15 @@ export function createMissionSimulation({
           accepted: false,
           reason: evaluation.reason,
         };
+      const tender = evaluation.workerId
+        ? working.actorsById.get(evaluation.workerId)
+        : undefined;
       occupancy!.place(evaluation.footprint);
       if (working.economy) {
         const definition = definitionFor(evaluation.actor);
-        const cost = materialsCost(definition);
-        working.economy.materials -= cost;
+        const cost = chargeCost(working.economy, definition);
         evaluation.actor.construction = {
-          paidMaterials: cost,
+          paidCost: cost,
           completedTicks: 0,
           totalTicks: secondsToTicks(
             definition.constructionSeconds,
@@ -1280,6 +1320,16 @@ export function createMissionSimulation({
         };
       }
       stageActor(working, evaluation.actor);
+      if (working.economy && definitionFor(evaluation.actor).growth) {
+        applyEconomy(
+          { kind: "tend", actorId: tender!.id, buildingId: applied.actorId },
+          working.economy,
+          working.actors,
+          definitionsById,
+          () => {},
+        );
+        delete tender!.orders;
+      }
       return { tick, command: applied, accepted: true };
     },
     "train-unit": (command, tick, working) => {
@@ -1299,13 +1349,12 @@ export function createMissionSimulation({
         };
       if (working.economy) {
         const definition = definitionsById.get(applied.definitionId)!;
-        const cost = materialsCost(definition);
-        working.economy.materials -= cost;
+        const cost = chargeCost(working.economy, definition);
         working.economy.production.push({
           actorId: applied.actorId,
           producerId: applied.producerId,
           definitionId: applied.definitionId,
-          paidMaterials: cost,
+          paidCost: cost,
           completedTicks: 0,
           totalTicks: secondsToTicks(definition.trainingSeconds, tickSeconds),
           exitBlocked: false,
@@ -1317,6 +1366,7 @@ export function createMissionSimulation({
       return { tick, command: applied, accepted: true };
     },
     gather: applyEconomyCommand,
+    tend: applyEconomyCommand,
     "assign-refinery": applyEconomyCommand,
     "return-cargo": applyEconomyCommand,
     "cancel-production": applyEconomyCommand,
@@ -1333,7 +1383,7 @@ export function createMissionSimulation({
       });
       if (!reason) {
         startAttack(actor!, target!);
-        interruptHarvesting(actor!, working.economy);
+        interruptWorker(actor!, working.economy);
       }
       return {
         tick,
@@ -1419,6 +1469,23 @@ export function createMissionSimulation({
       ),
     evaluateRallyPoint: (id, target) =>
       evaluateRallyPoint(actorsById.get(id), target),
+    tendWorker: (buildingId, workerIds) => {
+      const building = actorsById.get(buildingId);
+      if (
+        !map ||
+        !building?.construction ||
+        !definitionFor(building).growth ||
+        state.economy?.cultivation?.workers.some(
+          (worker) => worker.tendingId === buildingId,
+        )
+      )
+        return undefined;
+      return growthWorkerFor(building, workerIds, state.actors, {
+        definitions: definitionsById,
+        behaviors: behaviorsById,
+        map,
+      })?.id;
+    },
     unusedActorId: (prefix) => {
       let number = nextActorNumbers.get(prefix) ?? 1;
       while (usedActorIds.has(`${prefix}${number}`)) number += 1;
@@ -1468,22 +1535,17 @@ export function createMissionSimulation({
         }
         footprint = evaluation.footprint;
       }
+      const definition = definitionFor(copy);
+      let economy = state.economy;
+      if (state.economy && (definition.harvesting || definition.cultivation)) {
+        economy = structuredClone(state.economy);
+        enrollWorker(economy, copy.id, definition);
+      }
       state = {
         ...state,
         actors: freezeActors([...state.actors, register(copy, state.actors)]),
+        ...(economy && { economy: deepFreeze(economy) }),
       };
-      if (state.economy && definitionFor(copy).harvesting) {
-        state = {
-          ...state,
-          economy: deepFreeze({
-            ...structuredClone(state.economy),
-            harvesters: [
-              ...state.economy.harvesters,
-              createHarvesterState(copy.id),
-            ],
-          }),
-        };
-      }
       // Registered first, so a rejected actor never leaves occupancy behind.
       if (footprint) {
         occupancy!.place(footprint);
@@ -1751,16 +1813,10 @@ function canQueueOrder(
 ): boolean {
   return (
     (order.kind !== "attack" || !!definition.weapon) &&
-    (order.kind !== "gather" || (hasEconomy && !!definition.harvesting))
+    (order.kind !== "gather" ||
+      (hasEconomy && (!!definition.harvesting || !!definition.cultivation)))
   );
 }
-
-/** Harvester phases that keep it busy before its queued orders. */
-const HARVEST_TRIP_PHASES: readonly HarvesterState["phase"][] = [
-  "travelling",
-  "gathering",
-  "returning",
-];
 
 type ActorOrderCommand = Extract<
   MissionCommand,

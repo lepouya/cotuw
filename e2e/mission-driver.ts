@@ -18,7 +18,7 @@ export class MissionDriver {
     readonly realTime: boolean,
   ) {}
 
-  async opening(dismissGuide = true) {
+  async opening(dismissGuide = true, faction: "arc" | "circle" = "arc") {
     await this.page.addInitScript((realTime) => {
       window.missionClock = 0;
       if (realTime) return;
@@ -29,11 +29,15 @@ export class MissionDriver {
     }, this.realTime);
     await this.page.goto("/");
     await activate(this.page.locator("#new-mission"), this.touch);
+    await activate(this.page.locator(`#choose-${faction}`), this.touch);
     await expect(this.page.locator("#game-canvas")).toHaveAttribute(
       "data-terrain-ready",
       "true",
     );
-    if (dismissGuide) await this.explanation("Welcome, Commander");
+    if (dismissGuide)
+      await this.explanation(
+        faction === "arc" ? "Welcome, Commander" : "Welcome, Guide",
+      );
     await this.page.evaluate(async (realTime) => {
       if (!realTime) {
         const path: string = "/e2e/harness.ts";

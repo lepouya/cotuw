@@ -2,9 +2,245 @@
   "format": "cotuw-content",
   "formatVersion": 1,
   "id": "base",
-  "version": 1,
-  "name": "Anomaly Response Command and wildlife",
+  "version": 2,
+  "name": "ARC, Circle of Repose, and wildlife",
+  "factionNames": {
+    "arc": "Anomaly Response Command",
+    "circle": "Circle of Repose",
+    "wildlife": "Wildlife"
+  },
   "actors": [
+    {
+      "id": "circle-musterhall",
+      "behaviorId": "idle",
+      "faction": "circle",
+      "health": 800,
+      "vision": {
+        "radius": 8
+      },
+      "lifebloomCost": 100,
+      "constructionSeconds": 8,
+      "growth": {
+        "workerDefinitionId": "circle-cultivator",
+        "headquartersDefinitionId": "circle-heartgrove"
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "z": 2
+          },
+          {
+            "x": 1,
+            "z": 2
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      },
+      "production": {
+        "unitDefinitionIds": ["circle-sentinel", "circle-wayfinder"]
+      }
+    },
+    {
+      "id": "circle-conservatory",
+      "behaviorId": "idle",
+      "faction": "circle",
+      "health": 700,
+      "vision": {
+        "radius": 8
+      },
+      "lifebloomCost": 100,
+      "constructionSeconds": 6,
+      "growth": {
+        "workerDefinitionId": "circle-cultivator",
+        "headquartersDefinitionId": "circle-heartgrove"
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "z": 1
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      },
+      "cultivationDropoff": true
+    },
+    {
+      "id": "circle-heartgrove",
+      "behaviorId": "idle",
+      "faction": "circle",
+      "health": 2000,
+      "vision": {
+        "radius": 14
+      },
+      "lifebloomCost": 300,
+      "constructionSeconds": 12,
+      "growth": {
+        "workerDefinitionId": "circle-cultivator",
+        "headquartersDefinitionId": "circle-heartgrove"
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "z": 2
+          },
+          {
+            "x": 1,
+            "z": 2
+          },
+          {
+            "x": 2,
+            "z": 2
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      },
+      "production": {
+        "unitDefinitionIds": ["circle-cultivator"]
+      },
+      "infrastructure": {
+        "slots": 1
+      }
+    },
+    {
+      "id": "circle-cultivator",
+      "faction": "circle",
+      "behaviorId": "terrain-move",
+      "health": 60,
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.25
+      },
+      "vision": {
+        "radius": 8
+      },
+      "cultivation": {
+        "capacity": 30,
+        "rate": 1
+      },
+      "lifebloomCost": 50,
+      "trainingSeconds": 4
+    },
+    {
+      "id": "circle-sentinel",
+      "behaviorId": "terrain-move",
+      "faction": "circle",
+      "health": 150,
+      "weapon": {
+        "damage": 10,
+        "damageType": "arcane",
+        "range": 4,
+        "cooldownSeconds": 1
+      },
+      "guard": {
+        "acquisitionRadius": 7,
+        "chaseRadius": 10
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.32
+      },
+      "vision": {
+        "radius": 7
+      },
+      "lifebloomCost": 35,
+      "trainingSeconds": 5
+    },
+    {
+      "id": "circle-wayfinder",
+      "behaviorId": "terrain-move",
+      "faction": "circle",
+      "health": 40,
+      "movement": {
+        "speed": 7,
+        "profileId": "surface-ground",
+        "radius": 0.26
+      },
+      "vision": {
+        "radius": 14
+      },
+      "lifebloomCost": 20,
+      "trainingSeconds": 3
+    },
     {
       "id": "arc-trooper",
       "behaviorId": "terrain-move",
@@ -289,6 +525,94 @@
     }
   ],
   "presentation": {
+    "circle-sentinel": {
+      "name": "Sentinel",
+      "description": "Tough, short-ranged Circle infantry",
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "circle-cast"
+            }
+          ],
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        }
+      },
+      "attackEffect": "bolt",
+      "damageEffect": "biological",
+      "model": {
+        "glb": {
+          "url": "/assets/actors/circle-sentinel.glb",
+          "minimapColor": [0.47, 0.68, 0.85],
+          "bounds": {
+            "radius": 0.58,
+            "height": 2.25
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "attack": "channel",
+            "death": "death",
+            "hit": "hit",
+            "aim": "aim"
+          },
+          "cycleDistance": 2.18
+        }
+      },
+      "train": {
+        "id": "train-circle-sentinel",
+        "label": "Train Sentinel"
+      },
+      "portrait": "circle-sentinel"
+    },
+    "circle-wayfinder": {
+      "name": "Wayfinder",
+      "description": "Fast, fragile, unarmed Circle explorer",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        }
+      },
+      "damageEffect": "biological",
+      "model": {
+        "glb": {
+          "url": "/assets/actors/circle-wayfinder.glb",
+          "minimapColor": [0.47, 0.68, 0.85],
+          "bounds": {
+            "radius": 0.5,
+            "height": 1.9
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "death": "death",
+            "hit": "hit"
+          },
+          "cycleDistance": 1.85
+        }
+      },
+      "train": {
+        "id": "train-circle-wayfinder",
+        "label": "Train Wayfinder"
+      },
+      "portrait": "circle-wayfinder"
+    },
     "arc-trooper": {
       "name": "Trooper",
       "description": "Line infantry",
@@ -541,6 +865,11 @@
             {
               "cue": "wolf-attack"
             }
+          ],
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
           ]
         }
       }
@@ -581,9 +910,154 @@
             {
               "cue": "wolf-attack"
             }
+          ],
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
           ]
         }
       }
+    },
+    "circle-cultivator": {
+      "name": "Cultivator",
+      "description": "Tends living buildings and cultivates renewable Lifebloom",
+      "train": {
+        "id": "train-circle-cultivator",
+        "label": "Train Cultivator"
+      },
+      "damageEffect": "biological",
+      "model": {
+        "glb": {
+          "url": "/assets/actors/circle-cultivator.glb",
+          "minimapColor": [0.47, 0.68, 0.85],
+          "bounds": {
+            "radius": 0.5,
+            "height": 1.9
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "death": "death",
+            "hit": "hit",
+            "work": "cultivate"
+          },
+          "cycleDistance": 1.85
+        }
+      },
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        },
+        "loops": {
+          "working": "circle-cultivation"
+        }
+      },
+      "portrait": "circle-cultivator"
+    },
+    "circle-heartgrove": {
+      "name": "Heartgrove",
+      "description": "Trains Cultivators and supplies one growth slot",
+      "build": {
+        "id": "build-circle-heartgrove",
+        "label": "Grow Heartgrove",
+        "order": 2
+      },
+      "building": {
+        "height": 0.12,
+        "color": [0.38, 0.29, 0.18],
+        "minimapColor": [0.58, 0.79, 0.51],
+        "glb": {
+          "url": "/assets/models/circle-heartgrove.glb",
+          "idle": "idle"
+        }
+      },
+      "damageEffect": "living",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        },
+        "loops": {
+          "constructing": "circle-growth"
+        }
+      },
+      "portrait": "circle-heartgrove"
+    },
+    "circle-conservatory": {
+      "name": "Lifebloom Conservatory",
+      "description": "Receives Lifebloom from any number of Cultivators",
+      "build": {
+        "id": "build-circle-conservatory",
+        "label": "Grow Lifebloom Conservatory",
+        "order": 0
+      },
+      "building": {
+        "height": 0.12,
+        "color": [0.38, 0.29, 0.18],
+        "minimapColor": [0.58, 0.79, 0.51],
+        "glb": {
+          "url": "/assets/models/circle-conservatory.glb",
+          "idle": "idle"
+        }
+      },
+      "damageEffect": "living",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        },
+        "loops": {
+          "constructing": "circle-growth"
+        }
+      },
+      "portrait": "circle-conservatory"
+    },
+    "circle-musterhall": {
+      "name": "Musterhall",
+      "description": "Trains Sentinels and Wayfinders",
+      "build": {
+        "id": "build-circle-musterhall",
+        "label": "Grow Musterhall",
+        "order": 1
+      },
+      "building": {
+        "height": 0.12,
+        "color": [0.38, 0.29, 0.18],
+        "minimapColor": [0.58, 0.79, 0.51],
+        "glb": {
+          "url": "/assets/models/circle-musterhall.glb",
+          "idle": "idle"
+        }
+      },
+      "damageEffect": "living",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        },
+        "loops": {
+          "constructing": "circle-growth"
+        }
+      },
+      "portrait": "circle-musterhall"
     }
   },
   "clips": {
@@ -884,6 +1358,10 @@
     "tracer": {
       "url": "/assets/models/tracer.glb"
     },
+    "bolt": {
+      "url": "/assets/models/bolt.glb",
+      "idle": "idle"
+    },
     "bite": {
       "url": "/assets/models/bite.glb"
     },
@@ -904,6 +1382,13 @@
     "regeneration": {
       "url": "/assets/models/regeneration.glb",
       "idle": "pulse"
+    },
+    "cultivation-site": {
+      "url": "/assets/models/cultivation-site.glb",
+      "idle": "idle"
+    },
+    "leaf": {
+      "url": "/assets/models/leaf.glb"
     }
   },
   "materialsStages": [
@@ -949,6 +1434,26 @@
       "wolf-attack": {
         "url": "/assets/audio/wolf-attack.wav",
         "loop": false
+      },
+      "circle-cast-1": {
+        "url": "/assets/audio/circle-cast-1.wav",
+        "loop": false
+      },
+      "circle-cast-2": {
+        "url": "/assets/audio/circle-cast-2.wav",
+        "loop": false
+      },
+      "living-hit": {
+        "url": "/assets/audio/living-hit.wav",
+        "loop": false
+      },
+      "circle-frontier": {
+        "url": "/assets/audio/circle-frontier.wav",
+        "loop": true
+      },
+      "circle-ridge": {
+        "url": "/assets/audio/circle-ridge.wav",
+        "loop": true
       },
       "damage-1": {
         "url": "/assets/audio/damage-1.wav",
@@ -1005,9 +1510,47 @@
       "beneath-the-ridge": {
         "url": "/assets/audio/beneath-the-ridge.wav",
         "loop": true
+      },
+      "circle-growth": {
+        "url": "/assets/audio/circle-growth.wav",
+        "loop": true
+      },
+      "circle-cultivation": {
+        "url": "/assets/audio/circle-cultivation.wav",
+        "loop": true
       }
     },
     "cues": {
+      "circle-cast": {
+        "clips": ["circle-cast-1", "circle-cast-2"],
+        "gain": 0.48,
+        "cooldown": 0.08,
+        "voices": 5,
+        "priority": 2,
+        "range": 45
+      },
+      "living-hit": {
+        "clips": ["living-hit"],
+        "gain": 0.32,
+        "cooldown": 0.1,
+        "voices": 4,
+        "priority": 1,
+        "range": 45
+      },
+      "circle-frontier": {
+        "clips": ["circle-frontier"],
+        "gain": 0.6,
+        "cooldown": 0,
+        "voices": 1,
+        "priority": 0
+      },
+      "circle-ridge": {
+        "clips": ["circle-ridge"],
+        "gain": 0.6,
+        "cooldown": 0,
+        "voices": 1,
+        "priority": 0
+      },
       "command-accepted": {
         "clips": ["command-accepted"],
         "gain": 0.7,
@@ -1135,6 +1678,24 @@
         "cooldown": 0,
         "voices": 1,
         "priority": 0
+      },
+      "circle-growth": {
+        "clips": ["circle-growth"],
+        "gain": 0.3,
+        "unselectedGain": 0.12,
+        "cooldown": 0,
+        "voices": 3,
+        "priority": 0,
+        "range": 35
+      },
+      "circle-cultivation": {
+        "clips": ["circle-cultivation"],
+        "gain": 0.32,
+        "unselectedGain": 0.12,
+        "cooldown": 0,
+        "voices": 3,
+        "priority": 0,
+        "range": 35
       }
     },
     "events": {
@@ -1186,7 +1747,13 @@
     "music": {
       "default": "unquiet-frontier",
       "combat": "beneath-the-ridge",
-      "holdSeconds": 8
+      "holdSeconds": 8,
+      "factions": {
+        "circle": {
+          "default": "circle-frontier",
+          "combat": "circle-ridge"
+        }
+      }
     }
   }
 }

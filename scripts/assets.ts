@@ -4,7 +4,7 @@ import { PNG } from "pngjs";
 import { MUSIC_ASSETS, SOUND_ASSETS } from "../src/content/audio-assets.ts";
 import { buildAudioPreview, buildMusic, buildSound } from "./audio-assets.ts";
 import { buildGrassSheet, GRASS_CLIP, GRASS_SHEETS } from "./grass-sheet.ts";
-import { exportInfantry, INFANTRY_ROLES } from "./infantry-model.ts";
+import { exportInfantry, INFANTRY_IDS } from "./infantry-model.ts";
 import { exportModelAsset, MODEL_ASSETS } from "./model-assets.ts";
 import {
   buildMuzzleFlashSheet,
@@ -63,9 +63,9 @@ export const ASSET_FAMILIES = {
     clips: { "muzzle-flash": MUZZLE_FLASH_CLIP },
   },
   infantry: {
-    assets: INFANTRY_ROLES.map((role) => ({
-      path: `actors/arc-${role}.glb`,
-      build: () => exportInfantry(role),
+    assets: INFANTRY_IDS.map((id) => ({
+      path: `actors/${id}.glb`,
+      build: () => exportInfantry(id),
     })),
   },
   models: {

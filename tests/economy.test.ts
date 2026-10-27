@@ -2,7 +2,7 @@ import { harvestingRecoveryCost } from "../src/simulation/economy";
 import { createActor } from "../src/simulation/actor";
 import type { ActorDefinition } from "../src/simulation/actor";
 import { describe, expect, test } from "vitest";
-import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
+import { ARC_ACTOR_DEFINITIONS, BASE_CONTENT } from "./helpers/content";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { createMissionSimulation } from "../src/simulation/mission";
@@ -165,6 +165,67 @@ const gather = (siteId = "site"): MissionCommand => ({
   kind: "gather",
   actorId: "worker",
   siteId,
+});
+
+test("scripted worker enrollment rejects an absent economy before publishing the actor", () => {
+  const { simulation, map } = fixture(undefined, 1, false, BASE_CONTENT.actors);
+  try {
+    const before = simulation.snapshot();
+    const position = map.tileCenter(10, 10);
+    expect(() =>
+      simulation.spawnActor(
+        createActor({
+          id: "scripted-worker",
+          definitionId: "circle-cultivator",
+          worldPosition: position,
+        }),
+      ),
+    ).toThrow("cultivation state");
+    expect(simulation.snapshot()).toEqual(before);
+    simulation.spawnActor(
+      createActor({
+        id: "scripted-worker",
+        definitionId: "arc-trooper",
+        worldPosition: position,
+      }),
+    );
+    expect(simulation.actorById("scripted-worker")!.definitionId).toBe(
+      "arc-trooper",
+    );
+  } finally {
+    simulation.dispose();
+  }
+});
+
+test("a zero price cannot spend a resource the mission does not hold", () => {
+  const content = definitions.map((definition) => {
+    if (definition.id === "arc-trooper")
+      return { ...definition, materialsCost: undefined, lifebloomCost: 0 };
+    if (definition.id === "arc-command-center-prototype")
+      return {
+        ...definition,
+        production: { unitDefinitionIds: ["arc-trooper"] },
+      };
+    return definition;
+  });
+  const { simulation } = fixture(undefined, 1, false, content);
+  try {
+    const producer = simulation.actors.find(
+      ({ definitionId }) => definitionId === "arc-command-center-prototype",
+    )!;
+    expect(
+      command(simulation, {
+        kind: "train-unit",
+        actorId: "free-trooper",
+        definitionId: "arc-trooper",
+        producerId: producer.id,
+      }),
+    ).toMatchObject({ accepted: false, reason: "insufficient-resources" });
+    expect(() => simulation.tick()).not.toThrow();
+    expect(simulation.economy!.production).toEqual([]);
+  } finally {
+    simulation.dispose();
+  }
 });
 
 test.each([
@@ -430,7 +491,7 @@ describe("Materials economy", () => {
       { completedTicks: -1 },
       { completedTicks: 8 },
       { totalTicks: 9 },
-      { paidMaterials: 99 },
+      { paidCost: 99 },
     ]) {
       const saved = simulation.snapshot();
       Object.assign(
@@ -1050,4 +1111,24 @@ test("paid production uses the current rally point when it completes", () => {
   });
   until(restored, () => !restored.actorById("worker")!.movement);
   expect(restored.actorById("worker")!.worldPosition).toEqual(target);
+});
+
+test("gifts must name one positive resource available in their mission", () => {
+  for (const reward of [
+    { materials: 25, lifebloom: 25 },
+    { lifebloom: 25 },
+    { materials: 0 },
+  ]) {
+    const state = exploredScenarioState(scenario, definitions);
+    state.economy!.loot = [
+      {
+        id: "bad-gift",
+        name: "Gift",
+        tile: { x: 20, z: 10 },
+        collected: false,
+        ...reward,
+      },
+    ] as NonNullable<typeof state.economy>["loot"];
+    expect(() => fixture(state)).toThrow("invalid economy state");
+  }
 });

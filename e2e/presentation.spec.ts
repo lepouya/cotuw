@@ -59,7 +59,7 @@ async function openPresentation(
         );
         // The second of three stages cuts the building at half height.
         actor("blueprint").construction = {
-          paidMaterials: barracks.materialsCost!,
+          paidCost: barracks.materialsCost!,
           completedTicks: Math.round(totalTicks / 2),
           totalTicks,
         };

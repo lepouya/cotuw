@@ -20,9 +20,10 @@ experience.
 ## Play
 
 Open the supplied link at its root, without a `?level=` parameter. Choose
-**New mission** and try to complete the mission using only the game and its
-in-game guidance. Play at your own pace. The organizer should not give a
-walkthrough unless you ask for help or cannot continue.
+**New mission**, then **Anomaly Response Command**, and try to complete the
+mission using only the game and its in-game guidance. Play at your own pace.
+The organizer should not give a walkthrough unless you ask for help or cannot
+continue.
 
 Tell the observer what you are trying to do and what seems unclear. If you
 need help, record when and why. If you stop, record what led you to stop.

@@ -16,6 +16,7 @@ import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 
 export type ContextActionKind =
+  | "tend"
   | "attack"
   | "select"
   | "add"
@@ -73,6 +74,7 @@ export function contextActionKinds(
 }
 
 const CONTEXT_LABELS: Record<ContextActionKind, string> = {
+  tend: "Tend",
   attack: "Attack",
   select: "Select",
   add: "Add to group",
@@ -107,6 +109,8 @@ export type CommandInputOptions = {
     clientY: number,
     actions: readonly ContextAction[],
   ) => void;
+  /** Submits a tend order for this unfinished growth, when one is possible. */
+  tend?: (actorId: string) => (() => void) | undefined;
   /** Whether clicking this actor attacks it instead of selecting it. */
   canAttack?: (actorId: string) => boolean;
   /** Offers Focus on actors in the radial menu. */
@@ -170,6 +174,7 @@ export function createCommandInput(
     canSelect = () => true,
     canCommand = () => true,
     canAttack = () => false,
+    tend,
     groundTargetMode = () => false,
     onGroundTarget,
     cancelGroundTarget,
@@ -314,6 +319,11 @@ export function createCommandInput(
         canCommand: canCommand(),
       },
     );
+    const tendAction =
+      picked && !additive && !boxMode && canCommand()
+        ? tend?.(picked)
+        : undefined;
+    if (tendAction) kinds.unshift("tend");
     // Camera actions follow the commands, so they are never the default.
     if (picked && !additive && focusActor) {
       kinds.push("focus");
@@ -332,6 +342,9 @@ export function createCommandInput(
       submitCommand(moveCommand(kind, actorIds, target!, queued));
     };
     const runs: Record<ContextActionKind, () => void> = {
+      tend: () => {
+        if (canCommand()) tendAction?.();
+      },
       attack: () => {
         if (!canCommand() || !canAttack(picked!)) return;
         for (const actorId of currentMovers())

@@ -14,6 +14,13 @@ test.each([
   { kind: "group-move", actorIds: Array(1), target: { x: 0, z: 0 } },
   { kind: "terrain", heights: Array(1) },
   { kind: "terrain", tiles: Array(1) },
+  {
+    kind: "place-actor",
+    actorId: "growth",
+    definitionId: "circle-conservatory",
+    origin: { x: 0, z: 0 },
+    workerIds: Array(1),
+  },
 ])("commands with sparse arrays cannot be saved: %j", (command) => {
   expect(isMissionCommand(command)).toBe(false);
 });

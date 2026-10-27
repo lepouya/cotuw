@@ -7,6 +7,21 @@ export const SOUND_ASSETS = {
   "rifle-1": { seconds: 0.65, label: "Trooper rifle · variant 1" },
   "rifle-2": { seconds: 0.65, label: "Trooper rifle · variant 2" },
   "rifle-3": { seconds: 0.65, label: "Trooper rifle · variant 3" },
+  "circle-cast-1": { seconds: 0.8, label: "Living focus · variant 1" },
+  "circle-cast-2": { seconds: 0.8, label: "Living focus · variant 2" },
+  "circle-cultivation": {
+    seconds: 8,
+    label: "Lifebloom cultivation",
+    loop: true,
+    peak: 0.22,
+  },
+  "circle-growth": {
+    seconds: 4,
+    label: "Living construction",
+    loop: true,
+    peak: 0.3,
+  },
+  "living-hit": { seconds: 0.5, label: "Living impact" },
   "wolf-attack": { seconds: 0.75, label: "Wolf attack" },
   "damage-1": { seconds: 0.45, label: "Damage · variant 1" },
   "damage-2": { seconds: 0.45, label: "Damage · variant 2" },
@@ -46,17 +61,35 @@ export function soundPeak(id: SoundId): number {
 
 export const MUSIC_ASSETS = {
   "unquiet-frontier": {
+    arrangement: "synth",
     seconds: 48,
     label: "Unquiet Frontier",
     tension: false,
     description: "Exploration: warm pads, glass notes, and a sparse low pulse.",
   },
   "beneath-the-ridge": {
+    arrangement: "synth",
     seconds: 48,
     label: "Beneath the Ridge",
     tension: true,
     description:
       "Tension: darker pads, a muted sequence, and restrained drums.",
+  },
+  "circle-frontier": {
+    arrangement: "organic",
+    seconds: 48,
+    label: "Unquiet Frontier · Circle",
+    tension: false,
+    description:
+      "Exploration: plucked strings, breathy woodwinds, and soft wooden percussion.",
+  },
+  "circle-ridge": {
+    arrangement: "organic",
+    seconds: 48,
+    label: "Beneath the Ridge · Circle",
+    tension: true,
+    description:
+      "Tension: interwoven strings, airy reeds, and a stronger wood-and-skin pulse.",
   },
 } as const;
 

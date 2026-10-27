@@ -131,12 +131,14 @@ test(
         "wolf",
         "alpha-wolf",
         "arc-harvester",
+        "circle-sentinel",
+        "circle-wayfinder",
       ].entries()) {
         const model = pack.presentation[id]!.model!;
         if (!("glb" in model)) throw new Error("Expected a generated model");
         const appearance = await loadSkinnedActorAppearance(scene, model.glb);
         const actor = appearance.instantiate(id, 0);
-        actor.root.position.set(-6 + index * 3, 0, 2);
+        actor.root.position.set(-9 + index * 3, 0, 2);
         actor.setAnimationState?.({ working: true });
         actor.animate?.({ seconds: 0.1, distance: 0.15, turn: 0 });
         actor.play?.("attack");

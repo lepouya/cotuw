@@ -8,36 +8,105 @@ import type { Page } from "@playwright/test";
 
 const time = (page: Page) => page.locator("#mission-time");
 
+for (const { faction, guide, prompt } of [
+  {
+    faction: "arc",
+    guide: "Welcome, Commander",
+    prompt: "place a Materials Refinery",
+  },
+  { faction: "circle", guide: "Welcome, Guide", prompt: "train a Cultivator" },
+] as const) {
+  test(
+    `${faction}: the opening guide pauses, saves, and restarts with shared time controls`,
+    { tag: [QUICK, WEBKIT] },
+    async ({ page }) => {
+      const mission = new MissionDriver(page, false, false);
+      await mission.opening(false, faction);
+      await expect(page.locator("#explanation-title")).toHaveText(guide);
+      await expect(page.locator("#explanation-text")).toContainText(prompt);
+      await mission.advance(15);
+      await expect(time(page)).toHaveText("0:00");
+      await mission.explanation(guide);
+      await mission.advance(1);
+      await expect(time(page)).toHaveText("0:01");
+      await mission.press('[data-speed="4"]');
+      await mission.advance(10);
+      await expect(time(page)).toHaveText("0:41");
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#game-menu-title")).toHaveText("Paused");
+      await mission.advance(10);
+      await expect(time(page)).toHaveText("0:41");
+      await page.keyboard.press("Escape");
+      await expect(page.locator('[data-speed="4"]')).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await page.keyboard.press("F5");
+      await expect(page.locator("#notifications")).toContainText(
+        "Quick save complete",
+      );
+      await page.keyboard.press("F9");
+      await expect(page.locator("#game-menu-title")).toHaveText(
+        "Mission loaded",
+      );
+      await expect(page.locator('[data-speed="1"]')).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await mission.press("#inspect-loaded-mission");
+      await expect(page.locator("#explanation")).toBeHidden();
+      await mission.press("#open-menu");
+      await mission.press("#restart-mission");
+      await expect(page.locator("#explanation-title")).toHaveText(guide);
+    },
+  );
+}
+
 test(
-  "the opening guide pauses, survives saving, and repeats on restart",
-  { tag: [QUICK, WEBKIT] },
+  "Escape cancels placement and selection before opening the pause menu",
+  { tag: WEBKIT },
   async ({ page }) => {
     const mission = new MissionDriver(page, false, false);
-    await mission.opening(false);
-    await expect(page.locator("#explanation-title")).toHaveText(
-      "Welcome, Commander",
+    await mission.opening();
+    const canvas = page.locator("#game-canvas");
+    const menu = page.locator("#game-menu");
+    await mission.press("#tab-buildings");
+    await mission.press("#build-refinery");
+    await mission.explanation("Support Network");
+    await page.mouse.move(1, 1);
+    await canvas.focus();
+    await page.keyboard.press("Escape");
+    await expect(canvas).toHaveAttribute("data-placement-active", "false");
+    await expect(menu).toBeHidden();
+
+    await mission.ground(9, 51);
+    await expect(canvas).toHaveAttribute(
+      "data-selected-actors",
+      /starting-command-center/,
     );
-    await expect(page.locator("#explanation-text")).toContainText(
-      "lower sidebar",
-    );
-    await mission.advance(15);
-    await expect(time(page)).toHaveText("0:00");
-    await mission.explanation("Welcome, Commander");
+    await page.keyboard.press("Escape");
+    await expect(canvas).toHaveAttribute("data-selected-actors", "[]");
+    await expect(menu).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#game-menu-title")).toHaveText("Paused");
+    const frozen = await time(page).textContent();
+    await mission.advance(5);
+    await expect(time(page)).toHaveText(frozen!);
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
     await mission.advance(1);
-    await expect(time(page)).toHaveText("0:01");
-    await page.keyboard.press("F5");
-    await expect(page.locator("#notifications")).toContainText(
-      "Quick save complete",
-    );
-    await page.keyboard.press("F9");
-    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
-    await mission.press("#inspect-loaded-mission");
-    await expect(page.locator("#explanation")).toBeHidden();
-    await mission.press("#open-menu");
-    await mission.press("#restart-mission");
-    await expect(page.locator("#explanation-title")).toHaveText(
-      "Welcome, Commander",
-    );
+    await expect(time(page)).not.toHaveText(frozen!);
+
+    await mission.press("#pause-mission");
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeVisible();
+    await mission.press("#save-mission");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#save-form")).toBeHidden();
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(page.locator("#pause-mission")).toHaveText("▶ Paused");
   },
 );
 
@@ -102,14 +171,21 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   );
   await mission.advance(10);
   await expect(time(page)).toHaveText("0:30");
+  await mission.press('[data-speed="4"]');
+  await expect(page.locator('[data-speed="4"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await mission.advance(10);
+  await expect(time(page)).toHaveText("1:10");
   await mission.press('[data-speed="0.5"]');
   await mission.advance(10);
-  await expect(time(page)).toHaveText("0:35");
+  await expect(time(page)).toHaveText("1:15");
   await mission.press('[data-speed="1"]');
   await mission.press("#pause-mission");
   await expect(page.locator("#pause-mission")).toHaveText("▶ Paused");
   await mission.advance(10);
-  await expect(time(page)).toHaveText("0:35");
+  await expect(time(page)).toHaveText("1:15");
   await mission.press("#pause-mission");
   await expect(page.locator("#pause-mission")).toHaveText("⏸ Pause");
 
@@ -248,6 +324,7 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
         "#pause-mission",
         '[data-speed="0.5"]',
         '[data-speed="2"]',
+        '[data-speed="4"]',
         "#objective-summary",
         "#mission-time",
         "#alert-toggle",
@@ -263,12 +340,12 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
       await expect(page.locator("#resource-bar")).toHaveAccessibleName(
         "150 Materials",
       );
-      await mission.press('[data-speed="2"]');
+      await mission.press('[data-speed="4"]');
       await mission.advance(5);
-      await expect(time(page)).toHaveText("0:10");
+      await expect(time(page)).toHaveText("0:20");
       await mission.press("#pause-mission");
       await mission.advance(5);
-      await expect(time(page)).toHaveText("0:10");
+      await expect(time(page)).toHaveText("0:20");
       await mission.press("#pause-mission");
       await mission.press("#objective-summary");
       await expect(page.locator("#panel-goals")).toBeVisible();

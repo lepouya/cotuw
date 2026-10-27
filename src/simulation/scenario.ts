@@ -3,15 +3,16 @@ import { createMissionState } from "./mission";
 import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
 import { createFogState } from "./vision";
-import { createHarvesterState } from "./economy";
+import { enrollWorker } from "./economy";
 import { createTerritoryState } from "./territory";
 import { createObjectiveStates } from "./objectives";
 import type { MissionScenario } from "./mission-file";
 
+import type { CultivationState } from "./cultivation";
 import type { TerritoryAssignment } from "./territory";
 import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
-import type { EconomyState, MaterialsSite, MaterialsLoot } from "./economy";
+import type { EconomyState, MaterialsSite, ResourceLoot } from "./economy";
 import type { MissionState } from "./mission";
 import type { TerrainGridOptions, TerrainState } from "./terrain";
 import type { TileCoord } from "./grid";
@@ -33,10 +34,21 @@ export type ScenarioDefinition = MissionScenario & {
   readonly buildings: readonly ActorPlacement[];
   /** Territorial units default to their starting position as home. */
   readonly units?: readonly ScenarioUnit[];
-  readonly materials: number;
-  readonly sites: readonly MaterialsSite[];
-  readonly loot: readonly MaterialsLoot[];
-};
+} & (
+    | {
+        readonly materials: number;
+        /** Worker states derive from the scenario's units. */
+        readonly cultivation?: Pick<CultivationState, "lifebloom" | "sites">;
+        readonly sites: readonly MaterialsSite[];
+        readonly loot: readonly ResourceLoot[];
+      }
+    | {
+        readonly materials?: never;
+        readonly cultivation?: never;
+        readonly sites?: never;
+        readonly loot?: never;
+      }
+  );
 
 /** Copies and freezes authored content; each mission gets its own runtime. */
 export function defineScenario(
@@ -109,23 +121,35 @@ export function createScenarioState(
     return actor;
   });
   const actors = [...buildings, ...units];
-  const economy: EconomyState = {
-    materials: scenario.materials,
-    depositedMaterials: 0,
-    sites: structuredClone([...scenario.sites]),
-    loot: structuredClone([...scenario.loot]),
-    harvesters: units
-      .filter((actor) => definitionFor(actor.definitionId).harvesting)
-      .map((actor) => createHarvesterState(actor.id)),
-    production: [],
-  };
+  const economy: EconomyState | undefined =
+    scenario.materials === undefined
+      ? undefined
+      : {
+          materials: scenario.materials,
+          depositedMaterials: 0,
+          sites: structuredClone([...scenario.sites]),
+          loot: structuredClone([...scenario.loot]),
+          harvesters: [],
+          production: [],
+          ...(scenario.cultivation && {
+            cultivation: {
+              lifebloom: scenario.cultivation.lifebloom,
+              depositedLifebloom: 0,
+              sites: structuredClone([...scenario.cultivation.sites]),
+              workers: [],
+            },
+          }),
+        };
+  for (const actor of units)
+    if (economy)
+      enrollWorker(economy, actor.id, definitionFor(actor.definitionId));
   return {
     ...createMissionState(actors),
     objectives: createObjectiveStates(scenario.objectives ?? []),
     scenarioId: scenario.id,
     playerFaction: scenario.playerFaction,
     terrain: structuredClone(terrain),
-    economy,
+    ...(economy && { economy }),
     fog: createFogState(terrain.width, terrain.height),
   };
 }

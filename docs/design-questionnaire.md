@@ -2600,7 +2600,7 @@ damage application understandable.
 - Opening the menu does not pause multiplayer; the interface must clearly warn
   that the game continues.
 - The single-player top bar provides **Pause**, **half-speed**,
-  **normal-speed**, and **double-speed** controls.
+  **normal-speed**, **double-speed**, and **quadruple-speed** controls.
 - Pause is tactical. The player may pan the camera, inspect actors, change
   selections, place blueprints, manage production, and issue commands while
   simulation is stopped.
@@ -2828,17 +2828,19 @@ Selected M0 examples include:
   large enough for a Briar Ram; and a narrow, sturdy Thornspire with thorn
   plates around a violet focus. The Thornspire crown opens briefly to fire a
   heavy magical bolt.
-- Personnel remain recognizable elven figures in fitted clothing and grown
-  armor, with pale plates and curved equipment tying them to the architecture.
+- Personnel have slender elven proportions, pointed ears, exposed faces,
+  long tunics, flowing mantles, circlets, and grown leaf-shaped armor.
+  Pale plates and curved artifacts tie them to the architecture.
   Distinguish roles through clothing, equipment, and posture at gameplay scale:
-  broad, armored Sentinels; lightly equipped, compact Wayfinders; practical
-  Cultivators with carrying pods and tending tools; Healers with flowing
-  mantles and open-handed casting poses; and Artificers with work gear and
-  prominent tool harnesses for tending constructs.
+  broad leaf-armored Sentinels; hooded Wayfinders with slim wayfinding staves;
+  practical Cultivators with carrying pods and tending tools; Healers with
+  flowing mantles and open-handed casting poses; and Artificers with work gear
+  and prominent tool harnesses for tending constructs.
 - Sentinels carry a grown focus weapon in both hands: a compact, curved pale
-  wood frame around a violet core. A braced firing pose releases brief,
-  concentrated magical bolts, expressing advanced living technology and the
-  Sentinel's tough, shorter-range role.
+  wood frame around a violet core. A two-handed channeling pose releases
+  concentrated magical bolts with twisting strands and branching sparks,
+  expressing advanced living technology and the Sentinel's tough,
+  shorter-range role. Reduced motion holds the shape while the bolt fades.
 - The Briar Ram is a low, broad heavy quadruped on four thick root-like legs.
   Overlapping pale wood armor, dark flexible joints, and a partially sheltered
   violet core share the faction palette. Curved thorns frame a reinforced
@@ -2862,8 +2864,9 @@ Selected M0 examples include:
   reactions and fallen-body presentation.
 - Sound effects combine wooden impacts, leaf-like rustling, and clear musical
   tones. Orders and readiness use brief chimes; cultivation and growth use
-  soft rustling over a warm pulse. Sentinel fire has a sharp wooden crack and
-  short bright magical tail; Thornspire fire is deeper and heavier. Briar Ram
+  soft rustling over a warm pulse. Sentinel casting has a soft wooden onset,
+  rising harmonic bloom, and short magical tail; Thornspire fire is deeper
+  and heavier. Biological impacts use rustling and warm resonance. Briar Ram
   strikes use weighty wooden impacts and cracking fibers. Healing and repair
   use soft harmonic patterns distinct from weapons; destruction uses splitting
   wood and fading low resonance.

@@ -259,6 +259,13 @@ for (const mode of ["selection", "placement"] as const) {
       document.querySelector<HTMLDialogElement>("#game-menu")!.close(),
     );
     await canvas.focus();
+    // A hovered card owns Escape until its tooltip closes.
+    const bounds = (await canvas.boundingBox())!;
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    );
+    await expect(page.locator(".production-tooltip")).toBeHidden();
     if (mode === "placement") {
       await page.keyboard.press("r");
       await expect(canvas).toHaveAttribute("data-placement-rotation", "1");

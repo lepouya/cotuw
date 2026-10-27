@@ -100,6 +100,7 @@ export type ActorLifecycleCommand =
   PlaceActorCommand | RemoveActorCommand | TrainUnitCommand;
 
 export type EconomyCommand =
+  | { kind: "tend"; actorId: string; buildingId: string }
   | (Queueable & { kind: "gather"; actorId: string; siteId: string })
   | { kind: "assign-refinery"; actorId: string; refineryId: string }
   | { kind: "return-cargo"; actorId: string }
@@ -114,6 +115,7 @@ export type SellActorCommand = { kind: "sell-actor"; actorId: string };
 
 export const ECONOMY_COMMAND_KINDS = [
   "gather",
+  "tend",
   "assign-refinery",
   "return-cargo",
   "cancel-production",
@@ -131,6 +133,7 @@ export const QUEUEABLE_KINDS = [
 export const ACTOR_ORDER_KINDS = [
   ...QUEUEABLE_KINDS,
   "stop",
+  "tend",
   "assign-refinery",
   "return-cargo",
 ] as const;
@@ -229,6 +232,10 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
         isId(command.actorId) &&
         isId(command.definitionId) &&
         isTileCoord(command.origin) &&
+        (command.workerIds === undefined ||
+          (Array.isArray(command.workerIds) &&
+            command.workerIds.length > 0 &&
+            Array.from(command.workerIds).every(isId))) &&
         (command.quarterTurns === undefined ||
           Number.isInteger(command.quarterTurns))
       );
@@ -238,6 +245,8 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
         isId(command.producerId) &&
         isId(command.definitionId)
       );
+    case "tend":
+      return isId(command.actorId) && isId(command.buildingId);
     case "gather":
       return isId(command.actorId) && isId(command.siteId);
     case "assign-refinery":

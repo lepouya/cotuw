@@ -1,3 +1,4 @@
+import { BASE_CONTENT } from "./helpers/content";
 import { describe, expect, test } from "vitest";
 
 import { LEVEL_SOURCES } from "../src/content/levels";
@@ -152,13 +153,13 @@ describe("mission files", () => {
     const file = JSON.parse(LEVEL_SOURCES.get("sandbox")!);
     file.scenario.content.version = 0;
     expect(() => loadMission(JSON.stringify(file))).toThrow(
-      "content pack base version 0; this build has version 1",
+      `content pack base version 0; this build has version ${BASE_CONTENT.version}`,
     );
     file.scenario.content = { id: "missing", version: 1 };
     expect(() => loadMission(JSON.stringify(file))).toThrow(
       'no content pack named "missing"',
     );
-    file.scenario.content = { id: "base", version: 1 };
+    file.scenario.content = { id: "base", version: BASE_CONTENT.version };
     file.scenario.actors = ["arc-trooper", "dragon"];
     expect(() => loadMission(JSON.stringify(file))).toThrow(
       'has no actor named "dragon"',

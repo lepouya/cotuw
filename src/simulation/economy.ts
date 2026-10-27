@@ -1,10 +1,20 @@
-import { isTileCoord, tileKey } from "./grid";
 import {
-  adjacentTiles,
-  isTilePlacedActor,
-  occupiedTilesFor,
-} from "./placement";
-import { findNavigationPath } from "./navigation";
+  updateGrowth,
+  validateGrowth,
+  validateGrowthDefinitions,
+} from "./growth";
+import {
+  applyCultivationCommand,
+  createCultivatorState,
+  interruptCultivation,
+  updateCultivation,
+  validateCultivation,
+  validateCultivationDefinitions,
+} from "./cultivation";
+import type { CultivationState } from "./cultivation";
+import { isTileCoord, tileKey } from "./grid";
+import { isTilePlacedActor } from "./placement";
+import { advanceWorkerRoute, workerNavigation } from "./worker-navigation";
 import { disconnectedBuildings } from "./support";
 import { secondsToTicks } from "./clock";
 import { isCount, isId, isNonnegative, isPositive } from "./validation";
@@ -33,13 +43,15 @@ export type MaterialsSite = {
   initialMaterials: number;
   remainingMaterials: number;
 };
-export type MaterialsLoot = {
+export type ResourceLoot = {
   id: string;
   name: string;
   tile: TileCoord;
-  materials: number;
   collected: boolean;
-};
+} & (
+  | { materials: number; lifebloom?: never }
+  | { lifebloom: number; materials?: never }
+);
 export const HARVESTER_PHASES = [
   "idle",
   "travelling",
@@ -73,46 +85,234 @@ export function createHarvesterState(
     phase: refineryId === undefined ? "unassigned" : "idle",
   };
 }
+/** Adds the worker state a new actor's definition requires, if any. */
+export function enrollWorker(
+  economy: EconomyState,
+  actorId: string,
+  definition: ActorDefinition,
+  refineryId?: string,
+) {
+  if (definition.cultivation && !economy.cultivation)
+    throw new RangeError("Mission has no cultivation state for this worker.");
+  if (definition.harvesting)
+    economy.harvesters.push(createHarvesterState(actorId, refineryId));
+  if (definition.cultivation)
+    economy.cultivation!.workers.push(createCultivatorState(actorId));
+}
 export type ProductionJob = {
   actorId: string;
   producerId: string;
   definitionId: string;
-  paidMaterials: number;
+  paidCost: number;
   completedTicks: number;
   totalTicks: number;
   exitBlocked: boolean;
 };
 export type EconomyState = {
   materials: number;
+  cultivation?: CultivationState;
   depositedMaterials: number;
   sites: MaterialsSite[];
-  loot: MaterialsLoot[];
+  loot: ResourceLoot[];
   harvesters: HarvesterState[];
   production: ProductionJob[];
 };
 export type EconomyView = DeepReadonly<EconomyState>;
+export const economyWorkers = (economy: EconomyView | undefined) => [
+  ...(economy?.harvesters ?? []),
+  ...(economy?.cultivation?.workers ?? []),
+];
+export const economySites = (economy: EconomyView | undefined) => [
+  ...(economy?.sites ?? []),
+  ...(economy?.cultivation?.sites ?? []),
+];
+/** Sites that can still be gathered; renewable sites always can. */
+export const activeSites = (economy: EconomyView | undefined) => [
+  ...(economy?.sites ?? []).filter((site) => site.remainingMaterials > 0),
+  ...(economy?.cultivation?.sites ?? []),
+];
+
+/** Workers whose gathering capability accepts this site. */
+export function workersForSite(
+  economy: EconomyView | undefined,
+  siteId: string | undefined,
+) {
+  if (economy?.sites.some((site) => site.id === siteId))
+    return economy.harvesters;
+  if (economy?.cultivation?.sites.some((site) => site.id === siteId))
+    return economy.cultivation.workers;
+  return [];
+}
+/** Explicit actor orders stop automatic work while retaining onboard cargo. */
+export function interruptWorker(actor: Actor, economy?: EconomyState) {
+  interruptCultivation(actor, economy);
+  const worker = economy?.harvesters.find(
+    (worker) => worker.actorId === actor.id,
+  );
+  if (!worker) return;
+  worker.phase = worker.refineryId ? "idle" : "unassigned";
+  delete worker.targetSiteId;
+  delete worker.activeSiteId;
+  delete worker.retryNavigationVersion;
+}
+
+/** Automatic work owns the actor until it finishes or is explicitly replaced. */
+export function workerHasOrder(
+  economy: EconomyView | undefined,
+  actorId: string,
+) {
+  const cultivator = economy?.cultivation?.workers.find(
+    (worker) => worker.actorId === actorId,
+  );
+  if (cultivator)
+    return !!(
+      cultivator.siteId ||
+      cultivator.tendingId ||
+      cultivator.dropoffId ||
+      cultivator.phase === "returning" ||
+      cultivator.phase === "no-dropoff"
+    );
+  return !!economy?.harvesters.some(
+    (worker) =>
+      worker.actorId === actorId &&
+      ["travelling", "gathering", "returning"].includes(worker.phase),
+  );
+}
+export function workingWorkerIds(
+  economy: EconomyView | undefined,
+  actors: readonly ActorRenderState[],
+) {
+  const growth = new Set(
+    actors
+      .filter((actor) => actor.construction?.active)
+      .map((actor) => actor.id),
+  );
+  return new Set(
+    economyWorkers(economy)
+      .filter(
+        (worker) =>
+          worker.phase === "gathering" ||
+          ("tendingId" in worker &&
+            worker.tendingId &&
+            growth.has(worker.tendingId)),
+      )
+      .map((worker) => worker.actorId),
+  );
+}
+
 export type EconomyReason =
   | "invalid-harvester"
   | "missing-site"
   | "missing-refinery"
   | "refinery-occupied"
   | "empty-cargo"
-  | "missing-order";
+  | "missing-order"
+  | "invalid-cultivator"
+  | "invalid-growth"
+  | "tender-occupied";
 
 /** Outstanding paid orders one producer may hold. */
 export const PRODUCTION_QUEUE_LIMIT = 5;
+
+type ResourceRules = {
+  name: string;
+  /** The price field an actor definition uses for this resource. */
+  cost: (definition: ActorDefinition) => number | undefined;
+  /** Absent when this economy does not hold the resource. */
+  balance: (economy: EconomyView) => number | undefined;
+  change: (economy: EconomyState, amount: number) => void;
+};
+/** Common resources; each definition prices itself in at most one. */
+const RESOURCES = {
+  materials: {
+    name: "Materials",
+    cost: (definition) => definition.materialsCost,
+    balance: (economy) => economy.materials,
+    change: (economy, amount) => {
+      economy.materials += amount;
+    },
+  },
+  lifebloom: {
+    name: "Lifebloom",
+    cost: (definition) => definition.lifebloomCost,
+    balance: (economy) => economy.cultivation?.lifebloom,
+    change: (economy, amount) => {
+      if (!economy.cultivation)
+        throw new RangeError("Lifebloom economy is unavailable.");
+      economy.cultivation.lifebloom += amount;
+    },
+  },
+} satisfies Record<string, ResourceRules>;
+export type Resource = keyof typeof RESOURCES;
+export const RESOURCE_IDS = Object.keys(RESOURCES) as Resource[];
+export const lootResource = (loot: Readonly<ResourceLoot>): Resource =>
+  RESOURCE_IDS.find((id) => loot[id] !== undefined)!;
+export const lootAmount = (loot: Readonly<ResourceLoot>): number =>
+  loot[lootResource(loot)]!;
+export const costResource = (definition: ActorDefinition): Resource =>
+  RESOURCE_IDS.find((id) => RESOURCES[id].cost(definition) !== undefined) ??
+  "materials";
+export const costAmount = (definition: ActorDefinition) =>
+  RESOURCES[costResource(definition)].cost(definition) ?? 0;
+export const resourceName = (resource: Resource) => RESOURCES[resource].name;
+export const costCurrency = (definition: ActorDefinition) =>
+  resourceName(costResource(definition));
+/** A price as players read it, such as "50 Lifebloom". */
+export const costLabel = (definition: ActorDefinition) =>
+  `${costAmount(definition)} ${costCurrency(definition)}`;
+export function canAfford(economy: EconomyView, definition: ActorDefinition) {
+  const balance = RESOURCES[costResource(definition)].balance(economy);
+  return balance !== undefined && balance >= costAmount(definition);
+}
+/** Balances of the resources this economy holds. */
+export const resourceBalances = (
+  economy: EconomyView,
+): Partial<Record<Resource, number>> =>
+  Object.fromEntries(
+    RESOURCE_IDS.flatMap((id) => {
+      const balance = RESOURCES[id].balance(economy);
+      return balance === undefined ? [] : [[id, balance]];
+    }),
+  );
+/** The resource that prices a faction's roster; each faction uses one. */
+export function factionResource(
+  definitions: Iterable<ActorDefinition>,
+  faction: string | undefined,
+): Resource | undefined {
+  for (const definition of definitions)
+    if (definition.faction === faction && costAmount(definition) > 0)
+      return costResource(definition);
+  return undefined;
+}
+/** Pays a definition's price and returns the amount retained by its job. */
+export function chargeCost(
+  economy: EconomyState,
+  definition: ActorDefinition,
+): number {
+  const cost = costAmount(definition);
+  RESOURCES[costResource(definition)].change(economy, -cost);
+  return cost;
+}
+/** Returns an amount in the resource that prices `definition`. */
+export function refundCost(
+  economy: EconomyState,
+  definition: ActorDefinition,
+  amount: number,
+) {
+  RESOURCES[costResource(definition)].change(economy, amount);
+}
 
 export const materialsCost = (definition: ActorDefinition) =>
   definition.materialsCost ?? 0;
 
 /** Half the construction cost, scaled by remaining health and rounded down. */
-export function saleMaterialsRefund(
+export function saleRefund(
   actor: Pick<ActorRenderState, "health">,
   definition: ActorDefinition,
 ): number {
   const max = definition.health ?? 1;
   return Math.floor(
-    (materialsCost(definition) * healthOf(actor, max)) / (2 * max),
+    (costAmount(definition) * healthOf(actor, max)) / (2 * max),
   );
 }
 
@@ -120,9 +320,11 @@ export function validateEconomyDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,
 ): void {
   for (const definition of definitions.values()) {
+    const prices = RESOURCE_IDS.map((id) => RESOURCES[id].cost(definition));
+    const priced = prices.filter((cost) => cost !== undefined);
     if (
-      (definition.materialsCost !== undefined &&
-        !isCount(definition.materialsCost)) ||
+      priced.length > 1 ||
+      !priced.every(isCount) ||
       (definition.trainingSeconds !== undefined &&
         !isNonnegative(definition.trainingSeconds))
     )
@@ -162,6 +364,8 @@ export function validateEconomyDefinitions(
     )
       throw new RangeError(`Invalid refinery definition: ${definition.id}.`);
   }
+  validateCultivationDefinitions(definitions);
+  validateGrowthDefinitions(definitions);
 }
 
 /** Validates saved state before any terrain or occupancy is published. */
@@ -184,14 +388,15 @@ export function validateEconomyState(
     !Array.isArray(economy.sites) ||
     !Array.isArray(economy.loot) ||
     !Array.isArray(economy.harvesters) ||
-    !Array.isArray(economy.production)
+    !Array.isArray(economy.production) ||
+    (economy.cultivation && !Array.isArray(economy.cultivation.sites))
   )
     return invalid();
   const validTile = (tile: TileCoord) =>
     isTileCoord(tile) && map.containsTile(tile.x, tile.z);
   const ids = new Set<string>();
   const tiles = new Set<string>();
-  for (const site of [...economy.sites, ...economy.loot]) {
+  for (const site of [...economySites(economy), ...economy.loot]) {
     if (
       !site ||
       !isId(site.id) ||
@@ -215,12 +420,16 @@ export function validateEconomyState(
   }
   for (const loot of economy.loot) {
     if (
-      !isCount(loot.materials) ||
-      loot.materials === 0 ||
+      RESOURCE_IDS.filter((id) => loot[id] !== undefined).length !== 1 ||
+      !isCount(lootAmount(loot)) ||
+      lootAmount(loot) === 0 ||
+      RESOURCES[lootResource(loot)].balance(economy) === undefined ||
       typeof loot.collected !== "boolean"
     )
       return invalid();
   }
+  validateCultivation(economy, actors, definitions, tickSeconds);
+  validateGrowth(actors, definitions);
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const assigned = new Set<string>();
   const workers = new Set<string>();
@@ -281,7 +490,7 @@ export function validateEconomyState(
       !definitions
         .get(producer.definitionId)
         ?.production?.unitDefinitionIds.includes(unit.id) ||
-      job.paidMaterials !== materialsCost(unit) ||
+      job.paidCost !== costAmount(unit) ||
       !isCount(job.completedTicks) ||
       job.totalTicks !== secondsToTicks(unit.trainingSeconds, tickSeconds) ||
       job.completedTicks > job.totalTicks ||
@@ -368,10 +577,16 @@ export function applyEconomyCommand(
     );
     if (index < 0) return "missing-order";
     const [job] = economy.production.splice(index, 1);
-    economy.materials += job.paidMaterials;
+    refundCost(economy, definitions.get(job.definitionId)!, job.paidCost);
     retire(job.actorId);
     return;
   }
+  const candidate = actors.find((actor) => actor.id === command.actorId);
+  if (
+    command.kind === "tend" ||
+    (candidate && definitions.get(candidate.definitionId)?.cultivation)
+  )
+    return applyCultivationCommand(command, economy, actors, definitions);
   const worker = economy.harvesters.find(
     (worker) => worker.actorId === command.actorId,
   );
@@ -417,22 +632,39 @@ export function applyEconomyCommand(
 
 /**
  * Loss of a producer loses its paid orders, while onboard cargo survives.
- * Returns the Harvesters whose automated movement the loss interrupts.
+ * Returns workers whose automated movement the loss interrupts.
  */
 export function removeEconomyActor(
   economy: EconomyState,
   actorId: string,
   retire: (id: string) => void,
 ): string[] {
+  const interrupted: string[] = [];
   for (const job of economy.production)
     if (job.producerId === actorId) retire(job.actorId);
   economy.production = economy.production.filter(
     (job) => job.producerId !== actorId,
   );
+  if (economy.cultivation) {
+    economy.cultivation.workers = economy.cultivation.workers.filter(
+      (worker) => worker.actorId !== actorId,
+    );
+    for (const worker of economy.cultivation.workers) {
+      if (worker.tendingId === actorId) {
+        interrupted.push(worker.actorId);
+        delete worker.tendingId;
+        worker.phase = "idle";
+      }
+      if (worker.dropoffId === actorId) {
+        interrupted.push(worker.actorId);
+        delete worker.dropoffId;
+        worker.phase = "returning";
+      }
+    }
+  }
   economy.harvesters = economy.harvesters.filter(
     (worker) => worker.actorId !== actorId,
   );
-  const interrupted: string[] = [];
   for (const worker of economy.harvesters) {
     if (worker.refineryId !== actorId) continue;
     // Idle Harvesters keep manual movement.
@@ -448,21 +680,10 @@ export function updateEconomy(
   economy: EconomyState,
   world: EconomyWorld,
 ): void {
-  const { actors, definitions, map, tickSeconds, move } = world;
-  let disconnected = disconnectedBuildings(world.support());
-  // Paused blueprints yield the slot without losing their queue priority.
-  const building = actors.find(
-    (actor) => actor.construction && !disconnected.has(actor.id),
-  );
-  if (building?.construction) {
-    building.construction.completedTicks += 1;
-    if (
-      building.construction.completedTicks === building.construction.totalTicks
-    ) {
-      delete building.construction;
-      disconnected = disconnectedBuildings(world.support());
-    }
-  }
+  const { actors, definitions, map, tickSeconds } = world;
+  if (economy.cultivation) updateCultivation(economy.cultivation, world);
+  updateGrowth(economy, world);
+  const disconnected = disconnectedBuildings(world.support());
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const producers = [
     ...new Set(economy.production.map((job) => job.producerId)),
@@ -476,24 +697,13 @@ export function updateEconomy(
     job.exitBlocked = !result.accepted;
     if (!("actor" in result)) continue;
     economy.production.splice(economy.production.indexOf(job), 1);
-    if (definitions.get(job.definitionId)?.harvesting) {
-      economy.harvesters.push(createHarvesterState(job.actorId, id));
-    }
+    enrollWorker(economy, job.actorId, definitions.get(job.definitionId)!, id);
     world.spawn(result.actor, id);
     byId.set(result.actor.id, result.actor);
   }
   const near = (actor: Actor, point: WorldPosition) =>
     distance(actor.worldPosition, point) < map.tileSize * 0.3;
-  const reachable = (actor: Actor, target: WorldPosition) => {
-    const definition = definitions.get(actor.definitionId)!;
-    const grid = world.behaviors
-      .get(definition.behaviorId)
-      ?.navigationGrid?.(actor, definition);
-    return (
-      grid &&
-      findNavigationPath(grid, actor.worldPosition, target)?.reachedTarget
-    );
-  };
+  const { reachable, entrance } = workerNavigation(world);
   const block = (worker: HarvesterState) => {
     worker.phase = "blocked";
     worker.retryNavigationVersion = map.navigationChanges.version;
@@ -504,34 +714,13 @@ export function updateEconomy(
     worker: HarvesterState,
     target: WorldPosition,
   ) => {
-    if (near(actor, target)) {
-      delete actor.movement;
-      return true;
-    }
-    if (actor.movement) {
-      if (actor.movement.blocked) block(worker);
-    } else if (!reachable(actor, target) || !move(actor, target)) {
-      block(worker);
-    }
-    return false;
+    const result = advanceWorkerRoute(actor, target, world, map.tileSize * 0.3);
+    if (result === "blocked") block(worker);
+    return result === "arrived";
   };
-  /** The nearest reachable tile beside the Refinery. */
   const refineryExit = (actor: Actor, refineryId: string) => {
     const refinery = byId.get(refineryId);
-    if (!refinery || !isTilePlacedActor(refinery)) return undefined;
-    return adjacentTiles(
-      map,
-      occupiedTilesFor(refinery, definitions.get(refinery.definitionId)!),
-    )
-      .map((tile) => ({ tile, point: map.tileCenter(tile.x, tile.z) }))
-      .sort(
-        (a, b) =>
-          distance(actor.worldPosition, a.point) -
-            distance(actor.worldPosition, b.point) ||
-          a.tile.z - b.tile.z ||
-          a.tile.x - b.tile.x,
-      )
-      .find(({ point }) => reachable(actor, point))?.point;
+    return refinery && entrance(actor, refinery);
   };
   for (const worker of [...economy.harvesters].sort((a, b) =>
     compareIds(a.actorId, b.actorId),
@@ -647,6 +836,6 @@ export function updateEconomy(
     )
       continue;
     loot.collected = true;
-    economy.materials += loot.materials;
+    RESOURCES[lootResource(loot)].change(economy, lootAmount(loot));
   }
 }

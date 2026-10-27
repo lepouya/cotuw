@@ -118,13 +118,13 @@ function runUntil(
 }
 
 describe("combat", () => {
-  test("every unit and building has health; only Troopers and wolves are armed", () => {
+  test("every actor has health; combat infantry and wolves are armed", () => {
     expect(definitions.filter((definition) => !definition.health)).toEqual([]);
     expect(
       definitions
         .filter((definition) => definition.weapon)
         .map((definition) => definition.id),
-    ).toEqual(["arc-trooper", "wolf", "alpha-wolf"]);
+    ).toEqual(["circle-sentinel", "arc-trooper", "wolf", "alpha-wolf"]);
   });
 
   test("one idle Trooper engages and defeats a lone wolf deterministically", () => {
@@ -813,7 +813,7 @@ describe("combat edge cases", () => {
             actorId: "paid-scout",
             producerId: "barracks",
             definitionId: "arc-scout",
-            paidMaterials: 20,
+            paidCost: 20,
             completedTicks: 0,
             totalTicks: 30,
             exitBlocked: false,
@@ -1029,7 +1029,10 @@ describe("combat state validation and faction vision", () => {
       const { simulation } = fixture([], (state) => {
         state.playerFaction = "wildlife";
       });
-      expect(spy).toHaveBeenCalledTimes(2);
+      const factions = new Set(
+        definitions.map(({ faction }) => faction).filter(Boolean),
+      );
+      expect(spy).toHaveBeenCalledTimes(factions.size);
       simulation.dispose();
       expect(active).toBe(0);
     } finally {

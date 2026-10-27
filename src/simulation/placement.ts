@@ -23,8 +23,11 @@ export const PLACEMENT_REASONS = [
   "excessive-slope",
   "actor-conflict",
   "occupancy-conflict",
-  "insufficient-materials",
+  "insufficient-resources",
   "resource-site",
+  "missing-worker",
+  "unreachable-growth",
+  "missing-headquarters",
   "outside-support",
   "unexplored",
   "debris",
@@ -39,6 +42,8 @@ export type PlacementEvaluation =
       footprint: FootprintPlacement;
       /** The actor state the placement implies. */
       actor: Actor;
+      /** Selected worker that will tend a growth placement. */
+      workerId?: string;
     }
   | { accepted: false; reason: PlacementReason; tiles: TileCoord[] };
 
@@ -49,6 +54,8 @@ export type ActorPlacement = {
   origin: TileCoord;
   /** Clockwise quarter turns around the origin; defaults to 0. */
   quarterTurns?: number;
+  /** Candidate workers chosen by the player; nearest reachable one tends. */
+  workerIds?: string[];
 };
 
 type TilePlacement = NonNullable<Actor["tilePlacement"]>;

@@ -36,6 +36,8 @@ export type AudioBindings = {
   loops?: Readonly<Record<string, string | null>>;
 };
 
+export type MusicArrangement = { default: string; combat?: string };
+
 export type AudioContent = {
   clips: Readonly<Record<string, AudioClip>>;
   cues: Readonly<Record<string, AudioCue>>;
@@ -43,8 +45,21 @@ export type AudioContent = {
   events: NonNullable<AudioBindings["events"]>;
   /** Object bindings that apply where a definition names no override. */
   defaults?: AudioBindings;
-  music?: { default: string; combat?: string; holdSeconds: number };
+  music?: MusicArrangement & {
+    holdSeconds: number;
+    factions?: Readonly<Record<string, MusicArrangement>>;
+  };
 };
+
+export function musicForFaction(
+  audio: AudioContent | undefined,
+  faction?: string,
+): MusicArrangement | undefined {
+  const music = audio?.music;
+  return faction && music?.factions && hasOwn(music.factions, faction)
+    ? music.factions[faction]
+    : music;
+}
 
 type Invalid = (problem: string) => Error;
 
@@ -101,17 +116,25 @@ export function validateAudioContent(
   if (audio.defaults !== undefined)
     validateAudioBindings(audio.defaults, audio, invalid, "defaults");
   const music = audio.music;
+  const validArrangement = (value: unknown) =>
+    isRecord(value) &&
+    [value.default, value.combat ?? value.default].every(
+      (id) =>
+        isId(id) &&
+        hasOwn(audio.cues, id) &&
+        cueLoops(audio, id) &&
+        audio.cues[id]!.range === undefined,
+    );
   if (
     music !== undefined &&
     (!isRecord(music) ||
       !isNonnegative(music.holdSeconds) ||
-      [music.default, music.combat ?? music.default].some(
-        (id) =>
-          !isId(id) ||
-          !hasOwn(audio.cues, id) ||
-          !cueLoops(audio, id) ||
-          audio.cues[id]!.range !== undefined,
-      ))
+      !validArrangement(music) ||
+      (music.factions !== undefined &&
+        (!isRecord(music.factions) ||
+          Object.entries(music.factions).some(
+            ([id, arrangement]) => !isId(id) || !validArrangement(arrangement),
+          ))))
   )
     throw invalid("needs looping audio cues without range for music");
 }

@@ -14,7 +14,11 @@ import { createLifetime } from "../lifetime";
 import { isRgb } from "../content/presentation";
 import { createFootprintOverlay } from "./footprint-overlay";
 import { createScreenBar } from "./screen-bar";
-import { constructionStage, stageBlueprint } from "./construction-stage";
+import {
+  constructionStage,
+  stageBlueprint,
+  stageGrowth,
+} from "./construction-stage";
 import { createMaterialCopies } from "./material-copies";
 import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
 
@@ -330,22 +334,22 @@ export function createTilePlacedActorViewRegistry(
         const foundationMeshes = new Set(
           foundations.flatMap(({ root }) => hierarchyMeshes(root)),
         );
-        const scaffold = stageBlueprint(
-          {
-            root,
-            parts: root
-              .getChildMeshes()
-              .filter((mesh) => !foundationMeshes.has(mesh)),
-            tiles,
-            roof,
-            top,
-          },
-          constructionStage(actor.construction!),
-          map,
-          materials,
-          appearance?.scaffold,
-        );
-        if (scaffold) lifetime.own(scaffold);
+        const parts = root
+          .getChildMeshes()
+          .filter((mesh) => !foundationMeshes.has(mesh));
+        const stage = constructionStage(actor.construction!);
+        // Living buildings grow in layers; others rise inside scaffolding.
+        if (definition.growth) stageGrowth(parts, stage);
+        else {
+          const scaffold = stageBlueprint(
+            { root, parts, tiles, roof, top },
+            stage,
+            map,
+            materials,
+            appearance?.scaffold,
+          );
+          if (scaffold) lifetime.own(scaffold);
+        }
       }
       if (disconnected)
         materials.edit(root.getChildMeshes(), "offline", (dimmed) => {
@@ -378,7 +382,11 @@ export function createTilePlacedActorViewRegistry(
         badge.isPickable = false;
       }
       let progress:
-        | { bar: ReturnType<typeof createScreenBar>; fill: StandardMaterial }
+        | {
+            bar: ReturnType<typeof createScreenBar>;
+            fill: StandardMaterial;
+            paused: StandardMaterial;
+          }
         | undefined;
       if (constructing) {
         const bar = createScreenBar(scene, `${root.name}-construction`, {
@@ -395,25 +403,39 @@ export function createTilePlacedActorViewRegistry(
           worldPosition.z,
         );
         const fill = shared("construction-fill", (material) => {
-          material.emissiveColor = new Color3(1, 0.78, 0.24);
+          material.emissiveColor = definition.growth
+            ? new Color3(0.7, 0.4, 0.95)
+            : new Color3(1, 0.78, 0.24);
           material.disableLighting = true;
         });
-        progress = { bar, fill };
+        const paused = shared("construction-paused", (material) => {
+          material.emissiveColor = new Color3(0.48, 0.48, 0.48);
+          material.disableLighting = true;
+        });
+        progress = { bar, fill, paused };
       }
       const active = !constructing && !disconnected;
+      let growing = actor.construction?.active === true;
       if (!active) playing.delete(actor.id);
       return {
         root,
         top,
         update: ({ construction }: TilePlacedActorState) => {
+          growing = construction?.active === true;
           if (!progress || !construction) return;
           progress.bar.setFill(
             construction.completedTicks / construction.totalTicks,
-            progress.fill,
+            definition.growth && !construction.active
+              ? progress.paused
+              : progress.fill,
           );
         },
         animate: (seconds: number, frameSeconds: number) => {
-          details?.update(active ? seconds : 0);
+          details?.update(
+            active || (definition.growth && growing && !reducedMotion())
+              ? seconds
+              : 0,
+          );
           const activity = playing.get(actor.id);
           if (!activity) return;
           const motion = details?.activities?.[activity.kind];

@@ -7,7 +7,7 @@ bundled packs through the same parser future mod packs will use.
 ## Files
 
 - [`src/content/packs/base.json`](../src/content/packs/base.json) holds the
-  Anomaly Response Command roster and wildlife.
+  Anomaly Response Command roster, Circle cultivation roster, and wildlife.
 - [`src/content/packs.ts`](../src/content/packs.ts) lists the bundled packs.
 - Change `version` whenever a change would alter how an existing save plays.
   Saves made against another version then fail to load with a clear message
@@ -25,6 +25,14 @@ bundled packs through the same parser future mod packs will use.
   footprints, costs, and timings. The simulation validates the ones a mission
   uses when it loads. Actor IDs must be unique, and every actor needs its
   name, description, and the model or building geometry its rules require.
+- `materialsCost` and `lifebloomCost` are mutually exclusive common-resource
+  prices. Paid jobs retain the amount; their definition selects the balance.
+  `cultivation: { capacity, rate }` identifies a mobile Cultivator; a completed
+  building with `cultivationDropoff: true` receives its cargo. `growth` names
+  the worker and headquarters definitions for tended construction, and
+  `infrastructure.slots` supplies capacity per headquarters actor.
+- Optional `factionNames` maps simulation faction IDs to nonempty display
+  names for the sidebar heading. Unnamed factions use a generic heading.
 - `movementProfiles` prices each terrain type and slope for ground movement.
 - `presentation` maps actor IDs to what the player sees:
   - `name`, `description`, and optional `build` or `train` button labels.
@@ -32,9 +40,13 @@ bundled packs through the same parser future mod packs will use.
     order; omitted values use zero, and ties retain actor definition order.
     Build actions require a footprint; train actions require movement and no
     footprint. Construction ordering does not reorder unit cards.
-  - `attackEffect` is `"tracer"` or `"bite"`.
-  - `damageEffect` is `"mechanical"` smoke and fire or `"biological"` drops,
-    shown once health falls to 60%; absent shows no damage effect.
+  - Optional `portrait` selects an original SVG production illustration from
+    `PORTRAIT_IDS` in `content/presentation.ts`. Circle actors bind distinct
+    portraits. Omitted portraits fall back to a generic gameplay-role icon.
+  - `attackEffect` is `"tracer"`, `"bolt"` (violet Circle focus fire), or
+    `"bite"`.
+  - `damageEffect` is `"mechanical"` smoke and fire, `"biological"` drops, or
+    `"living"` falling leaves, shown at 60% health or below; absent shows none.
   - `regenerationEffect: true` shows the `regeneration` prop while a visible
     wolf is actively healing. Its idle clip freezes under reduced motion.
   - `model` is a GLB with clips under `glb`, or a built-in procedural model
@@ -61,8 +73,9 @@ bundled packs through the same parser future mod packs will use.
   the schema, supported mission events, and extension points. Audio bindings
   are validated even on unused presentation entries.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
-  `materials-mound`, `salvage`, `tracer`, `bite`, `smoke`, `fire`, `wound`,
-  `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.
+  `materials-mound`, `cultivation-site`, `leaf`, `salvage`, `tracer`, `bolt`,
+  `bite`, `smoke`, `fire`, `wound`, `regeneration`, and `bird` GLBs with `url`
+  and an optional `idle` clip.
 - `materialsStages` lists `{ above, scale }` in descending order. A remaining
   fraction strictly greater than `above` uses that scale. Cutoffs lie in
   `[0, 1)`, scales are positive and decrease, and the last cutoff is zero.

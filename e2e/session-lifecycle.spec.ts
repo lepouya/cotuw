@@ -33,6 +33,7 @@ for (const action of ["exit-mission", "restart-mission"]) {
       }),
     ).toBe(0);
     await page.locator("#new-mission").click();
+    await page.locator("#choose-arc").click();
     await expect(page.locator("#explanation-title")).toHaveText(
       "Welcome, Commander",
     );

@@ -14,7 +14,7 @@ a { color: #9fe1e5; display: inline-block; padding: 8px 0; }
 button { font: inherit; padding: 12px 20px; cursor: pointer; margin-bottom: 12px; }
 </style>
 <h1>Unquiet World · Audio audition</h1>
-<p>Atmospheric synths, sparse percussion, crisp gameplay cues.
+<p>ARC synths and Circle plucked strings, breathy woodwinds, and wooden percussion.
 Original synthesized audio. Music repeats every 48 seconds at 80 BPM.
 Play machinery and cues over either track to compare the mix.</p>
 <button type="button" id="stop">Stop all</button>
@@ -36,8 +36,44 @@ Play machinery and cues over either track to compare the mix.</p>
 <audio id="beneath-the-ridge" data-bus="music" controls preload="none" loop
   aria-label="Beneath the Ridge" src="/assets/audio/beneath-the-ridge.wav"></audio>
 <a href="/assets/audio/beneath-the-ridge.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Unquiet Frontier · Circle</h3>
+<p>Exploration: plucked strings, breathy woodwinds, and soft wooden percussion.</p>
+<button type="button" data-play="circle-frontier">Play Unquiet Frontier · Circle</button>
+<p>48 seconds · loop</p>
+<audio id="circle-frontier" data-bus="music" controls preload="none" loop
+  aria-label="Unquiet Frontier · Circle" src="/assets/audio/circle-frontier.wav"></audio>
+<a href="/assets/audio/circle-frontier.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Beneath the Ridge · Circle</h3>
+<p>Tension: interwoven strings, airy reeds, and a stronger wood-and-skin pulse.</p>
+<button type="button" data-play="circle-ridge">Play Beneath the Ridge · Circle</button>
+<p>48 seconds · loop</p>
+<audio id="circle-ridge" data-bus="music" controls preload="none" loop
+  aria-label="Beneath the Ridge · Circle" src="/assets/audio/circle-ridge.wav"></audio>
+<a href="/assets/audio/circle-ridge.wav" download>Download WAV</a>
 </article></section>
 <h2>Machinery loops</h2><section><article>
+<h3>Lifebloom cultivation</h3>
+
+<button type="button" data-play="circle-cultivation">Play Lifebloom cultivation</button>
+<p>8 seconds · loop</p>
+<audio id="circle-cultivation" data-bus="machine" controls preload="none" loop
+  aria-label="Lifebloom cultivation" src="/assets/audio/circle-cultivation.wav"></audio>
+<a href="/assets/audio/circle-cultivation.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Living construction</h3>
+
+<button type="button" data-play="circle-growth">Play Living construction</button>
+<p>4 seconds · loop</p>
+<audio id="circle-growth" data-bus="machine" controls preload="none" loop
+  aria-label="Living construction" src="/assets/audio/circle-growth.wav"></audio>
+<a href="/assets/audio/circle-growth.wav" download>Download WAV</a>
+</article>
+<article>
 <h3>Harvester drilling</h3>
 
 <button type="button" data-play="harvester-work">Play Harvester drilling</button>
@@ -60,7 +96,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="command-accepted">Play Command accepted</button>
 <p>0.25 seconds</p>
-<audio id="command-accepted" data-bus="cue" controls preload="none" 
+<audio id="command-accepted" data-bus="cue" controls preload="none"
   aria-label="Command accepted" src="/assets/audio/command-accepted.wav"></audio>
 <a href="/assets/audio/command-accepted.wav" download>Download WAV</a>
 </article>
@@ -69,7 +105,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="command-invalid">Play Invalid action</button>
 <p>0.38 seconds</p>
-<audio id="command-invalid" data-bus="cue" controls preload="none" 
+<audio id="command-invalid" data-bus="cue" controls preload="none"
   aria-label="Invalid action" src="/assets/audio/command-invalid.wav"></audio>
 <a href="/assets/audio/command-invalid.wav" download>Download WAV</a>
 </article>
@@ -78,7 +114,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="rifle-1">Play Trooper rifle · variant 1</button>
 <p>0.65 seconds</p>
-<audio id="rifle-1" data-bus="cue" controls preload="none" 
+<audio id="rifle-1" data-bus="cue" controls preload="none"
   aria-label="Trooper rifle · variant 1" src="/assets/audio/rifle-1.wav"></audio>
 <a href="/assets/audio/rifle-1.wav" download>Download WAV</a>
 </article>
@@ -87,7 +123,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="rifle-2">Play Trooper rifle · variant 2</button>
 <p>0.65 seconds</p>
-<audio id="rifle-2" data-bus="cue" controls preload="none" 
+<audio id="rifle-2" data-bus="cue" controls preload="none"
   aria-label="Trooper rifle · variant 2" src="/assets/audio/rifle-2.wav"></audio>
 <a href="/assets/audio/rifle-2.wav" download>Download WAV</a>
 </article>
@@ -96,16 +132,43 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="rifle-3">Play Trooper rifle · variant 3</button>
 <p>0.65 seconds</p>
-<audio id="rifle-3" data-bus="cue" controls preload="none" 
+<audio id="rifle-3" data-bus="cue" controls preload="none"
   aria-label="Trooper rifle · variant 3" src="/assets/audio/rifle-3.wav"></audio>
 <a href="/assets/audio/rifle-3.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Living focus · variant 1</h3>
+
+<button type="button" data-play="circle-cast-1">Play Living focus · variant 1</button>
+<p>0.8 seconds</p>
+<audio id="circle-cast-1" data-bus="cue" controls preload="none"
+  aria-label="Living focus · variant 1" src="/assets/audio/circle-cast-1.wav"></audio>
+<a href="/assets/audio/circle-cast-1.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Living focus · variant 2</h3>
+
+<button type="button" data-play="circle-cast-2">Play Living focus · variant 2</button>
+<p>0.8 seconds</p>
+<audio id="circle-cast-2" data-bus="cue" controls preload="none"
+  aria-label="Living focus · variant 2" src="/assets/audio/circle-cast-2.wav"></audio>
+<a href="/assets/audio/circle-cast-2.wav" download>Download WAV</a>
+</article>
+<article>
+<h3>Living impact</h3>
+
+<button type="button" data-play="living-hit">Play Living impact</button>
+<p>0.5 seconds</p>
+<audio id="living-hit" data-bus="cue" controls preload="none"
+  aria-label="Living impact" src="/assets/audio/living-hit.wav"></audio>
+<a href="/assets/audio/living-hit.wav" download>Download WAV</a>
 </article>
 <article>
 <h3>Wolf attack</h3>
 
 <button type="button" data-play="wolf-attack">Play Wolf attack</button>
 <p>0.75 seconds</p>
-<audio id="wolf-attack" data-bus="cue" controls preload="none" 
+<audio id="wolf-attack" data-bus="cue" controls preload="none"
   aria-label="Wolf attack" src="/assets/audio/wolf-attack.wav"></audio>
 <a href="/assets/audio/wolf-attack.wav" download>Download WAV</a>
 </article>
@@ -114,7 +177,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="damage-1">Play Damage · variant 1</button>
 <p>0.45 seconds</p>
-<audio id="damage-1" data-bus="cue" controls preload="none" 
+<audio id="damage-1" data-bus="cue" controls preload="none"
   aria-label="Damage · variant 1" src="/assets/audio/damage-1.wav"></audio>
 <a href="/assets/audio/damage-1.wav" download>Download WAV</a>
 </article>
@@ -123,7 +186,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="damage-2">Play Damage · variant 2</button>
 <p>0.45 seconds</p>
-<audio id="damage-2" data-bus="cue" controls preload="none" 
+<audio id="damage-2" data-bus="cue" controls preload="none"
   aria-label="Damage · variant 2" src="/assets/audio/damage-2.wav"></audio>
 <a href="/assets/audio/damage-2.wav" download>Download WAV</a>
 </article>
@@ -132,7 +195,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="alert">Play Player alert</button>
 <p>1.1 seconds</p>
-<audio id="alert" data-bus="cue" controls preload="none" 
+<audio id="alert" data-bus="cue" controls preload="none"
   aria-label="Player alert" src="/assets/audio/alert.wav"></audio>
 <a href="/assets/audio/alert.wav" download>Download WAV</a>
 </article>
@@ -141,7 +204,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="objective-complete">Play Objective complete</button>
 <p>2.4 seconds</p>
-<audio id="objective-complete" data-bus="cue" controls preload="none" 
+<audio id="objective-complete" data-bus="cue" controls preload="none"
   aria-label="Objective complete" src="/assets/audio/objective-complete.wav"></audio>
 <a href="/assets/audio/objective-complete.wav" download>Download WAV</a>
 </article>
@@ -150,7 +213,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="victory">Play Victory</button>
 <p>4.8 seconds</p>
-<audio id="victory" data-bus="cue" controls preload="none" 
+<audio id="victory" data-bus="cue" controls preload="none"
   aria-label="Victory" src="/assets/audio/victory.wav"></audio>
 <a href="/assets/audio/victory.wav" download>Download WAV</a>
 </article>
@@ -159,7 +222,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="defeat">Play Defeat</button>
 <p>4.8 seconds</p>
-<audio id="defeat" data-bus="cue" controls preload="none" 
+<audio id="defeat" data-bus="cue" controls preload="none"
   aria-label="Defeat" src="/assets/audio/defeat.wav"></audio>
 <a href="/assets/audio/defeat.wav" download>Download WAV</a>
 </article>
@@ -168,7 +231,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="training-start">Play Barracks training started</button>
 <p>0.9 seconds</p>
-<audio id="training-start" data-bus="cue" controls preload="none" 
+<audio id="training-start" data-bus="cue" controls preload="none"
   aria-label="Barracks training started" src="/assets/audio/training-start.wav"></audio>
 <a href="/assets/audio/training-start.wav" download>Download WAV</a>
 </article>
@@ -177,7 +240,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="unit-trained">Play Unit trained</button>
 <p>1.4 seconds</p>
-<audio id="unit-trained" data-bus="cue" controls preload="none" 
+<audio id="unit-trained" data-bus="cue" controls preload="none"
   aria-label="Unit trained" src="/assets/audio/unit-trained.wav"></audio>
 <a href="/assets/audio/unit-trained.wav" download>Download WAV</a>
 </article>
@@ -186,7 +249,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="refinery-door-open">Play Refinery garage opening</button>
 <p>0.8 seconds</p>
-<audio id="refinery-door-open" data-bus="cue" controls preload="none" 
+<audio id="refinery-door-open" data-bus="cue" controls preload="none"
   aria-label="Refinery garage opening" src="/assets/audio/refinery-door-open.wav"></audio>
 <a href="/assets/audio/refinery-door-open.wav" download>Download WAV</a>
 </article>
@@ -195,7 +258,7 @@ Play machinery and cues over either track to compare the mix.</p>
 
 <button type="button" data-play="refinery-door-close">Play Refinery garage closing</button>
 <p>0.8 seconds</p>
-<audio id="refinery-door-close" data-bus="cue" controls preload="none" 
+<audio id="refinery-door-close" data-bus="cue" controls preload="none"
   aria-label="Refinery garage closing" src="/assets/audio/refinery-door-close.wav"></audio>
 <a href="/assets/audio/refinery-door-close.wav" download>Download WAV</a>
 </article></section>

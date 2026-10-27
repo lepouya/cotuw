@@ -1,5 +1,9 @@
+import { expect } from "vitest";
 import { createScenarioState } from "../../src/simulation/scenario";
-import type { MissionState } from "../../src/simulation/mission";
+import type {
+  MissionSimulation,
+  MissionState,
+} from "../../src/simulation/mission";
 
 /** Starts fully explored, so fog does not limit placement in these tests. */
 export function exploredScenarioState(
@@ -10,4 +14,20 @@ export function exploredScenarioState(
     ...state,
     fog: { explored: "1".repeat(state.fog!.explored.length) },
   };
+}
+
+export function advanceSeconds(sim: MissionSimulation, seconds: number) {
+  for (let tick = 0; tick < Math.round(seconds / sim.tickSeconds); tick++)
+    sim.tick();
+}
+
+/** Ticks until `predicate` holds, failing after `seconds` of mission time. */
+export function untilSeconds(
+  sim: MissionSimulation,
+  predicate: () => boolean,
+  seconds = 300,
+) {
+  for (let tick = 0; tick < seconds / sim.tickSeconds && !predicate(); tick++)
+    sim.tick();
+  expect(predicate()).toBe(true);
 }

@@ -1,7 +1,7 @@
 import { NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
-import { INFANTRY_ROLES } from "../scripts/infantry-model";
+import { INFANTRY_IDS } from "../scripts/infantry-model";
 import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
@@ -40,14 +40,12 @@ function skinnedMesh(root: TransformNode): AbstractMesh {
 
 const glbModels = Object.entries(BASE_CONTENT.presentation).flatMap(
   ([id, { model }]) =>
-    INFANTRY_ROLES.some((role) => id === `arc-${role}`) &&
-    model &&
-    "glb" in model
+    INFANTRY_IDS.some((assetId) => id === assetId) && model && "glb" in model
       ? [[id, model.glb] as const]
       : [],
 );
 
-describe.each(glbModels)("%s model", (_id, graphics) => {
+describe.each(glbModels)("%s model", (id, graphics) => {
   test("gives each instance its own rig and clips", async () => {
     const { engine, scene, appearance } = await load(graphics);
     const first = appearance.instantiate("first", 0);
@@ -71,6 +69,7 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
         graphics.clips.death,
         graphics.clips.hit,
         graphics.clips.aim,
+        graphics.clips.work,
       ]
         .filter((name) => name !== undefined)
         .map((name) => `first-${name}`)
@@ -116,8 +115,9 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
     const left = lean(-0.05);
     const { max, min } = right.instance.root.getHierarchyBoundingVectors(true);
 
-    // The rifle reaches forward.
-    expect(max.z).toBeGreaterThan(-min.z);
+    // Armed actors present their weapon forward; cloaks can extend backward.
+    if (graphics.clips.attack) expect(max.z).toBeGreaterThan(-min.z);
+    if (id === "arc-scout") expect(max.z).toBeLessThan(0.5);
     expect(right.stride).toBeGreaterThan(0.1);
     expect(Math.abs(right.spine)).toBeGreaterThan(0.01);
     expect(Math.sign(left.spine)).toBe(-Math.sign(right.spine));
@@ -125,7 +125,7 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
   });
 
   test.runIf(graphics.clips.attack)(
-    "layers one recoil per shot over the idle pose",
+    "layers an attack over idle and returns to its resting pose",
     async () => {
       const { engine, scene, appearance } = await load(graphics);
       const instance = appearance.instantiate("shooter", 0);
@@ -145,7 +145,7 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
 
       instance.play!("attack");
       expect(step(6)).toBeLessThan(-0.02);
-      step(30);
+      step(60);
       expect(spine()).toBeCloseTo(0);
       engine.dispose();
     },
@@ -205,7 +205,7 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
   });
 
   test.runIf(graphics.clips.attack)(
-    "restarts recoil and cancels it when reduced motion changes",
+    "restarts attacks and cancels them when reduced motion changes",
     async () => {
       let reduced = false;
       const { engine, scene, appearance } = await load(graphics, {
@@ -220,11 +220,12 @@ describe.each(glbModels)("%s model", (_id, graphics) => {
       };
       step(0);
       instance.play!("attack");
-      step(0.05);
+      const sampleSeconds = graphics.clips.attack === "channel" ? 0.12 : 0.05;
+      step(sampleSeconds);
       const first = spine();
       expect(first).toBeLessThan(-0.02);
       instance.play!("attack");
-      step(0.05);
+      step(sampleSeconds);
       expect(spine()).toBeCloseTo(first);
       reduced = true;
       step(0.01);

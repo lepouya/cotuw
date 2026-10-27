@@ -1,3 +1,4 @@
+import { lootAmount } from "../src/simulation/economy";
 import { describe, expect, test } from "vitest";
 import {
   ECONOMY_ACTOR_DEFINITIONS,
@@ -349,7 +350,7 @@ describe("authored wolf encounters", () => {
     );
     expect(recovery).toHaveLength(2);
     const trooper = definitions.find(({ id }) => id === "arc-trooper")!;
-    expect(recovery.reduce((total, loot) => total + loot.materials, 0)).toBe(
+    expect(recovery.reduce((total, loot) => total + lootAmount(loot), 0)).toBe(
       2 * trooper.materialsCost!,
     );
     for (const loot of recovery) {

@@ -8,13 +8,25 @@ can be read, edited by hand, and loaded again.
 ## Files
 
 - [`src/content/levels/`](../src/content/levels/) holds the bundled levels:
-  `arc-economy-opening.json`, `sandbox.json`, and `skirmish-map.json`.
+  `arc-economy-opening.json`, `sandbox.json`, `skirmish-map.json`, and
+  `circle-wolf-den.json`.
 - `npm run levels` rebuilds them from
   [`scripts/levels/`](../scripts/levels/), replacing hand edits. Edit the
   scripts to keep a change, or edit the JSON for quick experiments.
 - Prettier skips the level directory; the game writes its own layout.
 - Free-construction previews share `scripts/levels/sandbox-level.ts`. Each
   can supply its own content reference and actor roster.
+- ARC and Circle introductions share `scripts/levels/wolf-den.ts` for terrain,
+  starting headquarters placement, wildlife, objectives, and crossing gifts.
+  Each opening supplies its economy, roster, guidance, and reward currency.
+  `base-content.ts` resolves actor definitions and prices for authored text;
+  neither introduction imports the other.
+- Fixed-force scenarios can omit the authoring fields `materials`, `sites`,
+  and `loot` together. `createScenarioState` then supplies fog and actor state
+  without an economy. The Circle level uses `materials: 0`, empty Materials
+  sites, Lifebloom gifts, and an authored `cultivation` with `lifebloom` and
+  `sites`. Worker states for harvesting and cultivating units derive from
+  their definitions, as they do for trained units.
 - `skirmish-map` is a development terrain preview with free construction and
   training. It has no economy, so its resource areas are not shown. The
   authoring inputs in `scripts/levels/skirmish-map.ts` define mirrored
@@ -58,6 +70,27 @@ can be read, edited by hand, and loaded again.
 - `state` holds the complete simulation state. `state.scenarioId` must match
   `scenario.id`. `state.dismissedPopups` lists the popup IDs the player
   dismissed; removing an ID shows that popup again.
+
+## Circle economy state
+
+- `state.economy.cultivation` owns Lifebloom, deposited Lifebloom, renewable
+  sites, and Cultivator states. Materials remain a separate balance.
+- Site reserves and regeneration use integer thousandths of a resource unit.
+  Sites save capacity, reserve, thresholds, regeneration remainder, and
+  dormancy. Workers save integer cargo, fractional collection and rate
+  remainders, site and delivery targets, the building they tend, and phase.
+  At most one worker tends each building.
+- Each `economy.loot` entry has exactly one positive `materials` or
+  `lifebloom` reward and a saved `collected` flag. The mission must hold that
+  resource. Pickups credit its stockpile once; they do not count as worker
+  deliveries. Materials and Lifebloom share the gift model and pickup rules.
+- Paid construction and production save `paidCost`; their actor definition
+  identifies its currency. Circle construction also saves `headquartersId`;
+  any construction saves whether it holds an active slot.
+  Growth layers derive from completed ticks and save no rendering state.
+- Placement commands can carry selected `workerIds`. Evaluation chooses the
+  nearest reachable eligible worker against the prospective footprint. A
+  `tend` command names one worker and its unfinished `buildingId`.
 
 ## Terrain and fog
 

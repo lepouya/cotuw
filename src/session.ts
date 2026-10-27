@@ -1,5 +1,14 @@
 // A playable session: the mission's simulation, its views, and its controls.
 // Every mission-specific rule and look comes from the mission's content pack.
+import {
+  economyWorkers,
+  activeSites,
+  economySites,
+  workersForSite,
+  factionResource,
+  resourceBalances,
+  workingWorkerIds,
+} from "./simulation/economy";
 import { createSessionSimulation, missionTerrain } from "./mission-loading";
 import type { LoadedMission } from "./mission-loading";
 import { createAttackMoveControls } from "./ui/attack-move-controls";
@@ -75,6 +84,7 @@ import { duePopup } from "./ui/popups";
 import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
+import { isTextEntry, worldInputAvailable } from "./render/input-focus";
 import type { ScenarioPopup } from "./simulation/mission-file";
 import type { WorldPosition } from "./simulation/world";
 import { createAudioScene } from "./audio/scene";
@@ -126,6 +136,7 @@ export type GameSessionControls = BuildingPlacementControls &
     mission: LoadedMission;
     audio?: AudioMixer;
     startPaused?: boolean;
+    onMenu?: () => void;
     onResult?: (result: MissionResult) => void;
     buildings?: readonly DefinitionButton[];
     economyRoot?: HTMLElement;
@@ -223,15 +234,11 @@ async function assembleGameSession(
   if (materialsView) own(materialsView);
   const explored = ({ x, z }: TileCoord) =>
     simulation.fog?.isExplored(x, z) ?? true;
-  /** An explored, unspent Materials site under a world point. */
+  /** An explored gathering site under a world point. */
   const siteAt = (point: WorldPosition) => {
     const { x, z } = map.tileAtWorldPosition(point.x, point.z);
-    return simulation.economy?.sites.find(
-      ({ tile, remainingMaterials }) =>
-        remainingMaterials > 0 &&
-        tile.x === x &&
-        tile.z === z &&
-        explored(tile),
+    return activeSites(simulation.economy).find(
+      (site) => site.tile.x === x && site.tile.z === z && explored(site.tile),
     );
   };
   const fogOverlay = createFogOverlay(
@@ -250,6 +257,8 @@ async function assembleGameSession(
   );
   const playerFaction = simulation.playerFaction;
   const player = createPlayerView(simulation, definitionsById);
+  const playerResource =
+    factionResource(definitions, simulation.playerFaction) ?? "materials";
   const startingActor = simulation.actors.find(player.owns);
   if (startingActor) {
     const { x, z } = startingActor.worldPosition;
@@ -283,7 +292,7 @@ async function assembleGameSession(
       case "attack-move":
         return order.target;
       case "gather": {
-        const site = simulation.economy?.sites.find(
+        const site = economySites(simulation.economy).find(
           ({ id }) => id === order.siteId,
         );
         return site && map.tileCenter(site.tile.x, site.tile.z);
@@ -295,8 +304,11 @@ async function assembleGameSession(
   own(queuedOrders);
   const healthBars = createHealthBarView(view.scene, map);
   own(healthBars);
-  const combatEffects = createCombatEffectsView(view.scene, map, (style) =>
-    propAssets.get(style),
+  const combatEffects = createCombatEffectsView(
+    view.scene,
+    map,
+    (style) => propAssets.get(style),
+    reducedMotion,
   );
   own(combatEffects);
   const damageEffects = createDamageEffectsView(
@@ -361,9 +373,12 @@ async function assembleGameSession(
   const audioScene = own(
     createAudioScene(
       content.audio,
-      content.presentation,
+      Object.fromEntries(
+        definitions.map(({ id }) => [id, presentationOf(id) ?? {}]),
+      ),
       controls.audio ?? SILENT_AUDIO,
       () => view.camera.focusPoint,
+      simulation.playerFaction,
     ),
   );
   /** World sounds play only while the mission runs; music continues. */
@@ -442,12 +457,9 @@ async function assembleGameSession(
       const economy = simulation.economy;
       if (economy?.loot.some((loot) => !loot.collected && at(loot.tile)))
         return "Collect";
-      const harvesters = new Set(
-        economy?.harvesters.map(({ actorId }) => actorId),
-      );
+      const workers = workersForSite(economy, siteAt(target)?.id);
       if (
-        input.selectedActorIds.some((id) => harvesters.has(id)) &&
-        siteAt(target)
+        workers.some(({ actorId }) => input.selectedActorIds.includes(actorId))
       )
         return "Gather";
       return undefined;
@@ -457,6 +469,21 @@ async function assembleGameSession(
     canFollow: (actorId) => followableIds([actorId]).length > 0,
     followActor: (actorId) => followActors([actorId]),
     cancelFocus: view.camera.cancelFocus,
+    tend: (buildingId) => {
+      if (!canCommand() || !player.ownActor(buildingId)) return undefined;
+      const workerId = simulation.tendWorker(
+        buildingId,
+        input.selectedActorIds.filter((id) => player.ownActor(id)),
+      );
+      return workerId
+        ? () =>
+            simulation.submitCommand({
+              kind: "tend",
+              actorId: workerId,
+              buildingId,
+            })
+        : undefined;
+    },
     canAttack: (actorId) => {
       if (!canCommand()) return false;
       const actor = player.shownActor(actorId);
@@ -469,10 +496,13 @@ async function assembleGameSession(
         (command.kind === "move" || command.kind === "group-move") &&
         economy
       ) {
+        const siteId = siteAt(command.target)?.id;
         for (const order of contextualMoveCommands(
           command,
-          new Set(economy.harvesters.map(({ actorId }) => actorId)),
-          siteAt(command.target)?.id,
+          new Set(
+            workersForSite(economy, siteId).map(({ actorId }) => actorId),
+          ),
+          siteId,
         ))
           simulation.submitCommand(order);
         return;
@@ -510,6 +540,14 @@ async function assembleGameSession(
     },
     // Structures first, so unit markers draw over them.
     actors: () => [
+      ...(simulation.economy?.cultivation?.sites
+        .filter((site) => explored(site.tile))
+        .map((site) => ({
+          id: `cultivation-${site.id}`,
+          worldPosition: map.tileCenter(site.tile.x, site.tile.z),
+          tiles: [site.tile],
+          color: [0.68, 0.4, 0.85] as Rgb,
+        })) ?? []),
       ...(simulation.economy?.sites
         .filter((site) => site.remainingMaterials > 0 && explored(site.tile))
         .map((site) => ({
@@ -573,7 +611,10 @@ async function assembleGameSession(
       paused: !playing,
       following: view.camera.following,
       canRemove,
-      materials: simulation.economy?.materials,
+      ...(simulation.economy && {
+        balances: resourceBalances(simulation.economy),
+        resource: playerResource,
+      }),
       objectives: simulation.objectives,
       result: simulation.result,
     });
@@ -615,8 +656,18 @@ async function assembleGameSession(
       wrecks: simulation.wrecks,
       support: simulation.support,
       objectives: simulation.objectives,
-      harvesterIds:
-        simulation.economy?.harvesters.map(({ actorId }) => actorId) ?? [],
+      workerIds: economyWorkers(simulation.economy).map(
+        ({ actorId }) => actorId,
+      ),
+      sites: (simulation.economy?.cultivation?.sites ?? [])
+        .filter((site) => explored(site.tile))
+        .map((site) => ({
+          id: site.id,
+          name: site.name,
+          dormant: site.dormant,
+          reopensAt: Math.round((site.recoverAt / site.capacity) * 100),
+          position: map.tileCenter(site.tile.x, site.tile.z),
+        })),
     });
   const placement = createBuildingPlacement(
     canvas,
@@ -641,16 +692,18 @@ async function assembleGameSession(
       controls,
       enabled: canCommand,
       pointerEnabled: () => !view.camera.primaryPanActive,
+      workerIds: () => input.selectedActorIds,
       onPlaced: (actorId) => {
         input.select(actorId);
         showActor(actorId);
       },
-      onStart: () => {
+      onStart: (definition) => {
         cancelGroundTargets();
         input.setBoxMode(false);
         input.setAdditiveMode(false);
         input.setQueueMode(false);
-        input.select(undefined);
+        // Selected workers are the candidates that will tend growth.
+        if (!definition.growth) input.select(undefined);
         raisePopup();
       },
       onInvalid: () => audioScene.emit("command.invalid"),
@@ -1003,11 +1056,7 @@ async function assembleGameSession(
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
     birds.update(frameSeconds);
-    const gathering = new Set(
-      simulation.economy?.harvesters
-        .filter((worker) => worker.phase === "gathering")
-        .map((worker) => worker.actorId),
-    );
+    const gathering = workingWorkerIds(simulation.economy, simulation.actors);
     actorViews.update(shownMobile, loop.tickProgress(), frameSeconds, (actor) =>
       animationStateOf(actor, gathering),
     );
@@ -1131,13 +1180,34 @@ async function assembleGameSession(
       updateWrecks(0);
     },
     onPropLoaded: (id, asset) => {
-      if (id === "materials-mound") materialsView?.setMound(asset);
+      if (id === "cultivation-site") materialsView?.setCultivation(asset);
+      else if (id === "materials-mound") materialsView?.setMound(asset);
       else if (id === "salvage") materialsView?.setSalvage(asset);
     },
     onModelsReady: () => {
       canvas.dataset.modelsReady = "true";
     },
   });
+  // World tools consume Escape before the menu fallback.
+  const menuKey = (event: KeyboardEvent) => {
+    if (
+      event.key !== "Escape" ||
+      event.defaultPrevented ||
+      event.repeat ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      isTextEntry(event.target) ||
+      !worldInputAvailable(canvas.ownerDocument)
+    )
+      return;
+    if (controls.onMenu) {
+      event.preventDefault();
+      controls.onMenu();
+    }
+  };
+  window.addEventListener("keydown", menuKey);
+  lifetime.defer(() => window.removeEventListener("keydown", menuKey));
   try {
     controls.onReady?.(session);
   } catch (error) {

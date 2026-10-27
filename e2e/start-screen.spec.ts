@@ -28,6 +28,9 @@ test("title controls work before the mission renderer loads", async ({
   await page.locator("#cancel-options").click();
   expect(rendererRequests).toBe(0);
   await page.locator("#new-mission").click();
+  await expect(page.locator("#choose-arc")).toBeFocused();
+  expect(rendererRequests).toBe(0);
+  await page.locator("#choose-arc").click();
   await expect(page.locator("#game-menu-status")).toContainText(
     "The mission could not start.",
   );
@@ -89,6 +92,21 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       expect(models).toEqual([]);
 
       await press("new-mission");
+      await expect(page.locator("#choose-arc")).toBeFocused();
+      await expect(page.locator("#choose-circle")).toContainText(
+        "Grow a living base",
+      );
+      await expect(page.locator("#choose-circle")).not.toContainText(
+        /development|pending/i,
+      );
+      await info.attach(`faction-choice-${profile.name}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+      await press("cancel-mission-setup");
+      await expect(page.locator("#new-mission")).toBeFocused();
+      await press("new-mission");
+      await press("choose-arc");
       await dismissExplanation(page, "Welcome, Commander", profile.touch);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-models-ready",
@@ -158,6 +176,7 @@ test(
     await page.locator("#open-menu").click();
     await page.locator("#exit-mission").click();
     await page.locator("#new-mission").click();
+    await page.locator("#choose-arc").click();
     await dismissExplanation(page, "Welcome, Commander");
     await expect(page.locator("#materials-counter")).toHaveText("150");
   },
@@ -187,5 +206,16 @@ test(
     await expect(page.locator("#new-mission")).toBeFocused();
     await expect(page.locator("#game-menu")).toBeVisible();
     await expect(page.locator(".game-shell")).toBeHidden();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#choose-arc")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#new-mission")).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press(tab);
+    await expect(page.locator("#choose-circle")).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#explanation-title")).toHaveText(
+      "Welcome, Guide",
+    );
   },
 );

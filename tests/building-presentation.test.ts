@@ -71,7 +71,7 @@ const leaf = (scene: Scene) =>
 
 test("construction progress divides into three equal stages", () => {
   const stage = (completedTicks: number) =>
-    constructionStage({ paidMaterials: 0, completedTicks, totalTicks: 90 });
+    constructionStage({ paidCost: 0, completedTicks, totalTicks: 90 });
   expect([0, 29, 30, 59, 60, 89].map(stage)).toEqual([0, 0, 1, 1, 2, 2]);
 });
 
@@ -86,7 +86,7 @@ test("blueprints rise through stages inside a scaffold that completion removes",
     const scaffold = () =>
       scene.getTransformNodeByName("tile-placed-actor-barracks-root-scaffold");
     const stage = (completedTicks: number) => {
-      actor.construction = { paidMaterials: 0, completedTicks, totalTicks: 90 };
+      actor.construction = { paidCost: 0, completedTicks, totalTicks: 90 };
       views.update([actor]);
       return scene.getMeshByName("tile-placed-actor-barracks-root-quarters")!;
     };
@@ -148,7 +148,7 @@ test("a unit exit opens the Barracks doors once, and a blueprint ignores it", ()
   const { engine, scene, views, actor } = setup();
   try {
     actor.construction = {
-      paidMaterials: 0,
+      paidCost: 0,
       completedTicks: 80,
       totalTicks: 90,
     };
@@ -345,3 +345,95 @@ test("activity clips may not key channels that idle keys", async () => {
     engine.dispose();
   }
 });
+
+test.each(["circle-heartgrove", "circle-conservatory", "circle-musterhall"])(
+  "%s reveals roots, ribs and canopy with paused growth feedback",
+  async (id) => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const map = new TerrainMap({ width: 12, height: 12, tileSize: 1 });
+    const definition = BASE_CONTENT.actors.find((actor) => actor.id === id)!;
+    const graphics = BASE_CONTENT.presentation[id]!.building!;
+    const model = await loadModelAsset(scene, {
+      ...graphics.glb!,
+      url: glbDataUrl(graphics.glb!.url),
+    });
+    const appearances = new Map([
+      [id, { ...graphics, createDetails: modelBuildingDetails(model) }],
+    ]);
+    const views = createTilePlacedActorViewRegistry(
+      scene,
+      map,
+      [definition],
+      appearances,
+    );
+    const actor = createTilePlacedActor(map, definition, {
+      actorId: "growing",
+      origin: { x: 3, z: 3 },
+    });
+    try {
+      for (const [ticks, ribs, canopy] of [
+        [0, false, false],
+        [30, true, false],
+        [60, true, true],
+      ] as const) {
+        actor.construction = {
+          paidCost: 100,
+          totalTicks: 90,
+          completedTicks: ticks,
+          active: true,
+        };
+        views.update([actor]);
+        const part = (layer: string) =>
+          scene.meshes.filter(
+            (mesh) =>
+              mesh.name.includes(`growth-${layer}`) &&
+              mesh.name.includes("growing"),
+          );
+        expect(
+          scene.meshes.filter(
+            (mesh) =>
+              mesh.name.includes("growing") && mesh.name.includes("growth-"),
+          ).length,
+        ).toBeLessThanOrEqual(8);
+        for (const layer of ["roots", "ribs", "canopy"])
+          expect(part(layer).length).toBeGreaterThan(0);
+        expect(part("roots").every((mesh) => mesh.isEnabled())).toBe(true);
+        expect(part("ribs").every((mesh) => mesh.isEnabled() === ribs)).toBe(
+          true,
+        );
+        expect(
+          part("canopy").every((mesh) => mesh.isEnabled() === canopy),
+        ).toBe(true);
+        expect(
+          scene.transformNodes.some(
+            (node) =>
+              node.name.includes("growing") && node.name.endsWith("-scaffold"),
+          ),
+        ).toBe(false);
+      }
+      actor.construction!.active = false;
+      views.update([actor]);
+      views.animate(0.5, 0.1);
+      const paused = scene.materials.find((material) =>
+        material.name.endsWith("construction-paused"),
+      ) as StandardMaterial;
+      expect(paused.emissiveColor.r).toBeCloseTo(paused.emissiveColor.b);
+      delete actor.construction;
+      views.update([actor]);
+      expect(
+        scene.meshes
+          .filter(
+            (mesh) =>
+              mesh.name.includes("growing") &&
+              mesh.name.includes("growth-canopy"),
+          )
+          .every((mesh) => mesh.isEnabled()),
+      ).toBe(true);
+    } finally {
+      views.dispose();
+      model.dispose();
+      engine.dispose();
+    }
+  },
+);

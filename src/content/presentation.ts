@@ -22,6 +22,22 @@ export const BUILTIN_BUILDING_DETAIL_IDS = [
 export type BuiltinBuildingDetailId =
   (typeof BUILTIN_BUILDING_DETAIL_IDS)[number];
 
+export const PORTRAIT_IDS = [
+  "refinery",
+  "headquarters",
+  "building",
+  "harvester",
+  "armed",
+  "unarmed",
+  "circle-cultivator",
+  "circle-sentinel",
+  "circle-wayfinder",
+  "circle-heartgrove",
+  "circle-conservatory",
+  "circle-musterhall",
+] as const;
+export type PortraitId = (typeof PORTRAIT_IDS)[number];
+
 export type Rgb = [number, number, number];
 
 export function isRgb(value: unknown): value is Rgb {
@@ -218,11 +234,15 @@ export function validateFrameEffects(
 }
 
 /** How an attacker's hits are drawn. */
-export const ATTACK_EFFECT_STYLES = ["tracer", "bite"] as const;
+export const ATTACK_EFFECT_STYLES = ["tracer", "bite", "bolt"] as const;
 export type AttackEffectStyle = (typeof ATTACK_EFFECT_STYLES)[number];
 
 /** How damage on an actor is drawn. */
-export const DAMAGE_EFFECT_STYLES = ["mechanical", "biological"] as const;
+export const DAMAGE_EFFECT_STYLES = [
+  "mechanical",
+  "biological",
+  "living",
+] as const;
 export type DamageEffectStyle = (typeof DAMAGE_EFFECT_STYLES)[number];
 
 /** A marker scale for remaining fractions strictly greater than `above`. */

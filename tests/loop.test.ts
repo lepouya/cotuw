@@ -152,7 +152,7 @@ describe("simulation loop", () => {
     },
   );
 
-  test.each([0.5, 2])(
+  test.each([0.5, 2, 4])(
     "speed %s preserves whole and fractional ticks owed before a rate change",
     (speed) => {
       let now = 0;

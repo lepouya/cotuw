@@ -4,8 +4,8 @@ import { forEachProfile, PROFILES } from "./profiles";
 import {
   activate,
   collectPageErrors,
-  dismissExplanation,
   openOpening,
+  startOpening,
   withoutApp,
 } from "./prototype-helpers";
 import { WEBKIT } from "./tags";
@@ -73,8 +73,7 @@ forEachProfile(PROFILES, (profile) => {
       ).toBe(true);
       await activate(page.locator("#restart-mission"), profile.touch);
       await page.reload();
-      await activate(page.locator("#new-mission"), profile.touch);
-      await dismissExplanation(page, "Welcome, Commander", profile.touch);
+      await startOpening(page, profile.touch);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-terrain-ready",
         "true",
@@ -96,6 +95,10 @@ test(
   "committed gameplay drives music, training, machinery, doors, and pause cleanup",
   { tag: WEBKIT },
   async ({ page }) => {
+    const requestedAudio = new Set<string>();
+    page.on("request", (request) => {
+      if (request.url().endsWith(".wav")) requestedAudio.add(request.url());
+    });
     await page.addInitScript(() => {
       window.audioStarts = [];
       window.audioDecoded = 0;
@@ -155,7 +158,12 @@ test(
         ),
       )
       .toBe(true);
-    await expect.poll(() => page.evaluate(() => window.audioDecoded)).toBe(20);
+    await expect
+      .poll(() => page.evaluate(() => window.audioDecoded))
+      .toBe(requestedAudio.size);
+    expect(
+      [...requestedAudio].some((url) => /circle-(frontier|ridge)/.test(url)),
+    ).toBe(false);
     await mission.press("#resume-mission");
     await mission.place("refinery", 12, 49, { placement: "Support Network" });
     await mission.press("#train-harvester");

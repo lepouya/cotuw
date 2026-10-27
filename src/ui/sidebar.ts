@@ -4,7 +4,9 @@ import {
   occupiedTilesFor,
 } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
-import { materialsCost } from "../simulation/economy";
+import { costAmount, costLabel, costResource } from "../simulation/economy";
+import { growthCandidates } from "../simulation/growth";
+import type { Resource } from "../simulation/economy";
 import { createPlayerAccess } from "../simulation/faction";
 import { createGoalList } from "./goals";
 import { createProductionCards } from "./production-card";
@@ -32,13 +34,16 @@ export type SidebarState = {
   /** Whether the camera follows actors. */
   following?: boolean;
   canRemove: boolean;
-  materials?: number;
+  /** Present when the mission has an economy. */
+  balances?: Partial<Record<Resource, number>>;
+  /** The player's spending resource, shown in the top bar. */
+  resource?: Resource;
   objectives?: readonly ObjectiveView[];
   result?: MissionResult;
 };
 
 const RESULT_DIRECTIVES: Record<MissionResult["kind"], string> = {
-  victory: "Victory secured. Continue building and exploring in free play.",
+  victory: "Victory secured. Continue exploring in free play.",
   defeat: "Mission failed. Restart or load a saved mission.",
 };
 
@@ -50,6 +55,7 @@ export type SidebarOptions = {
   selectActor: (id: string, additive?: boolean) => void;
   /** The player's faction; rosters list only its actors. */
   playerFaction?: string;
+  factionName?: string;
 };
 
 /** Tabs and actor lists present committed simulation state only. */
@@ -74,6 +80,7 @@ function buildSidebar(
   const signal = controller.signal;
   const element = <T extends HTMLElement>(id: string) =>
     root.querySelector<T>(`#${id}`)!;
+  setText(element("faction-label"), options.factionName ?? "Expedition");
   for (const id of ["building-options", "training-options", "unit-roster"])
     element(id).replaceChildren();
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
@@ -144,16 +151,15 @@ function buildSidebar(
   ) =>
     cards.create(element(container), action, definition, {
       name: nameFor(definition.id),
+      portrait: presentations.get(definition.id)?.portrait,
       details: [
         presentations.get(definition.id)?.description,
         details,
-        ...(options.economy
-          ? [`${materialsCost(definition)} Materials`, `${seconds}s`]
-          : []),
+        ...(options.economy ? [costLabel(definition), `${seconds}s`] : []),
       ]
         .filter(Boolean)
         .join(" · "),
-      cost: options.economy ? materialsCost(definition) : undefined,
+      cost: options.economy ? costLabel(definition) : undefined,
     });
   const buildings: ProductionCard[] = [];
   const train: ProductionCard[] = [];
@@ -192,6 +198,16 @@ function buildSidebar(
     (a, b) => buildOrder(a.definitionId) - buildOrder(b.definitionId),
   );
   element("building-options").append(...buildings.map(({ card }) => card));
+  setText(
+    element("construction-instructions"),
+    buildings.length
+      ? "Choose a structure to place."
+      : "This scenario has no construction.",
+  );
+  element("production-status").hidden = !definitions.some(
+    (definition) =>
+      friendly({ definitionId: definition.id }) && definition.production,
+  );
   const createActorList = (container: HTMLElement, emptyText: string) => {
     const buttons = new Map<string, HTMLButtonElement>();
     // Labels number each type separately and keep a unit's number for life.
@@ -308,7 +324,7 @@ function buildSidebar(
     },
     { signal },
   );
-  showTab("panel-buildings");
+  showTab(buildings.length ? "panel-buildings" : "panel-units");
   return {
     controls: {
       rallyRoot: root,
@@ -358,13 +374,25 @@ function buildSidebar(
         "build",
       );
       for (const action of buildings) {
-        const cost = materialsCost(definitionById.get(action.definitionId)!);
+        const definition = definitionById.get(action.definitionId)!;
+        const cost = costAmount(definition);
+        const balance = state.balances?.[costResource(definition)];
+        const workerSelected =
+          !definition.growth ||
+          growthCandidates(
+            definition,
+            state.selectedActorIds,
+            state.actors,
+            definitionById,
+          ).length > 0;
         setActionAvailability(
           action,
           blocker ||
-            (state.materials !== undefined && state.materials < cost
-              ? `Need ${cost} Materials; available ${state.materials}.`
-              : ""),
+            (!workerSelected
+              ? `Select a ${nameFor(definition.growth!.workerDefinitionId)} to tend construction.`
+              : balance !== undefined && balance < cost
+                ? `Need ${costLabel(definition)}; available ${balance}.`
+                : ""),
         );
       }
       const ids = state.selectedActorIds;

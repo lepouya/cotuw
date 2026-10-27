@@ -52,6 +52,14 @@ export type ActorDefinition = {
   /** World-space sight radius; terrain can still block the sightline. */
   vision?: { radius: number };
   materialsCost?: number;
+  lifebloomCost?: number;
+  /** Infrastructure capacity owned by this headquarters. */
+  infrastructure?: { slots: number };
+  /** Worker-led growth uses infrastructure without a support network. */
+  growth?: { workerDefinitionId: string; headquartersDefinitionId: string };
+  cultivation?: { capacity: number; rate: number };
+  /** Completed buildings that receive cultivated Lifebloom. */
+  cultivationDropoff?: boolean;
   trainingSeconds?: number;
   constructionSeconds?: number;
   refinery?: { harvesterDefinitionId: string };
@@ -101,7 +109,9 @@ export type Actor = {
   };
   /** Paid blueprint progress; absent once the building is operational. */
   construction?: {
-    paidMaterials: number;
+    paidCost: number;
+    headquartersId?: string;
+    active?: boolean;
     completedTicks: number;
     totalTicks: number;
   };
@@ -276,6 +286,16 @@ export function healthOf(actor: Pick<Actor, "health">, max: number): number {
 export function compareIds(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
+
+/** Orders actors nearest-first from a point, breaking ties by ID. */
+export const nearestTo =
+  (point: WorldPosition) =>
+  (
+    a: Pick<Actor, "id" | "worldPosition">,
+    b: Pick<Actor, "id" | "worldPosition">,
+  ) =>
+    distance(point, a.worldPosition) - distance(point, b.worldPosition) ||
+    compareIds(a.id, b.id);
 
 export type DeepReadonly<T> = T extends readonly (infer Item)[]
   ? readonly DeepReadonly<Item>[]

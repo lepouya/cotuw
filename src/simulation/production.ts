@@ -22,7 +22,7 @@ export type TrainingReason =
   | "missing-producer"
   | "unsupported-unit"
   | "exit-blocked"
-  | "insufficient-materials"
+  | "insufficient-resources"
   | "refinery-occupied"
   | "queue-full"
   | "under-construction"

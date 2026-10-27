@@ -24,7 +24,7 @@ const REASONS: Record<TrainingReason, string> = {
   "unsupported-unit": "This building cannot train these units.",
   "exit-blocked":
     "Exit blocked. Move units or clear ground beside the building.",
-  "insufficient-materials": "Not enough Materials for this unit.",
+  "insufficient-resources": "Not enough resources for this unit.",
   "refinery-occupied": "This Refinery already has a Harvester or a paid order.",
   "under-construction": "Wait for this building to finish construction.",
   "queue-full": `Production queue full (${PRODUCTION_QUEUE_LIMIT} orders).`,
@@ -115,7 +115,7 @@ export function createUnitTraining(
           ? REASONS[availability.reason]
           : (currentResult ??
             (simulation.economy
-              ? "Queue a unit. Materials are paid now; cancel for a full refund."
+              ? "Queue a unit. Resources are paid now; cancel for a full refund."
               : "Train a unit. It will appear beside this building.")),
     );
   };

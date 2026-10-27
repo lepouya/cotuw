@@ -7,27 +7,33 @@ damaged world and encounters the elven Circle of Repose. Their struggle over
 its citadels and lost technology begins humanity's first contact and helps
 awaken the deathless Everwake, eventually requiring an uneasy alliance.
 
-The playable build contains ARC's M0 mission and a construction sandbox. M1
-targets an ARC-versus-Circle skirmish with a base-building AI opponent. Follow
-[TODO.md](TODO.md) for active tasks, dependencies, and progress.
+The playable build contains ARC's M0 mission, a construction sandbox, and a
+Circle cultivation slice. M1 targets an ARC-versus-Circle skirmish with a
+base-building AI opponent. Follow [TODO.md](TODO.md) for active tasks,
+dependencies, and progress.
 
-## Play the ARC prototype
+## Play the prototype
 
 The title screen offers **New mission**, **Load**, **Options**, and **Exit**.
+New mission opens the wolf-den faction chooser: ARC's base-building mission
+or the Circle's worker-tended cultivation slice. Difficulty selection is planned
+for this screen.
 Options provides master, sound, and music volume and mute controls; preferences
 persist on this device. Leaving a mission through **Main menu** returns to the
 title screen. Exit closes the desktop app; browsers show a close-tab message.
 
-Start a new mission and follow the in-game guides. Build a Materials Refinery
+For ARC, follow the in-game guides. Build a Materials Refinery
 and its Harvester, gather Materials, then build a Field Barracks and train
 Troopers and Scouts. Defeat the lone wolf and all five den wolves while
 protecting your Command Center. Victory allows continued free play.
 
 Click or tap to select and command. Drag a box to select units; touch uses
 **Box select**. **Pan** enables camera dragging, and **View** offers camera
-presets. **Goals** shows objectives and preparation. **Menu** or `F10` opens
-save, load, restart, audio, and Main menu controls; `F5` quicksaves and `F9`
-quickloads. Loading starts paused for inspection.
+presets. **Goals** shows objectives and preparation. **Menu**, `F10`, or `Esc`
+opens save, load, restart, audio, and Main menu controls. `Esc` first cancels
+active tools or clears selection. Choose **½×**, **1×**, **2×**, or **4×** in
+the top bar to change game speed. `F5` quicksaves and `F9` quickloads. Loading
+starts paused for inspection.
 
 ## Development
 
@@ -47,6 +53,20 @@ npm run playtest:build # browser playtest bundle with build manifest
 Open `/?level=sandbox` for free construction and training. Explicit
 `?level=<scenario ID>` links open a bundled level directly for development.
 Use `/?level=skirmish-map` to inspect the rough M1 battlefield the same way.
+Choose Circle in New mission or use `/?level=circle-wolf-den`. Start with a
+Heartgrove and 150 Lifebloom. Train a Cultivator for 50, select it, and grow a
+Conservatory for 100. Keep the worker nearby to tend construction, then send it
+to Gather Lifebloom. Deliveries fund a Musterhall, Sentinels, and Wayfinders.
+Sites regenerate; heavy staffing slows output and can trigger dormancy. Rotate
+between the two sites or let workers wait for recovery. Moving or stopping a
+worker pauses growth; select a replacement and use Tend to resume. Protect the
+Heartgrove and clear the wolves to win. Gift boxes beyond the lone wolf grant
+Lifebloom when a friendly unit walks over them.
+
+This development slice uses the existing single-player control model.
+Multi-owner economies and authority, emergency headquarters recovery, healing,
+defenses, constructs, faction AI, difficulty, and skirmish balance remain
+pending. See the [slice scope](DESIGN.md#circle-wolf-den-development-slice).
 
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all

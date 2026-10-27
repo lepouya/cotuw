@@ -14,7 +14,7 @@
         aria-label="Command sidebar"
       >
         <header class="sidebar-header">
-          <p class="eyebrow">Anomaly Response Command</p>
+          <p id="faction-label" class="eyebrow"></p>
           <h1>Unquiet World</h1>
           <p class="muted">
             <span id="scenario-label"></span>
@@ -51,7 +51,7 @@
               role="tabpanel"
               aria-labelledby="tab-buildings"
             >
-              <p class="muted">Choose a structure to place.</p>
+              <p id="construction-instructions" class="muted"></p>
               <div id="building-options" class="production-grid"></div>
               <div
                 id="construction-queue"
@@ -73,7 +73,7 @@
               ></div>
               <p id="production-status" class="muted" role="status"></p>
               <details id="economy-overview" hidden open>
-                <summary>Materials sites &amp; salvage</summary>
+                <summary>Resource sites &amp; salvage</summary>
                 <p id="economy-alert" class="muted" role="status"></p>
                 <div id="resource-overview" class="actor-list"></div>
               </details>
@@ -124,10 +124,10 @@
               hidden
               aria-label="Harvesting controls"
             >
-              <h3>Materials gathering</h3>
+              <h3 id="worker-activity-heading">Materials gathering</h3>
               <p id="harvester-details" class="muted"></p>
               <div id="gather-sites" class="actor-list"></div>
-              <h3>Assigned Refinery</h3>
+              <h3 id="refinery-assignment-heading">Assigned Refinery</h3>
               <div id="refinery-assignments" class="actor-list"></div>
               <div id="return-cargo-actions" class="actor-list"></div>
               <p id="harvester-status" class="muted" role="status"></p>
@@ -219,7 +219,11 @@
       <div class="game-viewport">
         <header id="top-bar" class="top-bar" aria-label="Mission status">
           <div class="top-bar-group">
-            <button id="open-menu" type="button" title="Game menu (F10)">
+            <button
+              id="open-menu"
+              type="button"
+              title="Game menu (Escape / F10)"
+            >
               Menu
             </button>
             <div class="time-controls" role="group" aria-label="Game speed">
@@ -249,6 +253,14 @@
                 aria-label="Double speed"
               >
                 2×
+              </button>
+              <button
+                type="button"
+                data-speed="4"
+                aria-pressed="false"
+                aria-label="Quadruple speed"
+              >
+                4×
               </button>
             </div>
           </div>
@@ -533,6 +545,24 @@
           Return to main menu
         </button>
       </div>
+      <section id="mission-setup" hidden aria-label="Choose your faction">
+        <div class="faction-choices">
+          <button id="choose-arc" class="faction-choice" type="button">
+            <strong>Anomaly Response Command</strong>
+            <span
+              >Establish a base, gather Materials, and train a force to clear
+              the wolf den.</span
+            >
+          </button>
+          <button id="choose-circle" class="faction-choice" type="button">
+            <strong>Circle of Repose</strong>
+            <span
+              >Grow a living base, cultivate Lifebloom, and raise an army.</span
+            >
+          </button>
+        </div>
+        <button id="cancel-mission-setup" type="button">Back</button>
+      </section>
       <form id="save-form" class="save-form" hidden>
         <label for="save-name">Save name</label>
         <input id="save-name" type="text" maxlength="80" required />

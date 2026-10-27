@@ -753,6 +753,44 @@ summary {
   margin-top: 1.25rem;
 }
 
+.faction-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.faction-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem;
+  text-align: left;
+  border-color: #809c86;
+  background: #223c37;
+}
+
+.faction-choice strong {
+  color: #f1e4be;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.15rem;
+}
+
+.faction-choice span,
+.faction-choice small {
+  line-height: 1.45;
+}
+
+.faction-choice small {
+  color: #c9bfdf;
+}
+
+@media (max-width: 480px) {
+  .faction-choices {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-height: 450px) {
   #game-menu.title-menu {
     padding: 1rem 1.5rem;

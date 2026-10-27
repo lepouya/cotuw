@@ -74,7 +74,7 @@ const emitter = (changes: Partial<AudioEmitter> = {}): AudioEmitter => ({
   states: ["moving"],
   ...changes,
 });
-function setup() {
+function setup(playerFaction?: string) {
   const backend = device();
   const focus = { x: 0, z: 0 };
   const scene = createAudioScene(
@@ -82,9 +82,90 @@ function setup() {
     BASE_CONTENT.presentation,
     backend.mixer,
     () => focus,
+    playerFaction,
   );
   return { ...backend, scene, focus };
 }
+
+test("preloading follows bindings and the selected arrangement, including all cue variants", () => {
+  const { mixer } = device();
+  const scene = createAudioScene(
+    BASE_CONTENT.audio,
+    {
+      "circle-sentinel": BASE_CONTENT.presentation["circle-sentinel"]!,
+      "circle-wayfinder": BASE_CONTENT.presentation["circle-wayfinder"]!,
+      wolf: BASE_CONTENT.presentation.wolf!,
+    },
+    mixer,
+    () => ({ x: 0, z: 0 }),
+    "circle",
+  );
+  const urls = vi.mocked(mixer.preload).mock.calls[0]![0];
+  expect(urls).toEqual(
+    expect.arrayContaining([
+      "/assets/audio/circle-frontier.wav",
+      "/assets/audio/circle-ridge.wav",
+      "/assets/audio/circle-cast-1.wav",
+      "/assets/audio/circle-cast-2.wav",
+      "/assets/audio/wolf-attack.wav",
+      "/assets/audio/command-invalid.wav",
+      "/assets/audio/damage-1.wav",
+      "/assets/audio/damage-2.wav",
+    ]),
+  );
+  expect(
+    urls.some((url) =>
+      /harvester|refinery|rifle|unquiet-frontier|beneath-the-ridge/.test(url),
+    ),
+  ).toBe(false);
+  expect(new Set(urls).size).toBe(urls.length);
+  scene.dispose();
+});
+
+test.each([
+  ["circle", "circle-frontier", "circle-ridge"],
+  ["arc", "unquiet-frontier", "beneath-the-ridge"],
+  ["toString", "unquiet-frontier", "beneath-the-ridge"],
+])(
+  "%s selects its own exploration and combat arrangements",
+  (faction, exploration, combat) => {
+    const { scene, calls } = setup(faction);
+    scene.sync([]);
+    expect(calls.map(({ url }) => url)).toEqual([
+      `/assets/audio/${exploration}.wav`,
+    ]);
+    scene.setMusic(true);
+    expect(calls[0]!.ended).toBe(true);
+    expect(calls[calls.length - 1]!.url).toBe(`/assets/audio/${combat}.wav`);
+    scene.setMusic(false);
+    expect(calls[calls.length - 1]!.url).toBe(
+      `/assets/audio/${exploration}.wav`,
+    );
+    scene.dispose();
+  },
+);
+
+test("Circle casting and living damage use tonal cues without metallic impacts", () => {
+  const { scene, calls } = setup("circle");
+  const sentinel = emitter({
+    id: "sentinel",
+    definitionId: "circle-sentinel",
+    states: [],
+  });
+  const wolf = emitter({ id: "wolf", definitionId: "wolf", states: [] });
+  scene.sync([sentinel, wolf]);
+  scene.emit("attack", sentinel);
+  scene.emit("damage", wolf);
+  expect(
+    calls
+      .filter(({ options }) => options.bus === "sound")
+      .map(({ url }) => url),
+  ).toEqual([
+    "/assets/audio/circle-cast-1.wav",
+    "/assets/audio/living-hit.wav",
+  ]);
+  scene.dispose();
+});
 test("state loops resume when buffers arrive, without replaying past events", () => {
   const { scene, ready, calls } = setup();
   ready(false);
@@ -314,6 +395,15 @@ test.each([
   },
   (pack: any) => {
     pack.audio.music.default = "rifle";
+  },
+  (pack: any) => {
+    pack.audio.music.factions = { circle: { default: "rifle" } };
+  },
+  (pack: any) => {
+    pack.audio.music.factions = { circle: null };
+  },
+  (pack: any) => {
+    pack.audio.music.factions = [];
   },
   (pack: any) => {
     pack.presentation["arc-harvester"].audio.loops.moving = "damage";
@@ -1096,4 +1186,14 @@ test("specific player feedback replaces routine alerts in the same tick", () => 
   simulation.result = { kind: "victory" };
   adapter.observe([], [routine]);
   expect(played()).toEqual(["victory"]);
+});
+
+test("Circle cultivation and construction use distinct work cues without Harvester audio", () => {
+  const worker = BASE_CONTENT.presentation["circle-cultivator"]!.audio!;
+  const building = BASE_CONTENT.presentation["circle-conservatory"]!.audio!;
+  expect(worker.loops!.working).toBe("circle-cultivation");
+  expect(building.loops!.constructing).toBe("circle-growth");
+  expect(BASE_CONTENT.audio!.cues[worker.loops!.working!]!.clips).toEqual([
+    "circle-cultivation",
+  ]);
 });

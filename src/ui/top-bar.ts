@@ -2,6 +2,7 @@ import type { MissionResult, ObjectiveView } from "../simulation/objectives";
 import type { GameSession } from "../session";
 import type { SidebarState } from "./sidebar";
 import { setText } from "./dom";
+import { resourceName } from "../simulation/economy";
 
 export type TopBarState = {
   /** Whether a mission is running and can resume. */
@@ -9,7 +10,7 @@ export type TopBarState = {
   playing: boolean;
   speed: number;
   elapsedSeconds: number;
-  materials?: number;
+  resource?: { name: string; balance: number };
   objectives: readonly ObjectiveView[];
   result?: MissionResult;
 };
@@ -26,7 +27,10 @@ export function topBarState(
     elapsedSeconds: session
       ? session.simulation.completedTicks * session.simulation.tickSeconds
       : 0,
-    materials: state?.materials,
+    resource: state?.resource && {
+      name: resourceName(state.resource),
+      balance: state.balances?.[state.resource] ?? 0,
+    },
     objectives: state?.objectives ?? [],
     result: state?.result,
   };
@@ -74,6 +78,7 @@ export function createTopBar(
   const objectiveText = element("objective-text");
   const time = element("mission-time");
   const resource = element("resource-bar");
+  const resourceName = resource.querySelector<HTMLElement>(".resource-name")!;
   const materials = element("materials-counter");
   pause.addEventListener("click", actions.togglePause);
   for (const { button, speed } of speeds)
@@ -90,9 +95,12 @@ export function createTopBar(
         button.setAttribute("aria-pressed", String(speed === state.speed));
       }
       setText(time, formatElapsed(state.elapsedSeconds));
-      resource.hidden = state.materials === undefined;
-      setText(materials, String(state.materials ?? 0));
-      const resourceLabel = `${state.materials ?? 0} Materials`;
+      const { name = "", balance = 0 } = state.resource ?? {};
+      resource.hidden = !state.resource;
+      setText(resourceName, name);
+      resource.title = name;
+      setText(materials, String(balance));
+      const resourceLabel = `${balance} ${name}`;
       if (resource.getAttribute("aria-label") !== resourceLabel)
         resource.setAttribute("aria-label", resourceLabel);
       const summary = objectiveSummary(state.objectives, state.result);

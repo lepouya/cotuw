@@ -57,7 +57,7 @@ function tracker() {
       attacks: [],
       wrecks: [],
       objectives: [],
-      harvesterIds: [],
+      workerIds: [],
       ...state,
     });
 }
@@ -81,7 +81,7 @@ describe("mission alerts", () => {
     const first = observe({
       actors,
       attacks: [hit("h1"), hit("t1"), hit("t1")],
-      harvesterIds: ["h1"],
+      workerIds: ["h1"],
     });
     expect(first.map(({ text, pulse }) => [text, !!pulse])).toEqual([
       ["Harvester under attack", true],
@@ -90,7 +90,7 @@ describe("mission alerts", () => {
     expect(first.every(({ priority }) => priority === "high")).toBe(true);
     for (let tick = 0; tick < ATTACK_ALERT_SECONDS / TICK_SECONDS; tick++)
       expect(
-        observe({ actors, attacks: [hit("t1")], harvesterIds: ["h1"] }),
+        observe({ actors, attacks: [hit("t1")], workerIds: ["h1"] }),
       ).toEqual([]);
     for (let tick = 0; tick <= ATTACK_ALERT_SECONDS / TICK_SECONDS; tick++)
       observe({ actors });
@@ -100,10 +100,10 @@ describe("mission alerts", () => {
   test("a lethal Harvester hit retains its attack category and location", () => {
     const observe = tracker();
     const worker = actor("h1", "harvester");
-    observe({ actors: [worker], harvesterIds: [worker.id] });
+    observe({ actors: [worker], workerIds: [worker.id] });
     const alerts = observe({
       actors: [],
-      harvesterIds: [],
+      workerIds: [],
       attacks: [hit(worker.id)],
     });
     expect(alerts).toEqual([
@@ -127,7 +127,7 @@ describe("mission alerts", () => {
           actor("b2", "barracks", {
             tilePlacement,
             construction: {
-              paidMaterials: 1,
+              paidCost: 1,
               completedTicks: 0,
               totalTicks: 2,
             },
@@ -143,7 +143,7 @@ describe("mission alerts", () => {
       actors: [
         actor("b1", "barracks", {
           tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
-          construction: { paidMaterials: 1, completedTicks: 0, totalTicks: 2 },
+          construction: { paidCost: 1, completedTicks: 0, totalTicks: 2 },
         }),
         actor("t1", "trooper"),
         actor("s1", "scout", { movement: { target: { x: 4, z: 4 } } }),
@@ -216,5 +216,27 @@ describe("mission alerts", () => {
       "1 building reconnected",
       "Objective complete: Clear the den",
     ]);
+  });
+
+  test("announces a site only when an explored site falls dormant", () => {
+    const observe = tracker();
+    const site = (dormant: boolean) => ({
+      id: "grove",
+      name: "Near Lifebloom",
+      dormant,
+      reopensAt: 60,
+      position: { x: 3, z: 4 },
+    });
+    observe({ sites: [] });
+    expect(observe({ sites: [site(true)] })).toEqual([]);
+    observe({ sites: [site(false)] });
+    expect(observe({ sites: [site(true)] })).toEqual([
+      {
+        priority: "normal",
+        text: "Near Lifebloom is dormant. Workers deliver cargo and wait for recovery to 60%.",
+        position: { x: 3, z: 4 },
+      },
+    ]);
+    expect(observe({ sites: [site(true)] })).toEqual([]);
   });
 });

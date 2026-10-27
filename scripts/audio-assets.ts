@@ -248,6 +248,64 @@ function damage(target: Mix, variant: number) {
   note(target, 0.003, 49 + variant * 3, 0.28, 0.3);
 }
 
+function livingFocus(target: Mix, variant: number) {
+  const frequency = hz(76 + variant * 2);
+  voice(target, 0, 0.65, (t) => {
+    const bloom = Math.min(1, t / 0.035) * Math.exp(-7 * t);
+    const phase = TAU * frequency * t + 3 * Math.exp(-16 * t);
+    return (
+      bloom *
+      (0.55 * Math.sin(phase) +
+        0.2 * Math.sin(phase * 1.5) +
+        0.12 * sine(frequency * 2.01, t))
+    );
+  });
+  noise(target, 0.02, 0.19, 0.2, 920 + variant, 0.08);
+  note(target, 0.07, 88 + variant * 2, 0.5, 0.16);
+  echo(target, 0.095, 0.22, 2);
+}
+
+function pluck(
+  target: Mix,
+  start: number,
+  midi: number,
+  level: number,
+  pan: number,
+) {
+  const frequency = hz(midi);
+  voice(
+    target,
+    start,
+    2.6,
+    (t) => {
+      let string = 0;
+      for (let partial = 1; partial <= 7; partial++)
+        string +=
+          (sine(frequency * partial, t) *
+            Math.exp(-(1.8 + partial * 1.2) * t)) /
+          partial ** 1.4;
+      return (
+        level * Math.min(1, t / 0.004) * Math.min(1, (2.6 - t) / 0.05) * string
+      );
+    },
+    pan,
+  );
+}
+
+function woodenBeat(target: Mix, start: number, level: number, seed: number) {
+  voice(
+    target,
+    start,
+    0.42,
+    (t) =>
+      level *
+      Math.min(1, t / 0.007) *
+      Math.exp(-15 * t) *
+      (sine(145, t) + 0.35 * sine(385, t) + 0.1 * sine(730, t)),
+  );
+  noise(target, start, 0.09, level * 0.4, seed, 0.18);
+}
+
 /** A rising or falling phrase over an optional sustained chord. */
 function phrase(
   target: Mix,
@@ -275,6 +333,61 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
   "rifle-1": (target) => rifle(target, 1),
   "rifle-2": (target) => rifle(target, 2),
   "rifle-3": (target) => rifle(target, 3),
+  "circle-cast-1": (target) => livingFocus(target, 1),
+  "circle-cast-2": (target) => livingFocus(target, 2),
+  "circle-cultivation": (target) => {
+    for (const [start, midi] of [
+      [0, 72],
+      [1.3, 79],
+      [3.1, 76],
+      [5.4, 81],
+      [6.7, 74],
+    ])
+      pluck(target, start!, midi!, 0.16, 0);
+    // Wrapped swells keep the loop seamless without a machine-like drone.
+    for (const start of [0.6, 4.8]) {
+      voice(
+        target,
+        start,
+        3.2,
+        (t) =>
+          Math.sin((Math.PI * t) / 3.2) ** 2 *
+          (0.07 * sine(392, t) + 0.035 * sine(588, t)),
+      );
+      noise(target, start, 2.4, 0.09, 741 + start * 10, 0.15);
+    }
+    echo(target, 0.17, 0.18, 2);
+  },
+  "circle-growth": (target) => {
+    for (const [start, midi] of [
+      [0, 60],
+      [1.1, 67],
+      [2.7, 62],
+    ])
+      pluck(target, start!, midi!, 0.18, 0);
+    voice(
+      target,
+      0,
+      4,
+      (t) =>
+        Math.sin((Math.PI * t) / 4) ** 2 *
+        (0.09 * sine(294, t) + 0.04 * sine(440, t)),
+    );
+    noise(target, 0.4, 2.8, 0.1, 830, 0.12);
+  },
+  "living-hit": (target) => {
+    noise(target, 0, 0.27, 0.5, 940, 0.12);
+    voice(
+      target,
+      0,
+      0.4,
+      (t) =>
+        Math.min(1, t / 0.012) *
+        Math.exp(-14 * t) *
+        (0.25 * sine(174, t) + 0.12 * sine(348, t)),
+    );
+    note(target, 0.025, 83, 0.35, 0.08);
+  },
   "wolf-attack": (target) => {
     voice(target, 0, 0.55, (t) => {
       const phase = TAU * (125 * t - 55 * t * t);
@@ -325,7 +438,8 @@ export function buildSound(id: SoundId): Uint8Array {
 }
 
 export function buildMusic(id: MusicId): Uint8Array {
-  const { seconds, tension } = MUSIC_ASSETS[id];
+  const { seconds, tension, arrangement } = MUSIC_ASSETS[id];
+  const organic = arrangement === "organic";
   const target = mix(seconds, true, true);
   const beat = 60 / 80;
   // Six-second chords form a sixteen-bar D-minor phrase at 80 BPM.
@@ -343,12 +457,26 @@ export function buildMusic(id: MusicId): Uint8Array {
     chord.forEach((midi, degree) => {
       const frequency = hz(midi);
       const pan = [-0.2, -0.75, 0.65, 0.2][degree]!;
+      const breath = random(1100 + index * 4 + degree);
+      let air = 0;
       voice(
         target,
         index * 6,
         8.5,
         (t) => {
           const envelope = Math.sin((Math.PI * t) / 8.5) ** 2;
+          if (organic) {
+            air += 0.07 * (breath() - air);
+            const phase = TAU * frequency * t + 0.035 * sine(4.8, t);
+            return (
+              envelope *
+              (degree === 0 ? 0.1 : 0.055) *
+              (Math.sin(phase) +
+                0.2 * Math.sin(phase * 2) +
+                0.07 * Math.sin(phase * 3) +
+                0.12 * air)
+            );
+          }
           return (
             envelope *
             (degree === 0 ? 0.16 : 0.1) *
@@ -363,6 +491,18 @@ export function buildMusic(id: MusicId): Uint8Array {
     const motif = tension ? [1, 2, 1, 3, 2, 1, 3, 2] : [2, 3, 1, 2];
     motif.forEach((degree, step) => {
       const start = index * 6 + step * (tension ? beat : beat * 2);
+      if (organic) {
+        pluck(
+          target,
+          start,
+          chord[degree]! + 12,
+          tension ? 0.12 : 0.14,
+          step % 2 ? 0.5 : -0.5,
+        );
+        if (tension && step % 2 === 0)
+          pluck(target, start + beat / 2, chord[(degree % 3) + 1]!, 0.065, 0.2);
+        return;
+      }
       note(
         target,
         start,
@@ -372,6 +512,18 @@ export function buildMusic(id: MusicId): Uint8Array {
         step % 2 ? 0.55 : -0.55,
       );
     });
+    if (organic) {
+      woodenBeat(target, index * 6, tension ? 0.14 : 0.055, 1200 + index);
+      if (tension)
+        for (const step of [2, 4, 5, 7])
+          woodenBeat(
+            target,
+            index * 6 + step * beat,
+            step === 4 ? 0.1 : 0.045,
+            1240 + index * 8 + step,
+          );
+      return;
+    }
     thump(target, index * 6, tension ? 0.2 : 0.1);
     if (tension) {
       thump(target, index * 6 + beat * 4, 0.13);
@@ -407,7 +559,7 @@ export function buildAudioPreview(): Uint8Array {
 ${"description" in asset ? `<p>${asset.description}</p>` : ""}
 <button type="button" data-play="${id}">Play ${asset.label}</button>
 <p>${asset.seconds} seconds${bus !== "cue" ? " · loop" : ""}</p>
-<audio id="${id}" data-bus="${bus}" controls preload="none" ${bus !== "cue" ? "loop" : ""}
+<audio id="${id}" data-bus="${bus}" controls preload="none"${bus !== "cue" ? " loop" : ""}
   aria-label="${asset.label}" src="${audioAssetUrl(id as SoundId | MusicId)}"></audio>
 <a href="${audioAssetUrl(id as SoundId | MusicId)}" download>Download WAV</a>
 </article>`,
@@ -430,7 +582,7 @@ a { color: #9fe1e5; display: inline-block; padding: 8px 0; }
 button { font: inherit; padding: 12px 20px; cursor: pointer; margin-bottom: 12px; }
 </style>
 <h1>Unquiet World · Audio audition</h1>
-<p>Atmospheric synths, sparse percussion, crisp gameplay cues.
+<p>ARC synths and Circle plucked strings, breathy woodwinds, and wooden percussion.
 Original synthesized audio. Music repeats every 48 seconds at 80 BPM.
 Play machinery and cues over either track to compare the mix.</p>
 <button type="button" id="stop">Stop all</button>

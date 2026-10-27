@@ -191,7 +191,12 @@ export function createSessionAssets(
 
     const propHandlers: Partial<Record<PropId, (asset: ModelAsset) => void>> = {
       foundation: (asset) =>
-        setBuildings([...buildingAppearances.keys()], { foundation: asset }),
+        setBuildings(
+          definitions
+            .filter((definition) => !definition.growth)
+            .map(({ id }) => id),
+          { foundation: asset },
+        ),
       scaffold: (asset) =>
         setBuildings([...buildingAppearances.keys()], { scaffold: asset }),
     };

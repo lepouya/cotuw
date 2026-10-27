@@ -2,6 +2,7 @@ import "./styles.css";
 import { version } from "../package.json";
 import { createAudioMixer } from "./audio/mixer";
 import { bindAudioControls } from "./ui/audio-controls";
+import { factionName } from "./content/content-pack";
 import { LEVEL_SOURCES } from "./content/levels";
 import { createPlatform } from "./platform";
 import { isTextEntry, worldInputAvailable } from "./render/input-focus";
@@ -45,13 +46,13 @@ const saveName = byId<HTMLInputElement>("save-name");
 const loadPanel = byId("load-panel");
 const saveEntries = byId("save-entries");
 const newMission = byId<HTMLButtonElement>("new-mission");
+const missionSetup = byId("mission-setup");
 const options = byId<HTMLButtonElement>("open-options");
 const quit = byId<HTMLButtonElement>("quit-game");
 const audioControls = byId("audio-controls");
 const optionsBack = byId<HTMLButtonElement>("cancel-options");
 const titleBack = byId<HTMLButtonElement>("return-to-title");
 const versionLabel = byId("game-version");
-const DEFAULT_LEVEL = "arc-economy-opening";
 versionLabel.textContent = `Prototype demo · v${version}`;
 
 /** Level sources by scenario ID; loading a level file adds or replaces one. */
@@ -88,7 +89,7 @@ const MENU_TEXT = {
   victory: {
     title: "Victory",
     description:
-      "All victory objectives are complete. Continue building and exploring in free play, or restart the mission.",
+      "All victory objectives are complete. Continue exploring in free play, or restart the mission.",
   },
   loaded: {
     title: "Mission loaded",
@@ -97,14 +98,24 @@ const MENU_TEXT = {
   home: {
     title: "Citadels of the Unquiet World",
     description:
-      "Establish an ARC foothold, explore the frontier, and clear the wolves from the mountain den.",
+      "Choose your expedition, explore the frontier, and clear the wolves from the mountain den.",
   },
   quit: {
     title: "Thanks for playing",
     description: "You can close this browser tab when you’re ready.",
   },
 };
-type MenuPanel = "actions" | "save" | "load" | "options";
+type MenuPanel = "actions" | "save" | "load" | "options" | "setup";
+/** Panels that replace the menu mode's title and, on the title screen, text. */
+const PANEL_TEXT: Partial<
+  Record<MenuPanel, { title: string; description?: string }>
+> = {
+  options: { title: "Options" },
+  setup: {
+    title: "Choose your faction",
+    description: "Choose a faction for the wolf-den demo.",
+  },
+};
 /** The control each menu panel focuses when it opens or becomes enabled. */
 const PANEL_FOCUS: Record<MenuPanel, () => HTMLElement> = {
   actions: () =>
@@ -113,6 +124,7 @@ const PANEL_FOCUS: Record<MenuPanel, () => HTMLElement> = {
   save: () => saveName,
   load: () => byId("import-mission"),
   options: () => byId("audio-master-volume"),
+  setup: () => byId("choose-arc"),
 };
 const BRIEFING_ELEMENTS: Record<keyof ScenarioBriefing, string> = {
   label: "scenario-label",
@@ -190,12 +202,15 @@ function showPanel(panel: MenuPanel) {
   actions.hidden = panel !== "actions";
   saveForm.hidden = panel !== "save";
   loadPanel.hidden = panel !== "load";
+  missionSetup.hidden = panel !== "setup";
   // In a mission, audio settings stay beside every panel.
   audioControls.hidden = panel !== "options" && !session;
   optionsBack.hidden = panel !== "options";
   description.hidden = panel === "options";
-  title.textContent =
-    panel === "options" ? "Options" : MENU_TEXT[menuMode].title;
+  const text = PANEL_TEXT[panel];
+  if (menuMode === "home")
+    description.textContent = text?.description ?? MENU_TEXT.home.description;
+  title.textContent = text?.title ?? MENU_TEXT[menuMode].title;
   focusPanel();
 }
 
@@ -292,14 +307,17 @@ async function start(next: LoadedMission, loaded = false) {
         .map(({ id }) => id),
     );
     showBriefing(next.scenario.briefing);
-    for (const id of ["network-view-control", "economy-overview"])
-      byId(id).hidden = !next.state.economy;
+    byId("economy-overview").hidden = !next.state.economy;
+    byId("network-view-control").hidden =
+      !next.state.economy ||
+      !next.definitions.some((definition) => definition.support);
     sidebar = createSidebar(byId("game-sidebar"), {
       definitions: next.definitions,
       economy: !!next.state.economy,
       presentations: new Map(Object.entries(next.content.presentation)),
       goals: next.scenario.goals ?? [],
       playerFaction: next.state.playerFaction,
+      factionName: factionName(next.content, next.state.playerFaction),
       selectActor: (id, additive) => session?.selectActor(id, additive),
     });
     const activeSidebar = sidebar;
@@ -308,6 +326,7 @@ async function start(next: LoadedMission, loaded = false) {
       mission: next,
       audio,
       startPaused: loaded,
+      onMenu: openMenu,
       cameraControls: byId("camera-controls"),
       onStateChanged: (state) => {
         activeSidebar.update(state);
@@ -494,7 +513,7 @@ dialog.addEventListener("keydown", (event) => {
   // Repeated native close requests can become non-cancelable.
   event.preventDefault();
   event.stopPropagation();
-  cancelMenu();
+  if (!event.repeat) cancelMenu();
 });
 dialog.addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -514,11 +533,19 @@ explanation.addEventListener("cancel", (event) => {
   dismissPopup();
 });
 restart.addEventListener("click", () => startLevel(mission!.scenario.id));
-newMission.addEventListener("click", () => {
-  // An imported level file may have replaced the bundled default.
-  levels.set(DEFAULT_LEVEL, LEVEL_SOURCES.get(DEFAULT_LEVEL)!);
-  startLevel(DEFAULT_LEVEL);
-});
+newMission.addEventListener("click", () => showPanel("setup"));
+for (const [id, level] of [
+  ["choose-arc", "arc-economy-opening"],
+  ["choose-circle", "circle-wolf-den"],
+] as const)
+  byId(id).addEventListener("click", () => {
+    // Fresh missions always use bundled content, including after an import.
+    levels.set(level, LEVEL_SOURCES.get(level)!);
+    startLevel(level);
+  });
+byId("cancel-mission-setup").addEventListener("click", () =>
+  showPanel("actions"),
+);
 options.addEventListener("click", () => showPanel("options"));
 optionsBack.addEventListener("click", () => showPanel("actions"));
 titleBack.addEventListener("click", showTitle);

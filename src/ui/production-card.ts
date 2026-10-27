@@ -1,3 +1,4 @@
+import type { PortraitId } from "../content/presentation";
 import { createActorPortrait } from "./actor-portrait";
 
 import type { ActorDefinition } from "../simulation/actor";
@@ -124,7 +125,13 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
       container: HTMLElement,
       action: { id: string; label: string },
       definition: ActorDefinition,
-      content: { name: string; details: string; cost?: number },
+      content: {
+        name: string;
+        details: string;
+        /** A price label such as "20 Materials". */
+        cost?: string;
+        portrait?: PortraitId;
+      },
     ): ProductionCard => {
       const card = document.createElement("div");
       card.className = "production-card";
@@ -135,11 +142,11 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
       button.setAttribute("aria-label", action.label);
       const label = document.createElement("strong");
       label.textContent = content.name;
-      button.append(createActorPortrait(definition), label);
+      button.append(createActorPortrait(definition, content.portrait), label);
       if (content.cost !== undefined) {
         const cost = document.createElement("span");
         cost.className = "option-cost";
-        cost.textContent = `${content.cost} Materials`;
+        cost.textContent = content.cost;
         button.append(cost);
       }
       const description = document.createElement("span");

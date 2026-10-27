@@ -104,7 +104,7 @@ function building(id: string, x: number, z: number): Actor {
 function blueprint(id: string, x: number, z: number): Actor {
   return {
     ...building(id, x, z),
-    construction: { paidMaterials: 100, completedTicks: 2, totalTicks: 8 },
+    construction: { paidCost: 100, completedTicks: 2, totalTicks: 8 },
   };
 }
 
