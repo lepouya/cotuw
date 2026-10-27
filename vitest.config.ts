@@ -7,6 +7,7 @@ const assetTests = ["tests/**/*-assets.test.ts"];
 // Playwright specs in e2e/ and don't depend on the Tauri dev-server settings.
 export default defineConfig({
   test: {
+    silent: "passed-only",
     // Leave CPU capacity for the game and editor during development.
     maxWorkers: Math.max(1, Math.min(2, availableParallelism() - 1)),
     // Babylon probes localStorage at import; Node's webstorage warns about it

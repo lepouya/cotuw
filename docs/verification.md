@@ -11,16 +11,27 @@ clarity, pacing, and usability.
 
 Use two check tiers:
 
-- `npm run check` during development and before completing a coding task. It
+- `npm run check` before completing a coding task or committing. It
   checks formatting, TypeScript and Rust linting and types, all non-asset unit
-  tests, and four Chromium browser smoke checks. These cover title-screen
+  tests, and five Chromium browser smoke checks. These cover title-screen
   options and session startup, generated model loading, construction and
   training with mouse and phone touch, and guide/save/load/restart integration.
-- `npm run check:full` before committing. It adds generated-asset checks, the
-  Rust test harness, every browser flow in Chromium, and the `@webkit` browser
-  flows in macOS WebKit, including phone/tablet layouts and complete M0
-  playthroughs. The Rust harness currently has no tests; platform adapters have
-  TypeScript tests.
+- `npm run check:full` for acceptance, releases, or an explicit request. It adds
+  generated-asset checks, the Rust test harness, every browser flow in Chromium,
+  and the `@webkit` browser flows in macOS WebKit, including phone/tablet
+  layouts and complete M0 playthroughs. The Rust harness currently has no tests;
+  platform adapters have TypeScript tests.
+
+Reuse a passing check when the checked files have not changed. A full pass
+also satisfies the quick check; do not run both tiers on the same files.
+
+Check commands print step results and timings, stop at the first failure, and
+save each step's complete output in ignored `.checks/*.log` files. Failures
+print the last 60 lines, capped at 12,000 characters, and the full log path.
+Read that log as needed instead of rerunning a failed command to capture its
+output. Logs are replaced by the next run of that step. Direct test commands
+remain available for debugging; Vitest and Playwright use compact reporters.
+Passing unit tests suppress console output; failing tests retain it.
 
 `npm test` runs the quick tests without formatting, linting, or type checks.
 `npm run test:full` runs all tests. Both tiers use at most two unit workers and
@@ -31,15 +42,26 @@ For narrower feedback:
 
 ```sh
 npm run test:watch                         # non-asset units, watch mode
+npm run test:changed                       # units affected by uncommitted edits
 npm run test:ts:quick -- tests/combat.test.ts
 npm run test:ts -- --project=assets        # asset contracts and regeneration
-npm run test:visual:quick                  # four Chromium smoke checks
+npm run test:visual:quick                  # five Chromium smoke checks
 npm run test:visual -- e2e/saves.spec.ts --project=chromium
 ```
 
-Asset changes need the asset project; browser, input, layout, or platform
-changes need the affected full browser specs as well as the quick tier. A quick
-pass does not establish full cross-engine or mission acceptance.
+Use changed-unit runs while editing; the commit gate still runs every
+non-asset unit test. Asset or generator changes need the asset project;
+browser, input, layout, audio, or platform changes need the affected browser
+specs as well as the quick tier. On macOS, a focused spec runs its tagged
+WebKit cases too unless restricted with `--project`. A quick pass does not
+establish full cross-engine or mission acceptance.
+
+All browser specs import `test` from `e2e/fixtures.ts`. Its context fixture
+silences Web Audio at the speaker output and mutes media-element playback
+before it starts, including the asset audition page. Decoding, scheduling,
+mixing, gain assertions, and playback state still use the real browser APIs;
+offline audio rendering is unaffected. Listen to the running game or audition
+page manually when verifying audio quality.
 
 Install Playwright browsers once with `npx playwright install chromium`, plus
 `webkit` on macOS. Checks use full headless Chromium with GPU WebGL; macOS also

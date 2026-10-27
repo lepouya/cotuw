@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { forEachProfile, TOUCH_PROFILES } from "./profiles";
 import { MissionDriver } from "./mission-driver";
 import { collectPageErrors, terrainPoint } from "./prototype-helpers";

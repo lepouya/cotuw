@@ -1,5 +1,5 @@
 import { trainTestUnits } from "./prototype-helpers";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import type { Page } from "@playwright/test";
 import type { AbstractMesh } from "@babylonjs/core";

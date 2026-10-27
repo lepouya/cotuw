@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("building visibility follows fog in a mission without an economy", async ({
   page,

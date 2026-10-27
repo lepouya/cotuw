@@ -50,6 +50,12 @@
 - Make the smallest coherent change that fully satisfies the request; include
   necessary local refactoring, but preserve unrelated work.
 - Verify changes in proportion to their risk and scope.
-- Run `npm run check` before considering a coding task complete.
-- Run `npm run check:full` before committing.
+- Run `npm run check` before completing a coding task or committing. Reuse a
+  passing run if the checked files have not changed.
+- Run affected browser specs for browser, input, layout, audio, or platform
+  changes, and asset tests for asset changes. See `docs/verification.md`.
+- Reserve `npm run check:full` for acceptance and release verification, or an
+  explicit request. A full pass also satisfies the quick check.
+- Check commands print summaries and save details in `.checks/`. On failure,
+  read only the failed step's log as needed; do not rerun to capture output.
 - Use original or appropriately licensed code, assets, and content.

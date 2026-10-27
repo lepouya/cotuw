@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openOpening, importMission, placeBuilding } from "./prototype-helpers";
 import { MissionDriver } from "./mission-driver";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";

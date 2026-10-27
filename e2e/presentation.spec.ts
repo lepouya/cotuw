@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { collectPageErrors, withoutApp } from "./prototype-helpers";
 import { WEBKIT } from "./tags";
 

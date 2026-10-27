@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import {
   collectPageErrors,

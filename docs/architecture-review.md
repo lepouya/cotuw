@@ -49,6 +49,9 @@ These rules apply to every installed review skill and its upstream references:
   [DESIGN.md](../DESIGN.md), and the relevant runtime or content contracts.
   Locked decisions remain requirements. Surface conflicts as proposals.
 - Use [TODO.md](../TODO.md) for active milestone tasks and dependencies.
+- Apply the [verification tiers](verification.md): use `npm run check` and
+  affected focused checks for commits; reserve `npm run check:full` for
+  acceptance, releases, or an explicit request.
 - Apply the user's task scope and existing authorization before upstream
   defaults. Assessments leave implementation unchanged. Report generation and
   candidate discussion do not authorize a refactor or commit.
@@ -167,8 +170,8 @@ under `docs/architecture-review/`. Keep selected findings, dependencies, current
 status, check results, and the next action there. Version control owns history.
 Read the current plan and manifest when resuming.
 
-Run affected tests, lint, and type checks per chunk. Run `npm run check` before
-finishing a coding task and `npm run check:full` before an authorized commit.
+Run affected tests, lint, and type checks per chunk. Follow the project
+verification tiers before finishing a coding task or an authorized commit.
 Retain distinct behavior coverage when replacing tests tied to old interfaces.
 Report unavailable checks and remaining uncertainty. Revise a failed plan based
 on evidence rather than silently changing its target or skipping verification.

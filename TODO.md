@@ -20,9 +20,10 @@ in the [design questionnaire](docs/design-questionnaire.md).
   letters. Keep them stable once work starts. Check a task only when its
   stated outcome is verified, including appropriate checks for implementation
   work.
-- Run `npm run check` before completing coding tasks and `npm run check:full`
-  before committing. Use [verification](docs/verification.md) for focused
-  checks, platform coverage, and human acceptance.
+- Run `npm run check` before completing coding tasks or committing, plus
+  affected focused checks. Reserve `npm run check:full` for acceptance and
+  releases. Use [verification](docs/verification.md) for check selection,
+  platform coverage, and human acceptance.
 - Keep task-specific findings and reproduction details in issues. Link issues
   from their tasks when useful; do not accumulate dated playtest logs here.
 - Tasks that depend on an optional scope choice implement only the agreed

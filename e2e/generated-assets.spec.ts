@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { terrainPoint } from "./prototype-helpers";
 import { WEBKIT } from "./tags";
 

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
 import {
@@ -69,6 +69,10 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
           );
       await press('[data-play="unquiet-frontier"]');
       await expect.poll(() => playing("unquiet-frontier")).toBe(true);
+      await expect(page.locator("audio#unquiet-frontier")).toHaveJSProperty(
+        "muted",
+        true,
+      );
       await press('[data-play="victory"]');
       await expect.poll(() => playing("victory")).toBe(true);
       expect(await playing("unquiet-frontier")).toBe(true);

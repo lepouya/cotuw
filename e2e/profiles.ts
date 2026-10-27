@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "./fixtures";
 import type { ViewportSize } from "@playwright/test";
 
 /** A viewport and input modality that browser flows are verified with. */

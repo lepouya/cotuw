@@ -1,5 +1,5 @@
 import { terrainPoint, placeBuilding } from "./prototype-helpers";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
 

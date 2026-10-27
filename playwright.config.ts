@@ -14,7 +14,7 @@ export default defineConfig({
   // Windows WebGL canvas captures can take longer than the default budget.
   timeout: 90_000,
   reporter: [
-    ["list"],
+    ["dot"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
   ],
   // macOS builds run in WKWebView, so WebKit is checked there too. Windows uses

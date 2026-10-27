@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import type { Page } from "@playwright/test";
 import { activate, trainTestUnits } from "./prototype-helpers";

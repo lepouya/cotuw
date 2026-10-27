@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { MissionDriver } from "./mission-driver";
 import { collectPageErrors, openOpening } from "./prototype-helpers";

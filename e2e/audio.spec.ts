@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { MissionDriver } from "./mission-driver";
 import { forEachProfile, PROFILES } from "./profiles";
 import {
@@ -17,6 +17,48 @@ declare global {
     audioVoiceGains: (GainNode | undefined)[];
   }
 }
+
+test(
+  "automation silences speaker output and preserves offline rendering",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await withoutApp(page);
+    await page.goto("/");
+    const result = await page.evaluate(async () => {
+      const context = new AudioContext();
+      const outputs: GainNode[] = [];
+      const createGain = context.createGain.bind(context);
+      context.createGain = () => {
+        const node = createGain();
+        outputs.push(node);
+        return node;
+      };
+      const source = context.createOscillator();
+      const destination = source.connect(context.destination);
+      source.disconnect(context.destination);
+      source.connect(context.destination);
+      const gains = outputs.map((node) => node.gain.value);
+      await context.close();
+
+      const offline = new OfflineAudioContext(1, 128, 8_000);
+      const constant = offline.createConstantSource();
+      constant.offset.value = 0.25;
+      constant.connect(offline.destination);
+      constant.start();
+      const rendered = await offline.startRendering();
+      return {
+        gains,
+        destinationPreserved: destination === context.destination,
+        sample: rendered.getChannelData(0)[0],
+      };
+    });
+    expect(result).toEqual({
+      gains: [0],
+      destinationPreserved: true,
+      sample: 0.25,
+    });
+  },
+);
 
 forEachProfile(PROFILES, (profile) => {
   test(

@@ -37,12 +37,13 @@
     "test:full": "npm run test:ts && npm run test:rs && npm run test:visual",
     "test:ts": "vitest run",
     "test:ts:quick": "vitest run --project=unit",
+    "test:changed": "vitest run --project=unit --changed=HEAD",
     "test:watch": "vitest --project=unit",
     "test:rs": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
     "test:visual": "playwright test",
     "test:visual:quick": "playwright test --project=chromium --grep @quick",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:quick",
-    "check:full": "npm run format:check && npm run lint && npm run typecheck && npm run test:full"
+    "check": "node --no-experimental-webstorage scripts/check-runner.ts quick",
+    "check:full": "node --no-experimental-webstorage scripts/check-runner.ts full"
   },
   "dependencies": {
     "@babylonjs/core": "^9",

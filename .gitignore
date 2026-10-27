@@ -18,6 +18,7 @@ src-tauri/target/
 playwright-report/
 test-results/
 .vite/
+.checks/
 
 # Operating-system and editor files
 .DS_Store

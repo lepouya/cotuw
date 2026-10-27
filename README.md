@@ -43,8 +43,8 @@ Install Node.js 26 and Rust for desktop development, then run:
 npm install
 npm run dev            # browser
 npm run tauri dev      # desktop
-npm run check          # quick checks while developing and before finishing
-npm run check:full     # full checks before committing
+npm run check          # quick checks before finishing or committing
+npm run check:full     # full acceptance and release checks
 npm run build          # production browser build
 npm run tauri build    # desktop app and bundles
 npm run playtest:build # browser playtest bundle with build manifest
@@ -71,7 +71,9 @@ pending. See the [slice scope](DESIGN.md#circle-wolf-den-development-slice).
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all
 art and audio. The full check verifies that committed assets match their
-generators. See [verification](docs/verification.md) for focused and watch runs.
+generators. Checks print concise summaries and save details in `.checks/`;
+browser automation is silent. See [verification](docs/verification.md) for
+focused and watch runs.
 
 ## Documentation
 

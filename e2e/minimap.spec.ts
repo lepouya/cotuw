@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { WEBKIT } from "./tags";
 
 test("refreshes footprint geometry and in-place color changes at the same center", async ({
