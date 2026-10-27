@@ -403,10 +403,13 @@ describe("wolf movement and persistence", () => {
     expect(actor.combat?.returning?.point).toEqual(at(20));
     expect(distance(actor.worldPosition, at(20))).toBe(1);
     continuation(simulation, units);
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: [{ x: 20, z: 12, terrain: { typeId: "plain" } }],
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: [{ x: 20, z: 12, terrain: { typeId: "plain" } }],
+      },
+      { script: true },
+    );
     tick(simulation, 20);
     expect(simulation.actorById("wolf")!.worldPosition).toEqual(at(20));
     expect(simulation.actorById("wolf")!.health).toBeGreaterThan(50);
@@ -419,14 +422,17 @@ describe("wolf movement and persistence", () => {
       tuning({ stalledSeconds: 0.5 }),
     );
     simulation.tick();
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: Array.from({ length: 24 }, (_, z) => ({
-        x: 13,
-        z,
-        terrain: { typeId: "water" },
-      })),
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: Array.from({ length: 24 }, (_, z) => ({
+          x: 13,
+          z,
+          terrain: { typeId: "water" },
+        })),
+      },
+      { script: true },
+    );
     tick(simulation, 40);
     expect(
       simulation.actorById("wolf")!.territory?.investigation,
@@ -615,32 +621,41 @@ describe("wolf movement and persistence", () => {
     const content = tuning({ stalledSeconds: 0.5 });
     const simulation = fixture(units, undefined, content);
     simulation.tick();
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: Array.from({ length: 24 }, (_, z) => ({
-        x: 22,
-        z,
-        terrain: { typeId: "water" },
-      })),
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: Array.from({ length: 24 }, (_, z) => ({
+          x: 22,
+          z,
+          terrain: { typeId: "water" },
+        })),
+      },
+      { script: true },
+    );
     tick(simulation, 40);
     expect(simulation.actorById("wolf")!.territory?.failedTargets).toEqual([
       expect.objectContaining({ targetId: "player" }),
     ]);
     continuation(simulation, units, content);
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: [{ x: 0, z: 0, terrain: { typeId: "water" } }],
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: [{ x: 0, z: 0, terrain: { typeId: "water" } }],
+      },
+      { script: true },
+    );
     simulation.tick();
     expect(simulation.actorById("wolf")!.territory?.failedTargets?.length).toBe(
       1,
     );
     expect(simulation.actorById("wolf")!.combat?.attack).toBeUndefined();
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: [{ x: 22, z: 12, terrain: { typeId: "plain" } }],
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: [{ x: 22, z: 12, terrain: { typeId: "plain" } }],
+      },
+      { script: true },
+    );
     simulation.tick();
     expect(simulation.actorById("wolf")!.combat?.attack?.targetId).toBe(
       "player",

@@ -4,7 +4,11 @@ import { productionBlocker, setActionAvailability } from "./production-action";
 import { setText } from "./dom";
 
 import type { MissionSimulation } from "../simulation/mission";
-import type { CommandOutcome, TrainUnitCommand } from "../simulation/command";
+import type {
+  AuthorityReason,
+  CommandOutcome,
+  TrainUnitCommand,
+} from "../simulation/command";
 import type {
   TrainingEvaluation,
   TrainingReason,
@@ -16,7 +20,8 @@ export type UnitTrainingControls = {
   productionStatus?: HTMLElement;
 };
 
-const REASONS: Record<TrainingReason, string> = {
+const REASONS: Record<TrainingReason | AuthorityReason, string> = {
+  unauthorized: "You cannot command this building.",
   disconnected: "Disconnected. Restore a support path to the Command Center.",
   "invalid-actor": "Invalid unit request.",
   "used-id": "Unit request changed. Try again.",

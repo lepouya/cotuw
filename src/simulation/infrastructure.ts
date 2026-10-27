@@ -24,7 +24,10 @@ export type HostingRules = {
   /** Required for work that needs support from its headquarters. */
   support?: SupportView;
 };
-type AffiliationRules = HostingRules & { emergencyHeadquarters?: boolean };
+type EmergencyRules = Pick<HostingRules, "definitions"> & {
+  emergencyHeadquarters?: boolean;
+};
+type AffiliationRules = HostingRules & EmergencyRules;
 
 /** Whether `actor` is a completed headquarters of the building's kind. */
 function compatibleHeadquarters(
@@ -89,6 +92,19 @@ export function headquarteredOwners(
   );
 }
 
+/**
+ * Whether the emergency rule lets the building's owner, holding no completed
+ * headquarters, run it as a replacement without one.
+ */
+export const replacesHeadquarters = (
+  building: Building,
+  headquartered: ReadonlySet<string>,
+  { definitions, emergencyHeadquarters }: EmergencyRules,
+) =>
+  !!emergencyHeadquarters &&
+  !!definitions.get(building.definitionId)?.infrastructure &&
+  !headquartered.has(building.owner);
+
 /** Keeps eligible base affiliations for completed buildings and paid work. */
 export function assignInfrastructure(
   actors: readonly Actor[],
@@ -99,10 +115,8 @@ export function assignInfrastructure(
   for (const building of actors) {
     if (!building.tilePlacement) continue;
     const emergency =
-      rules.emergencyHeadquarters &&
-      building.construction &&
-      rules.definitions.get(building.definitionId)?.infrastructure &&
-      !headquartered.has(building.owner);
+      !!building.construction &&
+      replacesHeadquarters(building, headquartered, rules);
     const headquarters =
       !building.construction &&
       rules.definitions.get(building.definitionId)?.infrastructure
@@ -144,10 +158,7 @@ export function updateInfrastructure(
   const headquartered = headquarteredOwners(actors, definitions);
   /** A replacement headquarters runs without capacity or support. */
   const emergency = (building: Actor) =>
-    world.emergencyHeadquarters &&
-    !building.headquartersId &&
-    !!definitions.get(building.definitionId)!.infrastructure &&
-    !headquartered.has(building.owner);
+    replacesHeadquarters(building, headquartered, rules);
   /** Work needs a headquarters; growth also needs an arrived tending worker. */
   const ready = (building: Actor) => {
     if (definitions.get(building.definitionId)!.growth)

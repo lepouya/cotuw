@@ -162,11 +162,46 @@ export type MissionCommand =
   | SellActorCommand
   | CancelConstructionCommand;
 
+/**
+ * Who submitted a command: an owner's player or AI, or a mission script.
+ * Scripts command actors only for owners the scenario's `scriptControl`
+ * permits, and alone may edit terrain.
+ */
+export type CommandIssuer =
+  { owner: string; script?: never } | { script: true; owner?: string };
+
+/** Whether an owner's player or AI, rather than a script, issued a command. */
+export const issuedBy = (issuer: CommandIssuer, owner: string) =>
+  issuer.script !== true && issuer.owner === owner;
+
+/** A command for one actor or the mission as a whole, rather than a group. */
+export type SingleCommand = Exclude<
+  MissionCommand,
+  GroupMoveCommand | GroupAttackMoveCommand
+>;
+
 /** A command waiting for the start of the tick numbered `tick`. */
 export type ScheduledCommand = {
   tick: number;
+  issuer: CommandIssuer;
   command: MissionCommand;
 };
+
+/** Checks a saved issuer; scripts may omit the owner they act for. */
+export function isCommandIssuer(
+  value: unknown,
+  owners: ReadonlySet<string>,
+): value is CommandIssuer {
+  if (!isRecord(value)) return false;
+  const { owner, script, ...rest } = value;
+  return (
+    Object.keys(rest).length === 0 &&
+    (script === undefined || script === true) &&
+    (owner === undefined
+      ? script === true
+      : typeof owner === "string" && owners.has(owner))
+  );
+}
 
 /**
  * A move or Attack Move for one actor, or for a group that spreads around the
@@ -278,18 +313,23 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
   }
 }
 
-type RejectionReason<C extends MissionCommand> = C extends PlaceActorCommand
-  ? PlacementReason
-  : C extends TrainUnitCommand
-    ? TrainingReason
-    : C extends EconomyCommand
-      ? EconomyReason
-      : C extends AttackCommand
-        ? AttackReason
-        : never;
+/** The issuer may not command the actors involved. */
+export type AuthorityReason = "unauthorized";
 
-/** Whether the mission accepted a command at the start of `tick`. */
-export type CommandOutcome<C extends MissionCommand = MissionCommand> =
+type RejectionReason<C extends MissionCommand> =
+  | AuthorityReason
+  | (C extends PlaceActorCommand
+      ? PlacementReason
+      : C extends TrainUnitCommand
+        ? TrainingReason
+        : C extends EconomyCommand
+          ? EconomyReason
+          : C extends AttackCommand
+            ? AttackReason
+            : never);
+
+/** A command's outcome as the mission applies it, before naming its issuer. */
+export type CommandResult<C extends MissionCommand = MissionCommand> =
   C extends MissionCommand
     ? {
         tick: number;
@@ -305,6 +345,10 @@ export type CommandOutcome<C extends MissionCommand = MissionCommand> =
           : never;
       }
     : never;
+
+/** Whether the mission accepted a command at the start of `tick`. */
+export type CommandOutcome<C extends MissionCommand = MissionCommand> =
+  CommandResult<C> & { issuer: CommandIssuer };
 
 export function isCommandOf<K extends MissionCommand["kind"]>(
   command: MissionCommand,

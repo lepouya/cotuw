@@ -505,6 +505,7 @@ test("committed observations group commands, baseline loads, and queue starts", 
   adapter.observe(
     Array.from({ length: 5 }, (_, i) => ({
       tick: 100,
+      issuer: { owner: "player" },
       command: { kind: "stop" as const, actorId: String(i) },
       accepted: true,
     })),
@@ -613,6 +614,7 @@ test("instant production still emits training start and completion once", () => 
   adapter.observe([
     {
       tick: 1,
+      issuer: { owner: "player" },
       accepted: true,
       command: {
         kind: "train-unit",

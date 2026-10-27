@@ -7,7 +7,9 @@ export const isId = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
 export const isIdList = (ids: unknown): ids is string[] =>
-  Array.isArray(ids) && ids.every(isId) && new Set(ids).size === ids.length;
+  Array.isArray(ids) &&
+  Array.from(ids).every(isId) &&
+  new Set(ids).size === ids.length;
 
 export const isPositive = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;

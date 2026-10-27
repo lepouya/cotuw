@@ -24,11 +24,16 @@ import type {
 } from "../simulation/economy";
 import type { MissionSimulation } from "../simulation/mission";
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
-import type { CommandOutcome, MissionCommand } from "../simulation/command";
+import type {
+  AuthorityReason,
+  CommandOutcome,
+  MissionCommand,
+} from "../simulation/command";
 import type { TileCoord } from "../simulation/grid";
 import type { WorldPosition } from "../simulation/world";
 
-const REASONS: Record<EconomyReason, string> = {
+const REASONS: Record<EconomyReason | AuthorityReason, string> = {
+  unauthorized: "You cannot command this unit.",
   "invalid-cultivator": "Select a cultivating worker first.",
   "invalid-growth": "Choose an unfinished growing building.",
   "tender-occupied": "This building already has a tending worker.",

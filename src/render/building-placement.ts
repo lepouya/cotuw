@@ -17,7 +17,7 @@ import { setText } from "../ui/dom";
 import type { Scene, LinesMesh } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { MissionSimulation } from "../simulation/mission";
-import type { CommandOutcome } from "../simulation/command";
+import type { AuthorityReason, CommandOutcome } from "../simulation/command";
 import type { ActorPlacement, PlacementReason } from "../simulation/placement";
 import type { ActorDefinition } from "../simulation/actor";
 import type {
@@ -32,7 +32,8 @@ export type BuildingPlacementControls = {
   status?: HTMLElement;
 };
 
-const REASONS: Record<PlacementReason, string> = {
+const REASONS: Record<PlacementReason | AuthorityReason, string> = {
+  unauthorized: "Select only your own workers.",
   "missing-worker": "Select a worker that can tend this building.",
   "missing-headquarters": "An operational headquarters is needed for growth.",
   "unreachable-growth": "No selected worker can reach this building.",

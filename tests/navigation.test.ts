@@ -811,7 +811,7 @@ describe("saved missions", () => {
       target: center(map, 8, 2),
     });
     original.tick();
-    original.submitCommand(wall(4));
+    original.submitCommand(wall(4), { script: true });
     original.tick();
     original.tick();
 
@@ -840,11 +840,14 @@ describe("saved missions", () => {
   test("rejects an invalid terrain command without partial edits", () => {
     const map = createMap();
     const simulation = createSimulation(map, createMissionState([]));
-    simulation.submitCommand({
-      kind: "terrain",
-      heights: [{ x: 0, z: 0, height: 1 }],
-      tiles: [{ x: 0, z: 0, terrain: { typeId: "lava" } }],
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        heights: [{ x: 0, z: 0, height: 1 }],
+        tiles: [{ x: 0, z: 0, terrain: { typeId: "lava" } }],
+      },
+      { script: true },
+    );
 
     const [outcome] = simulation.tick();
 

@@ -53,17 +53,20 @@ describe("simulation terrain", () => {
         bounds: map.worldBounds,
       });
       const before = map.terrainState();
-      simulation.submitCommand({
-        kind: "terrain",
-        [field]: Array(1),
-      } as MissionCommand);
+      simulation.submitCommand(
+        { kind: "terrain", [field]: Array(1) } as MissionCommand,
+        { script: true },
+      );
       expect(simulation.snapshot().commands).toEqual([]);
       expect(simulation.tick()).toMatchObject([{ accepted: false }]);
       expect(map.terrainState()).toEqual(before);
-      simulation.submitCommand({
-        kind: "terrain",
-        heights: [{ x: 0, z: 0, height: 1 }],
-      });
+      simulation.submitCommand(
+        {
+          kind: "terrain",
+          heights: [{ x: 0, z: 0, height: 1 }],
+        },
+        { script: true },
+      );
       expect(simulation.tick()).toMatchObject([{ accepted: true }]);
       expect(map.heightAt(0, 0)).toBe(1);
       simulation.dispose();
@@ -258,9 +261,10 @@ describe("simulation terrain", () => {
       tickSeconds: 1,
     });
     const before = map.terrainState();
-    mission.submitCommand({ kind: "terrain", ...invalid } as TerrainEdit & {
-      kind: "terrain";
-    });
+    mission.submitCommand(
+      { kind: "terrain", ...invalid } as TerrainEdit & { kind: "terrain" },
+      { script: true },
+    );
     expect(mission.tick()[0]?.accepted).toBe(false);
     expect(map.terrainState()).toEqual(before);
   });

@@ -113,13 +113,34 @@ can be read, edited by hand, and loaded again.
   ends. Harvesters choose sites from their owner's known tiles: explored
   terrain for the player, current vision for other owners. Without `fog`,
   every owner sees everything.
-- Placement creates buildings for the player owner, and trained units inherit
-  their producer's owner. Behaviors cannot change an actor's owner.
+- Placement creates buildings for the issuing owner, and trained units
+  inherit their producer's owner. Behaviors cannot change an actor's owner.
 - Scenario authoring assigns each building and unit without an explicit
   `owner` to the first owner playing its definition's faction, and rejects an
   actor that no owner plays. Wolf-den levels use a `player` owner and a
   `wildlife` owner, hostile to each other; free-construction previews use a
   factionless `player` owner.
+
+## Commands
+
+- `state.commands` lists commands waiting for the next tick, each with its
+  `tick`, `issuer`, and `command`.
+- An `issuer` is `{ "owner": id }` for an owner's player or AI, or
+  `{ "script": true }` for mission scripts, optionally with the `owner` they
+  act for.
+- Owners command only their own actors: the ordered units, the producer for
+  training and its cancellation, and selected workers for placement. A group
+  move rejects only the members the issuer may not command. Rejections report
+  `unauthorized`.
+- Placement builds for the issuer's owner and requires that owner to know
+  every footprint tile, as Harvesters do for sites. Rally points use their
+  producer owner's knowledge.
+- `scenario.scriptControl` lists the owners whose actors scripts may command,
+  as `{ "owner": id }`, optionally limited by `actorIds`. Each owner appears
+  once; actor lists are nonempty and distinct, and unknown fields are invalid.
+  Scripts command the player's actors only through an entry for the
+  player owner. A limited entry places only the building IDs it lists.
+- Only scripts issue `terrain` commands.
 
 ## Events
 

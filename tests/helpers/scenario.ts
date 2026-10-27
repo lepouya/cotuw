@@ -5,6 +5,10 @@ import {
   depositedBy,
   stockpileOf,
 } from "../../src/simulation/stockpiles";
+import type {
+  CommandIssuer,
+  MissionCommand,
+} from "../../src/simulation/command";
 import type { EconomyView } from "../../src/simulation/economy";
 import type { Resource } from "../../src/simulation/resources";
 import type { Stockpile } from "../../src/simulation/stockpiles";
@@ -39,6 +43,16 @@ export function exploredScenarioState(
     ...state,
     fog: { explored: "1".repeat(state.fog!.explored.length) },
   };
+}
+
+/** Submits one command and returns its outcome from the next tick. */
+export function command(
+  sim: MissionSimulation,
+  value: MissionCommand,
+  issuer?: CommandIssuer,
+) {
+  sim.submitCommand(value, issuer);
+  return sim.tick()[0]!;
 }
 
 export function advanceSeconds(sim: MissionSimulation, seconds: number) {

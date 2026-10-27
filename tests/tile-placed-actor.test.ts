@@ -193,20 +193,29 @@ describe("tile-placed actors", () => {
       createMissionState([wall(placed, "wall-1", 2, 2)]),
     );
     const water = { typeId: "plain", surfacePassable: false };
-    mission.submitCommand({
-      kind: "terrain",
-      tiles: [{ x: 3, z: 2, terrain: water }],
-    });
+    mission.submitCommand(
+      {
+        kind: "terrain",
+        tiles: [{ x: 3, z: 2, terrain: water }],
+      },
+      { script: true },
+    );
     // The corner shared by tiles (1, 1) and (2, 2) shapes the footprint.
-    mission.submitCommand({
-      kind: "terrain",
-      heights: [{ x: 2, z: 2, height: 1 }],
-    });
-    mission.submitCommand({
-      kind: "terrain",
-      tiles: [{ x: 5, z: 5, terrain: water }],
-      heights: [{ x: 1, z: 1, height: 1 }],
-    });
+    mission.submitCommand(
+      {
+        kind: "terrain",
+        heights: [{ x: 2, z: 2, height: 1 }],
+      },
+      { script: true },
+    );
+    mission.submitCommand(
+      {
+        kind: "terrain",
+        tiles: [{ x: 5, z: 5, terrain: water }],
+        heights: [{ x: 1, z: 1, height: 1 }],
+      },
+      { script: true },
+    );
 
     expect(mission.tick().map(({ accepted }) => accepted)).toEqual([
       false,
@@ -572,10 +581,13 @@ describe("tile-placed actors", () => {
     );
     const terrain = map.terrainState();
     mission.submitCommand(placeWall("wall-1", 2, 1));
-    mission.submitCommand({
-      kind: "terrain",
-      heights: [{ x: 0, z: 0, height: 1 }],
-    });
+    mission.submitCommand(
+      {
+        kind: "terrain",
+        heights: [{ x: 0, z: 0, height: 1 }],
+      },
+      { script: true },
+    );
 
     expect(() => mission.tick()).toThrow("facing");
     expect(occupancy.placementByOwnerId("wall-1")).toBeUndefined();

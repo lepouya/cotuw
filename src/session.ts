@@ -22,7 +22,11 @@ import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
 import { createNetworkControls } from "./ui/network-controls";
 import type { NetworkControls } from "./ui/network-controls";
-import { ACTOR_REMOVAL_KINDS, isCommandOf } from "./simulation/command";
+import {
+  ACTOR_REMOVAL_KINDS,
+  isCommandOf,
+  issuedBy,
+} from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
 import {
   createMaterialsSitesView,
@@ -933,7 +937,11 @@ async function assembleGameSession(
       haltControls();
       canvas.dataset.simulationFault = "true";
     },
-    afterTick: (outcomes) => {
+    afterTick: (tickOutcomes) => {
+      // Feedback covers only the player's own orders.
+      const outcomes = tickOutcomes.filter(({ issuer }) =>
+        issuedBy(issuer, playerOwner),
+      );
       // Capture a destroyed building's height before its view leaves.
       if (simulation.actorVersion !== knownWreckActorVersion) {
         updateWrecks(0);

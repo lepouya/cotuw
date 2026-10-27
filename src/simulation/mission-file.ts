@@ -1,6 +1,7 @@
 import type { MissionState } from "./mission";
 import type { ObjectiveDefinition } from "./objectives";
 import type { MissionEventDefinition } from "./events";
+import type { ScriptControl } from "./authority";
 import { isTerrainTileShape } from "./terrain";
 import { isCount, isId, isIdList, isPositive, isRecord } from "./validation";
 
@@ -9,7 +10,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 12;
+export const MISSION_FILE_VERSION = 13;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -66,6 +67,8 @@ export type MissionScenario = {
   readonly events?: readonly MissionEventDefinition[];
   /** Lets an owner without a headquarters run one replacement job. */
   readonly emergencyHeadquarters?: boolean;
+  /** Owners whose actors mission scripts may command. */
+  readonly scriptControl?: readonly ScriptControl[];
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
   readonly popups?: readonly ScenarioPopup[];
@@ -124,6 +127,8 @@ export function serializeMission(
     terrainTypeIds,
     objectives,
     events,
+    emergencyHeadquarters,
+    scriptControl,
     briefing,
     goals,
     popups,
@@ -143,6 +148,8 @@ export function serializeMission(
       terrainTypeIds,
       objectives,
       events,
+      emergencyHeadquarters,
+      scriptControl,
       briefing,
       goals,
       popups,
@@ -287,6 +294,11 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     typeof scenario.emergencyHeadquarters !== "boolean"
   )
     throw new RangeError("Scenario emergencyHeadquarters must be a boolean.");
+  if (
+    scenario.scriptControl !== undefined &&
+    !Array.isArray(scenario.scriptControl)
+  )
+    throw new RangeError("Scenario scriptControl must be a list.");
   if (
     save !== undefined &&
     (!isRecord(save) ||

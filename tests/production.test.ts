@@ -491,10 +491,13 @@ test("rally points are persistent ground orders, clearable, and used after exiti
 
 test("rally points reject water, occupied footprints, invalid positions, and non-producers", () => {
   const { simulation, map } = fixture();
-  simulation.submitCommand({
-    kind: "terrain",
-    tiles: [{ x: 8, z: 8, terrain: { typeId: "water" } }],
-  });
+  simulation.submitCommand(
+    {
+      kind: "terrain",
+      tiles: [{ x: 8, z: 8, terrain: { typeId: "water" } }],
+    },
+    { script: true },
+  );
   simulation.tick();
   for (const target of [
     map.tileCenter(8, 8),

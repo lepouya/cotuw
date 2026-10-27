@@ -29,12 +29,14 @@ function fixture() {
 
 const move: CommandOutcome<MoveCommand> = {
   tick: 0,
+  issuer: { owner: "player" },
   command: { kind: "move", actorId: "unit", target: { x: 4, z: 0 } },
   accepted: true,
   reachedTarget: true,
 };
 const stop: CommandOutcome<StopCommand> = {
   tick: 0,
+  issuer: { owner: "player" },
   command: { kind: "stop", actorId: "unit" },
   accepted: true,
 };
@@ -95,6 +97,7 @@ test("queued receipts are reported apart from orders that start now", () => {
   );
   const attack = {
     tick: 0,
+    issuer: { owner: "player" },
     command: { kind: "attack", actorId: "a", targetId: "t" },
     accepted: true,
   } as const;

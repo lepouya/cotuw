@@ -176,18 +176,26 @@ test.each([null, {}, { target: null }])(
   },
 );
 
+const stop = { kind: "stop", actorId: "trooper" };
 test.each([
   null,
-  { tick: -1, command: { kind: "stop", actorId: "trooper" } },
-  { tick: 0.5, command: { kind: "stop", actorId: "trooper" } },
-  { tick: 0, command: null },
-  { tick: 0, command: { kind: "unknown", actorId: "trooper" } },
-  { tick: 0, command: { kind: "move", actorId: "trooper", target: null } },
-  {
-    tick: 0,
-    command: { kind: "group-move", actorIds: null, target: { x: 0, z: 0 } },
-  },
-  { tick: 0, command: { kind: "terrain", heights: [null] } },
+  ...[
+    { tick: -1, command: stop },
+    { tick: 0.5, command: stop },
+    { tick: 0, command: null },
+    { tick: 0, command: { kind: "unknown", actorId: "trooper" } },
+    { tick: 0, command: { kind: "move", actorId: "trooper", target: null } },
+    {
+      tick: 0,
+      command: { kind: "group-move", actorIds: null, target: { x: 0, z: 0 } },
+    },
+    { tick: 0, command: { kind: "terrain", heights: [null] } },
+  ].map((scheduled) => ({ ...scheduled, issuer: { owner: "player" } })),
+  { tick: 0, command: stop },
+  { tick: 0, command: stop, issuer: {} },
+  { tick: 0, command: stop, issuer: { owner: "rival" } },
+  { tick: 0, command: stop, issuer: { owner: "player", script: false } },
+  { tick: 0, command: stop, issuer: { owner: "player", name: "x" } },
 ])("rejects malformed saved queued command %j before starting", (scheduled) => {
   const state = createMissionState([actor()]);
   state.commands.push(scheduled as unknown as ScheduledCommand);
@@ -204,7 +212,11 @@ test.each([
 
 test("saved commands recheck gameplay legality at their scheduled tick", () => {
   const state = createMissionState([actor()]);
-  state.commands.push({ tick: 1, command: move("missing", 4, 0) });
+  state.commands.push({
+    tick: 1,
+    issuer: { owner: "player" },
+    command: move("missing", 4, 0),
+  });
   const simulation = createMissionSimulation({
     state,
     behaviorRegistry,
@@ -214,6 +226,29 @@ test("saved commands recheck gameplay legality at their scheduled tick", () => {
   });
   expect(simulation.tick()).toEqual([]);
   expect(simulation.tick()[0]!.accepted).toBe(false);
+});
+
+test("submission validates the copied issuer before queuing", () => {
+  const simulation = mission([actor()]);
+  const issuer = Object.create({ owner: "player" });
+  expect(() => simulation.submitCommand(move("trooper", 4, 0), issuer)).toThrow(
+    "invalid issuer",
+  );
+  expect(simulation.snapshot().commands).toEqual([]);
+});
+
+test("sparse saved command lists are rejected before starting", () => {
+  const state = createMissionState([actor()]);
+  state.commands = Array(1);
+  expect(() =>
+    createMissionSimulation({
+      state,
+      behaviorRegistry,
+      bounds,
+      definitions,
+      tickSeconds: 0.5,
+    }),
+  ).toThrow("queued commands");
 });
 
 describe("mission definitions", () => {
@@ -318,7 +353,12 @@ describe("mission commands", () => {
     const outcomes = simulation.tick();
 
     expect(outcomes).toEqual([
-      { tick: 0, command: move("trooper", 3, 0), accepted: true },
+      {
+        tick: 0,
+        issuer: { owner: "player" },
+        command: move("trooper", 3, 0),
+        accepted: true,
+      },
     ]);
     expect(simulation.completedTicks).toBe(1);
     expect(simulation.submitCommand(move("trooper", 0, 0))).toBe(1);

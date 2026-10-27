@@ -161,7 +161,8 @@ and bring up the rough skirmish map early for simulation and AI development.
   ARC's paid first-income opening from either slot through the single-faction
   opening builder. Owner-based launch assembly,
   difficulty, resolved restart setup, and Circle integration remain pending
-  their implementation dependencies.
+  their implementation dependencies. Launch assembly enables the scenario's
+  `emergencyHeadquarters` rule from 1.16.
 - [x] **1.15** Implement the actor ownership model from 1.08 across hostility,
   support networks, vision and fog, economy, objectives, presentation, and
   saves. Verify that opposing owners of the same faction type fight and keep
@@ -181,7 +182,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   Regression checks cover root-to-relay sharing, faction-compatible support,
   owner-specific resource knowledge, saved worker assignments, and training
   rosters for owned actors of another faction type.
-- [ ] **1.16** Give each owner its own stockpiles, workers, production, and
+- [x] **1.16** Give each owner its own stockpiles, workers, production, and
   stall state, with infrastructure queues and slots per headquarters and
   training queues per production building. Verify that spending and refunds
   cannot affect another owner's economy without explicit resource sharing.
@@ -202,13 +203,23 @@ and bring up the rough skirmish map early for simulation and AI development.
   replacement job independently of allied queues. Headless checks cover these
   rules and save continuation;
   browser specs cover owner-specific hints, construction, training, and
-  save/load/restart wiring. Playtest acceptance remains. Scenario-specified
-  pool divisions other than equal shares are not implemented.
-- [ ] **1.17** Add issuing-owner authority to commands and validate actor
+  save/load/restart wiring. Playtesting accepted the result. Scenario-specified
+  pool divisions other than equal shares are deferred; no M1 content shares
+  resources.
+- [x] **1.17** Add issuing-owner authority to commands and validate actor
   ownership, including between same-faction-type owners in the development
   harness. Implement the agreed mission-script authority and reject
   unauthorized work. Create placed buildings for the issuing owner and check
   placement against that owner's exploration rather than the player's fog.
+  [Commands](docs/mission-files.md#commands) carry a saved owner or script
+  issuer and are rejected as unauthorized outside its actors. Placement builds
+  for the issuer and uses its knowledge. Scenario `scriptControl` grants
+  scripts owners, optionally limited to actor IDs, and only scripts edit
+  terrain. Player feedback ignores other issuers' outcomes. Headless checks
+  cover rival ARC owners, shared services without command authority, placement
+  workers, script permissions, and deterministic saves. Browser checks cover
+  issuer-scoped feedback. Restricting scripts to a scripted sequence is deferred
+  until sequences exist; mirror-harness use follows 1.14 launch assembly.
 - [ ] **1.18** Replace player-only simulation assumptions, including loot
   collection, with owner-neutral rules or explicit documented exceptions.
 - [ ] **1.19** Add authoritative AI observation memory for observed enemies,
@@ -435,10 +446,10 @@ verified; preview work is partial progress.
   ARC and Circle use shared wolf-den authoring, worker route handling,
   interruption, and compatible-site queries. Regression checks cover tending
   cancellation, drop-off loss, queued delivery, and the 60% slowdown threshold.
-- [ ] Base-loop integration: owner economies, authority, information, and
-  persistence work in 1.16-1.18, 1.20, 1.24, and 1.27 remains required,
-  including owner balances in 1.16. The slice runs on 1.15's owners with
-  single-player control; it does not complete those prerequisites or their
+- [ ] Base-loop integration: 1.16 and 1.17 provide owner economies and
+  command authority. Owner-neutral rules, information, and persistence work
+  in 1.18, 1.20, 1.24, and 1.27 remains required. The slice runs on 1.15's owners
+  with single-player control; it does not complete those prerequisites or their
   dependent acceptance gates. Emergency Heartgrove recovery remains
   in 1.49. Difficulty and skirmish launch remain in 1.60.
 - [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
@@ -449,8 +460,8 @@ verified; preview work is partial progress.
   encounters. Wolves alone cannot validate structure counters. Circle AI
   remains 1.55; full skirmish integration and balance remain phases F and G.
 
-Next integration target: owner economies, command authority, and headquarters
-recovery through the common milestone foundations.
+Next integration target: owner-neutral rules and information boundaries
+through the common milestone foundations.
 
 #### Circle tasks
 

@@ -467,6 +467,7 @@ test("serialization preserves signed zero in authoritative state", () => {
   state.terrain.heights[0] = -0;
   state.commands.push({
     tick: 0,
+    issuer: { owner: "player" },
     command: { kind: "move", actorId: "unit", target: { x: -0, z: 0 } },
   });
   expect(parseMission(serializeMission(scenario, state, 1), 1).state).toEqual(

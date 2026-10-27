@@ -14,6 +14,12 @@ These contracts describe where new behaviors, views, and services attach.
   into per-member moves. Non-object submissions throw before queuing. Objects
   without the structure saves require are rejected at their tick, left out of
   snapshots, and do not reserve creation IDs.
+- `simulation/authority.ts` decides whether a command's issuer may command
+  the actors involved before its handler runs. Handlers and queued orders
+  trust that check; its exhaustive policy requires new command kinds to name
+  their commanded actors. Only an explicit `script: true` grants script
+  authority, and script grants reject unknown fields.
+  Session feedback reads only outcomes the player owner issued.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates
   the current batch even if its hook immediately resumes.
@@ -67,8 +73,8 @@ These contracts describe where new behaviors, views, and services attach.
   explicit actor commands interrupt either worker type without losing cargo.
   Building loss cancels affected automatic routes. Cultivators retain delivery
   work and queued orders while selecting a replacement drop-off.
-- Command authority remains an M1 prerequisite. Workers tend and deliver only
-  to their owner's buildings; training inherits the producer's owner.
+- Workers tend and deliver only to their owner's buildings; training inherits
+  the producer's owner.
   Resource-site knowledge follows the worker owner's vision, with explored
   terrain retained only for the player.
 

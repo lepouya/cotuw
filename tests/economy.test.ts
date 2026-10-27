@@ -24,6 +24,7 @@ import type {
 import type { MissionCommand } from "../src/simulation/command";
 import {
   balance,
+  command,
   deposited,
   exploredScenarioState,
   playerOwners,
@@ -127,10 +128,6 @@ function fixture(
     ]),
   });
   return { simulation, map, occupancy };
-}
-function command(simulation: MissionSimulation, command: MissionCommand) {
-  simulation.submitCommand(command);
-  return simulation.tick()[0];
 }
 function advance(simulation: MissionSimulation, ticks: number) {
   for (let tick = 0; tick < ticks; tick++) simulation.tick();
@@ -897,13 +894,17 @@ describe("Materials economy", () => {
       { x: 7, z: 8 },
       { x: 8, z: 8 },
     ];
-    command(simulation, {
-      kind: "terrain",
-      tiles: exits.map((tile) => ({
-        ...tile,
-        terrain: { typeId: "plain", surfacePassable: false },
-      })),
-    });
+    command(
+      simulation,
+      {
+        kind: "terrain",
+        tiles: exits.map((tile) => ({
+          ...tile,
+          terrain: { typeId: "plain", surfacePassable: false },
+        })),
+      },
+      { script: true },
+    );
     advance(simulation, 5);
     expect(simulation.actorById("worker")).toBeUndefined();
     expect(simulation.economy!.production[0].exitBlocked).toBe(true);
@@ -911,29 +912,41 @@ describe("Materials economy", () => {
     const cancelled = fixture(saved).simulation;
     command(cancelled, { kind: "cancel-production", actorId: "worker" });
     expect(balance(cancelled)).toBe(900);
-    command(simulation, {
-      kind: "terrain",
-      tiles: [{ x: 7, z: 8, terrain: { typeId: "plain" } }],
-    });
+    command(
+      simulation,
+      {
+        kind: "terrain",
+        tiles: [{ x: 7, z: 8, terrain: { typeId: "plain" } }],
+      },
+      { script: true },
+    );
     expect(simulation.actorById("worker")).toBeDefined();
   });
 
   test("a blocked patch reports stalled harvesting and resumes when navigation changes", () => {
     const { simulation } = workerFixture();
-    command(simulation, {
-      kind: "terrain",
-      tiles: [
-        { x: 22, z: 6, terrain: { typeId: "plain", surfacePassable: false } },
-      ],
-    });
+    command(
+      simulation,
+      {
+        kind: "terrain",
+        tiles: [
+          { x: 22, z: 6, terrain: { typeId: "plain", surfacePassable: false } },
+        ],
+      },
+      { script: true },
+    );
     command(simulation, gather("far"));
     expect(worker(simulation).phase).toBe("blocked");
     advance(simulation, 5);
     expect(worker(simulation).cargo).toBe(0);
-    command(simulation, {
-      kind: "terrain",
-      tiles: [{ x: 22, z: 6, terrain: { typeId: "plain" } }],
-    });
+    command(
+      simulation,
+      {
+        kind: "terrain",
+        tiles: [{ x: 22, z: 6, terrain: { typeId: "plain" } }],
+      },
+      { script: true },
+    );
     until(simulation, () => worker(simulation).cargo > 0);
   });
 
@@ -949,18 +962,26 @@ describe("Materials economy", () => {
         .filter((dz) => dx || dz)
         .map((dz) => ({ x: center.x + dx, z: center.z + dz })),
     );
-    command(simulation, {
-      kind: "terrain",
-      tiles: ring.map((tile) => ({
-        ...tile,
-        terrain: { typeId: "plain", surfacePassable: false },
-      })),
-    });
+    command(
+      simulation,
+      {
+        kind: "terrain",
+        tiles: ring.map((tile) => ({
+          ...tile,
+          terrain: { typeId: "plain", surfacePassable: false },
+        })),
+      },
+      { script: true },
+    );
     until(simulation, () => worker(simulation).phase === "blocked", 5);
-    command(simulation, {
-      kind: "terrain",
-      tiles: ring.map((tile) => ({ ...tile, terrain: { typeId: "plain" } })),
-    });
+    command(
+      simulation,
+      {
+        kind: "terrain",
+        tiles: ring.map((tile) => ({ ...tile, terrain: { typeId: "plain" } })),
+      },
+      { script: true },
+    );
     until(simulation, () => worker(simulation).cargo > 0);
   });
 
@@ -1196,29 +1217,38 @@ describe("owner economies", () => {
 
   test("spending, refunds, and deliveries stay with each owner", () => {
     const { simulation } = fixture(rivalState());
-    expect(command(simulation, train("rival-worker")).accepted).toBe(true);
+    const rival = { owner: "rival" };
+    expect(command(simulation, train("rival-worker"), rival).accepted).toBe(
+      true,
+    );
     expect(balances(simulation)).toEqual([150, 150]);
-    command(simulation, { kind: "cancel-production", actorId: "rival-worker" });
+    command(
+      simulation,
+      { kind: "cancel-production", actorId: "rival-worker" },
+      rival,
+    );
     expect(balances(simulation)).toEqual([150, 200]);
     expect(command(simulation, build()).accepted).toBe(true);
     expect(balances(simulation)).toEqual([50, 200]);
     command(simulation, { kind: "cancel-construction", actorId: "refinery" });
     expect(balances(simulation)).toEqual([150, 200]);
 
-    expect(command(simulation, train("rival-worker-2")).accepted).toBe(true);
+    expect(command(simulation, train("rival-worker-2"), rival).accepted).toBe(
+      true,
+    );
     until(simulation, () => !!simulation.actorById("rival-worker-2"), 10);
-    command(simulation, {
-      kind: "gather",
-      actorId: "rival-worker-2",
-      siteId: "site",
-    });
+    command(
+      simulation,
+      { kind: "gather", actorId: "rival-worker-2", siteId: "site" },
+      rival,
+    );
     until(simulation, () => deposited(simulation, "materials", "rival") > 0);
     const income = deposited(simulation, "materials", "rival");
     expect(balances(simulation)).toEqual([150, 150 + income]);
     expect(deposited(simulation)).toBe(0);
 
     const sale = balance(simulation, "materials", "rival");
-    command(simulation, { kind: "sell-actor", actorId: "rival-cc" });
+    command(simulation, { kind: "sell-actor", actorId: "rival-cc" }, rival);
     expect(balance(simulation)).toBe(150);
     expect(balance(simulation, "materials", "rival")).toBe(sale + 150);
 

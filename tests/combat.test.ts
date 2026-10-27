@@ -517,10 +517,13 @@ describe("combat edge cases", () => {
     ).state;
     const { simulation: restored } = fixture(units, undefined, saved);
     for (const run of [simulation, restored]) {
-      run.submitCommand({
-        kind: "terrain",
-        tiles: [{ x: 10, z: 10, terrain: { typeId: "plain" } }],
-      });
+      run.submitCommand(
+        {
+          kind: "terrain",
+          tiles: [{ x: 10, z: 10, terrain: { typeId: "plain" } }],
+        },
+        { script: true },
+      );
       runUntil(run, () => !run.actorById("trooper")!.combat?.returning);
       expect(
         distance(run.actorById("trooper")!.worldPosition, at(5, 10)),
@@ -566,14 +569,17 @@ describe("combat edge cases", () => {
     );
     simulation.tick();
     expect(simulation.actorById("wolf")!.movement).toBeDefined();
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: Array.from({ length: 18 }, (_, index) => ({
-        x: 27,
-        z: index + 1,
-        terrain: { typeId: "water" },
-      })),
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: Array.from({ length: 18 }, (_, index) => ({
+          x: 27,
+          z: index + 1,
+          terrain: { typeId: "water" },
+        })),
+      },
+      { script: true },
+    );
     for (let tick = 0; tick < 80; tick++) {
       simulation.tick();
       const wolf = simulation.actorById("wolf")!;
@@ -585,10 +591,13 @@ describe("combat edge cases", () => {
     expect(simulation.actorById("wolf")!.territory?.failedTargets).toEqual([
       expect.objectContaining({ targetId: "scout" }),
     ]);
-    simulation.submitCommand({
-      kind: "terrain",
-      tiles: [{ x: 27, z: 10, terrain: { typeId: "plain" } }],
-    });
+    simulation.submitCommand(
+      {
+        kind: "terrain",
+        tiles: [{ x: 27, z: 10, terrain: { typeId: "plain" } }],
+      },
+      { script: true },
+    );
     simulation.tick();
     expect(
       simulation.actorById("wolf")!.combat?.attack?.blocked,
@@ -651,7 +660,10 @@ describe("combat edge cases", () => {
       ["trooper", "wolf"],
       ["wolf", "trooper"],
     ])
-      simulation.submitCommand({ kind: "attack", actorId, targetId });
+      simulation.submitCommand(
+        { kind: "attack", actorId, targetId },
+        { owner: simulation.actorById(actorId)!.owner },
+      );
     simulation.tick();
     expect(simulation.attacks.map(({ attackerId }) => attackerId)).toEqual([
       "trooper",
@@ -1422,10 +1434,13 @@ describe("Attack Move", () => {
     ).state;
     const { simulation: restored } = fixture(units, undefined, saved);
     for (const sim of [simulation, restored]) {
-      sim.submitCommand({
-        kind: "terrain",
-        tiles: [{ x: 10, z: 10, terrain: { typeId: "plain" } }],
-      });
+      sim.submitCommand(
+        {
+          kind: "terrain",
+          tiles: [{ x: 10, z: 10, terrain: { typeId: "plain" } }],
+        },
+        { script: true },
+      );
       runUntil(sim, () => !sim.actorById("trooper")!.attackMove);
       expect(sim.actorById("trooper")!.worldPosition).toEqual(at(5, 10));
     }

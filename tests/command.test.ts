@@ -30,18 +30,21 @@ test("outcomes pair each command with its own rejection reasons", () => {
   expectTypeOf<Training>().toEqualTypeOf<CommandOutcome<TrainUnitCommand>>();
   expectTypeOf<{
     tick: number;
+    issuer: { owner: string };
     command: TrainUnitCommand;
     accepted: false;
     reason: "unknown-definition";
   }>().not.toExtend<CommandOutcome>();
   expectTypeOf<{
     tick: number;
+    issuer: { owner: string };
     command: PlaceActorCommand;
     accepted: false;
     reason: "missing-producer";
   }>().not.toExtend<CommandOutcome>();
   expectTypeOf<{
     tick: number;
+    issuer: { owner: string };
     command: MoveCommand;
     accepted: false;
     reason: "exit-blocked";
@@ -49,6 +52,7 @@ test("outcomes pair each command with its own rejection reasons", () => {
 
   const outcome: CommandOutcome = {
     tick: 0,
+    issuer: { owner: "player" },
     command: {
       kind: "train-unit",
       actorId: "unit",
@@ -61,6 +65,8 @@ test("outcomes pair each command with its own rejection reasons", () => {
   expect(isOutcomeOf(outcome, "place-actor")).toBe(false);
   expect(isOutcomeOf(outcome, "train-unit")).toBe(true);
   if (isOutcomeOf(outcome, "train-unit")) {
-    expectTypeOf(outcome.reason).toEqualTypeOf<TrainingReason | undefined>();
+    expectTypeOf(outcome.reason).toEqualTypeOf<
+      TrainingReason | "unauthorized" | undefined
+    >();
   }
 });

@@ -22,6 +22,7 @@ import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
 import {
   balance,
+  command,
   exploredScenarioState,
   playerOwners,
   setBalance,
@@ -99,10 +100,6 @@ function fixture(
     ]),
   });
   return { simulation, map };
-}
-function command(simulation: MissionSimulation, value: MissionCommand) {
-  simulation.submitCommand(value);
-  return simulation.tick()[0];
 }
 function ticks(simulation: MissionSimulation, count: number) {
   for (let i = 0; i < count; i++) simulation.tick();
@@ -550,12 +547,16 @@ describe("construction support", () => {
     setBalance(state, 100, "materials", "rival");
     const { simulation } = fixture(state);
     expect(
-      command(simulation, {
-        kind: "train-unit",
-        actorId: "rival-trooper",
-        producerId: "bridge",
-        definitionId: "arc-trooper",
-      }).accepted,
+      command(
+        simulation,
+        {
+          kind: "train-unit",
+          actorId: "rival-trooper",
+          producerId: "bridge",
+          definitionId: "arc-trooper",
+        },
+        { owner: "rival" },
+      ).accepted,
     ).toBe(true);
     ticks(simulation, 30);
     expect(simulation.actorById("rival-trooper")!.owner).toBe("rival");

@@ -744,6 +744,7 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - A mission owns its simulation terrain: corner heights and tile terrain. They
   change only through terrain commands at the start of a tick, so saves and
   replays capture every edit. A terrain command applies whole or is rejected.
+  Only mission scripts issue terrain commands; players and AI cannot.
 - Terrain changes report affected tile bounds. Renderers batch those reports by
   frame and rebuild only affected chunks while preserving shared material and
   texture state.
@@ -1633,13 +1634,13 @@ are tracked in the checklist.
   choices describe their playable opening. The setup screen will hold
   difficulty selection when implemented. Direct development links remain
   available.
-- Actors have owners with their own Lifebloom and Materials stockpiles, but
-  commands carry no issuing owner. Infrastructure has queues and slots per
-  headquarters, and emergency headquarters recovery is available to scenarios
-  that enable it. Command authority, support units, defenses, constructs, and
-  faction AI remain pending. The complete base-loop acceptance still requires
-  the shared milestone foundations. Presentation validation for the full
-  roster remains open.
+- Actors have owners with their own Lifebloom and Materials stockpiles, and
+  commands are authorized against their issuing owner. Infrastructure has
+  queues and slots per headquarters, and emergency headquarters recovery is
+  available to scenarios that enable it. Support units, defenses, constructs,
+  and faction AI remain pending. The complete base-loop acceptance still
+  requires the shared milestone foundations. Presentation validation for the
+  full roster remains open.
 - Wolves exercise movement, scouting, combat readability, durability, and
   basic recovery. They do not validate ARC matchups, defense-breaking counters,
   faction AI, skirmish pacing, or full-match balance. Add focused structure,

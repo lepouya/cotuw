@@ -8,6 +8,7 @@ import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
 import {
   advanceSeconds,
   balance,
+  command,
   exploredScenarioState,
   playerOwners,
   setBalance,
@@ -29,7 +30,6 @@ import type {
   MissionState,
   MissionSimulation,
 } from "../src/simulation/mission";
-import type { MissionCommand } from "../src/simulation/command";
 import type { MissionEventDefinition } from "../src/simulation/events";
 
 const definitions = BASE_CONTENT.actors.filter(
@@ -90,10 +90,6 @@ function fixture(
     ]),
   });
   return { simulation, map };
-}
-function command(sim: MissionSimulation, value: MissionCommand) {
-  sim.submitCommand(value);
-  return sim.tick()[0]!;
 }
 function train(sim: MissionSimulation, id = "worker") {
   expect(
@@ -539,12 +535,16 @@ test("delivery uses the nearest reachable drop-off and restarts after an outage"
         "player",
       ),
     );
-    command(sim, {
-      kind: "terrain",
-      tiles: adjacentTiles(map, occupiedTilesFor(near, definition)).map(
-        (tile) => ({ ...tile, terrain: { typeId: "water" } }),
-      ),
-    });
+    command(
+      sim,
+      {
+        kind: "terrain",
+        tiles: adjacentTiles(map, occupiedTilesFor(near, definition)).map(
+          (tile) => ({ ...tile, terrain: { typeId: "water" } }),
+        ),
+      },
+      { script: true },
+    );
     untilSeconds(sim, () => balance(sim, "lifebloom") >= 30);
     expect(
       sim.buildingActivity.some(
@@ -657,6 +657,47 @@ test.each([
     expect(() => fixture(state)).toThrow("invalid cultivation state");
   },
 );
+
+test("placement rejects another owner's workers before spending or assigning work", () => {
+  const state = exploredScenarioState(scenario, definitions);
+  state.owners.push({ id: "rival", faction: "circle" });
+  setBalance(state, 1000, "lifebloom");
+  const { simulation: sim, map } = fixture(state);
+  try {
+    train(sim);
+    sim.spawnActor(
+      createActor({
+        id: "rival-worker",
+        definitionId: "circle-cultivator",
+        owner: "rival",
+        worldPosition: map.tileCenter(13, 10),
+      }),
+    );
+    const before = balance(sim, "lifebloom");
+    const placement = {
+      kind: "place-actor" as const,
+      actorId: "growth",
+      definitionId: "circle-conservatory",
+      origin: { x: 10, z: 6 },
+      workerIds: ["worker", "rival-worker"],
+    };
+    expect(command(sim, placement)).toMatchObject({
+      accepted: false,
+      reason: "unauthorized",
+    });
+    expect(balance(sim, "lifebloom")).toBe(before);
+    expect(sim.actorById("growth")).toBeUndefined();
+    expect(
+      sim.economy!.cultivation!.workers.every((worker) => !worker.tendingId),
+    ).toBe(true);
+    expect(command(sim, { ...placement, workerIds: ["worker"] }).accepted).toBe(
+      true,
+    );
+    expect(sim.actorById("growth")!.owner).toBe("player");
+  } finally {
+    sim.dispose();
+  }
+});
 
 test("placement selects the nearest reachable selected Cultivator without mutating navigation", () => {
   const state = exploredScenarioState(scenario, definitions);

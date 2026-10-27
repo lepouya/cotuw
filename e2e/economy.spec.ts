@@ -244,6 +244,60 @@ async function advance(page: Page, seconds: number) {
     harness.view.scene.render();
   }, seconds);
 }
+
+test("command feedback follows the player issuer and ignores AI and scripts", async ({
+  page,
+}) => {
+  await controlledOpening(page);
+  await page.evaluate(() => {
+    const { simulation } = window.economyHarness.view;
+    simulation.spawnActor({
+      id: "receipt-scout",
+      definitionId: "arc-scout",
+      owner: "player",
+      worldPosition: { x: -36.5, z: 2.5 },
+      facing: 0,
+      occupancyLayer: "surface",
+    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "receipt-scout",
+        target: { x: -30.5, z: 2.5 },
+      },
+      { owner: "player", script: undefined },
+    );
+  });
+  await advance(page, 0.1);
+  const canvas = page.locator("#game-canvas");
+  await expect(canvas).toHaveAttribute("data-move-status", "accepted");
+  await expect(canvas).toHaveAttribute("data-actor-target", "-30.5,2.5");
+  const status = await page.locator("#movement-status").textContent();
+  await page.evaluate(() => {
+    const { simulation } = window.economyHarness.view;
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "lone-wolf",
+        target: { x: -20.5, z: 2.5 },
+      },
+      { owner: "wildlife" },
+    );
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "receipt-scout",
+        target: { x: -28.5, z: 2.5 },
+      },
+      { script: true, owner: "player" },
+    );
+  });
+  await advance(page, 0.1);
+  await expect(canvas).toHaveAttribute("data-move-status", "accepted");
+  await expect(canvas).toHaveAttribute("data-actor-target", "-30.5,2.5");
+  await expect(page.locator("#movement-status")).toHaveText(status!);
+});
+
 async function action(page: Page, selector: string, touch = false) {
   const locator = page.locator(selector);
   if (touch) await locator.tap();
@@ -661,6 +715,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       );
     controls.onOutcome({
       tick: 0,
+      issuer: { owner: "player" },
       command: {
         kind: "gather",
         actorId: worker.actorId,
