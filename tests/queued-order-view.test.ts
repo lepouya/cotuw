@@ -29,6 +29,7 @@ test("queue previews reuse geometry, follow terrain edits, and release observers
     {
       id: "a",
       definitionId: "scout",
+      owner: "player",
       occupancyLayer: "surface",
       facing: 0,
       worldPosition: { x: -2, z: 0 },

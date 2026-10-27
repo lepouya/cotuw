@@ -52,11 +52,16 @@ test.each([0, 1, 2, 3])(
         appearances,
         { preview: true },
       );
-      const actor = createTilePlacedActor(map, definition, {
-        actorId: "preview",
-        origin: { x: 5, z: 5 },
-        quarterTurns,
-      });
+      const actor = createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "preview",
+          origin: { x: 5, z: 5 },
+          quarterTurns,
+        },
+        "player",
+      );
       views.update([actor]);
       const arrow = scene.getMeshByName(
         "tile-placed-actor-preview-root-exit-arrow",
@@ -106,10 +111,15 @@ test("preview arrows follow terrain changes beyond the building footprint", () =
       appearances,
       { preview: true },
     );
-    const actor = createTilePlacedActor(map, definition, {
-      actorId: "preview",
-      origin: { x: 5, z: 5 },
-    });
+    const actor = createTilePlacedActor(
+      map,
+      definition,
+      {
+        actorId: "preview",
+        origin: { x: 5, z: 5 },
+      },
+      "player",
+    );
     views.update([actor]);
     const name = "tile-placed-actor-preview-root-exit-arrow";
     const previous = scene.getMeshByName(name)!;
@@ -183,10 +193,15 @@ test("Refinery animation freezes during construction and progresses when operati
       [definition],
       appearances,
     );
-    const actor = createTilePlacedActor(map, definition, {
-      actorId: "building",
-      origin: { x: 5, z: 5 },
-    });
+    const actor = createTilePlacedActor(
+      map,
+      definition,
+      {
+        actorId: "building",
+        origin: { x: 5, z: 5 },
+      },
+      "player",
+    );
     actor.construction = {
       paidCost: 100,
       completedTicks: 4,

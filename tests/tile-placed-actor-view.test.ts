@@ -51,10 +51,15 @@ test("failed building cleanup releases the remaining views and materials once", 
   try {
     views.update(
       [1, 4].map((x) =>
-        createTilePlacedActor(map, definition, {
-          actorId: `building-${x}`,
-          origin: { x, z: 2 },
-        }),
+        createTilePlacedActor(
+          map,
+          definition,
+          {
+            actorId: `building-${x}`,
+            origin: { x, z: 2 },
+          },
+          "player",
+        ),
       ),
     );
     views.setSelectedActor("building-1");
@@ -107,10 +112,15 @@ test("a failed detail setup releases partial geometry and owns its materials", (
   try {
     const update = () =>
       views.update([
-        createTilePlacedActor(map, definition, {
-          actorId: "building",
-          origin: { x: 2, z: 2 },
-        }),
+        createTilePlacedActor(
+          map,
+          definition,
+          {
+            actorId: "building",
+            origin: { x: 2, z: 2 },
+          },
+          "player",
+        ),
       ]);
     expect(update).toThrow(fault);
     expect(update).toThrow(fault);
@@ -153,11 +163,16 @@ test("draws irregular rotated footprints on slopes at small tile sizes", () => {
       [definition],
       new Map([["corner", { height: 0.1, color: [0.2, 0.4, 0.6] }]]),
     );
-    const actor = createTilePlacedActor(map, definition, {
-      actorId: "object",
-      origin: { x: 3, z: 3 },
-      quarterTurns: 1,
-    });
+    const actor = createTilePlacedActor(
+      map,
+      definition,
+      {
+        actorId: "object",
+        origin: { x: 3, z: 3 },
+        quarterTurns: 1,
+      },
+      "player",
+    );
     views.update([actor]);
     const root = scene.getTransformNodeByName("tile-placed-actor-object-root")!;
     const columns = root.getChildMeshes();
@@ -199,19 +214,29 @@ test("rebuilds a view when a restored placement changes under the same ID", () =
       new Map(),
     );
     views.update([
-      createTilePlacedActor(map, definition, {
-        actorId: "object",
-        origin: { x: 1, z: 1 },
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "object",
+          origin: { x: 1, z: 1 },
+        },
+        "player",
+      ),
     ]);
     const old = scene.getTransformNodeByName("tile-placed-actor-object-root")!;
     const oldMesh = old.getChildMeshes()[0]!;
     views.update([
-      createTilePlacedActor(map, definition, {
-        actorId: "object",
-        origin: { x: 3, z: 3 },
-        quarterTurns: 1,
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "object",
+          origin: { x: 3, z: 3 },
+          quarterTurns: 1,
+        },
+        "player",
+      ),
     ]);
     expect(old.isDisposed()).toBe(true);
     expect(views.actorIdForMesh(oldMesh)).toBeUndefined();
@@ -236,14 +261,24 @@ test("refreshes affected buildings and selection after a terrain edit", () => {
       new Map(),
     );
     const actors = [
-      createTilePlacedActor(map, definition, {
-        actorId: "near",
-        origin: { x: 1, z: 1 },
-      }),
-      createTilePlacedActor(map, definition, {
-        actorId: "far",
-        origin: { x: 5, z: 5 },
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "near",
+          origin: { x: 1, z: 1 },
+        },
+        "player",
+      ),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "far",
+          origin: { x: 5, z: 5 },
+        },
+        "player",
+      ),
     ];
     views.update(actors);
     views.setSelectedActor("near");
@@ -277,10 +312,15 @@ test("rebuilds an unchanged placement when restored terrain changes", () => {
       [definition],
       new Map([[definition.id, { height: 1, color: [0.2, 0.4, 0.6] }]]),
     );
-    const actor = createTilePlacedActor(map, definition, {
-      actorId: "object",
-      origin: { x: 1, z: 1 },
-    });
+    const actor = createTilePlacedActor(
+      map,
+      definition,
+      {
+        actorId: "object",
+        origin: { x: 1, z: 1 },
+      },
+      "player",
+    );
     views.update([actor]);
     const old = scene.getTransformNodeByName("tile-placed-actor-object-root")!;
     const material = old.getChildMeshes()[0]!.material;
@@ -318,14 +358,24 @@ test("shares one material per definition until disposal", () => {
       new Map([[definition.id, { height: 1, color: [0.2, 0.4, 0.6] }]]),
     );
     views.update([
-      createTilePlacedActor(map, definition, {
-        actorId: "first",
-        origin: { x: 0, z: 0 },
-      }),
-      createTilePlacedActor(map, definition, {
-        actorId: "second",
-        origin: { x: 3, z: 3 },
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "first",
+          origin: { x: 0, z: 0 },
+        },
+        "player",
+      ),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "second",
+          origin: { x: 3, z: 3 },
+        },
+        "player",
+      ),
     ]);
     const shared = scene.getMeshByName(
       "tile-placed-actor-first-tile-0-0",
@@ -374,11 +424,16 @@ test("picks articulated buildings and animates without changing actor state", ()
         ],
       ]),
     );
-    const actor = createTilePlacedActor(map, square, {
-      actorId: "command-center",
-      origin: { x: 3, z: 3 },
-      quarterTurns: 1,
-    });
+    const actor = createTilePlacedActor(
+      map,
+      square,
+      {
+        actorId: "command-center",
+        origin: { x: 3, z: 3 },
+        quarterTurns: 1,
+      },
+      "player",
+    );
     const before = structuredClone(actor);
     views.update([actor]);
     const root = scene.getTransformNodeByName(
@@ -442,17 +497,27 @@ test("preview models tolerate map edges and keep placed materials opaque", () =>
       { preview: true },
     );
     placed.update([
-      createTilePlacedActor(map, definition, {
-        actorId: "placed",
-        origin: { x: 2, z: 2 },
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "placed",
+          origin: { x: 2, z: 2 },
+        },
+        "player",
+      ),
     ]);
     preview.update([
-      createTilePlacedActor(map, definition, {
-        actorId: "preview",
-        origin: { x: 0, z: 0 },
-        quarterTurns: 1,
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "preview",
+          origin: { x: 0, z: 0 },
+          quarterTurns: 1,
+        },
+        "player",
+      ),
     ]);
     const root = scene.getTransformNodeByName(
       "tile-placed-actor-preview-root",
@@ -504,10 +569,15 @@ test("details share materials per definition until disposal", () => {
       ]),
     );
     const place = (actorId: string, x: number) =>
-      createTilePlacedActor(map, definition, {
-        actorId,
-        origin: { x, z: 2 },
-      });
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId,
+          origin: { x, z: 2 },
+        },
+        "player",
+      );
     views.update([place("first", 1)]);
     const materials = scene.materials.length;
     views.update([place("first", 1), place("second", 4)]);
@@ -547,10 +617,15 @@ test("offline buildings dim locally, stop machinery, and restore shared material
       ]),
     );
     const actors = [1, 4].map((x, i) =>
-      createTilePlacedActor(map, definition, {
-        actorId: `building-${i}`,
-        origin: { x, z: 2 },
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: `building-${i}`,
+          origin: { x, z: 2 },
+        },
+        "player",
+      ),
     );
     views.update(actors);
     const materialCount = scene.materials.length;

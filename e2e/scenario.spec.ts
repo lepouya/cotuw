@@ -34,7 +34,6 @@ test("building visibility follows fog in a mission without an economy", async ({
     const building = definitions.find(
       ({ production, refinery }) => production && !refinery,
     )!;
-    const hostile = { ...building, faction: "hostile" };
     const scout = definitions.find(({ id }) => id === "arc-scout")!;
     const map = new TerrainGrid({
       width: 36,
@@ -47,17 +46,27 @@ test("building visibility follows fog in a mission without an economy", async ({
         {
           id: "scout",
           definitionId: scout.id,
+          owner: "player",
           worldPosition: map.tileCenter(12, 10),
           facing: 0,
           occupancyLayer: "surface" as const,
         },
-        createTilePlacedActor(map, hostile, {
-          actorId: "hostile-building",
-          origin: { x: 18, z: 10 },
-        }),
+        createTilePlacedActor(
+          map,
+          building,
+          {
+            actorId: "hostile-building",
+            origin: { x: 18, z: 10 },
+          },
+          "rival",
+        ),
       ]),
       terrain: map.terrainState(),
-      playerFaction: "arc",
+      owners: [
+        { id: "player", faction: "arc" },
+        { id: "rival", faction: "arc" },
+      ],
+      playerOwner: "player",
       fog: { explored: "0".repeat(map.width * map.height) },
     };
     const canvas = document.createElement("canvas");
@@ -69,9 +78,6 @@ test("building visibility follows fog in a mission without an economy", async ({
         ...mission,
         scenario: { ...mission.scenario, tileSize: 1 },
         state,
-        definitions: definitions.map((definition) =>
-          definition.id === hostile.id ? hostile : definition,
-        ),
       },
       startPaused: true,
     });
@@ -96,7 +102,7 @@ test("building visibility follows fog in a mission without an economy", async ({
       };
       const hidden = visit(1);
       const detected = view.simulation.detects(
-        "arc",
+        "player",
         view.simulation.actorById("hostile-building")!,
       );
       const returned = visit(12);
@@ -165,7 +171,8 @@ test("a restored mission renders its own map and saved terrain", async ({
       terrain: map.terrainState(),
       tileSize: map.tileSize,
       terrainTypeIds: [...map.terrainTypeIds],
-      playerFaction: "arc",
+      owners: [{ id: "player", faction: "arc" }],
+      playerOwner: "player",
       buildings: [
         {
           actorId: "starting-command-center",

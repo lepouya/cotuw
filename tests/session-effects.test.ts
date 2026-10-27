@@ -75,6 +75,7 @@ describe("session effects extraction", () => {
     const actor = createActor({
       id: "unit-1",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 2, z: 2 },
     });
     actor.health = 40;
@@ -115,6 +116,7 @@ describe("session effects extraction", () => {
     const actor = createActor({
       id: "unit-2",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 4, z: 4 },
     });
     actor.health = 80;
@@ -144,6 +146,7 @@ describe("session effects extraction", () => {
     const actor = createActor({
       id: "unit-3",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 4, z: 4 },
     });
     actor.health = 10;
@@ -195,6 +198,7 @@ describe("actorAnimationState", () => {
     const attacker = createActor({
       id: "trooper-1",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 0, z: 0 },
     });
     attacker.combat = {
@@ -205,6 +209,7 @@ describe("actorAnimationState", () => {
     const target = createActor({
       id: "wolf-1",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 3, z: 0 },
     });
 
@@ -225,6 +230,7 @@ describe("actorAnimationState", () => {
     const attacker = createActor({
       id: "trooper-1",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 0, z: 0 },
     });
     attacker.combat = {
@@ -234,6 +240,7 @@ describe("actorAnimationState", () => {
     const farTarget = createActor({
       id: "target-far",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: { x: 20, z: 20 },
     });
 

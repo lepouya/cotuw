@@ -1,5 +1,6 @@
 import type { MissionState } from "./mission";
 import type { ObjectiveDefinition } from "./objectives";
+import type { MissionEventDefinition } from "./events";
 import { isTerrainTileShape } from "./terrain";
 import { isCount, isId, isIdList, isPositive, isRecord } from "./validation";
 
@@ -8,7 +9,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 9;
+export const MISSION_FILE_VERSION = 11;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -61,6 +62,8 @@ export type MissionScenario = {
   readonly tileSize: number;
   readonly terrainTypeIds: readonly string[];
   readonly objectives?: readonly ObjectiveDefinition[];
+  /** One-time triggers and actions, such as relationship changes. */
+  readonly events?: readonly MissionEventDefinition[];
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
   readonly popups?: readonly ScenarioPopup[];
@@ -118,6 +121,7 @@ export function serializeMission(
     tileSize,
     terrainTypeIds,
     objectives,
+    events,
     briefing,
     goals,
     popups,
@@ -136,6 +140,7 @@ export function serializeMission(
       tileSize,
       terrainTypeIds,
       objectives,
+      events,
       briefing,
       goals,
       popups,
@@ -273,6 +278,8 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     );
   if (scenario.objectives !== undefined && !Array.isArray(scenario.objectives))
     throw new RangeError("Scenario objectives must be a list.");
+  if (scenario.events !== undefined && !Array.isArray(scenario.events))
+    throw new RangeError("Scenario events must be a list.");
   if (
     save !== undefined &&
     (!isRecord(save) ||

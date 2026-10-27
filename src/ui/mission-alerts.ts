@@ -58,7 +58,7 @@ export function createAlertTracker({
   owns,
   nameOf,
 }: {
-  owns: (actor: Pick<ActorRenderState, "definitionId">) => boolean;
+  owns: (actor: Pick<ActorRenderState, "owner">) => boolean;
   nameOf: (definitionId: string) => string;
 }) {
   let previous: AlertObservation | undefined;

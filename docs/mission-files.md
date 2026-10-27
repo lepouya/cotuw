@@ -33,8 +33,8 @@ can be read, edited by hand, and loaded again.
   west/east start slots, flat base areas, three ridge crossings, resource
   areas, and faction opening packages. Each slot names its starting resource
   area for expansion attribution. `createSkirmishOpening` assembles one
-  faction's headless opening at a slot; owner and setup state are not yet part
-  of the mission format.
+  faction's headless opening at a slot, owned by that slot's ID. Two-owner
+  assembly and setup state are not yet part of the mission format.
 - Saves live in browser local storage or, in the desktop build, in the app
   data folder's `saves` directory. **Export file** and **Import file** in the
   game menu move them between the game and ordinary files.
@@ -70,6 +70,60 @@ can be read, edited by hand, and loaded again.
 - `state` holds the complete simulation state. `state.scenarioId` must match
   `scenario.id`. `state.dismissedPopups` lists the popup IDs the player
   dismissed; removing an ID shows that popup again.
+
+## Owners
+
+- `state.owners` lists the participants that control actors, each with an
+  `id` and an optional `faction` the participant plays. That faction selects
+  the player's labels, prices, and music; it does not limit control.
+- `state.playerOwner` names the owner the player controls and whose
+  exploration the fog records. Owner IDs are distinct.
+- Every actor and wreck has an `owner` naming one of `state.owners`.
+- `state.relationships` lists allied and hostile pairs as `{ "owners": [a,
+  b], "relationship": "allied" | "hostile" }`; every other pair is neutral.
+  Each pair appears once. Allies may add `"sharesSupport": true` and
+  `"sharesHeadquarters": true` independently.
+- Only hostile owners attack each other; Attack orders against neutral or
+  allied actors are rejected.
+- Support links connect same-faction buildings of owners that share support.
+  A building is powered only by a linked root whose owner shares support with
+  every relay along the path. Placement also requires sharing with both the
+  covering relay and its root; a relay cannot lend a third owner's support.
+- Circle growth uses the nearest Heartgrove of its owner or of an ally that
+  shares headquarters. When sharing ends, the growth moves to the nearest
+  eligible Heartgrove on the next tick, or pauses with its payment and
+  progress until one is available. Construction without a headquarters queue,
+  such as ARC construction, has one slot per owner.
+- Harvesters deliver only to their owner's Refineries; the stockpiles are
+  still shared by the mission. Cultivators tend and deliver only to their
+  owner's buildings, including when restoring saved assignments.
+- With `fog`, every owner sees what its own and its allies' actors see. Only
+  the player owner keeps explored terrain, which remains after an alliance
+  ends. Harvesters choose sites from their owner's known tiles: explored
+  terrain for the player, current vision for other owners. Without `fog`,
+  every owner sees everything.
+- Placement creates buildings for the player owner, and trained units inherit
+  their producer's owner. Behaviors cannot change an actor's owner.
+- Scenario authoring assigns each building and unit without an explicit
+  `owner` to the first owner playing its definition's faction, and rejects an
+  actor that no owner plays. Wolf-den levels use a `player` owner and a
+  `wildlife` owner, hostile to each other; free-construction previews use a
+  factionless `player` owner.
+
+## Events
+
+- `scenario.events` lists one-time events, each with an `id`, a `trigger`,
+  and a nonempty list of `actions`. `state.firedEvents` lists the IDs that
+  have fired, so loading never repeats them.
+- Triggers are `{ "kind": "time", "seconds": n }`, which holds once `n`
+  simulation seconds have elapsed, and `{ "kind": "objective-complete",
+  "objectiveId": id }`.
+- The `set-relationship` action names two distinct `owners` and a
+  `relationship` of `allied`, `neutral`, or `hostile`. An `allied` action may
+  add `sharesSupport` and `sharesHeadquarters`; sharing an action leaves out
+  is revoked.
+- Events fire in authored order at the end of the tick their trigger first
+  holds, and take effect from the next tick. A defeat stops them.
 
 ## Circle economy state
 

@@ -3,6 +3,7 @@ import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import {
   createSupportNetwork,
   createSupportResolver,
+  supportForOwner,
   supportsPosition,
 } from "../src/simulation/support";
 import { createMissionSimulation } from "../src/simulation/mission";
@@ -16,10 +17,14 @@ import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { createTilePlacedActor } from "../src/simulation/placement";
+import { createActor } from "../src/simulation/actor";
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
-import { exploredScenarioState } from "./helpers/scenario";
+import { exploredScenarioState, playerOwners } from "./helpers/scenario";
+import { createRelations } from "../src/simulation/ownership";
 
+const arcPlayer = { owner: "player", faction: "arc" };
+const sameOwner = (left: string, right: string) => left === right;
 const definitions = new Map(
   ARC_ACTOR_DEFINITIONS.map((definition) => [definition.id, definition]),
 );
@@ -32,7 +37,7 @@ const mapOptions = {
 const contentMap = new TerrainGrid(mapOptions);
 const scenario = defineScenario({
   id: "support-test",
-  playerFaction: "arc",
+  ...playerOwners("arc"),
   tileSize: 1,
   terrainTypeIds: mapOptions.terrainTypeIds,
   terrain: contentMap.terrainState(),
@@ -99,6 +104,7 @@ function building(id: string, x: number, z: number): Actor {
     contentMap,
     definitions.get("arc-field-barracks")!,
     { actorId: id, origin: { x, z } },
+    "player",
   );
 }
 function blueprint(id: string, x: number, z: number): Actor {
@@ -109,19 +115,126 @@ function blueprint(id: string, x: number, z: number): Actor {
 }
 
 describe("construction support", () => {
-  test("another faction's root cannot power buildings or authorize placement", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
-    const enemyRoot = {
+  test("ownership does not make another faction's support compatible", () => {
+    const foreignRoot = {
       ...definitions.get("arc-command-center-prototype")!,
-      id: "enemy-command-center",
-      faction: "enemy",
+      id: "foreign-root",
+      faction: "other",
     };
-    state.actors.find(({ id }) => id === "cc")!.definitionId = enemyRoot.id;
+    const catalog = new Map([...definitions, [foreignRoot.id, foreignRoot]]);
+    const root = createTilePlacedActor(
+      contentMap,
+      foreignRoot,
+      { actorId: "root", origin: { x: 2, z: 10 } },
+      "player",
+    );
+    const network = createSupportNetwork(
+      [root, building("barracks", 13, 10)],
+      catalog,
+      sameOwner,
+    );
+    expect(
+      network.nodes.find((node) => node.actorId === "barracks")!.connected,
+    ).toBe(false);
+    expect(
+      supportsPosition(network, root.worldPosition, arcPlayer, sameOwner),
+    ).toBe(false);
+  });
+  test("shared relays cannot lend another owner's root to a third owner", () => {
+    const root = createTilePlacedActor(
+      contentMap,
+      definitions.get("arc-command-center-prototype")!,
+      { actorId: "root", origin: { x: 2, z: 10 } },
+      "root-owner",
+    );
+    const relay = { ...building("relay", 13, 10), owner: "middle" };
+    const { sharesSupport } = createRelations(
+      ["root-owner", "player"].map((owner) => ({
+        owners: ["middle", owner],
+        relationship: "allied",
+        sharesSupport: true,
+      })),
+    );
+    const point = building("prospective", 18, 10).worldPosition;
+    const network = createSupportNetwork(
+      [root, relay],
+      definitions,
+      sharesSupport,
+    );
+    expect(network.nodes.every((node) => node.connected)).toBe(true);
+    expect(supportsPosition(network, point, arcPlayer, sharesSupport)).toBe(
+      false,
+    );
+    expect(
+      supportForOwner(network, "player", sharesSupport).nodes,
+    ).toMatchObject([{ actorId: "relay", connected: false }]);
+    const unfinished = createSupportNetwork(
+      [root, relay, blueprint("growth", 18, 10)],
+      definitions,
+      sharesSupport,
+    );
+    expect(
+      unfinished.nodes.find((node) => node.actorId === "growth")!.connected,
+    ).toBe(false);
+    const sharedRoot = createTilePlacedActor(
+      contentMap,
+      definitions.get("arc-command-center-prototype")!,
+      { actorId: "middle-root", origin: { x: 3, z: 2 } },
+      "middle",
+    );
+    const supplied = createSupportNetwork(
+      [root, relay, sharedRoot],
+      definitions,
+      sharesSupport,
+    );
+    expect(supportsPosition(supplied, point, arcPlayer, sharesSupport)).toBe(
+      true,
+    );
+    expect(
+      supportForOwner(supplied, "player", sharesSupport).nodes.every(
+        (node) => node.connected,
+      ),
+    ).toBe(true);
+  });
+
+  test("disconnected relays cannot bridge two branches of a shared network", () => {
+    const root = createTilePlacedActor(
+      contentMap,
+      definitions.get("arc-command-center-prototype")!,
+      { actorId: "root", origin: { x: 2, z: 10 } },
+      "root-owner",
+    );
+    const actors = [
+      root,
+      { ...building("near", 13, 10), owner: "middle" },
+      { ...building("bridge", 18, 10), owner: "outsider" },
+      { ...building("far", 23, 10), owner: "middle" },
+    ];
+    const { sharesSupport } = createRelations(
+      ["root-owner", "outsider"].map((owner) => ({
+        owners: ["middle", owner],
+        relationship: "allied",
+        sharesSupport: true,
+      })),
+    );
+    const network = createSupportNetwork(actors, definitions, sharesSupport);
+    expect(
+      network.nodes.find((node) => node.actorId === "near")!.connected,
+    ).toBe(true);
+    expect(
+      network.nodes.find((node) => node.actorId === "bridge")!.connected,
+    ).toBe(false);
+    expect(
+      network.nodes.find((node) => node.actorId === "far")!.connected,
+    ).toBe(false);
+  });
+
+  test("another ARC owner's root cannot power buildings or authorize placement", () => {
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    state.owners.push({ id: "rival", faction: "arc" });
+    state.actors.find(({ id }) => id === "cc")!.owner = "rival";
     state.actors.push(blueprint("construction", 7, 10));
-    const { simulation } = fixture(state, [
-      ...ARC_ACTOR_DEFINITIONS,
-      enemyRoot,
-    ]);
+    const { simulation } = fixture(state);
     expect(simulation.support!.links).toEqual([
       { from: "bridge", to: "remote", active: false },
     ]);
@@ -205,15 +318,16 @@ describe("construction support", () => {
       scenario,
       ARC_ACTOR_DEFINITIONS,
     ).actors;
-    const before = resolve(actors);
+    const before = resolve(actors, sameOwner);
     actors.splice(
       actors.findIndex((actor) => actor.id === "bridge"),
       1,
     );
-    expect(resolve(actors)).not.toBe(before);
+    expect(resolve(actors, sameOwner)).not.toBe(before);
     expect(
-      resolve(actors).nodes.find((node) => node.actorId === "remote")!
-        .connected,
+      resolve(actors, sameOwner).nodes.find(
+        (node) => node.actorId === "remote",
+      )!.connected,
     ).toBe(false);
   });
 
@@ -224,7 +338,7 @@ describe("construction support", () => {
     ).actors;
     actors[1] = building("bridge", 18, 10);
     actors.pop();
-    const network = createSupportNetwork(actors, definitions);
+    const network = createSupportNetwork(actors, definitions, sameOwner);
     expect(network.links).toEqual([]);
     expect(
       network.nodes.find((node) => node.actorId === "bridge")!.connected,
@@ -233,21 +347,32 @@ describe("construction support", () => {
 
   test("covered completed centers connect to roots with stable redundant edges", () => {
     const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
-    const network = createSupportNetwork(state.actors, definitions);
+    const network = createSupportNetwork(state.actors, definitions, sameOwner);
     expect(network.nodes.every((node) => node.connected)).toBe(true);
     expect(
-      supportsPosition(network, contentMap.tileCenter(23, 10), "arc"),
+      supportsPosition(
+        network,
+        contentMap.tileCenter(23, 10),
+        arcPlayer,
+        sameOwner,
+      ),
     ).toBe(true);
     expect(
-      supportsPosition(network, contentMap.tileCenter(50, 10), "arc"),
+      supportsPosition(
+        network,
+        contentMap.tileCenter(50, 10),
+        arcPlayer,
+        sameOwner,
+      ),
     ).toBe(false);
     expect(
-      createSupportNetwork([...state.actors].reverse(), definitions),
+      createSupportNetwork([...state.actors].reverse(), definitions, sameOwner),
     ).toEqual(network);
     state.actors.push(building("backup", 13, 12));
     const redundant = createSupportNetwork(
       state.actors.filter((actor) => actor.id !== "bridge"),
       definitions,
+      sameOwner,
     );
     expect(redundant.nodes.every((node) => node.connected)).toBe(true);
     expect(redundant.links.every((link) => link.active)).toBe(true);
@@ -256,17 +381,23 @@ describe("construction support", () => {
   test("blueprints never relay and rootless clusters stay disconnected", () => {
     const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
     state.actors[1] = blueprint("bridge", 13, 10);
-    const network = createSupportNetwork(state.actors, definitions);
+    const network = createSupportNetwork(state.actors, definitions, sameOwner);
     expect(
       network.nodes.find((node) => node.actorId === "remote")!.connected,
     ).toBe(false);
     expect(
-      supportsPosition(network, contentMap.tileCenter(18, 10), "arc"),
+      supportsPosition(
+        network,
+        contentMap.tileCenter(18, 10),
+        arcPlayer,
+        sameOwner,
+      ),
     ).toBe(false);
     expect(
       createSupportNetwork(
         state.actors.filter((actor) => actor.id !== "cc"),
         definitions,
+        sameOwner,
       ).nodes.every((node) => !node.connected),
     ).toBe(true);
   });
@@ -378,6 +509,7 @@ describe("construction support", () => {
     state.actors.push({
       id: "worker",
       definitionId: "arc-harvester",
+      owner: "player",
       worldPosition: contentMap.tileCenter(19, 12),
       facing: 0,
       occupancyLayer: "surface",
@@ -401,5 +533,60 @@ describe("construction support", () => {
     ticks(simulation, 2);
     expect(simulation.economy!.materials).toBe(materials + 50);
     expect(simulation.economy!.harvesters[0].cargo).toBe(0);
+  });
+
+  test("a rival owner's network trains units that inherit its ownership", () => {
+    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    state.owners.push({ id: "rival", faction: "arc" });
+    for (const actor of state.actors) actor.owner = "rival";
+    const { simulation } = fixture(state);
+    expect(
+      command(simulation, {
+        kind: "train-unit",
+        actorId: "rival-trooper",
+        producerId: "bridge",
+        definitionId: "arc-trooper",
+      }).accepted,
+    ).toBe(true);
+    ticks(simulation, 30);
+    expect(simulation.actorById("rival-trooper")!.owner).toBe("rival");
+  });
+
+  test("harvesters work only with their own owner's Refinery", () => {
+    const rivalRefinery = (state: MissionState) => {
+      state.owners.push({ id: "rival", faction: "arc" });
+      state.actors.find(({ id }) => id === "remote")!.owner = "rival";
+      state.actors.push(
+        createActor({
+          id: "worker",
+          definitionId: "arc-harvester",
+          owner: "player",
+          worldPosition: contentMap.tileCenter(19, 12),
+        }),
+      );
+      state.economy!.harvesters.push({
+        actorId: "worker",
+        cargo: 0,
+        gatherProgress: 0,
+        phase: "unassigned",
+      });
+      return state;
+    };
+    const { simulation } = fixture(
+      rivalRefinery(exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS)),
+    );
+    expect(
+      command(simulation, {
+        kind: "assign-refinery",
+        actorId: "worker",
+        refineryId: "remote",
+      }),
+    ).toMatchObject({ accepted: false, reason: "missing-refinery" });
+    const saved = rivalRefinery(
+      exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
+    );
+    saved.economy!.harvesters[0]!.refineryId = "remote";
+    saved.economy!.harvesters[0]!.phase = "idle";
+    expect(() => fixture(saved)).toThrow("invalid economy state");
   });
 });

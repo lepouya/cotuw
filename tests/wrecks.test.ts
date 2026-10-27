@@ -37,6 +37,7 @@ describe("remains", () => {
     const wreck = (actorId: string, definitionId: string): Wreck => ({
       actorId,
       definitionId,
+      owner: "player",
       worldPosition: { x: 0, z: 0 },
       facing: 0,
       tick: 0,
@@ -119,6 +120,7 @@ describe("remains", () => {
         const wreck: Wreck = {
           actorId: "building",
           definitionId: "building",
+          owner: "player",
           tick: 0,
           worldPosition: { x: -0.5, z: -0.5 },
           facing: 0,
@@ -178,6 +180,7 @@ describe("remains", () => {
       const wreck: Wreck = {
         actorId: "unit",
         definitionId: "unit",
+        owner: "player",
         tick: 0,
         worldPosition: { x: 0, z: 0 },
         facing: 0,
@@ -225,6 +228,7 @@ test("building debris collapses onto its footprint unless motion is reduced", ()
     const wreck: Wreck = {
       actorId: "building",
       definitionId: "building",
+      owner: "player",
       tick: 0,
       worldPosition: { x: -0.5, z: -0.5 },
       facing: 0,
@@ -294,6 +298,7 @@ test("flat replacement rubble cannot produce non-finite collapse transforms", ()
         {
           actorId: "flat",
           definitionId: "building",
+          owner: "player",
           tick: 0,
           worldPosition: { x: -0.5, z: -0.5 },
           facing: 0,

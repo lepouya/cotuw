@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ECONOMY_ACTOR_DEFINITIONS } from "./helpers/content";
-import { exploredScenarioState } from "./helpers/scenario";
+import { exploredScenarioState, playerOwners } from "./helpers/scenario";
 import { createMissionSimulation } from "../src/simulation/mission";
 import { isMissionCommand } from "../src/simulation/command";
 import { OccupancyGrid } from "../src/simulation/occupancy";
@@ -34,7 +34,7 @@ function scenario(units: ScenarioUnit[]) {
   return defineScenario({
     id: "queue-test",
     tileSize: 1,
-    playerFaction: "arc",
+    ...playerOwners("arc"),
     terrainTypeIds: mapOptions.terrainTypeIds,
     terrain: new TerrainGrid(mapOptions).terrainState(),
     buildings: [

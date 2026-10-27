@@ -1,4 +1,4 @@
-import { createPlayerAccess } from "./faction";
+import { createPlayerAccess } from "./ownership";
 import { isMobileActor, isTilePlacedActor } from "./placement";
 
 import type { ActorDefinition, ActorRenderState } from "./actor";
@@ -9,12 +9,15 @@ import type { MissionSimulation } from "./mission";
  * follow the simulation's latest committed actor list.
  */
 export function createPlayerView(
-  simulation: Pick<MissionSimulation, "actors" | "playerFaction" | "detects">,
+  simulation: Pick<
+    MissionSimulation,
+    "actors" | "playerOwner" | "relations" | "detects"
+  >,
   definitions: ReadonlyMap<string, ActorDefinition>,
 ) {
   const access = createPlayerAccess(
-    simulation.playerFaction,
-    definitions,
+    simulation.playerOwner,
+    (left, right) => simulation.relations.relationship(left, right),
     simulation.detects,
   );
   const isMobile = (actor: ActorRenderState) =>

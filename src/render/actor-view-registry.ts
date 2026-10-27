@@ -20,7 +20,12 @@ import type { ActorTrigger } from "../content/presentation";
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
-import type { ActorAnimationState, ActorAppearance, ActorPose } from "./actor";
+import type {
+  ActorAnimationState,
+  ActorAppearance,
+  ActorPose,
+  SelectionStyle,
+} from "./actor";
 import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 
@@ -67,7 +72,7 @@ export function createActorViewRegistry(
   scene: Scene,
   map: TerrainMap,
   appearances: ActorAppearanceCatalog,
-  isHostile: (definitionId: string) => boolean = () => false,
+  isHostile: (actor: ActorRenderState) => boolean = () => false,
 ): ActorViewRegistry {
   const lifetime = createLifetime();
   const selectionMaterial = lifetime.own(
@@ -80,6 +85,10 @@ export function createActorViewRegistry(
   );
   hostileSelectionMaterial.emissiveColor = HOSTILE_SELECTION_COLOR;
   hostileSelectionMaterial.disableLighting = true;
+  const styleFor = (actor: ActorRenderState): SelectionStyle =>
+    isHostile(actor)
+      ? { material: hostileSelectionMaterial, hostile: true }
+      : { material: selectionMaterial, hostile: false };
   let fallback: ActorAppearance | undefined;
   lifetime.defer(() => fallback?.dispose());
   // A visible stand-in beats a crash in the render loop for unknown kinds.
@@ -109,14 +118,12 @@ export function createActorViewRegistry(
           previousPoses.delete(id);
       },
       create: (actor, { appearance }) => {
-        const hostile = isHostile(actor.definitionId);
         const renderer = createActorRenderer(
           scene,
           map,
           actor,
           appearance,
-          hostile ? hostileSelectionMaterial : selectionMaterial,
-          hostile,
+          styleFor(actor),
         );
         renderer.setSelected(selectedActorIds.has(actor.id));
         return renderer;
@@ -206,6 +213,8 @@ export function createActorViewRegistry(
       for (const actor of actors) {
         interpolatePose(previousPoses.get(actor.id), actor, tickProgress, pose);
         const renderer = renderers.get(actor.id)!;
+        // Relationship changes can make an actor hostile after creation.
+        renderer.setSelectionStyle(styleFor(actor));
         renderer.update(pose, seconds, stateOf?.(actor));
         for (const trigger of pendingTriggers.get(actor.id) ?? [])
           renderer.play(trigger);

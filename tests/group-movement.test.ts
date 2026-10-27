@@ -71,6 +71,7 @@ function fixture(actors?: Actor[], saved?: MissionState, bounds?: WorldBounds) {
             createActor({
               id: `unit-${index}`,
               definitionId: index % 2 ? "scout" : "trooper",
+              owner: "player",
               worldPosition: map.tileCenter(
                 3 + (index % 2),
                 3 + Math.floor(index / 2),
@@ -101,6 +102,7 @@ describe("group movement", () => {
       createActor({
         id: `unit-${index}`,
         definitionId: "trooper",
+        owner: "player",
         worldPosition: { x: -8 + offset, z: 0 },
       }),
     );
@@ -135,6 +137,7 @@ describe("group movement", () => {
       createActor({
         id: "near",
         definitionId: "trooper",
+        owner: "player",
         worldPosition: { ...start, x: start.x - 0.01 },
       }),
     );
@@ -181,6 +184,7 @@ describe("group movement", () => {
         createActor({
           id,
           definitionId,
+          owner: "player",
           worldPosition: map.tileCenter(tile.x, tile.z),
         }),
       );
@@ -349,6 +353,7 @@ describe("group movement", () => {
       createActor({
         id: "swimmer",
         definitionId: "swimmer",
+        owner: "player",
         worldPosition: map.tileCenter(1, 1),
       }),
     );
@@ -356,6 +361,7 @@ describe("group movement", () => {
       createActor({
         id: "trooper",
         definitionId: "trooper",
+        owner: "player",
         worldPosition: map.tileCenter(3, 3),
       }),
     );
@@ -398,6 +404,7 @@ describe("group movement", () => {
         createActor({
           id,
           definitionId: "swimmer",
+          owner: "player",
           worldPosition: map.tileCenter(x, 1),
         }),
       );
@@ -440,6 +447,7 @@ describe("group movement", () => {
       createActor({
         id: "swimmer",
         definitionId: "swimmer",
+        owner: "player",
         worldPosition: map.tileCenter(1, 1),
       }),
     );
@@ -447,6 +455,7 @@ describe("group movement", () => {
       createActor({
         id: "trooper",
         definitionId: "trooper",
+        owner: "player",
         worldPosition: map.tileCenter(3, 3),
       }),
     );
@@ -477,6 +486,7 @@ describe("group movement", () => {
         createActor({
           id,
           definitionId: "swimmer",
+          owner: "player",
           worldPosition: {
             ...map.tileCenter(1, 1),
             x: map.tileCenter(1, 1).x + (id === "a" ? -0.2 : 0.2),
@@ -523,7 +533,12 @@ describe("friendly separation", () => {
     const from = { x: -4, z: 0 };
     const target = { x: from.x + 0.01, z: from.z };
     const actors = ["a", "b"].map((id) =>
-      createActor({ id, definitionId: "trooper", worldPosition: from }),
+      createActor({
+        id,
+        definitionId: "trooper",
+        owner: "player",
+        worldPosition: from,
+      }),
     );
     const { simulation } = fixture(actors);
     simulation.submitCommand({ kind: "move", actorId: "a", target });
@@ -539,7 +554,12 @@ describe("friendly separation", () => {
   test("coincident friendly units separate deterministically without crossing terrain blockers", () => {
     const point = { x: -0.65, z: -1.5 };
     const actors = ["a", "b"].map((id) =>
-      createActor({ id, definitionId: "trooper", worldPosition: point }),
+      createActor({
+        id,
+        definitionId: "trooper",
+        owner: "player",
+        worldPosition: point,
+      }),
     );
     const first = fixture(actors);
     const second = fixture([...actors].reverse());
@@ -570,6 +590,7 @@ describe("friendly separation", () => {
       createActor({
         id,
         definitionId: "trooper",
+        owner: "player",
         worldPosition: { x: -4, z: 0 },
         occupancyLayer: id === "a" ? "surface" : "air",
       }),

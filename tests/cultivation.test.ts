@@ -9,12 +9,14 @@ import {
   advanceSeconds,
   exploredScenarioState,
   untilSeconds,
+  playerOwners,
 } from "./helpers/scenario";
 import {
   createCultivationSite,
   cultivationEfficiency,
 } from "../src/simulation/cultivation";
 import { createMissionSimulation } from "../src/simulation/mission";
+import { createActor } from "../src/simulation/actor";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
@@ -25,6 +27,7 @@ import type {
   MissionSimulation,
 } from "../src/simulation/mission";
 import type { MissionCommand } from "../src/simulation/command";
+import type { MissionEventDefinition } from "../src/simulation/events";
 
 const definitions = BASE_CONTENT.actors.filter(
   ({ faction }) => faction === "circle",
@@ -38,7 +41,7 @@ const terrainOptions = {
 const terrain = new TerrainGrid(terrainOptions);
 const scenario = defineScenario({
   id: "cultivation-test",
-  playerFaction: "circle",
+  ...playerOwners("circle"),
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
   terrain: terrain.terrainState(),
@@ -60,11 +63,12 @@ const scenario = defineScenario({
     ],
   },
 });
-function fixture(state?: MissionState) {
+function fixture(state?: MissionState, events?: MissionEventDefinition[]) {
   const map = new TerrainGrid(terrainOptions);
   const occupancy = new OccupancyGrid(map);
   const simulation = createMissionSimulation({
     state: state ?? exploredScenarioState(scenario, definitions),
+    events,
     definitions,
     map,
     occupancy,
@@ -449,6 +453,7 @@ test("completed buildings operate without a Heartgrove while growth waits for re
         map,
         definitions.find(({ id }) => id === "circle-heartgrove")!,
         { actorId: "replacement", origin: { x: 2, z: 6 } },
+        "player",
       ),
     );
     untilSeconds(sim, () => !sim.actorById("conservatory")!.construction);
@@ -467,6 +472,7 @@ test("each Heartgrove supplies an independent growth slot", () => {
         map,
         definitions.find(({ id }) => id === "circle-heartgrove")!,
         { actorId: "east-heart", origin: { x: 25, z: 12 } },
+        "player",
       ),
     );
     train(sim, "a");
@@ -505,16 +511,26 @@ test("delivery uses the nearest reachable drop-off and restarts after an outage"
     const definition = definitions.find(
       ({ id }) => id === "circle-conservatory",
     )!;
-    const near = createTilePlacedActor(map, definition, {
-      actorId: "near-dropoff",
-      origin: { x: 10, z: 6 },
-    });
+    const near = createTilePlacedActor(
+      map,
+      definition,
+      {
+        actorId: "near-dropoff",
+        origin: { x: 10, z: 6 },
+      },
+      "player",
+    );
     sim.spawnActor(near);
     sim.spawnActor(
-      createTilePlacedActor(map, definition, {
-        actorId: "far-dropoff",
-        origin: { x: 20, z: 9 },
-      }),
+      createTilePlacedActor(
+        map,
+        definition,
+        {
+          actorId: "far-dropoff",
+          origin: { x: 20, z: 9 },
+        },
+        "player",
+      ),
     );
     command(sim, {
       kind: "terrain",
@@ -571,6 +587,7 @@ test("a blocked partial delivery retains queued orders and reroutes after drop-o
             map,
             definitions.find(({ id }) => id === "circle-conservatory")!,
             { actorId: "replacement-dropoff", origin: { x: 18, z: 12 } },
+            "player",
           ),
         );
         untilSeconds(
@@ -670,3 +687,95 @@ test("placement selects the nearest reachable selected Cultivator without mutati
     sim.dispose();
   }
 });
+
+test("allied Heartgroves host growth until the alliance stops sharing them", () => {
+  const state = exploredScenarioState(scenario, definitions);
+  state.owners.push({ id: "ally", faction: "circle" });
+  state.actors.find(({ id }) => id === "heart")!.owner = "ally";
+  state.relationships.push({
+    owners: ["player", "ally"],
+    relationship: "allied",
+    sharesHeadquarters: true,
+  });
+  const events: MissionEventDefinition[] = [
+    {
+      id: "end-sharing",
+      trigger: { kind: "time", seconds: 4 },
+      actions: [
+        {
+          kind: "set-relationship",
+          owners: ["player", "ally"],
+          relationship: "allied",
+        },
+      ],
+    },
+  ];
+  const { simulation: sim, map } = fixture(state, events);
+  try {
+    sim.spawnActor(
+      createActor({
+        id: "worker",
+        definitionId: "circle-cultivator",
+        owner: "player",
+        worldPosition: map.tileCenter(8, 9),
+      }),
+    );
+    expect(place(sim).accepted).toBe(true);
+    const construction = () => sim.actorById("conservatory")!.construction!;
+    untilSeconds(sim, () => construction().completedTicks > 0, 3.5);
+    expect(construction().headquartersId).toBe("heart");
+    untilSeconds(sim, () => sim.snapshot().firedEvents.length > 0, 4);
+    // The revoked queue reassigns on the next tick; saves load meanwhile.
+    expect(construction().headquartersId).toBe("heart");
+    fixture(saved(sim), events).simulation.dispose();
+    sim.tick();
+    const paused = construction();
+    expect(paused.headquartersId).toBeUndefined();
+    expect(paused.active).toBeUndefined();
+    advanceSeconds(sim, 2);
+    expect(construction()).toEqual(paused);
+    sim.spawnActor(
+      createTilePlacedActor(
+        map,
+        definitions.find(({ id }) => id === "circle-heartgrove")!,
+        { actorId: "own-heart", origin: { x: 2, z: 13 } },
+        "player",
+      ),
+    );
+    sim.tick();
+    expect(construction()).toMatchObject({
+      headquartersId: "own-heart",
+      active: true,
+      completedTicks: paused.completedTicks + 1,
+      paidCost: paused.paidCost,
+    });
+  } finally {
+    sim.dispose();
+  }
+});
+
+test.each(["tending", "returning"] as const)(
+  "loading rejects another owner's saved %s assignment",
+  (phase) => {
+    const { simulation: sim } = fixture();
+    try {
+      train(sim);
+      expect(place(sim).accepted).toBe(true);
+      const state = saved(sim);
+      state.owners.push({ id: "other", faction: "circle" });
+      const worker = state.economy!.cultivation!.workers[0]!;
+      const building = state.actors.find(({ id }) => id === "conservatory")!;
+      building.owner = "other";
+      if (phase === "returning") {
+        delete building.construction;
+        delete worker.tendingId;
+        worker.dropoffId = "conservatory";
+        worker.cargo = 1;
+        worker.phase = "returning";
+      }
+      expect(() => fixture(state)).toThrow("invalid cultivation state");
+    } finally {
+      sim.dispose();
+    }
+  },
+);

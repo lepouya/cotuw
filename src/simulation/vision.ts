@@ -4,6 +4,8 @@ import { terrainSightlineClear } from "./terrain-sightline";
 import { isPositive } from "./validation";
 
 import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
+import type { Detectable, Owner } from "./ownership";
+import type { TileCoord } from "./grid";
 import type { SupportView } from "./support";
 import type { TerrainGrid } from "./terrain";
 import { distance } from "./world";
@@ -183,6 +185,89 @@ export function createFog(map: TerrainGrid, state: FogState): Fog {
     },
     state: () => ({ explored: explored.join("") }),
     dispose: vision.dispose,
+  };
+}
+
+/**
+ * Each owner's current vision under fog of war, shared between allies. The
+ * player's vision is its fog, which also records exploration. Without fog,
+ * every owner sees everything.
+ */
+export function createOwnerVision({
+  map,
+  fog,
+  owners,
+  playerOwner,
+  definitions,
+}: {
+  map: TerrainGrid | undefined;
+  fog: Fog | undefined;
+  owners: readonly Owner[];
+  playerOwner: string;
+  definitions: ReadonlyMap<string, ActorDefinition>;
+}) {
+  const visions = new Map<string, Fog | Vision>();
+  if (fog)
+    for (const { id } of owners)
+      visions.set(id, id === playerOwner ? fog : createVision(map!));
+  const sees = (owner: string, point: WorldPosition) => {
+    if (!fog) return true;
+    const tile = map!.tileAtWorldPosition(point.x, point.z);
+    return !!visions.get(owner)?.isVisible(tile.x, tile.z);
+  };
+  return {
+    sees,
+    /** Only the player retains explored terrain; other owners know live tiles. */
+    knowsTile: (owner: string, tile: TileCoord) =>
+      !fog ||
+      (owner === playerOwner
+        ? fog.isExplored(tile.x, tile.z)
+        : !!visions.get(owner)?.isVisible(tile.x, tile.z)),
+    /** Whether an owner sees the unit's tile or any of a building's tiles. */
+    detects: (owner: string, actor: Detectable) => {
+      if (!fog) return true;
+      const vision = visions.get(owner);
+      const definition = definitions.get(actor.definitionId);
+      if (!vision || !actor.tilePlacement || !definition?.footprint)
+        return !!vision && sees(owner, actor.worldPosition);
+      return occupiedTilesFor(
+        {
+          id: actor.id ?? "",
+          definitionId: actor.definitionId,
+          tilePlacement: actor.tilePlacement,
+        },
+        definition,
+      ).some(({ x, z }) => vision.isVisible(x, z));
+    },
+    /** Replaces current vision from each owner's and its allies' actors. */
+    update: (
+      actors: readonly ActorRenderState[],
+      support: SupportView | undefined,
+      sharesVision: (left: string, right: string) => boolean,
+    ) => {
+      if (!fog) return;
+      const byOwner = new Map<string, ActorRenderState[]>();
+      for (const actor of actors) {
+        const owned = byOwner.get(actor.owner);
+        if (owned) owned.push(actor);
+        else byOwner.set(actor.owner, [actor]);
+      }
+      const sources = new Map(
+        [...byOwner].map(([owner, owned]) => [
+          owner,
+          visionSources(owned, definitions, support, map!),
+        ]),
+      );
+      for (const [viewer, vision] of visions)
+        vision.update(
+          [...sources].flatMap(([owner, list]) =>
+            sharesVision(owner, viewer) ? list : [],
+          ),
+        );
+    },
+    dispose: () => {
+      for (const vision of visions.values()) vision.dispose();
+    },
   };
 }
 

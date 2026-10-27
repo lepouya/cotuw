@@ -76,10 +76,15 @@ export type ActorPose = {
   facing: number;
 };
 
+/** Hostile actors use a segmented selection marker in their own material. */
+export type SelectionStyle = { material: Material; hostile: boolean };
+
 export type ActorRenderer = {
   actorId: string;
   selectionPoint: () => Vector3;
   setSelected: (selected: boolean) => void;
+  /** Rebuilds a shown marker when a relationship change restyles it. */
+  setSelectionStyle: (style: SelectionStyle) => void;
   /** `seconds` is real time since the previous update. */
   update: (
     pose: ActorPose,
@@ -100,8 +105,7 @@ export function createActorRenderer(
   map: TerrainMap,
   initialState: ActorRenderState,
   appearance: ActorAppearance,
-  selectionMaterial: Material,
-  hostile = false,
+  initialSelection: SelectionStyle,
 ): ActorRenderer {
   const { id } = initialState;
   const { radius, height } = appearance.bounds;
@@ -135,7 +139,11 @@ export function createActorRenderer(
     pick.metadata = { pickKind: ACTOR_PICK_KIND, actorId: id };
 
     let ring: TransformNode | undefined;
+    let selection = initialSelection;
+    let shown = false;
     const setSelected = (selected: boolean) => {
+      shown = selected;
+      const { material: selectionMaterial, hostile } = selection;
       if (selected && !ring) {
         const ringRadius = radius + SELECTION_RING_MARGIN;
         if (hostile) {
@@ -224,6 +232,13 @@ export function createActorRenderer(
       actorId: id,
       selectionPoint: () => root.position.add(new Vector3(0, height / 2, 0)),
       setSelected,
+      setSelectionStyle: (style) => {
+        if (style.hostile === selection.hostile) return;
+        selection = style;
+        ring?.dispose();
+        ring = undefined;
+        setSelected(shown);
+      },
       update,
       play: (trigger) => instance.play?.(trigger),
       dispose: lifetime.dispose,

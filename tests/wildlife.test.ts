@@ -1,3 +1,4 @@
+import { playerOwners } from "./helpers/scenario";
 import { describe, expect, test } from "vitest";
 import { WILDLIFE_ACTOR_DEFINITIONS } from "./helpers/content";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
@@ -55,7 +56,7 @@ const scenario = (units: ScenarioUnit[]) =>
     tileSize: 1,
     terrainTypeIds: options.terrainTypeIds,
     terrain: contentMap.terrainState(),
-    playerFaction: "arc",
+    ...playerOwners("arc"),
     buildings: [],
     units,
     materials: 0,
@@ -688,6 +689,7 @@ describe("wolf movement and persistence", () => {
       ],
       wrecks: [],
       detects: () => true,
+      hostile: (left, right) => left !== right,
       move: () => false,
       destination: (_actor, point) => point,
       destroy: () => {},
@@ -719,6 +721,7 @@ describe("wolf movement and persistence", () => {
       ],
       wrecks: [],
       detects: () => true,
+      hostile: (left, right) => left !== right,
       move: () => false,
       destination: (_actor, point) => point,
       destroy: () => {},
@@ -799,6 +802,7 @@ describe("wolf movement and persistence", () => {
     const actor = createActor({
       id: "new-wolf",
       definitionId: "wolf",
+      owner: "wildlife",
       worldPosition: at(25),
     });
     actor.territory = createTerritoryState(actor.worldPosition, {

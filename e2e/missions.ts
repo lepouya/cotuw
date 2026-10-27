@@ -25,7 +25,7 @@ export const missionMap = (mission: LoadedMission) =>
 /** Adds buildings after the authored ones, as if the level placed them. */
 export function placeBuildings(
   mission: LoadedMission,
-  placements: readonly ActorPlacement[],
+  placements: readonly (ActorPlacement & { owner?: string })[],
 ): void {
   const map = missionMap(mission);
   const { actors } = mission.state;
@@ -33,11 +33,12 @@ export function placeBuildings(
   actors.splice(
     firstUnit < 0 ? actors.length : firstUnit,
     0,
-    ...placements.map((placement) =>
+    ...placements.map(({ owner = "player", ...placement }) =>
       createTilePlacedActor(
         map,
         mission.definitions.find(({ id }) => id === placement.definitionId)!,
         placement,
+        owner,
       ),
     ),
   );

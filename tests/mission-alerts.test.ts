@@ -20,6 +20,7 @@ const actor = (
 ): ActorRenderState => ({
   id,
   definitionId,
+  owner: definitionId === "wolf" ? "wildlife" : "player",
   worldPosition: { x: 1, z: 2 },
   facing: 0,
   occupancyLayer: "surface",
@@ -45,7 +46,7 @@ const objective = (status: ObjectiveView["status"]): ObjectiveView => ({
 
 function tracker() {
   const alerts = createAlertTracker({
-    owns: ({ definitionId }) => definitionId !== "wolf",
+    owns: ({ owner }) => owner === "player",
     nameOf: (id) => id[0]!.toUpperCase() + id.slice(1),
   });
   let tick = 0;
@@ -165,6 +166,7 @@ describe("mission alerts", () => {
         {
           actorId: "t1",
           definitionId: "trooper",
+          owner: "player",
           worldPosition: { x: 1, z: 2 },
           facing: 0,
           tick: 1,
@@ -172,6 +174,7 @@ describe("mission alerts", () => {
         {
           actorId: "w1",
           definitionId: "wolf",
+          owner: "wildlife",
           worldPosition: { x: 1, z: 2 },
           facing: 0,
           tick: 1,
@@ -192,11 +195,13 @@ describe("mission alerts", () => {
     const network = (connected: Record<string, boolean>): SupportView => ({
       nodes: actors.map(({ id }) => ({
         actorId: id,
+        owner: "player",
         center: { x: 0, z: 0 },
         radius: 6,
         complete: true,
         root: false,
         connected: connected[id]!,
+        rootOwners: connected[id] ? ["player"] : [],
       })),
       links: [],
     });

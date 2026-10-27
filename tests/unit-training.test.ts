@@ -47,10 +47,15 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
   const map = new TerrainGrid({ width: 12, height: 12, tileSize: 1 });
   const state = createMissionState(
     ["one", "two"].map((actorId, index) =>
-      createTilePlacedActor(map, definitions[2], {
-        actorId,
-        origin: { x: 2 + index * 4, z: 2 },
-      }),
+      createTilePlacedActor(
+        map,
+        definitions[2],
+        {
+          actorId,
+          origin: { x: 2 + index * 4, z: 2 },
+        },
+        "player",
+      ),
     ),
   );
   state.retiredActorIds = retiredIds;

@@ -10,6 +10,11 @@ import { activate, placeBuilding, terrainPoint } from "./prototype-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
 import type { GameSession, GameSessionControls } from "../src/session";
+import type {
+  ActorDefinition,
+  ActorRenderState,
+} from "../src/simulation/actor";
+import type { SidebarOptions, SidebarState } from "../src/ui/sidebar";
 
 test("partial sidebar setup releases its tooltip and listeners", async ({
   page,
@@ -30,6 +35,7 @@ test("partial sidebar setup releases its tooltip and listeners", async ({
     try {
       createSidebar(root, {
         definitions: [],
+        playerOwner: "player",
         presentations: new Map(),
         goals: [],
         selectActor: () => {},
@@ -395,7 +401,13 @@ test("sidebar derives custom content and can be disposed and recreated", async (
   await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
     const path: string = "/src/ui/sidebar.ts";
-    const { createSidebar } = await import(path);
+    const { createSidebar } = (await import(
+      path
+    )) as typeof import("../src/ui/sidebar");
+    const ownershipPath: string = "/src/simulation/ownership.ts";
+    const { createRelations } = (await import(
+      ownershipPath
+    )) as typeof import("../src/simulation/ownership");
     const root = document
       .querySelector<HTMLElement>("#game-sidebar")!
       .cloneNode(true) as HTMLElement;
@@ -409,10 +421,16 @@ test("sidebar derives custom content and can be disposed and recreated", async (
       zIndex: "20",
     });
     document.body.append(root);
-    const definitions = [
-      { id: "runner", behaviorId: "move", movement: { speed: 9 } },
+    const definitions: ActorDefinition[] = [
+      {
+        id: "runner",
+        faction: "circle",
+        behaviorId: "move",
+        movement: { speed: 9, profileId: "ground" },
+      },
       {
         id: "factory",
+        faction: "arc",
         behaviorId: "idle",
         production: { unitDefinitionIds: ["runner"] },
         footprint: {
@@ -447,15 +465,18 @@ test("sidebar derives custom content and can be disposed and recreated", async (
     const options = {
       definitions,
       presentations,
+      playerOwner: "player",
+      playerFaction: "arc",
       goals: [{ definitionId: "runner", label: "Train a Runner" }],
       selectActor: (id: string) => {
         selected = id;
       },
-    };
-    const actors = [
+    } satisfies SidebarOptions;
+    const actors: ActorRenderState[] = [
       {
         id: "building",
         definitionId: "factory",
+        owner: "player",
         worldPosition: { x: 0, z: 0 },
         occupancyLayer: "surface",
         facing: Math.PI / 2,
@@ -464,11 +485,13 @@ test("sidebar derives custom content and can be disposed and recreated", async (
       {
         id: "unit",
         definitionId: "runner",
+        owner: "player",
         worldPosition: { x: 2, z: 0 },
         occupancyLayer: "surface",
         facing: 0,
       },
     ];
+    actors.push({ ...actors[0]!, id: "visitor", owner: "rival" });
     const state = {
       actors,
       actorVersion: 0,
@@ -476,11 +499,15 @@ test("sidebar derives custom content and can be disposed and recreated", async (
       placementActive: false,
       faulted: false,
       canRemove: true,
-    };
+      relations: createRelations([]),
+    } satisfies SidebarState;
     let sidebar = createSidebar(root, options);
     try {
       sidebar.update(state);
       const title = root.querySelector("#selection-details")!.textContent;
+      const foreignRosterVisible = !root
+        .querySelector<HTMLElement>("#train-runner")!
+        .closest<HTMLElement>(".production-card")!.hidden;
       const descriptionFor = (id: string) =>
         document.getElementById(
           root.querySelector(`#${id}`)!.getAttribute("aria-describedby")!,
@@ -502,6 +529,31 @@ test("sidebar derives custom content and can be disposed and recreated", async (
         root.querySelector("#unit-roster button") === listedUnit;
       listedUnit.click();
       const selectedByClick = selected;
+      const inspectVisitor = (
+        relationship: "allied" | "neutral" | "hostile",
+      ) => {
+        sidebar.update({
+          ...state,
+          selectedActorIds: ["visitor"],
+          relations: createRelations(
+            relationship === "neutral"
+              ? []
+              : [
+                  {
+                    owners: ["player", "rival"],
+                    relationship,
+                  },
+                ],
+          ),
+        });
+        return root.querySelector("#selection-info")!.textContent;
+      };
+      const alliedInfo = inspectVisitor("allied");
+      const visitorTrainingHidden = root
+        .querySelector<HTMLElement>("#train-runner")!
+        .closest<HTMLElement>(".production-card")!.hidden;
+      const neutralInfo = inspectVisitor("neutral");
+      const hostileInfo = inspectVisitor("hostile");
       sidebar.dispose();
       selected = "";
       listedUnit.click();
@@ -516,6 +568,11 @@ test("sidebar derives custom content and can be disposed and recreated", async (
         retainedNode,
         selectedByClick,
         disposed,
+        foreignRosterVisible,
+        visitorTrainingHidden,
+        alliedInfo,
+        neutralInfo,
+        hostileInfo,
         buildings: root.querySelectorAll("#building-options button").length,
         units: root.querySelectorAll("#training-options button").length,
         goals: root.querySelectorAll("#scenario-goals li").length,
@@ -531,12 +588,23 @@ test("sidebar derives custom content and can be disposed and recreated", async (
     retainedNode: true,
     selectedByClick: "unit",
     disposed: true,
+    foreignRosterVisible: true,
+    visitorTrainingHidden: true,
     buildings: 1,
     units: 1,
     goals: 1,
   });
   expect(result.buildText).toContain("Trains Runner · 2 × 1 tiles");
   expect(result.trainText).toContain("Speed 9");
+  expect(result.alliedInfo).toContain(
+    "Allied · Production · Not under your command.",
+  );
+  expect(result.neutralInfo).toContain(
+    "Neutral · Production · Not under your command.",
+  );
+  expect(result.hostileInfo).toContain(
+    "Hostile · Production · Select your units",
+  );
 });
 
 test("prototype controls skip unchanged frames and removal works without a sidebar", async ({
@@ -611,10 +679,15 @@ test("prototype controls skip unchanged frames and removal works without a sideb
         (definition) => definition.id === definitionId,
       )!;
       view.simulation.spawnActor(
-        createTilePlacedActor(map, definition, {
-          actorId: "standalone-building",
-          origin: { x: 49, z: 39 },
-        }),
+        createTilePlacedActor(
+          map,
+          definition,
+          {
+            actorId: "standalone-building",
+            origin: { x: 49, z: 39 },
+          },
+          "player",
+        ),
       );
       view.selectActor("standalone-building");
       refresh();

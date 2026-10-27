@@ -396,6 +396,7 @@ describe("terrain movement", () => {
     const saved = createActor({
       id: "trooper",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: center(map, 0, 0),
     });
     saved.movement = {
@@ -603,6 +604,7 @@ describe("terrain movement", () => {
     const saved = createActor({
       id: "trooper",
       definitionId: "trooper",
+      owner: "player",
       worldPosition: center(map, 0, 1),
     });
     // A stale route straight through the water at the current map version.
@@ -732,6 +734,7 @@ function createMovementMission(
       createActor({
         id: "trooper",
         definitionId: "trooper",
+        owner: "player",
         worldPosition: center(map, tileX, tileZ),
       }),
     ]),
@@ -797,6 +800,7 @@ describe("saved missions", () => {
         createActor({
           id: "trooper",
           definitionId: "trooper",
+          owner: "player",
           worldPosition: center(map, 0, 2),
         }),
       ]),

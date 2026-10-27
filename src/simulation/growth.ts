@@ -9,40 +9,55 @@ import { isCount } from "./validation";
 import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
 import type { EconomyState, EconomyWorld } from "./economy";
 
-type Ref = Pick<ActorRenderState, "id" | "definitionId">;
+type Ref = Pick<ActorRenderState, "id" | "definitionId" | "owner">;
+/** A building, or a prospective one, and the owner it would belong to. */
+type GrowthSite = Pick<ActorRenderState, "definitionId" | "owner">;
 
-/** Whether `actor` is an operational headquarters that can host `definition`. */
+/** Whether a building's owner may use a headquarters owner's queue. */
+export type SharesHeadquarters = (
+  headquartersOwner: string,
+  buildingOwner: string,
+) => boolean;
+
+/** Whether `actor` is an operational headquarters that can host `building`. */
 const hostsGrowth = (
   actor: ActorRenderState,
-  definition: ActorDefinition,
+  building: GrowthSite,
   definitions: ReadonlyMap<string, ActorDefinition>,
+  sharesHeadquarters: SharesHeadquarters,
 ) =>
   !actor.construction &&
-  actor.definitionId === definition.growth?.headquartersDefinitionId &&
-  definitions.get(actor.definitionId)?.faction === definition.faction;
+  sharesHeadquarters(actor.owner, building.owner) &&
+  actor.definitionId ===
+    definitions.get(building.definitionId)?.growth?.headquartersDefinitionId;
 
+/** Eligible headquarters, own or shared by allies, nearest first. */
 export function growthHeadquarters(
   building: ActorRenderState,
   actors: readonly ActorRenderState[],
   definitions: ReadonlyMap<string, ActorDefinition>,
+  sharesHeadquarters: SharesHeadquarters,
 ) {
-  const definition = definitions.get(building.definitionId)!;
   return actors
-    .filter((actor) => hostsGrowth(actor, definition, definitions))
+    .filter((actor) =>
+      hostsGrowth(actor, building, definitions, sharesHeadquarters),
+    )
     .sort(nearestTo(building.worldPosition));
 }
-/** Listed actors whose type and faction may tend a `definition` building. */
+/** Listed actors of the building's owner and worker type that may tend it. */
 export function growthCandidates<T extends Ref>(
-  definition: ActorDefinition,
+  building: GrowthSite,
   workerIds: readonly string[],
   actors: readonly T[],
   definitions: ReadonlyMap<string, ActorDefinition>,
 ): T[] {
+  const workerId = definitions.get(building.definitionId)?.growth
+    ?.workerDefinitionId;
   return actors.filter(
     (actor) =>
       workerIds.includes(actor.id) &&
-      actor.definitionId === definition.growth?.workerDefinitionId &&
-      definitions.get(actor.definitionId)?.faction === definition.faction,
+      actor.owner === building.owner &&
+      actor.definitionId === workerId,
   );
 }
 /** The nearest candidate that can reach the building. */
@@ -52,9 +67,8 @@ export function growthWorkerFor(
   actors: readonly Actor[],
   world: Pick<EconomyWorld, "definitions" | "behaviors" | "map">,
 ): Actor | undefined {
-  const definition = world.definitions.get(building.definitionId)!;
   const navigation = workerNavigation(world);
-  return growthCandidates(definition, workerIds, actors, world.definitions)
+  return growthCandidates(building, workerIds, actors, world.definitions)
     .sort(nearestTo(building.worldPosition))
     .find((actor) => navigation.entrance(actor, building));
 }
@@ -75,11 +89,15 @@ export function updateGrowth(economy: EconomyState, world: EconomyWorld) {
     const definition = definitions.get(building.definitionId)!;
     if (!definition.growth) return !disconnected.has(building.id);
     const current = byId.get(construction.headquartersId ?? "");
-    if (!current || !hostsGrowth(current, definition, definitions)) {
+    if (
+      !current ||
+      !hostsGrowth(current, building, definitions, world.sharesHeadquarters)
+    ) {
       construction.headquartersId = growthHeadquarters(
         building,
         actors,
         definitions,
+        world.sharesHeadquarters,
       )[0]?.id;
       delete construction.active;
     }
@@ -98,7 +116,12 @@ export function updateGrowth(economy: EconomyState, world: EconomyWorld) {
       .filter((actor) => actor.construction && ready(actor))
       .map((actor) => actor.id),
   );
-  const used = new Map<string | undefined, number>();
+  // Work without a headquarters, such as ARC construction until queues per
+  // Command Center exist, shares one slot per owner.
+  const used = {
+    headquarters: new Map<string, number>(),
+    owner: new Map<string, number>(),
+  };
   // Stable sort: active work first, then authored order.
   const work = actors
     .filter((actor) => actor.construction)
@@ -112,17 +135,19 @@ export function updateGrowth(economy: EconomyState, world: EconomyWorld) {
       delete construction.active;
       continue;
     }
-    const queue = construction.headquartersId;
-    const headquarters = byId.get(queue ?? "");
+    const headquarters = byId.get(construction.headquartersId ?? "");
+    const [queues, queue] = headquarters
+      ? [used.headquarters, headquarters.id]
+      : [used.owner, building.owner];
     const capacity = headquarters
       ? (definitions.get(headquarters.definitionId)?.infrastructure?.slots ?? 1)
       : 1;
-    const count = used.get(queue) ?? 0;
+    const count = queues.get(queue) ?? 0;
     if (count >= capacity) {
       delete construction.active;
       continue;
     }
-    used.set(queue, count + 1);
+    queues.set(queue, count + 1);
     construction.active = true;
     construction.completedTicks += 1;
     if (construction.completedTicks >= construction.totalTicks) {
@@ -161,6 +186,7 @@ export function validateGrowthDefinitions(
       return invalid(definition);
   }
 }
+/** Relationship changes can leave a saved queue ineligible until reassigned. */
 export function validateGrowth(
   actors: readonly Actor[],
   definitions: ReadonlyMap<string, ActorDefinition>,
@@ -183,9 +209,7 @@ export function validateGrowth(
         !actors.some(
           (headquarters) =>
             headquarters.id === construction.headquartersId &&
-            !headquarters.construction &&
-            headquarters.definitionId ===
-              definition.growth!.headquartersDefinitionId,
+            hostsGrowth(headquarters, actor, definitions, () => true),
         ))
     )
       return invalid();

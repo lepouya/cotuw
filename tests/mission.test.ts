@@ -62,7 +62,12 @@ const definitions: ActorDefinition[] = [
 const bounds: WorldBounds = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
 
 function actor(id = "trooper", definitionId = "trooper", x = 0): Actor {
-  return createActor({ id, definitionId, worldPosition: { x, z: 0 } });
+  return createActor({
+    id,
+    definitionId,
+    owner: "player",
+    worldPosition: { x, z: 0 },
+  });
 }
 
 function mission(actors: Actor[], tickSeconds = 0.5) {

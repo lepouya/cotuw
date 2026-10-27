@@ -445,7 +445,7 @@ export function createEconomyControls(
       );
       const recoveryCost = harvestingRecoveryCost(
         economy,
-        simulation.actors,
+        simulation.actors.filter(canControl),
         definitions,
       );
       // The selected, fielded, or paid Harvester explains the delivery cycle.
@@ -480,6 +480,7 @@ export function createEconomyControls(
         } else if (
           !simulation.actors.some(
             (actor) =>
+              canControl(actor) &&
               !actor.construction &&
               definitions.get(actor.definitionId)?.cultivationDropoff,
           )

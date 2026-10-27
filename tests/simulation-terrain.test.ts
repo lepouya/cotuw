@@ -168,12 +168,18 @@ describe("simulation terrain", () => {
         createActor({
           id: "unit-1",
           definitionId: "unit",
+          owner: "player",
           worldPosition: map.tileCenter(0, 1),
         }),
-        createTilePlacedActor(map, definitions[1]!, {
-          actorId: "marker-1",
-          origin: { x: 2, z: 1 },
-        }),
+        createTilePlacedActor(
+          map,
+          definitions[1]!,
+          {
+            actorId: "marker-1",
+            origin: { x: 2, z: 1 },
+          },
+          "player",
+        ),
       ]),
     ) =>
       createMissionSimulation({

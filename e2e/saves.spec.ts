@@ -153,6 +153,7 @@ test("completing an objective writes the autosave", async ({ page }) => {
       createActor({
         id: "trooper-1",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: {
           x: wolf.worldPosition.x - 1.5,
           z: wolf.worldPosition.z,

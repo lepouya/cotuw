@@ -4,14 +4,13 @@ import { ECONOMY_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import { distance } from "../src/simulation/world";
-import { createMissionState } from "../src/simulation/mission";
 import { createMissionSimulation } from "../src/simulation/mission";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { defineScenario } from "../src/simulation/scenario";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
-import { exploredScenarioState } from "./helpers/scenario";
+import { exploredScenarioState, playerOwners } from "./helpers/scenario";
 
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionState } from "../src/simulation/mission";
@@ -45,7 +44,7 @@ function scenario(
     id: "combat-test",
     objectives,
     tileSize: 1,
-    playerFaction: "arc",
+    ...playerOwners("arc"),
     terrainTypeIds: mapOptions.terrainTypeIds,
     terrain: contentMap.terrainState(),
     buildings: [
@@ -67,7 +66,7 @@ function fixture(
   edit?: (state: MissionState) => void,
   state?: MissionState,
   content: readonly ActorDefinition[] = definitions,
-  idleUpdate = () => {},
+  idleUpdate: (actor: Actor) => void = () => {},
   objectives: ObjectiveDefinition[] = [],
 ) {
   const map = new TerrainGrid(mapOptions);
@@ -249,6 +248,7 @@ describe("combat", () => {
           createActor({
             id: "wolf",
             definitionId: "wolf",
+            owner: "wildlife",
             worldPosition: at(7, 3),
           }),
           {
@@ -380,32 +380,6 @@ describe("combat", () => {
     expect(simulation.detects("wildlife", cc)).toBe(true);
   });
 
-  test("without a player faction, as in the sandbox, every faction sees everything", () => {
-    const map = new TerrainGrid(mapOptions);
-    const { simulation } = fixture([], undefined, {
-      ...createMissionState([
-        createActor({
-          id: "trooper",
-          definitionId: "arc-trooper",
-          worldPosition: at(2, 2),
-        }),
-        Object.assign(
-          createActor({
-            id: "wolf",
-            definitionId: "wolf",
-            worldPosition: at(35, 15),
-          }),
-          { territory: { home: at(35, 15) } },
-        ),
-      ]),
-      terrain: map.terrainState(),
-    });
-    expect(simulation.detects("arc", simulation.actorById("wolf")!)).toBe(true);
-    expect(
-      simulation.detects("wildlife", simulation.actorById("trooper")!),
-    ).toBe(true);
-  });
-
   test("a saved fight continues exactly as an uninterrupted one", () => {
     const units = [
       unit("trooper", "arc-trooper", 12, 10),
@@ -485,6 +459,7 @@ describe("combat edge cases", () => {
       state.wrecks.push({
         actorId: "wolf",
         definitionId: "wolf",
+        owner: "wildlife",
         worldPosition: at(35, 14),
         facing: 0,
         tick: state.tick - 1,
@@ -706,6 +681,7 @@ describe("combat edge cases", () => {
                   actorId: "blocker",
                   origin: { x: 15, z: 9 },
                 },
+                "player",
               ),
             );
           if (obstacle === "terrain")
@@ -716,6 +692,7 @@ describe("combat edge cases", () => {
               createActor({
                 id: "middle",
                 definitionId: "arc-scout",
+                owner: "player",
                 worldPosition: at(15, 10),
               }),
             );
@@ -795,6 +772,7 @@ describe("combat edge cases", () => {
             contentMap,
             definitions.find((definition) => definition.id === definitionId)!,
             { actorId: id, origin: { x, z: 5 } },
+            "player",
           );
           building.health = 8;
           state.actors.push(building);
@@ -865,7 +843,7 @@ describe("combat edge cases", () => {
   });
 });
 
-describe("combat state validation and faction vision", () => {
+describe("combat state validation and owner vision", () => {
   test.each(["position", "waypoint"] as const)(
     "rejects a saved route with its %s outside its bounds",
     (field) => {
@@ -977,6 +955,7 @@ describe("combat state validation and faction vision", () => {
         state.wrecks.push({
           actorId: "old-wolf",
           definitionId: "wolf",
+          owner: "wildlife",
           worldPosition: { x: 1000, z: 1000 },
           facing: 0,
           tick: 0,
@@ -985,17 +964,22 @@ describe("combat state validation and faction vision", () => {
     ).toThrow("invalid wrecks");
   });
 
-  test("saves carry their own player faction", () => {
-    const content = scenario([]);
+  test("saves carry their owners and player owner", () => {
+    const content = scenario([unit("wolf", "wolf", 35, 15)]);
     const state = exploredScenarioState(content, definitions);
-    state.playerFaction = "wildlife";
-    expect(
-      parseMission(serializeMission(content, state, TICK_SECONDS), TICK_SECONDS)
-        .state.playerFaction,
-    ).toBe("wildlife");
+    state.playerOwner = "wildlife";
+    const loaded = parseMission(
+      serializeMission(content, state, TICK_SECONDS),
+      TICK_SECONDS,
+    ).state;
+    expect(loaded.playerOwner).toBe("wildlife");
+    expect(loaded.owners).toEqual(state.owners);
+    expect(loaded.actors.find(({ id }) => id === "wolf")?.owner).toBe(
+      "wildlife",
+    );
   });
 
-  test("no-fog missions give all factions full visibility", () => {
+  test("no-fog missions give all owners full visibility", () => {
     const state = exploredScenarioState(
       scenario([
         unit("trooper", "arc-trooper", 2, 10),
@@ -1006,13 +990,15 @@ describe("combat state validation and faction vision", () => {
     delete state.fog;
     delete state.scenarioId;
     const { simulation } = fixture([], undefined, state);
-    expect(simulation.detects("arc", simulation.actorById("wolf")!)).toBe(true);
+    expect(simulation.detects("player", simulation.actorById("wolf")!)).toBe(
+      true,
+    );
     expect(
       simulation.detects("wildlife", simulation.actorById("trooper")!),
     ).toBe(true);
   });
 
-  test("one vision per faction releases every terrain subscription", () => {
+  test("one vision per owner releases every terrain subscription", () => {
     const original = TerrainGrid.prototype.onChanged;
     let active = 0;
     const spy = vi
@@ -1027,17 +1013,84 @@ describe("combat state validation and faction vision", () => {
       });
     try {
       const { simulation } = fixture([], (state) => {
-        state.playerFaction = "wildlife";
+        state.playerOwner = "wildlife";
       });
-      const factions = new Set(
-        definitions.map(({ faction }) => faction).filter(Boolean),
-      );
-      expect(spy).toHaveBeenCalledTimes(factions.size);
+      expect(spy).toHaveBeenCalledTimes(simulation.owners.length);
       simulation.dispose();
       expect(active).toBe(0);
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe("owners of one faction type", () => {
+  const addRival = (state: MissionState) => {
+    state.owners.push({ id: "rival", faction: "arc" });
+    state.relationships.push({
+      owners: ["player", "rival"],
+      relationship: "hostile",
+    });
+  };
+
+  test("opposing ARC owners fight while each owner's units hold fire", () => {
+    const { simulation } = fixture(
+      [
+        unit("trooper", "arc-trooper", 12, 10),
+        unit("partner", "arc-trooper", 12, 12),
+        { ...unit("rival", "arc-trooper", 17, 11), owner: "rival" },
+      ],
+      addRival,
+    );
+    expect(simulation.detects("rival", simulation.actorById("trooper")!)).toBe(
+      true,
+    );
+    const ownerOf = (id: string) => (id === "rival" ? "rival" : "player");
+    const hits: string[][] = [];
+    runUntil(simulation, () => {
+      for (const { attackerId, targetId } of simulation.attacks)
+        hits.push([ownerOf(attackerId), ownerOf(targetId)]);
+      return !simulation.actorById("rival");
+    });
+    expect(
+      simulation.wrecks.map(({ actorId, owner }) => [actorId, owner]),
+    ).toEqual([["rival", "rival"]]);
+    expect(hits).toContainEqual(["rival", "player"]);
+    expect(hits.every(([attacker, target]) => attacker !== target)).toBe(true);
+  });
+
+  test("an owner's vision and exploration stay its own", () => {
+    const { simulation } = fixture(
+      [{ ...unit("rival", "arc-trooper", 30, 10), owner: "rival" }],
+      addRival,
+    );
+    const rival = simulation.actorById("rival")!;
+    const cc = simulation.actorById("cc")!;
+    expect(simulation.detects("player", rival)).toBe(false);
+    expect(simulation.detects("rival", rival)).toBe(true);
+    expect(simulation.detects("rival", cc)).toBe(false);
+  });
+
+  test("owners are validated and cannot change during a tick", () => {
+    expect(() =>
+      fixture([], (state) => {
+        state.actors[0]!.owner = "nobody";
+      }),
+    ).toThrow("invalid identity");
+    expect(() =>
+      fixture([], (state) => {
+        state.owners.push({ id: "player" });
+      }),
+    ).toThrow("distinct IDs");
+    expect(() =>
+      fixture([], (state) => {
+        state.playerOwner = "nobody";
+      }),
+    ).toThrow("unknown player owner");
+    const defected = fixture([], addRival, undefined, definitions, (actor) => {
+      actor.owner = "rival";
+    }).simulation;
+    expect(() => defected.tick()).toThrow("changed its identity, owner");
   });
 });
 
@@ -1472,6 +1525,7 @@ describe("Command Center defeat", () => {
           createActor({
             id: "new-scout",
             definitionId: "arc-scout",
+            owner: "player",
             worldPosition: at(15, 10),
           }),
         ),

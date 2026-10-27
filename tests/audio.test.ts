@@ -639,8 +639,8 @@ test("hidden attacks stay silent while own damage and alerts trigger combat musi
   };
   const simulation: any = {
     actors: [
-      { ...actor, id: "hidden", definitionId: "wolf" },
-      { ...actor, id: "own", definitionId: "arc-harvester" },
+      { ...actor, id: "hidden", definitionId: "wolf", owner: "wildlife" },
+      { ...actor, id: "own", definitionId: "arc-harvester", owner: "player" },
     ],
     economy: { harvesters: [], production: [] },
     wrecks: [],
@@ -650,8 +650,7 @@ test("hidden attacks stay silent while own damage and alerts trigger combat musi
     completedTicks: 0,
     tickSeconds: 1 / 60,
   };
-  const owns = (value: { definitionId: string }) =>
-    value.definitionId === "arc-harvester";
+  const owns = (value: { owner: string }) => value.owner === "player";
   const access = { owns, shows: owns };
   const adapter = createMissionAudio(scene, simulation, access, 8);
   simulation.attacks = [{ attackerId: "hidden", targetId: "own" }];

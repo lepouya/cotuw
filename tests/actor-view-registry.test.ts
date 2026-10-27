@@ -30,6 +30,7 @@ function actor(id: string, x = 0, facing = 0): ActorRenderState {
   return {
     id,
     definitionId: "trooper",
+    owner: "player",
     worldPosition: { x, z: 0 },
     facing,
     occupancyLayer: "surface",

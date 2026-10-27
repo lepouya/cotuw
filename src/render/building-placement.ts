@@ -209,10 +209,12 @@ export function createBuildingPlacement(
     preview.update(
       candidate
         ? [
-            createTilePlacedActor(map, definition!, {
-              ...candidate,
-              actorId: "building-preview",
-            }),
+            createTilePlacedActor(
+              map,
+              definition!,
+              { ...candidate, actorId: "building-preview" },
+              simulation.playerOwner,
+            ),
           ]
         : [],
     );

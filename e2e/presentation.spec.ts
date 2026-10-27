@@ -83,6 +83,7 @@ async function openPresentation(
             createActor({
               id: "watcher",
               definitionId: "arc-scout",
+              owner: "player",
               worldPosition: {
                 x: wolf.worldPosition.x + 9,
                 z: wolf.worldPosition.z,
@@ -101,6 +102,7 @@ async function openPresentation(
             createActor({
               id: "present-worker",
               definitionId: "arc-harvester",
+              owner: "player",
               worldPosition: map.tileCenter(13, 56),
             }),
           );
@@ -120,6 +122,7 @@ async function openPresentation(
           definitions: mission.definitions,
           presentations: new Map(Object.entries(mission.content.presentation)),
           economy: !!mission.state.economy,
+          playerOwner: "player",
           playerFaction: "arc",
           goals: [],
           selectActor: () => {},
@@ -285,6 +288,7 @@ test("committed combat animates both survivors, aiming, and wolf pursuit", async
       createActor({
         id: "duelist",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: { x: -9.5, z: -17.5 },
       }),
     );
@@ -350,7 +354,7 @@ test("loaded healing shows a frozen cue and removes it when the wolf becomes hid
     return {
       held,
       hidden: !session.simulation.detects(
-        "arc",
+        "player",
         session.simulation.actorById("lone-wolf")!,
       ),
       removed: !scene.getTransformNodeByName("regeneration-lone-wolf"),

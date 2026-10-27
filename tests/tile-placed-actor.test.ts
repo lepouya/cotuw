@@ -72,6 +72,7 @@ function wall({ map }: World, id: string, x: number, z: number, turns = 0) {
     map,
     definitions[1]!,
     placeWall(id, x, z, turns),
+    "player",
   );
 }
 
@@ -79,6 +80,7 @@ function trooper({ map }: World, id: string, x: number, z: number): Actor {
   return createActor({
     id,
     definitionId: "trooper",
+    owner: "player",
     worldPosition: map.tileCenter(x, z),
   });
 }
@@ -447,6 +449,7 @@ describe("tile-placed actors", () => {
     const bare = createActor({
       id: "bare-wall",
       definitionId: "wall",
+      owner: "player",
       worldPosition: placed.map.tileCenter(2, 1),
     });
     expect(() => simulation(placed, createMissionState([bare]))).toThrow(

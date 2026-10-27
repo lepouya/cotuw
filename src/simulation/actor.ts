@@ -10,7 +10,7 @@ import type { WorldPosition } from "./world";
 export type ActorDefinition = {
   id: string;
   behaviorId: string;
-  /** Actors of different factions are hostile; absent means neutral. */
+  /** Faction type for roster and construction rules, not control. */
   faction?: string;
   /** Maximum health. Only actors with health can be damaged or destroyed. */
   health?: number;
@@ -96,6 +96,8 @@ export type Weapon = {
 export type Actor = {
   id: string;
   definitionId: string;
+  /** The controlling owner's ID; neutral actors belong to their own owner. */
+  owner: string;
   worldPosition: WorldPosition;
   /** Radians clockwise from the world's positive Z axis. */
   facing: number;
@@ -318,6 +320,7 @@ export type ActorRenderState = DeepReadonly<
     Actor,
     | "id"
     | "definitionId"
+    | "owner"
     | "worldPosition"
     | "facing"
     | "occupancyLayer"
@@ -336,6 +339,7 @@ export type ActorRenderState = DeepReadonly<
 export type ActorOptions = {
   id: string;
   definitionId: string;
+  owner: string;
   worldPosition: WorldPosition;
   facing?: number;
   occupancyLayer?: OccupancyLayer;
@@ -345,6 +349,7 @@ export type ActorOptions = {
 export function createActor({
   id,
   definitionId,
+  owner,
   worldPosition,
   facing = 0,
   occupancyLayer = "surface",
@@ -352,6 +357,7 @@ export function createActor({
   return {
     id,
     definitionId,
+    owner,
     worldPosition: { ...worldPosition },
     facing,
     occupancyLayer,

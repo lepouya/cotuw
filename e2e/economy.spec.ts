@@ -24,7 +24,7 @@ declare global {
 async function controlledOpening(
   page: Page,
   materials = 150,
-  playerFaction = "arc",
+  playerOwner = "player",
   extraBuildings: ActorPlacement[] = [],
   startPaused = false,
 ) {
@@ -39,7 +39,7 @@ async function controlledOpening(
   await withoutApp(page);
   await page.goto("/");
   const hiddenUnitsAtLoad = await page.evaluate(
-    async ({ materials, playerFaction, extraBuildings, startPaused }) => {
+    async ({ materials, playerOwner, extraBuildings, startPaused }) => {
       const prototypePath: string = "/src/session.ts";
       const sidebarPath: string = "/src/ui/sidebar.ts";
       const missionsPath: string = "/e2e/missions.ts";
@@ -65,7 +65,7 @@ async function controlledOpening(
       for (const id of ["network-view-control", "economy-overview"])
         document.getElementById(id)!.hidden = false;
       mission.state.economy!.materials = materials;
-      mission.state.playerFaction = playerFaction;
+      mission.state.playerOwner = playerOwner;
       placeBuildings(mission, extraBuildings);
       let view: GameSession;
       const sidebar = createSidebar(
@@ -74,7 +74,10 @@ async function controlledOpening(
           definitions: mission.definitions,
           presentations: new Map(Object.entries(mission.content.presentation)),
           economy: true,
-          playerFaction,
+          playerOwner,
+          playerFaction: mission.state.owners.find(
+            ({ id }) => id === playerOwner,
+          )?.faction,
           goals: [{ definitionId: "arc-trooper", label: "Train a Trooper" }],
           selectActor: (id, additive) => view.selectActor(id, additive),
         },
@@ -115,12 +118,12 @@ async function controlledOpening(
         .filter(
           (actor) =>
             !actor.tilePlacement &&
-            !view.simulation.detects(playerFaction, actor) &&
+            !view.simulation.detects(playerOwner, actor) &&
             !!view.scene.getTransformNodeByName(`actor-${actor.id}-root`),
         )
         .map((actor) => actor.id);
     },
-    { materials, playerFaction, extraBuildings, startPaused },
+    { materials, playerOwner, extraBuildings, startPaused },
   );
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-terrain-ready",
@@ -158,7 +161,7 @@ test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
 test("paused inspection allows selection but blocks orders and placement", async ({
   page,
 }) => {
-  await controlledOpening(page, 150, "arc", [], true);
+  await controlledOpening(page, 150, "player", [], true);
   const hiddenSelection = await page.evaluate(async () => {
     const path: string = "/src/simulation/actor.ts";
     const { createActor } = await import(path);
@@ -171,6 +174,7 @@ test("paused inspection allows selection but blocks orders and placement", async
       createActor({
         id: "inspection-trooper",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: { x: -36.5, z: 2.5 },
       }),
     );
@@ -253,6 +257,7 @@ test("scouting reveals the mountain den and its larger alpha", async ({
     view.simulation.spawnActor({
       id: "den-scout",
       definitionId: "arc-scout",
+      owner: "player",
       worldPosition: { x: 28.5, z: -27.5 },
       facing: 0,
       occupancyLayer: "surface",
@@ -352,7 +357,7 @@ test("default opening shows the Command Center, starting Materials, and paid con
 test("construction order and training cards follow the selected building", async ({
   page,
 }) => {
-  await controlledOpening(page, 500, "arc", [
+  await controlledOpening(page, 500, "player", [
     {
       actorId: "test-refinery",
       definitionId: "arc-materials-refinery",
@@ -767,6 +772,7 @@ test("worker controls share delivery actions and tolerate missions without culti
       const controls = setup(economy, [
         createActor({
           id: definitionId,
+          owner: "player",
           definitionId,
           worldPosition: { x: 0, z: 0 },
         }),
@@ -1018,6 +1024,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
         (definition) => definition.id === "arc-field-barracks",
       )!,
       { actorId: "test-backup", origin: { x: 17, z: 52 } },
+      "player",
     );
     const totalTicks = Math.round(8 / simulation.tickSeconds);
     backup.construction = {
@@ -1048,10 +1055,11 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   const wolfHidden = await page.evaluate(() => {
     const { view } = window.economyHarness;
     const wolf = view.simulation.actorById("lone-wolf")!;
-    const hidden = !view.simulation.detects("arc", wolf);
+    const hidden = !view.simulation.detects("player", wolf);
     view.simulation.spawnActor({
       id: "duelist",
       definitionId: "arc-trooper",
+      owner: "player",
       worldPosition: { x: 40.5 - 50, z: 32.5 - 50 },
       facing: Math.PI / 2,
       occupancyLayer: "surface",
@@ -1144,13 +1152,15 @@ test("hostile buildings require detection and expose inspection without player c
   expect(initiallyHidden).toEqual({ rendered: false, selected: "[]" });
   await advance(page, 0.1);
   await expect(page.locator("#building-options button")).toHaveCount(0);
-  await expect(page.locator("#training-options button")).toHaveCount(0);
+  await expect(page.locator("#training-options button:visible")).toHaveCount(0);
+  await expect(page.locator("#training-options button:enabled")).toHaveCount(0);
   await page.evaluate(() => {
     const { view } = window.economyHarness;
     const position = { x: 10.5 - 50, z: 50.5 - 50 };
     view.simulation.spawnActor({
       id: "observer",
       definitionId: "wolf",
+      owner: "wildlife",
       worldPosition: position,
       facing: 0,
       occupancyLayer: "surface",
@@ -1166,6 +1176,8 @@ test("hostile buildings require detection and expose inspection without player c
   await expect(page.locator("#remove-building")).toBeHidden();
   await expect(page.locator("#remove-building")).toBeDisabled();
   await expect(page.locator("#open-training")).toBeHidden();
+  await expect(page.locator("#training-options button:visible")).toHaveCount(0);
+  await expect(page.locator("#training-options button:enabled")).toHaveCount(0);
   await expect(page.locator("[data-rally-controls]").first()).toBeHidden();
   await expect(page.locator("#construction-queue button")).toHaveCount(0);
   await expect(page.locator("#production-queue button")).toHaveCount(0);
@@ -1237,6 +1249,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       view.simulation.spawnActor({
         id: "advance-trooper",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: { x: -11.5, z: -17.5 },
         facing: 0,
         occupancyLayer: "surface",
@@ -1363,6 +1376,7 @@ test("Goals tracks victory and restores free play", async ({
         createActor({
           id: `trooper-${wolf.id}`,
           definitionId: "arc-trooper",
+          owner: "player",
           worldPosition: {
             x: wolf.worldPosition.x - 1.5,
             z: wolf.worldPosition.z,

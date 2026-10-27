@@ -7,7 +7,8 @@ import { footprintSize } from "../simulation/grid";
 import { costAmount, costLabel, costResource } from "../simulation/economy";
 import { growthCandidates } from "../simulation/growth";
 import type { Resource } from "../simulation/economy";
-import { createPlayerAccess } from "../simulation/faction";
+import { createPlayerAccess, rosterIncludes } from "../simulation/ownership";
+import type { Relations } from "../simulation/ownership";
 import { createGoalList } from "./goals";
 import { createProductionCards } from "./production-card";
 import { productionBlocker, setActionAvailability } from "./production-action";
@@ -40,6 +41,7 @@ export type SidebarState = {
   resource?: Resource;
   objectives?: readonly ObjectiveView[];
   result?: MissionResult;
+  relations: Pick<Relations, "relationship">;
 };
 
 const RESULT_DIRECTIVES: Record<MissionResult["kind"], string> = {
@@ -53,7 +55,8 @@ export type SidebarOptions = {
   presentations: ReadonlyMap<string, ActorPresentation>;
   goals: readonly ScenarioGoal[];
   selectActor: (id: string, additive?: boolean) => void;
-  /** The player's faction; rosters list only its actors. */
+  playerOwner: string;
+  /** The player's faction, whose roster supplies the construction menu. */
   playerFaction?: string;
   factionName?: string;
 };
@@ -97,8 +100,15 @@ function buildSidebar(
       counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);
     return counts;
   };
-  const player = createPlayerAccess(options.playerFaction, definitionById);
-  const friendly = player.owns;
+  // Each update brings the mission's current relationships.
+  let relations: Pick<Relations, "relationship"> | undefined;
+  const player = createPlayerAccess(
+    options.playerOwner,
+    (left, right) => relations?.relationship(left, right) ?? "neutral",
+  );
+  const owns = player.owns;
+  const playable = (definition: ActorDefinition) =>
+    rosterIncludes(options.playerFaction, definition);
   const namesFor = (definition: ActorDefinition) =>
     definition.production!.unitDefinitionIds.map(nameFor);
   const selectionDetails = element("selection-details");
@@ -165,9 +175,8 @@ function buildSidebar(
   const train: ProductionCard[] = [];
   const buildOrder = (id: string) => presentations.get(id)?.build?.order ?? 0;
   for (const definition of definitions) {
-    if (!friendly({ definitionId: definition.id })) continue;
     const presentation = presentations.get(definition.id);
-    if (presentation?.build && definition.footprint) {
+    if (playable(definition) && presentation?.build && definition.footprint) {
       const trains = definition.production
         ? `Trains ${namesFor(definition).join(" & ")} · `
         : "";
@@ -205,8 +214,7 @@ function buildSidebar(
       : "This scenario has no construction.",
   );
   element("production-status").hidden = !definitions.some(
-    (definition) =>
-      friendly({ definitionId: definition.id }) && definition.production,
+    (definition) => definition.production,
   );
   const createActorList = (container: HTMLElement, emptyText: string) => {
     const buttons = new Map<string, HTMLButtonElement>();
@@ -270,12 +278,11 @@ function buildSidebar(
   let actorVersion: number | undefined;
   let selectionKey = "";
   let disabled: boolean | undefined;
-  /** Selecting a friendly production building opens its training cards. */
-  const showActor = (definitionId: string) => {
-    if (
-      friendly({ definitionId }) &&
-      definitionById.get(definitionId)?.production
-    )
+  /** Selecting an owned production building opens its training cards. */
+  const showActor = (
+    actor: Pick<ActorRenderState, "definitionId" | "owner">,
+  ) => {
+    if (owns(actor) && definitionById.get(actor.definitionId)?.production)
       showTab("panel-units");
   };
   root.addEventListener(
@@ -297,7 +304,7 @@ function buildSidebar(
         const actor = actorsById.get(button.dataset.actorId);
         if (!actor) return;
         selectActor(actor.id, event.shiftKey);
-        showActor(actor.definitionId);
+        showActor(actor);
       }
     },
     { signal },
@@ -353,6 +360,7 @@ function buildSidebar(
     showActor,
     showGoals: () => showTab("panel-goals"),
     update: (state: SidebarState) => {
+      relations = state.relations;
       const objectives = state.objectives ?? [];
       objectiveList.hidden = objectives.length === 0;
       missionDirective.hidden = !state.result;
@@ -380,7 +388,7 @@ function buildSidebar(
         const workerSelected =
           !definition.growth ||
           growthCandidates(
-            definition,
+            { definitionId: definition.id, owner: options.playerOwner },
             state.selectedActorIds,
             state.actors,
             definitionById,
@@ -399,13 +407,17 @@ function buildSidebar(
       const selected = new Set(ids);
       remove.hidden = !state.actors.some(
         (actor) =>
-          selected.has(actor.id) && friendly(actor) && isTilePlacedActor(actor),
+          selected.has(actor.id) && owns(actor) && isTilePlacedActor(actor),
       );
-      // Box mode changes how terrain taps behave, so it changes the hint.
+      // Box mode changes how terrain taps behave, so it changes the hint;
+      // relationship events change what a selected actor's hint offers.
       const nextSelectionKey = JSON.stringify([
         ids,
         state.boxMode ?? false,
         state.paused ?? false,
+        state.actors
+          .filter((actor) => selected.has(actor.id))
+          .map(player.relationTo),
       ]);
       const unavailable = state.placementActive || state.faulted;
       boxSelect.disabled = unavailable;
@@ -430,7 +442,7 @@ function buildSidebar(
         !state.actors.some(
           (actor) =>
             selected.has(actor.id) &&
-            friendly(actor) &&
+            owns(actor) &&
             isMobileActor(actor, definitionById.get(actor.definitionId)),
         );
       const inspected =
@@ -438,7 +450,7 @@ function buildSidebar(
           ? state.actors.find((actor) => actor.id === ids[0])
           : undefined;
       const trainable =
-        inspected && friendly(inspected)
+        inspected && owns(inspected)
           ? trainableUnitIds(inspected, definitionById)
           : [];
       for (const { definitionId, card } of train) {
@@ -474,10 +486,10 @@ function buildSidebar(
         actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
         roster.sync(
           state.actors.filter(
-            (actor) => !isTilePlacedActor(actor) && friendly(actor),
+            (actor) => !isTilePlacedActor(actor) && owns(actor),
           ),
         );
-        const counts = countByDefinition(state.actors.filter(friendly));
+        const counts = countByDefinition(state.actors.filter(owns));
         preparation.update(
           goals.map(({ definitionId, label, directive }) => {
             const current = counts.get(definitionId) ?? 0;
@@ -505,8 +517,7 @@ function buildSidebar(
           : undefined;
         const definition = actor && definitionById.get(actor.definitionId)!;
         const presentation = actor && presentations.get(actor.definitionId);
-        trainingLink.hidden =
-          !actor || !friendly(actor) || !definition?.production;
+        trainingLink.hidden = !actor || !owns(actor) || !definition?.production;
         const moveSubject = ids.length > 1 ? "the group" : "this unit";
         const moveHint = state.paused
           ? "Resume the mission to issue orders."
@@ -526,17 +537,30 @@ function buildSidebar(
             ? `${nameFor(actor.definitionId)} · ${footprintSize(occupiedTilesFor(actor, definition!))} · ${actor.tilePlacement.quarterTurns * 90}°`
             : nameFor(actor.definitionId)
           : "Nothing selected";
-        selectionInfo.textContent = !actor
-          ? "Choose a unit or building on the map, or a field unit in Units."
-          : player.relationTo(actor.definitionId) === "hostile"
-            ? `${presentation?.description ?? "Hostile"} · Select your units, then click or tap it to attack.`
-            : !friendly(actor)
-              ? `${presentation?.description ?? "Neutral"} · Not under your command.`
-              : definition?.production
-                ? `${presentation?.description ?? "Unit production"} · Trains ${namesFor(definition).join(" and ")}.`
-                : isTilePlacedActor(actor)
-                  ? `${presentation?.description ?? "Building"} · Select Buildings to expand your base.`
-                  : `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · ${moveHint}`;
+        const relation = actor && player.relationTo(actor);
+        if (!actor) {
+          selectionInfo.textContent =
+            "Choose a unit or building on the map, or a field unit in Units.";
+        } else if (relation !== "own") {
+          let label = "Neutral";
+          if (relation === "hostile") label = "Hostile";
+          else if (relation === "allied") label = "Allied";
+          selectionInfo.textContent = [
+            label,
+            presentation?.description,
+            relation === "hostile"
+              ? "Select your units, then click or tap it to attack."
+              : "Not under your command.",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+        } else if (definition?.production) {
+          selectionInfo.textContent = `${presentation?.description ?? "Unit production"} · Trains ${namesFor(definition).join(" and ")}.`;
+        } else if (isTilePlacedActor(actor)) {
+          selectionInfo.textContent = `${presentation?.description ?? "Building"} · Select Buildings to expand your base.`;
+        } else {
+          selectionInfo.textContent = `${presentation?.description ?? "Unit"} · Movement speed ${definition?.movement?.speed} · ${moveHint}`;
+        }
       }
     },
     dispose: lifetime.dispose,

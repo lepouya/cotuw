@@ -88,11 +88,16 @@ function fixture(
     terrainTypeIds: ["plain", "water"],
   });
   const occupancy = new OccupancyGrid(map);
-  const producer = createTilePlacedActor(map, barracks, {
-    actorId: "barracks-1",
-    origin: options.origin ?? { x: 5, z: 5 },
-    quarterTurns: options.rotation,
-  });
+  const producer = createTilePlacedActor(
+    map,
+    barracks,
+    {
+      actorId: "barracks-1",
+      origin: options.origin ?? { x: 5, z: 5 },
+      quarterTurns: options.rotation,
+    },
+    "player",
+  );
   const simulation = createMissionSimulation({
     map,
     occupancy,
@@ -185,15 +190,21 @@ describe("unit production", () => {
     map.editTerrain({ tiles: [{ x: 6, z: 7, terrain: { typeId: "water" } }] });
     map.editTerrain({ heights: [{ x: 5, z: 8, height: 3 }] });
     simulation.spawnActor(
-      createTilePlacedActor(map, barracks, {
-        actorId: "blocker",
-        origin: { x: 7, z: 5 },
-      }),
+      createTilePlacedActor(
+        map,
+        barracks,
+        {
+          actorId: "blocker",
+          origin: { x: 7, z: 5 },
+        },
+        "player",
+      ),
     );
     simulation.spawnActor(
       createActor({
         id: "standing-unit",
         definitionId: "trooper",
+        owner: "player",
         worldPosition: map.tileCenter(7, 4),
       }),
     );
@@ -221,6 +232,7 @@ describe("unit production", () => {
         createActor({
           id: `block-${tile.x}-${tile.z}`,
           definitionId: "trooper",
+          owner: "player",
           worldPosition: map.tileCenter(tile.x, tile.z),
         }),
       );
@@ -289,6 +301,7 @@ describe("unit production", () => {
       createActor({
         id: "unit-3",
         definitionId: "scout",
+        owner: "player",
         worldPosition: map.tileCenter(1, 1),
       }),
     );
@@ -314,10 +327,15 @@ describe("unit production", () => {
   test("a building without production and a removed producer cannot train", () => {
     const { simulation, map } = fixture();
     simulation.spawnActor(
-      createTilePlacedActor(map, definitions[3], {
-        actorId: "cc",
-        origin: { x: 1, z: 1 },
-      }),
+      createTilePlacedActor(
+        map,
+        definitions[3],
+        {
+          actorId: "cc",
+          origin: { x: 1, z: 1 },
+        },
+        "player",
+      ),
     );
     simulation.submitCommand(order("unit-1", "trooper", "cc"));
     simulation.submitCommand({ kind: "remove-actor", actorId: "barracks-1" });

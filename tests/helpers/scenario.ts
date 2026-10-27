@@ -5,6 +5,23 @@ import type {
   MissionState,
 } from "../../src/simulation/mission";
 
+/** The player owns one faction's actors; wolves belong to hostile wildlife. */
+export function playerOwners(faction: string) {
+  return {
+    owners: [
+      { id: "player", faction },
+      { id: "wildlife", faction: "wildlife" },
+    ],
+    playerOwner: "player",
+    relationships: [
+      {
+        owners: ["player", "wildlife"] as [string, string],
+        relationship: "hostile" as const,
+      },
+    ],
+  };
+}
+
 /** Starts fully explored, so fog does not limit placement in these tests. */
 export function exploredScenarioState(
   ...args: Parameters<typeof createScenarioState>

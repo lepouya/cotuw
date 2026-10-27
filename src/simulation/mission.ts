@@ -66,10 +66,9 @@ import type {
 import { resolveNavigationDestination } from "./navigation";
 import {
   createFog,
-  createVision,
+  createOwnerVision,
   isValidFogState,
   validateVisionDefinition,
-  visionSources,
 } from "./vision";
 import {
   applyEconomyCommand as applyEconomy,
@@ -98,7 +97,6 @@ import {
   isMobileActor,
   isTilePlacedActor,
   isValidTilePlacement,
-  occupiedTilesFor,
   tilePlacedPose,
   validatePlacementDefinition,
 } from "./placement";
@@ -132,8 +130,20 @@ import type {
 } from "./placement";
 import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
-import { playerRelation } from "./faction";
-import type { Detectable } from "./faction";
+import {
+  createRelations,
+  playerFactionOf,
+  validateOwners,
+  validateRelationships,
+} from "./ownership";
+import type {
+  Detectable,
+  Owner,
+  OwnerRelationship,
+  Relations,
+} from "./ownership";
+import { fireEvents, validateEvents } from "./events";
+import type { MissionEventDefinition } from "./events";
 import {
   isCount,
   isId,
@@ -142,19 +152,20 @@ import {
   isPositive,
   isRecord,
 } from "./validation";
-import type { FogState, FogView, Vision } from "./vision";
+import type { FogState, FogView } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
 /** Actor state that behaviors must leave unchanged. */
 type ActorIdentity = Pick<
   Actor,
-  "id" | "definitionId" | "tilePlacement" | "occupancyLayer"
+  "id" | "definitionId" | "owner" | "tilePlacement" | "occupancyLayer"
 >;
 
 function actorIdentity(actor: Actor): ActorIdentity {
   return {
     id: actor.id,
     definitionId: actor.definitionId,
+    owner: actor.owner,
     occupancyLayer: actor.occupancyLayer,
     tilePlacement: actor.tilePlacement && structuredClone(actor.tilePlacement),
   };
@@ -203,8 +214,14 @@ export type MissionState = {
   /** The player's explored terrain; absent when the whole map is known. */
   fog?: FogState;
   scenarioId?: string;
-  /** The faction whose vision the fog records. */
-  playerFaction?: string;
+  /** Participants that control actors, in authored order. */
+  owners: Owner[];
+  /** The owner the player controls, whose exploration the fog records. */
+  playerOwner: string;
+  /** Pairs that are allied or hostile; every other pair is neutral. */
+  relationships: OwnerRelationship[];
+  /** One-time events that have fired, in firing order. */
+  firedEvents: string[];
   /** Remains of destroyed actors, oldest first. */
   wrecks: Wreck[];
   /** Wolf alerts; each wolf's own state lives on its actor. */
@@ -215,12 +232,21 @@ export type MissionState = {
   dismissedPopups?: string[];
 };
 
-export function createMissionState(actors: readonly Actor[]): MissionState {
+/** Defaults to one factionless player owner, as in free construction. */
+export function createMissionState(
+  actors: readonly Actor[],
+  owners: readonly Owner[] = [{ id: "player" }],
+  playerOwner = owners[0]!.id,
+): MissionState {
   return {
     tick: 0,
     actors: [...actors],
     commands: [],
     retiredActorIds: [],
+    owners: structuredClone([...owners]),
+    playerOwner,
+    relationships: [],
+    firedEvents: [],
     wrecks: [],
     wildlife: createWildlifeState(),
     objectives: [],
@@ -248,6 +274,8 @@ export type MissionSimulationOptions = {
   occupancy?: OccupancyGrid;
   /** Matches `state.objectives`; a failed objective ends the mission. */
   objectives?: readonly ObjectiveDefinition[];
+  /** Authored mission logic; `state.firedEvents` records its progress. */
+  events?: readonly MissionEventDefinition[];
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -262,6 +290,9 @@ export type MissionSimulation = {
   readonly support: SupportView | undefined;
   /** Explored and visible terrain; absent when the whole map is known. */
   readonly fog: FogView | undefined;
+  readonly owners: readonly Owner[];
+  readonly playerOwner: string;
+  /** The player owner's faction, for labels, prices, and music. */
   readonly playerFaction: string | undefined;
   /** Hits resolved during the latest tick. */
   readonly attacks: readonly AttackEvent[];
@@ -271,10 +302,12 @@ export type MissionSimulation = {
   /** A defeat ends the mission; play continues after victory. */
   readonly result: MissionResult | undefined;
   readonly objectives: readonly ObjectiveView[];
-  /** Whether a faction currently sees any tile of the actor. */
-  detects: (faction: string | undefined, actor: Detectable) => boolean;
-  /** Whether a faction currently sees the tile under a point. */
-  sees: (faction: string | undefined, point: WorldPosition) => boolean;
+  /** Current relationship rules; events replace the view when they change. */
+  readonly relations: Relations;
+  /** Whether an owner currently sees any tile of the actor. */
+  detects: (owner: string, actor: Detectable) => boolean;
+  /** Whether an owner currently sees the tile under a point. */
+  sees: (owner: string, point: WorldPosition) => boolean;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /** Checks the same placement constraints used when commands are applied. */
@@ -316,6 +349,7 @@ export function createMissionSimulation({
   map,
   occupancy,
   objectives: authoredObjectives = [],
+  events: authoredEvents = [],
 }: MissionSimulationOptions): MissionSimulation {
   if (!isPositive(tickSeconds)) {
     throw new RangeError(
@@ -380,8 +414,18 @@ export function createMissionSimulation({
   delete state.fog;
   if (savedFog !== undefined && (!map || !isValidFogState(savedFog, map)))
     throw new RangeError("Mission state has invalid fog.");
-  if (state.playerFaction !== undefined && !isId(state.playerFaction))
-    throw new RangeError("Mission state has an invalid player faction.");
+  const ownerIds = validateOwners(state.owners, state.playerOwner);
+  deepFreeze(state.owners);
+  const playerOwner = state.playerOwner;
+  validateRelationships(state.relationships, ownerIds);
+  deepFreeze(state.relationships);
+  const events = deepFreeze(structuredClone(authoredEvents));
+  validateEvents(events, state.firedEvents, {
+    ownerIds,
+    objectiveIds: new Set(objectives.map(({ id }) => id)),
+  });
+  deepFreeze(state.firedEvents);
+  let relations = createRelations(state.relationships);
   const worldBounds = { ...bounds };
   const behaviorsById = new Map(behaviorRegistry);
   const definitionsById = indexDefinitions(
@@ -395,6 +439,7 @@ export function createMissionSimulation({
   validateWrecks(state.wrecks, {
     map,
     retiredIds: new Set(state.retiredActorIds),
+    owners: ownerIds,
     definitions: definitionsById,
     bounds: worldBounds,
     tick: state.tick,
@@ -410,7 +455,9 @@ export function createMissionSimulation({
       state.retiredActorIds,
     );
   if (state.economy) deepFreeze(state.economy);
-  const supportFor = createSupportResolver(definitionsById);
+  const supportResolver = createSupportResolver(definitionsById);
+  const supportFor = (actors: readonly Actor[]) =>
+    supportResolver(actors, relations.sharesSupport);
   let actorsById = new Map<string, Actor>();
   let usedActorIds = new Set(state.retiredActorIds);
   for (const job of state.economy?.production ?? [])
@@ -443,7 +490,11 @@ export function createMissionSimulation({
   const behaviorFor = (actor: Actor): ActorBehavior =>
     behaviorsById.get(definitionFor(actor).behaviorId)!;
   const ensureValidActor = (actor: Actor) => {
-    if (!isId(actor.id) || !definitionsById.has(actor.definitionId)) {
+    if (
+      !isId(actor.id) ||
+      !definitionsById.has(actor.definitionId) ||
+      !ownerIds.has(actor.owner)
+    ) {
       throw new RangeError("Actor has an invalid identity.");
     }
     const definition = definitionFor(actor);
@@ -540,11 +591,12 @@ export function createMissionSimulation({
     if (
       actor.id !== before.id ||
       actor.definitionId !== before.definitionId ||
+      actor.owner !== before.owner ||
       actor.occupancyLayer !== before.occupancyLayer ||
       !sameTilePlacement(actor.tilePlacement, before.tilePlacement)
     ) {
       throw new RangeError(
-        `Actor ${before.id} changed its identity, layer, or placement.`,
+        `Actor ${before.id} changed its identity, owner, layer, or placement.`,
       );
     }
     ensureValidActor(actor);
@@ -597,6 +649,7 @@ export function createMissionSimulation({
 
   const evaluatePlacement = (
     placement: ActorPlacement,
+    owner: string,
     actors: readonly Actor[],
     usedIds: ReadonlySet<string>,
     economy?: EconomyState,
@@ -626,7 +679,7 @@ export function createMissionSimulation({
     if (!definition.footprint) {
       return reject("not-placeable");
     }
-    const actor = createTilePlacedActor(map, definition, placement);
+    const actor = createTilePlacedActor(map, definition, placement, owner);
     let workerId: string | undefined;
     const evaluation = evaluateFootprint(
       map,
@@ -659,13 +712,17 @@ export function createMissionSimulation({
       if (evaluation.tiles.some((tile) => resources.has(tileKey(tile))))
         return { ...reject("resource-site"), tiles: evaluation.tiles };
       if (definition.growth) {
-        if (!growthHeadquarters(actor, actors, definitionsById).length)
+        if (
+          !growthHeadquarters(
+            actor,
+            actors,
+            definitionsById,
+            relations.sharesHeadquarters,
+          ).length
+        )
           return { ...reject("missing-headquarters"), tiles: evaluation.tiles };
         const workerIds = placement.workerIds ?? [];
-        if (
-          !growthCandidates(definition, workerIds, actors, definitionsById)
-            .length
-        )
+        if (!growthCandidates(actor, workerIds, actors, definitionsById).length)
           return { ...reject("missing-worker"), tiles: evaluation.tiles };
         const tender = growthWorkerFor(actor, workerIds, actors, {
           definitions: definitionsById,
@@ -681,7 +738,8 @@ export function createMissionSimulation({
         !supportsPosition(
           supportFor(actors),
           actor.worldPosition,
-          definition.faction,
+          { owner, faction: definition.faction },
+          relations.sharesSupport,
         )
       )
         return { ...reject("outside-support"), tiles: evaluation.tiles };
@@ -903,69 +961,21 @@ export function createMissionSimulation({
       : undefined;
   // Fog requires a map, which the saved-fog check above ensures.
   const fog = savedFog && createFog(map!, savedFog);
-  const playerFaction = state.playerFaction;
-  const relation = (faction: string | undefined) =>
-    playerRelation(playerFaction, faction);
-  // Other factions keep no exploration memory, only current vision.
-  const factionVision = new Map<string, Vision>();
-  if (map && fog && playerFaction !== undefined)
-    for (const { faction } of definitionsById.values())
-      if (
-        faction !== undefined &&
-        relation(faction) !== "own" &&
-        !factionVision.has(faction)
-      )
-        factionVision.set(faction, createVision(map));
-  const updateFog = () => {
-    const support = state.economy && supportFor(state.actors);
-    const byFaction = new Map<string | undefined, Actor[]>();
-    for (const actor of state.actors) {
-      const faction = definitionFor(actor).faction;
-      const key = relation(faction) === "own" ? playerFaction : faction;
-      const bucket = byFaction.get(key) ?? [];
-      bucket.push(actor);
-      byFaction.set(key, bucket);
-    }
-    const sources = (faction: string | undefined) =>
-      visionSources(
-        byFaction.get(faction) ?? [],
-        definitionsById,
-        support,
-        map!,
-      );
-    fog?.update(sources(playerFaction));
-    for (const [faction, vision] of factionVision)
-      vision.update(sources(faction));
-  };
+  const ownerVision = createOwnerVision({
+    map,
+    fog,
+    owners: state.owners,
+    playerOwner,
+    definitions: definitionsById,
+  });
+  const updateFog = () =>
+    ownerVision.update(
+      state.actors,
+      state.economy && supportFor(state.actors),
+      relations.sharesVision,
+    );
   updateFog();
-  /** Without a map or fog, a faction sees everything. */
-  const visionOf = (faction: string | undefined) =>
-    !fog || playerFaction === undefined
-      ? undefined
-      : relation(faction) === "own"
-        ? fog
-        : factionVision.get(faction!);
-  const sees = (faction: string | undefined, point: WorldPosition) => {
-    const vision = visionOf(faction);
-    if (!vision) return true;
-    const tile = map!.tileAtWorldPosition(point.x, point.z);
-    return vision.isVisible(tile.x, tile.z);
-  };
-  const detects: MissionSimulation["detects"] = (faction, actor) => {
-    const vision = visionOf(faction);
-    if (!vision) return true;
-    const definition = definitionsById.get(actor.definitionId);
-    return actor.tilePlacement && definition?.footprint
-      ? occupiedTilesFor(
-          {
-            id: actor.id ?? "",
-            definitionId: actor.definitionId,
-            tilePlacement: actor.tilePlacement,
-          },
-          definition,
-        ).some(({ x, z }) => vision.isVisible(x, z))
-      : sees(faction, actor.worldPosition);
-  };
+  const { sees, detects } = ownerVision;
   const wreckTicks = secondsToTicks(WRECK_SECONDS, tickSeconds);
   /** Footprint tiles under building debris, rebuilt when wrecks change. */
   const debrisFor = (wrecks: readonly Wreck[]) =>
@@ -1203,9 +1213,9 @@ export function createMissionSimulation({
     const site =
       applied.kind === "gather" &&
       economySites(working.economy).find((site) => site.id === applied.siteId);
-    // Undiscovered sites are unknown to the player.
+    const actor = working.actorsById.get(applied.actorId);
     const reason =
-      site && fog && !fog.isExplored(site.tile.x, site.tile.z)
+      site && actor && !ownerVision.knowsTile(actor.owner, site.tile)
         ? "missing-site"
         : applyEconomy(
             applied,
@@ -1289,8 +1299,10 @@ export function createMissionSimulation({
     },
     "place-actor": (command, tick, working) => {
       const applied = structuredClone(command);
+      // Commands carry no issuing owner yet, so the player places.
       const evaluation = evaluatePlacement(
         applied,
+        playerOwner,
         working.actors,
         working.usedIds,
         working.economy,
@@ -1380,6 +1392,7 @@ export function createMissionSimulation({
       const reason = attackRejection(actor, target, {
         definitions: definitionsById,
         detects,
+        hostile: relations.hostile,
       });
       if (!reason) {
         startAttack(actor!, target!);
@@ -1430,7 +1443,9 @@ export function createMissionSimulation({
     get fog() {
       return fog;
     },
-    playerFaction,
+    owners: state.owners,
+    playerOwner,
+    playerFaction: playerFactionOf(state),
     get attacks() {
       return attacks;
     },
@@ -1446,6 +1461,9 @@ export function createMissionSimulation({
     get wrecks() {
       return state.wrecks;
     },
+    get relations() {
+      return relations;
+    },
     detects,
     sees,
     actorById: (id) => {
@@ -1455,6 +1473,7 @@ export function createMissionSimulation({
     evaluatePlacement: (placement) =>
       evaluatePlacement(
         structuredClone(placement),
+        playerOwner,
         state.actors,
         usedActorIds,
         state.economy,
@@ -1525,6 +1544,7 @@ export function createMissionSimulation({
             definitionId: copy.definitionId,
             ...copy.tilePlacement,
           },
+          copy.owner,
           state.actors,
           usedActorIds,
         );
@@ -1589,8 +1609,7 @@ export function createMissionSimulation({
         throw new Error("Mission disposal cannot run during a tick.");
       disposed = true;
       releaseTerrainRule?.();
-      fog?.dispose();
-      for (const vision of factionVision.values()) vision.dispose();
+      ownerVision.dispose();
     },
     tick: () => {
       ensureRunning();
@@ -1645,6 +1664,7 @@ export function createMissionSimulation({
           map,
           occupancy,
           detects,
+          hostile: relations.hostile,
           move: moveActor,
           destroy: (actor) => {
             recordObjectiveDestruction(
@@ -1656,6 +1676,7 @@ export function createMissionSimulation({
             working.wrecks.push({
               actorId: actor.id,
               definitionId: actor.definitionId,
+              owner: actor.owner,
               worldPosition: { ...actor.worldPosition },
               facing: actor.facing,
               ...(actor.tilePlacement && {
@@ -1668,7 +1689,8 @@ export function createMissionSimulation({
         });
 
         // A defeat freezes motion and the economy where combat left them.
-        const defeated = resultOf(working.objectives)?.kind === "defeat";
+        const verdict = objectivesFor(working.objectives);
+        const defeated = verdict.result?.kind === "defeat";
         if (!defeated) {
           const previousPositions = new Map(
             working.actors.map((actor) => [
@@ -1694,8 +1716,9 @@ export function createMissionSimulation({
           if (working.economy)
             updateEconomy(working.economy, {
               actors: working.actors,
-              playerFaction,
-              explored: ({ x, z }) => fog?.isExplored(x, z) ?? true,
+              playerOwner,
+              sharesHeadquarters: relations.sharesHeadquarters,
+              knowsTile: ownerVision.knowsTile,
               definitions: definitionsById,
               behaviors: behaviorsById,
               map: map!,
@@ -1752,6 +1775,16 @@ export function createMissionSimulation({
           worldBounds,
           state.tick + 1,
         );
+        // Events see the tick's outcome; their changes apply from the next tick.
+        const fired =
+          defeated || !events.length
+            ? undefined
+            : fireEvents(events, state, {
+                completedTicks: state.tick + 1,
+                tickSeconds,
+                objectiveStatus: (id) =>
+                  verdict.views.find((view) => view.id === id)?.status,
+              });
         const previousWrecks = state.wrecks;
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
@@ -1762,6 +1795,10 @@ export function createMissionSimulation({
           actors: committedActors,
           retiredActorIds: working.retiredIds,
           objectives: deepFreeze(working.objectives),
+          ...(fired && {
+            relationships: deepFreeze(fired.relationships),
+            firedEvents: deepFreeze(fired.firedEvents),
+          }),
           commands: defeated
             ? []
             : state.commands.filter(({ tick }) => tick > state.tick),
@@ -1787,6 +1824,7 @@ export function createMissionSimulation({
         usedActorIds = working.usedIds;
         if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
+        if (fired) relations = createRelations(state.relationships);
         updateFog();
         return outcomes;
       } catch (error) {

@@ -19,7 +19,12 @@ type WolfDenOptions = Omit<
   | "buildings"
   | "units"
   | "objectives"
+  | "owners"
+  | "playerOwner"
+  | "relationships"
 > & {
+  /** The player owns this faction's actors; wolves belong to the wildlife. */
+  playerFaction: string;
   headquarters: Pick<ActorPlacement, "actorId" | "definitionId">;
   protection: Pick<ObjectiveDefinition, "id" | "label" | "directive">;
   directions: { loneWolf: string; den: string };
@@ -32,11 +37,20 @@ export function createWolfDenScenario({
   protection,
   directions,
   crossingLoot,
+  playerFaction,
   ...opening
 }: WolfDenOptions): ScenarioDefinition {
   const map = new TerrainGrid(PROTOTYPE_TERRAIN);
   return defineScenario({
     ...opening,
+    owners: [
+      { id: "player", faction: playerFaction },
+      { id: "wildlife", faction: "wildlife" },
+    ],
+    playerOwner: "player",
+    relationships: [
+      { owners: ["player", "wildlife"], relationship: "hostile" },
+    ],
     content: { id: BASE_CONTENT.id, version: BASE_CONTENT.version },
     tileSize: map.tileSize,
     terrainTypeIds: [...map.terrainTypeIds],

@@ -14,6 +14,7 @@ import type { ActorDefinition } from "./actor";
 import type { ActorPlacement } from "./placement";
 import type { EconomyState, MaterialsSite, ResourceLoot } from "./economy";
 import type { MissionState } from "./mission";
+import type { Owner, OwnerRelationship } from "./ownership";
 import type { TerrainGridOptions, TerrainState } from "./terrain";
 import type { TileCoord } from "./grid";
 
@@ -21,6 +22,8 @@ import type { TileCoord } from "./grid";
 export type ScenarioUnit = {
   actorId: string;
   definitionId: string;
+  /** Defaults to the first owner playing the definition's faction. */
+  owner?: string;
   tile: TileCoord;
   facing?: number;
   territory?: TerritoryAssignment;
@@ -29,9 +32,13 @@ export type ScenarioUnit = {
 /** Authoring input for a level's opening state. */
 export type ScenarioDefinition = MissionScenario & {
   readonly terrain: TerrainState;
-  /** The faction the player controls and whose vision the fog records. */
-  readonly playerFaction: string;
-  readonly buildings: readonly ActorPlacement[];
+  readonly owners: readonly Owner[];
+  /** The owner the player controls and whose vision the fog records. */
+  readonly playerOwner: string;
+  /** Starting allied and hostile pairs; other pairs start neutral. */
+  readonly relationships?: readonly OwnerRelationship[];
+  /** Owners default as they do for units. */
+  readonly buildings: readonly (ActorPlacement & { owner?: string })[];
   /** Territorial units default to their starting position as home. */
   readonly units?: readonly ScenarioUnit[];
 } & (
@@ -101,11 +108,25 @@ export function createScenarioState(
     if (!definition) throw new RangeError(`Unknown scenario actor: ${id}.`);
     return definition;
   };
+  const ownerFor = (authored: {
+    actorId: string;
+    definitionId: string;
+    owner?: string;
+  }) => {
+    const faction = definitionFor(authored.definitionId).faction;
+    const owner =
+      authored.owner ??
+      scenario.owners.find((owner) => owner.faction === faction)?.id;
+    if (owner === undefined)
+      throw new RangeError(`Scenario actor ${authored.actorId} has no owner.`);
+    return owner;
+  };
   const buildings = scenario.buildings.map((placement) =>
     createTilePlacedActor(
       map,
       definitionFor(placement.definitionId),
       placement,
+      ownerFor(placement),
     ),
   );
   const units = (scenario.units ?? []).map((unit) => {
@@ -113,6 +134,7 @@ export function createScenarioState(
     const actor = createActor({
       id: unit.actorId,
       definitionId: unit.definitionId,
+      owner: ownerFor(unit),
       worldPosition,
       facing: unit.facing,
     });
@@ -144,10 +166,10 @@ export function createScenarioState(
     if (economy)
       enrollWorker(economy, actor.id, definitionFor(actor.definitionId));
   return {
-    ...createMissionState(actors),
+    ...createMissionState(actors, scenario.owners, scenario.playerOwner),
     objectives: createObjectiveStates(scenario.objectives ?? []),
+    relationships: structuredClone([...(scenario.relationships ?? [])]),
     scenarioId: scenario.id,
-    playerFaction: scenario.playerFaction,
     terrain: structuredClone(terrain),
     ...(economy && { economy }),
     fog: createFogState(terrain.width, terrain.height),

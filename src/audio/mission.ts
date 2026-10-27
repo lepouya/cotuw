@@ -4,7 +4,7 @@ import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome } from "../simulation/command";
 import type { MissionAlert } from "../ui/mission-alerts";
 import type { ActorRenderState } from "../simulation/actor";
-import type { Detectable, PlayerAccess } from "../simulation/faction";
+import type { Detectable, PlayerAccess } from "../simulation/ownership";
 import { disconnectedBuildings } from "../simulation/support";
 import type { ProductionJob } from "../simulation/economy";
 
@@ -23,7 +23,7 @@ export function createMissionAudio(
   let combatUntil = -Infinity;
   const seconds = () => simulation.completedTicks * simulation.tickSeconds;
   const emitterOf = (
-    actor: Detectable & { id: string },
+    actor: Detectable & { id: string; owner: string },
     states: readonly string[] = [],
   ): AudioEmitter => ({
     id: actor.id,

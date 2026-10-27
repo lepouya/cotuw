@@ -15,7 +15,6 @@ import { isTick, secondsToTicks } from "./clock";
 import { followRoute } from "./automatic-movement";
 import { terrainSightlineClear } from "./terrain-sightline";
 import { tileAreaBounds } from "./terrain";
-import { areHostile } from "./faction";
 import { clearCombatOrders, compareIds, healthOf } from "./actor";
 import { isId, isPositive } from "./validation";
 import {
@@ -53,6 +52,7 @@ export type AttackEvent = {
 export type Wreck = {
   actorId: string;
   definitionId: string;
+  owner: string;
   worldPosition: WorldPosition;
   facing: number;
   /** Building debris keeps its footprint unbuildable until it clears. */
@@ -75,7 +75,7 @@ const ARRIVAL_RADIUS = 1;
  */
 export type CombatController = {
   applies: (definition: ActorDefinition) => boolean;
-  /** Personal sight replaces faction detection. */
+  /** Personal sight replaces owner detection. */
   personalSight?: boolean;
   /** Keeps automatic routes inside a circle. */
   bounds?: (actor: Actor, definition: ActorDefinition) => RouteBounds;
@@ -156,9 +156,11 @@ export type CombatWorld = {
   definitions: ReadonlyMap<string, ActorDefinition>;
   map?: TerrainGrid;
   occupancy?: OccupancyView;
-  /** Whether a faction currently detects the actor. */
+  /** Only hostile owners attack each other. */
+  hostile: (left: string, right: string) => boolean;
+  /** Whether an owner currently detects the actor. */
   detects: (
-    faction: string | undefined,
+    owner: string,
     target: Pick<Actor, "definitionId" | "worldPosition" | "tilePlacement">,
   ) => boolean;
   /** Starts a route; returns whether the actor accepted it. */
@@ -256,12 +258,14 @@ export function validateWrecks(
   wrecks: readonly Wreck[],
   {
     retiredIds,
+    owners,
     definitions,
     bounds,
     tick,
     map,
   }: {
     retiredIds: ReadonlySet<string>;
+    owners: ReadonlySet<string>;
     definitions: ReadonlyMap<string, ActorDefinition>;
     bounds: WorldBounds;
     tick: number;
@@ -276,6 +280,7 @@ export function validateWrecks(
       const invalid =
         !definition ||
         !retiredIds.has(wreck.actorId) ||
+        !owners.has(wreck.owner) ||
         seen.has(wreck.actorId) ||
         !isFinitePosition(wreck.worldPosition) ||
         !withinBounds(wreck.worldPosition, bounds) ||
@@ -319,13 +324,12 @@ export function wreckTiles(
 export function attackRejection(
   attacker: Actor | undefined,
   target: Actor | undefined,
-  world: Pick<CombatWorld, "definitions" | "detects">,
+  world: Pick<CombatWorld, "definitions" | "detects" | "hostile">,
 ): AttackReason | undefined {
   const definition = attacker && world.definitions.get(attacker.definitionId);
   if (!attacker || !definition?.weapon) return "unarmed";
-  if (!target || !canTarget(attacker, target, world.definitions))
-    return "invalid-target";
-  if (!world.detects(definition.faction, target)) return "undetected";
+  if (!target || !canTarget(attacker, target, world)) return "invalid-target";
+  if (!world.detects(attacker.owner, target)) return "undetected";
   return undefined;
 }
 
@@ -381,7 +385,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   const sorted = [...world.actors].sort((a, b) => compareIds(a.id, b.id));
   const definitionOf = (actor: Actor) => definitions.get(actor.definitionId)!;
   const targetable = (actor: Actor, target: Actor | undefined) =>
-    !!target && canTarget(actor, target, definitions);
+    !!target && canTarget(actor, target, world);
   const controllers = new Map(
     [...definitions].map(([id, definition]) => [
       id,
@@ -422,7 +426,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   const detected = (actor: Actor, target: Actor) =>
     controllerOf(actor)?.personalSight
       ? sees(actor, target)
-      : world.detects(definitionOf(actor).faction, target);
+      : world.detects(actor.owner, target);
   const engageable = (actor: Actor, target: Actor | undefined) =>
     targetable(actor, target) && detected(actor, target!);
   const arrived = (actor: Actor, point: WorldPosition) =>
@@ -558,7 +562,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     const wreck = wreckById.get(order.targetId);
     if (
       (target && !targetable(actor, target)) ||
-      (!target && wreck && world.detects(definitionOf(actor).faction, wreck))
+      (!target && wreck && world.detects(actor.owner, wreck))
     )
       return void endAttack(actor);
     if (!target || !detected(actor, target)) {
@@ -689,17 +693,14 @@ function planGuard(
 function canTarget(
   attacker: Actor,
   target: Actor,
-  definitions: ReadonlyMap<string, ActorDefinition>,
+  world: Pick<CombatWorld, "definitions" | "hostile">,
 ): boolean {
-  const definition = definitions.get(target.definitionId);
+  const definition = world.definitions.get(target.definitionId);
   return (
     target.id !== attacker.id &&
     definition?.health !== undefined &&
     target.occupancyLayer === attacker.occupancyLayer &&
-    areHostile(
-      definitions.get(attacker.definitionId)?.faction,
-      definition.faction,
-    )
+    world.hostile(attacker.owner, target.owner)
   );
 }
 

@@ -41,19 +41,25 @@ for (const distance of [20, 15]) {
       nodes: [
         {
           actorId: "root",
+          owner: "player",
+          faction: "arc",
           center: { x: 0, z: 0 },
           radius: 12,
           complete: true,
           root: true,
           connected: true,
+          rootOwners: ["player"],
         },
         {
           actorId: "remote",
+          owner: "player",
+          faction: "arc",
           center: { x: distance, z: 0 },
           radius: 6,
           complete: true,
           root: false,
           connected: false,
+          rootOwners: [],
         },
       ],
       links: [],
@@ -68,7 +74,14 @@ for (const distance of [20, 15]) {
         x: (points[0]! + points[3]!) / 2,
         z: (points[2]! + points[5]!) / 2,
       };
-      expect(supportsPosition(network, center, undefined)).toBe(false);
+      expect(
+        supportsPosition(
+          network,
+          center,
+          { owner: "player", faction: "arc" },
+          () => true,
+        ),
+      ).toBe(false);
       if (distance === 20) expect(center.x).toBeGreaterThan(12);
     }
     view.update(network, true);

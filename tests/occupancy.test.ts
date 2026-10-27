@@ -574,6 +574,7 @@ function actorAt(map: TerrainGrid, x: number, z: number): Actor {
   return createActor({
     id: "trooper",
     definitionId: "trooper",
+    owner: "player",
     worldPosition: map.tileCenter(x, z),
   });
 }

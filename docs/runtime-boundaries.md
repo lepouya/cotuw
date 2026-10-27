@@ -24,10 +24,12 @@ These contracts describe where new behaviors, views, and services attach.
   catalog. Terrain edits use the validated command and mutation APIs.
 - A mission may restrict its playable bounds within the map. Its bounds cannot
   extend outside the terrain used by navigation and vision.
-- M0 support links and placement coverage use the building's faction. M1
-  replaces this prototype boundary with owner-scoped support and explicit
+- Support links, power, and placement coverage use actor owners and explicit
   scenario sharing under
-  [ownership rules](../DESIGN.md#ownership-and-relationships).
+  [ownership rules](../DESIGN.md#ownership-and-relationships). Roots supply
+  only paths through owners they share with. Shared coverage requires access
+  to both the covering node and its supplying root; presentation uses the
+  same owner-specific projection.
 
 ## Cultivation and growth
 
@@ -55,9 +57,11 @@ These contracts describe where new behaviors, views, and services attach.
   explicit actor commands interrupt either worker type without losing cargo.
   Building loss cancels affected automatic routes. Cultivators retain delivery
   work and queued orders while selecting a replacement drop-off.
-- The single-player prototype keeps Materials and Lifebloom separate. Shared
-  owner identities, command authority, and owner resource pools remain M1
-  prerequisites; faction equality currently bounds worker and building access.
+- The prototype keeps Materials and Lifebloom separate in mission-wide
+  balances. Owner resource pools and command authority remain M1
+  prerequisites. Workers tend and deliver only to their owner's buildings;
+  training inherits the producer's owner. Resource-site knowledge follows the
+  worker owner's vision, with explored terrain retained only for the player.
 
 ## Resource ownership
 

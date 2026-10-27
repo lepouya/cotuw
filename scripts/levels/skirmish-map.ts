@@ -184,8 +184,8 @@ export const SKIRMISH_TERRAIN = {
 } as const satisfies TerrainGridOptions;
 
 /**
- * One faction's opening at a start slot, before owner-based assembly. The
- * economy holds Materials only, so other resources cannot assemble yet.
+ * One faction's opening, owned by its start slot, before two-owner assembly.
+ * The economy holds Materials only, so other resources cannot assemble yet.
  */
 export function createSkirmishOpening(
   start: SkirmishStart,
@@ -202,7 +202,8 @@ export function createSkirmishOpening(
     tileSize: map.tileSize,
     terrainTypeIds: [...map.terrainTypeIds],
     terrain: map.terrainState(),
-    playerFaction: faction,
+    owners: [{ id: start.id, faction }],
+    playerOwner: start.id,
     buildings: [
       {
         actorId: "headquarters",

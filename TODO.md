@@ -162,13 +162,25 @@ and bring up the rough skirmish map early for simulation and AI development.
   opening builder. Owner-based launch assembly,
   difficulty, resolved restart setup, and Circle integration remain pending
   their implementation dependencies.
-- [ ] **1.15** Implement the actor ownership model from 1.08 across hostility,
+- [x] **1.15** Implement the actor ownership model from 1.08 across hostility,
   support networks, vision and fog, economy, objectives, presentation, and
   saves. Verify that opposing owners of the same faction type fight and keep
   separate support networks.
   Cover mutual relationship changes, neutral attack restrictions, allied
   vision ending with exploration retained, and revocation of scenario-enabled
   support and headquarters access. Preserve effective relationships in saves.
+  [Owners and events](docs/mission-files.md#owners) define the saved format.
+  Every actor, wreck, and save carries an owner; hostility, per-owner vision
+  under fog, support networks, growth, cultivation and Refinery delivery,
+  training, and player presentation use them. Opposing ARC owners fight and
+  keep separate support networks and construction slots. Relationships
+  default to neutral and change through one-time scenario events; allies
+  share vision and optionally support and Heartgrove queues, and ending
+  sharing revokes it with payment and progress kept. Per-Command Center
+  queues in 1.16 use the same headquarters sharing rule.
+  Regression checks cover root-to-relay sharing, faction-compatible support,
+  owner-specific resource knowledge, saved worker assignments, and training
+  rosters for owned actors of another faction type.
 - [ ] **1.16** Give each owner its own stockpiles, workers, production, and
   stall state, with infrastructure queues and slots per headquarters and
   training queues per production building. Verify that spending and refunds
@@ -183,15 +195,21 @@ and bring up the rough skirmish map early for simulation and AI development.
 - [ ] **1.17** Add issuing-owner authority to commands and validate actor
   ownership, including between same-faction-type owners in the development
   harness. Implement the agreed mission-script authority and reject
-  unauthorized work.
+  unauthorized work. Create placed buildings for the issuing owner and check
+  placement against that owner's exploration rather than the player's fog.
 - [ ] **1.18** Replace player-only simulation assumptions, including loot
   collection, with owner-neutral rules or explicit documented exceptions.
 - [ ] **1.19** Add authoritative AI observation memory for observed enemies,
   economic sites, and threats, with last-seen positions and ticks. Expose
   only the observations and authored map knowledge permitted by the plan.
+  Keep explored terrain per owner; 1.15 gives non-player owners only current
+  vision, which their placement in 1.17 and planning need.
 - [ ] **1.20** Keep player alerts, audio, minimap pulses, and sidebar data
   limited to the player's own actors and detections. Verify that hidden AI
-  activity does not leak through these presentation paths.
+  activity does not leak through these presentation paths. Browser checks
+  cover allied and neutral labels changing with relationships. Hostile markers
+  changing after an event and allied support coverage still need browser
+  integration checks.
 - [ ] **1.21** Review UI ownership and choose the smallest coherent structure
   for feature-owned markup, behavior, styles, and shared layout primitives.
   Record the boundaries before refactoring; retain the locked technical stack.
@@ -241,6 +259,8 @@ and bring up the rough skirmish map early for simulation and AI development.
   Apply version changes with their implementations and regenerate bundled
   levels. Verify save/load continuation and safe rejection under the
   compatibility policy from 1.11.
+  1.15 added owners, relationships with sharing, scenario events, and fired
+  events to the format with their validation and documentation.
 - [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers
@@ -323,7 +343,10 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   relationship and reason to field a mixed force.
 - [ ] **1.43** Generate and register the added ARC models, animation, command
   feedback, effects, and essential audio. Verify readability and generated
-  asset contracts for each included actor.
+  asset contracts for each included actor. Reserve owner-color areas on ARC
+  models, as the [Circle direction](DESIGN.md#m1-circle-presentation) does,
+  and render owner colors there and on minimap markers so owners of the same
+  faction are distinguishable. 1.53 uses the same owner-color path.
 - [ ] **1.44** Add control groups, double-click selection, select-all-of-type,
   and idle-worker controls with the chosen keyboard and touch alternatives.
   Verify ten manual mobile-unit groups, overlapping membership, selection-only
@@ -400,11 +423,11 @@ verified; preview work is partial progress.
   ARC and Circle use shared wolf-den authoring, worker route handling,
   interruption, and compatible-site queries. Regression checks cover tending
   cancellation, drop-off loss, queued delivery, and the 60% slowdown threshold.
-- [ ] Base-loop integration: shared ownership, authority, information, and
-  persistence work in 1.15-1.18, 1.20, 1.24, and 1.27 remains required,
-  including owner balances in 1.16. The slice uses existing single-player
-  control and faction boundaries; it does not complete those prerequisites
-  or their dependent acceptance gates. Emergency Heartgrove recovery remains
+- [ ] Base-loop integration: owner economies, authority, information, and
+  persistence work in 1.16-1.18, 1.20, 1.24, and 1.27 remains required,
+  including owner balances in 1.16. The slice runs on 1.15's owners with
+  single-player control; it does not complete those prerequisites or their
+  dependent acceptance gates. Emergency Heartgrove recovery remains
   in 1.49. Difficulty and skirmish launch remain in 1.60.
 - [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
   and mechanic. Check interrupted work and deterministic saves under 1.56 as
@@ -414,8 +437,8 @@ verified; preview work is partial progress.
   encounters. Wolves alone cannot validate structure counters. Circle AI
   remains 1.55; full skirmish integration and balance remain phases F and G.
 
-Next integration target: shared ownership, command authority, owner economies,
-and headquarters recovery through the common milestone foundations.
+Next integration target: owner economies, command authority, and headquarters
+recovery through the common milestone foundations.
 
 #### Circle tasks
 

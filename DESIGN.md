@@ -195,13 +195,18 @@ story.
 - Each pair of distinct owners has one mutual relationship: allied, neutral,
   or hostile. Matching faction types do not imply an alliance, and different
   faction types do not imply hostility. Fixed teams can be expressed through
-  these owner-to-owner relationships. Mission behavior may restrain a hostile
-  force from initiating attacks without changing its relationship.
+  these owner-to-owner relationships. A pair without an authored relationship
+  is neutral. Mission behavior may restrain a hostile force from initiating
+  attacks without changing its relationship.
 - Units do not automatically engage neutral owners, and ordinary Attack orders
   cannot provoke hostility. A mission event or explicit mission decision must
   first change the relationship to hostile.
 - Allied owners share vision and detection under the existing rules without
   gaining control over one another's actors.
+- Every actor has exactly one owner. Neutral actors, such as wildlife, belong
+  to an owner of their own rather than to no owner.
+- Under fog of war every owner, including AI-controlled ones, has its own
+  vision and detection. No owner may act on events it has no way of seeing.
 - Vision, exploration, observations, and private economic and queue state are
   scoped by owner. Other owners' actors are inspected through detection rules;
   sharing a service does not grant command authority over their actors or jobs.
@@ -1089,6 +1094,11 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - Common mission logic uses data-driven triggers and actions. Complex campaign
   missions and story sequences may use mission-specific TypeScript modules in
   the codebase, independent of rendering and platform services.
+- Scenario events fire once when their trigger holds at the end of a tick,
+  in authored order, and their effects apply from the next tick. Current
+  triggers are elapsed simulation time and objective completion; the current
+  action sets an owner pair's relationship and allied sharing. A defeat
+  stops events.
 - Mission code reads deterministic simulation state and uses the shared event,
   action, and command boundaries. Player choices enter through serializable
   commands; persistent story state is explicit simulation data.
@@ -1400,13 +1410,12 @@ Deterministic acceptance checks cover:
 - Every unit and building definition authors maximum health. Current health is
   saved actor state and is absent while undamaged. Only actors with health can
   be targeted, damaged, or destroyed.
-- Definitions name a faction; actors of different factions are hostile, and an
-  actor without a faction is neutral. The scenario names the player's faction.
-  The fog records only that faction's vision; other factions derive current
-  vision each tick without exploration memory. A faction detects an actor
-  when it currently sees the unit's tile or any of a building's footprint
-  tiles. Without a player faction, as in the sandbox, or without fog, every
-  faction detects everything.
+- Actors save their controlling owner, and definitions name a faction type.
+  Only hostile owners attack each other; allies share vision and detection.
+  The mission names the player's owner, whose exploration the fog records;
+  other owners derive current vision each tick without exploration memory.
+  An owner detects an actor when it currently sees the unit's tile or any of
+  a building's footprint tiles. Without fog, every owner detects everything.
 - A weapon authors fixed damage, a damage type, a range, and a cooldown. Range
   runs from the attacker's center to the target's footprint or body edge.
   Weapons hit hostile actors on their own occupancy layer. Damage types are
@@ -1622,10 +1631,10 @@ are tracked in the checklist.
   choices describe their playable opening. The setup screen will hold
   difficulty selection when implemented. Direct development links remain
   available.
-- Current simulation control and faction membership remain single-player
-  prototype boundaries. Lifebloom and Materials are separate balances. Circle
-  growth has queues and slots per Heartgrove, but owner identities, shared
-  pools, command authority, emergency headquarters recovery, support units,
+- Actors have owners, but the mission keeps one economy and commands carry no
+  issuing owner. Lifebloom and Materials are separate balances. Circle growth
+  has queues and slots per Heartgrove, but owner economies, shared pools,
+  command authority, emergency headquarters recovery, support units,
   defenses, constructs, and faction AI remain pending. The complete base-loop
   acceptance still requires the shared milestone foundations. Presentation
   validation for the full roster remains open.
@@ -1966,7 +1975,7 @@ are tracked in the checklist.
 
 ## Persistence
 
-- Levels and mission saves share one human-readable JSON format, version 9. A
+- Levels and mission saves share one human-readable JSON format, version 11. A
   level is a mission file at tick 0. Every mission starts by loading a file,
   including bundled levels, and [mission files](docs/mission-files.md)
   documents the layout for hand editing.

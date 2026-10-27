@@ -23,6 +23,7 @@ import type {
 } from "./simulation/mission-file";
 import type { MissionResult, ObjectiveView } from "./simulation/objectives";
 import { evaluateObjectives } from "./simulation/objectives";
+import { playerFactionOf } from "./simulation/ownership";
 
 const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -311,13 +312,15 @@ async function start(next: LoadedMission, loaded = false) {
     byId("network-view-control").hidden =
       !next.state.economy ||
       !next.definitions.some((definition) => definition.support);
+    const playerFaction = playerFactionOf(next.state);
     sidebar = createSidebar(byId("game-sidebar"), {
       definitions: next.definitions,
       economy: !!next.state.economy,
       presentations: new Map(Object.entries(next.content.presentation)),
       goals: next.scenario.goals ?? [],
-      playerFaction: next.state.playerFaction,
-      factionName: factionName(next.content, next.state.playerFaction),
+      playerOwner: next.state.playerOwner,
+      playerFaction,
+      factionName: factionName(next.content, playerFaction),
       selectActor: (id, additive) => session?.selectActor(id, additive),
     });
     const activeSidebar = sidebar;

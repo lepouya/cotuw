@@ -32,6 +32,7 @@ function mission(tickSeconds = 0.5, speed = 4) {
       createActor({
         id: "trooper",
         definitionId: "trooper",
+        owner: "player",
         worldPosition: { x: 0, z: 0 },
       }),
     ]),

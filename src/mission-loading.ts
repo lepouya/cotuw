@@ -34,6 +34,7 @@ export function createSessionSimulation(
   return createMissionSimulation({
     state: mission.state,
     objectives: mission.scenario.objectives,
+    events: mission.scenario.events,
     behaviorRegistry: new Map([
       [
         "terrain-move",

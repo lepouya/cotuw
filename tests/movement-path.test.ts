@@ -22,6 +22,7 @@ function movingActor({
   return {
     id: "trooper",
     definitionId: "trooper",
+    owner: "player",
     worldPosition: { x, z: 0 },
     facing: 0,
     occupancyLayer: "surface",

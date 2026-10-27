@@ -16,7 +16,8 @@ import type { AttackMoveControls } from "./ui/attack-move-controls";
 import type { MissionResult } from "./simulation/objectives";
 import { serializeMission } from "./simulation/mission-file";
 import type { SaveInfo } from "./simulation/mission-file";
-import { disconnectedBuildings } from "./simulation/support";
+import { disconnectedBuildings, supportForOwner } from "./simulation/support";
+import { rosterIncludes } from "./simulation/ownership";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
 import { createNetworkControls } from "./ui/network-controls";
@@ -145,7 +146,7 @@ export type GameSessionControls = BuildingPlacementControls &
     /** Updates after simulation ticks or changes to controls and selection. */
     onStateChanged?: (state: SidebarState) => void;
     /** Reveals details for an actor the player selected or placed. */
-    showActor?: (definitionId: string) => void;
+    showActor?: (actor: ActorRenderState) => void;
     /** Receives grouped alerts after each tick. */
     onAlerts?: (alerts: readonly MissionAlert[]) => void;
     /** Shows a scenario popup once each time its trigger first holds. */
@@ -255,7 +256,7 @@ async function assembleGameSession(
   const definitionsById = new Map(
     definitions.map((definition) => [definition.id, definition]),
   );
-  const playerFaction = simulation.playerFaction;
+  const playerOwner = simulation.playerOwner;
   const player = createPlayerView(simulation, definitionsById);
   const playerResource =
     factionResource(definitions, simulation.playerFaction) ?? "materials";
@@ -268,7 +269,7 @@ async function assembleGameSession(
     view.scene,
     map,
     appearances,
-    (definitionId) => player.relationTo(definitionId) === "hostile",
+    (actor) => player.relationTo(actor) === "hostile",
   );
   own(actorViews);
   const tilePlacedViews = createTilePlacedActorViewRegistry(
@@ -398,7 +399,7 @@ async function assembleGameSession(
   let controlsDirty = true;
   const showActor = (actorId: string) => {
     const actor = player.actor(actorId);
-    if (actor) controls.showActor?.(actor.definitionId);
+    if (actor) controls.showActor?.(actor);
   };
   const radial = createRadialMenu(document.body, canvas);
   own(radial);
@@ -487,7 +488,7 @@ async function assembleGameSession(
     canAttack: (actorId) => {
       if (!canCommand()) return false;
       const actor = player.shownActor(actorId);
-      return !!actor && player.relationTo(actor.definitionId) === "hostile";
+      return !!actor && player.relationTo(actor) === "hostile";
     },
     submitCommand: (command) => {
       if (!canCommand()) return;
@@ -617,6 +618,7 @@ async function assembleGameSession(
       }),
       objectives: simulation.objectives,
       result: simulation.result,
+      relations: simulation.relations,
     });
     knownControlsTick = simulation.completedTicks;
     knownPlacementActive = placement.active;
@@ -680,7 +682,7 @@ async function assembleGameSession(
         .filter(
           (definition) =>
             definition.footprint &&
-            player.owns({ definitionId: definition.id }),
+            rosterIncludes(simulation.playerFaction, definition),
         )
         .map((definition) => ({
           definition,
@@ -945,8 +947,8 @@ async function assembleGameSession(
         const style = presentationOf(hit.attackerDefinitionId)?.attackEffect;
         if (
           style &&
-          (simulation.sees(playerFaction, hit.from) ||
-            simulation.sees(playerFaction, hit.to))
+          (simulation.sees(playerOwner, hit.from) ||
+            simulation.sees(playerOwner, hit.to))
         )
           combatEffects.hit(hit, style);
         if (player.shownActor(hit.attackerId))
@@ -1066,16 +1068,13 @@ async function assembleGameSession(
       input.selectedActorIds.flatMap((id) => player.ownActor(id) ?? []),
     );
     updateHealth(frameSeconds);
-    const ownIds = player.actors().ownIds;
     networkView.update(
-      simulation.support && {
-        nodes: simulation.support.nodes.filter((node) =>
-          ownIds.has(node.actorId),
+      simulation.support &&
+        supportForOwner(
+          simulation.support,
+          playerOwner,
+          simulation.relations.sharesSupport,
         ),
-        links: simulation.support.links.filter((link) =>
-          [link.from, link.to].every((id) => ownIds.has(id)),
-        ),
-      },
       placement.active ||
         network.visible ||
         !!simulation.support?.nodes.some(

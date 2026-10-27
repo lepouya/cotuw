@@ -1,3 +1,4 @@
+import { playerOwners } from "./helpers/scenario";
 import { describe, expect, test, vi } from "vitest";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
@@ -41,7 +42,7 @@ const mapOptions = {
 const contentMap = new TerrainGrid(mapOptions);
 const scenario = defineScenario({
   id: "vision-test",
-  playerFaction: "arc",
+  ...playerOwners("arc"),
   tileSize: 1,
   terrainTypeIds: mapOptions.terrainTypeIds,
   terrain: contentMap.terrainState(),
@@ -104,10 +105,15 @@ function fixture(
 }
 
 function placed(id: string, definitionId: string, x: number, z: number) {
-  return createTilePlacedActor(contentMap, definitions.get(definitionId)!, {
-    actorId: id,
-    origin: { x, z },
-  });
+  return createTilePlacedActor(
+    contentMap,
+    definitions.get(definitionId)!,
+    {
+      actorId: id,
+      origin: { x, z },
+    },
+    "player",
+  );
 }
 
 /** A scout at tile (10, 11) sent east until it stands on tile (40, 11). */
@@ -117,6 +123,7 @@ function scouted() {
     createActor({
       id: "scout",
       definitionId: "arc-scout",
+      owner: "player",
       worldPosition: map.tileCenter(10, 11),
     }),
   );
@@ -223,6 +230,7 @@ test("harvesters cannot be ordered to undiscovered sites", () => {
     createActor({
       id: "harvester",
       definitionId: "arc-harvester",
+      owner: "player",
       worldPosition: map.tileCenter(6, 16),
     }),
   );
@@ -262,6 +270,7 @@ test("automatic harvesting waits for unexplored patch tiles to be discovered", (
     createActor({
       id: "worker",
       definitionId: "arc-harvester",
+      owner: "player",
       worldPosition: contentMap.tileCenter(30, 11),
     }),
   );
@@ -290,6 +299,7 @@ test("automatic harvesting waits for unexplored patch tiles to be discovered", (
     createActor({
       id: "scout",
       definitionId: "arc-scout",
+      owner: "player",
       worldPosition: map.tileCenter(32, 11),
     }),
   );

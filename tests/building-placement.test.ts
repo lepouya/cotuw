@@ -153,10 +153,15 @@ afterEach(() => {
 
 test("placement skips existing and retired actor IDs after restoring a mission", () => {
   const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
-  const actor = createTilePlacedActor(map, definition, {
-    actorId: "store-1",
-    origin: { x: 4, z: 4 },
-  });
+  const actor = createTilePlacedActor(
+    map,
+    definition,
+    {
+      actorId: "store-1",
+      origin: { x: 4, z: 4 },
+    },
+    "player",
+  );
   current = fixture([actor], ["store-2"]);
   current.begin();
   expect(current.canvas.dataset.placementStatus).toBe("valid");
@@ -173,10 +178,15 @@ test("tick-time rejection survives a later valid evaluation until placement chan
   current.begin();
   current.controls.confirm.click();
   current.simulation.spawnActor(
-    createTilePlacedActor(current.map, definition, {
-      actorId: "blocker",
-      origin: { x: 1, z: 1 },
-    }),
+    createTilePlacedActor(
+      current.map,
+      definition,
+      {
+        actorId: "blocker",
+        origin: { x: 1, z: 1 },
+      },
+      "player",
+    ),
   );
   for (const outcome of current.simulation.tick())
     current.placement.onOutcome(outcome);

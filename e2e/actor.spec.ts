@@ -157,6 +157,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       createActor({
         id: "prototype-trooper",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: map.tileCenter(46, 40),
       }),
     );
@@ -164,6 +165,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       createActor({
         id: "prototype-scout",
         definitionId: "arc-scout",
+        owner: "player",
         worldPosition: map.tileCenter(55, 45),
       }),
     );

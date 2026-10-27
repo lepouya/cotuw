@@ -129,8 +129,7 @@ export function applyCultivationCommand(
       !building?.construction ||
       !growth ||
       growth.workerDefinitionId !== actor.definitionId ||
-      definitions.get(building.definitionId)?.faction !==
-        definitions.get(actor.definitionId)?.faction
+      building.owner !== actor.owner
     )
       return "invalid-growth";
     const prior = economy.cultivation!.workers.find(
@@ -213,8 +212,7 @@ export function updateCultivation(
             (building) =>
               !building.construction &&
               definitions.get(building.definitionId)?.cultivationDropoff &&
-              definitions.get(building.definitionId)?.faction ===
-                definition.faction,
+              building.owner === actor.owner,
           )
           .sort(nearestTo(actor.worldPosition));
         for (const building of candidates) {
@@ -359,6 +357,7 @@ export function validateCultivation(
   for (const worker of state.workers) {
     const actor = byId.get(worker?.actorId);
     const tending = byId.get(worker?.tendingId ?? "");
+    const dropoff = byId.get(worker?.dropoffId ?? "");
     const definition =
       actor && definitions.get(actor.definitionId)?.cultivation;
     if (
@@ -378,10 +377,13 @@ export function validateCultivation(
       (worker.siteId !== undefined &&
         !state.sites.some(({ id }) => id === worker.siteId)) ||
       (worker.dropoffId !== undefined &&
-        !definitions.get(byId.get(worker.dropoffId)?.definitionId ?? "")
-          ?.cultivationDropoff) ||
+        (!dropoff ||
+          dropoff.construction !== undefined ||
+          dropoff.owner !== actor.owner ||
+          !definitions.get(dropoff.definitionId)?.cultivationDropoff)) ||
       (worker.tendingId !== undefined &&
         (!tending?.construction ||
+          tending.owner !== actor.owner ||
           tended.has(tending.id) ||
           definitions.get(tending.definitionId)?.growth?.workerDefinitionId !==
             actor.definitionId)) ||

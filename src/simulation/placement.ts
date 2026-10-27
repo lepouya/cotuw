@@ -74,10 +74,12 @@ export function createTilePlacedActor(
   map: TerrainView,
   definition: Readonly<ActorDefinition>,
   { actorId, origin, quarterTurns = 0 }: Omit<ActorPlacement, "definitionId">,
+  owner: string,
 ): TilePlacedActor {
   const actor: TilePlacedActor = {
     id: actorId,
     definitionId: definition.id,
+    owner,
     worldPosition: { x: 0, z: 0 },
     facing: 0,
     occupancyLayer: definition.footprint!.layer,

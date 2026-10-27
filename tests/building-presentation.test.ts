@@ -59,10 +59,15 @@ function setup(reducedMotion = () => false) {
     appearances,
     { reducedMotion },
   );
-  const actor = createTilePlacedActor(map, barracks, {
-    actorId: "barracks",
-    origin: { x: 4, z: 4 },
-  });
+  const actor = createTilePlacedActor(
+    map,
+    barracks,
+    {
+      actorId: "barracks",
+      origin: { x: 4, z: 4 },
+    },
+    "player",
+  );
   return { engine, scene, map, views, appearances, actor };
 }
 
@@ -367,10 +372,15 @@ test.each(["circle-heartgrove", "circle-conservatory", "circle-musterhall"])(
       [definition],
       appearances,
     );
-    const actor = createTilePlacedActor(map, definition, {
-      actorId: "growing",
-      origin: { x: 3, z: 3 },
-    });
+    const actor = createTilePlacedActor(
+      map,
+      definition,
+      {
+        actorId: "growing",
+        origin: { x: 3, z: 3 },
+      },
+      "player",
+    );
     try {
       for (const [ticks, ribs, canopy] of [
         [0, false, false],

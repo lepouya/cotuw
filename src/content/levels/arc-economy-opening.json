@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 9,
+  "version": 11,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "arc-economy-opening",
@@ -121,6 +121,7 @@
       {
         "id": "starting-command-center",
         "definitionId": "arc-command-center-prototype",
+        "owner": "player",
         "worldPosition": { "x": -41, "z": 1 },
         "facing": 0,
         "occupancyLayer": "surface",
@@ -129,6 +130,7 @@
       {
         "id": "lone-wolf",
         "definitionId": "wolf",
+        "owner": "wildlife",
         "worldPosition": { "x": -3.5, "z": -17.5 },
         "facing": -1.5707963267948966,
         "occupancyLayer": "surface",
@@ -142,6 +144,7 @@
       {
         "id": "den-wolf-1",
         "definitionId": "wolf",
+        "owner": "wildlife",
         "worldPosition": { "x": 24.5, "z": -28.5 },
         "facing": 3.141592653589793,
         "occupancyLayer": "surface",
@@ -156,6 +159,7 @@
       {
         "id": "den-wolf-2",
         "definitionId": "wolf",
+        "owner": "wildlife",
         "worldPosition": { "x": 32.5, "z": -28.5 },
         "facing": 3.141592653589793,
         "occupancyLayer": "surface",
@@ -170,6 +174,7 @@
       {
         "id": "den-wolf-3",
         "definitionId": "wolf",
+        "owner": "wildlife",
         "worldPosition": { "x": 25.5, "z": -25.5 },
         "facing": 3.141592653589793,
         "occupancyLayer": "surface",
@@ -184,6 +189,7 @@
       {
         "id": "den-wolf-4",
         "definitionId": "wolf",
+        "owner": "wildlife",
         "worldPosition": { "x": 31.5, "z": -25.5 },
         "facing": 3.141592653589793,
         "occupancyLayer": "surface",
@@ -198,6 +204,7 @@
       {
         "id": "den-alpha-wolf",
         "definitionId": "alpha-wolf",
+        "owner": "wildlife",
         "worldPosition": { "x": 28.5, "z": -30.5 },
         "facing": 3.141592653589793,
         "occupancyLayer": "surface",
@@ -212,6 +219,15 @@
     ],
     "commands": [],
     "retiredActorIds": [],
+    "owners": [
+      { "id": "player", "faction": "arc" },
+      { "id": "wildlife", "faction": "wildlife" }
+    ],
+    "playerOwner": "player",
+    "relationships": [
+      { "owners": ["player", "wildlife"], "relationship": "hostile" }
+    ],
+    "firedEvents": [],
     "wrecks": [],
     "wildlife": { "nextAlertId": 1, "alerts": [] },
     "objectives": [
@@ -241,7 +257,6 @@
       }
     ],
     "scenarioId": "arc-economy-opening",
-    "playerFaction": "arc",
     "terrain": {
       "width": 100,
       "height": 100,

@@ -16,7 +16,7 @@ import type {
   MissionSimulation,
 } from "../src/simulation/mission";
 import type { MissionCommand } from "../src/simulation/command";
-import { exploredScenarioState } from "./helpers/scenario";
+import { exploredScenarioState, playerOwners } from "./helpers/scenario";
 
 const definitions = ARC_ACTOR_DEFINITIONS;
 const mapOptions = {
@@ -28,7 +28,7 @@ const mapOptions = {
 const contentMap = new TerrainGrid(mapOptions);
 const scenario = defineScenario({
   id: "economy-test",
-  playerFaction: "arc",
+  ...playerOwners("arc"),
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
   terrain: contentMap.terrainState(),
@@ -177,6 +177,7 @@ test("scripted worker enrollment rejects an absent economy before publishing the
         createActor({
           id: "scripted-worker",
           definitionId: "circle-cultivator",
+          owner: "player",
           worldPosition: position,
         }),
       ),
@@ -186,6 +187,7 @@ test("scripted worker enrollment rejects an absent economy before publishing the
       createActor({
         id: "scripted-worker",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: position,
       }),
     );
@@ -274,8 +276,7 @@ describe("Materials economy", () => {
         ? { ...definition, weapon: rifle.weapon }
         : definition,
     );
-    const enemy = { ...rifle, id: "enemy", faction: "hostile" };
-    const { simulation } = fixture(undefined, 1, false, [...armed, enemy]);
+    const { simulation } = fixture(undefined, 1, false, armed);
     command(simulation, build());
     finishBuilding(simulation);
     command(simulation, {
@@ -290,7 +291,8 @@ describe("Materials economy", () => {
     simulation.spawnActor(
       createActor({
         id: "enemy",
-        definitionId: "enemy",
+        definitionId: "arc-trooper",
+        owner: "wildlife",
         worldPosition: { x: point.x + 1, z: point.z },
       }),
     );
@@ -761,37 +763,33 @@ describe("Materials economy", () => {
     expect(simulation.economy!.materials).toBe(25);
   });
 
-  test.each(["wildlife", undefined])(
-    "salvage ignores mobile actors of faction %s",
-    (faction) => {
-      const content = definitions.map((definition) =>
-        definition.id === "arc-scout" ? { ...definition, faction } : definition,
-      );
-      const { simulation, map } = fixture(undefined, 1, false, content);
-      const worldPosition = map.tileCenter(22, 10);
-      simulation.spawnActor(
-        createActor({
-          id: "visitor",
-          definitionId: "arc-scout",
-          worldPosition,
-        }),
-      );
-      simulation.tick();
-      expect(simulation.economy!.loot[0].collected).toBe(false);
-      expect(simulation.economy!.materials).toBe(150);
-      simulation.removeActor("visitor");
-      simulation.spawnActor(
-        createActor({
-          id: "collector",
-          definitionId: "arc-trooper",
-          worldPosition,
-        }),
-      );
-      simulation.tick();
-      expect(simulation.economy!.loot[0].collected).toBe(true);
-      expect(simulation.economy!.materials).toBe(175);
-    },
-  );
+  test("salvage ignores another owner's mobile actors", () => {
+    const { simulation, map } = fixture();
+    const worldPosition = map.tileCenter(22, 10);
+    simulation.spawnActor(
+      createActor({
+        id: "visitor",
+        definitionId: "arc-scout",
+        owner: "wildlife",
+        worldPosition,
+      }),
+    );
+    simulation.tick();
+    expect(simulation.economy!.loot[0].collected).toBe(false);
+    expect(simulation.economy!.materials).toBe(150);
+    simulation.removeActor("visitor");
+    simulation.spawnActor(
+      createActor({
+        id: "collector",
+        definitionId: "arc-trooper",
+        owner: "player",
+        worldPosition,
+      }),
+    );
+    simulation.tick();
+    expect(simulation.economy!.loot[0].collected).toBe(true);
+    expect(simulation.economy!.materials).toBe(175);
+  });
 
   test.each<MissionCommand>([
     gather(),

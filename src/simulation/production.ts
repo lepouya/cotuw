@@ -160,6 +160,7 @@ export function evaluateTraining(
       actor: createActor({
         id: command.actorId,
         definitionId: unit.id,
+        owner: producer.owner,
         worldPosition: position,
         facing: producer.facing,
       }),

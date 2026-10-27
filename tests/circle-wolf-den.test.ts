@@ -7,6 +7,7 @@ import {
   missionTerrain,
 } from "../src/mission-loading";
 import { createScenarioMap } from "../src/simulation/scenario";
+import { playerFactionOf } from "../src/simulation/ownership";
 import { serializeMission } from "../src/simulation/mission-file";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { advanceSeconds } from "./helpers/scenario";
@@ -23,7 +24,7 @@ const sentinelIds = Array.from(
 test("the Circle opening uses shared wildlife, a paid worker bootstrap, and normal fog", () => {
   const circle = opening();
   const arc = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
-  expect(circle.state.playerFaction).toBe("circle");
+  expect(playerFactionOf(circle.state)).toBe("circle");
   expect(circle.state.terrain).toEqual(arc.state.terrain);
   expect(circle.state.actors.filter(({ territory }) => territory)).toEqual(
     arc.state.actors.filter(({ territory }) => territory),
@@ -46,11 +47,11 @@ test("the Circle opening uses shared wildlife, a paid worker bootstrap, and norm
   try {
     expect(simulation.fog).toBeDefined();
     expect(
-      simulation.detects("circle", simulation.actorById("lone-wolf")!),
+      simulation.detects("player", simulation.actorById("lone-wolf")!),
     ).toBe(false);
     expect(
       simulation.detects(
-        "circle",
+        "player",
         simulation.actorById("starting-heartgrove")!,
       ),
     ).toBe(true);
@@ -82,6 +83,7 @@ test("a prepared Circle force clears both encounters and continues identically a
       createActor({
         id,
         definitionId: "circle-sentinel",
+        owner: "player",
         worldPosition: map.tileCenter(
           10 + (index % 3) * 2,
           50 + Math.floor(index / 3) * 2,
@@ -222,6 +224,7 @@ test("Circle gifts reward Lifebloom once and retain collection through a save", 
       createActor({
         id: "gift-collector",
         definitionId: "circle-wayfinder",
+        owner: "player",
         worldPosition: map.tileCenter(gifts[0]!.tile.x, gifts[0]!.tile.z),
       }),
     );

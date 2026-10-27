@@ -29,12 +29,12 @@ import type {
 import type { TileCoord } from "./grid";
 import type { TerrainView } from "./terrain";
 import { clearCombatOrders, compareIds, healthOf } from "./actor";
-import { playerRelation } from "./faction";
 import { distance } from "./world";
 import type { WorldPosition } from "./world";
 import type { TrainingEvaluation } from "./production";
 import type { EconomyCommand } from "./command";
 import type { SupportView } from "./support";
+import type { SharesHeadquarters } from "./growth";
 
 export type MaterialsSite = {
   id: string;
@@ -460,6 +460,7 @@ export function validateEconomyState(
         !refinery ||
         !isTilePlacedActor(refinery) ||
         refinery.construction !== undefined ||
+        refinery.owner !== actor!.owner ||
         definitions.get(refinery.definitionId)?.refinery
           ?.harvesterDefinitionId !== actor!.definitionId ||
         assigned.has(worker.refineryId)
@@ -523,7 +524,7 @@ export function refineryOccupied(
   );
 }
 
-/** Cost of the cheapest Refinery and Harvester pair still needed. */
+/** Cheapest Refinery and Harvester pair the owner of `actors` still needs. */
 export function harvestingRecoveryCost(
   economy: Pick<EconomyView, "harvesters" | "production">,
   actors: readonly ActorRenderState[],
@@ -551,8 +552,11 @@ export function harvestingRecoveryCost(
 
 export type EconomyWorld = {
   actors: Actor[];
-  playerFaction?: string;
-  explored: (tile: TileCoord) => boolean;
+  playerOwner: string;
+  /** Whether a building's owner may use a headquarters owner's queue. */
+  sharesHeadquarters: SharesHeadquarters;
+  /** Whether a worker's owner knows a resource site's tile. */
+  knowsTile: (owner: string, tile: TileCoord) => boolean;
   definitions: ReadonlyMap<string, ActorDefinition>;
   behaviors: ReadonlyMap<string, ActorBehavior>;
   map: TerrainView;
@@ -597,6 +601,7 @@ export function applyEconomyCommand(
     if (
       !refinery ||
       refinery.construction !== undefined ||
+      refinery.owner !== actor.owner ||
       definitions.get(refinery.definitionId)?.refinery
         ?.harvesterDefinitionId !== actor.definitionId
     )
@@ -767,14 +772,14 @@ export function updateEconomy(
       (site) =>
         site.id === worker.activeSiteId &&
         site.remainingMaterials > 0 &&
-        world.explored(site.tile),
+        world.knowsTile(actor.owner, site.tile),
     );
     if (!site) {
       const candidates = economy.sites
         .filter(
           (site) =>
             site.remainingMaterials > 0 &&
-            world.explored(site.tile) &&
+            world.knowsTile(actor.owner, site.tile) &&
             Math.abs(site.tile.x - target.tile.x) <= gathering.patchRadius &&
             Math.abs(site.tile.z - target.tile.z) <= gathering.patchRadius,
         )
@@ -827,10 +832,7 @@ export function updateEconomy(
       !actors.some(
         (actor) =>
           definitions.get(actor.definitionId)?.movement &&
-          playerRelation(
-            world.playerFaction,
-            definitions.get(actor.definitionId)?.faction,
-          ) === "own" &&
+          actor.owner === world.playerOwner &&
           near(actor, point),
       )
     )

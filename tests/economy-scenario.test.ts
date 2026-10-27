@@ -74,6 +74,7 @@ function finalFightState(): MissionState {
       createActor({
         id: `trooper-${wolf.id}`,
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: {
           x: wolf.worldPosition.x - 1.5,
           z: wolf.worldPosition.z,
@@ -120,6 +121,7 @@ describe("mission objectives", () => {
       createActor({
         id: "duelist",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: mapForOpening().tileCenter(43, 32),
       }),
     );
@@ -234,6 +236,7 @@ describe("mission objectives", () => {
     const attacker = createActor({
       id: "free-play-wolf",
       definitionId: "wolf",
+      owner: "wildlife",
       worldPosition: point,
     });
     attacker.territory = { home: point };
@@ -482,7 +485,7 @@ describe("authored wolf encounters", () => {
     expect(simulation.actorById("lone-wolf")!.territory!.encounterId).toBe(
       "lone-wolf",
     );
-    expect(wolves.every((actor) => !simulation.detects("arc", actor))).toBe(
+    expect(wolves.every((actor) => !simulation.detects("player", actor))).toBe(
       true,
     );
   });
@@ -511,6 +514,7 @@ describe("authored wolf encounters", () => {
       createActor({
         id: "duelist",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: map.tileCenter(43, 32),
       }),
     );
@@ -543,6 +547,7 @@ describe("authored wolf encounters", () => {
       createActor({
         id: "intruder",
         definitionId: "arc-trooper",
+        owner: "player",
         worldPosition: mapForOpening().tileCenter(78, 29),
       }),
     );
