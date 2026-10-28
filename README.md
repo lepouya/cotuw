@@ -89,6 +89,8 @@ focused and watch runs.
   milestone review workflow.
 - [Runtime boundaries](docs/runtime-boundaries.md): simulation and resource
   ownership contracts.
+- [UI ownership](docs/ui-ownership.md): feature boundaries and the dialog,
+  navigation, and sidebar extraction scope.
 - [Mission files](docs/mission-files.md): level and save format and hand
   editing.
 - [Content packs](docs/content-packs.md): shared rules and presentation data.

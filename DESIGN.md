@@ -96,6 +96,24 @@ current time, so inspection and paused time never advance the mission.
 See [runtime extension contracts](docs/runtime-boundaries.md) for behavior,
 clock, and resource ownership boundaries.
 
+### UI module ownership
+
+- UI features own their markup, behavior, styles, and cleanup through explicit
+  mount roots, view data, and semantic callbacks. Use plain TypeScript, DOM,
+  native dialogs, and feature CSS through Vite.
+- The application owns mission loading, replacement, restart, and persistence
+  operations. Dialogs own panel transitions, focus, dismissal, and pause/resume
+  coordination. Session code owns simulation, rendering, and world controls;
+  UI reads content and player-visible state through those existing boundaries.
+- Keep one content-driven sidebar for both factions. Share base controls and
+  layout classes; keep feature details and compact rules with their owners.
+  The document owns the shell, canvases, and feature mount points.
+- Preserve headless preparation, lazy renderer startup, deterministic gameplay,
+  and platform-service isolation. UI extraction does not change save formats.
+
+[UI ownership](docs/ui-ownership.md) defines the selected module interfaces,
+lifetime contracts, extraction order, and behavior checks for tasks 1.22-1.24.
+
 ## Mission terminology
 
 - A campaign is a faction's long-form narrative and progression.

@@ -256,9 +256,12 @@ and bring up the rough skirmish map early for simulation and AI development.
   follows detection changes independently of actor creation and removal;
   visible damage triggers combat music even when its source is hidden, and
   only the player's production queues sound.
-- [ ] **1.21** Review UI ownership and choose the smallest coherent structure
+- [x] **1.21** Review UI ownership and choose the smallest coherent structure
   for feature-owned markup, behavior, styles, and shared layout primitives.
   Record the boundaries before refactoring; retain the locked technical stack.
+  [UI ownership](docs/ui-ownership.md) records inspected coupling, the selected
+  root-based DOM/CSS structure, application and dialog responsibilities,
+  lifetime rules, and verification. Runtime extraction follows in 1.22-1.24.
 - [ ] **1.22** Modularize dialogs with consistent focus, dismissal, pause and
   resume, asynchronous-work handling, and disposal. Verify interactions among
   menus, contextual guides, and mission-result screens.
