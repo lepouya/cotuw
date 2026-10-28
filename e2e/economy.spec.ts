@@ -679,7 +679,6 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       root,
       {
         actors: snapshot.actors,
-        economy: snapshot.economy,
         playerOwner: "player",
         playerFaction: "arc",
         support: undefined,
@@ -695,7 +694,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
         selectedActorId: () => worker.actorId,
         enabled: () => true,
         focus: () => {},
-        explored: () => true,
+        economy: () => snapshot.economy,
         positionForTile: () => ({ x: 0, z: 0 }),
         queueMode: () => true,
       },
@@ -780,7 +779,6 @@ test("worker controls share delivery actions and tolerate missions without culti
       createEconomyControls(
         root,
         {
-          economy,
           actors,
           playerOwner: "player",
           playerFaction,
@@ -799,7 +797,7 @@ test("worker controls share delivery actions and tolerate missions without culti
           selectedActorId: () => selection,
           enabled: () => true,
           focus: () => {},
-          explored: () => true,
+          economy: () => economy,
           positionForTile: () => ({ x: 0, z: 0 }),
         },
       );

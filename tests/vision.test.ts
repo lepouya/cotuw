@@ -181,7 +181,7 @@ describe("fog of war", () => {
     expect(fog.isVisible(25, 11)).toBe(false);
     const invalid: MissionState = {
       ...createScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
-      fog: { explored: "01" },
+      fog: { explored: { player: "01" } },
     };
     expect(() => fixture(invalid)).toThrow("Mission state has invalid fog.");
   });
@@ -194,7 +194,9 @@ describe("fog of war", () => {
       parseMission(JSON.stringify(saved), 1).state,
     );
     expect(simulation.fog).toBeUndefined();
-    saved.state.fog = { explored: ["2".repeat(scenario.terrain.width)] };
+    saved.state.fog = {
+      explored: { player: ["2".repeat(scenario.terrain.width)] },
+    };
     expect(() => parseMission(JSON.stringify(saved), 1)).toThrow(
       "explored rows",
     );

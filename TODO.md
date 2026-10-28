@@ -220,17 +220,33 @@ and bring up the rough skirmish map early for simulation and AI development.
   workers, script permissions, and deterministic saves. Browser checks cover
   issuer-scoped feedback. Restricting scripts to a scripted sequence is deferred
   until sequences exist; mirror-harness use follows 1.14 launch assembly.
-- [ ] **1.18** Replace player-only simulation assumptions, including loot
+- [x] **1.18** Replace player-only simulation assumptions, including loot
   collection, with owner-neutral rules or explicit documented exceptions.
-- [ ] **1.19** Add authoritative AI observation memory for observed enemies,
+  [Loot](DESIGN.md#ownership-and-relationships) pays the nearest collecting
+  unit's owner if it holds that resource, so wildlife cannot collect it.
+  [Runtime boundaries](docs/runtime-boundaries.md#simulation-and-timing)
+  document the remaining player-perspective exception, authored objectives,
+  which 1.25 makes owner-based. Headless checks cover rival collection,
+  wildlife exclusion, and simultaneous-arrival tie-breaking.
+- [x] **1.19** Add authoritative AI observation memory for observed enemies,
   economic sites, and threats, with last-seen positions and ticks. Expose
   only the observations and authored map knowledge permitted by the plan.
-  Keep explored terrain per owner; 1.15 gives non-player owners only current
-  vision, which their placement in 1.17 and planning need.
+  Keep explored terrain per owner.
+  Every owner saves its explored terrain and
+  [observations](docs/mission-files.md#observations) of non-allied actors,
+  site yields, and loot under the
+  [memory rules](DESIGN.md#fog-stealth-and-detection); threats are hostile
+  sightings. `knowledgeOf` exposes authored site locations, exploration,
+  vision, and memory. Headless checks cover last-seen units and buildings,
+  observed and unobserved destruction, alliances, per-owner exploration,
+  site yields, unseen pickups and depletion, saved continuation, malformed
+  memory, and owner IDs that match inherited object properties.
 - [ ] **1.20** Keep player alerts, audio, minimap pulses, and sidebar data
   limited to the player's own actors and detections. Verify that hidden AI
   activity does not leak through these presentation paths. Browser checks
-  cover allied and neutral labels changing with relationships. Hostile markers
+  cover allied and neutral labels changing with relationships. Sites and loot
+  on the map, minimap, and sidebar show the player's last-seen state from
+  1.19, hiding others' unseen gathering and pickups. Hostile markers
   changing after an event and allied support coverage still need browser
   integration checks.
 - [ ] **1.21** Review UI ownership and choose the smallest coherent structure
@@ -283,7 +299,8 @@ and bring up the rough skirmish map early for simulation and AI development.
   levels. Verify save/load continuation and safe rejection under the
   compatibility policy from 1.11.
   1.15 added owners, relationships with sharing, scenario events, and fired
-  events to the format with their validation and documentation.
+  events to the format with their validation and documentation; 1.19 added
+  per-owner exploration and observations.
 - [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers
@@ -302,6 +319,8 @@ AI tasks are developed and verified with them.
 - [ ] **1.29** Add a deterministic director with mission profiles, concurrent
   priorities, shared spending and force allocation, and counted work limits
   per tick. All actions enter through the normal command boundary.
+  Plan from `knowledgeOf` and the owner's own state, hiding the attacker on
+  its units' latest hits unless detected.
 - [ ] **1.30** Add a headless AI-versus-AI runner reporting each match summary
   and result. Accept profiles and start-slot assignments as case inputs rather
   than depending on random seeds in a simulation that has no randomness.
@@ -315,7 +334,8 @@ AI tasks are developed and verified with them.
 - [ ] **1.32** Serialize authoritative AI state, including plans, assignments,
   observations, timers, and budgets, as each part is added. Verify identical
   continuation after loading and across different clock batching, including
-  bounded catch-up work.
+  bounded catch-up work. Observations from 1.19 are saved and verified for
+  continuation after loading.
 - [ ] **1.33** Implement the initial ARC build plan: gather, place valid
   buildings, train workers and forces, and maintain functioning income and
   production using actual resources and normal costs and timings.
@@ -446,9 +466,9 @@ verified; preview work is partial progress.
   ARC and Circle use shared wolf-den authoring, worker route handling,
   interruption, and compatible-site queries. Regression checks cover tending
   cancellation, drop-off loss, queued delivery, and the 60% slowdown threshold.
-- [ ] Base-loop integration: 1.16 and 1.17 provide owner economies and
-  command authority. Owner-neutral rules, information, and persistence work
-  in 1.18, 1.20, 1.24, and 1.27 remains required. The slice runs on 1.15's owners
+- [ ] Base-loop integration: 1.16-1.18 provide owner economies, command
+  authority, and owner-neutral rules. Information and persistence work in
+  1.20, 1.24, and 1.27 remains required. The slice runs on 1.15's owners
   with single-player control; it does not complete those prerequisites or their
   dependent acceptance gates. Emergency Heartgrove recovery remains
   in 1.49. Difficulty and skirmish launch remain in 1.60.
@@ -460,8 +480,8 @@ verified; preview work is partial progress.
   encounters. Wolves alone cannot validate structure counters. Circle AI
   remains 1.55; full skirmish integration and balance remain phases F and G.
 
-Next integration target: owner-neutral rules and information boundaries
-through the common milestone foundations.
+Next integration target: information boundaries through the common
+milestone foundations.
 
 #### Circle tasks
 

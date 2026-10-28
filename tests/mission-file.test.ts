@@ -38,7 +38,7 @@ function testMission() {
     ...createMissionState([]),
     scenarioId: "test",
     terrain: map.terrainState(),
-    fog: { explored: "100011" },
+    fog: { explored: { player: "100011" } },
   };
 }
 
@@ -61,7 +61,7 @@ describe("mission files", () => {
       [1, 1.1, 1.2, 1.3],
       [0, 0.1, 0.2, 0.3],
     ]);
-    expect(file.state.fog.explored).toEqual(["011", "100"]);
+    expect(file.state.fog.explored).toEqual({ player: ["011", "100"] });
     const parsed = parseMission(source, 1);
     expect(parsed.state).toEqual(state);
     expect(parsed.scenario).toEqual(scenario);

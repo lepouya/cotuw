@@ -18,7 +18,7 @@ export type Ledger = {
   stockpiles: Stockpile[];
   deposited: Deposit[];
 };
-type LedgerView = DeepReadonly<Ledger>;
+export type LedgerView = DeepReadonly<Ledger>;
 
 /** Whether two owners pool their resources directly. */
 export type SharesResources = (left: string, right: string) => boolean;

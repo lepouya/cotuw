@@ -298,7 +298,7 @@ test("resource and gift markers follow edited terrain and release their observer
       giftHeight + 2,
     );
     economy.sites[0].remainingMaterials = 25;
-    view.update(economy, () => true);
+    view.update(economy);
     site.computeWorldMatrix(true);
     expect(site.getHierarchyBoundingVectors(true).min.y).toBeCloseTo(2);
     view.dispose();
@@ -362,7 +362,7 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
     }
     expect(view.lootTileForMesh(null)).toBeUndefined();
     economy.loot[0].collected = true;
-    view.update(economy, () => true);
+    view.update(economy);
     expect(gift.isEnabled()).toBe(false);
     expect(gift.getChildMeshes().every((mesh) => !mesh.isEnabled())).toBe(true);
     for (const mesh of gift.getChildMeshes())
@@ -427,7 +427,7 @@ test("Materials stages obey pack thresholds at their boundaries and disappear on
     const root = scene.getTransformNodeByName("materials-site")!;
     const scales = [100, 61, 60, 21, 20, 1, 0].map((remaining) => {
       economy.sites[0].remainingMaterials = remaining;
-      view.update(economy, () => true);
+      view.update(economy);
       return [root.scaling.x, root.isEnabled()];
     });
     expect(scales).toEqual([
@@ -440,7 +440,7 @@ test("Materials stages obey pack thresholds at their boundaries and disappear on
       [0, false],
     ]);
     economy.sites[0].remainingMaterials = 100;
-    view.update(economy, () => false);
+    view.update({ ...economy, sites: [] });
     expect(root.isEnabled()).toBe(false);
     expect(map.terrainAt(1, 1).typeId).toBe("plain");
     view.dispose();

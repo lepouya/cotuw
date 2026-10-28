@@ -10,7 +10,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 13;
+export const MISSION_FILE_VERSION = 14;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -159,7 +159,9 @@ export function serializeMission(
       ...state,
       terrain: terrainToText(terrain),
       fog: fog && {
-        explored: northToSouth(fog.explored, terrain.width, terrain.height),
+        explored: mapValues(fog.explored, (tiles) =>
+          northToSouth(tiles, terrain.width, terrain.height),
+        ),
       },
     },
   });
@@ -313,10 +315,15 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     );
   const terrain = terrainFromText(state.terrain, scenario.terrainTypeIds);
   const parsed = { ...state, terrain };
-  if (state.fog)
+  if (state.fog) {
+    if (!isRecord(state.fog) || !isRecord(state.fog.explored))
+      throw new RangeError("Fog needs explored rows for each owner.");
     parsed.fog = {
-      explored: fogFromText(state.fog.explored, terrain.width, terrain.height),
+      explored: mapValues(state.fog.explored, (rows) =>
+        fogFromText(rows, terrain.width, terrain.height),
+      ),
     };
+  }
   return { scenario: scenario as MissionScenario, state: parsed, save };
 }
 
@@ -424,6 +431,14 @@ function terrainFromText(
     navigationVersion: navigationVersion!,
   };
 }
+
+const mapValues = <T, U>(
+  record: Readonly<Record<string, T>>,
+  convert: (value: T) => U,
+): Record<string, U> =>
+  Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [key, convert(value)]),
+  );
 
 function fogFromText(rows: unknown, width: number, height: number): string {
   const explored = rowsFromText(rows, width, height, "explored").join("");

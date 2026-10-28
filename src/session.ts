@@ -1,6 +1,7 @@
 // A playable session: the mission's simulation, its views, and its controls.
 // Every mission-specific rule and look comes from the mission's content pack.
 import {
+  collectsLoot,
   economyWorkers,
   activeSites,
   economySites,
@@ -239,11 +240,11 @@ async function assembleGameSession(
   if (materialsView) own(materialsView);
   const explored = ({ x, z }: TileCoord) =>
     simulation.fog?.isExplored(x, z) ?? true;
-  /** An explored gathering site under a world point. */
+  /** A gathering site the player knows under a world point. */
   const siteAt = (point: WorldPosition) => {
     const { x, z } = map.tileAtWorldPosition(point.x, point.z);
-    return activeSites(simulation.economy).find(
-      (site) => site.tile.x === x && site.tile.z === z && explored(site.tile),
+    return activeSites(player.economy()).find(
+      (site) => site.tile.x === x && site.tile.z === z,
     );
   };
   const fogOverlay = createFogOverlay(
@@ -457,10 +458,15 @@ async function assembleGameSession(
     canMove: (actorId) => !!player.ownMobileActor(actorId),
     moveLabel: (target) => {
       const tile = map.tileAtWorldPosition(target.x, target.z);
-      const at = ({ x, z }: TileCoord) =>
-        x === tile.x && z === tile.z && explored(tile);
-      const economy = simulation.economy;
-      if (economy?.loot.some((loot) => !loot.collected && at(loot.tile)))
+      const economy = player.economy();
+      if (
+        economy?.loot.some(
+          (loot) =>
+            loot.tile.x === tile.x &&
+            loot.tile.z === tile.z &&
+            collectsLoot(economy, playerOwner, loot),
+        )
+      )
         return "Collect";
       const workers = workersForSite(economy, siteAt(target)?.id);
       if (
@@ -545,29 +551,26 @@ async function assembleGameSession(
     },
     // Structures first, so unit markers draw over them.
     actors: () => [
-      ...(simulation.economy?.cultivation?.sites
-        .filter((site) => explored(site.tile))
-        .map((site) => ({
-          id: `cultivation-${site.id}`,
-          worldPosition: map.tileCenter(site.tile.x, site.tile.z),
-          tiles: [site.tile],
-          color: [0.68, 0.4, 0.85] as Rgb,
-        })) ?? []),
-      ...(simulation.economy?.sites
-        .filter((site) => site.remainingMaterials > 0 && explored(site.tile))
+      ...(player.economy()?.cultivation?.sites.map((site) => ({
+        id: `cultivation-${site.id}`,
+        worldPosition: map.tileCenter(site.tile.x, site.tile.z),
+        tiles: [site.tile],
+        color: [0.68, 0.4, 0.85] as Rgb,
+      })) ?? []),
+      ...(player
+        .economy()
+        ?.sites.filter((site) => site.remainingMaterials > 0)
         .map((site) => ({
           id: `materials-${site.id}`,
           worldPosition: map.tileCenter(site.tile.x, site.tile.z),
           tiles: [site.tile],
           color: SITE_MINIMAP_COLOR,
         })) ?? []),
-      ...(simulation.economy?.loot
-        .filter((loot) => !loot.collected && explored(loot.tile))
-        .map((loot) => ({
-          id: `materials-${loot.id}`,
-          worldPosition: map.tileCenter(loot.tile.x, loot.tile.z),
-          color: SALVAGE_MINIMAP_COLOR,
-        })) ?? []),
+      ...(player.economy()?.loot.map((loot) => ({
+        id: `materials-${loot.id}`,
+        worldPosition: map.tileCenter(loot.tile.x, loot.tile.z),
+        color: SALVAGE_MINIMAP_COLOR,
+      })) ?? []),
       ...player.actors().placed.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
@@ -665,15 +668,13 @@ async function assembleGameSession(
       workerIds: economyWorkers(simulation.economy).map(
         ({ actorId }) => actorId,
       ),
-      sites: (simulation.economy?.cultivation?.sites ?? [])
-        .filter((site) => explored(site.tile))
-        .map((site) => ({
-          id: site.id,
-          name: site.name,
-          dormant: site.dormant,
-          reopensAt: Math.round((site.recoverAt / site.capacity) * 100),
-          position: map.tileCenter(site.tile.x, site.tile.z),
-        })),
+      sites: (player.economy()?.cultivation?.sites ?? []).map((site) => ({
+        id: site.id,
+        name: site.name,
+        dormant: site.dormant,
+        reopensAt: Math.round((site.recoverAt / site.capacity) * 100),
+        position: map.tileCenter(site.tile.x, site.tile.z),
+      })),
     });
   const placement = createBuildingPlacement(
     canvas,
@@ -805,7 +806,7 @@ async function assembleGameSession(
             const { x, z } = map.tileCenter(tile.x, tile.z);
             view.camera.glideToPoint(new Vector3(x, 0, z));
           },
-          explored,
+          economy: player.economy,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
           queueMode: () => input.queueMode,
         })
@@ -1043,9 +1044,8 @@ async function assembleGameSession(
     fogOverlay.update(simulation.fog);
     if (simulation.fog)
       canvas.dataset.exploredTiles = String(simulation.fog.exploredCount);
-    if (simulation.economy) {
-      materialsView?.update(simulation.economy, explored);
-    }
+    const known = player.economy();
+    if (known) materialsView?.update(known);
     if (
       controlsDirty ||
       simulation.completedTicks !== knownControlsTick ||

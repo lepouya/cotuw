@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 13,
+  "version": 14,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "sandbox",
@@ -42,6 +42,7 @@
     "retiredActorIds": [],
     "owners": [{ "id": "player" }],
     "playerOwner": "player",
+    "observations": {},
     "relationships": [],
     "firedEvents": [],
     "wrecks": [],

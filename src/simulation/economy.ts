@@ -18,7 +18,7 @@ import {
   refundCost,
 } from "./stockpiles";
 import type { Resource } from "./resources";
-import type { Ledger, SharesResources } from "./stockpiles";
+import type { Ledger, LedgerView, SharesResources } from "./stockpiles";
 import {
   applyCultivationCommand,
   createCultivatorState,
@@ -44,7 +44,7 @@ import type {
 } from "./actor";
 import type { TileCoord } from "./grid";
 import type { TerrainView } from "./terrain";
-import { clearCombatOrders, compareIds, healthOf } from "./actor";
+import { clearCombatOrders, compareIds, healthOf, nearestTo } from "./actor";
 import { distance } from "./world";
 import type { WorldPosition } from "./world";
 import type { TrainingEvaluation } from "./production";
@@ -232,6 +232,13 @@ export const lootResource = (loot: Readonly<ResourceLoot>): Resource =>
   RESOURCE_IDS.find((id) => loot[id] !== undefined)!;
 export const lootAmount = (loot: Readonly<ResourceLoot>): number =>
   loot[lootResource(loot)]!;
+/** Owners without a stockpile of loot's resource, such as wildlife, skip it. */
+export const collectsLoot = (
+  ledger: LedgerView,
+  owner: string,
+  loot: Readonly<ResourceLoot>,
+) =>
+  !loot.collected && balanceOf(ledger, owner, lootResource(loot)) !== undefined;
 
 /** Half the construction cost, scaled by remaining health and rounded down. */
 export function saleRefund(
@@ -517,13 +524,17 @@ export function harvestingStalled(
 
 export type EconomyWorld = {
   actors: Actor[];
-  playerOwner: string;
   /** Whether a building's owner may use a headquarters owner's queue. */
   sharesHeadquarters: SharesHeadquarters;
   /** Whether an owner without a headquarters may run one replacement job. */
   emergencyHeadquarters: boolean;
   /** Whether a worker's owner knows a resource site's tile. */
   knowsTile: (owner: string, tile: TileCoord) => boolean;
+  /** Last-seen yield, or undefined if the site has never been observed. */
+  knownMaterials: (
+    owner: string,
+    site: Readonly<MaterialsSite>,
+  ) => number | undefined;
   definitions: ReadonlyMap<string, ActorDefinition>;
   behaviors: ReadonlyMap<string, ActorBehavior>;
   map: TerrainView;
@@ -740,18 +751,18 @@ export function updateEconomy(
       worker.phase = "idle";
       continue;
     }
+    // Unknown yields can be investigated; unseen depletion cannot end a route.
+    const available = (site: MaterialsSite) =>
+      world.knowsTile(actor.owner, site.tile) &&
+      world.knownMaterials(actor.owner, site) !== 0;
     let site = economy.sites.find(
-      (site) =>
-        site.id === worker.activeSiteId &&
-        site.remainingMaterials > 0 &&
-        world.knowsTile(actor.owner, site.tile),
+      (site) => site.id === worker.activeSiteId && available(site),
     );
     if (!site) {
       const candidates = economy.sites
         .filter(
           (site) =>
-            site.remainingMaterials > 0 &&
-            world.knowsTile(actor.owner, site.tile) &&
+            available(site) &&
             Math.abs(site.tile.x - target.tile.x) <= gathering.patchRadius &&
             Math.abs(site.tile.z - target.tile.z) <= gathering.patchRadius,
         )
@@ -800,16 +811,16 @@ export function updateEconomy(
   for (const loot of economy.loot) {
     if (loot.collected) continue;
     const point = map.tileCenter(loot.tile.x, loot.tile.z);
-    if (
-      !actors.some(
+    const collector = actors
+      .filter(
         (actor) =>
           definitions.get(actor.definitionId)?.movement &&
-          actor.owner === world.playerOwner &&
+          collectsLoot(economy, actor.owner, loot) &&
           near(actor, point),
       )
-    )
-      continue;
+      .sort(nearestTo(point))[0];
+    if (!collector) continue;
     loot.collected = true;
-    credit(economy, world.playerOwner, lootResource(loot), lootAmount(loot));
+    credit(economy, collector.owner, lootResource(loot), lootAmount(loot));
   }
 }

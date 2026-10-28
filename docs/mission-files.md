@@ -76,8 +76,8 @@ can be read, edited by hand, and loaded again.
 - `state.owners` lists the participants that control actors, each with an
   `id` and an optional `faction` the participant plays. That faction selects
   the player's labels, prices, and music; it does not limit control.
-- `state.playerOwner` names the owner the player controls and whose
-  exploration the fog records. Owner IDs are distinct.
+- `state.playerOwner` names the owner the player controls. Owner IDs are
+  distinct.
 - Every actor and wreck has an `owner` naming one of `state.owners`.
 - `state.relationships` lists allied and hostile pairs as `{ "owners": [a,
   b], "relationship": "allied" | "hostile" }`; every other pair is neutral.
@@ -108,11 +108,11 @@ can be read, edited by hand, and loaded again.
 - Harvesters deliver only to their owner's Refineries and Cultivators tend
   and deliver only to their owner's buildings, including when restoring saved
   assignments. Deliveries credit the worker's owner.
-- With `fog`, every owner sees what its own and its allies' actors see. Only
-  the player owner keeps explored terrain, which remains after an alliance
-  ends. Harvesters choose sites from their owner's known tiles: explored
-  terrain for the player, current vision for other owners. Without `fog`,
-  every owner sees everything.
+- With `fog`, every owner sees what its own and its allies' actors see and
+  keeps the terrain it explored, which remains after an alliance ends.
+  Harvesters choose explored sites using last-seen yields and investigate
+  unknown yields. Placement checks footprints against the owner's explored
+  terrain. Without `fog`, every owner sees everything.
 - Placement creates buildings for the issuing owner, and trained units
   inherit their producer's owner. Behaviors cannot change an actor's owner.
 - Scenario authoring assigns each building and unit without an explicit
@@ -157,6 +157,28 @@ can be read, edited by hand, and loaded again.
 - Events fire in authored order at the end of the tick their trigger first
   holds, and take effect from the next tick. A defeat stops them.
 
+## Observations
+
+- `state.observations` maps owner IDs to what each owner remembers, as
+  `{ "actors": [], "sites": [], "loot": [] }`; an owner without an entry has
+  seen nothing. Each list is in ID order. Every tick ends by updating each
+  owner's memory from its current vision, so loading does not change it.
+- An actor sighting records another, non-allied owner's actor: `actorId`,
+  `definitionId`, `owner`, `worldPosition`, any `tilePlacement`, `health`
+  when damaged, construction `completedTicks` and `totalTicks`, and the
+  `tick` it was last seen. Payment and queue slots stay private.
+- Sightings follow the
+  [memory rules](../DESIGN.md#fog-stealth-and-detection): seeing the actor
+  again refreshes them, and seeing a building's footprint empty or a unit's
+  wreck removes them. An alliance clears and suspends memory of its partner.
+- A site sighting records `siteId`, last-seen `amount` (Materials left or the
+  renewable reserve in thousandths), `dormant: true` when dormant, and
+  `tick`. A loot sighting records `lootId` and `tick` for uncollected loot,
+  and is removed when the owner sees its tile without it.
+- Saved sightings must name active or retired actors and valid resources.
+  Positions, footprints, health, construction progress, and yields must fit
+  the referenced definitions, map, and site limits.
+
 ## Economy state
 
 - `state.economy.stockpiles` lists balances as `{ "resource": "materials" |
@@ -182,7 +204,8 @@ can be read, edited by hand, and loaded again.
   At most one worker tends each building.
 - Each `economy.loot` entry has exactly one positive `materials` or
   `lifebloom` reward and a saved `collected` flag. Some owner must hold that
-  resource. Pickups credit the player's stockpile once. Materials and
+  resource. A pickup credits the collecting unit's owner once, under the
+  [loot rule](../DESIGN.md#ownership-and-relationships). Materials and
   Lifebloom share the gift model and pickup rules.
 - Paid construction and production save `paidCost`; their actor definition
   identifies its currency. Buildings save `headquartersId` on the actor,
@@ -204,8 +227,9 @@ like the minimap.
 - `terrain.tiles` has one string per row and one legend character per tile.
 - `terrain.heights` has one number array per row of tile corners, so it has
   one more row and column than `tiles`.
-- `fog.explored` uses `1` for explored tiles. Removing `fog` reveals the whole
-  map.
+- `fog.explored` maps owner IDs to rows that use `1` for explored tiles. An
+  owner without rows has explored nothing. Removing `fog` reveals the whole
+  map to every owner.
 
 ## Positions
 

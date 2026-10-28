@@ -4,6 +4,7 @@ import {
 } from "../simulation/cultivation";
 import {
   harvestingStalled,
+  collectsLoot,
   lootAmount,
   lootResource,
   refineryOccupied,
@@ -69,13 +70,13 @@ const CULTIVATOR_PHASES: Record<
   blocked: "Route blocked",
 };
 
-/** Explored sites sharing a name form one patch, shown by its first site. */
-function patches(economy: EconomyView, explored: (tile: TileCoord) => boolean) {
+/** Known sites sharing a name form one patch, shown by its first site. */
+function patches(economy: EconomyView) {
   const byName = new Map<
     string,
     { site: EconomyView["sites"][number]; remaining: number }
   >();
-  for (const site of economy.sites.filter((site) => explored(site.tile))) {
+  for (const site of economy.sites) {
     const patch = byName.get(site.name);
     if (patch) patch.remaining += site.remainingMaterials;
     else byName.set(site.name, { site, remaining: site.remainingMaterials });
@@ -89,7 +90,6 @@ export function createEconomyControls(
   simulation: Pick<
     MissionSimulation,
     | "actors"
-    | "economy"
     | "playerOwner"
     | "playerFaction"
     | "tickSeconds"
@@ -104,8 +104,8 @@ export function createEconomyControls(
     queueMode?: () => boolean;
     canControl?: (actor: ActorRenderState) => boolean;
     focus: (tile: TileCoord) => void;
-    /** Undiscovered sites and salvage stay unlisted. */
-    explored: (tile: TileCoord) => boolean;
+    /** Sites and salvage as the player last saw them; others stay unlisted. */
+    economy: () => EconomyView | undefined;
     positionForTile: (tile: TileCoord) => WorldPosition;
   },
 ) {
@@ -209,14 +209,14 @@ export function createEconomyControls(
   let lastResult = "";
   return {
     refresh: () => {
-      const economy = simulation.economy!;
+      const economy = options.economy()!;
       const id = options.selectedActorId();
       const actors = new Map(
         simulation.actors.map((actor) => [actor.id, actor]),
       );
       const selected = id ? actors.get(id) : undefined;
       const actor = selected && canControl(selected) ? selected : undefined;
-      const resourcePatches = patches(economy, options.explored);
+      const resourcePatches = patches(economy);
       const definition = actor && definitions.get(actor.definitionId);
       const worker =
         actor &&
@@ -225,8 +225,7 @@ export function createEconomyControls(
       const cultivating = cultivation?.workers.find(
         (worker) => worker.actorId === actor?.id,
       );
-      const cultivationSites =
-        cultivation?.sites.filter((site) => options.explored(site.tile)) ?? [];
+      const cultivationSites = cultivation?.sites ?? [];
       const enabled = options.enabled();
       const disconnected = disconnectedBuildings(simulation.support);
       const refineries = simulation.actors.filter(
@@ -432,26 +431,29 @@ export function createEconomyControls(
           disabled: !enabled,
           action: () => options.focus(site.tile),
         })),
-        ...economy.loot
-          .filter((cache) => !cache.collected && options.explored(cache.tile))
-          .map((cache) => ({
+        ...economy.loot.map((cache) => {
+          const collector =
+            mobile && collectsLoot(economy, simulation.playerOwner, cache)
+              ? mobile
+              : undefined;
+          return {
             key: `loot:${cache.id}`,
-            text: `${mobile ? "Collect" : "Show"} ${lootResource(cache) === "materials" ? "salvage" : cache.name} (+${lootAmount(cache)} ${resourceName(lootResource(cache))})`,
+            text: `${collector ? "Collect" : "Show"} ${lootResource(cache) === "materials" ? "salvage" : cache.name} (+${lootAmount(cache)} ${resourceName(lootResource(cache))})`,
             disabled: !enabled,
             action: (shiftKey: boolean) => {
               options.focus(cache.tile);
-              if (mobile) {
+              if (collector)
                 submit(
                   {
                     kind: "move",
-                    actorId: mobile.id,
+                    actorId: collector.id,
                     target: options.positionForTile(cache.tile),
                   },
                   shiftKey,
                 );
-              }
             },
-          })),
+          };
+        }),
       ]);
       sync(
         element("production-queue"),

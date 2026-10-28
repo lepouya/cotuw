@@ -210,6 +210,9 @@ story.
 - Vision, exploration, observations, and private economic and queue state are
   scoped by owner. Other owners' actors are inspected through detection rules;
   sharing a service does not grant command authority over their actors or jobs.
+- Loot pays its whole reward once to the owner of the nearest mobile unit
+  reaching it, with stable actor IDs breaking ties. Owners holding no
+  stockpile of its resource, such as wildlife, cannot collect it.
 - Objectives identify relevant owners independently of faction type. A rule
   may also restrict faction types or name specific actor IDs. Skirmish result
   conditions, including rebuilt headquarters, are specified separately.
@@ -993,6 +996,13 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   frontier. Zooming out still shows only darkness beyond explored terrain.
 - Move orders may enter unexplored terrain. Building footprints and rally
   points must be explored.
+- Every owner keeps its own explored terrain and a saved memory of what it
+  has seen. It remembers non-allied actors at their last-seen state and tick:
+  a building until its footprint is seen empty, and a unit until it is seen
+  again or its remains are seen. Units that leave sight and unobserved
+  destruction leave stale reports. Resource sites keep their last-seen
+  yields, and loot stays known until its tile is seen without it. Player
+  presentation of sites and loot uses this memory.
 - Concealment categories are **Exposed**, **Camouflaged**, **Cloaked**, and the
   layer-derived **Subterranean** category.
 - Detection has no levels. It matches authored signature type, concealment
@@ -1381,8 +1391,8 @@ Deterministic acceptance checks cover:
   Completed buildings sell for half their prototype cost multiplied by their
   health fraction, rounded down; mobile units cannot be sold.
 - The near patch contains four 200-Materials tiles; the south patch contains
-  two. Three ordinary salvage tiles each grant 25 Materials to the first
-  player-owned mobile unit reaching them, without a delivery. One lies near
+  two. Three ordinary salvage tiles each grant 25 Materials to the owner of
+  the first mobile unit reaching them, without a delivery. One lies near
   the base at (25, 52). Two lie beyond the lone wolf at (54, 32) and (56, 34),
   providing 50 Materials for two replacement Troopers before the den.
   Resource tiles and uncollected salvage prevent placement. Depleted tiles

@@ -1,147 +1,30 @@
 import { describe, expect, test } from "vitest";
-import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import {
   advanceSeconds,
   balance,
   stockpiles,
   untilSeconds,
 } from "./helpers/scenario";
-import { createMissionSimulation } from "../src/simulation/mission";
+import {
+  at,
+  contentMap,
+  fixture,
+  rivals,
+  TICK_SECONDS,
+  unit,
+} from "./helpers/rivals";
 import { secondsToTicks } from "../src/simulation/clock";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
-import { OccupancyGrid } from "../src/simulation/occupancy";
-import {
-  createScenarioState,
-  defineScenario,
-} from "../src/simulation/scenario";
 import { disconnectedBuildings } from "../src/simulation/support";
-import { TerrainGrid } from "../src/simulation/terrain";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
-
-import type { ScriptControl } from "../src/simulation/authority";
-import type { MissionEventDefinition } from "../src/simulation/events";
 import { regroupStockpiles } from "../src/simulation/stockpiles";
+
+import type { Setup } from "./helpers/rivals";
 import type {
   EconomyState,
   EconomyView,
   MaterialsSite,
 } from "../src/simulation/economy";
 import type { MissionState } from "../src/simulation/mission";
-import type { ObjectiveDefinition } from "../src/simulation/objectives";
-import type { OwnerRelationship } from "../src/simulation/ownership";
-import type { ActorPlacement } from "../src/simulation/placement";
-import type { ScenarioUnit } from "../src/simulation/scenario";
-
-const TICK_SECONDS = 0.1;
-const mapOptions = {
-  width: 60,
-  height: 20,
-  tileSize: 1,
-  terrainTypeIds: ["plain", "path", "rough", "water"],
-};
-const contentMap = new TerrainGrid(mapOptions);
-
-type Setup = {
-  units?: ScenarioUnit[];
-  buildings?: (ActorPlacement & { owner?: string })[];
-  relationships?: OwnerRelationship[];
-  events?: MissionEventDefinition[];
-  objectives?: ObjectiveDefinition[];
-  sites?: MaterialsSite[];
-  scriptControl?: ScriptControl[];
-  /** Starts with every tile explored, so placement ignores fog. */
-  explored?: boolean;
-  edit?: (state: MissionState) => void;
-};
-
-function scenario({
-  units = [],
-  buildings = [],
-  relationships = [],
-  events,
-  objectives,
-  scriptControl,
-  sites = [],
-}: Setup) {
-  return defineScenario({
-    id: "relationships",
-    tileSize: 1,
-    terrainTypeIds: mapOptions.terrainTypeIds,
-    terrain: contentMap.terrainState(),
-    owners: [
-      { id: "player", faction: "arc" },
-      { id: "rival", faction: "arc" },
-    ],
-    playerOwner: "player",
-    relationships,
-    events,
-    objectives,
-    scriptControl,
-    buildings,
-    units,
-    stockpiles: [
-      ...stockpiles(1000),
-      ...stockpiles(1000, "materials", "rival"),
-    ],
-    sites,
-    loot: [],
-  });
-}
-
-function fixture(setup: Setup = {}, state?: MissionState) {
-  const content = scenario(setup);
-  const initial = state ?? createScenarioState(content, ARC_ACTOR_DEFINITIONS);
-  if (!state && setup.explored)
-    initial.fog = { explored: "1".repeat(initial.fog!.explored.length) };
-  setup.edit?.(initial);
-  const map = new TerrainGrid(mapOptions);
-  const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
-    state: initial,
-    objectives: content.objectives,
-    events: content.events,
-    scriptControl: content.scriptControl,
-    definitions: ARC_ACTOR_DEFINITIONS,
-    map,
-    occupancy,
-    tickSeconds: TICK_SECONDS,
-    bounds: map.worldBounds,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, [
-          {
-            id: "surface-ground",
-            maxSlope: 0.75,
-            slopeCostAtLimit: 2,
-            terrainCosts: { plain: 1, path: 1, rough: 2, water: null },
-          },
-        ]),
-      ],
-      ["idle", { handleCommand: () => false, update: () => {} }],
-    ]),
-  });
-  return { simulation, content };
-}
-
-const unit = (
-  actorId: string,
-  x: number,
-  owner = "player",
-  definitionId = "arc-trooper",
-): ScenarioUnit => ({ actorId, definitionId, owner, tile: { x, z: 10 } });
-
-const at = (seconds: number, actions: MissionEventDefinition["actions"]) => ({
-  id: `at-${seconds}`,
-  trigger: { kind: "time" as const, seconds },
-  actions,
-});
-
-const rivals = (relationship: "allied" | "neutral" | "hostile") => ({
-  kind: "set-relationship" as const,
-  owners: ["player", "rival"] as [string, string],
-  relationship,
-});
 
 describe("owner relationships", () => {
   test("neutral owners neither engage nor accept Attack orders", () => {

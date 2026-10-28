@@ -39,11 +39,18 @@ export function exploredScenarioState(
   ...args: Parameters<typeof createScenarioState>
 ): MissionState {
   const state = createScenarioState(...args);
-  return {
-    ...state,
-    fog: { explored: "1".repeat(state.fog!.explored.length) },
-  };
+  return { ...state, fog: exploredFog(state) };
 }
+
+/** Fog in which every owner has explored the whole map. */
+export const exploredFog = ({
+  owners,
+  terrain,
+}: Pick<MissionState, "owners" | "terrain">) => ({
+  explored: Object.fromEntries(
+    owners.map(({ id }) => [id, "1".repeat(terrain!.width * terrain!.height)]),
+  ),
+});
 
 /** Submits one command and returns its outcome from the next tick. */
 export function command(

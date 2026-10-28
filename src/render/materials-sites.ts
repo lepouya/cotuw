@@ -157,28 +157,34 @@ export function createMaterialsSitesView(
     setSalvage: (salvage: ModelAsset) => swap(loot, salvage, showGift),
     lootTileForMesh: (mesh: AbstractMesh | null) =>
       mesh?.isEnabled() ? lootTiles.get(mesh) : undefined,
-    /** Hides resources on tiles the player has not explored. */
-    update: (economy: EconomyView, explored: (tile: TileCoord) => boolean) => {
-      for (const site of economy.sites) {
-        const { root } = sites.get(site.id)!;
-        root.setEnabled(site.remainingMaterials > 0 && explored(site.tile));
+    /** Shows only the sites and loot `economy` lists, as the player knows them. */
+    update: (economy: EconomyView) => {
+      const listed = new Map(economy.sites.map((site) => [site.id, site]));
+      for (const [id, { root }] of sites) {
+        const site = listed.get(id);
+        root.setEnabled(!!site && site.remainingMaterials > 0);
+        if (!site) continue;
         const fraction = site.remainingMaterials / site.initialMaterials;
         const stage = stages.find(({ above }) => fraction > above);
         root.scaling.setAll(stage?.scale ?? 0);
       }
-      for (const site of economy.cultivation?.sites ?? []) {
-        const marker = cultivation.get(site.id)!;
-        marker.root.setEnabled(explored(site.tile));
+      const growing = new Map(
+        (economy.cultivation?.sites ?? []).map((site) => [site.id, site]),
+      );
+      for (const [id, marker] of cultivation) {
+        const site = growing.get(id);
+        marker.root.setEnabled(!!site);
+        if (!site) continue;
         marker.root.scaling.setAll(
           site.dormant ? 0.65 : 0.8 + (0.2 * site.reserve) / site.capacity,
         );
         for (const mesh of hierarchyMeshes(marker.model.root))
           mesh.visibility = site.dormant ? 0.45 : 1;
       }
-      for (const cache of economy.loot)
-        loot
-          .get(cache.id)!
-          .root.setEnabled(!cache.collected && explored(cache.tile));
+      const caches = new Set(
+        economy.loot.filter((cache) => !cache.collected).map(({ id }) => id),
+      );
+      for (const [id, { root }] of loot) root.setEnabled(caches.has(id));
     },
     animate: (seconds: number) => {
       for (const { root, model } of cultivation.values())

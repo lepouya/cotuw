@@ -193,6 +193,6 @@ export function createScenarioState(
     scenarioId: scenario.id,
     terrain: structuredClone(terrain),
     ...(economy && { economy }),
-    fog: createFogState(terrain.width, terrain.height),
+    fog: createFogState(),
   };
 }

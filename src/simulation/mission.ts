@@ -69,11 +69,16 @@ import type {
 } from "./objectives";
 import { resolveNavigationDestination } from "./navigation";
 import {
-  createFog,
   createOwnerVision,
   isValidFogState,
   validateVisionDefinition,
 } from "./vision";
+import {
+  observeAll,
+  siteLocations,
+  validateObservations,
+} from "./observations";
+import type { ObservationState, OwnerKnowledge } from "./observations";
 import {
   applyEconomyCommand as applyEconomy,
   enrollWorker,
@@ -222,12 +227,14 @@ export type MissionState = {
   /** The mission's simulation terrain; absent until the first snapshot. */
   terrain?: TerrainState;
   economy?: EconomyState;
-  /** The player's explored terrain; absent when the whole map is known. */
+  /** Each owner's explored terrain; absent when the whole map is known. */
   fog?: FogState;
+  /** Each owner's memory of other owners' actors and of resources. */
+  observations: ObservationState;
   scenarioId?: string;
   /** Participants that control actors, in authored order. */
   owners: Owner[];
-  /** The owner the player controls, whose exploration the fog records. */
+  /** The owner the player controls. */
   playerOwner: string;
   /** Pairs that are allied or hostile; every other pair is neutral. */
   relationships: OwnerRelationship[];
@@ -256,6 +263,7 @@ export function createMissionState(
     retiredActorIds: [],
     owners: structuredClone([...owners]),
     playerOwner,
+    observations: {},
     relationships: [],
     firedEvents: [],
     wrecks: [],
@@ -303,7 +311,7 @@ export type MissionSimulation = {
   readonly tickSeconds: number;
   readonly economy: EconomyView | undefined;
   readonly support: SupportView | undefined;
-  /** Explored and visible terrain; absent when the whole map is known. */
+  /** The player's explored and visible terrain; absent without fog. */
   readonly fog: FogView | undefined;
   readonly owners: readonly Owner[];
   readonly playerOwner: string;
@@ -323,6 +331,8 @@ export type MissionSimulation = {
   detects: (owner: string, actor: Detectable) => boolean;
   /** Whether an owner currently sees the tile under a point. */
   sees: (owner: string, point: WorldPosition) => boolean;
+  /** What an owner may know of the world beyond its own actors and economy. */
+  knowledgeOf: (owner: string) => OwnerKnowledge;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /**
@@ -436,11 +446,14 @@ export function createMissionSimulation({
     throw new Error("Mission state has terrain but no map to restore.");
   }
   delete state.terrain;
+  const ownerIds = validateOwners(state.owners, state.playerOwner);
   const savedFog = state.fog;
   delete state.fog;
-  if (savedFog !== undefined && (!map || !isValidFogState(savedFog, map)))
+  if (
+    savedFog !== undefined &&
+    (!map || !isValidFogState(savedFog, map, ownerIds))
+  )
     throw new RangeError("Mission state has invalid fog.");
-  const ownerIds = validateOwners(state.owners, state.playerOwner);
   if (state.commands.some(({ issuer }) => !isCommandIssuer(issuer, ownerIds)))
     throw new RangeError("Mission state has invalid queued commands.");
   const authority = createCommandAuthority(scriptControl, ownerIds);
@@ -491,6 +504,19 @@ export function createMissionSimulation({
   if (state.economy)
     validateEconomy(state.economy, state.actors, state.retiredActorIds);
   if (state.economy) deepFreeze(state.economy);
+  validateObservations(state.observations, {
+    ownerIds,
+    actorIds: new Set([
+      ...state.actors.map(({ id }) => id),
+      ...state.retiredActorIds,
+    ]),
+    definitions: definitionsById,
+    economy: state.economy,
+    tick: state.tick,
+    bounds: worldBounds,
+    map,
+    tickSeconds,
+  });
   const supportResolver = createSupportResolver(definitionsById);
   const supportFor = (actors: readonly Actor[]) =>
     supportResolver(actors, relations.sharesSupport);
@@ -1017,23 +1043,53 @@ export function createMissionSimulation({
     map && occupancy
       ? map.addEditRule((edit) => occupancy.allowsTerrainEdit(edit))
       : undefined;
-  // Fog requires a map, which the saved-fog check above ensures.
-  const fog = savedFog && createFog(map!, savedFog);
   const ownerVision = createOwnerVision({
     map,
-    fog,
-    owners: state.owners,
-    playerOwner,
+    fog: savedFog,
+    ownerIds,
     definitions: definitionsById,
   });
-  const updateFog = () =>
+  const { sees, seesTile, detects } = ownerVision;
+  /** Derives vision, then records what each owner now sees. */
+  const updateKnowledge = () => {
     ownerVision.update(
       state.actors,
       state.economy && supportFor(state.actors),
       relations.sharesVision,
     );
-  updateFog();
-  const { sees, detects } = ownerVision;
+    state = {
+      ...state,
+      observations: deepFreeze(
+        observeAll(state.observations, ownerIds, {
+          tick: state.tick,
+          actors: state.actors,
+          wrecks: state.wrecks,
+          economy: state.economy,
+          detects,
+          seesTile,
+          sharesVision: relations.sharesVision,
+        }),
+      ),
+    };
+  };
+  updateKnowledge();
+  // Sites are authored and fixed for the mission.
+  const sites = deepFreeze(siteLocations(state.economy));
+  const knowledge = new Map(
+    [...ownerIds].map((owner): [string, OwnerKnowledge] => [
+      owner,
+      {
+        owner,
+        fog: ownerVision.fogOf(owner),
+        knowsTile: (tile) => ownerVision.knowsTile(owner, tile),
+        seesTile: (tile) => seesTile(owner, tile),
+        sites,
+        get observations() {
+          return state.observations[owner]!;
+        },
+      },
+    ]),
+  );
   const wreckTicks = secondsToTicks(WRECK_SECONDS, tickSeconds);
   /** Footprint tiles under building debris, rebuilt when wrecks change. */
   const debrisFor = (wrecks: readonly Wreck[]) =>
@@ -1519,7 +1575,7 @@ export function createMissionSimulation({
       return state.economy;
     },
     get fog() {
-      return fog;
+      return ownerVision.fogOf(playerOwner);
     },
     owners: state.owners,
     playerOwner,
@@ -1544,6 +1600,11 @@ export function createMissionSimulation({
     },
     detects,
     sees,
+    knowledgeOf: (owner) => {
+      const view = knowledge.get(owner);
+      if (!view) throw new RangeError(`Unknown owner: ${owner}.`);
+      return view;
+    },
     actorById: (id) => {
       const actor = actorsById.get(id);
       return actor && structuredClone(actor);
@@ -1653,7 +1714,7 @@ export function createMissionSimulation({
         occupancy!.place(footprint);
       }
       actorVersion += 1;
-      updateFog();
+      updateKnowledge();
     },
     removeActor: (id) => {
       ensureMutable();
@@ -1670,7 +1731,7 @@ export function createMissionSimulation({
       };
       actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
       actorVersion += 1;
-      updateFog();
+      updateKnowledge();
       return true;
     },
     snapshot: () => {
@@ -1682,7 +1743,8 @@ export function createMissionSimulation({
       if (map) {
         snapshot.terrain = map.terrainState();
       }
-      if (fog) snapshot.fog = fog.state();
+      const fog = ownerVision.state();
+      if (fog) snapshot.fog = fog;
       return snapshot;
     },
     dispose: () => {
@@ -1801,10 +1863,15 @@ export function createMissionSimulation({
           if (working.economy)
             updateEconomy(working.economy, {
               actors: working.actors,
-              playerOwner,
               sharesHeadquarters: relations.sharesHeadquarters,
               emergencyHeadquarters,
               knowsTile: ownerVision.knowsTile,
+              knownMaterials: (owner, site) =>
+                seesTile(owner, site.tile)
+                  ? site.remainingMaterials
+                  : state.observations[owner]!.sites.find(
+                      ({ siteId }) => siteId === site.id,
+                    )?.amount,
               definitions: definitionsById,
               behaviors: behaviorsById,
               map: map!,
@@ -1918,7 +1985,7 @@ export function createMissionSimulation({
         if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
         if (nextRelations) relations = nextRelations;
-        updateFog();
+        updateKnowledge();
         return outcomes;
       } catch (error) {
         faulted = true;

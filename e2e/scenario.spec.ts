@@ -67,7 +67,7 @@ test("building visibility follows fog in a mission without an economy", async ({
         { id: "rival", faction: "arc" },
       ],
       playerOwner: "player",
-      fog: { explored: "0".repeat(map.width * map.height) },
+      fog: { explored: {} },
     };
     const canvas = document.createElement("canvas");
     const minimap = document.createElement("canvas");

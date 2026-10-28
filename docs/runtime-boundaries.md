@@ -36,6 +36,16 @@ These contracts describe where new behaviors, views, and services attach.
   only paths through owners they share with. Shared coverage requires access
   to both the covering node and its supplying root; presentation uses the
   same owner-specific projection.
+- Simulation rules read actor owners and relationships, not the player owner.
+  The exception records the player's perspective: authored objectives decide
+  the player's victory or defeat. A defeat freezes the whole mission and
+  stops events.
+- `simulation/observations.ts` owns each owner's memory and `knowledgeOf`,
+  the boundary for what an owner may know beyond its own actors and economy:
+  authored site locations, its explored terrain and vision, and its
+  sightings. AI planning reads only this view. Player presentation shows
+  sites and loot through `knownEconomy`, so others' unseen gathering and
+  pickups stay hidden until the player looks again.
 
 ## Economy, infrastructure, and growth
 
@@ -75,8 +85,9 @@ These contracts describe where new behaviors, views, and services attach.
   work and queued orders while selecting a replacement drop-off.
 - Workers tend and deliver only to their owner's buildings; training inherits
   the producer's owner.
-  Resource-site knowledge follows the worker owner's vision, with explored
-  terrain retained only for the player.
+  Harvesters choose explored sites using their owner's last-seen yields.
+  Unknown yields can be investigated; unseen depletion does not cancel a
+  route. Gathering uses the actual yield once the worker reaches the site.
 
 ## Resource ownership
 

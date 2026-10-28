@@ -1,8 +1,11 @@
+import { knownEconomy } from "./observations";
 import { createPlayerAccess } from "./ownership";
 import { isMobileActor, isTilePlacedActor } from "./placement";
 
 import type { ActorDefinition, ActorRenderState } from "./actor";
+import type { EconomyView } from "./economy";
 import type { MissionSimulation } from "./mission";
+import type { OwnerKnowledge } from "./observations";
 
 /**
  * The player's ownership and fog-limited view of committed actors. Lookups
@@ -11,7 +14,12 @@ import type { MissionSimulation } from "./mission";
 export function createPlayerView(
   simulation: Pick<
     MissionSimulation,
-    "actors" | "playerOwner" | "relations" | "detects"
+    | "actors"
+    | "economy"
+    | "playerOwner"
+    | "relations"
+    | "detects"
+    | "knowledgeOf"
   >,
   definitions: ReadonlyMap<string, ActorDefinition>,
 ) {
@@ -42,6 +50,23 @@ export function createPlayerView(
       grouped = group(simulation.actors);
     return grouped;
   };
+  let known:
+    | {
+        live: EconomyView;
+        observations: OwnerKnowledge["observations"];
+        view: EconomyView;
+      }
+    | undefined;
+  /** The economy with sites and loot as the player last saw them. */
+  const economy = () => {
+    const live = simulation.economy;
+    if (!live) return undefined;
+    const { observations } = simulation.knowledgeOf(simulation.playerOwner);
+    // Both are replaced, never mutated, when they change.
+    if (known?.live !== live || known.observations !== observations)
+      known = { live, observations, view: knownEconomy(live, observations) };
+    return known.view;
+  };
   const actor = (id: string | undefined) =>
     id === undefined ? undefined : actors().byId.get(id);
   /** The committed actor with this ID, if it passes `keep`. */
@@ -55,6 +80,7 @@ export function createPlayerView(
     ...access,
     isMobile,
     actors,
+    economy,
     actor,
     shownActor: actorIf(access.shows),
     ownActor: actorIf(access.owns),

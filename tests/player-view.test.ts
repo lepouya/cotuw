@@ -43,6 +43,10 @@ function fixture() {
     seen: new Set<string>(),
     detects: (_owner: string | undefined, target: Detectable) =>
       simulation.seen.has(target.id!),
+    economy: undefined,
+    knowledgeOf: () => {
+      throw new Error("No economy to know.");
+    },
   };
   return { simulation, player: createPlayerView(simulation, definitions) };
 }

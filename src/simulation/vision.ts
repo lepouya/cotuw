@@ -1,10 +1,10 @@
 import { occupiedTilesFor } from "./placement";
 import { disconnectedBuildings } from "./support";
 import { terrainSightlineClear } from "./terrain-sightline";
-import { isPositive } from "./validation";
+import { hasOwn, isPositive, isRecord } from "./validation";
 
 import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
-import type { Detectable, Owner } from "./ownership";
+import type { Detectable } from "./ownership";
 import type { TileCoord } from "./grid";
 import type { SupportView } from "./support";
 import type { TerrainGrid } from "./terrain";
@@ -19,8 +19,11 @@ const MAX_CACHED_VIEWPOINTS = 4096;
 
 /** Serializable fog memory; current vision is derived from actors. */
 export type FogState = {
-  /** One `0` or `1` per tile, row by row from the south-west corner. */
-  explored: string;
+  /**
+   * Each owner's explored terrain: one `0` or `1` per tile, row by row from
+   * the south-west corner. Owners without an entry have explored nothing.
+   */
+  explored: Record<string, string>;
 };
 
 /** Tiles a faction currently sees, without memory. */
@@ -45,7 +48,8 @@ export type FogView = VisionView & {
 export type Fog = FogView & {
   /** Replaces current vision and adds it to explored terrain. */
   update: (sources: readonly VisionSource[]) => void;
-  state: () => FogState;
+  /** The explored tiles in `FogState` form. */
+  explored: () => string;
   dispose: () => void;
 };
 
@@ -57,16 +61,23 @@ export function validateVisionDefinition(definition: ActorDefinition) {
     throw new RangeError(`Invalid vision definition: ${definition.id}.`);
 }
 
-export function createFogState(width: number, height: number): FogState {
-  return { explored: "0".repeat(width * height) };
-}
+export const createFogState = (): FogState => ({ explored: {} });
 
-export function isValidFogState(state: unknown, map: TerrainGrid): boolean {
-  const explored = (state as Partial<FogState> | null)?.explored;
+export function isValidFogState(
+  state: unknown,
+  map: TerrainGrid,
+  ownerIds: ReadonlySet<string>,
+): state is FogState {
   return (
-    typeof explored === "string" &&
-    explored.length === map.width * map.height &&
-    /^[01]*$/.test(explored)
+    isRecord(state) &&
+    isRecord(state.explored) &&
+    Object.entries(state.explored).every(
+      ([owner, tiles]) =>
+        ownerIds.has(owner) &&
+        typeof tiles === "string" &&
+        tiles.length === map.width * map.height &&
+        /^[01]*$/.test(tiles),
+    )
   );
 }
 
@@ -158,8 +169,8 @@ export function createVision(map: TerrainGrid): Vision {
 }
 
 /** Current vision plus the terrain it has ever revealed. */
-export function createFog(map: TerrainGrid, state: FogState): Fog {
-  const explored = Uint8Array.from(state.explored, (bit) => Number(bit));
+export function createFog(map: TerrainGrid, tiles: string): Fog {
+  const explored = Uint8Array.from(tiles, (bit) => Number(bit));
   let exploredCount = explored.reduce((sum, bit) => sum + bit, 0);
   const vision = createVision(map);
   return {
@@ -183,46 +194,58 @@ export function createFog(map: TerrainGrid, state: FogState): Fog {
         }
       }
     },
-    state: () => ({ explored: explored.join("") }),
+    explored: () => explored.join(""),
     dispose: vision.dispose,
   };
 }
 
 /**
- * Each owner's current vision under fog of war, shared between allies. The
- * player's vision is its fog, which also records exploration. Without fog,
- * every owner sees everything.
+ * Each owner's current vision under fog of war, shared between allies, and
+ * the terrain it has explored. Without fog, every owner sees everything.
  */
 export function createOwnerVision({
   map,
   fog,
-  owners,
-  playerOwner,
+  ownerIds,
   definitions,
 }: {
   map: TerrainGrid | undefined;
-  fog: Fog | undefined;
-  owners: readonly Owner[];
-  playerOwner: string;
+  fog: FogState | undefined;
+  ownerIds: ReadonlySet<string>;
   definitions: ReadonlyMap<string, ActorDefinition>;
 }) {
-  const visions = new Map<string, Fog | Vision>();
-  if (fog)
-    for (const { id } of owners)
-      visions.set(id, id === playerOwner ? fog : createVision(map!));
-  const sees = (owner: string, point: WorldPosition) => {
-    if (!fog) return true;
-    const tile = map!.tileAtWorldPosition(point.x, point.z);
-    return !!visions.get(owner)?.isVisible(tile.x, tile.z);
-  };
+  // Saved fog requires a map, which mission loading checks.
+  const visions = new Map(
+    fog
+      ? [...ownerIds].map((owner) => [
+          owner,
+          createFog(
+            map!,
+            hasOwn(fog.explored, owner)
+              ? fog.explored[owner]!
+              : "0".repeat(map!.width * map!.height),
+          ),
+        ])
+      : [],
+  );
+  const seesTile = (owner: string, { x, z }: TileCoord) =>
+    !fog || !!visions.get(owner)?.isVisible(x, z);
+  const sees = (owner: string, point: WorldPosition) =>
+    !fog || seesTile(owner, map!.tileAtWorldPosition(point.x, point.z));
   return {
     sees,
-    /** Only the player retains explored terrain; other owners know live tiles. */
-    knowsTile: (owner: string, tile: TileCoord) =>
-      !fog ||
-      (owner === playerOwner
-        ? fog.isExplored(tile.x, tile.z)
-        : !!visions.get(owner)?.isVisible(tile.x, tile.z)),
+    seesTile,
+    /** An owner's explored terrain; absent without fog. */
+    fogOf: (owner: string): FogView | undefined => visions.get(owner),
+    /** Explored terrain retained after its vision, or an alliance, ends. */
+    knowsTile: (owner: string, { x, z }: TileCoord) =>
+      !fog || !!visions.get(owner)?.isExplored(x, z),
+    state: (): FogState | undefined =>
+      fog && {
+        explored: Object.fromEntries(
+          [...visions].map(([owner, vision]) => [owner, vision.explored()]),
+        ),
+      },
     /** Whether an owner sees the unit's tile or any of a building's tiles. */
     detects: (owner: string, actor: Detectable) => {
       if (!fog) return true;

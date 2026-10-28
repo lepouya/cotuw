@@ -255,6 +255,7 @@ test.each([
     worker.targetSiteId = worker.activeSiteId = "site";
     const site = state.economy!.sites.find(({ id }) => id === "site")!;
     site.initialMaterials = site.remainingMaterials = capacity + 2;
+    state.observations = {};
     const content = definitions.map((definition) =>
       definition.harvesting
         ? {
@@ -773,7 +774,15 @@ describe("Materials economy", () => {
     expect(balance(simulation)).toBe(25);
   });
 
-  test("salvage ignores another owner's mobile actors", () => {
+  /** Adds a rival ARC owner holding Materials, neutral toward the player. */
+  function rivalFixture() {
+    const state = exploredScenarioState(scenario, definitions);
+    state.owners = [...state.owners, { id: "rival", faction: "arc" }];
+    setBalance(state, 40, "materials", "rival");
+    return fixture(state);
+  }
+
+  test("salvage ignores owners without a stockpile of its resource", () => {
     const { simulation, map } = fixture();
     const worldPosition = map.tileCenter(22, 10);
     simulation.spawnActor(
@@ -799,6 +808,58 @@ describe("Materials economy", () => {
     simulation.tick();
     expect(simulation.economy!.loot[0].collected).toBe(true);
     expect(balance(simulation)).toBe(175);
+  });
+
+  test("salvage credits the collecting owner's stockpile", () => {
+    const { simulation, map } = rivalFixture();
+    simulation.spawnActor(
+      createActor({
+        id: "rival-scout",
+        definitionId: "arc-scout",
+        owner: "rival",
+        worldPosition: map.tileCenter(22, 10),
+      }),
+    );
+    simulation.tick();
+    expect(simulation.economy!.loot[0].collected).toBe(true);
+    expect(balance(simulation, "materials", "rival")).toBe(65);
+    expect(balance(simulation)).toBe(150);
+    expect(deposited(simulation, "materials", "rival")).toBe(0);
+  });
+
+  test.each([
+    {
+      name: "actor ID",
+      rivalOffset: 0,
+      playerOffset: 0,
+      rival: 65,
+      player: 150,
+    },
+    {
+      name: "distance",
+      rivalOffset: 0.2,
+      playerOffset: 0.1,
+      rival: 40,
+      player: 175,
+    },
+  ])("simultaneous collectors resolve by $name", (expected) => {
+    const { simulation, map } = rivalFixture();
+    const center = map.tileCenter(22, 10);
+    for (const [id, owner, dx] of [
+      ["a-rival", "rival", expected.rivalOffset],
+      ["b-player", "player", expected.playerOffset],
+    ] as const)
+      simulation.spawnActor(
+        createActor({
+          id,
+          definitionId: "arc-scout",
+          owner,
+          worldPosition: { x: center.x + dx, z: center.z },
+        }),
+      );
+    simulation.tick();
+    expect(balance(simulation, "materials", "rival")).toBe(expected.rival);
+    expect(balance(simulation)).toBe(expected.player);
   });
 
   test.each<MissionCommand>([
