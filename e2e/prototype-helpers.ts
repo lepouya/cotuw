@@ -167,3 +167,20 @@ export async function importMission(
     buffer: Buffer.from(source),
   });
 }
+
+/**
+ * Runs real tick callbacks for a session under `controlSessionClock`, one
+ * frame per simulated second, then renders.
+ */
+export async function advance(page: Page, seconds: number) {
+  await page.evaluate((seconds) => {
+    const harness = window.sessionHarness;
+    const { scene } = harness.view;
+    for (let i = 0; i < Math.ceil(seconds); i++) {
+      harness.now += 1000 * Math.min(1, seconds - i);
+      scene.onBeforeAnimationsObservable.notifyObservers(scene);
+      scene.onBeforeRenderObservable.notifyObservers(scene);
+    }
+    scene.render();
+  }, seconds);
+}

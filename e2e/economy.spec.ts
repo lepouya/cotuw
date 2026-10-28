@@ -1,6 +1,7 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import {
+  advance,
   collectPageErrors,
   dismissExplanation,
   importMission,
@@ -12,13 +13,6 @@ import {
 import type { Page } from "@playwright/test";
 import type { GameSession } from "../src/session";
 import type { ActorPlacement } from "../src/simulation/placement";
-
-type EconomyHarness = { view: GameSession; now: number };
-declare global {
-  interface Window {
-    economyHarness: EconomyHarness;
-  }
-}
 
 /** Uses real tick callbacks with a controlled clock, so 60 seconds need no wall-time wait. */
 async function controlledOpening(
@@ -45,6 +39,7 @@ async function controlledOpening(
       const missionsPath: string = "/e2e/missions.ts";
       const notificationsPath: string = "/src/ui/notifications.ts";
       const topBarPath: string = "/src/ui/top-bar.ts";
+      const harnessPath: string = "/e2e/harness.ts";
       const { createGameSession } = (await import(
         prototypePath
       )) as typeof import("../src/session");
@@ -111,11 +106,10 @@ async function controlledOpening(
         },
       );
       notifications.setFocus(view.focus);
-      window.economyHarness = { view, now: performance.now() };
-      Object.defineProperty(performance, "now", {
-        configurable: true,
-        value: () => window.economyHarness.now,
-      });
+      const { controlSessionClock } = (await import(
+        harnessPath
+      )) as typeof import("./harness");
+      controlSessionClock(view);
       return view.simulation.actors
         .filter(
           (actor) =>
@@ -144,7 +138,7 @@ test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
   const result = await page.evaluate(async () => {
     const path: string = "/src/mission-loading.ts";
     const { loadMission } = await import(path);
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     view.dismissPopup("support-network");
     let rejected = false;
     try {
@@ -167,7 +161,7 @@ test("paused inspection allows selection but blocks orders and placement", async
   const hiddenSelection = await page.evaluate(async () => {
     const path: string = "/src/simulation/actor.ts";
     const { createActor } = await import(path);
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     view.selectActors(["lone-wolf", "den-alpha-wolf"]);
     const hiddenSelection =
       document.querySelector<HTMLCanvasElement>("#game-canvas")!.dataset
@@ -205,14 +199,14 @@ test("paused inspection allows selection but blocks orders and placement", async
   await page.locator("#build-barracks").dispatchEvent("click");
   expect(
     await page.evaluate(
-      () => window.economyHarness.view.simulation.snapshot().commands,
+      () => window.sessionHarness.view.simulation.snapshot().commands,
     ),
   ).toEqual([]);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-placement-active",
     "false",
   );
-  await page.evaluate(() => window.economyHarness.view.resume());
+  await page.evaluate(() => window.sessionHarness.view.resume());
   await page.locator("#tab-buildings").click();
   await expect(page.locator("#build-barracks")).toBeEnabled();
   await page.locator("#build-barracks").click();
@@ -228,29 +222,12 @@ test("paused inspection allows selection but blocks orders and placement", async
   );
 });
 
-async function advance(page: Page, seconds: number) {
-  await page.evaluate((seconds) => {
-    const harness = window.economyHarness;
-    const steps = Math.ceil(seconds);
-    for (let i = 0; i < steps; i++) {
-      harness.now += 1000 * Math.min(1, seconds - i);
-      harness.view.scene.onBeforeAnimationsObservable.notifyObservers(
-        harness.view.scene,
-      );
-      harness.view.scene.onBeforeRenderObservable.notifyObservers(
-        harness.view.scene,
-      );
-    }
-    harness.view.scene.render();
-  }, seconds);
-}
-
 test("command feedback follows the player issuer and ignores AI and scripts", async ({
   page,
 }) => {
   await controlledOpening(page);
   await page.evaluate(() => {
-    const { simulation } = window.economyHarness.view;
+    const { simulation } = window.sessionHarness.view;
     simulation.spawnActor({
       id: "receipt-scout",
       definitionId: "arc-scout",
@@ -274,7 +251,7 @@ test("command feedback follows the player issuer and ignores AI and scripts", as
   await expect(canvas).toHaveAttribute("data-actor-target", "-30.5,2.5");
   const status = await page.locator("#movement-status").textContent();
   await page.evaluate(() => {
-    const { simulation } = window.economyHarness.view;
+    const { simulation } = window.sessionHarness.view;
     simulation.submitCommand(
       {
         kind: "move",
@@ -309,7 +286,7 @@ test("scouting reveals the mountain den and its larger alpha", async ({
 }, testInfo) => {
   await controlledOpening(page);
   await page.evaluate(() => {
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     view.simulation.spawnActor({
       id: "den-scout",
       definitionId: "arc-scout",
@@ -321,7 +298,7 @@ test("scouting reveals the mountain den and its larger alpha", async ({
   });
   await advance(page, 0.1);
   const revealed = await page.evaluate(() => {
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     view.camera.focusOnTile(78, 23);
     view.selectActor("den-alpha-wolf");
     view.scene.render();
@@ -435,7 +412,7 @@ test("construction order and training cards follow the selected building", async
   await expect(cards).toHaveCount(0);
   await expect(page.locator("#production-status")).toContainText("on the map");
   const select = async (id: string) => {
-    await page.evaluate((id) => window.economyHarness.view.selectActor(id), id);
+    await page.evaluate((id) => window.sessionHarness.view.selectActor(id), id);
     await advance(page, 0.1);
   };
   await select("test-refinery");
@@ -473,7 +450,7 @@ test("recreating economy controls lists only discovered resources once", async (
 test("fog keeps the camera near explored terrain", async ({ page }) => {
   await controlledOpening(page);
   const target = await page.evaluate(() => {
-    const view = window.economyHarness.view;
+    const view = window.sessionHarness.view;
     view.camera.focusOnTile(90, 90);
     const camera = view.scene
       .activeCamera as import("@babylonjs/core").ArcRotateCamera;
@@ -547,7 +524,7 @@ test.describe("hovering salvage", () => {
       ).toHaveCount(0);
       // The salvage starts in unexplored terrain, so scout it first.
       await page.evaluate(() => {
-        const { simulation } = window.economyHarness.view;
+        const { simulation } = window.sessionHarness.view;
         const trooper = simulation.actors.find(
           (actor) => actor.definitionId === "arc-trooper",
         )!;
@@ -569,7 +546,7 @@ test.describe("hovering salvage", () => {
         );
         const { isTerrainPickMesh } = await import(terrainPath);
         const map = prototypeTerrainMap();
-        const view = window.economyHarness.view;
+        const view = window.sessionHarness.view;
         view.engine.stopRenderLoop();
         view.camera.focusOnTile(25, 52);
         const camera = view.scene
@@ -605,7 +582,7 @@ test.describe("hovering salvage", () => {
       else await page.mouse.click(point.x, point.y);
       await advance(page, 0.1);
       const target = await page.evaluate(() => {
-        const simulation = window.economyHarness.view.simulation;
+        const simulation = window.sessionHarness.view.simulation;
         return simulation.actors.find(
           (actor) => actor.definitionId === "arc-trooper",
         )!.movement!.target;
@@ -616,7 +593,7 @@ test.describe("hovering salvage", () => {
       expect(
         await page.evaluate(
           () =>
-            window.economyHarness.view.simulation.economy!.loot[0].collected,
+            window.sessionHarness.view.simulation.economy!.loot[0].collected,
         ),
       ).toBe(true);
     });
@@ -640,8 +617,8 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       contentPath
     )) as typeof import("../src/content/packs");
     const ARC_ACTOR_DEFINITIONS = currentContentPack("base").actors;
-    const snapshot = window.economyHarness.view.simulation.snapshot();
-    window.economyHarness.view.engine.stopRenderLoop();
+    const snapshot = window.sessionHarness.view.simulation.snapshot();
+    window.sessionHarness.view.engine.stopRenderLoop();
     const refinery = snapshot.actors.find(
       (actor) => actor.definitionId === "arc-materials-refinery",
     )!;
@@ -751,7 +728,7 @@ test("worker controls share delivery actions and tolerate missions without culti
     const { currentContentPack } = (await import(
       contentPath
     )) as typeof import("../src/content/packs");
-    const { createHarvesterState } = (await import(
+    const { createHarvesterState, economyForOwner } = (await import(
       workersPath
     )) as typeof import("../src/simulation/economy");
     const { createCultivatorState } = (await import(
@@ -797,7 +774,12 @@ test("worker controls share delivery actions and tolerate missions without culti
           selectedActorId: () => selection,
           enabled: () => true,
           focus: () => {},
-          economy: () => economy,
+          economy: () =>
+            economyForOwner(economy, "player", (id) =>
+              actors.some(
+                (actor) => actor.id === id && actor.owner === "player",
+              ),
+            ),
           positionForTile: () => ({ x: 0, z: 0 }),
         },
       );
@@ -966,7 +948,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
       );
       expect(
         await page.evaluate(() =>
-          window.economyHarness.view.simulation.actors.some(
+          window.sessionHarness.view.simulation.actors.some(
             (actor) => actor.rallyPoint,
           ),
         ),
@@ -983,7 +965,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     );
     expect(
       await page.evaluate(
-        () => !!window.economyHarness.view.scene.getMeshByName("rally-point"),
+        () => !!window.sessionHarness.view.scene.getMeshByName("rally-point"),
       ),
     ).toBe(true);
     await testInfo.attach(`rally-${name}`, {
@@ -993,7 +975,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     await action(page, "#train-harvester", touch);
     await advance(page, 15);
     const result = await page.evaluate(() => {
-      const simulation = window.economyHarness.view.simulation;
+      const simulation = window.sessionHarness.view.simulation;
       return {
         position: simulation.actors.find(
           (actor) => actor.definitionId === "arc-harvester",
@@ -1008,7 +990,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     await advance(page, 0.1);
     expect(
       await page.evaluate(
-        () => !!window.economyHarness.view.scene.getMeshByName("rally-point"),
+        () => !!window.sessionHarness.view.scene.getMeshByName("rally-point"),
       ),
     ).toBe(false);
   });
@@ -1021,12 +1003,12 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   await place(page, "#build-barracks", 16, 50);
   await place(page, "#build-barracks", 22, 50);
   const [bridgeId, remoteId] = await page.evaluate(() =>
-    window.economyHarness.view.simulation.actors
+    window.sessionHarness.view.simulation.actors
       .filter((actor) => actor.definitionId === "arc-field-barracks")
       .map((actor) => actor.id),
   );
   await page.evaluate(
-    (id) => window.economyHarness.view.selectActor(id),
+    (id) => window.sessionHarness.view.selectActor(id),
     remoteId,
   );
   await advance(page, 0.1);
@@ -1034,7 +1016,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   await page.locator("#train-trooper").click();
   await advance(page, 1);
   await page.evaluate(
-    (id) => window.economyHarness.view.selectActor(id),
+    (id) => window.sessionHarness.view.selectActor(id),
     bridgeId,
   );
   await advance(page, 0.1);
@@ -1051,7 +1033,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     .click();
   await page.locator("#alert-toggle").click();
   await page.evaluate(
-    (id) => window.economyHarness.view.selectActor(id),
+    (id) => window.sessionHarness.view.selectActor(id),
     remoteId,
   );
   await advance(page, 0.1);
@@ -1065,20 +1047,20 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   );
   const progress = await page.evaluate(
     () =>
-      window.economyHarness.view.simulation.economy!.production[0]
+      window.sessionHarness.view.simulation.economy!.production[0]
         .completedTicks,
   );
   await advance(page, 10);
   expect(
     await page.evaluate(
       () =>
-        window.economyHarness.view.simulation.economy!.production[0]
+        window.sessionHarness.view.simulation.economy!.production[0]
           .completedTicks,
     ),
   ).toBe(progress);
   expect(
     await page.evaluate(() =>
-      window.economyHarness.view.scene.meshes.some((mesh) =>
+      window.sessionHarness.view.scene.meshes.some((mesh) =>
         mesh.name.endsWith("-offline"),
       ),
     ),
@@ -1104,7 +1086,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     const { createTilePlacedActor } = (await import(
       placementPath
     )) as typeof import("../src/simulation/placement");
-    const simulation = window.economyHarness.view.simulation;
+    const simulation = window.sessionHarness.view.simulation;
     const replacement = simulation.actors.find(
       (actor) =>
         actor.tilePlacement?.origin.x === 16 &&
@@ -1145,7 +1127,7 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
 }) => {
   await controlledOpening(page);
   const wolfHidden = await page.evaluate(() => {
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     const wolf = view.simulation.actorById("lone-wolf")!;
     const hidden = !view.simulation.detects("player", wolf);
     view.simulation.spawnActor({
@@ -1162,7 +1144,7 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   expect(wolfHidden).toBe(true);
   await advance(page, 2);
   const engaged = await page.evaluate(() => {
-    const { simulation } = window.economyHarness.view;
+    const { simulation } = window.sessionHarness.view;
     return {
       trooper: simulation.actorById("duelist")!.combat?.attack?.targetId,
       wolf: simulation.actorById("lone-wolf")!.combat?.attack?.targetId,
@@ -1171,7 +1153,7 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   expect(engaged).toEqual({ trooper: "lone-wolf", wolf: "duelist" });
   // A shot within the rifle's one-second cooldown flashes at the Trooper.
   const flashed = await page.evaluate(() => {
-    const harness = window.economyHarness;
+    const harness = window.sessionHarness;
     for (let step = 0; step < 40; step++) {
       harness.now += 50;
       harness.view.scene.onBeforeAnimationsObservable.notifyObservers(
@@ -1191,7 +1173,7 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   expect(flashed).toBe(true);
   await advance(page, 12);
   const result = await page.evaluate(() => {
-    const { simulation } = window.economyHarness.view;
+    const { simulation } = window.sessionHarness.view;
     return {
       wolf: simulation.actorById("lone-wolf"),
       health: simulation.actorById("duelist")!.health,
@@ -1202,17 +1184,17 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   expect(result.wrecks).toEqual(["lone-wolf"]);
   expect(result.health).toBeGreaterThan(0);
   expect(result.health).toBeLessThan(100);
-  await page.evaluate(() => window.economyHarness.view.selectActor("duelist"));
+  await page.evaluate(() => window.sessionHarness.view.selectActor("duelist"));
   await expect(page.locator("#selection-health")).toHaveText(
     `Health ${result.health} / 100`,
   );
   await page.evaluate(() =>
-    window.economyHarness.view.simulation.removeActor("duelist"),
+    window.sessionHarness.view.simulation.removeActor("duelist"),
   );
   await advance(page, 0.1);
   expect(
     await page.evaluate(() => {
-      const { view } = window.economyHarness;
+      const { view } = window.sessionHarness;
       return view.scene.getTransformNodeByName("wreck-lone-wolf")!.isEnabled();
     }),
   ).toBe(false);
@@ -1230,7 +1212,7 @@ test("hostile buildings require detection and expose inspection without player c
   ]);
   await advance(page, 0.1);
   const initiallyHidden = await page.evaluate(() => {
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     view.selectActor("starting-command-center");
     return {
       rendered: !!view.scene.getTransformNodeByName(
@@ -1247,7 +1229,7 @@ test("hostile buildings require detection and expose inspection without player c
   await expect(page.locator("#training-options button:visible")).toHaveCount(0);
   await expect(page.locator("#training-options button:enabled")).toHaveCount(0);
   await page.evaluate(() => {
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     const position = { x: 10.5 - 50, z: 50.5 - 50 };
     view.simulation.spawnActor({
       id: "observer",
@@ -1274,7 +1256,7 @@ test("hostile buildings require detection and expose inspection without player c
   await expect(page.locator("#construction-queue button")).toHaveCount(0);
   await expect(page.locator("#production-queue button")).toHaveCount(0);
   const rendered = await page.evaluate(() => {
-    const { view } = window.economyHarness;
+    const { view } = window.sessionHarness;
     document
       .querySelector<HTMLButtonElement>("#remove-building")!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1286,11 +1268,11 @@ test("hostile buildings require detection and expose inspection without player c
   await advance(page, 0.1);
   expect(
     await page.evaluate(
-      () => !!window.economyHarness.view.simulation.actorById("enemy-barracks"),
+      () => !!window.sessionHarness.view.simulation.actorById("enemy-barracks"),
     ),
   ).toBe(true);
   await page.evaluate(() =>
-    window.economyHarness.view.simulation.removeActor("observer"),
+    window.sessionHarness.view.simulation.removeActor("observer"),
   );
   await advance(page, 0.1);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
@@ -1300,7 +1282,7 @@ test("hostile buildings require detection and expose inspection without player c
   expect(
     await page.evaluate(
       () =>
-        !!window.economyHarness.view.scene.getTransformNodeByName(
+        !!window.sessionHarness.view.scene.getTransformNodeByName(
           "tile-placed-actor-starting-command-center-root",
         ),
     ),
@@ -1312,7 +1294,7 @@ test("damaged building sale feedback matches the credited refund", async ({
 }) => {
   await controlledOpening(page);
   await page.evaluate(() => {
-    const { simulation } = window.economyHarness.view;
+    const { simulation } = window.sessionHarness.view;
     const cc = simulation.actorById("starting-command-center")!;
     simulation.removeActor(cc.id);
     simulation.spawnActor({
@@ -1320,7 +1302,7 @@ test("damaged building sale feedback matches the credited refund", async ({
       id: "damaged-command-center",
       health: 1640,
     });
-    window.economyHarness.view.selectActor("damaged-command-center");
+    window.sessionHarness.view.selectActor("damaged-command-center");
   });
   await advance(page, 0.1);
   await expect(page.locator("#remove-building")).toHaveText(
@@ -1337,7 +1319,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
   }, testInfo) => {
     await controlledOpening(page);
     await page.evaluate(() => {
-      const { view } = window.economyHarness;
+      const { view } = window.sessionHarness;
       view.simulation.spawnActor({
         id: "advance-trooper",
         definitionId: "arc-trooper",
@@ -1356,7 +1338,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
     expect(
       await page.evaluate(
         () =>
-          window.economyHarness.view.simulation.actorById("advance-trooper")!
+          window.sessionHarness.view.simulation.actorById("advance-trooper")!
             .attackMove,
       ),
     ).toBeUndefined();
@@ -1372,7 +1354,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
     const destination = await page.evaluate(async () => {
       const path: string = "/e2e/harness.ts";
       const { prototypeTerrainMap } = await import(path);
-      const order = window.economyHarness.view.simulation
+      const order = window.sessionHarness.view.simulation
         .snapshot()
         .commands.find(({ command }) => command.kind === "attack-move");
       if (order?.command.kind !== "attack-move")
@@ -1392,14 +1374,14 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
     expect(
       await page.evaluate(
         () =>
-          window.economyHarness.view.scene.getMeshByName(
+          window.sessionHarness.view.scene.getMeshByName(
             "attack-move-destination",
           ) !== null,
       ),
     ).toBe(true);
     await advance(page, 20);
     const result = await page.evaluate(() => {
-      const { simulation } = window.economyHarness.view;
+      const { simulation } = window.sessionHarness.view;
       const trooper = simulation.actorById("advance-trooper")!;
       return {
         wolf: simulation.actorById("lone-wolf"),

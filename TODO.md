@@ -241,14 +241,21 @@ and bring up the rough skirmish map early for simulation and AI development.
   observed and unobserved destruction, alliances, per-owner exploration,
   site yields, unseen pickups and depletion, saved continuation, malformed
   memory, and owner IDs that match inherited object properties.
-- [ ] **1.20** Keep player alerts, audio, minimap pulses, and sidebar data
+- [x] **1.20** Keep player alerts, audio, minimap pulses, and sidebar data
   limited to the player's own actors and detections. Verify that hidden AI
   activity does not leak through these presentation paths. Browser checks
   cover allied and neutral labels changing with relationships. Sites and loot
   on the map, minimap, and sidebar show the player's last-seen state from
-  1.19, hiding others' unseen gathering and pickups. Hostile markers
-  changing after an event and allied support coverage still need browser
-  integration checks.
+  1.19, hiding others' unseen gathering and pickups. Headless checks cover
+  other owners' attacks, losses, completions, training, blocked routes, and
+  outages raising no alerts or pulses, and unseen production staying silent.
+  A browser check covers an event turning an ally hostile: segmented hostile
+  markers, revoked shared coverage, one outage alert, and silent rival
+  activity beyond the player's vision. Player-view projections exclude other
+  owners' private economy and undetected support nodes. Sidebar inspection
+  follows detection changes independently of actor creation and removal;
+  visible damage triggers combat music even when its source is hidden, and
+  only the player's production queues sound.
 - [ ] **1.21** Review UI ownership and choose the smallest coherent structure
   for feature-owned markup, behavior, styles, and shared layout primitives.
   Record the boundaries before refactoring; retain the locked technical stack.

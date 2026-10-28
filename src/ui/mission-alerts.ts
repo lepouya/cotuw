@@ -26,7 +26,7 @@ export type AlertObservation = {
   wrecks: readonly Wreck[];
   support?: SupportView;
   objectives: readonly ObjectiveView[];
-  /** Economy workers; attacks on them are named and pulsed. */
+  /** The player's economy workers; attacks on them are named and pulsed. */
   workerIds: readonly string[];
   /** Explored renewable sites. */
   sites?: readonly SiteObservation[];

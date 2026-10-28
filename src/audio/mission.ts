@@ -40,7 +40,11 @@ export function createMissionAudio(
     const current = new Map(
       simulation.actors.map((actor) => [actor.id, actor]),
     );
-    const production = simulation.economy?.production ?? [];
+    // Queues are private, so only the player's producers sound their work.
+    const production = (simulation.economy?.production ?? []).filter((job) => {
+      const producer = current.get(job.producerId);
+      return !!producer && access.owns(producer);
+    });
     const heads = new Map<string, Readonly<ProductionJob>>();
     for (const job of production)
       if (!heads.has(job.producerId)) heads.set(job.producerId, job);
@@ -100,7 +104,7 @@ export function createMissionAudio(
         if (target) scene.emit("damage", emitterOf(target));
         if (
           (attacker && access.shows(attacker)) ||
-          (target && access.owns(target))
+          (target && access.shows(target))
         )
           combatUntil = seconds() + combatHoldSeconds;
       }
@@ -112,8 +116,9 @@ export function createMissionAudio(
         const actor = activity.actorId && current.get(activity.actorId);
         if (activity.kind !== "exit" || !actor || previous.has(actor.id))
           continue;
-        startTraining({ actorId: actor.id, producerId: activity.buildingId });
+        // Trained units share their producer's owner.
         if (!access.owns(actor)) continue;
+        startTraining({ actorId: actor.id, producerId: activity.buildingId });
         scene.emit("trained", emitterOf(actor));
         trained = true;
       }

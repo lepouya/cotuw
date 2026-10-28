@@ -104,7 +104,10 @@ export function createEconomyControls(
     queueMode?: () => boolean;
     canControl?: (actor: ActorRenderState) => boolean;
     focus: (tile: TileCoord) => void;
-    /** Sites and salvage as the player last saw them; others stay unlisted. */
+    /**
+     * The player's own workers, production, and balances, with sites and
+     * salvage as the player last saw them.
+     */
     economy: () => EconomyView | undefined;
     positionForTile: (tile: TileCoord) => WorldPosition;
   },
@@ -465,13 +468,7 @@ export function createEconomyControls(
             submit({ kind: "cancel-production", actorId: job.actorId }),
         })),
       );
-      const controlled = (id: string) => {
-        const actor = actors.get(id);
-        return !!actor && canControl(actor);
-      };
-      const harvesters = economy.harvesters.filter(({ actorId }) =>
-        controlled(actorId),
-      );
+      const harvesters = economy.harvesters;
       const warning = harvesters.find((worker) =>
         ["depleted", "blocked", "unassigned"].includes(worker.phase),
       );
@@ -482,9 +479,7 @@ export function createEconomyControls(
       const harvesting = [
         ...(worker ? [actor!.definitionId] : []),
         ...harvesters.map((worker) => actors.get(worker.actorId)!.definitionId),
-        ...economy.production
-          .filter((job) => controlled(job.producerId))
-          .map((job) => job.definitionId),
+        ...economy.production.map((job) => job.definitionId),
       ]
         .map((id) => definitions.get(id)?.harvesting)
         .find(Boolean);
@@ -498,8 +493,7 @@ export function createEconomyControls(
         (worker) =>
           worker.phase === "idle" && !actors.get(worker.actorId)?.movement,
       );
-      const cultivators =
-        cultivation?.workers.filter(({ actorId }) => controlled(actorId)) ?? [];
+      const cultivators = cultivation?.workers ?? [];
       let status: string;
       const ownsCultivation = simulation.actors.some(
         (actor) =>

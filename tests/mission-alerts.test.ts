@@ -224,6 +224,82 @@ describe("mission alerts", () => {
     ]);
   });
 
+  test("other owners' attacks, losses, production, routes, and outages stay silent", () => {
+    const observe = tracker();
+    const tilePlacement = { origin: { x: 0, z: 0 }, quarterTurns: 0 };
+    const node = (actorId: string, owner: string, connected: boolean) => ({
+      actorId,
+      owner,
+      center: { x: 0, z: 0 },
+      radius: 6,
+      complete: true,
+      root: false,
+      connected,
+      rootOwners: connected ? [owner] : [],
+      rootIds: connected ? ["root"] : [],
+    });
+    const before = ["rival", "ally"].flatMap((owner) => [
+      actor(`${owner}-worker`, "harvester", { owner }),
+      actor(`${owner}-unit`, "trooper", { owner }),
+      actor(`${owner}-scout`, "scout", {
+        owner,
+        movement: { target: { x: 4, z: 4 } },
+      }),
+      actor(`${owner}-site`, "barracks", {
+        owner,
+        tilePlacement,
+        construction: { paidCost: 1, completedTicks: 0, totalTicks: 2 },
+      }),
+      actor(`${owner}-relay`, "refinery", { owner, tilePlacement }),
+    ]);
+    const workerIds = ["rival-worker", "ally-worker"];
+    observe({
+      actors: before,
+      workerIds,
+      support: {
+        nodes: ["rival", "ally"].map((owner) =>
+          node(`${owner}-relay`, owner, true),
+        ),
+        links: [],
+      },
+    });
+    const after = ["rival", "ally"].flatMap((owner) => [
+      actor(`${owner}-worker`, "harvester", { owner }),
+      actor(`${owner}-scout`, "scout", {
+        owner,
+        movement: { target: { x: 4, z: 4 }, blocked: true },
+      }),
+      actor(`${owner}-site`, "barracks", { owner, tilePlacement }),
+      actor(`${owner}-relay`, "refinery", { owner, tilePlacement }),
+      actor(`${owner}-recruit`, "trooper", { owner }),
+    ]);
+    const alerts = observe({
+      actors: [...after, actor("t1", "trooper")],
+      workerIds,
+      attacks: ["worker", "site", "scout"].flatMap((id) => [
+        hit(`rival-${id}`),
+        hit(`ally-${id}`),
+      ]),
+      wrecks: ["rival", "ally"].map((owner) => ({
+        actorId: `${owner}-unit`,
+        definitionId: "trooper",
+        owner,
+        worldPosition: { x: 1, z: 2 },
+        facing: 0,
+        tick: 1,
+      })) as AlertObservation["wrecks"],
+      support: {
+        nodes: ["rival", "ally"].map((owner) =>
+          node(`${owner}-relay`, owner, false),
+        ),
+        links: [],
+      },
+    });
+    expect(alerts.map(({ text, pulse }) => [text, !!pulse])).toEqual([
+      ["Trooper ready", false],
+    ]);
+  });
+
   test("announces a site only when an explored site falls dormant", () => {
     const observe = tracker();
     const site = (dormant: boolean) => ({

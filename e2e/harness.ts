@@ -17,12 +17,29 @@ import {
 import type { ArcRotateCamera, Scene } from "@babylonjs/core";
 import type { TerrainMapOptions, TileType } from "../src/map";
 import type { GameViewOptions } from "../src/render";
+import type { GameSession } from "../src/session";
+
+declare global {
+  interface Window {
+    /** A session whose clock only `advance` in prototype-helpers moves. */
+    sessionHarness: { view: GameSession; now: number };
+  }
+}
 
 export { createMinimap, createTerrainMeshes } from "../src/render";
 export { currentContentPack } from "../src/content/packs";
 export { minimapProjection } from "../src/render/minimap";
 export { createFrameEffectsView } from "../src/render/frame-effects";
 export { EngineStore, Matrix, TransformNode, Vector3 } from "@babylonjs/core";
+
+/** Freezes `performance.now`, so frames advance only through the harness. */
+export function controlSessionClock(view: GameSession) {
+  window.sessionHarness = { view, now: performance.now() };
+  Object.defineProperty(performance, "now", {
+    configurable: true,
+    value: () => window.sessionHarness.now,
+  });
+}
 
 let authoredTerrain: TerrainGrid | undefined;
 /** Shared geometry for input helpers targeting the unedited prototype map. */

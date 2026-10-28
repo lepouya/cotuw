@@ -493,7 +493,7 @@ test("sidebar derives custom content and can be disposed and recreated", async (
     ];
     actors.push({ ...actors[0]!, id: "visitor", owner: "rival" });
     const state = {
-      actors,
+      actors: actors.filter(({ id }) => id !== "visitor"),
       actorVersion: 0,
       selectedActorIds: ["building"],
       placementActive: false,
@@ -534,6 +534,7 @@ test("sidebar derives custom content and can be disposed and recreated", async (
       ) => {
         sidebar.update({
           ...state,
+          actors,
           selectedActorIds: ["visitor"],
           relations: createRelations(
             relationship === "neutral"

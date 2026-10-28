@@ -140,6 +140,37 @@ export const economySites = (economy: EconomyView | undefined) => [
   ...(economy?.sites ?? []),
   ...(economy?.cultivation?.sites ?? []),
 ];
+/**
+ * One owner's balances, income, workers, and production, with every site and
+ * loot cache. Fields are listed explicitly so new state stays private until
+ * classified here.
+ */
+export function economyForOwner(
+  economy: EconomyView,
+  owner: string,
+  ownsActor: (actorId: string) => boolean,
+): EconomyView {
+  return {
+    stockpiles: economy.stockpiles.filter(({ owners }) =>
+      owners.includes(owner),
+    ),
+    deposited: economy.deposited.filter((income) => income.owner === owner),
+    sites: economy.sites,
+    loot: economy.loot,
+    harvesters: economy.harvesters.filter(({ actorId }) => ownsActor(actorId)),
+    production: economy.production.filter(({ producerId }) =>
+      ownsActor(producerId),
+    ),
+    ...(economy.cultivation && {
+      cultivation: {
+        sites: economy.cultivation.sites,
+        workers: economy.cultivation.workers.filter(({ actorId }) =>
+          ownsActor(actorId),
+        ),
+      },
+    }),
+  };
+}
 /** Sites that can still be gathered; renewable sites always can. */
 export const activeSites = (economy: EconomyView | undefined) => [
   ...(economy?.sites ?? []).filter((site) => site.remainingMaterials > 0),

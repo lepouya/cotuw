@@ -17,7 +17,7 @@ import type { AttackMoveControls } from "./ui/attack-move-controls";
 import type { MissionResult } from "./simulation/objectives";
 import { serializeMission } from "./simulation/mission-file";
 import type { SaveInfo } from "./simulation/mission-file";
-import { disconnectedBuildings, supportForOwner } from "./simulation/support";
+import { disconnectedBuildings } from "./simulation/support";
 import { rosterIncludes } from "./simulation/ownership";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
@@ -608,7 +608,7 @@ async function assembleGameSession(
     training.refresh();
     economyControls?.refresh();
     controls.onStateChanged?.({
-      actors: simulation.actors,
+      actors: player.actors().shown,
       actorVersion: simulation.actorVersion,
       selectedActorIds: input.selectedActorIds,
       boxMode: input.boxMode,
@@ -665,9 +665,7 @@ async function assembleGameSession(
       wrecks: simulation.wrecks,
       support: simulation.support,
       objectives: simulation.objectives,
-      workerIds: economyWorkers(simulation.economy).map(
-        ({ actorId }) => actorId,
-      ),
+      workerIds: economyWorkers(player.economy()).map(({ actorId }) => actorId),
       sites: (player.economy()?.cultivation?.sites ?? []).map((site) => ({
         id: site.id,
         name: site.name,
@@ -1076,18 +1074,12 @@ async function assembleGameSession(
       input.selectedActorIds.flatMap((id) => player.ownActor(id) ?? []),
     );
     updateHealth(frameSeconds);
+    const support = player.support();
     networkView.update(
-      simulation.support &&
-        supportForOwner(
-          simulation.support,
-          playerOwner,
-          simulation.relations.sharesSupport,
-        ),
+      support,
       placement.active ||
         network.visible ||
-        !!simulation.support?.nodes.some(
-          (node) => node.actorId === input.selectedActorId,
-        ),
+        !!support?.nodes.some((node) => node.actorId === input.selectedActorId),
     );
     rallyView.update(player.ownActor(input.selectedActorId)?.rallyPoint);
   });

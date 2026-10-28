@@ -23,6 +23,7 @@ import type { ActorPresentation } from "../content/content-pack";
 import type { ProductionCard } from "./production-card";
 
 export type SidebarState = {
+  /** Own and currently detected actors only. */
   actors: readonly ActorRenderState[];
   actorVersion: number;
   selectedActorIds: readonly string[];
@@ -480,10 +481,10 @@ function buildSidebar(
             selected.has(actor.id) &&
             isMobileActor(actor, definitionById.get(actor.definitionId)),
         );
+      actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
       const membershipChanged = state.actorVersion !== actorVersion;
       if (membershipChanged) {
         actorVersion = state.actorVersion;
-        actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
         roster.sync(
           state.actors.filter(
             (actor) => !isTilePlacedActor(actor) && owns(actor),

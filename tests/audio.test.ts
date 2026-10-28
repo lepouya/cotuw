@@ -676,6 +676,83 @@ test("hidden attacks stay silent while own damage and alerts trigger combat musi
   ).toEqual(["/assets/audio/unquiet-frontier.wav"]);
 });
 
+test("other owners' queues stay silent and their fights set combat music only when seen", () => {
+  const { scene, calls } = setup();
+  const actor = {
+    occupancyLayer: "surface",
+    worldPosition: { x: 0, z: 0 },
+    facing: 0,
+  };
+  const barracks = (id: string) => ({
+    ...actor,
+    id,
+    definitionId: "arc-field-barracks",
+    owner: "rival",
+  });
+  const simulation: any = {
+    actors: [barracks("hidden"), barracks("seen")],
+    economy: {
+      harvesters: [],
+      production: ["hidden", "seen"].map((producerId) => ({
+        actorId: `${producerId}-unit`,
+        producerId,
+        completedTicks: 1,
+        totalTicks: 10,
+      })),
+    },
+    wrecks: [],
+    attacks: [],
+    buildingActivity: [],
+    objectives: [],
+    completedTicks: 1,
+    tickSeconds: 1 / 60,
+  };
+  const access = {
+    owns: (value: { owner: string }) => value.owner === "player",
+    shows: (value: { id?: string }) => value.id?.startsWith("seen") ?? false,
+  };
+  // Loaded jobs establish a baseline; new jobs must start here.
+  const adapter = createMissionAudio(scene, simulation, access, 8);
+  simulation.economy.production = simulation.economy.production.map(
+    (job: { actorId: string }) => ({ ...job, actorId: `${job.actorId}-2` }),
+  );
+  simulation.attacks = [{ attackerId: "hidden-unit", targetId: "hidden" }];
+  simulation.actors = [
+    ...simulation.actors,
+    {
+      ...actor,
+      id: "hidden-unit",
+      definitionId: "arc-trooper",
+      owner: "rival",
+    },
+    { ...actor, id: "seen-unit", definitionId: "arc-trooper", owner: "rival" },
+  ];
+  simulation.buildingActivity = [
+    { buildingId: "hidden", kind: "exit", actorId: "hidden-unit" },
+    { buildingId: "seen", kind: "exit", actorId: "seen-unit" },
+  ];
+  adapter.observe();
+  expect(
+    calls.some((call) =>
+      ["training-start", "unit-trained", "/alert.wav"].some((cue) =>
+        call.url.includes(cue),
+      ),
+    ),
+  ).toBe(false);
+  expect(
+    calls
+      .filter((call) => !call.ended && call.options.bus === "music")
+      .map((call) => call.url),
+  ).toEqual(["/assets/audio/unquiet-frontier.wav"]);
+  simulation.attacks = [{ attackerId: "hidden-unit", targetId: "seen" }];
+  adapter.observe();
+  expect(
+    calls
+      .filter((call) => !call.ended && call.options.bus === "music")
+      .map((call) => call.url),
+  ).toEqual(["/assets/audio/beneath-the-ridge.wav"]);
+});
+
 test("per-cue budgets hand loops to nearer emitters", () => {
   const { scene, calls, focus } = setup();
   const workers = Array.from({ length: 7 }, (_, i) =>

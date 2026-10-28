@@ -127,9 +127,13 @@ These contracts describe where new behaviors, views, and services attach.
 - `content/presentation.ts` owns serializable presentation contracts and their
   validation. Renderer catalogs implement every accepted built-in identifier;
   rendering owns loaded-asset checks, playback, and disposal.
-- The player view in `simulation/player-view.ts` owns ownership and
-  fog-limited actor lookups. Session views and controls use it instead of
-  querying simulation actors directly, so hidden actors stay hidden.
+- `simulation/player-view.ts` owns ownership and fog-limited actor lookups.
+  Sidebar actors are owned or detected; private workers, income, production,
+  and balances belong to the player, including explicitly shared balances.
+  Support overlays include only usable, owned or detected buildings and links
+  between them. Session views and controls use these projections; simulation
+  and world-animation consumers retain live state, except that only the
+  player's production queues sound.
 
 ## Content lookup
 
