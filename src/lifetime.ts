@@ -30,3 +30,5 @@ export function createLifetime() {
     },
   };
 }
+
+export type Lifetime = ReturnType<typeof createLifetime>;

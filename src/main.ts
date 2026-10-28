@@ -1,26 +1,25 @@
 import "./styles.css";
 import { version } from "../package.json";
 import { createAudioMixer } from "./audio/mixer";
-import { bindAudioControls } from "./ui/audio-controls";
+import { createDialogs } from "./ui/dialogs";
+import type { MenuMode } from "./ui/dialogs";
 import { factionName } from "./content/content-pack";
 import { LEVEL_SOURCES } from "./content/levels";
 import { createPlatform } from "./platform";
 import { isTextEntry, worldInputAvailable } from "./render/input-focus";
 import { loadMission } from "./mission-loading";
-import { createSaveLibrary } from "./saves";
+import { createSaveLibrary, saveCompleteMessage } from "./saves";
 import { createSidebar } from "./ui/sidebar";
 import { createNotifications } from "./ui/notifications";
 import { createTopBar, formatElapsed, topBarState } from "./ui/top-bar";
+import { errorMessage } from "./errors";
 
 import type { Platform } from "./platform";
 import type { GameSession } from "./session";
 import type { LoadedMission } from "./mission-loading";
 import type { SaveKind, SaveLibrary } from "./saves";
 import type { SidebarState } from "./ui/sidebar";
-import type {
-  ScenarioBriefing,
-  ScenarioPopup,
-} from "./simulation/mission-file";
+import type { ScenarioBriefing } from "./simulation/mission-file";
 import type { MissionResult, ObjectiveView } from "./simulation/objectives";
 import { evaluateObjectives } from "./simulation/objectives";
 import { playerFactionOf } from "./simulation/ownership";
@@ -29,33 +28,6 @@ const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const canvas = byId<HTMLCanvasElement>("game-canvas");
 const minimap = byId<HTMLCanvasElement>("minimap");
-const dialog = byId<HTMLDialogElement>("game-menu");
-const title = byId("game-menu-title");
-const description = byId("game-menu-description");
-const menuStatus = byId("game-menu-status");
-const actions = byId("game-menu-actions");
-const restart = byId<HTMLButtonElement>("restart-mission");
-const load = byId<HTMLButtonElement>("load-mission");
-const exit = byId<HTMLButtonElement>("exit-mission");
-const resume = byId<HTMLButtonElement>("resume-mission");
-const inspect = byId<HTMLButtonElement>("inspect-loaded-mission");
-const explanation = byId<HTMLDialogElement>("explanation");
-const save = byId<HTMLButtonElement>("save-mission");
-const quicksave = byId<HTMLButtonElement>("quicksave-mission");
-const saveForm = byId<HTMLFormElement>("save-form");
-const saveName = byId<HTMLInputElement>("save-name");
-const loadPanel = byId("load-panel");
-const saveEntries = byId("save-entries");
-const newMission = byId<HTMLButtonElement>("new-mission");
-const missionSetup = byId("mission-setup");
-const options = byId<HTMLButtonElement>("open-options");
-const quit = byId<HTMLButtonElement>("quit-game");
-const audioControls = byId("audio-controls");
-const optionsBack = byId<HTMLButtonElement>("cancel-options");
-const titleBack = byId<HTMLButtonElement>("return-to-title");
-const versionLabel = byId("game-version");
-versionLabel.textContent = `Prototype demo · v${version}`;
-
 /** Level sources by scenario ID; loading a level file adds or replaces one. */
 const levels = new Map(LEVEL_SOURCES);
 let platform: Platform;
@@ -63,24 +35,11 @@ let library: SaveLibrary;
 let session: GameSession | undefined;
 let mission: LoadedMission | undefined;
 let busy = false;
-// Restart, exit, and newer loads invalidate pending file reads.
 let loadRequest = 0;
-let saveListRequest = 0;
+let missionGeneration = 0;
 /** Objectives already complete, so only new completions autosave. */
 let completed = new Set<string>();
-let resumeOnClose = false;
-let menuMode: keyof typeof MENU_TEXT = "home";
-let menuPanel: MenuPanel = "actions";
 let sidebar: ReturnType<typeof createSidebar> | undefined;
-/** A popup waiting for the game menu to close. */
-let pendingPopup: ScenarioPopup | undefined;
-let shownPopup: { popup: ScenarioPopup; resume: boolean } | undefined;
-
-const KIND_LABELS: Record<SaveKind, string> = {
-  manual: "Manual",
-  quick: "Quick",
-  auto: "Auto",
-};
 const MENU_TEXT = {
   menu: { title: "Paused", description: "" },
   defeat: {
@@ -106,27 +65,6 @@ const MENU_TEXT = {
     description: "You can close this browser tab when you’re ready.",
   },
 };
-type MenuPanel = "actions" | "save" | "load" | "options" | "setup";
-/** Panels that replace the menu mode's title and, on the title screen, text. */
-const PANEL_TEXT: Partial<
-  Record<MenuPanel, { title: string; description?: string }>
-> = {
-  options: { title: "Options" },
-  setup: {
-    title: "Choose your faction",
-    description: "Choose a faction for the wolf-den demo.",
-  },
-};
-/** The control each menu panel focuses when it opens or becomes enabled. */
-const PANEL_FOCUS: Record<MenuPanel, () => HTMLElement> = {
-  actions: () =>
-    actions.querySelector<HTMLElement>("button:not([hidden]):not(:disabled)") ??
-    dialog,
-  save: () => saveName,
-  load: () => byId("import-mission"),
-  options: () => byId("audio-master-volume"),
-  setup: () => byId("choose-arc"),
-};
 const BRIEFING_ELEMENTS: Record<keyof ScenarioBriefing, string> = {
   label: "scenario-label",
   title: "scenario-title",
@@ -136,14 +74,11 @@ const BRIEFING_ELEMENTS: Record<keyof ScenarioBriefing, string> = {
   rules: "scenario-rules",
 };
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
-
 const elapsed = () =>
   session ? formatElapsed(topBarState(session).elapsedSeconds) : "";
 
 /** Rolling saves would otherwise replace good progress with a lost mission. */
-const canSave = () => !!session && !busy && !session.halted();
+const canSave = () => !!session && !session.halted();
 
 const saveSource = (name: string) =>
   session!.save({ name, savedAt: new Date().toISOString() });
@@ -154,7 +89,35 @@ const fileNameFor = (name: string) =>
 
 const notifications = createNotifications(document);
 const audio = createAudioMixer();
-bindAudioControls(document, audio);
+const dialogs = createDialogs(byId("game-dialogs"), {
+  version,
+  audio,
+  mission: () => session,
+  focusWorld: () => canvas.focus({ preventScroll: true }),
+  notify: notifications.message,
+  cancelLoad: () => {
+    loadRequest++;
+  },
+  start: (faction) => {
+    const level = faction === "arc" ? "arc-economy-opening" : "circle-wolf-den";
+    levels.set(level, LEVEL_SOURCES.get(level)!);
+    startLevel(level);
+  },
+  restart: () => {
+    if (mission) startLevel(mission.scenario.id);
+  },
+  exitToTitle: returnToTitle,
+  showTitle,
+  quit: quitGame,
+  listSaves: () => library.list(),
+  removeSave: (id) => library.remove(id),
+  load: (id) =>
+    loadFrom(() =>
+      id === undefined ? platform.importFile() : library.read(id),
+    ),
+  save: writeSave,
+  export: exportMission,
+});
 
 const topBar = createTopBar(byId("top-bar"), {
   togglePause: () => {
@@ -169,92 +132,38 @@ const topBar = createTopBar(byId("top-bar"), {
 const updateTopBar = (state?: SidebarState) =>
   topBar.update(topBarState(session, state));
 
-const report = (message: string) => {
-  if (dialog.open) menuStatus.textContent = message;
-  else notifications.message(message);
-};
+const report = (message: string) => dialogs.report(message);
 
-/** Shows a waiting popup once no other dialog is open, pausing the mission. */
-function showPopup() {
-  if (!session || !pendingPopup || dialog.open || explanation.open) return;
-  const popup = pendingPopup;
-  pendingPopup = undefined;
-  shownPopup = { popup, resume: session.playing() };
-  // Placement continues after the explanation of it.
-  session.pause({ keepInteractions: true });
-  byId("explanation-title").textContent = popup.title;
-  byId("explanation-text").textContent = popup.text;
-  explanation.showModal();
-}
-
-function dismissPopup() {
-  if (!shownPopup) return;
-  const { popup, resume } = shownPopup;
-  shownPopup = undefined;
-  explanation.close();
-  session?.dismissPopup(popup.id);
-  if (resume) session?.resume();
-  canvas.focus({ preventScroll: true });
-}
-
-function showPanel(panel: MenuPanel) {
-  saveListRequest++;
-  menuPanel = panel;
-  actions.hidden = panel !== "actions";
-  saveForm.hidden = panel !== "save";
-  loadPanel.hidden = panel !== "load";
-  missionSetup.hidden = panel !== "setup";
-  // In a mission, audio settings stay beside every panel.
-  audioControls.hidden = panel !== "options" && !session;
-  optionsBack.hidden = panel !== "options";
-  description.hidden = panel === "options";
-  const text = PANEL_TEXT[panel];
-  if (menuMode === "home")
-    description.textContent = text?.description ?? MENU_TEXT.home.description;
-  title.textContent = text?.title ?? MENU_TEXT[menuMode].title;
-  focusPanel();
-}
-
-function focusPanel() {
-  if (dialog.open) PANEL_FOCUS[menuPanel]().focus();
-}
-
-function showMenu(mode: keyof typeof MENU_TEXT, result?: MissionResult) {
-  menuMode = mode;
+function showMenu(mode: MenuMode, result?: MissionResult) {
   const failure =
     result?.kind === "defeat" &&
     mission?.scenario.objectives?.find(({ id }) => id === result.objectiveId);
-  description.textContent = failure
-    ? `Objective failed: ${failure.label}. The mission is paused.`
-    : mode === "menu"
-      ? `${mission?.scenario.name ?? "Mission"} · ${elapsed()} elapsed`
-      : MENU_TEXT[mode].description;
-  resume.hidden = mode !== "menu" && mode !== "loaded" && mode !== "victory";
-  resume.textContent =
-    mode === "victory"
-      ? "Continue free play"
-      : mode === "menu" && !resumeOnClose
-        ? "Close"
-        : "Resume";
-  inspect.hidden = mode !== "loaded";
-  save.hidden = quicksave.hidden = !canSave();
-  restart.hidden = !session || !levels.has(mission?.scenario.id ?? "");
-  exit.hidden = !session;
-  newMission.hidden = options.hidden = quit.hidden = mode !== "home";
-  load.hidden = mode === "quit";
-  titleBack.hidden = mode !== "quit";
-  versionLabel.hidden = !!session;
-  dialog.classList.toggle("title-menu", !session);
-  menuStatus.textContent = "";
-  if (!dialog.open) dialog.showModal();
-  showPanel("actions");
+  dialogs.showMenu({
+    ...MENU_TEXT[mode],
+    mode,
+    description: failure
+      ? `Objective failed: ${failure.label}. The mission is paused.`
+      : mode === "menu"
+        ? `${mission?.scenario.name ?? "Mission"} · ${elapsed()} elapsed`
+        : MENU_TEXT[mode].description,
+    continueLabel:
+      mode === "victory"
+        ? "Continue free play"
+        : mode === "menu" || mode === "loaded"
+          ? "Resume"
+          : undefined,
+    mission: session
+      ? {
+          saveName: `${mission?.scenario.name ?? "Mission"} ${elapsed()}`,
+          canSave: canSave(),
+          canRestart: levels.has(mission?.scenario.id ?? ""),
+        }
+      : undefined,
+  });
 }
 
 function openMenu() {
-  if (!session || busy || dialog.open || explanation.open) return;
-  resumeOnClose = session.playing();
-  session.pause();
-  showMenu("menu");
+  if (session) showMenu("menu");
 }
 
 function showBriefing(briefing?: ScenarioBriefing) {
@@ -264,22 +173,19 @@ function showBriefing(briefing?: ScenarioBriefing) {
 
 function setBusy(value: boolean) {
   busy = value;
-  for (const button of dialog.querySelectorAll("button"))
-    button.disabled = value;
-  // Disabling drops focus from the pressed button.
-  if (!value) focusPanel();
+  dialogs.setBusy(value);
 }
 
 /** Releases the current mission and everything presented for it. */
 async function releaseMission() {
+  missionGeneration++;
+  dialogs.resetMission();
   try {
     await session?.disposeAsync();
   } finally {
     session = undefined;
     sidebar = undefined;
     mission = undefined;
-    pendingPopup = shownPopup = undefined;
-    explanation.close();
     notifications.clear();
   }
 }
@@ -295,7 +201,7 @@ async function start(next: LoadedMission, loaded = false) {
   setBusy(true);
   try {
     await releaseMission();
-    dialog.close();
+    const generation = missionGeneration;
     document.body.classList.remove("at-title");
     delete canvas.dataset.missionResult;
     delete canvas.dataset.terrainReady;
@@ -332,36 +238,43 @@ async function start(next: LoadedMission, loaded = false) {
       onMenu: openMenu,
       cameraControls: byId("camera-controls"),
       onStateChanged: (state) => {
+        if (generation !== missionGeneration) return;
         activeSidebar.update(state);
         updateTopBar(state);
         autosaveOnProgress(state.objectives ?? []);
       },
       onAlerts: (alerts) => {
+        if (generation !== missionGeneration) return;
         for (const alert of alerts) notifications.alert(alert, elapsed());
       },
       onPopup: (popup) => {
-        pendingPopup = popup;
-        showPopup();
+        if (generation === missionGeneration) dialogs.offerGuide(popup);
       },
       showActor: activeSidebar.showActor,
       onDispose: activeSidebar.dispose,
       // Results present at startup show once the session is ready.
-      onResult: (result) => session && showMenu(result.kind, result),
+      onResult: (result) => {
+        if (generation === missionGeneration && session)
+          showMenu(result.kind, result);
+      },
       onReady: (ready) => {
         session = ready;
         notifications.setFocus(ready.focus);
       },
     });
   } catch (error) {
-    sidebar?.dispose();
+    try {
+      sidebar?.dispose();
+    } catch (cleanupError) {
+      console.error("Sidebar cleanup failed.", cleanupError);
+    }
     sidebar = undefined;
     session = undefined;
     mission = undefined;
     updateTopBar();
     console.error("The mission failed to start.", error);
     showTitle();
-    menuStatus.textContent =
-      "The mission could not start. Try New mission or Load.";
+    report("The mission could not start. Try New mission or Load.");
     return;
   } finally {
     setBusy(false);
@@ -384,7 +297,7 @@ async function loadFrom(read: () => Promise<string | undefined>) {
       levels.set(loaded.scenario.id, source);
     await start(loaded, true);
   } catch (error) {
-    if (request === loadRequest) report(errorMessage(error));
+    if (request === loadRequest) throw error;
   }
 }
 
@@ -395,24 +308,48 @@ function startLevel(id: string) {
       throw new RangeError(`This build has no level named "${id}".`);
     void start(loadMission(source));
   } catch (error) {
-    if (session) showMenu("menu");
-    else showTitle();
-    menuStatus.textContent = `The level could not start: ${errorMessage(error)}`;
+    // Restart failures keep the open mission menu.
+    if (!session) showTitle();
+    report(`The level could not start: ${errorMessage(error)}`);
   }
 }
 
 async function writeSave(kind: SaveKind, name: string) {
-  if (!canSave()) return false;
+  if (busy || !canSave()) return false;
   const savedSession = session;
   try {
     await library.write(kind, saveSource(name));
-    if (session === savedSession)
-      report(`${KIND_LABELS[kind]} save complete: ${name}`);
-    return true;
+    return session === savedSession;
   } catch (error) {
     if (session === savedSession)
-      report(`Saving failed: ${errorMessage(error)}`);
+      throw new Error(`Saving failed: ${errorMessage(error)}`);
     return false;
+  }
+}
+
+async function backgroundSave(kind: SaveKind, name: string) {
+  const savedSession = session;
+  try {
+    if ((await writeSave(kind, name)) && session === savedSession)
+      report(saveCompleteMessage(kind, name));
+  } catch (error) {
+    if (session === savedSession) report(errorMessage(error));
+  }
+}
+
+async function exportMission(name: string) {
+  if (busy || !canSave()) return;
+  const savedSession = session;
+  const file = fileNameFor(name);
+  try {
+    if (
+      (await platform.exportFile(file, saveSource(name))) &&
+      session === savedSession
+    )
+      return file;
+  } catch (error) {
+    if (session === savedSession)
+      throw new Error(`Export failed: ${errorMessage(error)}`);
   }
 }
 
@@ -421,138 +358,10 @@ function autosaveOnProgress(objectives: readonly ObjectiveView[]) {
   const fresh = done.filter(({ id }) => !completed.has(id));
   if (fresh.length === 0) return;
   for (const { id } of fresh) completed.add(id);
-  void writeSave("auto", `Autosave: ${fresh[fresh.length - 1].label}`);
+  void backgroundSave("auto", `Autosave: ${fresh[fresh.length - 1].label}`);
 }
 
-async function showSaves() {
-  showPanel("load");
-  const request = saveListRequest;
-  saveEntries.replaceChildren();
-  let entries;
-  try {
-    entries = await library.list();
-  } catch (error) {
-    if (request === saveListRequest)
-      menuStatus.textContent = errorMessage(error);
-    return;
-  }
-  if (request !== saveListRequest || !dialog.open) return;
-  if (entries.length === 0) {
-    const empty = document.createElement("li");
-    empty.textContent = "No saved missions yet.";
-    saveEntries.append(empty);
-  }
-  for (const entry of entries) {
-    const item = document.createElement("li");
-    const label = document.createElement("span");
-    const details = document.createElement("small");
-    const savedAt = entry.savedAt && new Date(entry.savedAt).toLocaleString();
-    label.textContent = `${KIND_LABELS[entry.kind]} · ${entry.name}`;
-    details.textContent = [
-      entry.missionName,
-      `${formatElapsed(entry.elapsedSeconds)} elapsed`,
-      savedAt,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    label.append(details);
-    const loadEntry = document.createElement("button");
-    loadEntry.type = "button";
-    loadEntry.textContent = "Load";
-    loadEntry.addEventListener("click", () =>
-      loadFrom(() => library.read(entry.id)),
-    );
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "Delete";
-    let armed = false;
-    remove.addEventListener("click", async () => {
-      // The first press only arms deletion.
-      if (!armed) {
-        armed = true;
-        remove.textContent = "Confirm";
-        return;
-      }
-      try {
-        await library.remove(entry.id);
-        if (item.isConnected) void showSaves();
-      } catch (error) {
-        if (item.isConnected) menuStatus.textContent = errorMessage(error);
-      }
-    });
-    item.append(label, loadEntry, remove);
-    saveEntries.append(item);
-  }
-}
-
-const resumeMission = () => {
-  if (busy) return;
-  loadRequest++;
-  saveListRequest++;
-  session?.resume();
-  dialog.close();
-  showPopup();
-};
-const closeMenu = () => {
-  if (busy) return;
-  if (menuMode !== "menu" || resumeOnClose) resumeMission();
-  else {
-    loadRequest++;
-    saveListRequest++;
-    dialog.close();
-    showPopup();
-  }
-};
-/** Escape backs out of a panel, then closes only the pause menu. */
-function cancelMenu() {
-  if (busy) return;
-  if (menuPanel !== "actions") {
-    loadRequest++;
-    showPanel("actions");
-  } else if (menuMode === "menu") closeMenu();
-}
-dialog.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
-  // Repeated native close requests can become non-cancelable.
-  event.preventDefault();
-  event.stopPropagation();
-  if (!event.repeat) cancelMenu();
-});
-dialog.addEventListener("cancel", (event) => {
-  event.preventDefault();
-  cancelMenu();
-});
-resume.addEventListener("click", closeMenu);
-inspect.addEventListener("click", () => {
-  if (busy) return;
-  loadRequest++;
-  saveListRequest++;
-  dialog.close();
-  showPopup();
-});
-byId("dismiss-explanation").addEventListener("click", dismissPopup);
-explanation.addEventListener("cancel", (event) => {
-  event.preventDefault();
-  dismissPopup();
-});
-restart.addEventListener("click", () => startLevel(mission!.scenario.id));
-newMission.addEventListener("click", () => showPanel("setup"));
-for (const [id, level] of [
-  ["choose-arc", "arc-economy-opening"],
-  ["choose-circle", "circle-wolf-den"],
-] as const)
-  byId(id).addEventListener("click", () => {
-    // Fresh missions always use bundled content, including after an import.
-    levels.set(level, LEVEL_SOURCES.get(level)!);
-    startLevel(level);
-  });
-byId("cancel-mission-setup").addEventListener("click", () =>
-  showPanel("actions"),
-);
-options.addEventListener("click", () => showPanel("options"));
-optionsBack.addEventListener("click", () => showPanel("actions"));
-titleBack.addEventListener("click", showTitle);
-quit.addEventListener("click", async () => {
+async function quitGame() {
   if (busy) return;
   loadRequest++;
   setBusy(true);
@@ -564,9 +373,9 @@ quit.addEventListener("click", async () => {
   } finally {
     setBusy(false);
   }
-});
+}
 
-exit.addEventListener("click", async () => {
+async function returnToTitle() {
   if (busy) return;
   loadRequest++;
   setBusy(true);
@@ -581,59 +390,21 @@ exit.addEventListener("click", async () => {
   } finally {
     setBusy(false);
   }
-});
+}
 byId("open-menu").addEventListener("click", openMenu);
-save.addEventListener("click", () => {
-  showPanel("save");
-  saveName.value = `${mission?.scenario.name ?? "Mission"} ${elapsed()}`;
-  saveName.select();
-});
-saveForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const savedSession = session;
-  const request = saveListRequest;
-  const saved = await writeSave("manual", saveName.value.trim() || "Mission");
-  if (saved && session === savedSession && request === saveListRequest)
-    showPanel("actions");
-});
-byId("export-mission").addEventListener("click", async () => {
-  if (!canSave()) return;
-  const name = saveName.value.trim() || "Mission";
-  const file = fileNameFor(name);
-  const savedSession = session;
-  const request = saveListRequest;
-  try {
-    if (
-      (await platform.exportFile(file, saveSource(name))) &&
-      session === savedSession &&
-      request === saveListRequest
-    )
-      menuStatus.textContent = `Exported ${file}.`;
-  } catch (error) {
-    if (session === savedSession && request === saveListRequest)
-      menuStatus.textContent = `Export failed: ${errorMessage(error)}`;
-  }
-});
-byId("cancel-save").addEventListener("click", () => showPanel("actions"));
-quicksave.addEventListener("click", () => writeSave("quick", "Quicksave"));
-load.addEventListener("click", () => void showSaves());
-byId("import-mission").addEventListener("click", () =>
-  loadFrom(() => platform.importFile()),
-);
-byId("cancel-load").addEventListener("click", () => {
-  loadRequest++;
-  showPanel("actions");
-});
 // F5 and F10 would otherwise reload the page or focus the browser menu.
 window.addEventListener("keydown", (event) => {
   const action = {
-    F5: () => writeSave("quick", "Quicksave"),
+    F5: () => backgroundSave("quick", "Quicksave"),
     F9: () => loadFrom(library.readQuicksave),
     F10: openMenu,
   }[event.key];
   if (!action) return;
   event.preventDefault();
-  if (!event.repeat && library && worldInputAvailable(document)) void action();
+  if (!event.repeat && library && worldInputAvailable(document))
+    void Promise.resolve(action()).catch((error) =>
+      report(errorMessage(error)),
+    );
 });
 // Windows fires contextmenu after release, once the radial menu is under the
 // cursor. Text fields keep the native menu for clipboard actions.
@@ -654,7 +425,9 @@ async function init() {
   } catch (error) {
     // Stays busy: saves, loads, and exit need the platform.
     showTitle();
-    menuStatus.textContent = `The game could not initialize: ${errorMessage(error)}. Reload to try again.`;
+    report(
+      `The game could not initialize: ${errorMessage(error)}. Reload to try again.`,
+    );
   }
 }
 void init();

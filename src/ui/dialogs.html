@@ -1,0 +1,70 @@
+<dialog id="explanation" aria-labelledby="explanation-title">
+  <p class="eyebrow">Field guide</p>
+  <h2 id="explanation-title"></h2>
+  <p id="explanation-text"></p>
+  <p class="muted">The mission is paused.</p>
+  <button id="dismiss-explanation" type="button">Continue</button>
+</dialog>
+<dialog id="game-menu" aria-labelledby="game-menu-title">
+  <h2 id="game-menu-title">Paused</h2>
+  <p id="game-menu-description"></p>
+  <div id="menu-audio"></div>
+  <button id="cancel-options" type="button" hidden>Back</button>
+  <div id="game-menu-actions" class="action-row">
+    <button id="new-mission" class="primary-action" type="button" hidden>
+      New mission
+    </button>
+    <button id="inspect-loaded-mission" type="button" hidden>Inspect</button>
+    <button id="resume-mission" type="button" hidden>Resume</button>
+    <button id="save-mission" type="button">Save</button>
+    <button id="quicksave-mission" type="button" data-panel-work>
+      Quicksave
+    </button>
+    <button id="load-mission" type="button">Load</button>
+    <button id="open-options" type="button" hidden>Options</button>
+    <button id="restart-mission" type="button">Restart</button>
+    <button id="exit-mission" type="button">Main menu</button>
+    <button id="quit-game" type="button" hidden>Exit</button>
+    <button id="return-to-title" type="button" hidden>
+      Return to main menu
+    </button>
+  </div>
+  <section id="mission-setup" hidden aria-label="Choose your faction">
+    <div class="faction-choices">
+      <button id="choose-arc" class="faction-choice" type="button">
+        <strong>Anomaly Response Command</strong>
+        <span
+          >Establish a base, gather Materials, and train a force to clear the
+          wolf den.</span
+        >
+      </button>
+      <button id="choose-circle" class="faction-choice" type="button">
+        <strong>Circle of Repose</strong>
+        <span>Grow a living base, cultivate Lifebloom, and raise an army.</span>
+      </button>
+    </div>
+    <button id="cancel-mission-setup" type="button">Back</button>
+  </section>
+  <form id="save-form" class="save-form" hidden>
+    <label for="save-name">Save name</label>
+    <input id="save-name" type="text" maxlength="80" required data-panel-work />
+    <div class="action-row">
+      <button id="confirm-save" type="submit" data-panel-work>Save</button>
+      <button id="export-mission" type="button" data-panel-work>
+        Export file
+      </button>
+      <button id="cancel-save" type="button">Back</button>
+    </div>
+  </form>
+  <section id="load-panel" hidden aria-label="Saved missions">
+    <ul id="save-entries" class="save-entries"></ul>
+    <div class="action-row">
+      <button id="import-mission" type="button" data-panel-work>
+        Import file
+      </button>
+      <button id="cancel-load" type="button">Back</button>
+    </div>
+  </section>
+  <p id="game-menu-status" class="muted" role="status"></p>
+  <p id="game-version" class="eyebrow" hidden></p>
+</dialog>

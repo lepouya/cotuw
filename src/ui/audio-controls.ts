@@ -1,6 +1,10 @@
 import { AUDIO_CHANNELS, DEFAULT_AUDIO_SETTINGS } from "../audio/mixer";
 import type { AudioDevice, AudioSettings, AudioStatus } from "../audio/mixer";
 import { isRecord } from "../simulation/validation";
+import { mountFeature } from "./dom";
+import type { FeatureScope } from "./dom";
+import markup from "./audio-controls.html?raw";
+import "./audio-controls.css";
 
 const STORAGE_KEY = "cotuw.audio.settings";
 
@@ -33,10 +37,26 @@ export function readAudioSettings(source: string | null): AudioSettings {
   }
 }
 
-/** Binds the menu's volume and mute controls and unlocks audio on input. */
-export function bindAudioControls(
-  root: Document,
-  device: Pick<AudioDevice, "setSettings" | "unlock" | "onStatus">,
+export type AudioControlDevice = Pick<
+  AudioDevice,
+  "setSettings" | "unlock" | "onStatus"
+>;
+
+/** Mounts audio preferences and owns their bindings, including device unlock. */
+export function createAudioControls(
+  root: HTMLElement,
+  device: AudioControlDevice,
+) {
+  return mountFeature(root, markup, (scope) => {
+    bindControls(root.ownerDocument, device, scope);
+    return {};
+  });
+}
+
+function bindControls(
+  document: Document,
+  device: AudioControlDevice,
+  { lifetime, signal, element }: FeatureScope,
 ) {
   let settings = structuredClone(DEFAULT_AUDIO_SETTINGS);
   try {
@@ -45,22 +65,16 @@ export function bindAudioControls(
     /* Storage may be disabled. */
   }
   device.setSettings(settings);
-  const controller = new AbortController();
-  const { signal } = controller;
   for (const channel of AUDIO_CHANNELS) {
-    const volume = root.getElementById(
-      `audio-${channel}-volume`,
-    ) as HTMLInputElement;
-    const mute = root.getElementById(
-      `audio-${channel}-mute`,
-    ) as HTMLButtonElement;
-    const svg = root.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const volume = element<HTMLInputElement>(`audio-${channel}-volume`);
+    const mute = element<HTMLButtonElement>(`audio-${channel}-mute`);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("aria-hidden", "true");
     svg.setAttribute("focusable", "false");
-    const speaker = root.createElementNS(svg.namespaceURI, "path");
+    const speaker = document.createElementNS(svg.namespaceURI, "path");
     speaker.setAttribute("d", "M11 5 6 9H3v6h3l5 4z");
-    const state = root.createElementNS(svg.namespaceURI, "path");
+    const state = document.createElementNS(svg.namespaceURI, "path");
     svg.append(speaker, state);
     mute.replaceChildren(svg);
     const label = channel === "master" ? "all audio" : channel;
@@ -107,16 +121,12 @@ export function bindAudioControls(
     if (event.isTrusted) void device.unlock();
   };
   for (const type of ["pointerdown", "keydown"])
-    root.addEventListener(type, activate, { capture: true, signal });
-  const status = root.getElementById("audio-status")!;
-  const unsubscribe = device.onStatus((state) => {
-    status.dataset.audioState = state;
-    status.textContent = STATUS_TEXT[state];
-  });
-  return {
-    dispose: () => {
-      controller.abort();
-      unsubscribe();
-    },
-  };
+    document.addEventListener(type, activate, { capture: true, signal });
+  const status = element("audio-status");
+  lifetime.defer(
+    device.onStatus((state) => {
+      status.dataset.audioState = state;
+      status.textContent = STATUS_TEXT[state];
+    }),
+  );
 }

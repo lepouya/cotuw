@@ -262,9 +262,15 @@ and bring up the rough skirmish map early for simulation and AI development.
   [UI ownership](docs/ui-ownership.md) records inspected coupling, the selected
   root-based DOM/CSS structure, application and dialog responsibilities,
   lifetime rules, and verification. Runtime extraction follows in 1.22-1.24.
-- [ ] **1.22** Modularize dialogs with consistent focus, dismissal, pause and
+- [x] **1.22** Modularize dialogs with consistent focus, dismissal, pause and
   resume, asynchronous-work handling, and disposal. Verify interactions among
   menus, contextual guides, and mission-result screens.
+  `ui/dialogs.ts` owns menu/guide markup, styles, transitions, save-panel
+  handlers, and child audio bindings. Application operations remain behind
+  callbacks. Browser checks cover canceled loads, stale panel work, result
+  precedence, focus, busy restrictions, list feedback, and setup/disposal
+  failures preserving usable title navigation and original diagnostics. Human
+  playtest remains pending.
 - [ ] **1.23** Separate navigation and save/load presentation from session
   startup and teardown. Verify repeated loads, restarts, and returns to title
   without stale handlers, pending work, or retained session resources. Keep

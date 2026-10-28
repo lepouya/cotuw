@@ -3,6 +3,15 @@ import { isCount, isPositive, isRecord } from "./simulation/validation";
 
 export type SaveKind = "manual" | "quick" | "auto";
 
+export const SAVE_KIND_LABELS: Record<SaveKind, string> = {
+  manual: "Manual",
+  quick: "Quick",
+  auto: "Auto",
+};
+
+export const saveCompleteMessage = (kind: SaveKind, name: string) =>
+  `${SAVE_KIND_LABELS[kind]} save complete: ${name}`;
+
 export type SaveEntry = {
   id: string;
   kind: SaveKind;

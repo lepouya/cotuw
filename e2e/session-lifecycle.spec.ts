@@ -2,6 +2,98 @@ import { expect, test } from "./fixtures";
 
 import { MissionDriver } from "./mission-driver";
 import { collectPageErrors, openOpening } from "./prototype-helpers";
+import { WEBKIT } from "./tags";
+
+test(
+  "startup and sidebar cleanup failures leave title navigation usable",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page);
+    const reported: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") reported.push(message.text());
+    });
+    await page.route(
+      (url) => url.pathname === "/src/ui/sidebar.ts" && !url.search,
+      (route) =>
+        route.fulfill({
+          contentType: "text/javascript",
+          body: `
+      import { createSidebar as original } from "/src/ui/sidebar.ts?original";
+      export function createSidebar(...args) {
+        const sidebar = original(...args);
+        return { ...sidebar, dispose() {
+          sidebar.dispose();
+          throw new Error("Sidebar cleanup failed");
+        } };
+      }
+    `,
+        }),
+    );
+    await page.route(
+      (url) => url.pathname === "/src/session.ts" && !url.search,
+      (route) =>
+        route.fulfill({
+          contentType: "text/javascript",
+          body: 'export async function createGameSession() { throw new Error("Session startup failed"); }',
+        }),
+    );
+    await page.goto("/");
+    await page.locator("#new-mission").click();
+    await page.locator("#choose-arc").click();
+    await expect(page.locator("#new-mission")).toBeVisible();
+    await expect(page.locator("#new-mission")).toBeEnabled();
+    await expect(page.locator("#game-menu-status")).toContainText(
+      "could not start",
+    );
+    await page.locator("#open-options").click();
+    await expect(page.locator("#audio-master-volume")).toBeFocused();
+    expect(
+      reported.some((message) => message.includes("Sidebar cleanup failed")),
+    ).toBe(true);
+    expect(
+      reported.some((message) => message.includes("Session startup failed")),
+    ).toBe(true);
+    expect(errors).toEqual([]);
+  },
+);
+
+test(
+  "a departing session cannot publish a guide into its replacement",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.route(
+      (url) => url.pathname === "/src/session.ts" && !url.search,
+      (route) =>
+        route.fulfill({
+          contentType: "text/javascript",
+          body: `
+      import { createGameSession as original } from "/src/session.ts?original";
+      export async function createGameSession(canvas, minimap, controls) {
+        const session = await original(canvas, minimap, controls);
+        const dispose = session.disposeAsync;
+        session.disposeAsync = async () => {
+          controls.onPopup?.({ id: "departing-guide", title: "Departing guide",
+            text: "This belongs to the old mission.",
+            trigger: { kind: "actor", definitionId: "arc-command-center" } });
+          await dispose();
+        };
+        return session;
+      }
+    `,
+        }),
+    );
+    await openOpening(page);
+    await page.locator("#open-menu").click();
+    await page.locator("#restart-mission").click();
+    await expect(page.locator("#explanation-title")).toHaveText(
+      "Welcome, Commander",
+    );
+    await page.locator("#dismiss-explanation").click();
+    expect(errors).toEqual([]);
+  },
+);
 
 for (const action of ["exit-mission", "restart-mission"]) {
   test(`a cleanup failure during ${action} leaves a usable title screen`, async ({

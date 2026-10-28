@@ -13,8 +13,8 @@ import { createGoalList } from "./goals";
 import { createProductionCards } from "./production-card";
 import { productionBlocker, setActionAvailability } from "./production-action";
 import { trainableUnitIds } from "../simulation/production";
-import { createLifetime } from "../lifetime";
-import { setText } from "./dom";
+import { mountFeature, setText } from "./dom";
+import type { FeatureScope } from "./dom";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { MissionResult, ObjectiveView } from "../simulation/objectives";
@@ -64,26 +64,17 @@ export type SidebarOptions = {
 
 /** Tabs and actor lists present committed simulation state only. */
 export function createSidebar(root: HTMLElement, options: SidebarOptions) {
-  const lifetime = createLifetime();
-  try {
-    return buildSidebar(root, options, lifetime);
-  } catch (error) {
-    lifetime.dispose();
-    throw error;
-  }
+  return mountFeature(root, undefined, (scope) =>
+    buildSidebar(root, options, scope),
+  );
 }
 
 function buildSidebar(
   root: HTMLElement,
   options: SidebarOptions,
-  lifetime: ReturnType<typeof createLifetime>,
+  { signal, element }: FeatureScope,
 ) {
   const { definitions, presentations, goals, selectActor } = options;
-  const controller = new AbortController();
-  lifetime.defer(() => controller.abort());
-  const signal = controller.signal;
-  const element = <T extends HTMLElement>(id: string) =>
-    root.querySelector<T>(`#${id}`)!;
   setText(element("faction-label"), options.factionName ?? "Expedition");
   for (const id of ["building-options", "training-options", "unit-roster"])
     element(id).replaceChildren();
@@ -564,6 +555,5 @@ function buildSidebar(
         }
       }
     },
-    dispose: lifetime.dispose,
   };
 }

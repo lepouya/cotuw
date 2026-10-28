@@ -2,28 +2,24 @@
 
 [DESIGN.md](../DESIGN.md#ui-module-ownership) owns the selected direction.
 This document defines the implementation boundaries for tasks 1.22-1.24.
+Dialog ownership is implemented in 1.22. Application/navigation extraction
+and sidebar composition remain the scope of 1.23 and 1.24.
 
 ## Current coupling
 
-- Dialog transitions require coordinated knowledge in `src/main.ts`:
-  `showMenu`, `showPanel`, `showPopup`, and `cancelMenu` control focus and
-  visibility, while `start`, `loadFrom`, and `releaseMission` control mission
-  lifetime. `resumeOnClose`, popup state, and request counters connect them.
-  Task 1.22 needs one owner for those dialog transitions; task 1.23 needs to
-  keep session replacement independent of their DOM details.
-- `index.html` declares feature internals while `src/styles.css` combines
-  shell, dialog, sidebar, card, audio, and viewport rules. Compact-screen
-  rules mix shell sizing with feature layout. Tasks 1.22 and 1.24 therefore
-  need explicit markup and style ownership as well as TypeScript extraction.
+- `src/main.ts` composes session startup, storage operations, and menu view
+  data. `src/ui/dialogs.ts` owns modal interaction and panel state without
+  querying application storage or simulation. Task 1.23 separates application
+  navigation and session lifetime from bootstrap composition.
+- Dialog and audio markup and styles live beside their feature modules.
+  `index.html` and `src/styles.css` own the shell and remaining HUD internals.
+  Compact-screen HUD rules mix shell sizing with feature layout; task 1.24
+  assigns sidebar markup and styles to their feature owners.
 - `createSidebar` already accepts a root, content, and selection callback,
   and returns controls, updates, and disposal. `createGameSession` binds
   those controls to simulation and input. `createProductionCards` owns its
   tooltip and listeners. These are useful seams to retain and refine;
   their existence does not justify replacing the control system.
-
-The first two couplings make each committed UI task touch shared code; they
-cause no known gameplay failure. The existing seams limit the refactor to the
-parts that need it.
 
 ## Selected structure
 
@@ -69,7 +65,7 @@ Audio activation and modal-local input remain available while a dialog is open.
 
 ### Dialogs and navigation
 
-- `src/ui/dialogs.ts`, introduced in 1.22, owns the menu and field-guide
+- `src/ui/dialogs.ts` owns the menu and field-guide
   dialogs, their markup, panel transitions, focus, dismissal, pending guide,
   busy presentation, and pause/resume coordination. Menu contents remain
   local to this feature; shared behavior stays inside this module until a
@@ -123,6 +119,8 @@ Audio activation and modal-local input remain available while a dialog is open.
   validation; the panel displays its reason without duplicating format rules.
   A panel revision prevents late completions from updating a closed or
   replaced panel; mission identity separately guards session work. Panel
+  changes clear prior feedback. Save listings show loading state, clearing it
+  when listing completes, fails, or is invalidated by navigation. Panel
   operations return their outcome to the requesting panel instead of also
   publishing a generic application message. Background Quick/Auto save
   notifications use the originating mission's identity.
@@ -181,12 +179,14 @@ Audio activation and modal-local input remain available while a dialog is open.
   Mission replacement resets dialog state, notifications, and camera callbacks.
   Sidebar and command bindings have mission lifetime and release before their
   markup is replaced. Canvas elements outlive the session engine.
-- Use `createLifetime` and abortable listeners. Register cleanup immediately;
-  partial construction releases acquired resources, and disposal is idempotent.
+- Mount features with `mountFeature` from `src/ui/dom.ts`. It renders owned
+  markup and supplies a lifetime, an abort signal, and root-scoped lookup.
+  Register cleanup immediately; partial construction releases acquired
+  resources and owned markup, and disposal is idempotent.
   Portaled overlays and timers belong to the feature that creates them.
-  Dialog disposal cancels pending UI publication and removes its owned DOM
-  without resuming play or invoking mission actions. Mount roots and the
-  bootstrap-owned mixer remain their parent's responsibility.
+  Dialog disposal cancels pending loads and UI publication, and removes its
+  owned DOM without resuming play, dismissing guides, or starting missions.
+  Mount roots and the mixer remain their parent's responsibility.
 - Already-requested storage mutations finish in library order. Disposing a
   panel or replacing a session suppresses stale UI publication, not those
   writes. Separate UI pending state from mission startup/teardown busy state.

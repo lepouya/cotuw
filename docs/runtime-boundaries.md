@@ -103,6 +103,15 @@ These contracts describe where new behaviors, views, and services attach.
   scene's lifetime. Model instances release before their shared assets.
 - Sidebar setup releases partial controls after failure. Production cards own
   their tooltip and listeners; disposal or parent cancellation releases both.
+- `ui/dom.ts` mounts feature markup or binds an existing root with shared
+  cleanup, abortable listeners, and scoped element access. Failed setup keeps
+  its original error while reporting cleanup faults and releasing resources.
+- Dialogs own menu and guide markup, focus, pause restoration, panel requests,
+  and child audio controls. Reset closes modals and cancels pending loads
+  before session replacement without resuming the departing mission. Panel
+  revisions suppress late UI work; storage writes still finish in order.
+  Disposal releases global audio listeners and status subscriptions without
+  disposing the application-owned mixer.
 - Asset collections release after their views; a failed cleanup cannot skip
   the remaining assets.
 - Transient combat effects have a fixed instance budget. Bursts evict the
