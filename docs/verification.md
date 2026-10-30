@@ -248,7 +248,8 @@ sessions and triage satisfy task 1.02, not build preparation alone.
   restart, Main menu, and Exit. Check the default 800×600 window and resizing,
   keyboard and pointer controls, audio, and returning after Alt-Tab.
 - Verify named saves survive relaunch, repeated quicksave overwrite and
-  quickload, objective autosave, native Import and Export, cancellation, and
+  quickload, objective autosave, the skirmish map preview's start and
+  five-minute autosaves, native Import and Export, cancellation, and
   malformed or incompatible files preserving the current session.
 - For M1, verify incompatible saves stay listed with their mismatch reason and
   deletion action. Rejected loads preserve the stored file and current mission;

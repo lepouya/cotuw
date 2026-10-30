@@ -1,15 +1,14 @@
 import { errorMessage } from "../errors";
-import { SAVE_KIND_LABELS, saveCompleteMessage } from "../saves";
 import { createAudioControls } from "./audio-controls";
 import { mountFeature } from "./dom";
-import { formatElapsed } from "./top-bar";
+import { createSavePanel } from "./save-panel";
 import markup from "./dialogs.html?raw";
 import "./dialogs.css";
 
-import type { SaveEntry, SaveKind } from "../saves";
 import type { ScenarioPopup } from "../simulation/mission-file";
 import type { AudioControlDevice } from "./audio-controls";
 import type { FeatureScope } from "./dom";
+import type { SaveOperations } from "./save-panel";
 
 export type MenuMode =
   "home" | "menu" | "loaded" | "victory" | "defeat" | "quit";
@@ -27,7 +26,7 @@ type DialogMission = {
   resume: () => void;
   dismissPopup: (id: string) => void;
 };
-type DialogOptions = {
+type DialogOptions = SaveOperations & {
   version: string;
   audio: AudioControlDevice;
   /** Returns the same handle throughout a mission for pause restoration. */
@@ -41,14 +40,6 @@ type DialogOptions = {
   exitToTitle: () => Promise<void>;
   showTitle: () => void;
   quit: () => Promise<void>;
-  listSaves: () => Promise<SaveEntry[]>;
-  removeSave: (id: string) => Promise<void>;
-  /** Loads a stored save, or an imported file without an ID. */
-  load: (id?: string) => Promise<void>;
-  /** Resolves false when the mission changed before the write finished. */
-  save: (kind: Exclude<SaveKind, "auto">, name: string) => Promise<boolean>;
-  /** Resolves the exported file name, if the export completed. */
-  export: (name: string) => Promise<string | undefined>;
 };
 type Panel = "actions" | "save" | "load" | "options" | "setup";
 
@@ -57,7 +48,10 @@ const onlyIn =
   (...modes: MenuMode[]) =>
   (view: MenuView) =>
     modes.includes(view.mode);
-/** Controls a menu view can withhold; withheld controls are hidden and disabled. */
+/**
+ * Controls a menu view can withhold; withheld controls are hidden and
+ * disabled. Child panels mark save-dependent controls `data-requires-save`.
+ */
 const CONTROL_RULES: Record<string, (view: MenuView) => boolean> = {
   "new-mission": onlyIn("home"),
   "open-options": onlyIn("home"),
@@ -70,9 +64,10 @@ const CONTROL_RULES: Record<string, (view: MenuView) => boolean> = {
   "restart-mission": (view) => !!view.mission?.canRestart,
   "save-mission": canSave,
   "quicksave-mission": canSave,
-  "confirm-save": canSave,
-  "export-mission": canSave,
 };
+const ruleFor = (control: HTMLElement) =>
+  CONTROL_RULES[control.id] ??
+  ("requiresSave" in control.dataset ? canSave : undefined);
 
 /** Owns modal interaction and DOM; application operations stay in callbacks. */
 export function createDialogs(host: HTMLElement, options: DialogOptions) {
@@ -92,14 +87,21 @@ function bindDialogs(
   const description = element("game-menu-description");
   const status = element("game-menu-status");
   const actions = element("game-menu-actions");
-  const saveForm = element<HTMLFormElement>("save-form");
-  const saveName = element<HTMLInputElement>("save-name");
-  const saveEntries = element("save-entries");
   const audioRoot = element("menu-audio");
   const resume = element("resume-mission");
   const version = element("game-version");
   version.textContent = `Prototype demo · v${options.version}`;
   lifetime.own(createAudioControls(audioRoot, options.audio));
+  const savePanel = lifetime.own(
+    createSavePanel(element("save-panels"), options, {
+      perform,
+      report: (message) => report(message),
+      refresh: () => syncAvailability(),
+      back: () => {
+        if (!busy) showPanel("actions");
+      },
+    }),
+  );
   /** Each panel's exclusive content, opening focus, and replacement text. */
   const panels: Record<
     Panel,
@@ -114,11 +116,7 @@ function bindDialogs(
       content: actions,
       focus: () => actions.querySelector("button:not([hidden]):not(:disabled)"),
     },
-    save: { content: saveForm, focus: () => saveName },
-    load: {
-      content: element("load-panel"),
-      focus: () => element("import-mission"),
-    },
+    ...savePanel.panels,
     options: {
       content: element("cancel-options"),
       focus: () => audioRoot.querySelector("input"),
@@ -151,8 +149,7 @@ function bindDialogs(
   const invalidatePanel = () => {
     revision++;
     panelPending = false;
-    saveEntries.replaceChildren();
-    saveEntries.setAttribute("aria-busy", "false");
+    savePanel.clear();
     options.cancelLoad();
   };
   const report = (message: string) => {
@@ -196,7 +193,7 @@ function bindDialogs(
       control.disabled =
         busy ||
         !view ||
-        !(CONTROL_RULES[control.id]?.(view) ?? true) ||
+        !(ruleFor(control)?.(view) ?? true) ||
         (panelPending && "panelWork" in control.dataset);
     }
   };
@@ -206,8 +203,9 @@ function bindDialogs(
     panel = next;
     for (const [name, { content }] of Object.entries(panels))
       content.hidden = name !== next;
-    // In a mission, audio settings stay beside every panel.
-    audioRoot.hidden = next !== "options" && !view?.mission;
+    // Missions show audio settings beside their actions instead of Options.
+    audioRoot.hidden =
+      next !== "options" && !(next === "actions" && view?.mission);
     title.textContent = panels[next].title ?? view?.title ?? "";
     description.textContent =
       panels[next].description ?? view?.description ?? "";
@@ -290,88 +288,6 @@ function bindDialogs(
     if (panel !== "actions") showPanel("actions");
     else if (view?.mode === "menu") closeMenu(resumeOnClose);
   }
-  const showEmptySaves = () => {
-    const empty = document.createElement("li");
-    empty.textContent = "No saved missions yet.";
-    saveEntries.append(empty);
-  };
-  const saveRow = (entry: SaveEntry, listed: () => boolean) => {
-    const item = document.createElement("li");
-    const label = document.createElement("span");
-    const details = document.createElement("small");
-    label.textContent = `${SAVE_KIND_LABELS[entry.kind]} · ${entry.name}`;
-    details.textContent = [
-      entry.missionName,
-      `${formatElapsed(entry.elapsedSeconds)} elapsed`,
-      entry.savedAt && new Date(entry.savedAt).toLocaleString(),
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    label.append(details);
-    const load = document.createElement("button");
-    load.type = "button";
-    load.textContent = "Load";
-    load.dataset.panelWork = "";
-    load.addEventListener("click", () => {
-      if (listed()) void perform(() => options.load(entry.id));
-    });
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "Delete";
-    remove.dataset.panelWork = "";
-    let armed = false;
-    remove.addEventListener("click", () => {
-      if (!listed()) return;
-      // The first press only arms deletion.
-      if (!armed) {
-        armed = true;
-        remove.textContent = "Confirm";
-        return;
-      }
-      void perform(async (current) => {
-        await options.removeSave(entry.id);
-        if (!current()) return;
-        item.remove();
-        if (!saveEntries.childElementCount) showEmptySaves();
-      }, true);
-    });
-    item.append(label, load, remove);
-    return item;
-  };
-  async function showSaves() {
-    showPanel("load");
-    const loading = document.createElement("li");
-    loading.textContent = "Loading saved missions…";
-    saveEntries.append(loading);
-    saveEntries.setAttribute("aria-busy", "true");
-    await perform(async (current) => {
-      try {
-        const entries = await options.listSaves();
-        if (!current()) return;
-        if (!entries.length) showEmptySaves();
-        for (const entry of entries)
-          saveEntries.append(saveRow(entry, current));
-        syncAvailability();
-      } finally {
-        if (current()) {
-          loading.remove();
-          saveEntries.setAttribute("aria-busy", "false");
-        }
-      }
-    });
-  }
-  /** Saves or exports, reporting the outcome only to the requesting panel. */
-  const saveWork = (
-    work: () => Promise<string | undefined>,
-    after?: () => void,
-  ) =>
-    void perform(async (current) => {
-      const message = await work();
-      if (message === undefined || !current()) return;
-      after?.();
-      report(message);
-    }, true);
-
   const click = (id: string, action: () => void) =>
     element(id).addEventListener(
       "click",
@@ -416,49 +332,17 @@ function bindDialogs(
   click("quit-game", () => void perform(options.quit));
   click("return-to-title", options.showTitle);
   click("open-options", () => showPanel("options"));
-  for (const id of [
-    "cancel-options",
-    "cancel-mission-setup",
-    "cancel-save",
-    "cancel-load",
-  ])
+  for (const id of ["cancel-options", "cancel-mission-setup"])
     click(id, () => showPanel("actions"));
-  click("load-mission", () => void showSaves());
-  click("import-mission", () => void perform(() => options.load()));
+  click("load-mission", () => {
+    showPanel("load");
+    void savePanel.showSaves();
+  });
   click("save-mission", () => {
     showPanel("save");
-    saveName.value = view?.mission?.saveName ?? "Mission";
-    saveName.select();
+    savePanel.suggestName(view?.mission?.saveName ?? "Mission");
   });
-  const chosenName = () => saveName.value.trim() || "Mission";
-  saveForm.addEventListener(
-    "submit",
-    (event) => {
-      event.preventDefault();
-      const name = chosenName();
-      saveWork(
-        async () =>
-          (await options.save("manual", name))
-            ? saveCompleteMessage("manual", name)
-            : undefined,
-        () => showPanel("actions"),
-      );
-    },
-    { signal },
-  );
-  click("quicksave-mission", () =>
-    saveWork(async () =>
-      (await options.save("quick", "Quicksave"))
-        ? saveCompleteMessage("quick", "Quicksave")
-        : undefined,
-    ),
-  );
-  click("export-mission", () =>
-    saveWork(async () => {
-      const file = await options.export(chosenName());
-      return file ? `Exported ${file}.` : undefined;
-    }),
-  );
+  click("quicksave-mission", savePanel.quicksave);
 
   const resetMission = () => {
     if (disposed) return;
@@ -497,12 +381,18 @@ function bindDialogs(
       if (next.mission) menuMission?.pause();
       guideBlocked = next.mode === "victory" || next.mode === "defeat";
       view = next;
-      for (const [id, available] of Object.entries(CONTROL_RULES))
-        element(id).hidden = !available(next);
+      for (const control of dialog.querySelectorAll<HTMLElement>(
+        "button, input",
+      )) {
+        const available = ruleFor(control);
+        if (available) control.hidden = !available(next);
+      }
       resume.textContent =
         next.mode === "menu" && !resumeOnClose
           ? "Close"
           : (next.continueLabel ?? "Resume");
+      // Continuing play leads any menu that offers it.
+      resume.classList.toggle("primary-action", !!next.continueLabel);
       version.hidden = !!next.mission;
       dialog.classList.toggle("title-menu", !next.mission);
       if (!dialog.open) dialog.showModal();

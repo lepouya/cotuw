@@ -271,7 +271,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   precedence, focus, busy restrictions, list feedback, and setup/disposal
   failures preserving usable title navigation and original diagnostics. Human
   playtest remains pending.
-- [ ] **1.23** Separate navigation and save/load presentation from session
+- [x] **1.23** Separate navigation and save/load presentation from session
   startup and teardown. Verify repeated loads, restarts, and returns to title
   without stale handlers, pending work, or retained session resources. Keep
   incompatible saves listed with their reason and deletion action, following
@@ -279,6 +279,15 @@ and bring up the rough skirmish map early for simulation and AI development.
   Allow named saves and Quicksave after all skirmish results. Autosave at match
   start and each five-minute simulation boundary while in progress, skipping
   result ticks and preserving separate save entries.
+  `src/application.ts` owns the session, levels, restart source, replacement,
+  load validity, saves, and exit; `src/ui/save-panel.ts` owns save naming and
+  listing. Incompatible saves show their mismatch reason with Delete only.
+  Scenario `savePolicy: "skirmish"` applies the skirmish save rules, used by
+  the skirmish map preview until launch assembly in 1.14. Unit checks cover
+  compatibility reasons, listing, the policy schedule, startup rollback, and
+  stale save feedback during teardown. Browser checks cover incompatible
+  listing, skirmish autosaves and result saves, and repeated load, restart,
+  and title cycles.
 - [ ] **1.24** Make sidebar features composable and supply faction names,
   resource labels, costs, and actions through content and player-visible state.
   Modularize their markup and styles without duplicating the ARC sidebar.
@@ -316,7 +325,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   compatibility policy from 1.11.
   1.15 added owners, relationships with sharing, scenario events, and fired
   events to the format with their validation and documentation; 1.19 added
-  per-owner exploration and observations.
+  per-owner exploration and observations; 1.23 added the scenario save policy.
 - [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers

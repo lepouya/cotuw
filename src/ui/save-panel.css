@@ -1,0 +1,37 @@
+.save-form {
+  display: grid;
+  gap: 0.5rem;
+}
+.save-form input {
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  border: 1px solid #607161;
+  border-radius: 0.2rem;
+  color: #f4f0df;
+  background: #0f1f20;
+  font: inherit;
+}
+.save-entries {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.save-entries li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+/* Incompatible rows have no Load action; Delete keeps its column. */
+.save-entries li > button:last-child {
+  grid-column: 3;
+}
+.save-entries small {
+  display: block;
+  color: #a9b7ab;
+}
+.save-entries .save-incompatible {
+  color: #e7b98a;
+}

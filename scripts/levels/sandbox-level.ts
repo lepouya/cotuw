@@ -11,7 +11,7 @@ import type { TerrainGridOptions } from "../../src/simulation/terrain.ts";
 
 type SandboxOptions = Pick<
   MissionScenario,
-  "id" | "name" | "goals" | "content" | "actors"
+  "id" | "name" | "goals" | "content" | "actors" | "savePolicy"
 > & {
   terrain: TerrainGridOptions;
   briefing: Omit<ScenarioBriefing, "rules">;

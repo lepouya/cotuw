@@ -1,10 +1,12 @@
 import { contentPack } from "./content/packs";
+import { errorMessage } from "./errors";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { createMissionSimulation } from "./simulation/mission";
-import { parseMission } from "./simulation/mission-file";
+import { checkMissionHeader, parseMission } from "./simulation/mission-file";
 import { OccupancyGrid } from "./simulation/occupancy";
 import { createScenarioMap } from "./simulation/scenario";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
+import { isCount, isId, isRecord } from "./simulation/validation";
 
 import type { ContentPack } from "./content/content-pack";
 import type { ActorDefinition } from "./simulation/actor";
@@ -54,6 +56,22 @@ export function createSessionSimulation(
     map,
     occupancy,
   });
+}
+
+/**
+ * Why this build cannot load a parsed mission file, from the format, tick
+ * rate, and content pack checks loading applies. Contents are not validated.
+ */
+export function missionIncompatibility(file: unknown): string | undefined {
+  try {
+    checkMissionHeader(file, SIMULATION_TICK_SECONDS);
+    const scenario = isRecord(file) ? file.scenario : undefined;
+    const content = isRecord(scenario) && scenario.content;
+    if (isRecord(content) && isId(content.id) && isCount(content.version))
+      contentPack({ id: content.id, version: content.version });
+  } catch (error) {
+    return errorMessage(error);
+  }
 }
 
 /** Parses a level or save, rejecting state the simulation would refuse. */

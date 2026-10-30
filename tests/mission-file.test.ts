@@ -535,3 +535,17 @@ test.each([
     "Scenario flocks",
   );
 });
+
+test("save policies survive saving and reject unknown values", () => {
+  const source = serializeMission(
+    { ...scenario, savePolicy: "skirmish" },
+    testMission(),
+    1,
+  );
+  expect(parseMission(source, 1).scenario.savePolicy).toBe("skirmish");
+  const file = JSON.parse(source);
+  file.scenario.savePolicy = "always";
+  expect(() => parseMission(JSON.stringify(file), 1)).toThrow(
+    "Scenario savePolicy",
+  );
+});

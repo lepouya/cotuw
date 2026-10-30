@@ -20,6 +20,8 @@ export type SaveEntry = {
   /** An ISO timestamp, or empty when the file cannot be read. */
   savedAt: string;
   elapsedSeconds: number;
+  /** Why this build cannot load the file, when it cannot. */
+  incompatible?: string;
 };
 
 /** Rolling saves replace themselves and never touch manual saves. */
@@ -27,8 +29,14 @@ const ROLLING_IDS = { quick: "quicksave", auto: "autosave" } as const;
 /** Bounds file handles and JSON memory when the library grows. */
 const METADATA_READERS = 4;
 
-/** Mission files in storage, described by the metadata they carry. */
-export function createSaveLibrary(storage: SaveStorage) {
+/**
+ * Mission files in storage, described by the metadata they carry.
+ * `incompatibility` explains why a parsed file cannot load in this build.
+ */
+export function createSaveLibrary(
+  storage: SaveStorage,
+  incompatibility: (file: unknown) => string | undefined = () => undefined,
+) {
   let pending: Promise<void> = Promise.resolve();
   const mutate = <T>(action: () => Promise<T>): Promise<T> => {
     const result = pending.then(action);
@@ -62,6 +70,7 @@ export function createSaveLibrary(storage: SaveStorage) {
               entries[index] = describe(
                 id,
                 await storage.read(id).catch(() => ""),
+                incompatibility,
               );
             }
           },
@@ -99,15 +108,27 @@ export function createSaveLibrary(storage: SaveStorage) {
 
 export type SaveLibrary = ReturnType<typeof createSaveLibrary>;
 
-function describe(id: string, source: string): SaveEntry {
+function describe(
+  id: string,
+  source: string,
+  incompatibility: (file: unknown) => string | undefined,
+): SaveEntry {
   const kind: SaveKind =
     id === ROLLING_IDS.quick
       ? "quick"
       : id === ROLLING_IDS.auto
         ? "auto"
         : "manual";
+  let file: unknown;
+  let incompatible: string | undefined;
   try {
-    const file = JSON.parse(source);
+    file = JSON.parse(source);
+    incompatible = incompatibility(file);
+  } catch {
+    incompatible = "This file cannot be read as a mission.";
+  }
+  const reason = incompatible === undefined ? {} : { incompatible };
+  try {
     if (
       !isRecord(file) ||
       !isRecord(file.scenario) ||
@@ -137,6 +158,7 @@ function describe(id: string, source: string): SaveEntry {
             : "",
       savedAt,
       elapsedSeconds,
+      ...reason,
     };
   } catch {
     return {
@@ -146,6 +168,7 @@ function describe(id: string, source: string): SaveEntry {
       missionName: "Unreadable file",
       savedAt: "",
       elapsedSeconds: 0,
+      ...reason,
     };
   }
 }

@@ -2,15 +2,15 @@
 
 [DESIGN.md](../DESIGN.md#ui-module-ownership) owns the selected direction.
 This document defines the implementation boundaries for tasks 1.22-1.24.
-Dialog ownership is implemented in 1.22. Application/navigation extraction
-and sidebar composition remain the scope of 1.23 and 1.24.
+Dialog ownership is implemented in 1.22, and application and save-panel
+ownership in 1.23. Sidebar composition remains the scope of 1.24.
 
 ## Current coupling
 
-- `src/main.ts` composes session startup, storage operations, and menu view
-  data. `src/ui/dialogs.ts` owns modal interaction and panel state without
-  querying application storage or simulation. Task 1.23 separates application
-  navigation and session lifetime from bootstrap composition.
+- `src/main.ts` composes the application, dialogs, top bar, notifications,
+  and shortcuts. `src/application.ts` owns session startup, storage
+  operations, and menu view data. `src/ui/dialogs.ts` owns modal interaction
+  and panel state without querying application storage or simulation.
 - Dialog and audio markup and styles live beside their feature modules.
   `index.html` and `src/styles.css` own the shell and remaining HUD internals.
   Compact-screen HUD rules mix shell sizing with feature layout; task 1.24
@@ -39,11 +39,14 @@ Audio activation and modal-local input remain available while a dialog is open.
   initial title or explicit level route. Session code stays dynamically
   imported so title controls work before the renderer loads. Application and
   UI modules use type-only session imports outside that creation path.
-- `src/application.ts`, extracted in 1.23, owns the active mission/session,
-  level registry, resolved restart source, mission replacement, and the
-  validity of pending load requests. Its operations are start, load,
-  restart, return to title, save/export, and exit. It reports status and
-  state through callbacks; it does not query dialog or save-panel elements.
+- `src/application.ts` owns the active mission/session, level registry,
+  resolved restart source, mission replacement, and the validity of pending
+  load requests. Its operations are start, load, restart, return to title,
+  save/export, and exit. It reports status and state through callbacks; it
+  does not query dialog or save-panel elements. `src/save-policy.ts` maps
+  each scenario save policy to rules for when saving is allowed and which
+  autosaves fall due; a new policy adds one entry there. The sidebar shows
+  the scenario briefing from its options.
 - Bootstrap supplies mission UI roots. Startup mounts the sidebar through
   its feature constructor and passes returned control references and cleanup
   to session assembly. Register partial UI ownership before awaiting session
@@ -55,6 +58,9 @@ Audio activation and modal-local input remain available while a dialog is open.
   the pending load through an application callback. A panel revision alone
   cannot prevent an obsolete read from replacing the mission. Check request
   validity before changing the restart source or starting the loaded mission.
+  Replacement clears active references and invalidates mission callbacks before
+  awaiting disposal, so departing work cannot publish during cleanup. Failed
+  startup uses the same reset and release path, including notification focus.
   Session disposal completes before a replacement acquires its resources.
   Cleanup failures clear application references and leave title navigation
   usable. Exit waits for the save library's requested writes and deletions.
@@ -84,8 +90,8 @@ Audio activation and modal-local input remain available while a dialog is open.
   unlock, and status methods. `report` shows status in the open menu and
   otherwise forwards it to notifications. `setBusy` reflects application
   startup and teardown work; panel-local pending state stays internal.
-  Save/load panel rendering is an internal collaborator extracted in 1.23,
-  not another application API.
+  Save/load panel rendering is an internal collaborator, not another
+  application API.
 - For example, the application routes a session's `onPopup` callback to
   `dialogs.offerGuide(popup)`, routes its result callback to
   `dialogs.showMenu(resultView)`, and calls `dialogs.resetMission()` before
@@ -111,12 +117,16 @@ Audio activation and modal-local input remain available while a dialog is open.
   Closing restores focus to a usable opener or the world canvas. A guide
   preempted by a result cannot resume play when it closes. Any deferred guide
   can return only after an explicitly permitted continuation.
-- `src/ui/save-panel.ts`, extracted in 1.23, owns save names, list rows,
-  deletion confirmation, compatibility messages, and local pending/error
-  presentation. It receives list/load/save/import/export/delete callbacks.
+- `src/ui/save-panel.ts` owns save names, list rows, deletion confirmation,
+  compatibility messages, and local pending/error presentation, with its
+  markup and styles. It receives list/load/save/import/export/delete
+  callbacks and runs work through the dialog's panel revision. Controls that
+  need a savable mission carry `data-requires-save`, so dialog availability
+  applies without naming the panel's IDs.
   Application operations own reading, validation, serialization, and storage.
-  Compatibility status comes from shared mission/content
-  validation; the panel displays its reason without duplicating format rules.
+  Compatibility status comes from `missionIncompatibility`, which applies the
+  format, tick-rate, and content-pack checks loading uses; the panel displays
+  its reason without duplicating format rules.
   A panel revision prevents late completions from updating a closed or
   replaced panel; mission identity separately guards session work. Panel
   changes clear prior feedback. Save listings show loading state, clearing it
@@ -215,6 +225,8 @@ Audio activation and modal-local input remain available while a dialog is open.
 - **1.23:** Extract application/session navigation and save-panel presentation.
   Apply its incompatible-save and skirmish save policies with the corresponding
   mission rules. Keep request validity at the owner of each asynchronous action.
+  Scenarios select the skirmish save policy until skirmish launch assembly
+  (1.14) and results (1.25) exist.
 - **1.24:** Extract sidebar sections and styles behind the existing root-based
   composition. Retain content-driven faction support and world-control behavior.
 - Preserve behavior coverage in `e2e/start-screen.spec.ts`,

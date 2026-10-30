@@ -18,7 +18,10 @@ import type { FeatureScope } from "./dom";
 
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { MissionResult, ObjectiveView } from "../simulation/objectives";
-import type { ScenarioGoal } from "../simulation/mission-file";
+import type {
+  ScenarioBriefing,
+  ScenarioGoal,
+} from "../simulation/mission-file";
 import type { ActorPresentation } from "../content/content-pack";
 import type { ProductionCard } from "./production-card";
 
@@ -55,11 +58,21 @@ export type SidebarOptions = {
   economy?: boolean;
   presentations: ReadonlyMap<string, ActorPresentation>;
   goals: readonly ScenarioGoal[];
+  briefing?: ScenarioBriefing;
   selectActor: (id: string, additive?: boolean) => void;
   playerOwner: string;
   /** The player's faction, whose roster supplies the construction menu. */
   playerFaction?: string;
   factionName?: string;
+};
+
+const BRIEFING_ELEMENTS: Record<keyof ScenarioBriefing, string> = {
+  label: "scenario-label",
+  title: "scenario-title",
+  description: "scenario-description",
+  goalsHeading: "preparation-heading",
+  goalsNote: "scenario-goals-note",
+  rules: "scenario-rules",
 };
 
 /** Tabs and actor lists present committed simulation state only. */
@@ -76,6 +89,14 @@ function buildSidebar(
 ) {
   const { definitions, presentations, goals, selectActor } = options;
   setText(element("faction-label"), options.factionName ?? "Expedition");
+  for (const [key, id] of Object.entries(BRIEFING_ELEMENTS))
+    setText(
+      element(id),
+      options.briefing?.[key as keyof ScenarioBriefing] ?? "",
+    );
+  element("economy-overview").hidden = !options.economy;
+  element("network-view-control").hidden =
+    !options.economy || !definitions.some((definition) => definition.support);
   for (const id of ["building-options", "training-options", "unit-roster"])
     element(id).replaceChildren();
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];

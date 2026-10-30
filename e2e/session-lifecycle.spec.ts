@@ -1,7 +1,12 @@
 import { expect, test } from "./fixtures";
 
 import { MissionDriver } from "./mission-driver";
-import { collectPageErrors, openOpening } from "./prototype-helpers";
+import {
+  collectPageErrors,
+  dismissExplanation,
+  openOpening,
+  startOpening,
+} from "./prototype-helpers";
 import { WEBKIT } from "./tags";
 
 test(
@@ -220,3 +225,43 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
     await mission.advance(1);
     await expect(page.locator("#mission-time")).toHaveText("0:01");
   });
+
+test("repeated loads, restarts, and returns to title release each session", async ({
+  page,
+}) => {
+  const errors = collectPageErrors(page);
+  await openOpening(page);
+  const engines = () =>
+    page.evaluate(async () => {
+      const path: string = "/e2e/harness.ts";
+      const { EngineStore } = await import(path);
+      return EngineStore.Instances.length;
+    });
+  const cards = page.locator("#building-options > *");
+  const cardCount = await cards.count();
+  expect(cardCount).toBeGreaterThan(0);
+  const notifications = page.locator("#notifications > *");
+  await page.keyboard.press("F5");
+  await expect(notifications).toContainText(["Quick save complete"]);
+  for (let round = 0; round < 3; round++) {
+    await page.keyboard.press("F9");
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+    expect(await engines()).toBe(1);
+    await page.locator("#restart-mission").click();
+    await dismissExplanation(page, "Welcome, Commander");
+    expect(await engines()).toBe(1);
+    await page.locator("#open-menu").click();
+    await page.locator("#exit-mission").click();
+    await expect(page.locator("#new-mission")).toBeEnabled();
+    expect(await engines()).toBe(0);
+    await startOpening(page);
+    expect(await engines()).toBe(1);
+    await expect(cards).toHaveCount(cardCount);
+  }
+  // A single application shortcut and session remain subscribed.
+  await page.keyboard.press("F5");
+  await expect(
+    notifications.filter({ hasText: "Quick save complete" }),
+  ).toHaveCount(1);
+  expect(errors).toEqual([]);
+});

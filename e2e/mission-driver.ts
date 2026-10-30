@@ -18,7 +18,8 @@ export class MissionDriver {
     readonly realTime: boolean,
   ) {}
 
-  async opening(dismissGuide = true, faction: "arc" | "circle" = "arc") {
+  /** Opens a page whose clock advances only through `advance`, unless real. */
+  private async goto(url: string) {
     await this.page.addInitScript((realTime) => {
       window.missionClock = 0;
       if (realTime) return;
@@ -27,7 +28,26 @@ export class MissionDriver {
         value: () => window.missionClock,
       });
     }, this.realTime);
-    await this.page.goto("/");
+    await this.page.goto(url);
+  }
+
+  /** Opens an explicit level link and renders only through `advance`. */
+  async level(id: string) {
+    await this.goto(`/?level=${id}`);
+    await expect(this.page.locator("#game-canvas")).toHaveAttribute(
+      "data-terrain-ready",
+      "true",
+    );
+    if (!this.realTime)
+      await this.page.evaluate(async () => {
+        const path: string = "/e2e/harness.ts";
+        const { EngineStore } = await import(path);
+        EngineStore.Instances[0].stopRenderLoop();
+      });
+  }
+
+  async opening(dismissGuide = true, faction: "arc" | "circle" = "arc") {
+    await this.goto("/");
     await activate(this.page.locator("#new-mission"), this.touch);
     await activate(this.page.locator(`#choose-${faction}`), this.touch);
     await expect(this.page.locator("#game-canvas")).toHaveAttribute(

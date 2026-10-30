@@ -647,6 +647,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   menu after closing contextual UI, canceling active world tools, ending camera
   modes, and clearing selection. In the menu, Escape backs out of a panel,
   then closes the menu, preserving whether the mission was already paused.
+  An available continue action, such as Resume, leads the menu. Audio
+  settings sit beside the menu actions, not in the Save or Load panels.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
   an explicit command mode.
@@ -2048,7 +2050,8 @@ are tracked in the checklist.
   so neither rolling save captures a lost M0 mission. Saving after a simulation
   fault is unavailable. M1 skirmishes permit named saves and Quicksave after
   every result; their start and five-minute autosaves preserve an in-progress
-  recovery checkpoint under the skirmish rules.
+  recovery checkpoint under the skirmish rules. Each scenario declares which
+  of these save policies it follows.
 - Platform services own storage. Browsers keep saves in local storage and
   exchange files by download and upload; the desktop build keeps saves as
   files in its app data folder and uses native file dialogs.

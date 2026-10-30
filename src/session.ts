@@ -115,6 +115,8 @@ export type GameSession = Omit<GameView, "dispose"> & {
   playing: () => boolean;
   /** A fault or defeat leaves the session for inspection only. */
   halted: () => boolean;
+  /** Whether the simulation stopped on an error. */
+  faulted: () => boolean;
   /** Pausing ends placement and targeting unless they are kept. */
   pause: (options?: { keepInteractions?: boolean }) => void;
   resume: () => void;
@@ -144,6 +146,8 @@ export type GameSessionControls = BuildingPlacementControls &
     startPaused?: boolean;
     onMenu?: () => void;
     onResult?: (result: MissionResult) => void;
+    /** Runs after each simulation tick and its result, with the tick count. */
+    onTick?: (tick: number) => void;
     buildings?: readonly DefinitionButton[];
     economyRoot?: HTMLElement;
     onReady?: (session: GameSession) => void;
@@ -1010,6 +1014,7 @@ async function assembleGameSession(
       }
       showMissionResult();
       raisePopup();
+      controls.onTick?.(simulation.completedTicks);
     },
   });
   lifetime.defer(() => loop.stop());
@@ -1114,6 +1119,7 @@ async function assembleGameSession(
       })()),
     playing: () => playing,
     halted,
+    faulted: () => simulationFaulted,
     pause: ({ keepInteractions = false } = {}) => {
       if (keepInteractions) radial.close();
       else cancelInteractions();

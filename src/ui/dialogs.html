@@ -14,8 +14,8 @@
     <button id="new-mission" class="primary-action" type="button" hidden>
       New mission
     </button>
-    <button id="inspect-loaded-mission" type="button" hidden>Inspect</button>
     <button id="resume-mission" type="button" hidden>Resume</button>
+    <button id="inspect-loaded-mission" type="button" hidden>Inspect</button>
     <button id="save-mission" type="button">Save</button>
     <button id="quicksave-mission" type="button" data-panel-work>
       Quicksave
@@ -45,26 +45,7 @@
     </div>
     <button id="cancel-mission-setup" type="button">Back</button>
   </section>
-  <form id="save-form" class="save-form" hidden>
-    <label for="save-name">Save name</label>
-    <input id="save-name" type="text" maxlength="80" required data-panel-work />
-    <div class="action-row">
-      <button id="confirm-save" type="submit" data-panel-work>Save</button>
-      <button id="export-mission" type="button" data-panel-work>
-        Export file
-      </button>
-      <button id="cancel-save" type="button">Back</button>
-    </div>
-  </form>
-  <section id="load-panel" hidden aria-label="Saved missions">
-    <ul id="save-entries" class="save-entries"></ul>
-    <div class="action-row">
-      <button id="import-mission" type="button" data-panel-work>
-        Import file
-      </button>
-      <button id="cancel-load" type="button">Back</button>
-    </div>
-  </section>
+  <div id="save-panels"></div>
   <p id="game-menu-status" class="muted" role="status"></p>
   <p id="game-version" class="eyebrow" hidden></p>
 </dialog>

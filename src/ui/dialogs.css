@@ -46,24 +46,25 @@
   line-height: 1.6;
 }
 
-.title-menu .primary-action {
-  grid-column: 1 / -1;
-  border-color: #cfac62;
-  color: #fff0c9;
-  background: #3a4b3e;
-}
-
-.title-menu #game-menu-actions {
+/* Equal cells keep a trailing action from stretching across the menu. */
+#game-menu-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.title-menu #game-menu-actions button {
+#game-menu-actions button {
   text-align: center;
 }
 
-.title-menu #return-to-title {
+#game-menu-actions .primary-action,
+#return-to-title {
   grid-column: 1 / -1;
+}
+
+.primary-action {
+  border-color: #cfac62;
+  color: #fff0c9;
+  background: #3a4b3e;
 }
 
 #game-version {
@@ -121,35 +122,4 @@
   #game-version {
     margin-top: 0.75rem;
   }
-}
-
-.save-form {
-  display: grid;
-  gap: 0.5rem;
-}
-.save-form input {
-  min-height: 2.75rem;
-  padding: 0.5rem;
-  border: 1px solid #607161;
-  border-radius: 0.2rem;
-  color: #f4f0df;
-  background: #0f1f20;
-  font: inherit;
-}
-.save-entries {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0 0 0.75rem;
-  padding: 0;
-  list-style: none;
-}
-.save-entries li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 0.4rem;
-  align-items: center;
-}
-.save-entries small {
-  display: block;
-  color: #a9b7ab;
 }

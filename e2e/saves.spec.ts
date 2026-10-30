@@ -334,3 +334,148 @@ forEachProfile([PHONE_PROFILE], () => {
     },
   );
 });
+
+test(
+  "incompatible saves stay listed with their reason until deleted",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(async () => {
+      const path: string = "/e2e/missions.ts";
+      const { level, missionSource } = (await import(
+        path
+      )) as typeof import("./missions");
+      const mission = level();
+      mission.state.tick = 60;
+      const save = (name: string) =>
+        JSON.parse(
+          missionSource(mission, mission.state, {
+            name,
+            savedAt: "2026-10-04T10:00:00Z",
+          }),
+        );
+      const old = save("Older build");
+      old.version = 1;
+      localStorage.setItem("cotuw.save.manual-old", JSON.stringify(old));
+      localStorage.setItem(
+        "cotuw.save.manual-current",
+        JSON.stringify(save("Current build")),
+      );
+    });
+    await page.locator("#load-mission").click();
+    const entries = page.locator("#save-entries li");
+    await expect(entries).toHaveCount(2);
+    const old = entries.filter({ hasText: "Older build" });
+    await expect(old).toContainText(
+      "Incompatible: This mission file uses version 1;",
+    );
+    await expect(old).toContainText("Clear the wolf threat");
+    await expect(old.getByRole("button", { name: "Load" })).toHaveCount(0);
+    const current = entries.filter({ hasText: "Current build" });
+    await expect(current).not.toContainText("Incompatible");
+
+    await old.getByRole("button", { name: "Delete" }).click();
+    await old.getByRole("button", { name: "Confirm" }).click();
+    await expect(entries).toHaveCount(1);
+    expect(
+      await page.evaluate(() => localStorage.getItem("cotuw.save.manual-old")),
+    ).toBeNull();
+    await current.getByRole("button", { name: "Load" }).click();
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+  },
+);
+
+test("skirmish missions autosave at the start and every five minutes", async ({
+  page,
+}) => {
+  const mission = new MissionDriver(page, false, false);
+  await mission.level("skirmish-map");
+  await expect(page.locator("#notifications")).toContainText(
+    "Auto save complete: Autosave: Match start",
+  );
+  const autosave = () =>
+    page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("cotuw.save.autosave")!);
+      return { name: saved.save.name, tick: saved.state.tick };
+    });
+  expect(await autosave()).toEqual({ name: "Autosave: Match start", tick: 0 });
+  await mission.advance(299);
+  expect((await autosave()).name).toBe("Autosave: Match start");
+  await mission.advance(1);
+  await expect(page.locator("#notifications")).toContainText(
+    "Auto save complete: Autosave: 5:00",
+  );
+  expect(await autosave()).toEqual({ name: "Autosave: 5:00", tick: 18_000 });
+  await openLoadPanel(page);
+  await expect(page.locator("#save-entries li")).toContainText([
+    "Auto · Autosave: 5:00",
+  ]);
+});
+
+test(
+  "skirmish defeat permits saves and preserves the previous autosave",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await openOpening(page);
+    const checkpoint = await page.evaluate(async () => {
+      const path: string = "/e2e/missions.ts";
+      const { level, missionSource } = (await import(
+        path
+      )) as typeof import("./missions");
+      const original = level();
+      const mission = {
+        ...original,
+        scenario: { ...original.scenario, savePolicy: "skirmish" as const },
+      };
+      const { state } = mission;
+      state.tick = 17_999;
+      state.actors.find(({ id }) => id === "starting-command-center")!.health =
+        1;
+      const wolf = state.actors.find(({ id }) => id === "lone-wolf")!;
+      wolf.worldPosition = { x: -39.5, z: 0.5 };
+      wolf.territory = { home: { ...wolf.worldPosition } };
+      const source = missionSource(mission, state, {
+        name: "Recovery checkpoint",
+        savedAt: new Date().toISOString(),
+      });
+      localStorage.setItem("cotuw.save.autosave", source);
+      return source;
+    });
+    await importMission(page, checkpoint);
+    await page.locator("#resume-mission").click();
+    await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
+    await page.locator("#quicksave-mission").click();
+    await expect(page.locator("#game-menu-status")).toContainText(
+      "Quick save complete",
+    );
+    await page.locator("#save-mission").click();
+    await page.locator("#save-name").fill("Defeat summary");
+    await page.locator("#confirm-save").click();
+    await expect(page.locator("#save-form")).toBeHidden();
+    await expect(page.locator("#game-menu-status")).toHaveText(
+      "Manual save complete: Defeat summary",
+    );
+    const saves = await page.evaluate(() =>
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith("cotuw.save."))
+        .map((key) => ({ key, source: localStorage.getItem(key)! })),
+    );
+    expect(saves).toHaveLength(3);
+    expect(saves.find(({ key }) => key === "cotuw.save.autosave")!.source).toBe(
+      checkpoint,
+    );
+    for (const { key, source } of saves)
+      if (key !== "cotuw.save.autosave") {
+        const saved = JSON.parse(source);
+        expect(saved.state.tick).toBe(18_000);
+        expect(saved.scenario.savePolicy).toBe("skirmish");
+      }
+    await page.locator("#load-mission").click();
+    await page
+      .locator("#save-entries li", { hasText: "Manual · Defeat summary" })
+      .getByRole("button", { name: "Load" })
+      .click();
+    await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
+    await expect(page.locator("#quicksave-mission")).toBeEnabled();
+  },
+);

@@ -69,6 +69,8 @@ export type MissionScenario = {
   readonly emergencyHeadquarters?: boolean;
   /** Owners whose actors mission scripts may command. */
   readonly scriptControl?: readonly ScriptControl[];
+  /** When saving is allowed and autosaves occur; absent means objectives. */
+  readonly savePolicy?: SavePolicy;
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
   readonly popups?: readonly ScenarioPopup[];
@@ -76,6 +78,10 @@ export type MissionScenario = {
 };
 
 export type SaveInfo = { name: string; savedAt: string };
+
+/** Save permission and autosave rules; `src/save-policy.ts` applies them. */
+export const SAVE_POLICIES = ["objectives", "skirmish"] as const;
+export type SavePolicy = (typeof SAVE_POLICIES)[number];
 
 /** A level is a mission file at tick 0; a save is the same format later on. */
 export type MissionFile = {
@@ -129,6 +135,7 @@ export function serializeMission(
     events,
     emergencyHeadquarters,
     scriptControl,
+    savePolicy,
     briefing,
     goals,
     popups,
@@ -150,6 +157,7 @@ export function serializeMission(
       events,
       emergencyHeadquarters,
       scriptControl,
+      savePolicy,
       briefing,
       goals,
       popups,
@@ -167,6 +175,23 @@ export function serializeMission(
   });
 }
 
+/** Rejects a parsed file this build cannot read, whatever its contents. */
+export function checkMissionHeader(file: unknown, tickSeconds: number) {
+  if (!isRecord(file) || file.format !== FORMAT)
+    throw new RangeError("This file is not a mission file.");
+  if (file.version !== MISSION_FILE_VERSION)
+    throw new RangeError(
+      `This mission file uses version ${file.version}; this build reads version ${MISSION_FILE_VERSION}.`,
+    );
+  if (
+    !isPositive(file.ticksPerSecond) ||
+    1 / file.ticksPerSecond !== tickSeconds
+  )
+    throw new RangeError(
+      `This mission file runs at ${file.ticksPerSecond} ticks per second; this build runs at ${1 / tickSeconds}.`,
+    );
+}
+
 /**
  * Parses a level or save and checks its format. Simulation initialization
  * validates the returned state.
@@ -182,19 +207,7 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
       `This mission file is not valid JSON: ${(error as Error).message}`,
     );
   }
-  if (file?.format !== FORMAT)
-    throw new RangeError("This file is not a mission file.");
-  if (file.version !== MISSION_FILE_VERSION)
-    throw new RangeError(
-      `This mission file uses version ${file.version}; this build reads version ${MISSION_FILE_VERSION}.`,
-    );
-  if (
-    !isPositive(file.ticksPerSecond) ||
-    1 / file.ticksPerSecond !== tickSeconds
-  )
-    throw new RangeError(
-      `This mission file runs at ${file.ticksPerSecond} ticks per second; this build runs at ${1 / tickSeconds}.`,
-    );
+  checkMissionHeader(file, tickSeconds);
   const { scenario, state, save } = file;
   if (
     !isRecord(scenario) ||
@@ -301,6 +314,13 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     !Array.isArray(scenario.scriptControl)
   )
     throw new RangeError("Scenario scriptControl must be a list.");
+  if (
+    scenario.savePolicy !== undefined &&
+    !(SAVE_POLICIES as readonly unknown[]).includes(scenario.savePolicy)
+  )
+    throw new RangeError(
+      'Scenario savePolicy must be "objectives" or "skirmish".',
+    );
   if (
     save !== undefined &&
     (!isRecord(save) ||

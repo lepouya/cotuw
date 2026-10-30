@@ -371,3 +371,39 @@ test(
     );
   },
 );
+
+test(
+  "continuing play leads the menu and audio settings stay with its actions",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await mountDialogs(page);
+    const audio = page.locator("#menu-audio");
+    await expect(audio).toBeVisible();
+    for (const [open, back] of [
+      ["save-mission", "cancel-save"],
+      ["load-mission", "cancel-load"],
+    ]) {
+      await page.locator(`#${open}`).click();
+      await expect(audio).toBeHidden();
+      await page.locator(`#${back}`).click();
+      await expect(audio).toBeVisible();
+    }
+    await page.evaluate(() => {
+      const { ui, view } = window.dialogHarness;
+      ui.resetMission();
+      ui.showMenu({ ...view, mode: "loaded", title: "Mission loaded" });
+    });
+    const resume = page.locator("#resume-mission");
+    await expect(resume).toBeFocused();
+    await expect(resume).toHaveClass(/primary-action/);
+    const width = async (id: string) =>
+      (await page.locator(`#${id}`).boundingBox())!.width;
+    expect(await width("exit-mission")).toBeCloseTo(
+      await width("save-mission"),
+      0,
+    );
+    expect(await width("resume-mission")).toBeGreaterThan(
+      2 * (await width("exit-mission")),
+    );
+  },
+);

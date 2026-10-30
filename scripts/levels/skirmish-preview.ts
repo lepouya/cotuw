@@ -5,6 +5,7 @@ export const SKIRMISH_PREVIEW = createSandboxLevel({
   id: "skirmish-map",
   name: "Skirmish map preview",
   terrain: SKIRMISH_TERRAIN,
+  savePolicy: "skirmish",
   briefing: {
     label: "Development map preview",
     title: "Survey the skirmish battlefield",

@@ -73,6 +73,7 @@ test("unreadable files stay listed so they can be removed", async () => {
       missionName: "Unreadable file",
       savedAt: "",
       elapsedSeconds: 0,
+      incompatible: "This file cannot be read as a mission.",
     },
   ]);
   await library.remove("manual-1");
@@ -206,4 +207,30 @@ test("a large library bounds concurrent reads and still lists every file", async
   expect(
     entries.every(({ missionName }) => missionName === "Clear the wolf threat"),
   ).toBe(true);
+});
+
+test("incompatible saves keep their metadata and the reason they cannot load", async () => {
+  const storage = memoryStorage();
+  storage.files.set("old", saveFile("Old", "2026-10-04T10:00:00Z"));
+  storage.files.set("current", saveFile("Current", "2026-10-04T11:00:00Z"));
+  const seen: unknown[] = [];
+  const library = createSaveLibrary(storage, (file) => {
+    seen.push(file);
+    return (file as { save: { name: string } }).save.name === "Old"
+      ? "This mission file uses version 1."
+      : undefined;
+  });
+  const entries = await library.list();
+  expect(entries.map(({ name, incompatible }) => [name, incompatible])).toEqual(
+    [
+      ["Current", undefined],
+      ["Old", "This mission file uses version 1."],
+    ],
+  );
+  expect(entries[1]).toMatchObject({
+    missionName: "Clear the wolf threat",
+    elapsedSeconds: 2,
+  });
+  expect(seen).toHaveLength(2);
+  expect(storage.files.size).toBe(2);
 });
