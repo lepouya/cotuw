@@ -1,7 +1,11 @@
 import { isTerrainPickMesh } from "./terrain-mesh";
 import { createSelection } from "./selection";
 import { createPointerGesture } from "./pointer-gesture";
-import { isTextEntry, worldInputAvailable } from "./input-focus";
+import {
+  isTextEntry,
+  worldInputAvailable,
+  worldKeyboardAvailable,
+} from "./input-focus";
 import { moveCommand } from "../simulation/command";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
@@ -390,7 +394,7 @@ export function createCommandInput(
   const key = (event: KeyboardEvent) => {
     if (
       !enabled() ||
-      !worldInputAvailable(canvas.ownerDocument) ||
+      !worldKeyboardAvailable(canvas.ownerDocument) ||
       event.defaultPrevented ||
       event.ctrlKey ||
       event.metaKey ||

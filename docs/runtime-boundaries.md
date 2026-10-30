@@ -112,6 +112,9 @@ These contracts describe where new behaviors, views, and services attach.
   revisions suppress late UI work; storage writes still finish in order.
   Disposal releases global audio listeners and status subscriptions without
   disposing the application-owned mixer.
+- Delivered world keys check visibility and blocking overlays without requiring
+  `document.hasFocus()`, which browsers can misreport. Pointer input and
+  continuous navigation retain their focus checks.
 - Asset collections release after their views; a failed cleanup cannot skip
   the remaining assets.
 - Transient combat effects have a fixed instance budget. Bursts evict the

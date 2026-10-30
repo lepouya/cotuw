@@ -3,7 +3,7 @@ import { version } from "../package.json";
 import { createApplication } from "./application";
 import { createAudioMixer } from "./audio/mixer";
 import { createDialogs } from "./ui/dialogs";
-import { isTextEntry, worldInputAvailable } from "./render/input-focus";
+import { isTextEntry, worldKeyboardAvailable } from "./render/input-focus";
 import { createNotifications } from "./ui/notifications";
 import { createTopBar } from "./ui/top-bar";
 import { errorMessage } from "./errors";
@@ -63,7 +63,7 @@ window.addEventListener("keydown", (event) => {
   }[event.key];
   if (!action) return;
   event.preventDefault();
-  if (!event.repeat && app.ready() && worldInputAvailable(document))
+  if (!event.repeat && app.ready() && worldKeyboardAvailable(document))
     void Promise.resolve(action()).catch((error) =>
       dialogs.report(errorMessage(error)),
     );

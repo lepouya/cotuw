@@ -1,8 +1,14 @@
-/** Dialogs, menus and visible `data-world-input-blocking` popups own input. */
+/** Pointer and continuous input need focus and an uncovered world. */
 export function worldInputAvailable(document: Document | undefined): boolean {
+  return document?.hasFocus?.() !== false && worldKeyboardAvailable(document);
+}
+
+/** Use for delivered keys; browsers can misreport document focus. */
+export function worldKeyboardAvailable(
+  document: Document | undefined,
+): boolean {
   return (
     !document?.hidden &&
-    document?.hasFocus?.() !== false &&
     !document?.querySelector(
       'dialog[open], [role="menu"]:not([hidden]), [data-world-input-blocking]:not([hidden])',
     )

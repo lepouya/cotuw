@@ -90,7 +90,7 @@ import { duePopup } from "./ui/popups";
 import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
-import { isTextEntry, worldInputAvailable } from "./render/input-focus";
+import { isTextEntry, worldKeyboardAvailable } from "./render/input-focus";
 import type { ScenarioPopup } from "./simulation/mission-file";
 import type { WorldPosition } from "./simulation/world";
 import { createAudioScene } from "./audio/scene";
@@ -1203,7 +1203,7 @@ async function assembleGameSession(
       event.metaKey ||
       event.altKey ||
       isTextEntry(event.target) ||
-      !worldInputAvailable(canvas.ownerDocument)
+      !worldKeyboardAvailable(canvas.ownerDocument)
     )
       return;
     if (controls.onMenu) {

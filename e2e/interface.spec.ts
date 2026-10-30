@@ -1,7 +1,11 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, TOUCH_PROFILES } from "./profiles";
 import { MissionDriver } from "./mission-driver";
-import { collectPageErrors, terrainPoint } from "./prototype-helpers";
+import {
+  collectPageErrors,
+  importMission,
+  terrainPoint,
+} from "./prototype-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
@@ -114,6 +118,68 @@ async function rightClick(page: Page, x: number, z: number) {
   const point = await terrainPoint(page, x, z);
   await page.mouse.click(point.x, point.y, { button: "right" });
 }
+
+test(
+  "Escape handles skirmish controls when document focus is misreported",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(document, "hasFocus", { value: () => false });
+    });
+    await page.goto("/?level=skirmish-map");
+    const canvas = page.locator("#game-canvas");
+    await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#game-menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#game-menu")).toBeHidden();
+    const source = await page.evaluate(async () => {
+      const path: string = "/e2e/missions.ts";
+      const actorPath: string = "/src/simulation/actor.ts";
+      const { level, missionMap, missionSource } = (await import(
+        path
+      )) as typeof import("./missions");
+      const { createActor } = (await import(
+        actorPath
+      )) as typeof import("../src/simulation/actor");
+      const mission = level("skirmish-map");
+      mission.state.actors.push(
+        createActor({
+          id: "test-trooper",
+          owner: "player",
+          definitionId: "arc-trooper",
+          worldPosition: missionMap(mission).tileCenter(20, 60),
+        }),
+      );
+      return missionSource(mission);
+    });
+    await importMission(page, source);
+    await page.locator("#inspect-loaded-mission").click();
+    await page.locator("#tab-units").click();
+    await page
+      .locator('#unit-roster button[data-actor-id="test-trooper"]')
+      .click();
+    await expect(canvas).toHaveAttribute(
+      "data-selected-actors",
+      '["test-trooper"]',
+    );
+    const pan = page.locator('[data-camera-action="pan"]');
+    await pan.click();
+    await page.keyboard.press("Escape");
+    await expect(pan).toHaveAttribute("aria-pressed", "false");
+    await expect(canvas).toHaveAttribute(
+      "data-selected-actors",
+      '["test-trooper"]',
+    );
+    await page.keyboard.press("Escape");
+    await expect(canvas).toHaveAttribute("data-selected-actors", "[]");
+    await expect(page.locator("#game-menu")).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#game-menu")).toBeVisible();
+    expect(errors).toEqual([]);
+  },
+);
 
 test(
   "a ten-second stall catches up while rendering is stopped",

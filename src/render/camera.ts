@@ -8,7 +8,11 @@ import {
 
 import { createPointerGesture } from "./pointer-gesture";
 import { createEdgePan } from "./edge-pan";
-import { worldInputAvailable, isTextEntry } from "./input-focus";
+import {
+  worldInputAvailable,
+  worldKeyboardAvailable,
+  isTextEntry,
+} from "./input-focus";
 
 import type { TerrainMap } from "../map";
 
@@ -433,7 +437,7 @@ export function createStrategyCamera(
     if (
       event.key === "Escape" &&
       primaryPanActive() &&
-      worldInputAvailable(document) &&
+      worldKeyboardAvailable(document) &&
       !isTextEntry(document?.activeElement)
     ) {
       clearKeys();

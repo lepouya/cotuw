@@ -11,7 +11,11 @@ import { footprintSize, tileKey } from "../simulation/grid";
 import { isOutcomeOf } from "../simulation/command";
 import { createTilePlacedActorViewRegistry } from "./tile-placed-actor-view";
 import { createPrimaryClick } from "./primary-click";
-import { isTextEntry, worldInputAvailable } from "./input-focus";
+import {
+  isTextEntry,
+  worldInputAvailable,
+  worldKeyboardAvailable,
+} from "./input-focus";
 import { setText } from "../ui/dom";
 
 import type { Scene, LinesMesh } from "@babylonjs/core";
@@ -377,7 +381,7 @@ export function createBuildingPlacement(
   const key = (event: KeyboardEvent) => {
     if (
       !active ||
-      !worldInputAvailable(canvas.ownerDocument) ||
+      !worldKeyboardAvailable(canvas.ownerDocument) ||
       isTextEntry(event.target) ||
       event.defaultPrevented ||
       event.repeat ||
