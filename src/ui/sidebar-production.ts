@@ -12,7 +12,7 @@ import { trainableUnitIds } from "../simulation/production";
 import { createProductionCards } from "./production-card";
 import { productionBlocker, setActionAvailability } from "./production-action";
 import { createButton, createElement as el, createKeyedList } from "./dom";
-import { inspectedActor, ordersLocked } from "./sidebar-context";
+import { inspectedActor, selectionLocked } from "./sidebar-context";
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-production.css";
@@ -219,7 +219,7 @@ export function createSidebarProduction(
     update: (state: SidebarState) => {
       const blocker = productionBlocker(
         {
-          defeated: state.result?.kind === "defeat",
+          result: state.result,
           faulted: state.faulted,
           paused: !!state.paused,
           placing: state.placementActive,
@@ -264,7 +264,7 @@ export function createSidebarProduction(
         if (hadFocus) focusUnits();
       }
       const ids = state.selectedActorIds;
-      const disabled = ordersLocked(state);
+      const disabled = selectionLocked(state);
       const rosterKey = JSON.stringify([state.actorVersion, ids, disabled]);
       if (rosterKey === shownRoster) return;
       shownRoster = rosterKey;

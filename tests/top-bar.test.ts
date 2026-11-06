@@ -46,3 +46,12 @@ test("elapsed time shows hours only when needed", () => {
   expect(formatElapsed(65.9)).toBe("1:05");
   expect(formatElapsed(3725)).toBe("1:02:05");
 });
+
+test.each(["victory", "defeat", "draw"] as const)(
+  "skirmish %s never advertises free play",
+  (kind) => {
+    expect(
+      objectiveSummary([], { kind, tick: 3, eliminatedOwners: ["rival"] }),
+    ).toBe(kind[0].toUpperCase() + kind.slice(1));
+  },
+);

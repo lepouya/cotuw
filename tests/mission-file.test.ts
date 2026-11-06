@@ -549,3 +549,21 @@ test("save policies survive saving and reject unknown values", () => {
     "Scenario savePolicy",
   );
 });
+
+test("owner-based skirmishes reject the campaign save policy", () => {
+  const source = serializeMission(
+    {
+      ...scenario,
+      skirmish: {
+        owners: ["player", "rival"],
+        qualifyingDefinitionIds: ["hq"],
+      },
+      savePolicy: "objectives",
+    },
+    testMission(),
+    1,
+  );
+  expect(() => parseMission(source, 1)).toThrow(
+    "Owner-based skirmishes require the skirmish save policy.",
+  );
+});

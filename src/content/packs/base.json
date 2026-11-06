@@ -1731,6 +1731,11 @@
         {
           "cue": "defeat"
         }
+      ],
+      "draw": [
+        {
+          "cue": "defeat"
+        }
       ]
     },
     "defaults": {

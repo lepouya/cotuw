@@ -37,9 +37,14 @@ These contracts describe where new behaviors, views, and services attach.
   to both the covering node and its supplying root; presentation uses the
   same owner-specific projection.
 - Simulation rules read actor owners and relationships, not the player owner.
-  The exception records the player's perspective: authored objectives decide
-  the player's victory or defeat. A defeat freezes the whole mission and
-  stops events.
+  Results express the player's perspective. Campaign objectives track authored
+  actors; skirmish rules count qualifying completed buildings for both named
+  owners after commands, combat, and construction. A skirmish verdict commits
+  with the final tick and freezes the mission; campaign defeats also stop
+  play and events, while campaign victories allow free play.
+- Direct actor spawn and removal hooks accept skirmish setup edits only at
+  tick 0. Live skirmish changes use commands so every snapshot retains the
+  end-of-tick elimination checkpoint.
 - `simulation/observations.ts` owns each owner's memory and `knowledgeOf`,
   the boundary for what an owner may know beyond its own actors and economy:
   authored site locations, its explored terrain and vision, and its

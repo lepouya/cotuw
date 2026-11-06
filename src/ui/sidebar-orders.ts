@@ -1,6 +1,6 @@
 import { isMobileActor } from "../simulation/placement";
 import { createButton, createElement as el, setText } from "./dom";
-import { ordersLocked } from "./sidebar-context";
+import { ordersLocked, selectionLocked } from "./sidebar-context";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-orders.css";
 
@@ -132,7 +132,8 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
     },
     update: (state: SidebarState) => {
       placementActions.hidden = !state.placementActive;
-      placementPanel.hidden = !state.placementActive && !state.faulted;
+      const locked = ordersLocked(state);
+      placementPanel.hidden = !locked;
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
       const selectedMobile = state.actors.filter(
@@ -140,9 +141,9 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
           selected.has(actor.id) &&
           isMobileActor(actor, definitionById.get(actor.definitionId)),
       );
-      const locked = ordersLocked(state);
-      boxSelect.disabled = locked;
-      addSelection.disabled = locked;
+      const selectionOff = selectionLocked(state);
+      boxSelect.disabled = selectionOff;
+      addSelection.disabled = selectionOff;
       queueOrders.disabled = locked;
       queueOrders.setAttribute(
         "aria-pressed",
@@ -159,7 +160,7 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
       );
       stopUnits.disabled =
         locked || !!state.paused || !selectedMobile.some(owns);
-      clearSelection.disabled = locked || ids.length === 0;
+      clearSelection.disabled = selectionOff || ids.length === 0;
       focusSelection.disabled = ids.length === 0;
       followSelection.setAttribute(
         "aria-pressed",

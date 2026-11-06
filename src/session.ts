@@ -14,7 +14,8 @@ import { createSessionSimulation, missionTerrain } from "./mission-loading";
 import type { LoadedMission } from "./mission-loading";
 import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
-import type { MissionResult } from "./simulation/objectives";
+import { missionEnded } from "./simulation/mission-result";
+import type { MissionResult } from "./simulation/mission-result";
 import { serializeMission } from "./simulation/mission-file";
 import type { SaveInfo } from "./simulation/mission-file";
 import { disconnectedBuildings } from "./simulation/support";
@@ -115,7 +116,7 @@ const ACTIVITY_TRIGGERS: Partial<Record<BuildingActivityKind, ActorTrigger>> = {
 export type GameSession = Omit<GameView, "dispose"> & {
   simulation: MissionSimulation;
   playing: () => boolean;
-  /** A fault or defeat leaves the session for inspection only. */
+  /** Finished missions and faults permit inspection only. */
   halted: () => boolean;
   /** Whether the simulation stopped on an error. */
   faulted: () => boolean;
@@ -403,9 +404,8 @@ async function assembleGameSession(
     player,
     content.audio?.music?.holdSeconds ?? 0,
   );
-  /** A fault or defeat leaves the session for inspection only. */
-  const halted = () =>
-    simulationFaulted || simulation.result?.kind === "defeat";
+  /** Finished missions and faults permit inspection only. */
+  const halted = () => simulationFaulted || missionEnded(simulation.result);
   const canCommand = () => playing && !halted();
   let controlsDirty = true;
   const showActor = (actorId: string) => {
@@ -454,7 +454,7 @@ async function assembleGameSession(
       return tile && map.tileCenter(tile.x, tile.z);
     },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
-    enabled: () => !placement.active && !halted(),
+    enabled: () => !placement.active && !simulationFaulted,
     pointerEnabled: () => !view.camera.primaryPanActive,
     canCommand,
     canSelect: (id) => !!player.shownActor(id),
@@ -621,7 +621,7 @@ async function assembleGameSession(
       additiveMode: input.additiveMode,
       queueMode: input.queueMode,
       placementActive: placement.active,
-      faulted: halted(),
+      faulted: simulationFaulted,
       paused: !playing,
       following: view.camera.following,
       canRemove,
@@ -826,14 +826,14 @@ async function assembleGameSession(
   view.camera.setTouchPanFilter(
     (event) =>
       !placement.active &&
-      !halted() &&
+      !simulationFaulted &&
       !input.boxMode &&
       // Ground targeting ignores actors, so drags from them may pan too.
       (!!groundTarget() ||
         input.actorIdAt(event.clientX, event.clientY) === undefined),
   );
   const unitControls = createUnitControls(input, controls, {
-    enabled: () => !placement.active && !halted(),
+    enabled: () => !placement.active && !simulationFaulted,
     changed: () => {
       controlsDirty = true;
     },
@@ -921,14 +921,14 @@ async function assembleGameSession(
     training.fault();
   };
   let shownResult: MissionResult["kind"] | undefined;
-  /** Defeat stops the mission; victory pauses it until play continues. */
+  /** Campaign victory pauses; final verdicts stop the mission. */
   const showMissionResult = () => {
     const result = simulation.result;
     if (!result || result.kind === shownResult) return;
     shownResult = result.kind;
     playing = false;
     syncAudioActivity();
-    if (result.kind === "defeat") {
+    if (missionEnded(result)) {
       loop.stop();
       haltControls();
     } else {
@@ -1174,14 +1174,14 @@ async function assembleGameSession(
         info,
       ),
     selectActor: (actorId, additive = false) => {
-      if (halted() || placement.active) return;
+      if (simulationFaulted || placement.active) return;
       input.select(
         player.shownActor(actorId)?.id,
         additive || input.additiveMode,
       );
     },
     selectActors: (ids) => {
-      if (halted() || placement.active) return;
+      if (simulationFaulted || placement.active) return;
       input.selectMany(ids.filter((id) => !!player.shownActor(id)));
     },
   };

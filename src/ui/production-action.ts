@@ -1,3 +1,6 @@
+import { presentResult, SIMULATION_STOPPED } from "./mission-result";
+import type { MissionResult } from "../simulation/mission-result";
+
 /** Binds a production command to a button and an optional card explanation. */
 export type DefinitionButton = {
   definitionId: string;
@@ -8,7 +11,7 @@ export type DefinitionButton = {
 
 /** Session conditions that block every production order. */
 export type ProductionBlockers = {
-  defeated: boolean;
+  result?: MissionResult;
   faulted: boolean;
   paused: boolean;
   placing: boolean;
@@ -16,15 +19,12 @@ export type ProductionBlockers = {
 
 /** Why no production order can start now, or "" when one can. */
 export function productionBlocker(state: ProductionBlockers, action: string) {
-  return state.defeated
-    ? "Mission ended in defeat."
-    : state.faulted
-      ? "Simulation stopped. Restart or load a mission from the menu."
-      : state.paused
-        ? `Resume the mission to ${action}.`
-        : state.placing
-          ? "Finish or cancel the current building placement."
-          : "";
+  const ended = state.result && presentResult(state.result).blocker;
+  if (ended !== undefined) return ended;
+  if (state.faulted) return SIMULATION_STOPPED;
+  if (state.paused) return `Resume the mission to ${action}.`;
+  if (state.placing) return "Finish or cancel the current building placement.";
+  return "";
 }
 
 /** Disables the action with a player-facing reason; "" enables it. */

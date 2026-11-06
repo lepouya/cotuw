@@ -2,7 +2,8 @@ import { evaluateObjectives } from "./simulation/objectives";
 import { formatElapsed } from "./ui/top-bar";
 
 import type { MissionFile, SavePolicy } from "./simulation/mission-file";
-import type { MissionResult, ObjectiveView } from "./simulation/objectives";
+import type { MissionResult } from "./simulation/mission-result";
+import type { ObjectiveView } from "./simulation/objectives";
 
 const CHECKPOINT_SECONDS = 5 * 60;
 
@@ -76,13 +77,13 @@ const POLICIES: Record<
   },
 };
 
-/** The rules of the mission's scenario save policy, objectives by default. */
+/** The scenario's save policy; its default follows from its result rules. */
 export function createSaveRules(
   mission: PolicyMission,
   tickSeconds: number,
 ): SaveRules {
-  return POLICIES[mission.scenario.savePolicy ?? "objectives"](
-    mission,
-    tickSeconds,
-  );
+  return POLICIES[
+    mission.scenario.savePolicy ??
+      (mission.scenario.skirmish ? "skirmish" : "objectives")
+  ](mission, tickSeconds);
 }

@@ -1,15 +1,10 @@
 import { createGoalList } from "./goals";
 import { createElement as el, setText } from "./dom";
+import { presentResult } from "./mission-result";
 import { countByDefinition } from "./sidebar-context";
 import { rosterIncludes } from "../simulation/ownership";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
-import type { MissionResult } from "../simulation/objectives";
 import "./sidebar-goals.css";
-
-const RESULT_DIRECTIVES: Record<MissionResult["kind"], string> = {
-  victory: "Victory secured. Continue exploring in free play.",
-  defeat: "Mission failed. Restart or load a saved mission.",
-};
 
 export function createSidebarGoals({
   briefing,
@@ -111,7 +106,7 @@ export function createSidebarGoals({
       missionDirective.hidden = !state.result;
       setText(
         missionDirective,
-        state.result ? RESULT_DIRECTIVES[state.result.kind] : "",
+        state.result ? presentResult(state.result).directive : "",
       );
       missionGoals.update(objectives);
       if (state.actorVersion === actorVersion) return;

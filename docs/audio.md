@@ -97,8 +97,9 @@ registration in the [asset inventory](audio-assets.md).
   Committed building activity identifies
   the produced or delivering unit, so consumers share the same participant.
 - Global events are `command.accepted`, `command.invalid`, `alert`,
-  `objective.complete`, `victory`, and `defeat`. Command batches produce one
-  response; cue cooldowns group repeated combat feedback. Each tick plays the
+  `objective.complete`, `victory`, `defeat`, and `draw`. The base pack binds
+  `draw` to the defeat cue. Command batches produce one response; cue
+  cooldowns group repeated combat feedback. Each tick plays the
   most specific player feedback: a mission result replaces objective and alert
   cues, and an objective completion or owned unit's `trained` cue replaces
   the alert for routine alerts. High-priority alerts still sound.

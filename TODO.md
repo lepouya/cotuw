@@ -308,6 +308,15 @@ and bring up the rough skirmish map early for simulation and AI development.
   Evaluate both owners once at tick end after commands, combat, and
   construction. Cover same-tick completion and loss, sales, and construction
   paused by lost support or tending. Latch result and final metrics together.
+  Scenario `skirmish` rules identify competing owners and qualifying building
+  types. End-of-tick elimination records a frozen victory, defeat, or draw;
+  saves preserve the verdict and reject inconsistent results and conflicting
+  save policies. Direct actor hooks are limited to skirmish setup; live changes
+  use commands. Headless checks cover same-tick sales and lethal combat,
+  replacement completion, paused support and tending, both factions, and
+  emergency recovery. Browser checks cover all verdicts, inspection, save/load,
+  and result-boundary autosaves in Chromium and WebKit. Final metrics latching
+  remains with 1.26.
 - [ ] **1.26** Record match milestone ticks, losses, and result in mission state
   using the definitions from 1.09. Make the data available to summaries and
   headless reports. Freeze the recorded summary at the result tick.
@@ -331,6 +340,8 @@ and bring up the rough skirmish map early for simulation and AI development.
   1.15 added owners, relationships with sharing, scenario events, and fired
   events to the format with their validation and documentation; 1.19 added
   per-owner exploration and observations; 1.23 added the scenario save policy.
+  Owner-based skirmish rules and persisted verdicts use mission format 15,
+  with validation and frozen save continuation.
 - [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers

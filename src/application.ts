@@ -6,7 +6,9 @@ import { createPlatform } from "./platform";
 import { createSaveRules } from "./save-policy";
 import { createSaveLibrary, saveCompleteMessage } from "./saves";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
+import { missionEnded } from "./simulation/mission-result";
 import { playerFactionOf } from "./simulation/ownership";
+import { presentResult } from "./ui/mission-result";
 import { createSidebar } from "./ui/sidebar";
 import { formatElapsed, topBarState } from "./ui/top-bar";
 
@@ -16,31 +18,24 @@ import type { Platform } from "./platform";
 import type { SaveRules } from "./save-policy";
 import type { SaveKind, SaveLibrary } from "./saves";
 import type { GameSession } from "./session";
-import type { MissionResult } from "./simulation/objectives";
+import type { MissionResult } from "./simulation/mission-result";
 import type { createDialogs, MenuMode, MenuView } from "./ui/dialogs";
 import type { createNotifications } from "./ui/notifications";
 import type { createTopBar } from "./ui/top-bar";
 
-/** Each menu's text; modes with a continue label offer continuing play. */
-const MENU_VIEWS: Record<
-  MenuMode,
-  Pick<MenuView, "title" | "description" | "continueLabel">
-> = {
+type MenuText = Pick<
+  MenuView,
+  "title" | "description" | "continueLabel" | "canInspect"
+>;
+
+/** Text for menus without a result; a continue label offers continuing play. */
+const MENU_VIEWS: Record<Exclude<MenuMode, "result">, MenuText> = {
   menu: { title: "Paused", description: "", continueLabel: "Resume" },
-  defeat: {
-    title: "Defeat",
-    description: "A mandatory objective failed. The mission is paused.",
-  },
-  victory: {
-    title: "Victory",
-    description:
-      "All victory objectives are complete. Continue exploring in free play, or restart the mission.",
-    continueLabel: "Continue free play",
-  },
   loaded: {
     title: "Mission loaded",
     description: "Inspect the saved mission, then resume when ready.",
     continueLabel: "Resume",
+    canInspect: true,
   },
   home: {
     title: "Citadels of the Unquiet World",
@@ -146,21 +141,10 @@ export function createApplication({
     }
   }
 
-  function menuDescription(mode: MenuMode, result?: MissionResult) {
-    const failure =
-      result?.kind === "defeat" &&
-      mission?.scenario.objectives?.find(({ id }) => id === result.objectiveId);
-    if (failure)
-      return `Objective failed: ${failure.label}. The mission is paused.`;
-    if (mode === "menu") return `${missionName()} · ${elapsed()} elapsed`;
-    return MENU_VIEWS[mode].description;
-  }
-
-  function showMenu(mode: MenuMode, result?: MissionResult) {
+  function presentMenu(mode: MenuMode, text: MenuText) {
     dialogs.showMenu({
-      ...MENU_VIEWS[mode],
+      ...text,
       mode,
-      description: menuDescription(mode, result),
       mission: session && {
         saveName: `${missionName()} ${elapsed()}`,
         canSave: canSave(),
@@ -169,8 +153,30 @@ export function createApplication({
     });
   }
 
+  function showMenu(mode: keyof typeof MENU_VIEWS) {
+    const text = MENU_VIEWS[mode];
+    presentMenu(
+      mode,
+      mode === "menu"
+        ? { ...text, description: `${missionName()} · ${elapsed()} elapsed` }
+        : text,
+    );
+  }
+
+  /** Result menus preempt others; reopened ones behave as the pause menu. */
+  function showResult(result: MissionResult, mode: MenuMode = "result") {
+    const { title, description, continueLabel, canInspect } = presentResult(
+      result,
+      (id) => mission?.scenario.objectives?.find((o) => o.id === id)?.label,
+    );
+    presentMenu(mode, { title, description, continueLabel, canInspect });
+  }
+
   function openMenu() {
-    if (session) showMenu("menu");
+    if (!session) return;
+    const result = session.simulation.result;
+    if (result && missionEnded(result)) showResult(result, "menu");
+    else showMenu("menu");
   }
 
   function showTitle() {
@@ -299,7 +305,7 @@ export function createApplication({
         onDispose: activeSidebar.dispose,
         // Results present at startup show once the session is ready.
         onResult: (result) => {
-          if (current() && session) showMenu(result.kind, result);
+          if (current() && session) showResult(result);
         },
         onReady: (ready) => {
           if (!current()) return;
@@ -324,7 +330,7 @@ export function createApplication({
     const started = await exclusive(() => launch(next, loaded));
     if (!started) return;
     const result = started.simulation.result;
-    if (result) showMenu(result.kind, result);
+    if (result) showResult(result);
     else if (loaded) showMenu("loaded");
     const name = saveRules?.atStart();
     if (name) void backgroundSave("auto", name);

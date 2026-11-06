@@ -216,7 +216,7 @@ test(
       const { ui, view } = window.dialogHarness;
       ui.showMenu({
         ...view,
-        mode: "defeat",
+        mode: "result",
         continueLabel: undefined,
         mission: { ...view.mission!, canSave: false, canRestart: false },
       });
@@ -252,7 +252,7 @@ test(
       });
       ui.showMenu({
         ...view,
-        mode: "victory",
+        mode: "result",
         title: "Victory",
         continueLabel: "Continue free play",
       });
@@ -269,6 +269,39 @@ test(
     expect(await page.evaluate(() => window.dialogHarness.state)).toMatchObject(
       { playing: true, resumes: 3, dismissals: ["guide"] },
     );
+  },
+);
+
+test(
+  "inspecting a final result leaves a preempted guide hidden",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await mountDialogs(page);
+    await page.locator("#resume-mission").click();
+    await page.evaluate(() => {
+      const { ui, view } = window.dialogHarness;
+      ui.offerGuide({
+        id: "guide",
+        title: "Guide",
+        text: "Instructions",
+        trigger: { kind: "actor", definitionId: "worker" },
+      });
+      ui.showMenu({
+        ...view,
+        mode: "result",
+        title: "Draw",
+        continueLabel: undefined,
+        canInspect: true,
+      });
+    });
+    await page.locator("#inspect-loaded-mission").click();
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await page.evaluate(() => {
+      const { ui, view } = window.dialogHarness;
+      ui.showMenu({ ...view, title: "Draw", continueLabel: undefined });
+    });
+    await page.keyboard.press("Escape");
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
   },
 );
 

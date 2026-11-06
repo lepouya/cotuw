@@ -1,3 +1,4 @@
+import type { SkirmishRules } from "./skirmish";
 import type { MissionState } from "./mission";
 import type { ObjectiveDefinition } from "./objectives";
 import type { MissionEventDefinition } from "./events";
@@ -10,7 +11,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 14;
+export const MISSION_FILE_VERSION = 15;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -63,13 +64,15 @@ export type MissionScenario = {
   readonly tileSize: number;
   readonly terrainTypeIds: readonly string[];
   readonly objectives?: readonly ObjectiveDefinition[];
+  /** Owner-based elimination, separate from authored campaign objectives. */
+  readonly skirmish?: SkirmishRules;
   /** One-time triggers and actions, such as relationship changes. */
   readonly events?: readonly MissionEventDefinition[];
   /** Lets an owner without a headquarters run one replacement job. */
   readonly emergencyHeadquarters?: boolean;
   /** Owners whose actors mission scripts may command. */
   readonly scriptControl?: readonly ScriptControl[];
-  /** When saving is allowed and autosaves occur; absent means objectives. */
+  /** Absent selects skirmish with skirmish rules, otherwise objectives. */
   readonly savePolicy?: SavePolicy;
   readonly briefing?: Readonly<ScenarioBriefing>;
   readonly goals?: readonly ScenarioGoal[];
@@ -132,6 +135,7 @@ export function serializeMission(
     tileSize,
     terrainTypeIds,
     objectives,
+    skirmish,
     events,
     emergencyHeadquarters,
     scriptControl,
@@ -154,6 +158,7 @@ export function serializeMission(
       tileSize,
       terrainTypeIds,
       objectives,
+      skirmish,
       events,
       emergencyHeadquarters,
       scriptControl,
@@ -320,6 +325,10 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
   )
     throw new RangeError(
       'Scenario savePolicy must be "objectives" or "skirmish".',
+    );
+  if (scenario.skirmish !== undefined && scenario.savePolicy === "objectives")
+    throw new RangeError(
+      "Owner-based skirmishes require the skirmish save policy.",
     );
   if (
     save !== undefined &&

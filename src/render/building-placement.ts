@@ -16,7 +16,9 @@ import {
   worldInputAvailable,
   worldKeyboardAvailable,
 } from "./input-focus";
+import { missionEnded } from "../simulation/mission-result";
 import { setText } from "../ui/dom";
+import { presentResult, SIMULATION_STOPPED } from "../ui/mission-result";
 
 import type { Scene, LinesMesh } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
@@ -461,10 +463,11 @@ export function createBuildingPlacement(
       pendingId = undefined;
       clearOverlay();
       update();
+      const { result } = simulation;
       message(
-        simulation.result?.kind === "defeat"
-          ? "Mission ended in defeat. Restart or load a saved mission."
-          : "Simulation stopped. Restart or load a mission from the menu.",
+        result && missionEnded(result)
+          ? presentResult(result).directive
+          : SIMULATION_STOPPED,
       );
     },
     dispose: () => {

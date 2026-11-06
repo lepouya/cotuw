@@ -10,13 +10,13 @@ import type { AudioControlDevice } from "./audio-controls";
 import type { FeatureScope } from "./dom";
 import type { SaveOperations } from "./save-panel";
 
-export type MenuMode =
-  "home" | "menu" | "loaded" | "victory" | "defeat" | "quit";
+export type MenuMode = "home" | "menu" | "loaded" | "result" | "quit";
 export type MenuView = {
   mode: MenuMode;
   title: string;
   description: string;
   continueLabel?: string;
+  canInspect?: boolean;
   mission?: { saveName: string; canSave: boolean; canRestart: boolean };
 };
 
@@ -56,7 +56,7 @@ const CONTROL_RULES: Record<string, (view: MenuView) => boolean> = {
   "new-mission": onlyIn("home"),
   "open-options": onlyIn("home"),
   "quit-game": onlyIn("home"),
-  "inspect-loaded-mission": onlyIn("loaded"),
+  "inspect-loaded-mission": (view) => !!view.canInspect,
   "return-to-title": onlyIn("quit"),
   "load-mission": (view) => view.mode !== "quit",
   "resume-mission": (view) => !!view.continueLabel,
@@ -276,9 +276,10 @@ function bindDialogs(
     if (busy || !view) return;
     invalidatePanel();
     dialog.close();
-    if (continueMission && menuMission === options.mission())
-      menuMission?.resume();
-    guideBlocked = false;
+    if (continueMission) {
+      guideBlocked = false;
+      if (menuMission === options.mission()) menuMission?.resume();
+    }
     restoreFocus();
     showGuide();
   }
@@ -379,7 +380,7 @@ function bindDialogs(
       menuMission = options.mission();
       resumeOnClose = next.mode === "menu" && !!menuMission?.playing();
       if (next.mission) menuMission?.pause();
-      guideBlocked = next.mode === "victory" || next.mode === "defeat";
+      if (next.mode === "result") guideBlocked = true;
       view = next;
       for (const control of dialog.querySelectorAll<HTMLElement>(
         "button, input",

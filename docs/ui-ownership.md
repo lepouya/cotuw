@@ -75,6 +75,8 @@ Audio activation and modal-local input remain available while a dialog is open.
   busy presentation, and pause/resume coordination. Menu contents remain
   local to this feature; shared behavior stays inside this module until a
   second caller needs a separate primitive.
+- `src/ui/mission-result.ts` turns a mission result into the text and menu
+  actions the menu, top bar, sidebar, and placement status share.
 - The caller supplies menu view data and semantic callbacks for application
   actions, plus narrow access to current mission pause/resume and guide
   dismissal. The dialog module does not receive the simulation, save storage,

@@ -36,6 +36,7 @@ export function createSessionSimulation(
   return createMissionSimulation({
     state: mission.state,
     objectives: mission.scenario.objectives,
+    skirmish: mission.scenario.skirmish,
     events: mission.scenario.events,
     emergencyHeadquarters: mission.scenario.emergencyHeadquarters,
     scriptControl: mission.scenario.scriptControl,

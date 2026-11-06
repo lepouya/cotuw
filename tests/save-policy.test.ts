@@ -70,3 +70,30 @@ test("objective missions autosave only on new completions", () => {
   expect(missionRules.onObjectives(both)).toBe("Autosave: Objective b");
   expect(missionRules.onObjectives(both)).toBeUndefined();
 });
+
+test.each(["victory", "defeat", "draw"] as const)(
+  "owner-based %s uses skirmish save rules by default",
+  (kind) => {
+    const result = {
+      kind,
+      tick: FIVE_MINUTES - 1,
+      eliminatedOwners: ["rival"],
+    };
+    const mission = {
+      scenario: {
+        id: "test",
+        tileSize: 1,
+        terrainTypeIds: [],
+        skirmish: {
+          owners: ["player", "rival"],
+          qualifyingDefinitionIds: ["hq"],
+        },
+      },
+      state: { tick: FIVE_MINUTES, objectives: [], skirmishResult: result },
+    } as unknown as MissionFile;
+    const saveRules = createSaveRules(mission, TICK_SECONDS);
+    expect(saveRules.canSave({ faulted: false, result })).toBe(true);
+    expect(saveRules.atStart()).toBeUndefined();
+    expect(saveRules.afterTick(FIVE_MINUTES, result)).toBeUndefined();
+  },
+);

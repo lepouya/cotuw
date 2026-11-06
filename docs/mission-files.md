@@ -69,11 +69,13 @@ can be read, edited by hand, and loaded again.
     non-negative integer. They are presentation only.
   - `tileSize`, `terrainTypeIds`, and `objectives` define the map scale, valid
     terrain types, and victory and defeat rules.
-  - `savePolicy` is `"objectives"` by default: autosave when an objective
-    completes, and no saving after defeat. `"skirmish"` autosaves at a fresh
-    start and every five simulation minutes until a result, skipping a
+  - `savePolicy` defaults to `"skirmish"` when `skirmish` rules are present,
+    otherwise `"objectives"`. The objectives policy autosaves when an objective
+    completes and prevents saving after defeat. `"skirmish"` autosaves at a
+    fresh start and every five simulation minutes until a result, skipping a
     result tick, and permits saving after every result. The skirmish map
-    preview uses it.
+    preview uses it. Owner-based skirmish rules reject an explicit
+    `"objectives"` policy.
 - `state` holds the complete simulation state. `state.scenarioId` must match
   `scenario.id`. `state.dismissedPopups` lists the popup IDs the player
   dismissed; removing an ID shows that popup again.
@@ -128,6 +130,30 @@ can be read, edited by hand, and loaded again.
   `wildlife` owner, hostile to each other; free-construction previews use a
   factionless `player` owner.
 
+## Skirmish results
+
+- `scenario.skirmish` names exactly two distinct `owners`, including the
+  player, and a nonempty `qualifyingDefinitionIds` list of building types in
+  the mission's content. It cannot accompany campaign objectives. All owners'
+  actors use the same type list, independently of their faction.
+- Only surviving, completed, tile-placed buildings of those types prevent
+  elimination. Include the types specified in
+  [skirmish results](../DESIGN.md#m1-skirmish-results), including defenses and
+  excluding Relay Stations, as roster content becomes available.
+- Both owners are evaluated once after commands, combat, and construction.
+  Sales count; a building completed that tick counts. Inactive buildings
+  count, while unfinished construction and mobile units do not.
+- `state.skirmishResult` is absent during play. At elimination it records
+  `kind` (`"victory"`, `"defeat"`, or `"draw"` from the player's perspective),
+  the zero-based resolution `tick`, and `eliminatedOwners` in scenario order.
+  Both eliminated owners produce a draw. The final state has `tick` equal to
+  the resolution tick plus one and an empty command queue.
+- Loading validates the result against the final buildings and preserves
+  frozen inspection. Results cannot be dropped from finished saves. Further
+  simulation ticks do nothing and simulation mutations are rejected. Camera,
+  selection, saving, and loading remain available.
+- Match metrics and their final snapshot are tracked in task 1.26.
+
 ## Commands
 
 - `state.commands` lists commands waiting for the next tick, each with its
@@ -162,7 +188,8 @@ can be read, edited by hand, and loaded again.
   add `sharesSupport`, `sharesHeadquarters`, and `sharesResources`; sharing an
   action leaves out is revoked.
 - Events fire in authored order at the end of the tick their trigger first
-  holds, and take effect from the next tick. A defeat stops them.
+  holds, and take effect from the next tick. Campaign defeats and all
+  skirmish verdicts stop them.
 
 ## Observations
 

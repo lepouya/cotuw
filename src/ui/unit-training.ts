@@ -81,7 +81,7 @@ export function createUnitTraining(
       // Placement is the remaining reason `enabled` can be false.
       const reason = productionBlocker(
         {
-          defeated: simulation.result?.kind === "defeat",
+          result: simulation.result,
           faulted,
           paused: !!options.paused?.(),
           placing: true,

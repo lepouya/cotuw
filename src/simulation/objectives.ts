@@ -32,7 +32,7 @@ export type ObjectiveView = {
   progress?: { current: number; total: number };
 };
 
-export type MissionResult =
+export type ObjectiveResult =
   | { kind: "victory"; tick: number }
   | { kind: "defeat"; objectiveId: string; tick: number };
 
@@ -77,9 +77,9 @@ export function createObjectiveStates(
 export function evaluateObjectives(
   objectives: readonly ObjectiveDefinition[],
   states: readonly ObjectiveState[],
-): { views: ObjectiveView[]; result?: MissionResult } {
+): { views: ObjectiveView[]; result?: ObjectiveResult } {
   const statesById = new Map(states.map((state) => [state.id, state]));
-  let failure: Extract<MissionResult, { kind: "defeat" }> | undefined;
+  let failure: Extract<ObjectiveResult, { kind: "defeat" }> | undefined;
   let goals = 0;
   let completed = 0;
   let victoryTick = 0;

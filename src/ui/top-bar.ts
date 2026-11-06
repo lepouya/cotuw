@@ -1,7 +1,10 @@
-import type { MissionResult, ObjectiveView } from "../simulation/objectives";
+import { missionEnded } from "../simulation/mission-result";
+import type { MissionResult } from "../simulation/mission-result";
+import type { ObjectiveView } from "../simulation/objectives";
 import type { GameSession } from "../session";
 import type { SidebarState } from "./sidebar";
 import { setText } from "./dom";
+import { presentResult } from "./mission-result";
 import { resourceName } from "../simulation/resources";
 
 export type TopBarState = {
@@ -21,7 +24,8 @@ export function topBarState(
   state?: SidebarState,
 ): TopBarState {
   return {
-    canPlay: !!session && !!state && !state.faulted,
+    canPlay:
+      !!session && !!state && !state.faulted && !missionEnded(state.result),
     playing: session?.playing() ?? false,
     speed: session?.speed() ?? 1,
     elapsedSeconds: session
@@ -50,8 +54,7 @@ export function objectiveSummary(
   objectives: readonly ObjectiveView[],
   result?: MissionResult,
 ): string {
-  if (result?.kind === "victory") return "Victory · free play";
-  if (result?.kind === "defeat") return "Mission failed";
+  if (result) return presentResult(result).summary;
   const goals = objectives.filter(({ progress }) => progress);
   const next = goals.find(({ status }) => status === "active");
   if (!next) return "";

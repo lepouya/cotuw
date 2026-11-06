@@ -1,4 +1,8 @@
 import { growthCandidates, growthWorkerFor } from "./growth";
+import { missionEnded } from "./mission-result";
+import type { MissionResult } from "./mission-result";
+import { evaluateSkirmish, validateSkirmish } from "./skirmish";
+import type { SkirmishResult, SkirmishRules } from "./skirmish";
 import {
   headquarteredOwners,
   infrastructureHeadquarters,
@@ -62,7 +66,6 @@ import {
   validateObjectives,
 } from "./objectives";
 import type {
-  MissionResult,
   ObjectiveDefinition,
   ObjectiveState,
   ObjectiveView,
@@ -244,7 +247,9 @@ export type MissionState = {
   wrecks: Wreck[];
   /** Wolf alerts; each wolf's own state lives on its actor. */
   wildlife: WildlifeState;
-  /** Progress for the authored objectives, which also decide the result. */
+  /** Frozen owner-based verdict; absent until a skirmish ends. */
+  skirmishResult?: SkirmishResult;
+  /** Progress for authored campaign objectives. */
   objectives: ObjectiveState[];
   /** Scenario popups the player dismissed; the simulation only keeps them. */
   dismissedPopups?: string[];
@@ -293,6 +298,7 @@ export type MissionSimulationOptions = {
   occupancy?: OccupancyGrid;
   /** Matches `state.objectives`; a failed objective ends the mission. */
   objectives?: readonly ObjectiveDefinition[];
+  skirmish?: SkirmishRules;
   /** Authored mission logic; `state.firedEvents` records its progress. */
   events?: readonly MissionEventDefinition[];
   /** Matches the scenario's emergency headquarters rule. */
@@ -322,7 +328,7 @@ export type MissionSimulation = {
   /** Unit exits and cargo deliveries during the latest tick. */
   readonly buildingActivity: readonly BuildingActivity[];
   readonly wrecks: readonly Wreck[];
-  /** A defeat ends the mission; play continues after victory. */
+  /** Skirmish verdicts and campaign defeats end play. */
   readonly result: MissionResult | undefined;
   readonly objectives: readonly ObjectiveView[];
   /** Current relationship rules; events replace the view when they change. */
@@ -358,9 +364,9 @@ export type MissionSimulation = {
    * Non-object commands and unknown issuers throw.
    */
   submitCommand: (command: MissionCommand, issuer?: CommandIssuer) => number;
-  /** Adds a copy of the actor, validated like the initial state. */
+  /** Adds a validated actor; skirmishes permit this only at tick 0. */
   spawnActor: (actor: Actor) => void;
-  /** Returns whether an actor with this ID existed. */
+  /** Removes an actor and reports its existence; skirmish setup only. */
   removeActor: (id: string) => boolean;
   /** A deep copy of the current state and terrain, for saves and replays. */
   snapshot: () => MissionState;
@@ -383,6 +389,7 @@ export function createMissionSimulation({
   map,
   occupancy,
   objectives: authoredObjectives = [],
+  skirmish: authoredSkirmish,
   events: authoredEvents = [],
   emergencyHeadquarters = false,
   scriptControl = [],
@@ -426,6 +433,7 @@ export function createMissionSimulation({
     )
   )
     throw new RangeError("Mission state has invalid queued commands.");
+  const skirmish = deepFreeze(structuredClone(authoredSkirmish));
   const objectives = deepFreeze(structuredClone(authoredObjectives));
   validateObjectives(
     objectives,
@@ -439,7 +447,9 @@ export function createMissionSimulation({
     deepFreeze(evaluateObjectives(objectives, states));
   const resultOf = (states: readonly ObjectiveState[]) =>
     objectivesFor(states).result;
-  const ended = () => resultOf(state.objectives)?.kind === "defeat";
+  const currentResult = () =>
+    state.skirmishResult ?? resultOf(state.objectives);
+  const ended = () => missionEnded(currentResult());
   const savedTerrain = state.terrain;
   const restoringSnapshot = savedTerrain !== undefined;
   if (savedTerrain && !map) {
@@ -546,6 +556,11 @@ export function createMissionSimulation({
     ensureRunning();
     if (ticking) throw new Error("Mission mutations cannot run during a tick.");
     if (ended()) throw new Error("The mission has ended.");
+  };
+  const ensureActorMutation = () => {
+    ensureMutable();
+    if (skirmish && state.tick > 0)
+      throw new Error("Use commands to change actors after a skirmish starts.");
   };
   const definitionFor = (actor: Actor): ActorDefinition =>
     definitionsById.get(actor.definitionId)!;
@@ -699,6 +714,12 @@ export function createMissionSimulation({
     return committed;
   };
   state.actors = freezeActors(state.actors.map((actor) => register(actor)));
+  validateSkirmish(skirmish, state, {
+    owners: ownerIds,
+    definitions: definitionsById,
+    objectives,
+  });
+  deepFreeze(state.skirmishResult);
   validateWildlife(
     state.wildlife,
     state.actors,
@@ -1587,7 +1608,7 @@ export function createMissionSimulation({
       return buildingActivity;
     },
     get result() {
-      return resultOf(state.objectives);
+      return currentResult();
     },
     get objectives() {
       return objectivesFor(state.objectives).views;
@@ -1677,7 +1698,7 @@ export function createMissionSimulation({
       return state.tick;
     },
     spawnActor: (actor) => {
-      ensureMutable();
+      ensureActorMutation();
       const copy = structuredClone(actor);
       let footprint: FootprintPlacement | undefined;
       if (copy.tilePlacement !== undefined) {
@@ -1717,7 +1738,7 @@ export function createMissionSimulation({
       updateKnowledge();
     },
     removeActor: (id) => {
-      ensureMutable();
+      ensureActorMutation();
       if (!actorsById.has(id)) {
         return false;
       }
@@ -1928,9 +1949,13 @@ export function createMissionSimulation({
           worldBounds,
           state.tick + 1,
         );
+        const skirmishResult =
+          skirmish &&
+          evaluateSkirmish(skirmish, working.actors, playerOwner, state.tick);
+        const finished = defeated || !!skirmishResult;
         // Events see the tick's outcome; their changes apply from the next tick.
         const fired =
-          defeated || !events.length
+          finished || !events.length
             ? undefined
             : fireEvents(events, state, {
                 completedTicks: state.tick + 1,
@@ -1959,7 +1984,8 @@ export function createMissionSimulation({
             relationships: deepFreeze(fired.relationships),
             firedEvents: deepFreeze(fired.firedEvents),
           }),
-          commands: defeated
+          ...(skirmishResult && { skirmishResult: deepFreeze(skirmishResult) }),
+          commands: finished
             ? []
             : state.commands.filter(({ tick }) => tick > state.tick),
           ...(working.economy && { economy: deepFreeze(working.economy) }),

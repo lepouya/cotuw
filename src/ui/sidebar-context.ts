@@ -1,7 +1,9 @@
+import { missionEnded } from "../simulation/mission-result";
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { Resource } from "../simulation/resources";
 import type { Relations } from "../simulation/ownership";
-import type { MissionResult, ObjectiveView } from "../simulation/objectives";
+import type { MissionResult } from "../simulation/mission-result";
+import type { ObjectiveView } from "../simulation/objectives";
 import type {
   ScenarioBriefing,
   ScenarioGoal,
@@ -78,9 +80,13 @@ export function inspectedActor({ actors, selectedActorIds }: SidebarState) {
     : undefined;
 }
 
-/** Whether selection and order controls are locked for this state. */
-export const ordersLocked = (state: SidebarState) =>
+/** Whether world selection is locked; finished missions stay inspectable. */
+export const selectionLocked = (state: SidebarState) =>
   state.placementActive || state.faulted;
+
+/** Whether simulation orders are locked for this state. */
+export const ordersLocked = (state: SidebarState) =>
+  selectionLocked(state) || missionEnded(state.result);
 
 export function countByDefinition(actors: Iterable<ActorRenderState>) {
   const counts = new Map<string, number>();

@@ -2013,10 +2013,10 @@ are tracked in the checklist.
 
 ## Persistence
 
-- Levels and mission saves share one human-readable JSON format, version 11. A
-  level is a mission file at tick 0. Every mission starts by loading a file,
-  including bundled levels, and [mission files](docs/mission-files.md)
-  documents the layout for hand editing.
+- Levels and mission saves share one human-readable JSON format. A level is a
+  mission file at tick 0. Every mission starts by loading a file, including
+  bundled levels. The [mission-file guide](docs/mission-files.md) documents
+  the layout for hand editing.
 - Mission files carry the scenario's authored data, such as terrain,
   objectives, briefing, and goals, beside the runtime snapshot. They name a
   shared content pack and its version, and may list the pack's actors they

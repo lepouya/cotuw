@@ -1266,6 +1266,11 @@ test("specific player feedback replaces routine alerts in the same tick", () => 
   expect(played()).toEqual(["victory"]);
 });
 
+test("every mission result kind has a global audio binding", () => {
+  for (const kind of ["victory", "defeat", "draw"])
+    expect(BASE_CONTENT.audio!.events![kind]).toBeDefined();
+});
+
 test("Circle cultivation and construction use distinct work cues without Harvester audio", () => {
   const worker = BASE_CONTENT.presentation["circle-cultivator"]!.audio!;
   const building = BASE_CONTENT.presentation["circle-conservatory"]!.audio!;
