@@ -288,9 +288,14 @@ and bring up the rough skirmish map early for simulation and AI development.
   stale save feedback during teardown. Browser checks cover incompatible
   listing, skirmish autosaves and result saves, and repeated load, restart,
   and title cycles.
-- [ ] **1.24** Make sidebar features composable and supply faction names,
+- [x] **1.24** Make sidebar features composable and supply faction names,
   resource labels, costs, and actions through content and player-visible state.
   Modularize their markup and styles without duplicating the ARC sidebar.
+  One sidebar composes TypeScript-created production, goals, selection, and
+  order sections with adjacent CSS. Session binders receive typed controls;
+  cards and keyed rows retain their nodes across updates. Browser checks cover
+  both factions, custom content and costs, information isolation, focus,
+  compact layouts, and disposal. Human playtest accepted the result.
 - [ ] **1.25** Add the agreed objective rules for actors constructed during
   play. Eliminate owners on loss of qualifying completed buildings, including
   inactive buildings and replacement headquarters, without relying only on

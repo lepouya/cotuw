@@ -1,0 +1,13 @@
+.actor-portrait {
+  display: block;
+  width: 100%;
+  height: 4.5rem;
+}
+
+@media (max-height: 600px) {
+  .actor-portrait {
+    width: 2rem;
+    height: 2rem;
+    grid-row: span 2;
+  }
+}

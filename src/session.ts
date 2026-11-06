@@ -21,6 +21,7 @@ import { disconnectedBuildings } from "./simulation/support";
 import { rosterIncludes } from "./simulation/ownership";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
+import { contentRoles } from "./ui/content-roles";
 import { createNetworkControls } from "./ui/network-controls";
 import type { NetworkControls } from "./ui/network-controls";
 import {
@@ -29,6 +30,7 @@ import {
   issuedBy,
 } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
+import type { EconomyElements } from "./ui/economy-controls";
 import {
   createMaterialsSitesView,
   MATERIALS_COLOR,
@@ -149,7 +151,7 @@ export type GameSessionControls = BuildingPlacementControls &
     /** Runs after each simulation tick and its result, with the tick count. */
     onTick?: (tick: number) => void;
     buildings?: readonly DefinitionButton[];
-    economyRoot?: HTMLElement;
+    economy?: EconomyElements;
     onReady?: (session: GameSession) => void;
     onDispose?: () => void;
     /** Updates after simulation ticks or changes to controls and selection. */
@@ -746,8 +748,14 @@ async function assembleGameSession(
     controls.remove?.removeEventListener("click", removeSelected),
   );
   const selectedOwnActorId = () => player.ownActor(input.selectedActorId)?.id;
+  const roles = (actorId: string | undefined) =>
+    contentRoles(definitions, names, {
+      definitionId: player.ownActor(actorId)?.definitionId,
+      faction: simulation.playerFaction,
+    });
   const training = createUnitTraining(simulation, controls, {
     names,
+    roles,
     selectedActorId: selectedOwnActorId,
     unitDefinitionIds: () =>
       trainableUnitIds(player.ownActor(input.selectedActorId), definitionsById),
@@ -794,11 +802,12 @@ async function assembleGameSession(
     selectedActorId: selectedOwnActorId,
     canControl: (id) => !!player.ownActor(id),
     tileSize: map.tileSize,
+    supportHub: (actorId) => roles(actorId).supportHub,
   });
-  const economyRoot = controls.economyRoot;
+  const economyElements = controls.economy;
   const economyControls =
-    simulation.economy && economyRoot
-      ? createEconomyControls(economyRoot, simulation, {
+    simulation.economy && economyElements
+      ? createEconomyControls(economyElements, simulation, {
           definitions,
           names,
           selectedActorId: selectedOwnActorId,

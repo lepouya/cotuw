@@ -17,7 +17,8 @@ import type {
 } from "../simulation/cultivation";
 import { disconnectedBuildings } from "../simulation/support";
 import { ECONOMY_COMMAND_KINDS, isOutcomeOf } from "../simulation/command";
-import { setText } from "./dom";
+import { contentRoles } from "./content-roles";
+import { createButton, createKeyedList, setText } from "./dom";
 import type {
   EconomyReason,
   EconomyView,
@@ -33,30 +34,37 @@ import type {
 import type { TileCoord } from "../simulation/grid";
 import type { WorldPosition } from "../simulation/world";
 
-const REASONS: Record<EconomyReason | AuthorityReason, string> = {
+type EconomyRoles = ReturnType<typeof contentRoles>;
+
+const commandReasons = ({
+  harvester,
+  refinery,
+}: EconomyRoles): Record<EconomyReason | AuthorityReason, string> => ({
   unauthorized: "You cannot command this unit.",
   "invalid-cultivator": "Select a cultivating worker first.",
   "invalid-growth": "Choose an unfinished growing building.",
   "tender-occupied": "This building already has a tending worker.",
-  "invalid-harvester": "Select a Harvester first.",
+  "invalid-harvester": `Select a ${harvester} first.`,
   "missing-site": "Choose a resource site.",
-  "missing-refinery": "Assign this Harvester to an empty Refinery first.",
-  "refinery-occupied":
-    "This Refinery already has an assigned Harvester or paid order.",
+  "missing-refinery": `Assign this ${harvester} to an empty ${refinery} first.`,
+  "refinery-occupied": `This ${refinery} already has an assigned ${harvester} or paid order.`,
   "empty-cargo": "This worker has no cargo to deliver.",
   "missing-order":
     "This production order has already finished or been cancelled.",
-};
+});
 
-const PHASES: Record<HarvesterState["phase"], string> = {
+const harvesterPhases = (
+  materials: string,
+  { refinery }: EconomyRoles,
+): Record<HarvesterState["phase"], string> => ({
   idle: "Idle",
-  travelling: "Travelling to Materials",
+  travelling: `Travelling to ${materials}`,
   gathering: "Gathering",
   returning: "Returning cargo",
   depleted: "Patch depleted. Assign a new patch",
   blocked: "Route blocked. Clear the route or choose another patch",
-  unassigned: "Unassigned. Choose an empty Refinery",
-};
+  unassigned: `Unassigned. Choose an empty ${refinery}`,
+});
 
 const CULTIVATOR_PHASES: Record<
   Exclude<CultivatorState["phase"], "tending" | "no-dropoff">,
@@ -84,9 +92,34 @@ function patches(economy: EconomyView) {
   return [...byName.values()];
 }
 
+/** A keyed worker, queue, or site button. */
+type EconomyAction = {
+  key: string;
+  text: string;
+  disabled: boolean;
+  action: (shiftKey: boolean) => void;
+};
+
+export type EconomyElements = {
+  constructionDetails: HTMLElement;
+  workerActivityHeading: HTMLElement;
+  harvesterDetails: HTMLElement;
+  gatherSites: HTMLElement;
+  refineryAssignmentHeading: HTMLElement;
+  refineryAssignments: HTMLElement;
+  returnCargoActions: HTMLElement;
+  harvesterStatus: HTMLElement;
+  harvesterActions: HTMLElement;
+  productionQueue: HTMLElement;
+  removeBuilding: HTMLButtonElement;
+  constructionQueue: HTMLElement;
+  resourceOverview: HTMLElement;
+  economyAlert: HTMLElement;
+};
+
 /** Buttons remain stable while live cargo and production progress change. */
 export function createEconomyControls(
-  root: HTMLElement,
+  elements: EconomyElements,
   simulation: Pick<
     MissionSimulation,
     | "actors"
@@ -113,7 +146,6 @@ export function createEconomyControls(
   },
 ) {
   const controller = new AbortController();
-  const element = (id: string) => root.querySelector<HTMLElement>(`#${id}`)!;
   const definitions = new Map(
     options.definitions.map((definition) => [definition.id, definition]),
   );
@@ -121,19 +153,15 @@ export function createEconomyControls(
     options.canControl ?? ((actor) => actor.owner === simulation.playerOwner);
   const nameOf = (id: string | undefined) =>
     (id && options.names.get(id)) || "";
-  const definitionWith = (has: (definition: ActorDefinition) => unknown) =>
-    options.definitions.find(has);
-  // Growth and cultivation roles come from content rather than faction names.
-  const cultivatorDefinition = definitionWith(({ cultivation }) => cultivation);
-  const cultivator = nameOf(cultivatorDefinition?.id) || "cultivating worker";
-  const dropoff =
-    nameOf(
-      definitionWith(({ cultivationDropoff }) => cultivationDropoff)?.id,
-    ) || "drop-off building";
-  const headquarters =
-    nameOf(
-      definitionWith(({ growth }) => growth)?.growth?.headquartersDefinitionId,
-    ) || "headquarters";
+  const definitionWith = (
+    has: (definition: ActorDefinition) => unknown,
+    faction?: string,
+  ) =>
+    options.definitions.find(
+      (definition) =>
+        (faction === undefined || definition.faction === faction) &&
+        has(definition),
+    );
   /** The headquarters kind that hosts a building's construction. */
   const headquartersFor = (definitionId: string) => {
     const building = definitions.get(definitionId);
@@ -143,47 +171,49 @@ export function createEconomyControls(
           definitionWith(
             ({ infrastructure, faction }) =>
               infrastructure && faction === building?.faction,
+            building?.faction,
           )?.id,
       ) || "headquarters"
     );
   };
+  const rolesFor = (definitionId?: string) =>
+    contentRoles(options.definitions, options.names, {
+      definitionId,
+      faction: simulation.playerFaction,
+    });
+  const materials = resourceName("materials");
   const percent = (amount: number, total: number) =>
     Math.round((amount / total) * 100);
   const siteSummary = (site: CultivationSite) =>
     `${site.name} · ${cultivationStatus(site)} · ${percent(site.reserve, site.capacity)}% reserve · ${percent(cultivationEfficiency(site), 1)}% efficiency${site.dormant ? ` · Reopens at ${percent(site.recoverAt, site.capacity)}%` : ""}`;
-  const actions = new Map<string, (shiftKey: boolean) => void>();
-  const buttons = new Map<string, HTMLButtonElement>();
-  const sync = (
-    container: HTMLElement,
-    entries: {
-      key: string;
-      text: string;
-      disabled: boolean;
-      action: (shiftKey: boolean) => void;
-    }[],
-  ) => {
-    const keys = new Set(entries.map((entry) => entry.key));
-    for (const [key, button] of buttons) {
-      if (button.parentElement === container && !keys.has(key)) {
-        button.remove();
-        buttons.delete(key);
-        actions.delete(key);
-      }
-    }
-    entries.forEach((entry, index) => {
-      let button = buttons.get(entry.key);
-      if (!button) {
-        button = document.createElement("button");
-        button.type = "button";
-        button.dataset.economyAction = entry.key;
-        buttons.set(entry.key, button);
-      }
-      setText(button, entry.text);
-      button.disabled = entry.disabled;
-      actions.set(entry.key, entry.action);
-      if (container.children[index] !== button)
-        container.insertBefore(button, container.children[index] ?? null);
-    });
+  const actionList = (container: HTMLElement) =>
+    createKeyedList<EconomyAction>(
+      container,
+      ({ key }) => key,
+      ({ key }) => {
+        const node = createButton("", { "data-economy-action": key });
+        let run: EconomyAction["action"];
+        const activate = (event: MouseEvent) => run(event.shiftKey);
+        node.addEventListener("click", activate);
+        return {
+          node,
+          dispose: () => node.removeEventListener("click", activate),
+          update: ({ text, disabled, action }) => {
+            setText(node, text);
+            node.disabled = disabled;
+            run = action;
+          },
+        };
+      },
+      controller.signal,
+    );
+  const lists = {
+    gatherSites: actionList(elements.gatherSites),
+    refineryAssignments: actionList(elements.refineryAssignments),
+    returnCargoActions: actionList(elements.returnCargoActions),
+    constructionQueue: actionList(elements.constructionQueue),
+    resourceOverview: actionList(elements.resourceOverview),
+    productionQueue: actionList(elements.productionQueue),
   };
   const submit = (command: MissionCommand, shiftKey = false) => {
     if (!options.enabled()) return;
@@ -193,20 +223,8 @@ export function createEconomyControls(
         ? { ...command, queued: true }
         : command,
     );
-    element("harvester-status").textContent = "Order submitted.";
+    setText(elements.harvesterStatus, "Order submitted.");
   };
-  root.addEventListener(
-    "click",
-    (event) => {
-      if (!(event.target instanceof Element)) return;
-      const button = event.target.closest<HTMLButtonElement>(
-        "[data-economy-action]",
-      );
-      if (button && !button.disabled)
-        actions.get(button.dataset.economyAction!)?.(event.shiftKey);
-    },
-    { signal: controller.signal },
-  );
   const secondsLeft = (work: { completedTicks: number; totalTicks: number }) =>
     Math.ceil((work.totalTicks - work.completedTicks) * simulation.tickSeconds);
   let lastResult = "";
@@ -221,6 +239,30 @@ export function createEconomyControls(
       const actor = selected && canControl(selected) ? selected : undefined;
       const resourcePatches = patches(economy);
       const definition = actor && definitions.get(actor.definitionId);
+      const roles = rolesFor(definition?.id);
+      const { harvester, refinery } = roles;
+      const phases = harvesterPhases(materials, roles);
+      const faction = definition?.faction ?? simulation.playerFaction;
+      const cultivatorDefinition = definition?.cultivation
+        ? definition
+        : definitionWith(({ cultivation }) => cultivation, faction);
+      const cultivator =
+        nameOf(cultivatorDefinition?.id) || "cultivating worker";
+      const dropoff =
+        nameOf(
+          definitionWith(
+            ({ cultivationDropoff }) => cultivationDropoff,
+            faction,
+          )?.id,
+        ) || "drop-off building";
+      const headquarters =
+        nameOf(
+          definitionWith(
+            ({ growth }) =>
+              growth && growth.workerDefinitionId === cultivatorDefinition?.id,
+            faction,
+          )?.growth?.headquartersDefinitionId,
+        ) || "headquarters";
       const worker =
         actor &&
         economy.harvesters.find((worker) => worker.actorId === actor.id);
@@ -235,13 +277,14 @@ export function createEconomyControls(
         (actor) =>
           canControl(actor) && definitions.get(actor.definitionId)?.refinery,
       );
-      const details = element("harvester-actions");
+      const details = elements.harvesterActions;
       details.hidden = !worker && !cultivating;
       setText(
-        element("worker-activity-heading"),
-        cultivating ? "Cultivation and tending" : "Materials gathering",
+        elements.workerActivityHeading,
+        cultivating ? "Cultivation and tending" : `${materials} gathering`,
       );
-      element("refinery-assignment-heading").hidden = !!cultivating;
+      setText(elements.refineryAssignmentHeading, `Assigned ${refinery}`);
+      elements.refineryAssignmentHeading.hidden = !!cultivating;
       details.setAttribute(
         "aria-label",
         cultivating ? "Cultivation controls" : "Harvesting controls",
@@ -263,11 +306,11 @@ export function createEconomyControls(
                       ? "Travelling to tend growth"
                       : `Waiting for ${headquarters} capacity`;
         setText(
-          element("harvester-details"),
+          elements.harvesterDetails,
           `Cargo ${cultivating.cargo}/${definition!.cultivation!.capacity} ${resourceName("lifebloom")} · ${phase}`,
         );
-        sync(element("refinery-assignments"), []);
-        sync(element("gather-sites"), [
+        lists.refineryAssignments.update([]);
+        lists.gatherSites.update([
           ...cultivationSites.map((site) => ({
             key: `cultivate:${site.id}`,
             text: `Gather ${siteSummary(site)}`,
@@ -307,10 +350,11 @@ export function createEconomyControls(
         ]);
       }
       if (worker) {
-        element("harvester-details").textContent =
-          `Cargo ${worker.cargo}/${definition!.harvesting!.capacity} · ${PHASES[worker.phase]}${worker.refineryId && disconnected.has(worker.refineryId) ? " · Refinery disconnected; cargo delivery paused" : ""}`;
-        sync(
-          element("refinery-assignments"),
+        setText(
+          elements.harvesterDetails,
+          `Cargo ${worker.cargo}/${definition!.harvesting!.capacity} · ${phases[worker.phase]}${worker.refineryId && disconnected.has(worker.refineryId) ? ` · ${refinery} disconnected; cargo delivery paused` : ""}`,
+        );
+        lists.refineryAssignments.update(
           refineries
             .filter(
               (refinery) =>
@@ -318,23 +362,22 @@ export function createEconomyControls(
                 definitions.get(refinery.definitionId)?.refinery
                   ?.harvesterDefinitionId === actor!.definitionId,
             )
-            .map((refinery, index) => ({
-              key: `assign:${refinery.id}`,
-              text: `${worker.refineryId === refinery.id ? "Assigned to" : "Assign to"} Refinery ${index + 1}`,
+            .map((building, index) => ({
+              key: `assign:${building.id}`,
+              text: `${worker.refineryId === building.id ? "Assigned to" : "Assign to"} ${nameOf(building.definitionId) || refinery} ${index + 1}`,
               disabled:
                 !enabled ||
-                worker.refineryId === refinery.id ||
-                refineryOccupied(economy, refinery.id),
+                worker.refineryId === building.id ||
+                refineryOccupied(economy, building.id),
               action: () =>
                 submit({
                   kind: "assign-refinery",
                   actorId: worker.actorId,
-                  refineryId: refinery.id,
+                  refineryId: building.id,
                 }),
             })),
         );
-        sync(
-          element("gather-sites"),
+        lists.gatherSites.update(
           resourcePatches.map(({ site, remaining }) => ({
             key: `gather:${site.id}`,
             text: `Gather ${site.name} (${remaining})`,
@@ -352,8 +395,7 @@ export function createEconomyControls(
         );
       }
       const selectedWorker = worker ?? cultivating;
-      sync(
-        element("return-cargo-actions"),
+      lists.returnCargoActions.update(
         selectedWorker
           ? [
               {
@@ -373,8 +415,8 @@ export function createEconomyControls(
           : [],
       );
       if (!selectedWorker) {
-        sync(element("refinery-assignments"), []);
-        sync(element("gather-sites"), []);
+        lists.refineryAssignments.update([]);
+        lists.gatherSites.update([]);
       }
       const construction = simulation.actors.filter(
         (actor) => canControl(actor) && actor.construction,
@@ -400,8 +442,7 @@ export function createEconomyControls(
               : !headquartersId
                 ? `No ${headquartersFor(definitionId)} · Paused`
                 : "Queued";
-      sync(
-        element("construction-queue"),
+      lists.constructionQueue.update(
         construction.map((actor) => ({
           key: `construction:${actor.id}`,
           text: `${options.names.get(actor.definitionId)} · ${constructionStatus(actor)} · ${secondsLeft(actor.construction!)}s remaining · Cancel (+${actor.construction!.paidCost})`,
@@ -413,15 +454,18 @@ export function createEconomyControls(
       const selectedConstruction = construction.find(
         (actor) => actor.id === id,
       );
-      const constructionDetails = element("construction-details");
+      const constructionDetails = elements.constructionDetails;
       constructionDetails.hidden = !selectedConstruction;
       if (selectedConstruction)
-        constructionDetails.textContent = `${constructionStatus(selectedConstruction)} · ${secondsLeft(selectedConstruction.construction!)}s remaining`;
+        setText(
+          constructionDetails,
+          `${constructionStatus(selectedConstruction)} · ${secondsLeft(selectedConstruction.construction!)}s remaining`,
+        );
       const jobs = economy.production.filter(
         (job) => job.producerId === actor?.id,
       );
       const mobile = definition?.movement ? actor : undefined;
-      sync(element("resource-overview"), [
+      lists.resourceOverview.update([
         ...cultivationSites.map((site) => ({
           key: `show-cultivation:${site.id}`,
           text: `Show ${siteSummary(site)}`,
@@ -458,8 +502,7 @@ export function createEconomyControls(
           };
         }),
       ]);
-      sync(
-        element("production-queue"),
+      lists.productionQueue.update(
         jobs.map((job) => ({
           key: `cancel:${job.actorId}`,
           text: `${options.names.get(job.definitionId)} · ${disconnected.has(job.producerId) ? `Disconnected · Paused · ${secondsLeft(job)}s remaining` : job.exitBlocked ? "Exit blocked" : `${secondsLeft(job)}s remaining`} · Cancel (+${job.paidCost})`,
@@ -533,55 +576,57 @@ export function createEconomyControls(
       } else if (warning) {
         status =
           warning.phase === "depleted"
-            ? "Patch depleted: select the idle Harvester and assign a new patch."
+            ? `Patch depleted: select the idle ${harvester} and assign a new patch.`
             : warning.phase === "unassigned"
-              ? "Unassigned Harvester: select it and choose an empty Refinery."
-              : "Harvesting route blocked: clear the route or reassign the Harvester.";
+              ? `Unassigned ${harvester}: select it and choose an empty ${refinery}.`
+              : `Harvesting route blocked: clear the route or reassign the ${harvester}.`;
       } else if (
         construction.some(
           (actor) => definitions.get(actor.definitionId)?.refinery,
         )
       ) {
-        status =
-          "Refinery under construction. Produce its Harvester when it finishes.";
+        status = `${refinery} under construction. Produce its ${harvester} when it finishes.`;
       } else if (idleWorker) {
         status = idleWorker.cargo
-          ? "Idle Harvester: return its cargo or assign a Materials patch."
-          : "Select the idle Harvester and choose Gather in Selection.";
+          ? `Idle ${harvester}: return its cargo or assign a ${materials} patch.`
+          : `Select the idle ${harvester} and choose Gather in Selection.`;
       } else if (harvesting) {
-        status = `A full load takes ${harvesting.loadSeconds} seconds, plus travel. Materials arrive on delivery.`;
+        status = `A full load takes ${harvesting.loadSeconds} seconds, plus travel. ${materials} arrive on delivery.`;
       } else if (!stalled) {
         status = emptyRefinery
-          ? "Select an empty Refinery and produce its Harvester."
-          : "Build a Refinery, then produce its Harvester.";
+          ? `Select an empty ${refinery} and produce its ${harvester}.`
+          : `Build a ${refinery}, then produce its ${harvester}.`;
       } else {
-        status =
-          "Economy stalled: find Materials salvage or sell a building to recover.";
+        status = `Economy stalled: find ${materials} salvage or sell a building to recover.`;
       }
-      setText(element("economy-alert"), status);
+      setText(elements.economyAlert, status);
       const currency = definition ? costCurrency(definition) : "";
-      const remove = element("remove-building");
-      remove.textContent = actor?.construction
-        ? `Cancel construction (+${actor.construction.paidCost} ${currency})`
-        : definition && actor!.tilePlacement
-          ? `Sell building (+${saleRefund(actor!, definition)} ${currency})`
-          : "Sell selected building";
-      if (lastResult) element("harvester-status").textContent = lastResult;
+      const remove = elements.removeBuilding;
+      setText(
+        remove,
+        actor?.construction
+          ? `Cancel construction (+${actor.construction.paidCost} ${currency})`
+          : definition && actor!.tilePlacement
+            ? `Sell building (+${saleRefund(actor!, definition)} ${currency})`
+            : "Sell selected building",
+      );
+      if (lastResult) setText(elements.harvesterStatus, lastResult);
     },
     onOutcome: (outcome: CommandOutcome) => {
       if (isOutcomeOf(outcome, ...ECONOMY_COMMAND_KINDS)) {
+        const actor = simulation.actors.find(
+          ({ id }) => id === outcome.command.actorId,
+        );
+        const reasons = commandReasons(rolesFor(actor?.definitionId));
         lastResult = outcome.accepted
           ? outcome.queued
             ? "Order queued."
             : "Order accepted."
-          : REASONS[outcome.reason ?? "invalid-harvester"];
+          : reasons[outcome.reason ?? "invalid-harvester"];
       }
     },
     dispose: () => {
       controller.abort();
-      for (const button of buttons.values()) button.remove();
-      buttons.clear();
-      actions.clear();
     },
   };
 }

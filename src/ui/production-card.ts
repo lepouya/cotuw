@@ -1,3 +1,4 @@
+import "./production-card.css";
 import type { PortraitId } from "../content/presentation";
 import { createActorPortrait } from "./actor-portrait";
 

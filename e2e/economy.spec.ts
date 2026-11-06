@@ -29,7 +29,7 @@ async function controlledOpening(
       errors.push(String(event.reason)),
     );
   });
-  // The harness owns one session and its controls on the production HTML.
+  // The harness owns one session and its mounted sidebar.
   await withoutApp(page);
   await page.goto("/");
   const hiddenUnitsAtLoad = await page.evaluate(
@@ -57,8 +57,6 @@ async function controlledOpening(
         topBarPath
       )) as typeof import("../src/ui/top-bar");
       const mission = level();
-      for (const id of ["network-view-control", "economy-overview"])
-        document.getElementById(id)!.hidden = false;
       mission.state.playerOwner = playerOwner;
       mission.state.economy!.stockpiles = [
         { resource: "materials", owners: [playerOwner], amount: materials },
@@ -383,7 +381,7 @@ test("default opening shows the Command Center, starting Materials, and paid con
   await expect(page.locator("#train-harvester")).toContainText("50 Materials");
   await page.locator("#tab-units").click();
   await expect(page.locator("#economy-alert")).toContainText(
-    "Build a Refinery",
+    "Build a Materials Refinery",
   );
 });
 
@@ -608,6 +606,10 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   await page.locator("#train-harvester").click();
   await advance(page, 7);
   await page.evaluate(async () => {
+    const sidebarPath: string = "/src/ui/sidebar.ts";
+    const { createSidebar } = (await import(
+      sidebarPath
+    )) as typeof import("../src/ui/sidebar");
     const controlsPath: string = "/src/ui/economy-controls.ts";
     const contentPath: string = "/src/content/packs.ts";
     const { createEconomyControls } = (await import(
@@ -643,17 +645,23 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       id: "other-refinery",
       definitionId: otherRefinery.id,
     });
-    const root = document
-      .querySelector<HTMLElement>("#game-sidebar")!
-      .cloneNode(true) as HTMLElement;
+    const root = document.createElement("aside");
+    root.className = "game-sidebar";
     root.id = "review-economy-root";
-    for (const button of root.querySelectorAll("[data-economy-action]"))
-      button.remove();
+    const sidebar = createSidebar(root, {
+      definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
+      presentations: new Map(),
+      playerOwner: "player",
+      playerFaction: "arc",
+      economy: true,
+      goals: [],
+      selectActor: () => {},
+    });
     for (const panel of root.querySelectorAll<HTMLElement>("[role=tabpanel]"))
       panel.hidden = false;
     const submitted: import("../src/simulation/command").MissionCommand[] = [];
     const controls = createEconomyControls(
-      root,
+      sidebar.controls.economy!,
       {
         actors: snapshot.actors,
         playerOwner: "player",
@@ -704,8 +712,8 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   });
   const root = page.locator("#review-economy-root");
   await expect(root.locator("#refinery-assignments button")).toHaveCount(1);
-  await expect(root.locator("#refinery-assignments button")).toContainText(
-    "Assigned to",
+  await expect(root.locator("#refinery-assignments button")).toHaveText(
+    "Assigned to Refinery 1",
   );
   await expect(root.locator("#economy-alert")).toContainText("60 seconds");
   await expect(root.locator("#harvester-status")).toHaveText("Order queued.");
@@ -717,6 +725,10 @@ test("worker controls share delivery actions and tolerate missions without culti
   await withoutApp(page);
   await page.goto("/");
   const result = await page.evaluate(async () => {
+    const sidebarPath: string = "/src/ui/sidebar.ts";
+    const { createSidebar } = (await import(
+      sidebarPath
+    )) as typeof import("../src/ui/sidebar");
     const controlsPath: string = "/src/ui/economy-controls.ts";
     const contentPath: string = "/src/content/packs.ts";
     const workersPath: string = "/src/simulation/economy.ts";
@@ -739,6 +751,14 @@ test("worker controls share delivery actions and tolerate missions without culti
     )) as typeof import("../src/simulation/actor");
     const content = currentContentPack("base");
     const root = document.querySelector<HTMLElement>("#game-sidebar")!;
+    const sidebar = createSidebar(root, {
+      definitions: content.actors,
+      presentations: new Map(Object.entries(content.presentation)),
+      playerOwner: "player",
+      economy: true,
+      goals: [],
+      selectActor: () => {},
+    });
     const names = new Map<string, string>(
       Object.entries(content.presentation).map(([id, presentation]) => [
         id,
@@ -754,7 +774,7 @@ test("worker controls share delivery actions and tolerate missions without culti
       playerFaction = "arc",
     ) =>
       createEconomyControls(
-        root,
+        sidebar.controls.economy!,
         {
           actors,
           playerOwner: "player",
@@ -818,11 +838,13 @@ test("worker controls share delivery actions and tolerate missions without culti
         }),
       ]);
       controls.refresh();
-      root
-        .querySelector<HTMLButtonElement>("#return-cargo-actions button")!
-        .click();
+      const returnCargo = root.querySelector<HTMLButtonElement>(
+        "#return-cargo-actions button",
+      )!;
+      returnCargo.click();
       selection = undefined;
       controls.refresh();
+      returnCargo.click();
       cleared.push(
         root.querySelectorAll("#return-cargo-actions button").length,
       );
@@ -866,6 +888,7 @@ test("worker controls share delivery actions and tolerate missions without culti
     controls.refresh();
     const hint = root.querySelector("#economy-alert")!.textContent;
     controls.dispose();
+    sidebar.dispose();
     return { submitted, cleared, hint, ownerHints };
   });
   expect(result).toEqual({
@@ -876,7 +899,7 @@ test("worker controls share delivery actions and tolerate missions without culti
     cleared: [0, 0],
     hint: "Economy stalled: find Materials salvage or sell a building to recover.",
     ownerHints: [
-      "Build a Refinery, then produce its Harvester.",
+      "Build a Materials Refinery, then produce its Harvester.",
       "Select the Heartgrove and train a Cultivator for 50 Lifebloom.",
     ],
   });

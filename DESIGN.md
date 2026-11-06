@@ -108,6 +108,11 @@ clock, and resource ownership boundaries.
 - Keep one content-driven sidebar for both factions. Share base controls and
   layout classes; keep feature details and compact rules with their owners.
   The document owns the shell, canvases, and feature mount points.
+- Sidebar sections create native elements in TypeScript and own adjacent CSS.
+  Content defines catalogs, labels, costs, and capabilities; player-visible
+  state determines relevant actions and their availability. Keep nodes stable
+  across updates. Session controls receive explicit typed element references
+  and submit commands through the existing simulation boundary.
 - Preserve headless preparation, lazy renderer startup, deterministic gameplay,
   and platform-service isolation. UI extraction does not change save formats.
 
@@ -597,7 +602,7 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   preserves the player's zoom.
 - The left sidebar splits its available height between production above and
   selection below, with independent scrolling. Buildings and Units tabs use
-  illustrated cards with names and Materials costs; hover or keyboard focus
+  illustrated cards with names and resource costs; hover or keyboard focus
   reveals descriptions, footprint or speed, work duration, and unavailable
   reasons. Disabled cards still expose their explanations. Card focus follows
   changes in availability. Unavailable cards also explain themselves on touch.
@@ -606,8 +611,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   actions, and that building's production queue. Construction queues belong to
   Buildings. Active placement controls occupy their own row above the orders
   toolbar; idle placement controls stay hidden. Construction cards follow the
-  content pack's build order, with the Materials Refinery before the Field
-  Barracks. Units shows only the selected friendly building's trainable units,
+  content pack's build order, with ARC's Materials Refinery before the Field
+  Barracks. Units shows only the selected owned building's trainable units,
   including unavailable orders with explanations. With no production building
   selected, it prompts selection on the map. Units also provides collapsible
   field unit and resource lists. The sidebar header's Goals button toggles

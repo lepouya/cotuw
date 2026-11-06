@@ -1,5 +1,41 @@
 import { expect, test } from "./fixtures";
 import { withoutApp } from "./prototype-helpers";
+import { WEBKIT } from "./tags";
+
+test(
+  "keyed rows keep keyboard focus when reordered",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await withoutApp(page);
+    await page.goto("/");
+    const retained = await page.evaluate(async () => {
+      const path: string = "/src/ui/dom.ts";
+      const { createKeyedList } = (await import(
+        path
+      )) as typeof import("../src/ui/dom");
+      const root = document.createElement("div");
+      document.body.append(root);
+      const nodes = new Map<string, HTMLButtonElement>();
+      const list = createKeyedList(
+        root,
+        (id: string) => id,
+        (id) => {
+          const node = document.createElement("button");
+          node.textContent = id;
+          nodes.set(id, node);
+          return { node };
+        },
+      );
+      list.update(["a", "b", "c"]);
+      nodes.get("c")!.focus();
+      list.update(["c", "a", "b"]);
+      const retained = document.activeElement === nodes.get("c");
+      root.remove();
+      return retained;
+    });
+    expect(retained).toBe(true);
+  },
+);
 
 test("a setup error survives failing cleanup while all resources release", async ({
   page,

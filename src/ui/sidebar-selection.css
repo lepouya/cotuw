@@ -1,0 +1,35 @@
+.game-sidebar .selection-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 2px solid #607161;
+  overflow-y: auto;
+}
+
+.game-sidebar #panel-selection {
+  padding: 0.8rem 1rem;
+}
+
+.game-sidebar #open-training,
+.game-sidebar #remove-building {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+@media (max-height: 600px) {
+  .game-sidebar #panel-selection {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .game-sidebar #panel-selection {
+    padding-inline: 0.5rem;
+  }
+}
+
+.game-sidebar #production-queue:not(:empty),
+.game-sidebar #return-cargo-actions {
+  margin-block: 0.75rem;
+}

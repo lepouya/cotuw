@@ -54,22 +54,6 @@ body.at-title {
   height: 100dvh;
   overflow: hidden;
 }
-
-.game-sidebar {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
-  min-height: 0;
-  border-right: 1px solid #5e654e;
-  background: linear-gradient(160deg, #142729, #091719);
-  box-shadow: 0.3rem 0 1rem rgb(0 0 0 / 20%);
-  z-index: 1;
-}
-
-.sidebar-header {
-  min-height: 2.75rem;
-  padding: 0.65rem 1rem;
-  position: relative;
-}
 .eyebrow {
   margin: 0;
   color: #cfac62;
@@ -105,11 +89,6 @@ h3 {
   color: #d8bd79;
   font-size: 0.7rem;
 }
-.sidebar-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-block: 1px solid #354c48;
-}
 button {
   min-height: 2.75rem;
   padding: 0.65rem;
@@ -136,80 +115,6 @@ button:disabled {
 [hidden] {
   display: none !important;
 }
-.sidebar-tabs button {
-  border: 0;
-  border-radius: 0;
-  padding: 0.5rem 0.2rem;
-  text-align: center;
-  background: transparent;
-  font-size: 0.72rem;
-}
-.sidebar-tabs button[aria-selected="true"] {
-  color: #eac97f;
-  background: #233a37;
-  box-shadow: inset 0 -2px #d8bd79;
-}
-.sidebar-content {
-  flex: 1;
-  min-height: 0;
-  padding: 0.75rem 1rem;
-  overflow-y: auto;
-}
-.production-pane,
-.selection-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.selection-pane {
-  border-top: 2px solid #607161;
-  overflow-y: auto;
-}
-#panel-selection {
-  padding: 0.8rem 1rem;
-}
-#tab-goals {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  min-height: 2rem;
-  padding: 0.4rem;
-}
-.sidebar-header h1 {
-  margin-right: 3rem;
-}
-.production-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-block: 0.75rem;
-}
-.production-card {
-  min-width: 0;
-}
-.build-option {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  padding: 0.35rem;
-  text-align: center;
-}
-.actor-portrait {
-  display: block;
-  width: 100%;
-  height: 4.5rem;
-}
-.build-option strong {
-  font-size: 0.72rem;
-  font-weight: 400;
-}
-.option-cost {
-  margin-top: 0.3rem;
-  color: #eac97f;
-  font-size: 0.68rem;
-}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -218,90 +123,24 @@ button:disabled {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.production-card:focus-visible {
-  outline: 2px solid #eac97f;
-}
-.production-tooltip {
-  position: fixed;
-  z-index: 50;
-  width: min(18rem, calc(100vw - 1rem));
-  max-height: calc(100dvh - 1rem);
-  overflow-y: auto;
-  padding: 0.75rem;
-  border: 1px solid #cfac62;
-  border-radius: 0.25rem;
-  background: #142729;
-  box-shadow: 0 0.3rem 1rem rgb(0 0 0 / 40%);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  pointer-events: auto;
-}
 summary {
   padding-block: 0.6rem;
   color: #d8bd79;
   font-size: 0.75rem;
   cursor: pointer;
 }
-#open-training,
-#remove-building {
-  display: block;
-  width: 100%;
-  margin-top: 1rem;
-}
-.actor-list {
-  display: grid;
-  gap: 0.4rem;
-}
-.roster-item[aria-pressed="true"] {
-  border-color: #d8bd79;
-  color: #eac97f;
-}
-.placement-panel {
-  padding: 0.8rem 1rem;
-  border-top: 1px solid #354c48;
-}
-.building-controls,
+
 .action-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.building-controls button,
+
 .action-row button {
   flex: 1 1 auto;
   padding: 0.45rem;
   text-align: center;
   font-size: 0.7rem;
-}
-.animation-control {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: 2.75rem;
-  margin-top: 1rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-.animation-control input {
-  width: 1.1rem;
-  height: 1.1rem;
-  accent-color: #d8bd79;
-}
-.scenario-goals {
-  padding: 0;
-  list-style: none;
-  font-size: 0.8rem;
-  line-height: 2.2;
-}
-.goal-complete {
-  color: #98d5b0;
-}
-.goal-failed {
-  color: #f0a096;
-}
-.goal-directive {
-  margin: 0.2rem 0 0.85rem;
-  line-height: 1.5;
 }
 .game-viewport {
   display: grid;
@@ -489,42 +328,6 @@ summary {
   .game-shell {
     grid-template-columns: 14rem minmax(0, 1fr);
   }
-  .sidebar-header {
-    padding: 0.6rem 0.75rem;
-  }
-  .sidebar-header h1,
-  .sidebar-header .muted {
-    display: none;
-  }
-  .sidebar-content,
-  #panel-selection {
-    padding: 0.5rem 0.75rem;
-  }
-  .build-option {
-    display: grid;
-    grid-template-columns: 2rem minmax(0, 1fr);
-    column-gap: 0.3rem;
-    align-content: center;
-    padding: 0.25rem;
-  }
-  .actor-portrait {
-    width: 2rem;
-    height: 2rem;
-    grid-row: span 2;
-  }
-  .option-cost {
-    margin-top: 0;
-  }
-  #tab-goals {
-    top: 0.2rem;
-  }
-  .placement-panel {
-    padding: 0.4rem 0.75rem;
-  }
-  .placement-panel p {
-    margin-bottom: 0;
-    font-size: 0.7rem;
-  }
   .minimap {
     width: 7rem;
     top: 0.5rem;
@@ -535,18 +338,6 @@ summary {
 @media (max-width: 500px) {
   .game-shell {
     grid-template-columns: 10rem minmax(0, 1fr);
-  }
-  .sidebar-header,
-  .sidebar-content,
-  #panel-selection,
-  .placement-panel {
-    padding-inline: 0.5rem;
-  }
-  .sidebar-header h1 {
-    font-size: 1.25rem;
-  }
-  .sidebar-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .minimap {
     width: 5rem;
@@ -583,31 +374,6 @@ summary {
   border: 1px solid #eac97f;
   background: rgb(234 201 127 / 12%);
   pointer-events: none;
-}
-.unit-controls {
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid #354c48;
-}
-.unit-controls .building-controls {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.2rem;
-}
-.unit-controls .building-controls button {
-  padding: 0.3rem;
-}
-.unit-controls button[aria-pressed="true"] {
-  color: #eac97f;
-  border-color: #d8bd79;
-  background: #304e4d;
-}
-#movement-status,
-#placement-status {
-  max-height: 4.5em;
-  overflow-y: auto;
-}
-#movement-status:empty {
-  display: none;
 }
 .camera-controls {
   position: absolute;
@@ -673,12 +439,4 @@ summary {
     gap: 0.2rem;
     padding-inline: 0.2rem;
   }
-  .unit-controls .building-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-#production-queue:not(:empty),
-#return-cargo-actions {
-  margin-block: 0.75rem;
 }

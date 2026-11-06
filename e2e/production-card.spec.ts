@@ -37,6 +37,16 @@ async function setupCard(page: Page) {
       zIndex: "20",
     });
     document.body.append(root);
+    const outside = document.createElement("button");
+    outside.id = "outside-card";
+    outside.textContent = "Outside card";
+    Object.assign(outside.style, {
+      position: "fixed",
+      left: "8px",
+      top: "8px",
+      zIndex: "20",
+    });
+    document.body.append(outside);
     const parent = new AbortController();
     const factory = createProductionCards(root, parent.signal);
     const card = factory.create(
@@ -220,7 +230,7 @@ forEachProfile([PHONE_PROFILE], () => {
         "Need 20 Materials",
       );
       expect(await page.evaluate(() => window.cardFixture.clicks)).toBe(0);
-      await page.locator("#tab-goals").tap();
+      await page.locator("#outside-card").tap();
       await expect(page.getByRole("tooltip")).toBeHidden();
     },
   );

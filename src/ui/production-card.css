@@ -1,0 +1,58 @@
+.production-card {
+  min-width: 0;
+}
+
+.production-card .build-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.35rem;
+  text-align: center;
+}
+
+.production-card .build-option strong {
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.production-card .option-cost {
+  margin-top: 0.3rem;
+  color: #eac97f;
+  font-size: 0.68rem;
+}
+
+.production-card:focus-visible {
+  outline: 2px solid #eac97f;
+}
+
+.production-tooltip {
+  position: fixed;
+  z-index: 50;
+  width: min(18rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+  padding: 0.75rem;
+  border: 1px solid #cfac62;
+  border-radius: 0.25rem;
+  background: #142729;
+  box-shadow: 0 0.3rem 1rem rgb(0 0 0 / 40%);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  pointer-events: auto;
+}
+
+@media (max-height: 600px) {
+  .production-card .build-option {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr);
+    column-gap: 0.3rem;
+    align-content: center;
+    padding: 0.25rem;
+  }
+
+  .production-card .option-cost {
+    margin-top: 0;
+  }
+}

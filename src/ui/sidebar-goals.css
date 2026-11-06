@@ -1,0 +1,35 @@
+.game-sidebar .animation-control {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.game-sidebar .animation-control input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #d8bd79;
+}
+
+.game-sidebar .scenario-goals {
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  line-height: 2.2;
+}
+
+.game-sidebar .goal-complete {
+  color: #98d5b0;
+}
+
+.game-sidebar .goal-failed {
+  color: #f0a096;
+}
+
+.game-sidebar .goal-directive {
+  margin: 0.2rem 0 0.85rem;
+  line-height: 1.5;
+}

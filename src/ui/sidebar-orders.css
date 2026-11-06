@@ -1,0 +1,56 @@
+.game-sidebar .placement-panel {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid #354c48;
+}
+
+.game-sidebar .unit-controls {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #354c48;
+}
+
+.game-sidebar .unit-controls .action-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem;
+}
+
+.game-sidebar .unit-controls .action-row button {
+  padding: 0.3rem;
+}
+
+.game-sidebar .unit-controls button[aria-pressed="true"] {
+  color: #eac97f;
+  border-color: #d8bd79;
+  background: #304e4d;
+}
+
+.game-sidebar #movement-status,
+.game-sidebar #placement-status {
+  max-height: 4.5em;
+  overflow-y: auto;
+}
+
+.game-sidebar #movement-status:empty {
+  display: none;
+}
+
+@media (max-height: 600px) {
+  .game-sidebar .placement-panel {
+    padding: 0.4rem 0.75rem;
+  }
+
+  .game-sidebar .placement-panel p {
+    margin-bottom: 0;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .game-sidebar .placement-panel {
+    padding-inline: 0.5rem;
+  }
+
+  .game-sidebar .unit-controls .action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

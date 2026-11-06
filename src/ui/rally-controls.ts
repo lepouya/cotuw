@@ -1,10 +1,19 @@
 import type { MissionSimulation } from "../simulation/mission";
 import type { WorldPosition } from "../simulation/world";
 import type { CommandOutcome } from "../simulation/command";
+import { setText } from "./dom";
 
 export type RallyControls = {
-  rallyRoot?: HTMLElement;
+  rally?: {
+    section: HTMLElement;
+    set: HTMLButtonElement;
+    clear: HTMLButtonElement;
+    cancel: HTMLButtonElement;
+    status: HTMLElement;
+  };
 };
+
+const RALLY_ACTIONS = ["set", "clear", "cancel"] as const;
 
 export function createRallyControls(
   simulation: MissionSimulation,
@@ -17,7 +26,7 @@ export function createRallyControls(
     changed: () => void;
   },
 ) {
-  const root = controls.rallyRoot;
+  const elements = controls.rally;
   const controller = new AbortController();
   let choosingFor: string | undefined;
   let result = "";
@@ -29,28 +38,25 @@ export function createRallyControls(
     if (active) options.changed();
     return active;
   };
-  root?.addEventListener(
-    "click",
-    (event) => {
-      if (!(event.target instanceof Element) || !options.enabled()) return;
-      const button = event.target.closest<HTMLButtonElement>(
-        "[data-rally-action]",
-      );
-      if (!button || button.disabled) return;
-      const id = options.selectedActorId();
-      if (button.dataset.rallyAction === "cancel") cancel();
-      else if (id && button.dataset.rallyAction === "set") {
-        options.onStart();
-        choosingFor = id;
-        result = "";
-        options.changed();
-      } else if (id && button.dataset.rallyAction === "clear") {
-        cancel();
-        simulation.submitCommand({ kind: "set-rally-point", actorId: id });
-      }
-    },
-    { signal: controller.signal },
-  );
+  for (const action of RALLY_ACTIONS)
+    elements?.[action].addEventListener(
+      "click",
+      () => {
+        if (!options.enabled()) return;
+        const id = options.selectedActorId();
+        if (action === "cancel") cancel();
+        else if (id && action === "set") {
+          options.onStart();
+          choosingFor = id;
+          result = "";
+          options.changed();
+        } else if (id && action === "clear") {
+          cancel();
+          simulation.submitCommand({ kind: "set-rally-point", actorId: id });
+        }
+      },
+      { signal: controller.signal },
+    );
   return {
     get active() {
       return choosingFor !== undefined;
@@ -79,29 +85,24 @@ export function createRallyControls(
         knownSelection = id;
       }
       if (choosingFor && (!options.enabled() || choosingFor !== id)) cancel();
-      for (const section of root?.querySelectorAll<HTMLElement>(
-        "[data-rally-controls]",
-      ) ?? []) {
-        section.hidden = !producer;
-        for (const button of section.querySelectorAll<HTMLButtonElement>(
-          "[data-rally-action]",
-        )) {
-          const action = button.dataset.rallyAction;
+      if (elements) {
+        elements.section.hidden = !producer;
+        for (const action of RALLY_ACTIONS) {
+          const button = elements[action];
           button.hidden = action === "cancel" && !choosingFor;
           button.disabled =
             !options.enabled() ||
             (action === "clear" && (!actor || !actor.rallyPoint));
         }
-        const status = section.querySelector<HTMLElement>(
-          "[data-rally-status]",
-        )!;
-        status.textContent =
+        setText(
+          elements.status,
           result ||
-          (choosingFor
-            ? "Click or tap explored, passable ground. Cancel or Esc exits."
-            : actor && actor.rallyPoint
-              ? "New units move to the marked rally point."
-              : "New units exit and idle beside this building.");
+            (choosingFor
+              ? "Click or tap explored, passable ground. Cancel or Esc exits."
+              : actor && actor.rallyPoint
+                ? "New units move to the marked rally point."
+                : "New units exit and idle beside this building."),
+        );
       }
     },
     onOutcome: (outcome: CommandOutcome) => {

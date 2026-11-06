@@ -23,20 +23,31 @@ test("partial sidebar setup releases its tooltip and listeners", async ({
   const result = await page.evaluate(async () => {
     const path: string = "/src/ui/sidebar.ts";
     const { createSidebar } = await import(path);
-    const root = document
-      .querySelector("#game-sidebar")!
-      .cloneNode(true) as HTMLElement;
+    const root = document.createElement("aside");
     root.id = "failed-sidebar";
-    root.querySelector("#scenario-goals")!.remove();
     document.body.append(root);
     const count = () => document.querySelectorAll(".production-tooltip").length;
     const before = count();
     let failed = false;
     try {
       createSidebar(root, {
-        definitions: [],
+        definitions: [
+          { id: "broken", behaviorId: "idle", movement: { speed: 1 } },
+        ],
         playerOwner: "player",
-        presentations: new Map(),
+        presentations: new Map([
+          [
+            "broken",
+            {
+              name: "Broken",
+              description: "",
+              train: { id: "train-broken", label: "Train broken" },
+              get portrait() {
+                throw new Error("Card setup failed");
+              },
+            },
+          ],
+        ]),
         goals: [],
         selectActor: () => {},
       });
@@ -44,11 +55,13 @@ test("partial sidebar setup releases its tooltip and listeners", async ({
       failed = true;
     }
     const after = count();
+    const emptied = root.childElementCount === 0;
     root.remove();
-    return { failed, before, after };
+    return { failed, before, after, emptied };
   });
   expect(result.failed).toBe(true);
   expect(result.after).toBe(result.before);
+  expect(result.emptied).toBe(true);
 });
 
 forEachProfile(PROFILES, (profile) => {
@@ -395,218 +408,289 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
   );
 });
 
-test("sidebar derives custom content and can be disposed and recreated", async ({
-  page,
-}) => {
-  await page.goto("/?level=sandbox");
-  const result = await page.evaluate(async () => {
-    const path: string = "/src/ui/sidebar.ts";
-    const { createSidebar } = (await import(
-      path
-    )) as typeof import("../src/ui/sidebar");
-    const ownershipPath: string = "/src/simulation/ownership.ts";
-    const { createRelations } = (await import(
-      ownershipPath
-    )) as typeof import("../src/simulation/ownership");
-    const root = document
-      .querySelector<HTMLElement>("#game-sidebar")!
-      .cloneNode(true) as HTMLElement;
-    root.id = "sidebar-fixture";
-    Object.assign(root.style, {
-      position: "fixed",
-      left: "0",
-      top: "0",
-      width: "320px",
-      height: "720px",
-      zIndex: "20",
-    });
-    document.body.append(root);
-    const definitions: ActorDefinition[] = [
-      {
-        id: "runner",
-        faction: "circle",
-        behaviorId: "move",
-        movement: { speed: 9, profileId: "ground" },
-      },
-      {
-        id: "factory",
-        faction: "arc",
-        behaviorId: "idle",
-        production: { unitDefinitionIds: ["runner"] },
-        footprint: {
-          layer: "surface",
-          blocksMovement: true,
-          occupiedTiles: [
-            { x: 0, z: 0 },
-            { x: 1, z: 0 },
-          ],
-        },
-      },
-    ];
-    const presentations = new Map([
-      [
-        "runner",
-        {
-          name: "Runner",
-          description: "Mobile unit",
-          train: { id: "train-runner", label: "Train Runner" },
-        },
-      ],
-      [
-        "factory",
-        {
-          name: "Foundry",
-          description: "Production",
-          build: { id: "build-foundry", label: "Build Foundry" },
-        },
-      ],
-    ]);
-    let selected = "";
-    const options = {
-      definitions,
-      presentations,
-      playerOwner: "player",
-      playerFaction: "arc",
-      goals: [{ definitionId: "runner", label: "Train a Runner" }],
-      selectActor: (id: string) => {
-        selected = id;
-      },
-    } satisfies SidebarOptions;
-    const actors: ActorRenderState[] = [
-      {
-        id: "building",
-        definitionId: "factory",
-        owner: "player",
-        worldPosition: { x: 0, z: 0 },
-        occupancyLayer: "surface",
-        facing: Math.PI / 2,
-        tilePlacement: { origin: { x: 2, z: 2 }, quarterTurns: 1 },
-      },
-      {
-        id: "unit",
-        definitionId: "runner",
-        owner: "player",
-        worldPosition: { x: 2, z: 0 },
-        occupancyLayer: "surface",
-        facing: 0,
-      },
-    ];
-    actors.push({ ...actors[0]!, id: "visitor", owner: "rival" });
-    const state = {
-      actors: actors.filter(({ id }) => id !== "visitor"),
-      actorVersion: 0,
-      selectedActorIds: ["building"],
-      placementActive: false,
-      faulted: false,
-      canRemove: true,
-      relations: createRelations([]),
-    } satisfies SidebarState;
-    let sidebar = createSidebar(root, options);
-    try {
-      sidebar.update(state);
-      const title = root.querySelector("#selection-details")!.textContent;
-      const foreignRosterVisible = !root
-        .querySelector<HTMLElement>("#train-runner")!
-        .closest<HTMLElement>(".production-card")!.hidden;
-      const descriptionFor = (id: string) =>
-        document.getElementById(
-          root.querySelector(`#${id}`)!.getAttribute("aria-describedby")!,
-        )!.textContent;
-      const buildText = descriptionFor("build-foundry");
-      const trainText = descriptionFor("train-runner");
-      (root.querySelector("#tab-units") as HTMLButtonElement).click();
-      const listedUnit = root.querySelector<HTMLButtonElement>(
-        "#unit-roster button",
-      )!;
-      listedUnit.focus();
-      sidebar.update({
-        ...state,
-        selectedActorIds: ["unit"],
-        canRemove: false,
+test(
+  "sidebar derives custom content and can be disposed and recreated",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/?level=sandbox");
+    const result = await page.evaluate(async () => {
+      const path: string = "/src/ui/sidebar.ts";
+      const { createSidebar } = (await import(
+        path
+      )) as typeof import("../src/ui/sidebar");
+      const ownershipPath: string = "/src/simulation/ownership.ts";
+      const { createRelations } = (await import(
+        ownershipPath
+      )) as typeof import("../src/simulation/ownership");
+      const root = document.createElement("aside");
+      root.className = "game-sidebar";
+      root.id = "sidebar-fixture";
+      Object.assign(root.style, {
+        position: "fixed",
+        left: "0",
+        top: "0",
+        width: "320px",
+        height: "720px",
+        zIndex: "20",
       });
-      const retainedFocus = document.activeElement === listedUnit;
-      const retainedNode =
-        root.querySelector("#unit-roster button") === listedUnit;
-      listedUnit.click();
-      const selectedByClick = selected;
-      const inspectVisitor = (
-        relationship: "allied" | "neutral" | "hostile",
-      ) => {
+      document.body.append(root);
+      const definitions: ActorDefinition[] = [
+        {
+          id: "runner",
+          faction: "circle",
+          behaviorId: "move",
+          lifebloomCost: 20,
+          movement: { speed: 9, profileId: "ground" },
+        },
+        {
+          id: "factory",
+          faction: "arc",
+          behaviorId: "idle",
+          lifebloomCost: 75,
+          production: { unitDefinitionIds: ["runner"] },
+          footprint: {
+            layer: "surface",
+            blocksMovement: true,
+            occupiedTiles: [
+              { x: 0, z: 0 },
+              { x: 1, z: 0 },
+            ],
+          },
+        },
+      ];
+      definitions.push({
+        ...definitions[1]!,
+        id: "circle-hub",
+        faction: "circle",
+        support: { root: true, radius: 10 },
+        infrastructure: { slots: 1 },
+      });
+      const presentations = new Map([
+        [
+          "runner",
+          {
+            name: "Runner",
+            description: "Mobile unit",
+            train: { id: "train-runner", label: "Train Runner" },
+          },
+        ],
+        [
+          "factory",
+          {
+            name: "Foundry",
+            description: "Production",
+            build: { id: "build-foundry", label: "Build Foundry" },
+          },
+        ],
+      ]);
+      let selected = "";
+      const options = {
+        definitions,
+        presentations,
+        playerOwner: "player",
+        playerFaction: "arc",
+        factionName: "Foundry <crew>",
+        economy: true,
+        goals: [{ definitionId: "runner", label: "Train a Runner" }],
+        selectActor: (id: string) => {
+          selected = id;
+        },
+      } satisfies SidebarOptions;
+      const actors: ActorRenderState[] = [
+        {
+          id: "building",
+          definitionId: "factory",
+          owner: "player",
+          worldPosition: { x: 0, z: 0 },
+          occupancyLayer: "surface",
+          facing: Math.PI / 2,
+          tilePlacement: { origin: { x: 2, z: 2 }, quarterTurns: 1 },
+        },
+        {
+          id: "unit",
+          definitionId: "runner",
+          owner: "player",
+          worldPosition: { x: 2, z: 0 },
+          occupancyLayer: "surface",
+          facing: 0,
+        },
+      ];
+      actors.push({ ...actors[0]!, id: "visitor", owner: "rival" });
+      const state = {
+        actors: actors.filter(({ id }) => id !== "visitor"),
+        actorVersion: 0,
+        selectedActorIds: ["building"],
+        placementActive: false,
+        faulted: false,
+        canRemove: true,
+        balances: { lifebloom: 10 },
+        relations: createRelations([]),
+      } satisfies SidebarState;
+      let sidebar = createSidebar(root, options);
+      try {
+        sidebar.update(state);
+        const title = root.querySelector("#selection-details")!.textContent;
+        const foreignRosterVisible = !root
+          .querySelector<HTMLElement>("#train-runner")!
+          .closest<HTMLElement>(".production-card")!.hidden;
+        const descriptionFor = (id: string) =>
+          document.getElementById(
+            root.querySelector(`#${id}`)!.getAttribute("aria-describedby")!,
+          )!.textContent;
+        const buildText = descriptionFor("build-foundry");
+        const trainText = descriptionFor("train-runner");
+        const buildButton =
+          root.querySelector<HTMLButtonElement>("#build-foundry")!;
+        const unaffordable = buildButton.disabled;
+        const costs = [...root.querySelectorAll(".option-cost")].map(
+          (cost) => cost.textContent,
+        );
+        const faction = root.querySelector("#faction-label")!;
+        const factionIsText =
+          faction.textContent === "Foundry <crew>" &&
+          faction.children.length === 0;
+        sidebar.update({ ...state, balances: { lifebloom: 100 } });
+        const updatedInPlace =
+          root.querySelector("#build-foundry") === buildButton &&
+          !buildButton.disabled;
+        const network = root.querySelector<HTMLElement>(
+          "#network-view-control",
+        )!;
+        const foreignNetworkHidden = network.hidden;
         sidebar.update({
           ...state,
-          actors,
-          selectedActorIds: ["visitor"],
-          relations: createRelations(
-            relationship === "neutral"
-              ? []
-              : [
-                  {
-                    owners: ["player", "rival"],
-                    relationship,
-                  },
-                ],
-          ),
+          actorVersion: 1,
+          actors: [
+            ...state.actors,
+            { ...actors[0]!, id: "captured-hub", definitionId: "circle-hub" },
+          ],
         });
-        return root.querySelector("#selection-info")!.textContent;
-      };
-      const alliedInfo = inspectVisitor("allied");
-      const visitorTrainingHidden = root
-        .querySelector<HTMLElement>("#train-runner")!
-        .closest<HTMLElement>(".production-card")!.hidden;
-      const neutralInfo = inspectVisitor("neutral");
-      const hostileInfo = inspectVisitor("hostile");
-      sidebar.dispose();
-      selected = "";
-      listedUnit.click();
-      const disposed = selected === "";
-      sidebar = createSidebar(root, options);
-      sidebar.update(state);
-      return {
-        title,
-        buildText,
-        trainText,
-        retainedFocus,
-        retainedNode,
-        selectedByClick,
-        disposed,
-        foreignRosterVisible,
-        visitorTrainingHidden,
-        alliedInfo,
-        neutralInfo,
-        hostileInfo,
-        buildings: root.querySelectorAll("#building-options button").length,
-        units: root.querySelectorAll("#training-options button").length,
-        goals: root.querySelectorAll("#scenario-goals li").length,
-      };
-    } finally {
-      sidebar.dispose();
-      root.remove();
-    }
-  });
-  expect(result).toMatchObject({
-    title: "Foundry · 1 × 2 · 90°",
-    retainedFocus: true,
-    retainedNode: true,
-    selectedByClick: "unit",
-    disposed: true,
-    foreignRosterVisible: true,
-    visitorTrainingHidden: true,
-    buildings: 1,
-    units: 1,
-    goals: 1,
-  });
-  expect(result.buildText).toContain("Trains Runner · 2 × 1 tiles");
-  expect(result.trainText).toContain("Speed 9");
-  expect(result.alliedInfo).toContain(
-    "Allied · Production · Not under your command.",
-  );
-  expect(result.neutralInfo).toContain(
-    "Neutral · Production · Not under your command.",
-  );
-  expect(result.hostileInfo).toContain(
-    "Hostile · Production · Select your units",
-  );
-});
+        const ownedForeignNetworkVisible = !network.hidden;
+        sidebar.update({ ...state, balances: { materials: 1000 } });
+        const missingCurrencyBlocked = buildButton.disabled;
+        sidebar.update(state);
+        (root.querySelector("#tab-units") as HTMLButtonElement).click();
+        const trainingCard = root
+          .querySelector<HTMLElement>("#train-runner")!
+          .closest<HTMLElement>(".production-card")!;
+        trainingCard.tabIndex = 0;
+        trainingCard.focus();
+        sidebar.update({ ...state, selectedActorIds: ["unit"] });
+        const hiddenCardFocus =
+          document.activeElement === root.querySelector("#tab-units");
+        const listedUnit = root.querySelector<HTMLButtonElement>(
+          "#unit-roster button",
+        )!;
+        listedUnit.focus();
+        sidebar.update({
+          ...state,
+          selectedActorIds: ["unit"],
+          canRemove: false,
+        });
+        const retainedFocus = document.activeElement === listedUnit;
+        const retainedNode =
+          root.querySelector("#unit-roster button") === listedUnit;
+        listedUnit.click();
+        const selectedByClick = selected;
+        const inspectVisitor = (
+          relationship: "allied" | "neutral" | "hostile",
+        ) => {
+          sidebar.update({
+            ...state,
+            actors,
+            selectedActorIds: ["visitor"],
+            relations: createRelations(
+              relationship === "neutral"
+                ? []
+                : [
+                    {
+                      owners: ["player", "rival"],
+                      relationship,
+                    },
+                  ],
+            ),
+          });
+          return root.querySelector("#selection-info")!.textContent;
+        };
+        const alliedInfo = inspectVisitor("allied");
+        const visitorTrainingHidden = root
+          .querySelector<HTMLElement>("#train-runner")!
+          .closest<HTMLElement>(".production-card")!.hidden;
+        const neutralInfo = inspectVisitor("neutral");
+        const hostileInfo = inspectVisitor("hostile");
+        sidebar.dispose();
+        const emptied = root.childElementCount === 0;
+        selected = "";
+        listedUnit.click();
+        const disposed = selected === "";
+        sidebar = createSidebar(root, options);
+        sidebar.update(state);
+        return {
+          title,
+          buildText,
+          trainText,
+          retainedFocus,
+          retainedNode,
+          selectedByClick,
+          disposed,
+          emptied,
+          unaffordable,
+          costs,
+          factionIsText,
+          updatedInPlace,
+          missingCurrencyBlocked,
+          hiddenCardFocus,
+          foreignNetworkHidden,
+          ownedForeignNetworkVisible,
+          foreignRosterVisible,
+          visitorTrainingHidden,
+          alliedInfo,
+          neutralInfo,
+          hostileInfo,
+          buildings: root.querySelectorAll("#building-options button").length,
+          units: root.querySelectorAll("#training-options button").length,
+          goals: root.querySelectorAll("#scenario-goals li").length,
+        };
+      } finally {
+        sidebar.dispose();
+        root.remove();
+      }
+    });
+    expect(result).toMatchObject({
+      title: "Foundry · 1 × 2 · 90°",
+      retainedFocus: true,
+      retainedNode: true,
+      selectedByClick: "unit",
+      disposed: true,
+      emptied: true,
+      unaffordable: true,
+      costs: ["75 Lifebloom", "20 Lifebloom"],
+      factionIsText: true,
+      updatedInPlace: true,
+      missingCurrencyBlocked: true,
+      hiddenCardFocus: true,
+      foreignNetworkHidden: true,
+      ownedForeignNetworkVisible: true,
+      foreignRosterVisible: true,
+      visitorTrainingHidden: true,
+      buildings: 1,
+      units: 1,
+      goals: 1,
+    });
+    expect(result.buildText).toContain("Trains Runner · 2 × 1 tiles");
+    expect(result.buildText).toContain("Need 75 Lifebloom; available 10.");
+    expect(result.trainText).toContain("Speed 9");
+    expect(result.alliedInfo).toContain(
+      "Allied · Production · Not under your command.",
+    );
+    expect(result.neutralInfo).toContain(
+      "Neutral · Production · Not under your command.",
+    );
+    expect(result.hostileInfo).toContain(
+      "Hostile · Production · Select your units",
+    );
+  },
+);
 
 test("prototype controls skip unchanged frames and removal works without a sidebar", async ({
   page,

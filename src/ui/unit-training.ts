@@ -13,6 +13,7 @@ import type {
   TrainingEvaluation,
   TrainingReason,
 } from "../simulation/production";
+import type { ContentRoles } from "./content-roles";
 import type { DefinitionButton } from "./production-action";
 
 export type UnitTrainingControls = {
@@ -20,9 +21,13 @@ export type UnitTrainingControls = {
   productionStatus?: HTMLElement;
 };
 
-const REASONS: Record<TrainingReason | AuthorityReason, string> = {
+const trainingReasons = ({
+  supportHub,
+  refinery,
+  harvester,
+}: ContentRoles): Record<TrainingReason | AuthorityReason, string> => ({
   unauthorized: "You cannot command this building.",
-  disconnected: "Disconnected. Restore a support path to the Command Center.",
+  disconnected: `Disconnected. Restore a support path to the ${supportHub}.`,
   "invalid-actor": "Invalid unit request.",
   "used-id": "Unit request changed. Try again.",
   "missing-producer": "Select a production building on the map to train units.",
@@ -30,10 +35,10 @@ const REASONS: Record<TrainingReason | AuthorityReason, string> = {
   "exit-blocked":
     "Exit blocked. Move units or clear ground beside the building.",
   "insufficient-resources": "Not enough resources for this unit.",
-  "refinery-occupied": "This Refinery already has a Harvester or a paid order.",
+  "refinery-occupied": `This ${refinery} already has a ${harvester} or a paid order.`,
   "under-construction": "Wait for this building to finish construction.",
   "queue-full": `Production queue full (${PRODUCTION_QUEUE_LIMIT} orders).`,
-};
+});
 
 /** Local pending feedback; the simulation rechecks every submitted request. */
 export function createUnitTraining(
@@ -48,6 +53,7 @@ export function createUnitTraining(
   controls: UnitTrainingControls,
   options: {
     names: ReadonlyMap<string, string>;
+    roles: (producerId: string | undefined) => ContentRoles;
     selectedActorId: () => string | undefined;
     unitDefinitionIds: () => readonly string[];
     enabled: () => boolean;
@@ -55,6 +61,8 @@ export function createUnitTraining(
   },
 ) {
   const buttons = controls.train ?? [];
+  const reasonsFor = (producerId = options.selectedActorId()) =>
+    trainingReasons(options.roles(producerId));
   let faulted = false;
   let pending: TrainUnitCommand | undefined;
   let result: { producerId: string; text: string } | undefined;
@@ -68,6 +76,7 @@ export function createUnitTraining(
   const evaluate = (definitionId: string) =>
     simulation.evaluateTraining(commandFor(definitionId));
   const refresh = () => {
+    const reasons = reasonsFor();
     if (faulted || !options.enabled()) {
       // Placement is the remaining reason `enabled` can be false.
       const reason = productionBlocker(
@@ -96,10 +105,10 @@ export function createUnitTraining(
         pending
           ? "Waiting for the training order to be confirmed."
           : !evaluation
-            ? REASONS["unsupported-unit"]
+            ? reasons["unsupported-unit"]
             : evaluation.accepted
               ? ""
-              : REASONS[evaluation.reason],
+              : reasons[evaluation.reason],
       );
     }
     const availability: TrainingEvaluation = relevant.find(
@@ -117,7 +126,7 @@ export function createUnitTraining(
       pending && pending.producerId === options.selectedActorId()
         ? `Training ${options.names.get(pending.definitionId) ?? pending.definitionId}…`
         : !availability.accepted
-          ? REASONS[availability.reason]
+          ? reasons[availability.reason]
           : (currentResult ??
             (simulation.economy
               ? "Queue a unit. Resources are paid now; cancel for a full refund."
@@ -132,7 +141,7 @@ export function createUnitTraining(
       if (!evaluation.accepted) {
         result = {
           producerId: command.producerId,
-          text: REASONS[evaluation.reason],
+          text: reasonsFor(command.producerId)[evaluation.reason],
         };
       } else {
         simulation.submitCommand(command);
@@ -159,7 +168,7 @@ export function createUnitTraining(
           ? simulation.economy
             ? `${options.names.get(command.definitionId) ?? command.definitionId} queued. Select this building to view or cancel production.`
             : `${options.names.get(command.definitionId) ?? command.definitionId} ready beside the building.`
-          : REASONS[reason ?? "invalid-actor"],
+          : reasonsFor(command.producerId)[reason ?? "invalid-actor"],
       };
     },
     fault: () => {

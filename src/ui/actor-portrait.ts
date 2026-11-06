@@ -1,3 +1,4 @@
+import "./actor-portrait.css";
 import type { PortraitId } from "../content/presentation";
 import type { ActorDefinition } from "../simulation/actor";
 

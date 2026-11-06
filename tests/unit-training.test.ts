@@ -103,6 +103,11 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
         ["trooper", "Trooper"],
         ["scout", "Scout"],
       ]),
+      roles: () => ({
+        supportHub: "Command Center",
+        refinery: "Refinery",
+        harvester: "Harvester",
+      }),
       selectedActorId: () => selected,
       unitDefinitionIds: () =>
         trainableUnitIds(

@@ -2,8 +2,8 @@
 
 [DESIGN.md](../DESIGN.md#ui-module-ownership) owns the selected direction.
 This document defines the implementation boundaries for tasks 1.22-1.24.
-Dialog ownership is implemented in 1.22, and application and save-panel
-ownership in 1.23. Sidebar composition remains the scope of 1.24.
+Dialogs, application navigation, save panels, and sidebar sections have
+feature-owned markup, behavior, styles, and cleanup.
 
 ## Current coupling
 
@@ -11,15 +11,14 @@ ownership in 1.23. Sidebar composition remains the scope of 1.24.
   and shortcuts. `src/application.ts` owns session startup, storage
   operations, and menu view data. `src/ui/dialogs.ts` owns modal interaction
   and panel state without querying application storage or simulation.
-- Dialog and audio markup and styles live beside their feature modules.
+- Dialog, audio, save-panel, and sidebar styles live beside their modules.
   `index.html` and `src/styles.css` own the shell and remaining HUD internals.
-  Compact-screen HUD rules mix shell sizing with feature layout; task 1.24
-  assigns sidebar markup and styles to their feature owners.
-- `createSidebar` already accepts a root, content, and selection callback,
-  and returns controls, updates, and disposal. `createGameSession` binds
-  those controls to simulation and input. `createProductionCards` owns its
-  tooltip and listeners. These are useful seams to retain and refine;
-  their existence does not justify replacing the control system.
+  Shell breakpoints allocate viewport space; sidebar sections own compact
+  rules for their contents.
+- `createSidebar` accepts a root, content, and selection callback, and returns
+  controls, updates, navigation, and disposal. `createGameSession` binds those
+  controls to simulation and input. `createProductionCards` owns its tooltip
+  and listeners.
 
 ## Selected structure
 
@@ -142,15 +141,37 @@ Audio activation and modal-local input remain available while a dialog is open.
 
 ### Mission HUD and controls
 
-- `src/ui/sidebar.ts` owns sidebar layout, tabs, goals, selection, and roster
-  composition. Task 1.24 makes its sections composable within that owner.
-  There is one sidebar for both factions, with names, costs, rosters, and
-  actions drawn from content and player-visible state.
-- Production cards, goals, worker details, and order controls own their
-  markup and styles when extracted as sections. Sidebar composition creates
-  section hosts and obtains typed control references; it does not discover
-  section-private elements by ID. Existing control references may bridge
-  staged extraction, but each element has one action binding owner.
+- `src/ui/sidebar.ts` owns sidebar layout, header, tabs, and section
+  composition. Its interface is `createSidebar(root, options)`, returning
+  `controls`, `update(state)`, `showActor(actor)`, `showGoals()`, and
+  `dispose()`. One sidebar serves both factions. Names, costs, catalogs, and
+  actions derive from content, shared resource definitions, and player-visible
+  state. `content-roles.ts` names economy roles using the selected definition's
+  faction and producer-worker relationships, with the player's faction as
+  the default context.
+- `sidebar-context.ts` owns sidebar state and option types and the
+  mission-lifetime lookups sections share. Each section exposes
+  `update(state)`, and `createSidebar` refreshes them through that contract.
+- `sidebar-navigation.ts` owns the header, tabs, panel visibility, and focus
+  movement between panels.
+- `sidebar-production.ts` owns construction and training cards, the field
+  roster, and production-panel hosts. Construction follows the player's
+  roster; training follows the selected owned producer, including units of
+  another faction type. Unaffordable choices retain their explanations.
+- `sidebar-selection.ts` owns inspection details and worker, rally, and queue
+  hosts. `sidebar-goals.ts` owns briefing and objective rendering.
+  `sidebar-orders.ts` owns placement and order-control markup and state.
+  Each section creates native elements in TypeScript and imports adjacent CSS.
+- Composition obtains typed control references without querying private IDs.
+  Economy, rally, and network binders receive those references; each command
+  action has one binding owner. Shared production-card and portrait styles
+  belong to those features, including portaled tooltips.
+- Catalog cards are created once. Actor, economy, and objective rows use
+  `createKeyedList` from `src/ui/dom.ts`, retaining unchanged nodes, focus,
+  and disclosure state as committed state changes. Removed rows release their
+  listeners; list disposal or the owning abort signal releases remaining rows
+  and prevents further updates. Displayed content uses text, never authored
+  HTML.
 - `src/session.ts` owns simulation, rendering, world input, and the command
   controls that depend on them. It coordinates exclusive world tools and
   submits serializable commands. It receives control references and emits
@@ -174,10 +195,9 @@ Audio activation and modal-local input remain available while a dialog is open.
   shell/viewport sizing, and the title backdrop. Feature roots scope local
   selectors; owned overlays such as production tooltips use feature classes
   even when mounted under the document body.
-- Share the existing button treatment, muted text, eyebrow text, and action
-  row layout. Replace the cross-feature `.building-controls` name with a
-  neutral action-row class as affected features move. Add no generic widget
-  registry, template engine, UI framework, or design-system package.
+- Share the existing button treatment, muted text, eyebrow text, and
+  `.action-row` layout. Add no generic widget registry, template engine, UI
+  framework, or design-system package.
 - Shell CSS owns column widths, viewport allocation, and shell breakpoints.
   Feature CSS owns internal scrolling, card density, local compact rules,
   and pinned orders. Mixed media-query blocks split by owner while preserving
@@ -190,9 +210,11 @@ Audio activation and modal-local input remain available while a dialog is open.
   Sidebar and command bindings have mission lifetime and release before their
   markup is replaced. Canvas elements outlive the session engine.
 - Mount features with `mountFeature` from `src/ui/dom.ts`. It renders owned
-  markup and supplies a lifetime, an abort signal, and root-scoped lookup.
-  Register cleanup immediately; partial construction releases acquired
-  resources and owned markup, and disposal is idempotent.
+  markup and provides a lifetime, an abort signal, and root-scoped lookup.
+  Failed setup or disposal empties the root. The sidebar mounts empty markup,
+  and its sections create native elements with `createElement` under that
+  mission lifetime. Register cleanup immediately; partial construction
+  releases acquired resources and owned markup, and disposal is idempotent.
   Portaled overlays and timers belong to the feature that creates them.
   Dialog disposal cancels pending loads and UI publication, and removes its
   owned DOM without resuming play, dismissing guides, or starting missions.
@@ -227,8 +249,9 @@ Audio activation and modal-local input remain available while a dialog is open.
   mission rules. Keep request validity at the owner of each asynchronous action.
   Scenarios select the skirmish save policy until skirmish launch assembly
   (1.14) and results (1.25) exist.
-- **1.24:** Extract sidebar sections and styles behind the existing root-based
-  composition. Retain content-driven faction support and world-control behavior.
+- **1.24:** Sidebar sections own TypeScript-created DOM and adjacent styles
+  behind root-based composition. Session binders use typed controls. Preserve
+  content-driven faction support and world-control behavior.
 - Preserve behavior coverage in `e2e/start-screen.spec.ts`,
   `e2e/interface.spec.ts`, `e2e/saves.spec.ts`, and
   `e2e/session-lifecycle.spec.ts`: lazy renderer startup, keyboard focus,
