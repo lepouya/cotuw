@@ -11,7 +11,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 15;
+export const MISSION_FILE_VERSION = 16;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 

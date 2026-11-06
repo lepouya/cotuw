@@ -152,7 +152,40 @@ can be read, edited by hand, and loaded again.
   frozen inspection. Results cannot be dropped from finished saves. Further
   simulation ticks do nothing and simulation mutations are rejected. Camera,
   selection, saving, and loading remain available.
-- Match metrics and their final snapshot are tracked in task 1.26.
+
+## Match metrics
+
+- Owner-based skirmishes require `scenario.skirmish.startingResourceSites`,
+  mapping each competing owner to its starting Materials and Lifebloom site
+  IDs. Every other site qualifies for expansion income. Empty lists are valid
+  for scenarios without starting resource sites.
+- Actor definitions supply military roles. Armed mobile units that neither
+  harvest nor cultivate form the army; buildings that train them provide
+  military production.
+- `state.metrics.owners` follows the competing owners' order. Each entry saves
+  `milestones`, `gathered` and `spent` totals by resource, `unitsProduced`,
+  `buildingsCompleted`, `unitsLost`, `buildingsLost`, `peakArmy`, and `history`.
+  Losses count combat destruction; cancellations and sales do not. Paid jobs
+  authored in the opening contribute their prepaid cost to spending.
+- Milestone fields are `firstIncome`, `militaryReady`, `firstCombatUnit`,
+  `firstExpansion`, `firstEngagement`, and `firstBaseAttack`. Their values are
+  exact zero-based simulation ticks; absent fields mean Not reached. The
+  [match summary](../DESIGN.md#m1-match-summary) owns their gameplay meanings.
+- Each history sample saves `tick`, living mobile `units`, completed
+  `buildings`, `explored` tiles, and currently `visible` tiles. The opening
+  sample uses tick 0. Regular samples record the last tick of each five-second
+  interval; a final sample records the resolution tick, sharing the regular
+  sample if they coincide. A match ending on tick 0 keeps opening and final
+  samples at that tick.
+- `state.skirmishResult` owns the verdict and commits with all final-tick
+  counters and history. Finished saves retain this immutable checkpoint.
+  Loading rejects missing summaries after tick 0, invalid sample schedules,
+  inconsistent delivery totals, and inconsistent final populations. History
+  must fit saved exploration; spending must cover refundable jobs, and both
+  owners must agree on the first engagement tick.
+- `simulation.metrics` exposes immutable data for headless reports and
+  post-match presentation. It is omniscient and is not part of owner knowledge
+  or player sidebar state; rival histories remain unavailable during play.
 
 ## Commands
 
@@ -236,6 +269,11 @@ can be read, edited by hand, and loaded again.
   dormancy. Workers save integer cargo, fractional collection and rate
   remainders, site and delivery targets, the building they tend, and phase.
   At most one worker tends each building.
+- Worker `cargoSources` records collection order as `{ "siteId", "amount" }`
+  entries. Amounts use thousandths, including Cultivator fractional cargo.
+  Deliveries consume whole resources from that sequence; any fractional
+  remainder retains its source. Interruptions and site changes preserve it.
+  Sources must attribute all carried cargo; a worker with none may omit them.
 - Each `economy.loot` entry has exactly one positive `materials` or
   `lifebloom` reward and a saved `collected` flag. Some owner must hold that
   resource. A pickup credits the collecting unit's owner once, under the

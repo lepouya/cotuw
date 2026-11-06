@@ -167,6 +167,7 @@ export type CombatWorld = {
   move: (actor: Actor, target: WorldPosition, bounds?: RouteBounds) => boolean;
   /** Takes a destroyed actor out of the mission. */
   destroy: (actor: Actor) => void;
+  hit?: (attacker: Actor, target: Actor, damage: number) => void;
 };
 
 export function validateCombatDefinition(definition: ActorDefinition): void {
@@ -639,6 +640,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   }
   for (const hit of hits) {
     const target = byId.get(hit.targetId)!;
+    world.hit?.(byId.get(hit.attackerId)!, target, hit.damage);
     target.health = healthOf(target, definitionOf(target).health!) - hit.damage;
     const combat = (target.combat ??= {});
     combat.activeTick = tick;

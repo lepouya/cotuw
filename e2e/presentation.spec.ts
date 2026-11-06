@@ -110,6 +110,12 @@ async function openPresentation(
             actorId: "present-worker",
             refineryId: "present-refinery",
             cargo: 100,
+            cargoSources: [
+              {
+                siteId: mission.state.economy!.sites[0].id,
+                amount: 100_000,
+              },
+            ],
             gatherProgress: 0,
             targetSiteId: mission.state.economy!.sites[0].id,
             phase: "returning",

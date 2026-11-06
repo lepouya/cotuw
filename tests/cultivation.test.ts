@@ -815,6 +815,9 @@ test.each(["tending", "returning"] as const)(
         delete worker.tendingId;
         worker.dropoffId = "conservatory";
         worker.cargo = 1;
+        worker.cargoSources = [
+          { siteId: state.economy!.cultivation!.sites[0]!.id, amount: 1000 },
+        ];
         worker.phase = "returning";
       }
       expect(() => fixture(state)).toThrow("invalid cultivation state");

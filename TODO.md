@@ -296,7 +296,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   cards and keyed rows retain their nodes across updates. Browser checks cover
   both factions, custom content and costs, information isolation, focus,
   compact layouts, and disposal. Human playtest accepted the result.
-- [ ] **1.25** Add the agreed objective rules for actors constructed during
+- [x] **1.25** Add the agreed objective rules for actors constructed during
   play. Eliminate owners on loss of qualifying completed buildings, including
   inactive buildings and replacement headquarters, without relying only on
   fixed authored actor IDs. Mobile units and unfinished construction do not
@@ -315,9 +315,9 @@ and bring up the rough skirmish map early for simulation and AI development.
   use commands. Headless checks cover same-tick sales and lethal combat,
   replacement completion, paused support and tending, both factions, and
   emergency recovery. Browser checks cover all verdicts, inspection, save/load,
-  and result-boundary autosaves in Chromium and WebKit. Final metrics latching
-  remains with 1.26.
-- [ ] **1.26** Record match milestone ticks, losses, and result in mission state
+  and result-boundary autosaves in Chromium and WebKit. The verdict, exact
+  counters, and final history sample commit together.
+- [x] **1.26** Record match milestone ticks, losses, and result in mission state
   using the definitions from 1.09. Make the data available to summaries and
   headless reports. Freeze the recorded summary at the result tick.
   Include per-owner population, exploration, and active-vision histories;
@@ -329,6 +329,18 @@ and bring up the rough skirmish map early for simulation and AI development.
   committed damage, including defenses, relays, and unfinished structures.
   Verify exact resource, production, completion, loss, and peak-army counters,
   including cancellation refunds, sale proceeds, and authored starting actors.
+  Skirmish metrics persist exact per-owner counters and milestone ticks, with
+  immutable five-second histories and a final checkpoint. Actor definitions
+  supply military roles; scenario data names each owner's starting resource
+  sites. Ordered cargo provenance includes fractional cultivation and survives
+  interrupted routes.
+  Headless checks cover both factions, same-faction owners, mixed deliveries,
+  final-tick production and completion, combat losses, refunds, and save/load.
+  Browser playtests cover an economy opening, production, Quicksave, reload,
+  all frozen verdicts, and the autosave boundary in Chromium and WebKit.
+  Human playtest completed. Review checks cover same-tick production losses,
+  immutable histories, refundable spending, exploration consistency, and
+  fractional cargo capacity.
 - [ ] **1.27** Update mission and content formats, validation, and documentation
   for ownership, multi-faction state, observations, objectives, and metrics.
   Include effective difficulty and scaling, plus the skirmish draw result and
@@ -340,8 +352,9 @@ and bring up the rough skirmish map early for simulation and AI development.
   1.15 added owners, relationships with sharing, scenario events, and fired
   events to the format with their validation and documentation; 1.19 added
   per-owner exploration and observations; 1.23 added the scenario save policy.
-  Owner-based skirmish rules and persisted verdicts use mission format 15,
-  with validation and frozen save continuation.
+  Mission format 16 persists owner-based skirmish rules, verdicts, match
+  metrics, and cargo provenance, with validated deterministic continuation.
+  Effective difficulty and scaling remain with setup and AI integration.
 - [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers

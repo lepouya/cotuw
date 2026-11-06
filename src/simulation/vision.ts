@@ -34,6 +34,7 @@ export type VisionView = {
 };
 
 export type Vision = VisionView & {
+  readonly visibleCount: number;
   /** Replaces current vision; returns one `0` or `1` per tile. */
   update: (sources: readonly VisionSource[]) => Readonly<Uint8Array>;
   dispose: () => void;
@@ -46,6 +47,7 @@ export type FogView = VisionView & {
 };
 
 export type Fog = FogView & {
+  readonly visibleCount: number;
   /** Replaces current vision and adds it to explored terrain. */
   update: (sources: readonly VisionSource[]) => void;
   /** The explored tiles in `FogState` form. */
@@ -154,6 +156,9 @@ export function createVision(map: TerrainGrid): Vision {
     get version() {
       return version;
     },
+    get visibleCount() {
+      return visible.reduce((sum, bit) => sum + bit, 0);
+    },
     isVisible: (x, z) =>
       map.containsTile(x, z) && visible[z * map.width + x] === 1,
     update: (sources) => {
@@ -181,6 +186,9 @@ export function createFog(map: TerrainGrid, tiles: string): Fog {
     },
     get exploredCount() {
       return exploredCount;
+    },
+    get visibleCount() {
+      return vision.visibleCount;
     },
     isExplored: (x, z) =>
       map.containsTile(x, z) && explored[z * map.width + x] === 1,
@@ -237,6 +245,15 @@ export function createOwnerVision({
     seesTile,
     /** An owner's explored terrain; absent without fog. */
     fogOf: (owner: string): FogView | undefined => visions.get(owner),
+    /** Tiles an owner has explored and sees now; every tile without fog. */
+    coverage: (owner: string) => {
+      const tiles = map ? map.width * map.height : 0;
+      const vision = visions.get(owner);
+      return {
+        explored: vision?.exploredCount ?? tiles,
+        visible: vision?.visibleCount ?? tiles,
+      };
+    },
     /** Explored terrain retained after its vision, or an alliance, ends. */
     knowsTile: (owner: string, { x, z }: TileCoord) =>
       !fog || !!visions.get(owner)?.isExplored(x, z),

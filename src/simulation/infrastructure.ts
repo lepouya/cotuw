@@ -213,6 +213,7 @@ export function updateInfrastructure(
       if (definitions.get(building.definitionId)!.infrastructure)
         building.headquartersId = building.id;
       releaseTender(economy, building.id);
+      world.complete?.(building);
     }
   }
 }

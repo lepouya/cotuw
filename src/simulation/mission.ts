@@ -1,3 +1,14 @@
+import {
+  createMatchMetrics,
+  recordMatch,
+  validateMatchMetrics,
+} from "./match-metrics";
+import type {
+  MatchContext,
+  MatchMetrics,
+  MatchRecorder,
+  MatchView,
+} from "./match-metrics";
 import { growthCandidates, growthWorkerFor } from "./growth";
 import { missionEnded } from "./mission-result";
 import type { MissionResult } from "./mission-result";
@@ -104,7 +115,7 @@ import {
   refundCost,
   regroupStockpiles,
 } from "./stockpiles";
-import type { EconomyState, EconomyView } from "./economy";
+import type { EconomyCommandHooks, EconomyState, EconomyView } from "./economy";
 import {
   createTilePlacedActor,
   evaluateFootprint,
@@ -118,6 +129,7 @@ import {
 
 import type {
   Actor,
+  DeepReadonly,
   ActorBehavior,
   ActorDefinition,
   ActorRenderState,
@@ -212,6 +224,7 @@ type WorkingActors = {
   retiredIds: string[];
   lifecycleChanges: number;
   activity: BuildingActivity[];
+  match?: MatchRecorder;
   economy?: EconomyState;
   wildlife: WildlifeState;
   wrecks: Wreck[];
@@ -249,6 +262,8 @@ export type MissionState = {
   wildlife: WildlifeState;
   /** Frozen owner-based verdict; absent until a skirmish ends. */
   skirmishResult?: SkirmishResult;
+  /** Omniscient match summary; player views must hide rival history in play. */
+  metrics?: MatchMetrics;
   /** Progress for authored campaign objectives. */
   objectives: ObjectiveState[];
   /** Scenario popups the player dismissed; the simulation only keeps them. */
@@ -330,6 +345,8 @@ export type MissionSimulation = {
   readonly wrecks: readonly Wreck[];
   /** Skirmish verdicts and campaign defeats end play. */
   readonly result: MissionResult | undefined;
+  /** For headless reports and post-match summaries, outside player knowledge. */
+  readonly metrics: DeepReadonly<MatchMetrics> | undefined;
   readonly objectives: readonly ObjectiveView[];
   /** Current relationship rules; events replace the view when they change. */
   readonly relations: Relations;
@@ -528,8 +545,8 @@ export function createMissionSimulation({
     tickSeconds,
   });
   const supportResolver = createSupportResolver(definitionsById);
-  const supportFor = (actors: readonly Actor[]) =>
-    supportResolver(actors, relations.sharesSupport);
+  const supportFor = (actors: readonly Actor[], sharing = relations) =>
+    supportResolver(actors, sharing.sharesSupport);
   let actorsById = new Map<string, Actor>();
   let usedActorIds = new Set(state.retiredActorIds);
   for (const job of state.economy?.production ?? [])
@@ -718,8 +735,25 @@ export function createMissionSimulation({
     owners: ownerIds,
     definitions: definitionsById,
     objectives,
+    siteIds: new Set(economySites(state.economy).map((site) => site.id)),
   });
   deepFreeze(state.skirmishResult);
+  const matchContext: MatchContext | undefined = skirmish && {
+    rules: skirmish,
+    definitions: definitionsById,
+    tickSeconds,
+  };
+  if (matchContext)
+    validateMatchMetrics(state.metrics, matchContext, {
+      completedTicks: state.tick,
+      tileCount: map ? map.width * map.height : 0,
+      result: state.skirmishResult,
+      actors: state.actors,
+      economy: state.economy,
+      fog: savedFog,
+    });
+  else if (state.metrics !== undefined)
+    throw new RangeError("Mission has match metrics without skirmish rules.");
   validateWildlife(
     state.wildlife,
     state.actors,
@@ -958,6 +992,26 @@ export function createMissionSimulation({
     working.retiredIds.push(actor.id);
     working.lifecycleChanges += 1;
   };
+  /** Charges a job's price and returns the amount it retains. */
+  const pay = (
+    working: WorkingActors,
+    owner: string,
+    definition: ActorDefinition,
+  ) => {
+    const cost = chargeCost(working.economy!, owner, definition);
+    working.match?.spend(owner, definition, cost);
+    return cost;
+  };
+  /** Cancellation refunds reduce spending; sale proceeds do not. */
+  const refundPayment = (
+    working: WorkingActors,
+    owner: string,
+    definition: ActorDefinition,
+    amount: number,
+  ) => {
+    refundCost(working.economy!, owner, definition, amount);
+    working.match?.spend(owner, definition, -amount);
+  };
   const stageActor = (working: WorkingActors, actor: Actor) => {
     working.actors.push(actor);
     working.actorsById.set(actor.id, actor);
@@ -972,6 +1026,7 @@ export function createMissionSimulation({
     const rally = working.actorsById.get(producerId)?.rallyPoint;
     if (rally) moveActor(actor, rally);
     stageActor(working, actor);
+    working.match?.produced(actor, working.actors);
     working.activity.push({
       buildingId: producerId,
       kind: "exit",
@@ -994,6 +1049,8 @@ export function createMissionSimulation({
   const stageWorking = (): WorkingActors => {
     const actors = state.actors.map((actor) => structuredClone(actor));
     return {
+      match:
+        state.metrics && recordMatch(state.metrics, matchContext!, state.tick),
       actors,
       actorsById: new Map(actors.map((actor) => [actor.id, actor])),
       usedIds: new Set(usedActorIds),
@@ -1072,28 +1129,64 @@ export function createMissionSimulation({
   });
   const { sees, seesTile, detects } = ownerVision;
   /** Derives vision, then records what each owner now sees. */
-  const updateKnowledge = () => {
+  const withKnowledge = (
+    candidate: MissionState,
+    sharing = relations,
+  ): MissionState => {
     ownerVision.update(
-      state.actors,
-      state.economy && supportFor(state.actors),
-      relations.sharesVision,
+      candidate.actors,
+      candidate.economy && supportFor(candidate.actors, sharing),
+      sharing.sharesVision,
     );
-    state = {
-      ...state,
+    return {
+      ...candidate,
       observations: deepFreeze(
-        observeAll(state.observations, ownerIds, {
-          tick: state.tick,
-          actors: state.actors,
-          wrecks: state.wrecks,
-          economy: state.economy,
+        observeAll(candidate.observations, ownerIds, {
+          tick: candidate.tick,
+          actors: candidate.actors,
+          wrecks: candidate.wrecks,
+          economy: candidate.economy,
           detects,
           seesTile,
-          sharesVision: relations.sharesVision,
+          sharesVision: sharing.sharesVision,
         }),
       ),
     };
   };
-  updateKnowledge();
+  state = withKnowledge(state);
+  const matchView = (
+    actors: readonly Actor[],
+    sharing = relations,
+  ): MatchView => ({
+    actors,
+    support: supportFor(actors, sharing),
+    coverage: ownerVision.coverage,
+  });
+  /** Authored paid jobs count as spending so their refunds balance. */
+  const openMetrics = () => {
+    if (!matchContext) return;
+    const recorder = recordMatch(
+      createMatchMetrics(matchContext.rules.owners),
+      matchContext,
+      0,
+    );
+    for (const actor of state.actors)
+      if (actor.construction)
+        recorder.spend(
+          actor.owner,
+          definitionFor(actor),
+          actor.construction.paidCost,
+        );
+    for (const job of state.economy?.production ?? [])
+      recorder.spend(
+        actorsById.get(job.producerId)!.owner,
+        definitionsById.get(job.definitionId)!,
+        job.paidCost,
+      );
+    state.metrics = recorder.commit(matchView(state.actors), true);
+  };
+  if (state.metrics) deepFreeze(state.metrics);
+  else openMetrics();
   // Sites are authored and fixed for the mission.
   const sites = deepFreeze(siteLocations(state.economy));
   const knowledge = new Map(
@@ -1340,6 +1433,11 @@ export function createMissionSimulation({
         replaceQueue(executeCommand(command, tick, working, issuer), working),
     ];
   };
+  const economyHooks = (working: WorkingActors): EconomyCommandHooks => ({
+    retire: (id) => working.retiredIds.push(id),
+    refund: (owner, definition, amount) =>
+      refundPayment(working, owner, definition, amount),
+  });
   const applyEconomyCommand = (
     command: EconomyCommand,
     tick: number,
@@ -1364,7 +1462,7 @@ export function createMissionSimulation({
             working.economy,
             working.actors,
             definitionsById,
-            (id) => working.retiredIds.push(id),
+            economyHooks(working),
           );
     return {
       tick,
@@ -1394,9 +1492,9 @@ export function createMissionSimulation({
       (!economy || !actor.construction)
     )
       return outcome(false);
-    if (economy && command.kind === "cancel-construction")
-      refundCost(
-        economy,
+    if (command.kind === "cancel-construction")
+      refundPayment(
+        working,
         actor.owner,
         definitionFor(actor),
         actor.construction!.paidCost,
@@ -1469,20 +1567,15 @@ export function createMissionSimulation({
       occupancy!.place(evaluation.footprint);
       if (working.economy) {
         const definition = definitionFor(evaluation.actor);
-        const cost = chargeCost(
-          working.economy,
-          evaluation.actor.owner,
-          definition,
-        );
         evaluation.actor.construction = {
-          paidCost: cost,
+          paidCost: pay(working, evaluation.actor.owner, definition),
           completedTicks: 0,
           totalTicks: secondsToTicks(
             definition.constructionSeconds,
             tickSeconds,
           ),
         };
-      }
+      } else working.match?.completed(evaluation.actor);
       stageActor(working, evaluation.actor);
       if (working.economy && definitionFor(evaluation.actor).growth) {
         applyEconomy(
@@ -1490,7 +1583,7 @@ export function createMissionSimulation({
           working.economy,
           working.actors,
           definitionsById,
-          () => {},
+          economyHooks(working),
         );
         delete tender!.orders;
       }
@@ -1514,7 +1607,7 @@ export function createMissionSimulation({
       if (working.economy) {
         const definition = definitionsById.get(applied.definitionId)!;
         const producer = working.actorsById.get(applied.producerId)!;
-        const cost = chargeCost(working.economy, producer.owner, definition);
+        const cost = pay(working, producer.owner, definition);
         working.economy.production.push({
           actorId: applied.actorId,
           producerId: applied.producerId,
@@ -1579,6 +1672,9 @@ export function createMissionSimulation({
     );
 
   return {
+    get metrics() {
+      return state.metrics;
+    },
     get actors() {
       return state.actors;
     },
@@ -1735,7 +1831,8 @@ export function createMissionSimulation({
         occupancy!.place(footprint);
       }
       actorVersion += 1;
-      updateKnowledge();
+      state = withKnowledge(state);
+      openMetrics();
     },
     removeActor: (id) => {
       ensureActorMutation();
@@ -1752,7 +1849,8 @@ export function createMissionSimulation({
       };
       actorsById = new Map(state.actors.map((actor) => [actor.id, actor]));
       actorVersion += 1;
-      updateKnowledge();
+      state = withKnowledge(state);
+      openMetrics();
       return true;
     },
     snapshot: () => {
@@ -1834,7 +1932,9 @@ export function createMissionSimulation({
           detects,
           hostile: relations.hostile,
           move: moveActor,
+          hit: working.match?.hit,
           destroy: (actor) => {
+            working.match?.lost(actor);
             recordObjectiveDestruction(
               objectives,
               working.objectives,
@@ -1905,6 +2005,8 @@ export function createMissionSimulation({
                   new Set([...working.usedIds].filter((id) => id !== actorId)),
                 ),
               support: () => supportFor(working.actors),
+              income: working.match?.income,
+              complete: working.match?.completed,
               spawn: (actor, producerId) =>
                 stageProducedActor(working, actor, producerId),
               deliver: (refineryId, actorId) =>
@@ -1974,7 +2076,7 @@ export function createMissionSimulation({
         const committedActors = freezeActors(
           working.actors.map((actor) => deepFreeze(actor)),
         );
-        state = {
+        const candidate: MissionState = {
           ...state,
           tick: state.tick + 1,
           actors: committedActors,
@@ -1997,6 +2099,14 @@ export function createMissionSimulation({
             ),
           ),
         };
+        const sharing = nextRelations ?? relations;
+        const nextState = withKnowledge(candidate, sharing);
+        if (working.match)
+          nextState.metrics = working.match.commit(
+            matchView(nextState.actors, sharing),
+            !!skirmishResult,
+          );
+        state = nextState;
         if (
           state.wrecks.length !== previousWrecks.length ||
           state.wrecks.some(
@@ -2011,7 +2121,6 @@ export function createMissionSimulation({
         if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
         if (nextRelations) relations = nextRelations;
-        updateKnowledge();
         return outcomes;
       } catch (error) {
         faulted = true;

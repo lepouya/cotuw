@@ -1,10 +1,12 @@
 import type { Actor, ActorDefinition } from "./actor";
-import { isIdList, isRecord } from "./validation";
+import { hasOwn, isIdList, isRecord } from "./validation";
 
-/** Completed buildings of these types keep either participant in play. */
 export type SkirmishRules = {
   readonly owners: readonly [string, string];
+  /** Completed buildings of these types keep either participant in play. */
   readonly qualifyingDefinitionIds: readonly string[];
+  /** Each owner's home sites; income from any other site is expansion. */
+  readonly startingResourceSites: Readonly<Record<string, readonly string[]>>;
 };
 
 /** A verdict from the player's perspective, committed with the final tick. */
@@ -56,6 +58,7 @@ export function validateSkirmish(
     owners: ReadonlySet<string>;
     definitions: ReadonlyMap<string, ActorDefinition>;
     objectives: readonly unknown[];
+    siteIds: ReadonlySet<string>;
   },
 ): void {
   const result = state.skirmishResult;
@@ -74,6 +77,16 @@ export function validateSkirmish(
     !rules.qualifyingDefinitionIds.length ||
     rules.qualifyingDefinitionIds.some(
       (id) => !scope.definitions.get(id)?.footprint,
+    ) ||
+    !isRecord(rules.startingResourceSites) ||
+    Object.keys(rules.startingResourceSites).length !== rules.owners.length ||
+    rules.owners.some(
+      (owner) =>
+        !hasOwn(rules.startingResourceSites, owner) ||
+        !isIdList(rules.startingResourceSites[owner]) ||
+        rules.startingResourceSites[owner]!.some(
+          (id) => !scope.siteIds.has(id),
+        ),
     ) ||
     scope.objectives.length
   )

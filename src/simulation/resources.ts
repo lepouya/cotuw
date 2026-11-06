@@ -17,6 +17,8 @@ const RESOURCES = {
   },
 } satisfies Record<string, ResourceRules>;
 export type Resource = keyof typeof RESOURCES;
+/** Fractional cargo and cultivation reserves use integer thousandths. */
+export const RESOURCE_SCALE = 1000;
 export const RESOURCE_IDS = Object.keys(RESOURCES) as Resource[];
 
 /** The prices a definition sets; valid definitions set at most one. */

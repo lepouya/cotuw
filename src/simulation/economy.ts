@@ -1,3 +1,5 @@
+import { depositCargo, gatherCargo, validCargoSources } from "./cargo";
+import type { CargoSource } from "./cargo";
 import {
   updateInfrastructure,
   validateInfrastructure,
@@ -9,14 +11,9 @@ import {
   definedPrices,
   materialsCost,
   RESOURCE_IDS,
+  RESOURCE_SCALE,
 } from "./resources";
-import {
-  balanceOf,
-  credit,
-  deposit,
-  isValidLedger,
-  refundCost,
-} from "./stockpiles";
+import { balanceOf, credit, isValidLedger } from "./stockpiles";
 import type { Resource } from "./resources";
 import type { Ledger, LedgerView, SharesResources } from "./stockpiles";
 import {
@@ -81,6 +78,7 @@ export type HarvesterState = {
   actorId: string;
   refineryId?: string;
   cargo: number;
+  cargoSources?: CargoSource[];
   gatherProgress: number;
   targetSiteId?: string;
   activeSiteId?: string;
@@ -315,6 +313,7 @@ export function validateEconomyDefinitions(
       gathering &&
       (!definition.movement ||
         !isCount(gathering.capacity) ||
+        !isCount(gathering.capacity * RESOURCE_SCALE) ||
         gathering.capacity === 0 ||
         !isPositive(gathering.loadSeconds) ||
         !isCount(gathering.patchRadius))
@@ -412,12 +411,14 @@ export function validateEconomyState(
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const assigned = new Set<string>();
   const workers = new Set<string>();
+  const sourceIds = new Set(economy.sites.map((site) => site.id));
   for (const worker of economy.harvesters) {
     const actor = byId.get(worker?.actorId);
     const gathering = actor && definitions.get(actor.definitionId)?.harvesting;
     if (
       !gathering ||
       workers.has(worker.actorId) ||
+      !validCargoSources(worker, worker.cargo * RESOURCE_SCALE, sourceIds) ||
       !isCount(worker.cargo) ||
       worker.cargo > gathering.capacity ||
       !isCount(worker.gatherProgress) ||
@@ -575,6 +576,19 @@ export type EconomyWorld = {
   support: () => SupportView;
   spawn: (actor: Actor, producerId: string) => void;
   deliver: (refineryId: string, actorId: string) => void;
+  income?: (
+    owner: string,
+    resource: Resource,
+    amount: number,
+    sources: readonly CargoSource[],
+  ) => void;
+  complete?: (actor: Actor) => void;
+};
+
+export type EconomyCommandHooks = {
+  retire: (actorId: string) => void;
+  /** Returns a cancelled job's payment to its owner. */
+  refund: (owner: string, definition: ActorDefinition, amount: number) => void;
 };
 
 export function applyEconomyCommand(
@@ -582,7 +596,7 @@ export function applyEconomyCommand(
   economy: EconomyState,
   actors: Actor[],
   definitions: ReadonlyMap<string, ActorDefinition>,
-  retire: (actorId: string) => void,
+  { retire, refund }: EconomyCommandHooks,
 ): EconomyReason | undefined {
   if (command.kind === "cancel-production") {
     const index = economy.production.findIndex(
@@ -591,12 +605,7 @@ export function applyEconomyCommand(
     if (index < 0) return "missing-order";
     const [job] = economy.production.splice(index, 1);
     const producer = actors.find((actor) => actor.id === job.producerId)!;
-    refundCost(
-      economy,
-      producer.owner,
-      definitions.get(job.definitionId)!,
-      job.paidCost,
-    );
+    refund(producer.owner, definitions.get(job.definitionId)!, job.paidCost);
     retire(job.actorId);
     return;
   }
@@ -767,9 +776,14 @@ export function updateEconomy(
         block(worker);
       } else if (routeTo(actor, worker, destination)) {
         if (disconnected.has(worker.refineryId)) continue;
-        deposit(economy, actor.owner, "materials", worker.cargo);
-        world.deliver(worker.refineryId, worker.actorId);
-        worker.cargo = 0;
+        depositCargo(
+          economy,
+          world,
+          actor.owner,
+          "materials",
+          worker,
+          worker.refineryId,
+        );
         worker.phase = worker.targetSiteId ? "travelling" : "idle";
         delete worker.activeSiteId;
       }
@@ -829,6 +843,7 @@ export function updateEconomy(
     );
     worker.gatherProgress -= collected * loadTicks;
     site.remainingMaterials -= collected;
+    gatherCargo(worker, site.id, collected * RESOURCE_SCALE);
     worker.cargo += collected;
     if (worker.cargo === gathering.capacity) {
       worker.gatherProgress = 0;

@@ -40,8 +40,15 @@ These contracts describe where new behaviors, views, and services attach.
   Results express the player's perspective. Campaign objectives track authored
   actors; skirmish rules count qualifying completed buildings for both named
   owners after commands, combat, and construction. A skirmish verdict commits
-  with the final tick and freezes the mission; campaign defeats also stop
-  play and events, while campaign victories allow free play.
+  with the final metrics checkpoint and freezes the mission; campaign defeats
+  also stop play and events, while campaign victories allow free play.
+- `simulation/match-metrics.ts` records exact per-owner counters and milestones
+  from staged payments, refunds, deliveries, production, completion, and
+  combat. Production records peaks before a same-tick loss can hide them.
+  Histories share immutable samples without traversing them each tick. The
+  verdict and final sample commit together after knowledge and active vision
+  update. This omniscient reporting data stays outside `knowledgeOf` and
+  player views.
 - Direct actor spawn and removal hooks accept skirmish setup edits only at
   tick 0. Live skirmish changes use commands so every snapshot retains the
   end-of-tick elimination checkpoint.
@@ -88,6 +95,9 @@ These contracts describe where new behaviors, views, and services attach.
   explicit actor commands interrupt either worker type without losing cargo.
   Building loss cancels affected automatic routes. Cultivators retain delivery
   work and queued orders while selecting a replacement drop-off.
+- `simulation/cargo.ts` preserves ordered resource-source amounts, including
+  fractional cultivation, independently of workers' current orders and sites.
+  Both economies consume provenance on delivery before recording income.
 - Workers tend and deliver only to their owner's buildings; training inherits
   the producer's owner.
   Harvesters choose explored sites using their owner's last-seen yields.

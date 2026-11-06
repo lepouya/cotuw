@@ -1,6 +1,8 @@
+import { depositCargo, gatherCargo, validCargoSources } from "./cargo";
+import type { CargoSource } from "./cargo";
 import { clearCombatOrders, compareIds, nearestTo } from "./actor";
 import { secondsToTicks } from "./clock";
-import { deposit } from "./stockpiles";
+import { RESOURCE_SCALE } from "./resources";
 import { isCount, isPositive } from "./validation";
 import {
   advanceWorkerRoute,
@@ -12,9 +14,7 @@ import type { EconomyCommand } from "./command";
 import type { EconomyReason, EconomyState, EconomyWorld } from "./economy";
 import type { TileCoord } from "./grid";
 
-/** Reserve and fractional gathered resources use integer thousandths. */
-export const CULTIVATION_SCALE = 1000;
-const rateUnits = (rate: number) => Math.round(rate * CULTIVATION_SCALE);
+const rateUnits = (rate: number) => Math.round(rate * RESOURCE_SCALE);
 export type CultivationSite = {
   id: string;
   name: string;
@@ -41,6 +41,7 @@ export const CULTIVATOR_PHASES = [
 export type CultivatorState = {
   actorId: string;
   cargo: number;
+  cargoSources?: CargoSource[];
   /** Fractional resources already taken from the site's reserve. */
   gatherProgress: number;
   /** Fractional rate remaining below a reserve unit per tick. */
@@ -230,9 +231,14 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
       worker.dropoffId = destination.id;
       worker.phase = "returning";
       if (route(actor, worker, destination.point)) {
-        deposit(economy, actor.owner, "lifebloom", worker.cargo);
-        world.deliver(destination.id, worker.actorId);
-        worker.cargo = 0;
+        depositCargo(
+          economy,
+          world,
+          actor.owner,
+          "lifebloom",
+          worker,
+          destination.id,
+        );
         delete worker.dropoffId;
         worker.phase = site ? "travelling" : "idle";
       }
@@ -251,21 +257,22 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     worker.phase = "gathering";
     worker.rateProgress +=
       rateUnits(definition.cultivation!.rate) *
-      Math.round(cultivationEfficiency(site) * CULTIVATION_SCALE);
+      Math.round(cultivationEfficiency(site) * RESOURCE_SCALE);
     const available = Math.floor(
-      worker.rateProgress / (perSecond * CULTIVATION_SCALE),
+      worker.rateProgress / (perSecond * RESOURCE_SCALE),
     );
-    worker.rateProgress %= perSecond * CULTIVATION_SCALE;
+    worker.rateProgress %= perSecond * RESOURCE_SCALE;
     const amount = Math.min(
       available,
       site.reserve - site.dormantBelow,
-      (definition.cultivation!.capacity - worker.cargo) * CULTIVATION_SCALE -
+      (definition.cultivation!.capacity - worker.cargo) * RESOURCE_SCALE -
         worker.gatherProgress,
     );
     site.reserve -= amount;
+    gatherCargo(worker, site.id, amount);
     worker.gatherProgress += amount;
-    worker.cargo += Math.floor(worker.gatherProgress / CULTIVATION_SCALE);
-    worker.gatherProgress %= CULTIVATION_SCALE;
+    worker.cargo += Math.floor(worker.gatherProgress / RESOURCE_SCALE);
+    worker.gatherProgress %= RESOURCE_SCALE;
     if (site.reserve <= site.dormantBelow) site.dormant = true;
   }
 }
@@ -280,12 +287,13 @@ export function validateCultivationDefinitions(
     if (
       definition.cultivation &&
       (!definition.movement ||
+        !isCount(definition.cultivation.capacity * RESOURCE_SCALE) ||
         !isCount(definition.cultivation.capacity) ||
         !definition.cultivation.capacity ||
         !isPositive(definition.cultivation.rate) ||
-        !isCount(rateUnits(definition.cultivation.rate) * CULTIVATION_SCALE) ||
+        !isCount(rateUnits(definition.cultivation.rate) * RESOURCE_SCALE) ||
         Math.abs(
-          definition.cultivation.rate * CULTIVATION_SCALE -
+          definition.cultivation.rate * RESOURCE_SCALE -
             rateUnits(definition.cultivation.rate),
         ) > 1e-6)
     )
@@ -345,6 +353,7 @@ export function validateCultivation(
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   const workers = new Set<string>();
   const tended = new Set<string>();
+  const sourceIds = new Set(state.sites.map((site) => site.id));
   for (const worker of state.workers) {
     const actor = byId.get(worker?.actorId);
     const tending = byId.get(worker?.tendingId ?? "");
@@ -355,13 +364,18 @@ export function validateCultivation(
       !actor ||
       !definition ||
       workers.has(worker.actorId) ||
+      !validCargoSources(
+        worker,
+        worker.cargo * RESOURCE_SCALE + worker.gatherProgress,
+        sourceIds,
+      ) ||
       !isCount(worker.cargo) ||
-      worker.cargo > definition.capacity ||
+      worker.cargo * RESOURCE_SCALE + worker.gatherProgress >
+        definition.capacity * RESOURCE_SCALE ||
       !isCount(worker.gatherProgress) ||
-      worker.gatherProgress >= CULTIVATION_SCALE ||
+      worker.gatherProgress >= RESOURCE_SCALE ||
       !isCount(worker.rateProgress) ||
-      worker.rateProgress >=
-        secondsToTicks(1, tickSeconds) * CULTIVATION_SCALE ||
+      worker.rateProgress >= secondsToTicks(1, tickSeconds) * RESOURCE_SCALE ||
       (!!worker.tendingId &&
         (worker.siteId !== undefined || worker.dropoffId !== undefined)) ||
       !CULTIVATOR_PHASES.includes(worker.phase) ||

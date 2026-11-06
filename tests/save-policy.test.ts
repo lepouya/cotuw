@@ -86,6 +86,7 @@ test.each(["victory", "defeat", "draw"] as const)(
         terrainTypeIds: [],
         skirmish: {
           owners: ["player", "rival"],
+          startingResourceSites: { player: [], rival: [] },
           qualifyingDefinitionIds: ["hq"],
         },
       },

@@ -556,6 +556,7 @@ test("owner-based skirmishes reject the campaign save policy", () => {
       ...scenario,
       skirmish: {
         owners: ["player", "rival"],
+        startingResourceSites: { player: [], rival: [] },
         qualifyingDefinitionIds: ["hq"],
       },
       savePolicy: "objectives",

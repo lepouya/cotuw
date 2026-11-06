@@ -519,10 +519,18 @@ describe("construction support", () => {
       facing: 0,
       occupancyLayer: "surface",
     });
+    state.economy!.sites.push({
+      id: "site",
+      name: "Site",
+      tile: { x: 2, z: 2 },
+      initialMaterials: 37,
+      remainingMaterials: 37,
+    });
     state.economy!.harvesters.push({
       actorId: "worker",
       refineryId: "remote",
       cargo: 50,
+      cargoSources: [{ siteId: "site", amount: 50_000 }],
       gatherProgress: 0,
       phase: "returning",
     });

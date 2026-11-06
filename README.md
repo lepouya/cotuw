@@ -67,7 +67,7 @@ This development slice uses the existing single-player control model.
 Healing, defenses, constructs, faction AI, difficulty, and skirmish balance
 remain pending. Owner economies, command authority, and headquarters queues
 are implemented; scenarios can enable owner-based elimination and emergency
-headquarters recovery. See the
+headquarters recovery with persisted per-owner match metrics. See the
 [slice scope](DESIGN.md#circle-wolf-den-development-slice).
 
 Levels and assets are generated from source and committed. `npm run levels`

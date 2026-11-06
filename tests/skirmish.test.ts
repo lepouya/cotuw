@@ -34,6 +34,7 @@ const HEART = "circle-heartgrove";
 const CONSERVATORY = "circle-conservatory";
 const rules: SkirmishRules = {
   owners: ["player", "rival"],
+  startingResourceSites: { player: [], rival: [] },
   qualifyingDefinitionIds: [
     CC,
     BARRACKS,

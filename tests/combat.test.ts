@@ -795,11 +795,19 @@ describe("combat edge cases", () => {
           building.health = 8;
           state.actors.push(building);
         }
+        state.economy!.sites.push({
+          id: "site",
+          name: "Site",
+          tile: { x: 2, z: 2 },
+          initialMaterials: 37,
+          remainingMaterials: 37,
+        });
         state.economy!.harvesters = [
           {
             actorId: "worker",
             refineryId: "refinery",
             cargo: 37,
+            cargoSources: [{ siteId: "site", amount: 37_000 }],
             gatherProgress: 0,
             phase: "returning",
           },
