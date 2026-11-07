@@ -1,4 +1,5 @@
 import type { SkirmishRules } from "./skirmish";
+import type { MissionSetup } from "./mission-setup";
 import type { MissionState } from "./mission";
 import type { ObjectiveDefinition } from "./objectives";
 import type { MissionEventDefinition } from "./events";
@@ -11,7 +12,7 @@ import { isFinitePosition } from "./world";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 16;
+export const MISSION_FILE_VERSION = 17;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -66,6 +67,8 @@ export type MissionScenario = {
   readonly objectives?: readonly ObjectiveDefinition[];
   /** Owner-based elimination, separate from authored campaign objectives. */
   readonly skirmish?: SkirmishRules;
+  /** Launch choices; absent plays at the authored baseline. */
+  readonly setup?: MissionSetup;
   /** One-time triggers and actions, such as relationship changes. */
   readonly events?: readonly MissionEventDefinition[];
   /** Lets an owner without a headquarters run one replacement job. */
@@ -136,6 +139,7 @@ export function serializeMission(
     terrainTypeIds,
     objectives,
     skirmish,
+    setup,
     events,
     emergencyHeadquarters,
     scriptControl,
@@ -159,6 +163,7 @@ export function serializeMission(
       terrainTypeIds,
       objectives,
       skirmish,
+      setup,
       events,
       emergencyHeadquarters,
       scriptControl,

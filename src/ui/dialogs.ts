@@ -1,10 +1,12 @@
 import { errorMessage } from "../errors";
+import { DIFFICULTIES, DIFFICULTY_IDS } from "../simulation/mission-setup";
 import { createAudioControls } from "./audio-controls";
-import { mountFeature } from "./dom";
+import { createElement, mountFeature } from "./dom";
 import { createSavePanel } from "./save-panel";
 import markup from "./dialogs.html?raw";
 import "./dialogs.css";
 
+import type { Difficulty } from "../simulation/mission-setup";
 import type { ScenarioPopup } from "../simulation/mission-file";
 import type { AudioControlDevice } from "./audio-controls";
 import type { FeatureScope } from "./dom";
@@ -34,7 +36,7 @@ type DialogOptions = SaveOperations & {
   focusWorld: () => void;
   notify: (message: string) => void;
   cancelLoad: () => void;
-  start: (faction: "arc" | "circle") => void;
+  start: (faction: "arc" | "circle", difficulty: Difficulty) => void;
   restart: () => void;
   /** Releases the mission, then shows the title screen. */
   exitToTitle: () => Promise<void>;
@@ -54,7 +56,7 @@ const onlyIn =
  */
 const CONTROL_RULES: Record<string, (view: MenuView) => boolean> = {
   "new-mission": onlyIn("home"),
-  "open-options": onlyIn("home"),
+  "open-options": (view) => view.mode === "home" || !!view.mission,
   "quit-game": onlyIn("home"),
   "inspect-loaded-mission": (view) => !!view.canInspect,
   "return-to-title": onlyIn("quit"),
@@ -126,8 +128,9 @@ function bindDialogs(
     setup: {
       content: element("mission-setup"),
       focus: () => element("choose-arc"),
-      title: "Choose your faction",
-      description: "Choose a faction for the wolf-den demo.",
+      title: "Set up your mission",
+      description:
+        "Choose a difficulty, then a faction, for the wolf-den demo.",
     },
   };
   let revision = 0;
@@ -203,9 +206,7 @@ function bindDialogs(
     panel = next;
     for (const [name, { content }] of Object.entries(panels))
       content.hidden = name !== next;
-    // Missions show audio settings beside their actions instead of Options.
-    audioRoot.hidden =
-      next !== "options" && !(next === "actions" && view?.mission);
+    audioRoot.hidden = next !== "options";
     title.textContent = panels[next].title ?? view?.title ?? "";
     description.textContent =
       panels[next].description ?? view?.description ?? "";
@@ -326,8 +327,25 @@ function bindDialogs(
   );
   click("inspect-loaded-mission", () => closeMenu(false));
   click("new-mission", () => showPanel("setup"));
-  click("choose-arc", () => options.start("arc"));
-  click("choose-circle", () => options.start("circle"));
+  let difficulty: Difficulty = "normal";
+  const difficultyChoices = DIFFICULTY_IDS.map((id) => {
+    const button = createElement(
+      "button",
+      { id: `difficulty-${id}`, class: "setup-choice", type: "button" },
+      createElement("strong", {}, DIFFICULTIES[id].name),
+    );
+    element("difficulty-choices").append(button);
+    click(button.id, () => selectDifficulty(id));
+    return { id, button };
+  });
+  const selectDifficulty = (selected: Difficulty) => {
+    difficulty = selected;
+    for (const { id, button } of difficultyChoices)
+      button.setAttribute("aria-pressed", String(id === selected));
+  };
+  selectDifficulty(difficulty);
+  click("choose-arc", () => options.start("arc", difficulty));
+  click("choose-circle", () => options.start("circle", difficulty));
   click("restart-mission", options.restart);
   click("exit-mission", () => void perform(options.exitToTitle));
   click("quit-game", () => void perform(options.quit));

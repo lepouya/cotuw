@@ -168,6 +168,8 @@ export type CombatWorld = {
   /** Takes a destroyed actor out of the mission. */
   destroy: (actor: Actor) => void;
   hit?: (attacker: Actor, target: Actor, damage: number) => void;
+  /** Multiplies an owner's damage and its effective health. */
+  combatScale?: (owner: string) => number;
 };
 
 export function validateCombatDefinition(definition: ActorDefinition): void {
@@ -378,6 +380,7 @@ export function noteAttackMoveRoute(
  * order answers an attacker already in range.
  */
 export function updateCombat(world: CombatWorld): AttackEvent[] {
+  const combatScale = world.combatScale ?? (() => 1);
   const { definitions, tick } = world;
   const byId = new Map(world.actors.map((actor) => [actor.id, actor]));
   const wreckById = new Map(
@@ -634,14 +637,17 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       targetId: target.id,
       from: { ...actor.worldPosition },
       to: { ...target.worldPosition },
-      damage: weapon.damage,
+      damage: weapon.damage * combatScale(actor.owner),
       damageType: weapon.damageType,
     });
   }
   for (const hit of hits) {
     const target = byId.get(hit.targetId)!;
     world.hit?.(byId.get(hit.attackerId)!, target, hit.damage);
-    target.health = healthOf(target, definitionOf(target).health!) - hit.damage;
+    // Scaling incoming damage keeps health bars on the definition's maximum.
+    target.health =
+      healthOf(target, definitionOf(target).health!) -
+      hit.damage / combatScale(target.owner);
     const combat = (target.combat ??= {});
     combat.activeTick = tick;
     combat.lastHit = { attackerId: hit.attackerId, tick };

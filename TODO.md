@@ -144,25 +144,24 @@ roster is bounded, and baseline findings have an actionable disposition.
 Use the decisions from phase A. Keep the ARC introduction playable throughout
 and bring up the rough skirmish map early for simulation and AI development.
 
-- [ ] **1.14** Author the rough skirmish map with both start slots, expansion
+- [x] **1.14** Author the rough skirmish map with both start slots, expansion
   sites, scouting opportunities, and attack routes. Implement the selected
   setup mechanism using the ARC mirror harness for starts and restarts.
-  Map authoring can begin first; setup integration depends on 1.15-1.17 and
-  1.27. Supply ARC starting packages and define the Circle setup inputs for
-  later content integration. Circle income checks follow 1.48-1.50;
-  both-faction first deposits and restart coverage are verified in 1.59.
-  Identify starting resource sites per start position for expansion metrics.
-  Resolve chosen faction and difficulty into setup, applying existing enemy
-  health/damage scaling while keeping starting stocks and AI profiles intact.
-  The generated `skirmish-map` preview and authoring inputs provide both
-  slots, three independent crossings, home income, and expansion areas.
+  Supply both factions' starting packages and identify starting resource sites
+  per start position for expansion metrics. Resolve chosen faction and
+  difficulty into setup, applying enemy health/damage scaling while keeping
+  starting stocks and AI profiles intact.
+  The generated `skirmish-map` preview and `src/content/skirmish-map.ts`
+  provide both slots, three independent crossings, home income, and expansion
+  areas.
   The rough-map preview is playtested and accepted.
-  Headless checks cover slot symmetry, flat base space, resource access, and
-  ARC's paid first-income opening from either slot through the single-faction
-  opening builder. Owner-based launch assembly,
-  difficulty, resolved restart setup, and Circle integration remain pending
-  their implementation dependencies. Launch assembly enables the scenario's
-  `emergencyHeadquarters` rule from 1.16.
+  `assembleSkirmish` resolves any faction assignment and difficulty at launch
+  through the shared loading path, with `emergencyHeadquarters`, owner-based
+  rules, and both resource kinds on every area. `scenario.setup` keeps the
+  choices for restart. Headless checks cover slot symmetry, flat base space,
+  resource access, both factions' paid first income from either slot, matchup
+  independence, scaling, saved continuation, and restart after load. Browser
+  specs verify the setup screen and skirmish links in Chromium and WebKit.
 - [x] **1.15** Implement the actor ownership model from 1.08 across hostility,
   support networks, vision and fog, economy, objectives, presentation, and
   saves. Verify that opposing owners of the same faction type fight and keep
@@ -341,7 +340,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   Human playtest completed. Review checks cover same-tick production losses,
   immutable histories, refundable spending, exploration consistency, and
   fractional cargo capacity.
-- [ ] **1.27** Update mission and content formats, validation, and documentation
+- [x] **1.27** Update mission and content formats, validation, and documentation
   for ownership, multi-faction state, observations, objectives, and metrics.
   Include effective difficulty and scaling, plus the skirmish draw result and
   its resolution tick. Control-group interface-state persistence is added
@@ -352,9 +351,10 @@ and bring up the rough skirmish map early for simulation and AI development.
   1.15 added owners, relationships with sharing, scenario events, and fired
   events to the format with their validation and documentation; 1.19 added
   per-owner exploration and observations; 1.23 added the scenario save policy.
-  Mission format 16 persists owner-based skirmish rules, verdicts, match
-  metrics, and cargo provenance, with validated deterministic continuation.
-  Effective difficulty and scaling remain with setup and AI integration.
+  Mission format 17 persists owner-based skirmish rules, verdicts, match
+  metrics, and cargo provenance, with validated deterministic continuation,
+  plus `scenario.setup` with difficulty, effective scaling, enemy owners, and
+  skirmish factions, validated against the mission's owners.
 - [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers
@@ -426,7 +426,8 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   tasks. No selected roster or AI task requires these deferred systems.
 - [ ] **1.39** Add the ARC Relay Station and Sentry Turret as data-driven
   content. Verify support loss, reconnection, placement, targeting, and the
-  expansion or protection choices they are intended to provide.
+  expansion or protection choices they are intended to provide. Exclude Relay
+  Stations from assembled skirmishes' qualifying buildings.
 - [ ] **1.40** Implement building repair through each headquarters'
   infrastructure pool, following [recovery rules](DESIGN.md#repair-and-healing).
   Cover payment, cancellation, paused work, disconnection, and competition with
@@ -596,7 +597,7 @@ milestone foundations.
   dormancy, recovery, and support work. Preserve site reserves and dormancy
   state, worker cargo, cultivation progress, assignments, and queued orders.
 - [ ] **1.57** Playtest the Circle introduction and base loop with the cohort,
-  launched through the demo faction chooser or a development link. Verify
+  launched through the demo setup screen or a development link. Verify
   that RTS-familiar newcomers understand its differences,
   can establish and sustain a base, and can explain a useful cultivation
   decision. Refine cultivation rates, reserve capacity, cargo capacity, and
@@ -613,15 +614,14 @@ and producer-based progression scope from 1.06.
 
 - [ ] **1.59** Finish the map with viable routes, expansion opportunities,
   scouting landmarks, and defensible starts for both player assignments.
-  Verify both factions in both start slots can fund and complete their first
-  worker and drop-off building, deliver resources, and restart reproducibly
-  from the assembled setup after 1.48-1.50.
+  Both factions' first income and restart from either slot are verified in
+  1.14; re-verify them against the finished map.
 - [ ] **1.60** Add the normal-menu flow for faction choice, introductions, and
   skirmish launch. The mission-start dialog offers ARC or Circle and Easy,
   Normal, or Hard difficulty.
-  The demo faction chooser launches ARC's introduction or the Circle
-  cultivation slice. Difficulty selection, the complete Circle introduction, and
-  skirmish launch remain pending.
+  The demo setup screen offers difficulty and launches ARC's introduction or
+  the Circle cultivation slice. The complete Circle introduction and skirmish
+  launch remain pending.
 - [ ] **1.61** Wire the agreed objectives, victory, defeat, and post-result
   behavior into complete matches, including same-tick elimination draws.
   Freeze skirmishes for inspection after every result and offer Save, Restart,

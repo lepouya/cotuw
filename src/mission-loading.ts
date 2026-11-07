@@ -1,15 +1,27 @@
 import { contentPack } from "./content/packs";
+import {
+  createSkirmishScenario,
+  SKIRMISH_SCENARIO_ID,
+  skirmishChoiceError,
+} from "./content/skirmish";
 import { errorMessage } from "./errors";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
+import { resolveSetup } from "./simulation/mission-setup";
 import { createMissionSimulation } from "./simulation/mission";
-import { checkMissionHeader, parseMission } from "./simulation/mission-file";
+import {
+  checkMissionHeader,
+  parseMission,
+  serializeMission,
+} from "./simulation/mission-file";
 import { OccupancyGrid } from "./simulation/occupancy";
-import { createScenarioMap } from "./simulation/scenario";
+import { createScenarioMap, createScenarioState } from "./simulation/scenario";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import { isCount, isId, isRecord } from "./simulation/validation";
 
 import type { ContentPack } from "./content/content-pack";
+import type { SkirmishChoice } from "./content/skirmish";
 import type { ActorDefinition } from "./simulation/actor";
+import type { Difficulty } from "./simulation/mission-setup";
 import type { MissionSimulation } from "./simulation/mission";
 import type { MissionFile } from "./simulation/mission-file";
 import type { ScenarioTerrain } from "./simulation/scenario";
@@ -37,6 +49,7 @@ export function createSessionSimulation(
     state: mission.state,
     objectives: mission.scenario.objectives,
     skirmish: mission.scenario.skirmish,
+    setup: mission.scenario.setup,
     events: mission.scenario.events,
     emergencyHeadquarters: mission.scenario.emergencyHeadquarters,
     scriptControl: mission.scenario.scriptControl,
@@ -77,7 +90,59 @@ export function missionIncompatibility(file: unknown): string | undefined {
 
 /** Parses a level or save, rejecting state the simulation would refuse. */
 export function loadMission(source: string): LoadedMission {
+  return prepareMission(parseMission(source, SIMULATION_TICK_SECONDS));
+}
+
+/** Starts a level at a difficulty, or as authored without one. */
+export function loadLevel(
+  source: string,
+  difficulty?: Difficulty,
+): LoadedMission {
   const file = parseMission(source, SIMULATION_TICK_SECONDS);
+  // A level authored at this difficulty keeps its own enemy owners.
+  if (!difficulty || difficulty === file.scenario.setup?.difficulty)
+    return prepareMission(file);
+  // The level's own owners decide who counts as an enemy.
+  const setup = resolveSetup(
+    difficulty,
+    file.state,
+    file.scenario.setup?.factions,
+  );
+  return prepareMission({ ...file, scenario: { ...file.scenario, setup } });
+}
+
+/** Resolves launch choices into a tick-0 mission file and loads it. */
+export function assembleSkirmish(choice: SkirmishChoice): LoadedMission {
+  const scenario = createSkirmishScenario(choice);
+  const pack = contentPack(scenario.content!);
+  return loadMission(
+    serializeMission(
+      scenario,
+      createScenarioState(scenario, pack.actors),
+      SIMULATION_TICK_SECONDS,
+    ),
+  );
+}
+
+/** Registered levels take precedence over built-in setup reconstruction. */
+export function missionRestart(
+  { scenario, state }: MissionFile,
+  levelSource?: string,
+): (() => LoadedMission) | undefined {
+  const { setup } = scenario;
+  if (levelSource !== undefined)
+    return () => loadLevel(levelSource, setup?.difficulty);
+  if (scenario.id === SKIRMISH_SCENARIO_ID && setup?.factions) {
+    const choice = {
+      factions: setup.factions,
+      playerSlot: state.playerOwner,
+      difficulty: setup.difficulty,
+    };
+    if (!skirmishChoiceError(choice)) return () => assembleSkirmish(choice);
+  }
+}
+
+function prepareMission(file: MissionFile): LoadedMission {
   if (!file.scenario.content)
     throw new RangeError("This mission file names no content pack.");
   const content = contentPack(file.scenario.content);

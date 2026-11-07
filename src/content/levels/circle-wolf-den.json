@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 16,
+  "version": 17,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "circle-wolf-den",

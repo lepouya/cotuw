@@ -1,23 +1,32 @@
 import { factionName } from "./content/content-pack";
 import { LEVEL_SOURCES } from "./content/levels";
 import { errorMessage } from "./errors";
-import { loadMission, missionIncompatibility } from "./mission-loading";
+import {
+  assembleSkirmish,
+  loadLevel,
+  loadMission,
+  missionIncompatibility,
+  missionRestart,
+} from "./mission-loading";
 import { createPlatform } from "./platform";
 import { createSaveRules } from "./save-policy";
 import { createSaveLibrary, saveCompleteMessage } from "./saves";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { missionEnded } from "./simulation/mission-result";
+import { DIFFICULTIES } from "./simulation/mission-setup";
 import { playerFactionOf } from "./simulation/ownership";
 import { presentResult } from "./ui/mission-result";
 import { createSidebar } from "./ui/sidebar";
 import { formatElapsed, topBarState } from "./ui/top-bar";
 
 import type { AudioMixer } from "./audio/mixer";
+import type { SkirmishChoice } from "./content/skirmish";
 import type { LoadedMission } from "./mission-loading";
 import type { Platform } from "./platform";
 import type { SaveRules } from "./save-policy";
 import type { SaveKind, SaveLibrary } from "./saves";
 import type { GameSession } from "./session";
+import type { Difficulty } from "./simulation/mission-setup";
 import type { MissionResult } from "./simulation/mission-result";
 import type { createDialogs, MenuMode, MenuView } from "./ui/dialogs";
 import type { createNotifications } from "./ui/notifications";
@@ -107,12 +116,22 @@ export function createApplication({
   const elapsed = () =>
     session ? formatElapsed(topBarState(session).elapsedSeconds) : "";
   const missionName = () => mission?.scenario.name ?? "Mission";
+  const missionSummary = () => {
+    const setup = mission?.scenario.setup;
+    return [
+      missionName(),
+      `${elapsed()} elapsed`,
+      ...(setup ? [`${DIFFICULTIES[setup.difficulty].name} difficulty`] : []),
+    ].join(" · ");
+  };
   const canSave = () =>
     !!session &&
     !!saveRules?.canSave({
       faulted: session.faulted(),
       result: session.simulation.result,
     });
+  const restartLoader = () =>
+    mission && missionRestart(mission, levels.get(mission.scenario.id));
   const cancelLoad = () => {
     loadRequest++;
   };
@@ -148,19 +167,18 @@ export function createApplication({
       mission: session && {
         saveName: `${missionName()} ${elapsed()}`,
         canSave: canSave(),
-        canRestart: levels.has(mission?.scenario.id ?? ""),
+        canRestart: !!restartLoader(),
       },
     });
   }
 
   function showMenu(mode: keyof typeof MENU_VIEWS) {
     const text = MENU_VIEWS[mode];
-    presentMenu(
-      mode,
-      mode === "menu"
-        ? { ...text, description: `${missionName()} · ${elapsed()} elapsed` }
-        : text,
-    );
+    let description = text.description;
+    if (mode === "menu") description = missionSummary();
+    else if (mode === "loaded")
+      description = `${missionSummary()}. ${text.description}`;
+    presentMenu(mode, { ...text, description });
   }
 
   /** Result menus preempt others; reopened ones behave as the pause menu. */
@@ -169,7 +187,12 @@ export function createApplication({
       result,
       (id) => mission?.scenario.objectives?.find((o) => o.id === id)?.label,
     );
-    presentMenu(mode, { title, description, continueLabel, canInspect });
+    presentMenu(mode, {
+      title,
+      description: `${description} ${missionSummary()}.`,
+      continueLabel,
+      canInspect,
+    });
   }
 
   function openMenu() {
@@ -255,6 +278,7 @@ export function createApplication({
       delete canvas.dataset.missionResult;
       delete canvas.dataset.terrainReady;
       delete canvas.dataset.simulationFault;
+      canvas.dataset.difficulty = next.scenario.setup?.difficulty ?? "normal";
       const { createGameSession } = await import("./session");
       mission = next;
       const rules = createSaveRules(next, SIMULATION_TICK_SECONDS);
@@ -353,18 +377,32 @@ export function createApplication({
     }
   }
 
-  function startLevel(id: string) {
+  function startResolved(resolve: () => LoadedMission) {
     try {
-      const source = levels.get(id);
-      if (source === undefined)
-        throw new RangeError(`This build has no level named "${id}".`);
-      void start(loadMission(source));
+      void start(resolve());
     } catch (error) {
       // Restart failures keep the open mission menu.
       if (!session) showTitle();
       dialogs.report(`The level could not start: ${errorMessage(error)}`);
     }
   }
+
+  function startLevel(id: string, difficulty?: Difficulty) {
+    startResolved(() => {
+      const source = levels.get(id);
+      if (source === undefined)
+        throw new RangeError(`This build has no level named "${id}".`);
+      return loadLevel(source, difficulty);
+    });
+  }
+
+  const startSkirmish = (choice: SkirmishChoice) =>
+    startResolved(() => {
+      const assembled = assembleSkirmish(choice);
+      // A level file loaded earlier must not replace this skirmish's restart.
+      levels.delete(assembled.scenario.id);
+      return assembled;
+    });
 
   /** Resolves the exported file name, if the export completed. */
   async function exportMission(name: string) {
@@ -398,14 +436,15 @@ export function createApplication({
     });
 
   return {
-    /** Creates platform services, then opens a level or the title screen. */
-    initialize: async (level: string | null) => {
+    /** Creates platform services, then opens a link or the title screen. */
+    initialize: async (link: { level?: string; skirmish?: SkirmishChoice }) => {
       setBusy(true);
       try {
         platform = await createPlatform();
         library = createSaveLibrary(platform.saves, missionIncompatibility);
         setBusy(false);
-        if (level !== null) startLevel(level);
+        if (link.skirmish) startSkirmish(link.skirmish);
+        else if (link.level !== undefined) startLevel(link.level);
         else showTitle();
       } catch (error) {
         // Stays busy: saves, loads, and exit need the platform.
@@ -419,14 +458,18 @@ export function createApplication({
     ready: () => !!library,
     /** The same handle throughout a mission. */
     session: () => session,
-    startFaction: (faction: keyof typeof FACTION_LEVELS) => {
+    startFaction: (
+      faction: keyof typeof FACTION_LEVELS,
+      difficulty: Difficulty,
+    ) => {
       const level = FACTION_LEVELS[faction];
       // A level file loaded earlier must not replace the chosen introduction.
       levels.set(level, LEVEL_SOURCES.get(level)!);
-      startLevel(level);
+      startLevel(level, difficulty);
     },
     restart: () => {
-      if (mission) startLevel(mission.scenario.id);
+      const resolve = restartLoader();
+      if (resolve) startResolved(resolve);
     },
     returnToTitle,
     showTitle,

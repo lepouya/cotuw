@@ -29,12 +29,25 @@ can be read, edited by hand, and loaded again.
   units derive from their definitions, as they do for trained units.
 - `skirmish-map` is a development terrain preview with free construction and
   training. It has no economy, so its resource areas are not shown. The
-  authoring inputs in `scripts/levels/skirmish-map.ts` define mirrored
-  west/east start slots, flat base areas, three ridge crossings, resource
-  areas, and faction opening packages. Each slot names its starting resource
-  area for expansion attribution. `createSkirmishOpening` assembles one
-  faction's headless opening at a slot, owned by that slot's ID. Two-owner
-  assembly and setup state are not yet part of the mission format.
+  authoring inputs in `src/content/skirmish-map.ts` define mirrored west/east
+  start slots, flat base areas, three ridge crossings, and resource areas with
+  both Materials and Lifebloom sites. Each slot names its starting resource
+  area for expansion attribution. `src/content/skirmish.ts` holds the faction
+  opening packages and assembles any `SkirmishMap`. Each map supplies a stable
+  `id` used as `scenario.id`; distinct maps use distinct IDs. Alternate maps
+  restart from their registered level source.
+- Built-in skirmishes have no bundled level file. `assembleSkirmish` resolves
+  faction-to-slot assignments, the player's slot, and difficulty into a tick-0
+  mission at launch, with one owner per slot sharing the slot's ID. Links use
+  `?skirmish=<west>-<east>&player=<slot>&difficulty=<level>`, for example
+  `?skirmish=arc-circle&player=east&difficulty=hard`.
+- `scenario.setup` records launch choices: `difficulty`, the matching
+  `enemyScale`, `enemyOwners`, and for skirmishes `factions` by slot. Restart
+  reapplies them; a level without it plays at the authored baseline. Enemy
+  owners are fixed at launch, so later alliance changes do not change scaling.
+- Imported level files remain their scenario's restart source for the session,
+  including assembled skirmishes edited as levels. Otherwise, only saves with
+  a known built-in skirmish setup can restart without a registered level.
 - Saves live in browser local storage or, in the desktop build, in the app
   data folder's `saves` directory. **Export file** and **Import file** in the
   game menu move them between the game and ordinary files.
@@ -52,7 +65,8 @@ can be read, edited by hand, and loaded again.
 - `save` holds a save's name and ISO timestamp. Levels omit it.
   A tick-0 save keeps its metadata and does not replace the restart level.
 - `scenario` holds authored content that stays fixed during a mission:
-  - `id` identifies the level. Restart reloads the level with this ID.
+  - `id` identifies the scenario. Restart uses its registered level source or
+    reconstructs the built-in skirmish from its setup.
   - `content` names the [content pack](content-packs.md) and version that
     supply actor definitions and presentation. Loading rejects a pack the
     build lacks or a different version, so a save keeps its rules.

@@ -2,6 +2,7 @@ import "./styles.css";
 import { version } from "../package.json";
 import { createApplication } from "./application";
 import { createAudioMixer } from "./audio/mixer";
+import { skirmishLink } from "./content/skirmish";
 import { createDialogs } from "./ui/dialogs";
 import { isTextEntry, worldKeyboardAvailable } from "./render/input-focus";
 import { createNotifications } from "./ui/notifications";
@@ -22,7 +23,7 @@ const dialogs = createDialogs(byId("game-dialogs"), {
   focusWorld: () => canvas.focus({ preventScroll: true }),
   notify: notifications.message,
   cancelLoad: () => app.cancelLoad(),
-  start: (faction) => app.startFaction(faction),
+  start: (faction, difficulty) => app.startFaction(faction, difficulty),
   restart: () => app.restart(),
   exitToTitle: () => app.returnToTitle(),
   showTitle: () => app.showTitle(),
@@ -74,5 +75,9 @@ document.addEventListener("contextmenu", (event) => {
   if (!isTextEntry(event.target)) event.preventDefault();
 });
 
-// Explicit level links remain available for authoring and browser checks.
-void app.initialize(new URLSearchParams(location.search).get("level"));
+// Explicit links remain available for authoring and browser checks.
+const link = new URLSearchParams(location.search);
+void app.initialize({
+  level: link.get("level") ?? undefined,
+  skirmish: skirmishLink(link),
+});

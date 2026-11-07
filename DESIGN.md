@@ -517,8 +517,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   to this screen. Exit closes the desktop app; browsers show a close-tab
   message. The title screen shows the game version.
   Explicit `?level=<scenario ID>` links open bundled levels for development.
-  New mission opens the wolf-den faction chooser described in the Circle
-  development slice; the same setup screen will support difficulty selection.
+  New mission opens the setup screen described in the Circle development
+  slice, with independent difficulty and faction choices.
 - Primary click selects or issues the contextual default command. Clicking a
   selected actor keeps it selected. Primary drag box-selects friendly mobile
   units. Shift-click toggles individual units; Shift-drag adds boxed units.
@@ -647,13 +647,14 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   and Harvester, connect support, gather Materials, train and rally units,
   then scout and use Attack Move against the wolves.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
-  Load, Restart, and Main menu; its Load panel lists saves and imports files. F5
-  quicksaves, F9 loads the quicksave, and F10 opens the menu. Escape opens the
-  menu after closing contextual UI, canceling active world tools, ending camera
-  modes, and clearing selection. In the menu, Escape backs out of a panel,
-  then closes the menu, preserving whether the mission was already paused.
+  Load, Options, Restart, and Main menu; its Load panel lists saves and imports
+  files. F5 quicksaves, F9 loads the quicksave, and F10 opens the menu. Escape
+  opens the menu after closing contextual UI, canceling active world tools,
+  ending camera modes, and clearing selection. In the menu, Escape backs out of
+  a panel, then closes the menu, preserving whether the mission was paused.
   An available continue action, such as Resume, leads the menu. Audio
-  settings sit beside the menu actions, not in the Save or Load panels.
+  settings open from Options, on the title screen and in missions. Mission
+  menus name the difficulty, including right after loading a save.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
   an explicit command mode.
@@ -1121,11 +1122,13 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   [M1 resources and progression](#m1-resources-and-progression), covering the
   first worker and drop-off building. They are data-driven and verified against
   normal costs; this opening does not constrain other scenarios' starts.
-- Setup assembly produces a resolved tick-0 mission file through the shared
-  validation and loading path. Restart reproduces the pristine resolved setup,
-  including faction-to-slot assignments and starting assets. Saves preserve
-  that setup alongside runtime state so loading and restarting cannot silently
-  choose a different opening.
+- Every expansion area and start slot holds both Materials and Lifebloom
+  sites, whichever factions are assigned, so sites never depend on the matchup.
+- Setup assembly runs at launch and produces a resolved tick-0 mission file
+  through the shared validation and loading path. Restart reassembles the
+  opening from the launch choices, including faction-to-slot assignments and
+  difficulty. Saves preserve those choices alongside runtime state so loading
+  and restarting cannot silently choose a different opening.
 
 ## Mission behavior
 
@@ -1664,11 +1667,12 @@ are tracked in the checklist.
 - Two gift boxes beyond the lone wolf grant 25 Lifebloom each. Any friendly
   mobile unit collects one by walking over it; each pays once and remains
   collected in saves. They do not replace cultivation in the paid opening.
-- New mission opens a faction chooser for the wolf-den demo. ARC launches its
+- New mission opens a setup screen for the wolf-den demo. Difficulty buttons
+  span the same width as the faction choices, default to Normal, and apply to
+  whichever faction is chosen. ARC launches its
   base-building introduction; Circle launches its cultivation slice. Both
-  choices describe their playable opening. The setup screen will hold
-  difficulty selection when implemented. Direct development links remain
-  available.
+  choices describe their playable opening. Direct development links remain
+  available, including skirmish links for any faction assignment.
 - Actors have owners with their own Lifebloom and Materials stockpiles, and
   commands are authorized against their issuing owner. Infrastructure has
   queues and slots per headquarters, and emergency headquarters recovery is
@@ -1974,6 +1978,10 @@ are tracked in the checklist.
   scaling: sqrt(0.5), 1, and sqrt(2), respectively. Difficulty does not change
   starting stocks, roster availability, AI profiles, or opening grace. Normal
   remains the pacing and balance baseline.
+- Enemies are the owners outside the player's alliance at launch. Their damage
+  is multiplied and incoming damage divided, so health bars keep each
+  definition's maximum. Regeneration, repair, and healing restore displayed
+  health, so they keep their share of an enemy's scaled health.
 - Resolved mission setup and saves preserve faction choice, difficulty, and
   effective scaling. Restart uses the same choices. Existing saves retain
   their original difficulty.
@@ -2043,11 +2051,11 @@ are tracked in the checklist.
   and any ambient bird flocks.
 - Mission saving provides manual save, load, restart, one rolling quicksave,
   and one rolling autosave. Loading begins paused. Restart reloads the level
-  with the mission's scenario ID and preserves the original launch setup for
-  assembled missions. Loading a level file makes it that scenario's restart
-  level for the session. A tick-0 file with save metadata remains a save and
-  does not replace that level. M1 saves preserve the pristine resolved setup
-  required to reproduce their opening on restart.
+  with the mission's scenario ID at its chosen difficulty, and reassembles
+  skirmishes from their launch choices. Loading a level file makes it that
+  scenario's restart level for the session. A tick-0 file with save metadata
+  remains a save and does not replace that level. M1 saves preserve the launch
+  choices required to reproduce their opening on restart.
 - Manual saves form a named list without a count limit. Each entry shows its
   kind (Manual, Quick, or Auto), name, mission name, elapsed time, and
   timestamp. The quicksave and autosave replace only themselves.

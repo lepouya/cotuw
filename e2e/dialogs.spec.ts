@@ -347,6 +347,7 @@ test(
       subscriptions: 1,
     });
     await expect(page.locator("#game-menu-status")).toHaveText("");
+    await page.locator("#open-options").click();
     const before = await page.evaluate(
       () => window.dialogHarness.state.unlocks,
     );
@@ -406,21 +407,19 @@ test(
 );
 
 test(
-  "continuing play leads the menu and audio settings stay with its actions",
+  "continuing play leads the menu and audio settings open from Options",
   { tag: WEBKIT },
   async ({ page }) => {
     await mountDialogs(page);
     const audio = page.locator("#menu-audio");
+    await expect(audio).toBeHidden();
+    await page.locator("#open-options").click();
     await expect(audio).toBeVisible();
-    for (const [open, back] of [
-      ["save-mission", "cancel-save"],
-      ["load-mission", "cancel-load"],
-    ]) {
-      await page.locator(`#${open}`).click();
-      await expect(audio).toBeHidden();
-      await page.locator(`#${back}`).click();
-      await expect(audio).toBeVisible();
-    }
+    await expect(page.locator("#game-menu-title")).toHaveText("Options");
+    await expect(page.locator("#audio-master-volume")).toBeFocused();
+    await page.locator("#cancel-options").click();
+    await expect(audio).toBeHidden();
+    await expect(page.locator("#game-menu-actions")).toBeVisible();
     await page.evaluate(() => {
       const { ui, view } = window.dialogHarness;
       ui.resetMission();

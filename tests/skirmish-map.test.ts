@@ -1,33 +1,42 @@
 import { expect, test, vi } from "vitest";
 import { balance, deposited } from "./helpers/scenario";
 import {
-  SKIRMISH_CROSSINGS,
   SKIRMISH_OPENINGS,
+  createSkirmishScenario,
+  createSkirmishCultivationSites,
+  createSkirmishMaterialsSites,
+  skirmishLink,
+} from "../src/content/skirmish";
+import {
+  SKIRMISH_CROSSINGS,
+  SKIRMISH_MAP,
   SKIRMISH_RESOURCE_AREAS,
   SKIRMISH_STARTS,
   SKIRMISH_TERRAIN,
-  createSkirmishMaterialsSites,
-  createSkirmishOpening,
-} from "../scripts/levels/skirmish-map";
+} from "../src/content/skirmish-map";
 import { BASE_CONTENT } from "./helpers/content";
 import { LEVEL_SOURCES } from "../src/content/levels";
-import { createSessionSimulation, loadMission } from "../src/mission-loading";
+import {
+  assembleSkirmish,
+  createSessionSimulation,
+  loadMission,
+  missionRestart,
+} from "../src/mission-loading";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
-import { materialsCost } from "../src/simulation/resources";
-import { tileKey } from "../src/simulation/grid";
 import { serializeMission } from "../src/simulation/mission-file";
+import { DIFFICULTIES } from "../src/simulation/mission-setup";
+import { createScenarioState } from "../src/simulation/scenario";
+import { costAmount } from "../src/simulation/resources";
+import { tileKey } from "../src/simulation/grid";
 import {
   findNavigationPath,
   NavigationGrid,
 } from "../src/simulation/navigation";
 import { OccupancyGrid } from "../src/simulation/occupancy";
-import { createScenarioState } from "../src/simulation/scenario";
 import { TerrainGrid } from "../src/simulation/terrain";
 
-import type {
-  RidgeCrossing,
-  SkirmishStart,
-} from "../scripts/levels/skirmish-map";
+import type { SkirmishMap, SkirmishStart } from "../src/content/skirmish";
+import type { RidgeCrossing } from "../src/content/skirmish-map";
 import type { TileCoord } from "../src/simulation/grid";
 import type { TerrainView } from "../src/simulation/terrain";
 import type { MissionSimulation } from "../src/simulation/mission";
@@ -49,8 +58,8 @@ function navigation(map = new TerrainGrid(SKIRMISH_TERRAIN)) {
 }
 
 /** The center of open ground just north of the headquarters. */
-const approach = (map: TerrainView, { headquartersOrigin }: SkirmishStart) =>
-  map.tileCenter(headquartersOrigin.x, headquartersOrigin.z - 3);
+const approach = (map: TerrainView, { headquartersOrigins }: SkirmishStart) =>
+  map.tileCenter(headquartersOrigins.arc.x, headquartersOrigins.arc.z - 3);
 
 const mirrored = (map: TerrainGrid, { x, z }: TileCoord) => ({
   x: map.width - 1 - x,
@@ -93,9 +102,19 @@ test("terrain and resource access are symmetric under swapping starts", () => {
       );
     }
   const sites = createSkirmishMaterialsSites();
-  expect(new Set(sites.map(({ id }) => id)).size).toBe(sites.length);
-  const tiles = new Set(sites.map(({ tile }) => tileKey(tile)));
-  expect(tiles.size).toBe(sites.length);
+  const lifebloom = createSkirmishCultivationSites();
+  const all = [...sites, ...lifebloom];
+  expect(new Set(all.map(({ id }) => id)).size).toBe(all.length);
+  const tiles = new Set(all.map(({ tile }) => tileKey(tile)));
+  expect(tiles.size).toBe(all.length);
+  for (const { tile, capacity } of lifebloom) {
+    const opposite = mirrored(map, tile);
+    expect(
+      lifebloom.find(
+        ({ tile: other }) => other.x === opposite.x && other.z === opposite.z,
+      )!.capacity,
+    ).toBe(capacity);
+  }
   for (const { tile, initialMaterials } of sites) {
     const opposite = mirrored(map, tile);
     expect(
@@ -121,13 +140,15 @@ test("start slots mirror each other's base and opening footprints", () => {
       )
       .sort();
   const flip = (tile: TileCoord) => mirrored(map, tile);
-  const { headquarters, dropoff } = SKIRMISH_OPENINGS.arc;
-  expect(footprint(headquarters, east.headquartersOrigin)).toEqual(
-    footprint(headquarters, west.headquartersOrigin, flip),
-  );
-  expect(footprint(dropoff, east.dropoffOrigins.arc!)).toEqual(
-    footprint(dropoff, west.dropoffOrigins.arc!, flip),
-  );
+  for (const faction of ["arc", "circle"] as const) {
+    const { headquarters, dropoff } = SKIRMISH_OPENINGS[faction];
+    expect(footprint(headquarters, east.headquartersOrigins[faction])).toEqual(
+      footprint(headquarters, west.headquartersOrigins[faction], flip),
+    );
+    expect(footprint(dropoff, east.dropoffOrigins[faction])).toEqual(
+      footprint(dropoff, west.dropoffOrigins[faction], flip),
+    );
+  }
   const { minX, maxX, minZ, maxZ } = west.baseArea;
   const low = flip({ x: maxX, z: maxZ });
   const high = flip({ x: minX, z: minZ });
@@ -172,14 +193,14 @@ test.each(SKIRMISH_STARTS)(
     );
     const from = approach(map, start);
     for (const area of SKIRMISH_RESOURCE_AREAS) {
-      for (const tile of area.tiles)
+      for (const tile of [...area.tiles, ...area.lifebloomTiles]) {
         expect(grid.costAt(tile.x, tile.z)).toBeDefined();
-      const tile = area.tiles[0];
-      expect(
-        findNavigationPath(grid, from, map.tileCenter(tile.x, tile.z))
-          ?.reachedTarget,
-        area.id,
-      ).toBe(true);
+        expect(
+          findNavigationPath(grid, from, map.tileCenter(tile.x, tile.z))
+            ?.reachedTarget,
+          area.id,
+        ).toBe(true);
+      }
     }
   },
 );
@@ -190,33 +211,31 @@ function until(simulation: MissionSimulation, ready: () => boolean) {
   expect(ready()).toBe(true);
 }
 
-test("only Materials openings assemble until owner economies exist", () => {
-  expect(() => createSkirmishOpening(SKIRMISH_STARTS[0], "circle")).toThrow(
-    /lifebloom/,
+function opening(faction: "arc" | "circle", start: SkirmishStart) {
+  return createSessionSimulation(
+    assembleSkirmish({
+      factions: { west: faction, east: faction },
+      playerSlot: start.id,
+      difficulty: "normal",
+    }),
   );
-});
+}
 
 test.each(SKIRMISH_STARTS)(
   "ARC can fund and deliver its first income from $id",
   (start) => {
-    const opening = SKIRMISH_OPENINGS.arc;
+    const { dropoff, worker, stockpile } = SKIRMISH_OPENINGS.arc;
     expect(
-      materialsCost(definitions.get(opening.dropoff)!) +
-        materialsCost(definitions.get(opening.worker)!),
-    ).toBe(opening.stockpile);
-    const scenario = createSkirmishOpening(start, "arc");
-    const source = serializeMission(
-      scenario,
-      createScenarioState(scenario, BASE_CONTENT.actors),
-      SIMULATION_TICK_SECONDS,
-    );
-    const simulation = createSessionSimulation(loadMission(source));
+      costAmount(definitions.get(dropoff)!) +
+        costAmount(definitions.get(worker)!),
+    ).toBe(stockpile);
+    const simulation = opening("arc", start);
     try {
       simulation.submitCommand({
         kind: "place-actor",
         actorId: "refinery",
-        definitionId: opening.dropoff,
-        origin: start.dropoffOrigins.arc!,
+        definitionId: dropoff,
+        origin: start.dropoffOrigins.arc,
       });
       expect(simulation.tick()[0].accepted).toBe(true);
       until(simulation, () => !simulation.actorById("refinery")!.construction);
@@ -224,7 +243,7 @@ test.each(SKIRMISH_STARTS)(
         kind: "train-unit",
         producerId: "refinery",
         actorId: "harvester",
-        definitionId: opening.worker,
+        definitionId: worker,
       });
       expect(simulation.tick()[0].accepted).toBe(true);
       expect(balance(simulation)).toBe(0);
@@ -242,3 +261,241 @@ test.each(SKIRMISH_STARTS)(
     }
   },
 );
+
+test.each(SKIRMISH_STARTS)(
+  "Circle can fund and deliver its first income from $id",
+  (start) => {
+    const { dropoff, headquarters, worker, stockpile } =
+      SKIRMISH_OPENINGS.circle;
+    expect(
+      costAmount(definitions.get(dropoff)!) +
+        costAmount(definitions.get(worker)!),
+    ).toBe(stockpile);
+    const simulation = opening("circle", start);
+    const headquartersId = `${start.id}-headquarters`;
+    try {
+      expect(simulation.actorById(headquartersId)!.definitionId).toBe(
+        headquarters,
+      );
+      simulation.submitCommand({
+        kind: "train-unit",
+        producerId: headquartersId,
+        actorId: "cultivator",
+        definitionId: worker,
+      });
+      expect(simulation.tick()[0].accepted).toBe(true);
+      until(simulation, () => !!simulation.actorById("cultivator"));
+      simulation.submitCommand({
+        kind: "place-actor",
+        actorId: "conservatory",
+        definitionId: dropoff,
+        origin: start.dropoffOrigins.circle,
+        workerIds: ["cultivator"],
+      });
+      expect(simulation.tick()[0].accepted).toBe(true);
+      expect(balance(simulation, "lifebloom")).toBe(0);
+      until(
+        simulation,
+        () => !simulation.actorById("conservatory")!.construction,
+      );
+      simulation.submitCommand({
+        kind: "gather",
+        actorId: "cultivator",
+        siteId: `${start.startingResourceAreaId}-lifebloom-1`,
+      });
+      expect(simulation.tick()[0].accepted).toBe(true);
+      until(simulation, () => deposited(simulation, "lifebloom") > 0);
+      expect(balance(simulation, "lifebloom")).toBeGreaterThan(0);
+    } finally {
+      simulation.dispose();
+    }
+  },
+);
+
+test.each([
+  { west: "arc", east: "circle", playerSlot: "west" },
+  { west: "arc", east: "circle", playerSlot: "east" },
+  { west: "circle", east: "arc", playerSlot: "west" },
+  { west: "arc", east: "arc", playerSlot: "east" },
+])(
+  "$west at west and $east at east assemble for the $playerSlot player",
+  ({ west, east, playerSlot }) => {
+    const mission = assembleSkirmish({
+      factions: { west, east },
+      playerSlot,
+      difficulty: "hard",
+    });
+    const { scenario, state } = mission;
+    expect(state.tick).toBe(0);
+    expect(state.playerOwner).toBe(playerSlot);
+    expect(state.owners).toEqual([
+      { id: "west", faction: west },
+      { id: "east", faction: east },
+    ]);
+    expect(
+      state.actors.map(({ owner, definitionId }) => [owner, definitionId]),
+    ).toEqual([
+      ["west", SKIRMISH_OPENINGS[west as "arc"].headquarters],
+      ["east", SKIRMISH_OPENINGS[east as "arc"].headquarters],
+    ]);
+    expect(state.economy!.stockpiles).toEqual([
+      {
+        resource: SKIRMISH_OPENINGS[west as "arc"].resource,
+        owners: ["west"],
+        amount: 150,
+      },
+      {
+        resource: SKIRMISH_OPENINGS[east as "arc"].resource,
+        owners: ["east"],
+        amount: 150,
+      },
+    ]);
+    expect(scenario.emergencyHeadquarters).toBe(true);
+    expect(scenario.savePolicy).toBe("skirmish");
+    expect(scenario.skirmish!.startingResourceSites.west).toEqual([
+      "west-home-1",
+      "west-home-2",
+      "west-home-3",
+      "west-home-4",
+      "west-home-lifebloom-1",
+      "west-home-lifebloom-2",
+    ]);
+    expect(scenario.setup).toEqual({
+      difficulty: "hard",
+      enemyScale: DIFFICULTIES.hard.scale,
+      enemyOwners: [playerSlot === "west" ? "east" : "west"],
+      factions: { west, east },
+    });
+  },
+);
+
+test("assembled sites do not depend on the matchup", () => {
+  const sites = (west: string, east: string) => {
+    const { economy } = assembleSkirmish({
+      factions: { west, east },
+      playerSlot: "west",
+      difficulty: "normal",
+    }).state;
+    return [economy!.sites, economy!.cultivation!.sites];
+  };
+  expect(sites("arc", "arc")).toEqual(sites("circle", "arc"));
+});
+
+test("custom maps keep their identity and restart from their registered level", () => {
+  const alternate: SkirmishMap = {
+    ...SKIRMISH_MAP,
+    id: "flat-skirmish",
+    terrain: { ...SKIRMISH_MAP.terrain, createHeight: () => 0 },
+  };
+  const scenario = createSkirmishScenario(
+    {
+      factions: { west: "arc", east: "circle" },
+      playerSlot: "east",
+      difficulty: "hard",
+    },
+    alternate,
+  );
+  const source = serializeMission(
+    scenario,
+    createScenarioState(scenario, BASE_CONTENT.actors),
+    SIMULATION_TICK_SECONDS,
+  );
+  const opening = loadMission(source);
+  const simulation = createSessionSimulation(opening);
+  try {
+    simulation.tick();
+    const saved = loadMission(
+      serializeMission(
+        scenario,
+        simulation.snapshot(),
+        SIMULATION_TICK_SECONDS,
+        {
+          name: "Alternate map",
+          savedAt: "2026-11-06T00:00:00.000Z",
+        },
+      ),
+    );
+    expect(saved.scenario.id).toBe(alternate.id);
+    expect(missionRestart(saved)).toBeUndefined();
+    const restarted = missionRestart(saved, source)!();
+    expect(restarted.state.tick).toBe(0);
+    expect(restarted.state.terrain).toEqual(opening.state.terrain);
+    expect(restarted.scenario.setup).toEqual(opening.scenario.setup);
+  } finally {
+    simulation.dispose();
+  }
+});
+
+test("assembly requires an authored home resource area", () => {
+  expect(() =>
+    createSkirmishScenario(
+      {
+        factions: { west: "arc", east: "arc" },
+        playerSlot: "west",
+        difficulty: "normal",
+      },
+      { ...SKIRMISH_MAP, resourceAreas: [] },
+    ),
+  ).toThrow(
+    new RangeError('Start slot west has no resource area "west-home".'),
+  );
+});
+
+test("inherited faction assignments are not authored content", () => {
+  const factions: Record<string, string> = Object.assign(
+    Object.create({ west: "arc" }),
+    { east: "circle", other: "arc" },
+  );
+  expect(() =>
+    createSkirmishScenario({
+      factions,
+      playerSlot: "west",
+      difficulty: "normal",
+    }),
+  ).toThrow("Start slot west has no playable faction.");
+});
+
+test("assembly rejects unknown factions and slots", () => {
+  const difficulty = "normal";
+  expect(() =>
+    assembleSkirmish({
+      factions: { west: "arc", east: "wildlife" },
+      playerSlot: "west",
+      difficulty,
+    }),
+  ).toThrow("Start slot east has no playable faction.");
+  expect(() =>
+    assembleSkirmish({
+      factions: { west: "arc", east: "arc" },
+      playerSlot: "north",
+      difficulty,
+    }),
+  ).toThrow('no start slot named "north"');
+});
+
+test.each([
+  ["skirmish=arc", "Start slot east has no playable faction."],
+  ["skirmish=arc-circle-arc", "no start slot for an assigned faction"],
+  ["skirmish=arc-arc&difficulty=brutal", "invalid difficulty"],
+])("the link %s is rejected rather than reinterpreted", (query, message) => {
+  const choice = skirmishLink(new URLSearchParams(query))!;
+  expect(() => assembleSkirmish(choice)).toThrow(message);
+});
+
+test("skirmish links resolve matchups, sides, and difficulty", () => {
+  expect(skirmishLink(new URLSearchParams("level=sandbox"))).toBeUndefined();
+  expect(skirmishLink(new URLSearchParams("skirmish=arc-circle"))).toEqual({
+    factions: { west: "arc", east: "circle" },
+    playerSlot: "west",
+    difficulty: "normal",
+  });
+  expect(
+    skirmishLink(
+      new URLSearchParams("skirmish=circle-arc&player=east&difficulty=hard"),
+    ),
+  ).toEqual({
+    factions: { west: "circle", east: "arc" },
+    playerSlot: "east",
+    difficulty: "hard",
+  });
+});

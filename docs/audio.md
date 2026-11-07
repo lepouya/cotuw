@@ -1,8 +1,8 @@
 # Gameplay audio
 
-Open title-screen **Options** or the in-game **Menu** for master, sound, and
-music volume sliders and mute icons. Master volume defaults to 50% and scales
-both buses without changing their levels.
+Open **Options** on the title screen or in the in-game **Menu** for master,
+sound, and music volume sliders and mute icons. Master volume defaults to 50%
+and scales both buses without changing their levels.
 Preferences are saved on this device, outside mission saves; invalid saved
 values restore the defaults. Icon buttons have accessible names, pressed
 states, and action tooltips. A click, tap, or key press unlocks playback.

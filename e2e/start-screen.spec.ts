@@ -221,3 +221,82 @@ test(
     );
   },
 );
+
+test(
+  "the setup screen applies difficulty independently of faction",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.goto("/");
+    await page.locator("#new-mission").click();
+    const hard = page.locator("#difficulty-hard");
+    await expect(page.locator("#difficulty-normal")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await hard.click();
+    await expect(hard).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#difficulty-normal")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    const width = async (selector: string) =>
+      (await page.locator(selector).boundingBox())!.width;
+    expect(await width("#difficulty-choices")).toBe(
+      await width(".faction-choices"),
+    );
+    await page.locator("#choose-circle").click();
+    await dismissExplanation(page, "Welcome, Guide");
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-difficulty",
+      "hard",
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
+test.describe("skirmish links", () => {
+  for (const { query, faction, resource, difficulty } of [
+    {
+      query: "skirmish=arc-circle",
+      faction: "arc",
+      resource: "Materials",
+      difficulty: "normal",
+    },
+    {
+      query: "skirmish=arc-circle&player=east&difficulty=hard",
+      faction: "circle",
+      resource: "Lifebloom",
+      difficulty: "hard",
+    },
+    {
+      query: "skirmish=arc-arc&player=east&difficulty=easy",
+      faction: "arc",
+      resource: "Materials",
+      difficulty: "easy",
+    },
+  ])
+    test(
+      `${query} starts a ${faction} match`,
+      { tag: WEBKIT },
+      async ({ page }, info) => {
+        const errors = collectPageErrors(page, { console: true });
+        await page.goto(`/?${query}`);
+        const canvas = page.locator("#game-canvas");
+        await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+        await expect(canvas).toHaveAttribute("data-models-ready", "true");
+        await expect(page.locator("body")).toContainText(resource);
+        await info.attach(`skirmish-${faction}`, {
+          body: await page.screenshot(),
+          contentType: "image/png",
+        });
+        await page.keyboard.press("Escape");
+        await expect(page.locator("#restart-mission")).toBeVisible();
+        await page.locator("#restart-mission").click();
+        await expect(page.locator("#game-menu")).toBeHidden();
+        await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+        await expect(canvas).toHaveAttribute("data-difficulty", difficulty);
+        expect(errors).toEqual([]);
+      },
+    );
+});

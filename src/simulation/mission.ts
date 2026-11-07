@@ -14,6 +14,8 @@ import { missionEnded } from "./mission-result";
 import type { MissionResult } from "./mission-result";
 import { evaluateSkirmish, validateSkirmish } from "./skirmish";
 import type { SkirmishResult, SkirmishRules } from "./skirmish";
+import { combatScaling, validateSetup } from "./mission-setup";
+import type { MissionSetup } from "./mission-setup";
 import {
   headquarteredOwners,
   infrastructureHeadquarters,
@@ -314,6 +316,8 @@ export type MissionSimulationOptions = {
   /** Matches `state.objectives`; a failed objective ends the mission. */
   objectives?: readonly ObjectiveDefinition[];
   skirmish?: SkirmishRules;
+  /** Launch choices, including enemy health and damage scaling. */
+  setup?: MissionSetup;
   /** Authored mission logic; `state.firedEvents` records its progress. */
   events?: readonly MissionEventDefinition[];
   /** Matches the scenario's emergency headquarters rule. */
@@ -407,6 +411,7 @@ export function createMissionSimulation({
   occupancy,
   objectives: authoredObjectives = [],
   skirmish: authoredSkirmish,
+  setup: authoredSetup,
   events: authoredEvents = [],
   emergencyHeadquarters = false,
   scriptControl = [],
@@ -731,6 +736,8 @@ export function createMissionSimulation({
     return committed;
   };
   state.actors = freezeActors(state.actors.map((actor) => register(actor)));
+  validateSetup(authoredSetup, state, !!skirmish);
+  const combatScale = combatScaling(authoredSetup);
   validateSkirmish(skirmish, state, {
     owners: ownerIds,
     definitions: definitionsById,
@@ -1933,6 +1940,7 @@ export function createMissionSimulation({
           hostile: relations.hostile,
           move: moveActor,
           hit: working.match?.hit,
+          combatScale,
           destroy: (actor) => {
             working.match?.lost(actor);
             recordObjectiveDestruction(

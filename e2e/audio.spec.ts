@@ -71,6 +71,8 @@ forEachProfile(PROFILES, (profile) => {
         "true",
       );
       await activate(page.locator("#open-menu"), profile.touch);
+      await expect(page.locator("#menu-audio")).toBeHidden();
+      await activate(page.locator("#open-options"), profile.touch);
       await expect(page.locator("#audio-status")).toHaveAttribute(
         "data-audio-state",
         "ready",
@@ -113,6 +115,8 @@ forEachProfile(PROFILES, (profile) => {
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
+      await activate(page.locator("#cancel-options"), profile.touch);
+      await expect(page.locator("#menu-audio")).toBeHidden();
       await activate(page.locator("#restart-mission"), profile.touch);
       await page.reload();
       await startOpening(page, profile.touch);

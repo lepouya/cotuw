@@ -1,5 +1,5 @@
 import { createSandboxLevel } from "./sandbox-level.ts";
-import { SKIRMISH_TERRAIN } from "./skirmish-map.ts";
+import { SKIRMISH_TERRAIN } from "../../src/content/skirmish-map.ts";
 
 export const SKIRMISH_PREVIEW = createSandboxLevel({
   id: "skirmish-map",
