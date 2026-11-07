@@ -18,6 +18,7 @@ type WolfDenOptions = Omit<
   | "terrainTypeIds"
   | "buildings"
   | "units"
+  | "flocks"
   | "objectives"
   | "owners"
   | "playerOwner"
@@ -57,6 +58,16 @@ export function createWolfDenScenario({
     terrain: map.terrainState(),
     buildings: [{ ...headquarters, origin: { x: 8, z: 50 } }],
     units: wolfEncounters(map),
+    // Circles the lake shore, visible early on.
+    flocks: [
+      {
+        center: map.tileCenter(30, 57),
+        radius: 6,
+        altitude: 5,
+        count: 4,
+        lapSeconds: 28,
+      },
+    ],
     objectives: [
       { ...protection, kind: "protect", actorIds: [headquarters.actorId] },
       ...wolfObjectives(directions),

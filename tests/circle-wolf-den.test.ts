@@ -26,6 +26,8 @@ test("the Circle opening uses shared wildlife, a paid worker bootstrap, and norm
   const arc = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
   expect(playerFactionOf(circle.state)).toBe("circle");
   expect(circle.state.terrain).toEqual(arc.state.terrain);
+  expect(circle.scenario.flocks).toEqual(arc.scenario.flocks);
+  expect(circle.scenario.flocks).toHaveLength(1);
   expect(circle.state.actors.filter(({ territory }) => territory)).toEqual(
     arc.state.actors.filter(({ territory }) => territory),
   );

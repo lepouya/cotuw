@@ -105,6 +105,15 @@
         "text": "Train Sentinels at the Musterhall to fight. Wayfinders scout farther but cannot attack. Select your Sentinels, choose Attack Move, and click a destination. Follow the southern path to the lone wolf, then cross the ridge to the den. Gift boxes along the route grant Lifebloom when a unit walks over them.",
         "trigger": { "kind": "actor", "definitionId": "circle-musterhall" }
       }
+    ],
+    "flocks": [
+      {
+        "center": { "x": -19.5, "z": 7.5 },
+        "radius": 6,
+        "altitude": 5,
+        "count": 4,
+        "lapSeconds": 28
+      }
     ]
   },
   "state": {

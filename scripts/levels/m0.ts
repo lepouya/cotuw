@@ -1,6 +1,4 @@
 // The economy opening's authored content, baked into its level file.
-import { TerrainGrid } from "../../src/simulation/terrain.ts";
-import { PROTOTYPE_TERRAIN } from "./m0-terrain.ts";
 import { costOf } from "./base-content.ts";
 import { createWolfDenScenario } from "./wolf-den.ts";
 
@@ -9,8 +7,6 @@ import type {
   MaterialsSite,
 } from "../../src/simulation/economy.ts";
 import type { TileCoord } from "../../src/simulation/grid.ts";
-
-const map = new TerrainGrid(PROTOTYPE_TERRAIN);
 
 /** One named patch of 200-Materials tiles, numbered in authored order. */
 const patch = (
@@ -98,16 +94,6 @@ export const ECONOMY_SCENARIO = createWolfDenScenario({
       title: "Scouting & Combat",
       text: "Select a unit, then click ground to move. Keep your unarmed Scout away from wolves. Drag a box around your Troopers, choose Attack Move, and click a destination. Follow the southern path to the lone wolf, then cross the ridge to the den.",
       trigger: { kind: "actor", definitionId: "arc-scout" },
-    },
-  ],
-  // Circles the lake shore beyond the near patch, visible early on.
-  flocks: [
-    {
-      center: map.tileCenter(30, 57),
-      radius: 6,
-      altitude: 5,
-      count: 4,
-      lapSeconds: 28,
     },
   ],
   playerFaction: "arc",
