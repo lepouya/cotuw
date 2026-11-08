@@ -14,8 +14,9 @@ in the [design questionnaire](docs/design-questionnaire.md).
 ### Using this checklist
 
 - Work through the phases in order, except the Circle wolf-den slice below
-  may progress alongside phases B-D as its prerequisites become ready. Tasks
-  within a phase may overlap; explicit dependencies take precedence.
+  may progress alongside phases B-D as its prerequisites become ready, and
+  1.02 is deferred. Tasks within a phase may overlap; explicit dependencies
+  take precedence.
 - Task IDs are the milestone number and a task number, independent of phase
   letters. Keep them stable once work starts. Check a task only when its
   stated outcome is verified, including appropriate checks for implementation
@@ -35,15 +36,20 @@ These decisions define implementation scope. Resolve each before starting
 work that depends on it; Circle art direction can begin once construction and
 roster choices are ready.
 
-- [ ] **1.01** Prepare a reproducible M0 playtest build and report template.
-  Agree on distribution and recruit an initial five-to-eight-person cohort
-  spanning RTS-familiar and less experienced players. The browser bundle
-  command and [tester instructions](docs/playtest-instructions.md) include a
-  [report template](docs/playtest-report.md) and revision/file hashes.
-  Distribution, cohort recruitment, and fixed-revision acceptance remain.
-- [ ] **1.02** Run baseline M0 playtests using in-game guidance. Record
-  controls, clarity, pacing, reliability, assistance, and abandonment; turn
-  actionable findings into prioritized issues for the UI and onboarding work.
+- [x] **1.01** Prepare a reproducible M0 playtest build and report template.
+  The browser bundle command and
+  [tester instructions](docs/playtest-instructions.md) include a
+  [report template](docs/playtest-report.md) and revision/file hashes. The
+  bundle uses relative URLs for
+  [GitHub Pages hosting](docs/verification.md#m0-baseline-playtest-preparation).
+  Playtesting verified the build.
+- [ ] **1.02** Recruit a five-to-eight-person cohort spanning RTS-familiar and
+  less experienced players, then run baseline M0 playtests using in-game
+  guidance. Record controls, clarity, pacing, reliability, assistance, and
+  abandonment; turn actionable findings into prioritized issues for the UI and
+  onboarding work. Deferred until the enemy AI is playable: without it,
+  sessions would yield only surface feedback. Revise this task's scope then and
+  run it with 1.47 and 1.57, using one cohort for all three.
   ARC guides use short action prompts. Both slices offer 4× speed and Escape
   opens the pause menu after canceling active tools and clearing selection.
   Browser checks cover these controls, including compact touch layouts.
@@ -136,8 +142,8 @@ roster choices are ready.
   binary art. New asset recipes, presentation integration, and gameplay-scale
   validation remain in 1.53.
 
-Phase gate: dependent rules and acceptance values are recorded, the selected
-roster is bounded, and baseline findings have an actionable disposition.
+Phase gate: dependent rules and acceptance values are recorded, and the
+selected roster is bounded.
 
 ### B. Multi-faction and UI foundations
 
@@ -268,8 +274,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   handlers, and child audio bindings. Application operations remain behind
   callbacks. Browser checks cover canceled loads, stale panel work, result
   precedence, focus, busy restrictions, list feedback, and setup/disposal
-  failures preserving usable title navigation and original diagnostics. Human
-  playtest remains pending.
+  failures preserving usable title navigation and original diagnostics.
 - [x] **1.23** Separate navigation and save/load presentation from session
   startup and teardown. Verify repeated loads, restarts, and returns to title
   without stale handlers, pending work, or retained session resources. Keep
@@ -355,10 +360,21 @@ and bring up the rough skirmish map early for simulation and AI development.
   metrics, and cargo provenance, with validated deterministic continuation,
   plus `scenario.setup` with difficulty, effective scaling, enemy owners, and
   skirmish factions, validated against the mission's owners.
-- [ ] **1.28** Profile the rough map at 200 mobile units and 40 buildings
+- [x] **1.28** Profile the rough map at 200 mobile units and 40 buildings
   across both owners, with a 400-unit/80-building stress scene. Measure
   pathfinding, group movement, vision, and tick/frame costs; address blockers
   before roster and AI work depend on the target scale.
+  `npm run benchmark` and `e2e/benchmark.spec.ts` measure a scripted ARC mirror
+  without AI on the reference Mac on mains power. Both report actual population,
+  combat, gathering, and deliveries. A shared probe replaces combat losses, so
+  normal scenes hold 180-196 units and stress scenes 360-391, with buildings at
+  40 or 80.
+  Normal ticks meet the 3 ms pre-AI p95 goal in Chromium and WebKit, and both
+  sustain 120 ticks per second at 2x. At 1x, Chromium meets the frame budget at
+  about 60 FPS with 99.9% of frames within 20 ms. WebKit misses it at 53-55 FPS
+  with 76-83%; 1.64 owns that budget. The stress scene falls behind at 2x. A
+  group move costs about 1 ms per unit on its command tick. Performance is
+  accepted for phase C.
 
 Phase gate: independent owners can operate through the same simulation rules,
 ownership and information boundaries hold, and M0 still works.
@@ -479,7 +495,8 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
   expansion, defense, recovery, and combat content.
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
-  units, and controls with the cohort. Play against the harness AI on the rough
+  units, and controls with the 1.02 cohort, in the same sessions as 1.02 and
+  1.57. Play against the harness AI on the rough
   map through a development link or test-build entry; keep the mirror matchup
   out of the normal menu. Check whether repair under attack blocks rebuilding
   excessively; propose any rule changes explicitly before tuning beyond the
@@ -521,12 +538,11 @@ verified; preview work is partial progress.
   ARC and Circle use shared wolf-den authoring, worker route handling,
   interruption, and compatible-site queries. Regression checks cover tending
   cancellation, drop-off loss, queued delivery, and the 60% slowdown threshold.
-- [ ] Base-loop integration: 1.16-1.18 provide owner economies, command
-  authority, and owner-neutral rules. Information and persistence work in
-  1.20, 1.24, and 1.27 remains required. The slice runs on 1.15's owners
-  with single-player control; it does not complete those prerequisites or their
-  dependent acceptance gates. Emergency Heartgrove recovery remains
-  in 1.49. Difficulty and skirmish launch remain in 1.60.
+- [ ] Base-loop integration: 1.15-1.18 provide owners, economies, command
+  authority, and owner-neutral rules; 1.20, 1.24, and 1.27 provide information
+  boundaries and persistence. The slice runs with single-player control.
+  Emergency Heartgrove recovery remains in 1.49. Difficulty and skirmish launch
+  remain in 1.60.
 - [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
   and mechanic. Check interrupted work and deterministic saves under 1.56 as
   each system lands. Run the cohort introduction and cultivation acceptance
@@ -535,8 +551,7 @@ verified; preview work is partial progress.
   encounters. Wolves alone cannot validate structure counters. Circle AI
   remains 1.55; full skirmish integration and balance remain phases F and G.
 
-Next integration target: information boundaries through the common
-milestone foundations.
+Next integration target: emergency Heartgrove recovery and skirmish launch.
 
 #### Circle tasks
 
@@ -596,8 +611,9 @@ milestone foundations.
   construction, tending assignments and worker replacement, cultivation,
   dormancy, recovery, and support work. Preserve site reserves and dormancy
   state, worker cargo, cultivation progress, assignments, and queued orders.
-- [ ] **1.57** Playtest the Circle introduction and base loop with the cohort,
-  launched through the demo setup screen or a development link. Verify
+- [ ] **1.57** Playtest the Circle introduction and base loop with the 1.02
+  cohort, in the same sessions as 1.02 and 1.47, launched through the demo
+  setup screen or a development link. Verify
   that RTS-familiar newcomers understand its differences,
   can establish and sustain a base, and can explain a useful cultivation
   decision. Refine cultivation rates, reserve capacity, cargo capacity, and
@@ -651,7 +667,9 @@ and producer-based progression scope from 1.06.
   Verify 2x keeps simulation pace and report rendering performance. Report
   degradation at 400 units and 80 buildings, exercising movement, gathering,
   combat, vision, and AI together. Physical mobile performance targets are
-  deferred; compact layout and touch checks remain.
+  deferred; compact layout and touch checks remain. WebKit missed the frame
+  budget in 1.28 from per-frame rendering work; merging each unit's meshes in
+  1.43 and skipping off-screen animation are the next candidates.
 
 Phase gate: either faction can enter a complete skirmish through the normal
 menu, and both matchups meet the agreed automated behavior and scale targets.
