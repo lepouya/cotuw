@@ -28,7 +28,9 @@ import type { SaveKind, SaveLibrary } from "./saves";
 import type { GameSession } from "./session";
 import type { Difficulty } from "./simulation/mission-setup";
 import type { MissionResult } from "./simulation/mission-result";
+import type { CameraControls } from "./ui/camera-controls";
 import type { createDialogs, MenuMode, MenuView } from "./ui/dialogs";
+import type { SetupFaction } from "./ui/mission-setup";
 import type { createNotifications } from "./ui/notifications";
 import type { createTopBar } from "./ui/top-bar";
 
@@ -57,10 +59,10 @@ const MENU_VIEWS: Record<Exclude<MenuMode, "result">, MenuText> = {
   },
 };
 
-const FACTION_LEVELS = {
+const FACTION_LEVELS: Record<SetupFaction, string> = {
   arc: "arc-economy-opening",
   circle: "circle-wolf-den",
-} as const;
+};
 
 /** A file name made of the save name's letters, digits, and dashes. */
 const fileNameFor = (name: string) =>
@@ -71,8 +73,9 @@ export type ApplicationOptions = {
   canvas: HTMLCanvasElement;
   minimap: HTMLCanvasElement;
   audio: AudioMixer;
-  /** Mission UI roots that each mission mounts its features into. */
-  roots: { sidebar: HTMLElement; cameraControls: HTMLElement };
+  /** Each mission mounts its sidebar into this root. */
+  sidebarRoot: HTMLElement;
+  cameraControls: Pick<CameraControls, "bind">;
   dialogs: Pick<
     ReturnType<typeof createDialogs>,
     "showMenu" | "offerGuide" | "report" | "setBusy" | "resetMission"
@@ -93,7 +96,8 @@ export function createApplication({
   canvas,
   minimap,
   audio,
-  roots,
+  sidebarRoot,
+  cameraControls,
   dialogs,
   notifications,
   topBar,
@@ -101,8 +105,7 @@ export function createApplication({
 }: ApplicationOptions) {
   /** Level sources by scenario ID; loading a level file adds or replaces one. */
   const levels = new Map(LEVEL_SOURCES);
-  let platform: Platform | undefined;
-  let library: SaveLibrary | undefined;
+  let services: { platform: Platform; library: SaveLibrary } | undefined;
   let session: GameSession | undefined;
   let mission: LoadedMission | undefined;
   let sidebar: ReturnType<typeof createSidebar> | undefined;
@@ -139,13 +142,10 @@ export function createApplication({
   const cancelLoad = () => {
     loadRequest++;
   };
-  const ready = () => {
-    if (!platform || !library)
-      throw new Error("The game is still initializing.");
-    return { platform, library };
+  const requireServices = () => {
+    if (!services) throw new Error("The game is still initializing.");
+    return services;
   };
-  const saveSource = (name: string) =>
-    session!.save({ name, savedAt: new Date().toISOString() });
 
   function setBusy(value: boolean) {
     busy = value;
@@ -242,10 +242,12 @@ export function createApplication({
     failure: string,
     store: (source: string) => Promise<T>,
   ) {
-    if (busy || !canSave()) return;
     const savedSession = session;
+    if (busy || !savedSession || !canSave()) return;
     try {
-      const stored = await store(saveSource(name));
+      const stored = await store(
+        savedSession.save({ name, savedAt: new Date().toISOString() }),
+      );
       return session === savedSession ? stored : undefined;
     } catch (error) {
       if (session === savedSession)
@@ -256,7 +258,7 @@ export function createApplication({
   /** Resolves false when nothing was saved for the current mission. */
   async function writeSave(kind: SaveKind, name: string) {
     return !!(await withSave(name, "Saving failed", async (source) => {
-      await ready().library.write(kind, source);
+      await requireServices().library.write(kind, source);
       return true;
     }));
   }
@@ -279,10 +281,6 @@ export function createApplication({
       const generation = missionGeneration;
       const current = () => generation === missionGeneration;
       setTitleScreen(false);
-      delete canvas.dataset.missionResult;
-      delete canvas.dataset.terrainReady;
-      delete canvas.dataset.simulationFault;
-      canvas.dataset.difficulty = next.scenario.setup?.difficulty ?? "normal";
       const { createGameSession } = await import("./session");
       mission = next;
       const rules = createSaveRules(next, SIMULATION_TICK_SECONDS);
@@ -292,7 +290,7 @@ export function createApplication({
         next.state.playerOwner,
       );
       // Registered before session creation, so a failed start releases it.
-      const activeSidebar = createSidebar(roots.sidebar, {
+      const activeSidebar = createSidebar(sidebarRoot, {
         definitions: next.definitions,
         economy: !!next.state.economy,
         presentations: new Map(Object.entries(next.content.presentation)),
@@ -312,7 +310,7 @@ export function createApplication({
         onMenu: () => {
           if (current()) openMenu();
         },
-        cameraControls: roots.cameraControls,
+        cameraControls,
         onStateChanged: (state) => {
           if (!current()) return;
           activeSidebar.update(state);
@@ -338,10 +336,10 @@ export function createApplication({
         onResult: (result) => {
           if (current() && session) showResult(result);
         },
-        onReady: (ready) => {
+        onReady: (started) => {
           if (!current()) return;
-          session = ready;
-          notifications.setFocus(ready.focus);
+          session = started;
+          notifications.setFocus(started.focus);
         },
       });
       return session;
@@ -415,7 +413,9 @@ export function createApplication({
   async function exportMission(name: string) {
     const file = fileNameFor(name);
     return withSave(name, "Export failed", async (source) =>
-      (await ready().platform.exportFile(file, source)) ? file : undefined,
+      (await requireServices().platform.exportFile(file, source))
+        ? file
+        : undefined,
     );
   }
 
@@ -423,7 +423,7 @@ export function createApplication({
   const quit = () =>
     exclusive(async () => {
       try {
-        const { platform, library } = ready();
+        const { platform, library } = requireServices();
         await library.flush();
         if (!(await platform.exit())) showMenu("quit");
       } catch (error) {
@@ -447,8 +447,11 @@ export function createApplication({
     initialize: async (link: { level?: string; skirmish?: SkirmishChoice }) => {
       setBusy(true);
       try {
-        platform = await createPlatform();
-        library = createSaveLibrary(platform.saves, missionIncompatibility);
+        const platform = await createPlatform();
+        services = {
+          platform,
+          library: createSaveLibrary(platform.saves, missionIncompatibility),
+        };
         setBusy(false);
         if (link.skirmish) startSkirmish(link.skirmish);
         else if (link.level !== undefined) startLevel(link.level);
@@ -462,13 +465,10 @@ export function createApplication({
       }
     },
     /** Platform services are ready for saves, loads, and exit. */
-    ready: () => !!library,
+    ready: () => !!services,
     /** The same handle throughout a mission. */
     session: () => session,
-    startFaction: (
-      faction: keyof typeof FACTION_LEVELS,
-      difficulty: Difficulty,
-    ) => {
+    startFaction: (faction: SetupFaction, difficulty: Difficulty) => {
       const level = FACTION_LEVELS[faction];
       // A level file loaded earlier must not replace the chosen introduction.
       levels.set(level, LEVEL_SOURCES.get(level)!);
@@ -490,19 +490,17 @@ export function createApplication({
     setSpeed: (speed: number) => session?.setSpeed(speed),
     showObjectives: () => sidebar?.showGoals(),
     cancelLoad,
-    listSaves: () => ready().library.list(),
-    removeSave: (id: string) => ready().library.remove(id),
+    listSaves: () => requireServices().library.list(),
+    removeSave: (id: string) => requireServices().library.remove(id),
     load: (id?: string) => {
-      const { platform, library } = ready();
+      const { platform, library } = requireServices();
       return loadFrom(() =>
         id === undefined ? platform.importFile() : library.read(id),
       );
     },
-    quickload: () => loadFrom(ready().library.readQuicksave),
+    quickload: () => loadFrom(requireServices().library.readQuicksave),
     save: writeSave,
     quicksave: () => backgroundSave("quick", "Quicksave"),
     export: exportMission,
   };
 }
-
-export type Application = ReturnType<typeof createApplication>;

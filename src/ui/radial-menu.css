@@ -1,0 +1,28 @@
+.radial-menu {
+  position: fixed;
+  z-index: 40;
+  width: 2.75rem;
+  height: 2.75rem;
+  transform: translate(-50%, -50%);
+}
+.radial-menu button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  min-width: 2.75rem;
+  white-space: nowrap;
+  text-align: center;
+  background: rgb(20 39 41 / 96%);
+  box-shadow: 0 0.25rem 0.8rem rgb(0 0 0 / 35%);
+}
+.radial-action span {
+  margin-right: 0.35rem;
+}
+.radial-default {
+  color: #eac97f;
+  border-color: #d8bd79;
+}
+.radial-cancel {
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}

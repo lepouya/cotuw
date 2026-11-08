@@ -1,6 +1,6 @@
 import { SAVE_KIND_LABELS, saveCompleteMessage } from "../saves";
 import { formatElapsed } from "../format-time";
-import { mountFeature } from "./dom";
+import { createButton, createElement, mountFeature } from "./dom";
 import markup from "./save-panel.html?raw";
 import "./save-panel.css";
 
@@ -43,12 +43,11 @@ export function createSavePanel(
   host: SavePanelHost,
 ) {
   return mountFeature(root, markup, (scope) =>
-    bindSavePanel(root.ownerDocument, operations, host, scope),
+    bindSavePanel(operations, host, scope),
   );
 }
 
 function bindSavePanel(
-  document: Document,
   operations: SaveOperations,
   host: SavePanelHost,
   { signal, element }: FeatureScope,
@@ -58,38 +57,33 @@ function bindSavePanel(
   const loadPanel = element("load-panel");
   const saveEntries = element("save-entries");
 
-  const showEmptySaves = () => {
-    const empty = document.createElement("li");
-    empty.textContent = "No saved missions yet.";
-    saveEntries.append(empty);
-  };
-  const button = (text: string) => {
-    const control = document.createElement("button");
-    control.type = "button";
-    control.textContent = text;
-    control.dataset.panelWork = "";
-    return control;
-  };
+  const showEmptySaves = () =>
+    saveEntries.append(createElement("li", {}, "No saved missions yet."));
+  const button = (text: string) =>
+    createButton(text, { "data-panel-work": true });
   const saveRow = (entry: SaveEntry, listed: () => boolean) => {
-    const item = document.createElement("li");
-    const label = document.createElement("span");
-    const details = document.createElement("small");
-    label.textContent = `${SAVE_KIND_LABELS[entry.kind]} · ${entry.name}`;
-    details.textContent = [
+    const details = [
       entry.missionName,
       `${formatElapsed(entry.elapsedSeconds)} elapsed`,
       entry.savedAt && new Date(entry.savedAt).toLocaleString(),
     ]
       .filter(Boolean)
       .join(" · ");
-    label.append(details);
-    if (entry.incompatible !== undefined) {
-      const reason = document.createElement("small");
-      reason.className = "save-incompatible";
-      reason.textContent = `Incompatible: ${entry.incompatible}`;
-      label.append(reason);
-    }
-    item.append(label);
+    const label = createElement(
+      "span",
+      {},
+      `${SAVE_KIND_LABELS[entry.kind]} · ${entry.name}`,
+      createElement("small", {}, details),
+    );
+    if (entry.incompatible !== undefined)
+      label.append(
+        createElement(
+          "small",
+          { class: "save-incompatible" },
+          `Incompatible: ${entry.incompatible}`,
+        ),
+      );
+    const item = createElement("li", {}, label);
     // Loading would only fail, so incompatible saves offer deletion alone.
     if (entry.incompatible === undefined) {
       const load = button("Load");
@@ -177,8 +171,7 @@ function bindSavePanel(
     quicksave: () => write("quick", "Quicksave"),
     /** Lists saves into the opened load panel. */
     showSaves: async () => {
-      const loading = document.createElement("li");
-      loading.textContent = "Loading saved missions…";
+      const loading = createElement("li", {}, "Loading saved missions…");
       saveEntries.append(loading);
       saveEntries.setAttribute("aria-busy", "true");
       await host.perform(async (current) => {

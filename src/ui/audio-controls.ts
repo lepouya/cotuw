@@ -1,10 +1,11 @@
 import { AUDIO_CHANNELS, DEFAULT_AUDIO_SETTINGS } from "../audio/mixer";
-import type { AudioDevice, AudioSettings, AudioStatus } from "../audio/mixer";
 import { isRecord } from "../simulation/validation";
 import { mountFeature } from "./dom";
-import type { FeatureScope } from "./dom";
 import markup from "./audio-controls.html?raw";
 import "./audio-controls.css";
+
+import type { AudioDevice, AudioSettings, AudioStatus } from "../audio/mixer";
+import type { FeatureScope } from "./dom";
 
 const STORAGE_KEY = "cotuw.audio.settings";
 

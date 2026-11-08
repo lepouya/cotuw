@@ -78,16 +78,11 @@ h3 {
   margin: 1.2rem 0 0.6rem;
   font-size: 0.85rem;
 }
-.muted,
-.controls {
+.muted {
   margin: 0.5rem 0;
   color: #b7c8c2;
   font-size: 0.78rem;
   line-height: 1.5;
-}
-.controls {
-  color: #d8bd79;
-  font-size: 0.7rem;
 }
 button {
   min-height: 2.75rem;
@@ -152,39 +147,17 @@ summary {
   position: relative;
   min-height: 0;
 }
-.radial-menu {
-  position: fixed;
-  z-index: 40;
-  width: 2.75rem;
-  height: 2.75rem;
-  transform: translate(-50%, -50%);
-}
-.radial-menu button {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  min-width: 2.75rem;
-  white-space: nowrap;
-  text-align: center;
-  background: rgb(20 39 41 / 96%);
-  box-shadow: 0 0.25rem 0.8rem rgb(0 0 0 / 35%);
-}
-.radial-action span {
-  margin-right: 0.35rem;
-}
-.radial-default {
-  color: #eac97f;
-  border-color: #d8bd79;
-}
-.radial-cancel {
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-}
 #game-canvas {
   display: block;
   width: 100%;
   height: 100%;
   touch-action: none;
+}
+#game-canvas[data-camera-pan-active="true"] {
+  cursor: grab;
+}
+#game-canvas[data-camera-dragging="true"] {
+  cursor: grabbing;
 }
 .minimap {
   position: absolute;
@@ -227,61 +200,4 @@ summary {
   border: 1px solid #eac97f;
   background: rgb(234 201 127 / 12%);
   pointer-events: none;
-}
-.camera-controls {
-  position: absolute;
-  left: 0.5rem;
-  bottom: 0.5rem;
-  display: grid;
-  grid-template-columns: repeat(3, 2.75rem);
-  gap: 0.2rem;
-}
-.camera-controls button {
-  text-align: center;
-  padding: 0.3rem;
-  background: rgb(20 39 41 / 90%);
-}
-.camera-controls button[aria-pressed="true"] {
-  color: #eac97f;
-  border-color: #d8bd79;
-  background: #304e4d;
-}
-/* Opens beside the cluster so short landscape screens keep every button. */
-.camera-views {
-  position: absolute;
-  left: calc(100% + 0.2rem);
-  bottom: 0;
-  display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 0.2rem;
-}
-.camera-views[hidden] {
-  display: none;
-}
-.edge-pan-control {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 2.75rem;
-  padding: 0.4rem;
-  border: 1px solid #607161;
-  border-radius: 0.2rem;
-  background: rgb(20 39 41 / 90%);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-.edge-pan-control input {
-  accent-color: #d8bd79;
-}
-@media (any-hover: none) and (any-pointer: coarse) {
-  .edge-pan-control {
-    display: none;
-  }
-}
-#game-canvas[data-camera-pan-active="true"] {
-  cursor: grab;
-}
-#game-canvas[data-camera-dragging="true"] {
-  cursor: grabbing;
 }

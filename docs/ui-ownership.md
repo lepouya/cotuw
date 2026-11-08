@@ -8,13 +8,15 @@ feature-owned markup, behavior, styles, and cleanup.
 ## Current coupling
 
 - `src/main.ts` composes the application, dialogs, top bar, notifications,
-  and shortcuts. `src/application.ts` owns session startup, storage
-  operations, and menu view data. `src/ui/dialogs.ts` owns modal interaction
-  and panel state without querying application storage or simulation.
-- Dialog, audio, save-panel, sidebar, top bar, and notification styles live
-  beside their modules. `index.html` and `src/styles.css` own the shell and the
-  camera controls and minimap internals. Shell breakpoints allocate viewport
-  space; sidebar sections and the top bar own compact rules for their contents.
+  camera controls, and shortcuts. `src/application.ts` owns platform creation,
+  session startup, storage operations, and menu view data. `src/ui/dialogs.ts`
+  owns modal interaction and panel state without querying application storage
+  or simulation.
+- Dialog, mission setup, audio, save-panel, sidebar, top bar, notification,
+  camera control, and radial menu styles live beside their modules.
+  `index.html` and `src/styles.css` own the shell and minimap canvas. Shell
+  breakpoints allocate viewport space; sidebar sections and the top bar own
+  compact rules for their contents.
 - `createSidebar` accepts a root, content, and selection callback, and returns
   controls, updates, navigation, and disposal. `createGameSession` binds those
   controls to simulation and input. `createProductionCards` owns its tooltip
@@ -36,8 +38,8 @@ Audio activation and modal-local input remain available while a dialog is open.
 
 ### Bootstrap and mission lifetime
 
-- `src/main.ts` composes platform services, audio, application operations,
-  shell roots, and UI. It installs application shortcuts and starts the
+- `src/main.ts` composes audio, application operations, shell roots, and UI.
+  It installs application shortcuts and starts the
   initial title or explicit level route. Session code stays dynamically
   imported so title controls work before the renderer loads. Application and
   UI modules use type-only session imports outside that creation path.
@@ -49,11 +51,12 @@ Audio activation and modal-local input remain available while a dialog is open.
   each scenario save policy to rules for when saving is allowed and which
   autosaves fall due; a new policy adds one entry there. The sidebar shows
   the scenario briefing from its options.
-- Bootstrap supplies mission UI roots. Startup mounts the sidebar through
-  its feature constructor and passes returned control references and cleanup
-  to session assembly. Register partial UI ownership before awaiting session
-  creation; startup failure releases it even if the session never becomes
-  ready. Session callbacks publish only for the active mission generation.
+- Bootstrap supplies the sidebar root and camera controls. Startup mounts the
+  sidebar through its feature constructor and passes returned control references
+  and cleanup to session assembly. Register partial UI ownership before
+  awaiting session creation; startup failure releases it even if the session
+  never becomes ready. Session callbacks publish only for the active mission
+  generation.
 - Loading parses and validates before releasing the current session. A newer
   request, restart, or return to title invalidates older pending reads.
   Leaving Load, closing the menu, or choosing Inspect or Resume also cancels
@@ -138,6 +141,11 @@ Audio activation and modal-local input remain available while a dialog is open.
   operations return their outcome to the requesting panel instead of also
   publishing a generic application message. Background Quick/Auto save
   notifications use the originating mission's identity.
+- `src/ui/mission-setup.ts` owns the new-mission panel: difficulty and faction
+  choices, with its markup and styles. It reports the choice through `start`.
+  Panels share one shape, content plus opening focus and optional replacement
+  text, which the dialog module switches between. The Options panel holds the
+  audio controls and is where other device preferences mount.
 - `src/ui/audio-controls.ts` owns audio settings markup, labels, styles, and
   bindings. Dialog construction mounts this child before binding its controls
   and owns its disposal; bootstrap owns the mixer. One application-lifetime
@@ -201,8 +209,11 @@ Audio activation and modal-local input remain available while a dialog is open.
   the top bar to host.
 - `src/ui/mission-alerts.ts` turns what the player may know, read through the
   owner view, into grouped alerts.
-- Camera controls and the minimap host remain distinct features. Their owning
-  modules supply markup and styles when touched.
+- `src/ui/camera-controls.ts` mounts its markup into `#camera-controls` once
+  for the application, so Edge panning keeps its setting between missions, and
+  owns its styles. Each session binds its camera through `bind`.
+- The minimap host remains a distinct feature. Its owning module supplies
+  markup and styles when touched.
 
 ### Markup and shared styles
 

@@ -1,7 +1,7 @@
 import { errorMessage } from "../errors";
-import { DIFFICULTIES, DIFFICULTY_IDS } from "../simulation/mission-setup";
 import { createAudioControls } from "./audio-controls";
-import { createElement, mountFeature } from "./dom";
+import { mountFeature } from "./dom";
+import { createMissionSetup } from "./mission-setup";
 import { createSavePanel } from "./save-panel";
 import markup from "./dialogs.html?raw";
 import "./dialogs.css";
@@ -10,6 +10,7 @@ import type { Difficulty } from "../simulation/mission-setup";
 import type { ScenarioPopup } from "../simulation/mission-file";
 import type { AudioControlDevice } from "./audio-controls";
 import type { FeatureScope } from "./dom";
+import type { SetupFaction } from "./mission-setup";
 import type { SaveOperations } from "./save-panel";
 
 export type MenuMode = "home" | "menu" | "loaded" | "result" | "quit";
@@ -36,7 +37,7 @@ type DialogOptions = SaveOperations & {
   focusWorld: () => void;
   notify: (message: string) => void;
   cancelLoad: () => void;
-  start: (faction: "arc" | "circle", difficulty: Difficulty) => void;
+  start: (faction: SetupFaction, difficulty: Difficulty) => void;
   restart: () => void;
   /** Releases the mission, then shows the title screen. */
   exitToTitle: () => Promise<void>;
@@ -94,14 +95,21 @@ function bindDialogs(
   const version = element("game-version");
   version.textContent = `Prototype demo · v${options.version}`;
   lifetime.own(createAudioControls(audioRoot, options.audio));
+  const back = () => {
+    if (!busy) showPanel("actions");
+  };
   const savePanel = lifetime.own(
     createSavePanel(element("save-panels"), options, {
       perform,
-      report: (message) => report(message),
-      refresh: () => syncAvailability(),
-      back: () => {
-        if (!busy) showPanel("actions");
-      },
+      report,
+      refresh: syncAvailability,
+      back,
+    }),
+  );
+  const setupPanel = lifetime.own(
+    createMissionSetup(element("setup-panel"), {
+      start: options.start,
+      back,
     }),
   );
   /** Each panel's exclusive content, opening focus, and replacement text. */
@@ -119,18 +127,12 @@ function bindDialogs(
       focus: () => actions.querySelector("button:not([hidden]):not(:disabled)"),
     },
     ...savePanel.panels,
+    ...setupPanel.panels,
     options: {
-      content: element("cancel-options"),
+      content: element("options-panel"),
       focus: () => audioRoot.querySelector("input"),
       title: "Options",
       description: "",
-    },
-    setup: {
-      content: element("mission-setup"),
-      focus: () => element("choose-arc"),
-      title: "Set up your mission",
-      description:
-        "Choose a difficulty, then a faction, for the wolf-den demo.",
     },
   };
   let revision = 0;
@@ -155,11 +157,11 @@ function bindDialogs(
     savePanel.clear();
     options.cancelLoad();
   };
-  const report = (message: string) => {
+  function report(message: string) {
     if (disposed) return;
     if (dialog.open) status.textContent = message;
     else options.notify(message);
-  };
+  }
   const focusedElement = () => {
     const active = document.activeElement;
     return active instanceof HTMLElement && active !== document.body
@@ -187,7 +189,7 @@ function bindDialogs(
     if (dialog.open && (!dialog.contains(active) || active === dialog))
       focusPanel();
   };
-  const syncAvailability = () => {
+  function syncAvailability() {
     for (const control of dialog.querySelectorAll<
       HTMLInputElement | HTMLButtonElement
     >("button, input")) {
@@ -199,14 +201,13 @@ function bindDialogs(
         !(ruleFor(control)?.(view) ?? true) ||
         (panelPending && "panelWork" in control.dataset);
     }
-  };
+  }
   const showPanel = (next: Panel) => {
     invalidatePanel();
     status.textContent = "";
     panel = next;
     for (const [name, { content }] of Object.entries(panels))
       content.hidden = name !== next;
-    audioRoot.hidden = next !== "options";
     title.textContent = panels[next].title ?? view?.title ?? "";
     description.textContent =
       panels[next].description ?? view?.description ?? "";
@@ -327,32 +328,12 @@ function bindDialogs(
   );
   click("inspect-loaded-mission", () => closeMenu(false));
   click("new-mission", () => showPanel("setup"));
-  let difficulty: Difficulty = "normal";
-  const difficultyChoices = DIFFICULTY_IDS.map((id) => {
-    const button = createElement(
-      "button",
-      { id: `difficulty-${id}`, class: "setup-choice", type: "button" },
-      createElement("strong", {}, DIFFICULTIES[id].name),
-    );
-    element("difficulty-choices").append(button);
-    click(button.id, () => selectDifficulty(id));
-    return { id, button };
-  });
-  const selectDifficulty = (selected: Difficulty) => {
-    difficulty = selected;
-    for (const { id, button } of difficultyChoices)
-      button.setAttribute("aria-pressed", String(id === selected));
-  };
-  selectDifficulty(difficulty);
-  click("choose-arc", () => options.start("arc", difficulty));
-  click("choose-circle", () => options.start("circle", difficulty));
   click("restart-mission", options.restart);
   click("exit-mission", () => void perform(options.exitToTitle));
   click("quit-game", () => void perform(options.quit));
   click("return-to-title", options.showTitle);
   click("open-options", () => showPanel("options"));
-  for (const id of ["cancel-options", "cancel-mission-setup"])
-    click(id, () => showPanel("actions"));
+  click("cancel-options", back);
   click("load-mission", () => {
     showPanel("load");
     void savePanel.showSaves();

@@ -3,11 +3,12 @@ import { version } from "../package.json";
 import { createApplication } from "./application";
 import { createAudioMixer } from "./audio/mixer";
 import { skirmishLink } from "./content/skirmish";
-import { createDialogs } from "./ui/dialogs";
+import { errorMessage } from "./errors";
 import { isTextEntry, worldKeyboardAvailable } from "./render/input-focus";
+import { createCameraControls } from "./ui/camera-controls";
+import { createDialogs } from "./ui/dialogs";
 import { createNotifications } from "./ui/notifications";
 import { createTopBar } from "./ui/top-bar";
-import { errorMessage } from "./errors";
 
 const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -45,10 +46,8 @@ const app = createApplication({
   canvas,
   minimap: byId<HTMLCanvasElement>("minimap"),
   audio,
-  roots: {
-    sidebar: byId("game-sidebar"),
-    cameraControls: byId("camera-controls"),
-  },
+  sidebarRoot: byId("game-sidebar"),
+  cameraControls: createCameraControls(byId("camera-controls")),
   dialogs,
   notifications,
   topBar,
@@ -56,13 +55,14 @@ const app = createApplication({
     document.body.classList.toggle("at-title", atTitle),
 });
 
+const APPLICATION_KEYS = new Map<string, () => unknown>([
+  ["F5", app.quicksave],
+  ["F9", app.quickload],
+  ["F10", app.openMenu],
+]);
 // F5 and F10 would otherwise reload the page or focus the browser menu.
 window.addEventListener("keydown", (event) => {
-  const action = {
-    F5: app.quicksave,
-    F9: app.quickload,
-    F10: app.openMenu,
-  }[event.key];
+  const action = APPLICATION_KEYS.get(event.code);
   if (!action) return;
   event.preventDefault();
   if (!event.repeat && app.ready() && worldKeyboardAvailable(document))

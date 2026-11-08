@@ -1,5 +1,6 @@
-import type { SaveStorage } from "./platform";
 import { isCount, isPositive, isRecord } from "./simulation/validation";
+
+import type { SaveStorage } from "./platform";
 
 export type SaveKind = "manual" | "quick" | "auto";
 
@@ -28,6 +29,11 @@ export type SaveEntry = {
 const ROLLING_IDS = { quick: "quicksave", auto: "autosave" } as const;
 /** Bounds file handles and JSON memory when the library grows. */
 const METADATA_READERS = 4;
+
+const randomId = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 
 /**
  * Mission files in storage, described by the metadata they carry.
@@ -90,10 +96,6 @@ export function createSaveLibrary(
     remove: (id: string) => mutate(() => storage.remove(id)),
     /** Resolves the ID the source was stored under. */
     write: (kind: SaveKind, source: string): Promise<string> => {
-      const randomId = () =>
-        Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
-          byte.toString(16).padStart(2, "0"),
-        ).join("");
       const id =
         kind === "manual"
           ? `manual-${Date.now()}-${randomId()}`
@@ -108,17 +110,20 @@ export function createSaveLibrary(
 
 export type SaveLibrary = ReturnType<typeof createSaveLibrary>;
 
+function kindOf(id: string): SaveKind {
+  if (id === ROLLING_IDS.quick) return "quick";
+  if (id === ROLLING_IDS.auto) return "auto";
+  return "manual";
+}
+
+const text = (value: unknown) =>
+  typeof value === "string" ? value : undefined;
+
 function describe(
   id: string,
   source: string,
   incompatibility: (file: unknown) => string | undefined,
 ): SaveEntry {
-  const kind: SaveKind =
-    id === ROLLING_IDS.quick
-      ? "quick"
-      : id === ROLLING_IDS.auto
-        ? "auto"
-        : "manual";
   let file: unknown;
   let incompatible: string | undefined;
   try {
@@ -127,48 +132,34 @@ function describe(
   } catch {
     incompatible = "This file cannot be read as a mission.";
   }
-  const reason = incompatible === undefined ? {} : { incompatible };
-  try {
-    if (
-      !isRecord(file) ||
-      !isRecord(file.scenario) ||
-      !isRecord(file.state) ||
-      !isCount(file.state.tick) ||
-      !isPositive(file.ticksPerSecond)
-    )
-      throw new Error("Invalid save metadata.");
-    const save = isRecord(file.save) ? file.save : undefined;
-    const savedAt =
-      typeof save?.savedAt === "string" &&
-      Number.isFinite(Date.parse(save.savedAt))
-        ? new Date(save.savedAt).toISOString()
-        : "";
-    const elapsedSeconds = file.state.tick / file.ticksPerSecond;
-    if (!Number.isFinite(elapsedSeconds))
-      throw new Error("Invalid elapsed time.");
-    return {
-      id,
-      kind,
-      name: typeof save?.name === "string" ? save.name : id,
-      missionName:
-        typeof file.scenario.name === "string"
-          ? file.scenario.name
-          : typeof file.scenario.id === "string"
-            ? file.scenario.id
-            : "",
-      savedAt,
-      elapsedSeconds,
-      ...reason,
-    };
-  } catch {
-    return {
-      id,
-      kind,
-      name: id,
-      missionName: "Unreadable file",
-      savedAt: "",
-      elapsedSeconds: 0,
-      ...reason,
-    };
-  }
+  const unreadable: SaveEntry = {
+    id,
+    kind: kindOf(id),
+    name: id,
+    missionName: "Unreadable file",
+    savedAt: "",
+    elapsedSeconds: 0,
+    ...(incompatible === undefined ? {} : { incompatible }),
+  };
+  if (
+    !isRecord(file) ||
+    !isRecord(file.scenario) ||
+    !isRecord(file.state) ||
+    !isCount(file.state.tick) ||
+    !isPositive(file.ticksPerSecond)
+  )
+    return unreadable;
+  const elapsedSeconds = file.state.tick / file.ticksPerSecond;
+  if (!Number.isFinite(elapsedSeconds)) return unreadable;
+  const save = isRecord(file.save) ? file.save : undefined;
+  const savedAt = text(save?.savedAt) ?? "";
+  return {
+    ...unreadable,
+    name: text(save?.name) ?? id,
+    missionName: text(file.scenario.name) ?? text(file.scenario.id) ?? "",
+    savedAt: Number.isFinite(Date.parse(savedAt))
+      ? new Date(savedAt).toISOString()
+      : "",
+    elapsedSeconds,
+  };
 }

@@ -99,7 +99,8 @@ async function application() {
     canvas: { dataset: {} } as HTMLCanvasElement,
     minimap: {} as HTMLCanvasElement,
     audio: {} as ApplicationOptions["audio"],
-    roots: {} as ApplicationOptions["roots"],
+    sidebarRoot: {} as HTMLElement,
+    cameraControls: { bind: vi.fn() },
     dialogs: ui,
     notifications: {
       alert: vi.fn(),

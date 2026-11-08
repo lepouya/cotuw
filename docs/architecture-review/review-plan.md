@@ -596,7 +596,7 @@ product work in `TODO.md`, and remove temporary files in
     - Deferred: `session.ts` and `sidebar-selection.ts`
       both set the Remove button's `disabled` from `canRemove`.
 
-- [ ] **Slice 8B: app shell, desktop host, persistence, and modal dialogs**
+- [x] **Slice 8B: app shell, desktop host, persistence, and modal dialogs**
   (24 files, ~1,850 LOC)
   - `index.html`.
   - `src/`: `main.ts`, `application.ts`, `mission-loading.ts`, `saves.ts`,
@@ -611,6 +611,94 @@ product work in `TODO.md`, and remove temporary files in
   - Focus: Tauri/browser isolation, removing `save-policy -> ui/top-bar`,
     `MissionFile.uiState` load/save wiring, Options shortcut rebinding host
     (`1.45`), and setup/summary dialog seams (`1.60`, `1.62`).
+  - Manifest after Pass A: added `src/ui/mission-setup.ts`,
+    `src/ui/mission-setup.html`, `src/ui/mission-setup.css`,
+    `src/ui/camera-controls.html`, `src/ui/camera-controls.css`, and
+    `src/ui/radial-menu.css` (34 files). `src/ui/camera-controls.ts` and
+    `src/ui/radial-menu.ts` were reviewed in Slice 5; Pass B rereads them for
+    the changed seam.
+  - [x] **Pass A** (modular assessment and refactor, base `15fdba4`):
+    - Camera controls own their markup and styles. `createCameraControls`
+      mounts `camera-controls.html` once for the application, keeping Edge
+      panning's setting between missions, and returns `bind(camera)`, which
+      the session calls. Owned markup removes the binder's optional element
+      checks. `roots` became `sidebarRoot` and `cameraControls`; `index.html`
+      holds only the shell and mount points. Radial menu styles moved to
+      `radial-menu.css`.
+    - Dialog panels: `src/ui/mission-setup.ts` owns difficulty and faction
+      choices with its markup and styles (`1.60`), through the panel shape the
+      save panel uses. `#options-panel` wraps the audio controls and Back,
+      removing the audio visibility special case and giving `1.45` rebinding a
+      mount point. `FACTION_LEVELS` is keyed by `SetupFaction`.
+    - `createGameSession` clears and sets its own canvas probes, including
+      `data-difficulty`; the application no longer writes them.
+    - No persisted format change or public ID change. Substantial markup and
+      style moves, so Pass B runs in its own session. Docs: `ui-ownership.md`,
+      which also now states that the application creates platform services.
+    - Checks: format, lint, typecheck, units, and a Vite build pass. Moved CSS
+      rules and markup match `HEAD` by script. On the host, `132` of `136`
+      Chromium and WebKit cases in `start-screen`, `interface`, `sidebar`,
+      `dialogs`, `audio`, `camera-navigation`, `session-lifecycle`, and `saves`
+      pass. The other `4`, an `audio.spec.ts` harness that blocks `main.ts` yet
+      clicked `#open-menu`, broke when Slice 8A moved that button out of
+      `index.html`; it now adds its own button and passes on the host.
+    - Healthy, unchanged: `Platform`/`SaveStorage` adapters and capabilities
+      (scoped to `$APPDATA/saves`), `save-policy.ts`, `saves.ts` ordering,
+      `session.save` building `uiState` (no application wiring), and
+      `formatElapsed` (`save-policy -> ui` already removed in Slice 8A).
+    - Rejected: splitting `application.ts` (menu, save, and level code share
+      `session`, `mission`, and `busy`, so a split forwards closures); merging
+      F5/F9/F10 into `bindWorldShortcuts` (they must `preventDefault` even
+      when unavailable, or the browser reloads); replacing the `main.ts`
+      callback lambdas (they break the dialogs/application construction
+      cycle explicitly); injecting `createPlatform` (the doc was wrong, not
+      the code; tests already mock it).
+    - Deferred to `1.45`: a device preferences module when bindings become
+      the second `localStorage` caller beside `audio-controls.ts`. Deferred to
+      `1.62`: a summary panel, which needs only a `MenuView` field and a panel
+      entry. Kept in `styles.css`: `.selection-box`, since `src/render` imports
+      no CSS.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `main.ts`: F5, F9, and F10 match `KeyboardEvent.code` through a `Map`;
+      imports grouped.
+    - `application.ts`: one `services` value replaces separate `platform` and
+      `library` state and the shadowing destructures; `withSave` no longer
+      needs `session!`; `ready` parameter renamed `started`; unused
+      `Application` type removed.
+    - `saves.ts`: `describe` returns an unreadable entry instead of throwing
+      to its own `catch`, with `kindOf` and `text` replacing nested ternaries;
+      `randomId` is module-level.
+    - `save-panel.ts`: rows use `dom.ts` helpers, so the panel no longer takes
+      a `document`. `audio-controls.ts`: imports grouped; its markup drops
+      values and labels that `bind` always replaces. `dialogs.ts`: `report`
+      and `syncAvailability` are hoisted, ending two wrapper lambdas.
+    - `camera-controls.ts`: `bindCamera` looks up its elements directly;
+      `.camera-views[hidden]` removed, since `[hidden]` already covers it.
+    - `styles.css`: unused `.controls` removed; canvas cursor rules sit beside
+      `#game-canvas`. `session.ts`: `actorReady` and `tilePlacedActorCount`
+      no longer go stale across sessions; unused `tilePlacedActorReady`
+      removed. `Cargo.toml`: template comment removed.
+    - Reviewed without change: `mission-loading.ts`, `save-policy.ts`,
+      `lifetime.ts`, `errors.ts`, `vite-env.d.ts`, `index.html`, `platform/*`,
+      `src-tauri` sources and config, `dialogs.html`, `dialogs.css`,
+      `save-panel.html`, `save-panel.css`, `audio-controls.css`,
+      `mission-setup.*`, `camera-controls.html`, `radial-menu.css`.
+    - Kept: `createSaveLibrary`'s default `incompatibility`, since most save
+      library tests do not concern compatibility; the dialog's separate
+      `busy`, `panelPending`, and guide flags, which combine independently
+      and are covered by `dialogs.spec.ts`.
+    - Independent diff review found no actionable defects. Checks:
+      `npm run check` (`1369` units and `5` Chromium smoke cases) and the
+      production build pass. All `149` affected Chromium and WebKit cases
+      pass on the host: `start-screen`, `dialogs`, `audio`, `saves`,
+      `interface`, `camera-navigation`, `session-lifecycle`, `sidebar`,
+      `actor`, `mission`, and `tile-placed-actor`.
+    - Deferred: Ctrl+F5 and Shift+F10 still quicksave and open the menu, since
+      `main.ts` ignores modifiers (Ctrl+F5 blocks a hard reload; decide with
+      `1.45`). A desktop crash mid-write can leave a `.tmp` file in `saves/`,
+      which listing ignores. `platform/index.ts` statically imports `isTauri`,
+      so `@tauri-apps/api/core` stays in the browser bundle, unlike the rest
+      of the host code.
 
 - [ ] **Slice 9: content packs, presentation contracts, and audio**
   (13 TS files + JSON packs/levels, ~2,357 LOC)

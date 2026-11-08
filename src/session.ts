@@ -71,7 +71,7 @@ import { createBuildingPlacement } from "./ui/building-placement";
 import { createPlacementPreview } from "./render/placement-preview";
 import { createUnitControls } from "./ui/unit-controls";
 import type { UnitControls } from "./ui/unit-controls";
-import { bindCameraControls } from "./ui/camera-controls";
+import type { CameraControls } from "./ui/camera-controls";
 import { createRallyControls } from "./ui/rally-controls";
 import type { RallyControls } from "./ui/rally-controls";
 import { createRallyPointView } from "./render/rally-point";
@@ -169,7 +169,7 @@ export type GameSessionControls = BuildingPlacementControls &
     onPopup?: (popup: ScenarioPopup) => void;
     remove?: HTMLButtonElement;
     animate?: HTMLInputElement;
-    cameraControls?: HTMLElement;
+    cameraControls?: Pick<CameraControls, "bind">;
   };
 
 declare global {
@@ -184,9 +184,19 @@ export async function createGameSession(
   minimapCanvas: HTMLCanvasElement,
   controls: GameSessionControls,
 ): Promise<GameSession> {
-  delete canvas.dataset.modelsReady;
   const { mission } = controls;
   const { content } = mission;
+  // Probes describe one session; the canvas outlives each.
+  for (const probe of [
+    "modelsReady",
+    "missionResult",
+    "simulationFault",
+    "terrainReady",
+    "actorReady",
+    "tilePlacedActorCount",
+  ])
+    delete canvas.dataset[probe];
+  canvas.dataset.difficulty = mission.scenario.setup?.difficulty ?? "normal";
   const map = createSessionMap(missionTerrain(mission), content.terrain);
   const view = createGameView(canvas, map, viewOptions(content.view));
   try {
@@ -834,10 +844,8 @@ async function assembleGameSession(
     },
   });
   own(unitControls);
-  const disposeCameraControls =
-    controls.cameraControls &&
-    bindCameraControls(controls.cameraControls, view.camera);
-  if (disposeCameraControls) lifetime.defer(disposeCameraControls);
+  if (controls.cameraControls)
+    lifetime.defer(controls.cameraControls.bind(view.camera));
   view.camera.onViewChangedObservable.add(() => {
     controlsDirty = true;
   });
@@ -1092,7 +1100,6 @@ async function assembleGameSession(
   view.scene.onAfterRenderObservable.addOnce(() => {
     canvas.dataset.terrainReady = "true";
     canvas.dataset.actorReady = "true";
-    canvas.dataset.tilePlacedActorReady = "true";
     canvas.dataset.tilePlacedActorCount = String(player.actors().placed.length);
   });
 

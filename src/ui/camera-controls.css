@@ -1,0 +1,48 @@
+.camera-controls {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, 2.75rem);
+  gap: 0.2rem;
+}
+.camera-controls button {
+  text-align: center;
+  padding: 0.3rem;
+  background: rgb(20 39 41 / 90%);
+}
+.camera-controls button[aria-pressed="true"] {
+  color: #eac97f;
+  border-color: #d8bd79;
+  background: #304e4d;
+}
+/* Opens beside the cluster so short landscape screens keep every button. */
+.camera-views {
+  position: absolute;
+  left: calc(100% + 0.2rem);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.2rem;
+}
+.edge-pan-control {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.4rem;
+  border: 1px solid #607161;
+  border-radius: 0.2rem;
+  background: rgb(20 39 41 / 90%);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.edge-pan-control input {
+  accent-color: #d8bd79;
+}
+@media (any-hover: none) and (any-pointer: coarse) {
+  .edge-pan-control {
+    display: none;
+  }
+}

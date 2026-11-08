@@ -1,3 +1,7 @@
+import { mountFeature } from "./dom";
+import markup from "./camera-controls.html?raw";
+import "./camera-controls.css";
+
 import type { StrategyCamera } from "../render/camera";
 
 const CAMERA_ACTIONS: Record<string, (camera: StrategyCamera) => void> = {
@@ -21,71 +25,76 @@ const VIEW_ACTIONS: Record<string, (camera: StrategyCamera) => void> = {
   reset: (camera) => camera.resetView(),
 };
 
-/** All pointer camera actions also have touch-sized buttons. */
-export function bindCameraControls(root: HTMLElement, camera: StrategyCamera) {
-  const controller = new AbortController();
-  const { signal } = controller;
-  const edges = root.querySelector<HTMLInputElement>("#edge-panning");
-  if (edges) {
-    camera.setEdgePanEnabled(edges.checked);
-    edges.addEventListener(
-      "change",
-      () => camera.setEdgePanEnabled(edges.checked),
-      { signal },
-    );
-  }
+/**
+ * Mounts the camera buttons, all with touch-sized targets, for the application
+ * lifetime, so Edge panning keeps its setting between missions. `bind` connects
+ * a mission's camera and returns a function that releases it.
+ */
+export function createCameraControls(root: HTMLElement) {
+  return mountFeature(root, markup, () => ({
+    bind: (camera: StrategyCamera) => bindCamera(root, camera),
+  }));
+}
+
+export type CameraControls = ReturnType<typeof createCameraControls>;
+
+function bindCamera(root: HTMLElement, camera: StrategyCamera) {
+  const edges = root.querySelector<HTMLInputElement>("#edge-panning")!;
+  const views = root.querySelector<HTMLElement>("#camera-views")!;
   const pan = root.querySelector<HTMLButtonElement>(
     '[data-camera-action="pan"]',
+  )!;
+  const viewsToggle = root.querySelector<HTMLButtonElement>(
+    '[data-camera-action="views"]',
+  )!;
+  const controller = new AbortController();
+  const { signal } = controller;
+  const document = root.ownerDocument;
+  const host = document.defaultView!;
+  camera.setEdgePanEnabled(edges.checked);
+  edges.addEventListener(
+    "change",
+    () => camera.setEdgePanEnabled(edges.checked),
+    { signal },
   );
   const updatePan = () => {
-    if (!pan) return;
     pan.setAttribute("aria-pressed", String(camera.panMode));
     pan.textContent = camera.panMode ? "Pan ✓" : "Pan";
   };
   updatePan();
-  const views = root.querySelector<HTMLElement>("#camera-views");
-  const viewsToggle = root.querySelector<HTMLButtonElement>(
-    '[data-camera-action="views"]',
-  );
   const showViews = (open: boolean) => {
-    if (views) views.hidden = !open;
-    viewsToggle?.setAttribute("aria-expanded", String(open));
+    views.hidden = !open;
+    viewsToggle.setAttribute("aria-expanded", String(open));
   };
   showViews(false);
-  const host = root.ownerDocument.defaultView;
   const dismissOutside = (event: Event) => {
     if (
-      views &&
       !views.hidden &&
       !views.contains(event.target as Node) &&
-      !viewsToggle?.contains(event.target as Node)
+      !viewsToggle.contains(event.target as Node)
     )
       showViews(false);
   };
-  host?.addEventListener("pointerdown", dismissOutside, {
+  host.addEventListener("pointerdown", dismissOutside, {
     capture: true,
     signal,
   });
-  root.ownerDocument.addEventListener("focusin", dismissOutside, { signal });
-  host?.addEventListener(
+  document.addEventListener("focusin", dismissOutside, { signal });
+  host.addEventListener(
     "keydown",
     (event) => {
-      if (event.key !== "Escape" || !views || views.hidden) return;
+      if (event.key !== "Escape" || views.hidden) return;
       showViews(false);
-      viewsToggle?.focus({ preventScroll: true });
+      viewsToggle.focus({ preventScroll: true });
       event.preventDefault();
       event.stopImmediatePropagation();
     },
     { capture: true, signal },
   );
-  host?.addEventListener("blur", () => showViews(false), { signal });
-  root.ownerDocument.addEventListener(
-    "visibilitychange",
-    () => showViews(false),
-    {
-      signal,
-    },
-  );
+  host.addEventListener("blur", () => showViews(false), { signal });
+  document.addEventListener("visibilitychange", () => showViews(false), {
+    signal,
+  });
   const updatePreset = () => {
     for (const button of root.querySelectorAll<HTMLButtonElement>(
       "button[data-camera-view]:not([data-camera-view=reset])",
@@ -106,12 +115,12 @@ export function bindCameraControls(root: HTMLElement, camera: StrategyCamera) {
         "button[data-camera-action], button[data-camera-view]",
       );
       if (!button || button.disabled) return;
-      if (button === viewsToggle) return showViews(!!views?.hidden);
+      if (button === viewsToggle) return showViews(!!views.hidden);
       const view = button.dataset.cameraView;
       if (view) {
         VIEW_ACTIONS[view]?.(camera);
         showViews(false);
-        viewsToggle?.focus({ preventScroll: true });
+        viewsToggle.focus({ preventScroll: true });
         return;
       }
       CAMERA_ACTIONS[button.dataset.cameraAction!]?.(camera);

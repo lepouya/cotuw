@@ -1,3 +1,5 @@
+import "./radial-menu.css";
+
 import type { ContextAction, ContextActionKind } from "../render/command-input";
 
 /** Distance from the menu center to each action, in CSS pixels. */

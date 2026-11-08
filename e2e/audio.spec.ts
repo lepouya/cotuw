@@ -437,9 +437,14 @@ for (const nativeHold of [true, false]) {
         device.onReady(() => {
           ready = true;
         });
-        document.getElementById("open-menu")!.addEventListener("click", () => {
+        // A real click, since unlocking needs a user gesture.
+        const unlock = document.createElement("button");
+        unlock.id = "unlock-audio";
+        unlock.textContent = "Unlock audio";
+        unlock.addEventListener("click", () => {
           void device.unlock();
         });
+        document.getElementById("top-bar")!.append(unlock);
         Reflect.set(window, "audioSequenceHarness", {
           scene,
           device,
@@ -453,7 +458,7 @@ for (const nativeHold of [true, false]) {
           },
         });
       });
-      await page.locator("#open-menu").click();
+      await page.locator("#unlock-audio").click();
       await expect
         .poll(() =>
           page.evaluate(
