@@ -1,5 +1,7 @@
-import { groundPoint, groundRing } from "./ground-marker";
 import { Color3, MeshBuilder, Vector3 } from "@babylonjs/core";
+
+import { groundPoint, groundRing } from "./ground-marker";
+
 import type { LinesMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { WorldPosition } from "../simulation/world";

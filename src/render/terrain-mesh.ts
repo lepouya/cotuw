@@ -12,24 +12,19 @@ import {
 import { createDebugOverlay } from "./debug-overlay";
 import { loadClipFrames } from "./texture-clip";
 import { compileTextureClip } from "../content/texture-clip";
-import { cornerAlpha } from "../map";
+import { cornerAlpha, layerSlot } from "../map";
 import type { ClipFrames } from "./texture-clip";
 import type { TextureClip } from "../content/texture-clip";
+import type { TileGraphics, TileType } from "../content/terrain-style";
 
-import type {
-  TerrainBounds,
-  TerrainMap,
-  TileGraphics,
-  TileLayer,
-  TileType,
-} from "../map";
+import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
 import type { AbstractMesh } from "@babylonjs/core";
 
 const CHUNK_SIZE = 32;
 /** Clip lags round to this many shares of a cycle, each with one material. */
 export const CLIP_PHASE_GROUPS = 8;
-export const TERRAIN_LAYER_OFFSET = 0.012;
-export const TERRAIN_PICK_KIND = "terrain";
+const TERRAIN_LAYER_OFFSET = 0.012;
+const TERRAIN_PICK_KIND = "terrain";
 
 /** A height above the ground that clears every layer; scans every tile. */
 export function aboveTerrainLayers(
@@ -195,7 +190,7 @@ export function createTerrainMeshes(
       for (let x = minX; x < maxX; x += 1) {
         for (const [index, layer] of map.layersAt(x, z).entries()) {
           const type = canonicalType(layer.type);
-          const layerIndex = type?.slot ?? index;
+          const layerIndex = layerSlot(layer, index);
           const phase = phaseAt(type, x, z);
           const groupKey = JSON.stringify([type?.id, phase]);
           let layerGroups = groups.get(layerIndex);
@@ -273,7 +268,7 @@ export function createTerrainMeshes(
     }
   });
   const overlay = debugOverlay
-    ? createDebugOverlay(scene, map, { layerOffset: TERRAIN_LAYER_OFFSET })
+    ? createDebugOverlay(scene, map, TERRAIN_LAYER_OFFSET)
     : undefined;
   const changeObserver = map.onChangedObservable.add((bounds) => {
     markDirty(bounds);
@@ -472,8 +467,6 @@ function createLayerMesh(
 export function isTerrainPickMesh(mesh: AbstractMesh | null): boolean {
   return mesh?.metadata?.pickKind === TERRAIN_PICK_KIND;
 }
-
-export { cornerAlpha } from "../map";
 
 function tileTypeName(type?: TileType): string {
   return type ? `tile-${type.id}` : "plain";

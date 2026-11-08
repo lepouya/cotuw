@@ -1,15 +1,15 @@
 import { Color4, NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
-import { TerrainMap } from "../src/map";
+import { cornerAlpha, TerrainMap } from "../src/map";
 import {
   chunksForBounds,
-  cornerAlpha,
   CLIP_PHASE_GROUPS,
   createTerrainMeshes,
 } from "../src/render/terrain-mesh";
 
-import type { TileLayer, TileType } from "../src/map";
+import type { TileType } from "../src/content/terrain-style";
+import type { TileLayer } from "../src/map";
 
 const waterType: TileType = { id: "water", featherEdges: true };
 const water = (alpha: number): TileLayer => ({

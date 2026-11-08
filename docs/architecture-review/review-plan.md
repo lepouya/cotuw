@@ -363,7 +363,7 @@ product work in `TODO.md`, and remove temporary files in
       `sidebar`, `queued-orders`) pass on the host: `68` Chromium cases and
       `20` tagged WebKit cases.
 
-- [ ] **Slice 6: world rendering, terrain, fog, minimap, and overlays**
+- [x] **Slice 6: world rendering, terrain, fog, minimap, and overlays**
   (20 files, ~3,550 LOC)
   - `src/map.ts`.
   - `src/render/`: `index.ts`, `game-view.ts`, `canvas-size.ts`,
@@ -375,6 +375,61 @@ product work in `TODO.md`, and remove temporary files in
   - Focus: per-frame allocation and WebKit frame budget (`1.64`), moving pure
     `TerrainStyle` schema types to `src/content/`, owner-colored minimap
     markers, and AI dev-overlay extension points (`1.31`).
+  - Manifest after Pass A: added `src/content/terrain-style.ts`; removed
+    `src/render/index.ts` in Pass B (20 files).
+  - [x] **Pass A** (modular assessment and refactor, base `f67c26a`):
+    - `src/content/terrain-style.ts` owns the terrain presentation schema
+      (`TerrainStyle`, `TerrainLayerRule`, `TileType`, `TileGraphics`);
+      `content-pack.ts` no longer imports from `src/render/`. `map.ts` and
+      `render/terrain-style.ts` keep tile layers, the map, and layer building.
+      Docs: `content-packs.md`.
+    - Small type move with no persisted format change, so Pass B continued
+      in the same session.
+    - Kept: caller-side caching of `aboveTerrainLayers`; `TerrainMap` cannot
+      cache `layerCount`, since tests and specs push manual layers through
+      `layersAt`. `minimap.ts` stays whole; its terrain baking, projection,
+      and pointer code share one canvas and are tested through pure exports.
+    - Rejected as speculative: owner-colored minimap markers (the session
+      already chooses `MinimapActor.color`; owner palettes arrive with `1.43`
+      and Slice 9) and a `1.31` extension point in `debug-overlay.ts`, a
+      terrain grid unrelated to AI posture, operations, and budgets.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `render/index.ts` barrel removed: about 30 of its 40 re-exports were
+      unused, and `session.ts` mixed it with direct imports. `session.ts`
+      and `e2e/harness.ts` import the owning modules.
+    - `terrain-mesh.ts`: `cornerAlpha` re-export shim removed (tests import
+      `map.ts`); layer slots use `layerSlot`; `TERRAIN_LAYER_OFFSET` and
+      `TERRAIN_PICK_KIND` made module-private.
+    - `debug-overlay.ts`: unused `grids` and `boundaryColor` options folded
+      into constants; it takes the layer offset directly.
+    - `fog.ts`: corner shading visits neighbors without per-corner tuple
+      arrays on each fog change; `fogAlpha` without a nested ternary.
+    - `ambient-birds.ts`: per-bird seeds computed once instead of hashing a
+      string per bird per frame.
+    - `minimap.ts`: `clampToMap` uses `clampToBounds`; marker comparison
+      reads each pair once. `movement-path.ts`: always-true route `actorId`
+      check removed. `health-bars.ts`: fill color without a nested ternary.
+      `support-network.ts`, `rally-point.ts`: imports grouped.
+      `materials-sites.ts`: "as the player knows them" wording removed.
+    - Reviewed without change: `game-view.ts`, `canvas-size.ts`,
+      `lighting.ts`, `footprint-overlay.ts`, `queued-orders.ts`,
+      `ground-marker.ts`, `screen-bar.ts`.
+    - Checks: `npm run check` passes (`1367` unit tests and five Chromium
+      smoke cases), along with a Vite build and `23` terrain asset tests.
+      Affected browser specs (`terrain`, `terrain-animation`, `minimap`,
+      `observations`, `queued-orders`, `economy`, `interface`,
+      `presentation`) pass all `84` Chromium and tagged WebKit cases on
+      the host.
+    - Deferred until profiling shows cost (`1.64`): per-frame
+      `JSON.stringify` in `support-network.ts` (while visible),
+      `queued-orders.ts`, and `rally-point.ts`; per-frame maps in
+      `materials-sites.ts` `update` (an identity guard needs tests that stop
+      mutating the economy in place); `JSON.stringify` group keys in terrain
+      chunk rebuilds.
+    - Deferred to Slice 9: moving `validateTerrainStyle` from
+      `content-pack.ts` beside its schema. Deferred to Slices 7/10:
+      `scripts/model-assets.ts` importing `MATERIALS_COLOR`/`SALVAGE_COLOR`
+      from `render/materials-sites.ts`.
 
 - [ ] **Slice 7: actor views, models, session assets, and visual effects**
   (25 files, ~3,810 LOC; check cross-slice caller `scripts/model-assets.ts`)
@@ -424,9 +479,10 @@ product work in `TODO.md`, and remove temporary files in
     (`1.45`), and setup/summary dialog seams (`1.60`, `1.62`).
 
 - [ ] **Slice 9: content packs, presentation contracts, and audio**
-  (12 TS files + JSON packs/levels, ~2,357 LOC)
+  (13 TS files + JSON packs/levels, ~2,357 LOC)
   - `src/content/`: `content-pack.ts`, `packs.ts`, `levels.ts`,
-    `presentation.ts`, `texture-clip.ts`, `audio.ts`, `audio-assets.ts`,
+    `presentation.ts`, `texture-clip.ts`, `terrain-style.ts`, `audio.ts`,
+    `audio-assets.ts`,
     `skirmish.ts`, `skirmish-map.ts`, `packs/base.json`, `levels/*.json`.
   - `src/audio/`: `mixer.ts`, `scene.ts`, `mission.ts`.
   - Focus: owning `TerrainStyle` schema in `src/content/`, breaking the

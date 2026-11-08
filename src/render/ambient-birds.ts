@@ -81,7 +81,13 @@ export function createAmbientBirdsView(
     terrainDirty = true;
   });
   let asset: ModelAsset | undefined;
-  let birds: { instance: ModelInstance; flock: number; index: number }[] = [];
+  let birds: {
+    instance: ModelInstance;
+    flock: number;
+    index: number;
+    /** Fixed per bird: its loop radius and wingbeat offset. */
+    seed: number;
+  }[] = [];
   let seconds = 0;
   const release = () => {
     for (const { instance } of birds) instance.dispose();
@@ -106,15 +112,15 @@ export function createAmbientBirdsView(
                 );
                 for (const mesh of hierarchyMeshes(instance.root))
                   mesh.isPickable = false;
-                return { instance, flock: flockIndex, index };
+                const seed = stableUnit(`bird-${flockIndex}-${index}`);
+                return { instance, flock: flockIndex, index, seed };
               }),
             )
           : [];
       }
       if (!reducedMotion()) seconds += frameSeconds;
-      for (const { instance, flock: flockIndex, index } of birds) {
+      for (const { instance, flock: flockIndex, index, seed } of birds) {
         const flock = flocks[flockIndex]!;
-        const seed = stableUnit(`bird-${flockIndex}-${index}`);
         const angle =
           ((seconds % flock.lapSeconds) / flock.lapSeconds) * Math.PI * 2 -
           index * FLOCK_SPACING;

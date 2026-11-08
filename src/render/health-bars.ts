@@ -49,6 +49,10 @@ export function createHealthBarView(scene: Scene, map: TerrainMap) {
   const healthy = material("healthy", new Color3(0.3, 0.86, 0.38));
   const wounded = material("wounded", new Color3(0.98, 0.74, 0.18));
   const critical = material("critical", new Color3(0.94, 0.24, 0.2));
+  const fillFor = (fraction: number) => {
+    if (fraction > 0.6) return healthy;
+    return fraction > 0.3 ? wounded : critical;
+  };
   const bars = new Map<string, { bar: ScreenBar; width: number }>();
   return {
     /** Shows exactly these bars; others are removed. */
@@ -83,14 +87,7 @@ export function createHealthBarView(scene: Scene, map: TerrainMap) {
           map.heightAtWorldPosition(x, z) + entry.height,
           z,
         );
-        bar.setFill(
-          entry.fraction,
-          entry.fraction > 0.6
-            ? healthy
-            : entry.fraction > 0.3
-              ? wounded
-              : critical,
-        );
+        bar.setFill(entry.fraction, fillFor(entry.fraction));
         for (const mesh of bar.meshes) mesh.visibility = entry.opacity;
       }
     },

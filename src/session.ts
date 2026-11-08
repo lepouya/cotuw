@@ -48,20 +48,22 @@ import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { Color3, Vector3 } from "@babylonjs/core";
 import { TerrainMap } from "./map";
+import { createCommandInput } from "./render/command-input";
+import { createGameView } from "./render/game-view";
+import { createMinimap } from "./render/minimap";
+import { createMovementPathView } from "./render/movement-path";
+import { createActorViewRegistry } from "./render/actor-view-registry";
+import { createTilePlacedActorViewRegistry } from "./render/tile-placed-actor-view";
+import { createTerrainMeshes } from "./render/terrain-mesh";
+import { createSessionMap } from "./render/terrain-style";
 import {
-  createCommandInput,
-  createGameView,
-  createMinimap,
-  createMovementPathView,
-  createActorViewRegistry,
-  createTilePlacedActorViewRegistry,
-  createTerrainMeshes,
-  createSessionMap,
   actorAnimationState,
   extractHealthAndDamageEffects,
+} from "./render/session-effects";
+import {
   createSessionAssets,
   waitForEnvironmentReady,
-} from "./render";
+} from "./render/session-assets";
 import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
 import type { ActorTrigger, Rgb } from "./content/presentation";
 import { startSimulationLoop } from "./simulation/loop";
@@ -82,7 +84,7 @@ import { trainableUnitIds } from "./simulation/production";
 import type { MissionSimulation } from "./simulation/mission";
 import type { BuildingActivityKind } from "./simulation/production";
 
-import type { GameView, GameViewOptions } from "./render";
+import type { GameView, GameViewOptions } from "./render/game-view";
 import type { ActorAnimationState } from "./render/actor";
 import type { ObservedActor } from "./simulation/owner-view";
 import type { TileCoord } from "./simulation/grid";

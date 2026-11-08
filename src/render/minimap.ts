@@ -6,6 +6,7 @@ import { watchCanvasSize } from "./canvas-size";
 import { createPointerGesture } from "./pointer-gesture";
 import { worldInputAvailable } from "./input-focus";
 import { fogAlpha } from "./fog";
+import { clampToBounds } from "../simulation/world";
 import type { Rgb } from "../content/presentation";
 
 import type { Scene } from "@babylonjs/core";
@@ -352,17 +353,19 @@ function drawActors(context: CanvasRenderingContext2D, actors: ActorMarker[]) {
 function sameActorMarkers(left: ActorMarker[], right: ActorMarker[]): boolean {
   return (
     left.length === right.length &&
-    left.every(
-      (actor, index) =>
-        actor.id === right[index]?.id &&
-        actor.point.x === right[index]?.point.x &&
-        actor.point.y === right[index]?.point.y &&
+    left.every((actor, index) => {
+      const other = right[index]!;
+      return (
+        actor.id === other.id &&
+        actor.point.x === other.point.x &&
+        actor.point.y === other.point.y &&
         actor.color.every(
-          (channel, colorIndex) => channel === right[index]?.color[colorIndex],
+          (channel, channelIndex) => channel === other.color[channelIndex],
         ) &&
-        actor.selected === right[index]?.selected &&
-        sameTilePolygons(actor.tiles, right[index]?.tiles),
-    )
+        actor.selected === other.selected &&
+        sameTilePolygons(actor.tiles, other.tiles)
+      );
+    })
   );
 }
 
@@ -418,12 +421,8 @@ export function minimapProjection(
 
 /** Pulls a world point onto the map, so the view never centers off it. */
 export function clampToMap(point: Vector3, map: TerrainMap): Vector3 {
-  const { minX, maxX, minZ, maxZ } = map.worldBounds;
-  return new Vector3(
-    Math.min(Math.max(point.x, minX), maxX),
-    0,
-    Math.min(Math.max(point.z, minZ), maxZ),
-  );
+  const { x, z } = clampToBounds(point, map.worldBounds);
+  return new Vector3(x, 0, z);
 }
 
 /** Writes an opaque RGBA pixel per tile in `bounds`, north row first. */

@@ -1,4 +1,3 @@
-import { groundPoint, groundRing, groundCross } from "./ground-marker";
 import {
   Color3,
   Mesh,
@@ -7,7 +6,10 @@ import {
   Vector3,
   VertexData,
 } from "@babylonjs/core";
+
+import { groundCross, groundPoint, groundRing } from "./ground-marker";
 import { clampToBounds } from "../simulation/world";
+
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { SupportView } from "../simulation/support";
@@ -103,8 +105,8 @@ export function createSupportNetworkView(scene: Scene, map: TerrainMap) {
         const circle = groundRing(node.center, node.radius, SEGMENTS, ground);
         line("support-radius", circle, node.connected);
         if (!node.connected) continue;
-        const positions: number[] = [],
-          indices: number[] = [];
+        const positions: number[] = [];
+        const indices: number[] = [];
         const columns = SEGMENTS + 1;
         // Radial bands follow hills instead of cutting a flat disc through them.
         for (let band = 0; band <= BANDS; band++)

@@ -1,31 +1,11 @@
 import { Color4 } from "@babylonjs/core";
 
 import { TerrainMap } from "../map";
-import type { TerrainMapOptions, TileType } from "../map";
+import type { TerrainMapOptions } from "../map";
 import { createScenarioMap } from "../simulation/scenario";
 import type { ScenarioTerrain } from "../simulation/scenario";
+import type { TerrainStyle } from "../content/terrain-style";
 import type { TerrainGridOptions, TerrainView } from "../simulation/terrain";
-
-/** One visual layer that tiles of a terrain type carry. */
-export type TerrainLayerRule = {
-  tileType: string;
-  color: [number, number, number, number];
-  /** Adds a gentle per-tile tint so large areas do not look flat. */
-  variation?: boolean;
-  /** Shows on this share of tiles, in a fixed pattern; absent shows on all. */
-  coverage?: number;
-  /** Fades from the edge of its terrain to full opacity deeper inside. */
-  shoreFade?: boolean;
-};
-
-/** Content-defined terrain presentation, independent of simulation terrain. */
-export type TerrainStyle = {
-  tileTypes: Readonly<Record<string, Omit<TileType, "id">>>;
-  /** Opacity at the edge and the center of shore-faded layers. */
-  shore?: { shoreAlpha: number; deepAlpha: number; depthTiles: number };
-  /** Layers by terrain type ID, bottom first. */
-  layers: Readonly<Record<string, readonly TerrainLayerRule[]>>;
-};
 
 /** Builds each tile's layers from its terrain type, so saved terrain keeps its look. */
 export function terrainLayers(

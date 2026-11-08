@@ -157,7 +157,7 @@ export function createMaterialsSitesView(
     setSalvage: (salvage: ModelAsset) => swap(loot, salvage, showGift),
     lootTileForMesh: (mesh: AbstractMesh | null) =>
       mesh?.isEnabled() ? lootTiles.get(mesh) : undefined,
-    /** Shows only the sites and loot `economy` lists, as the player knows them. */
+    /** Shows only the sites and loot that `economy` lists. */
     update: (economy: EconomyView) => {
       const listed = new Map(economy.sites.map((site) => [site.id, site]));
       for (const [id, { root }] of sites) {

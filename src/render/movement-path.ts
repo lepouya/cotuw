@@ -2,11 +2,11 @@ import { Color3, LinesMesh, MeshBuilder, Vector3 } from "@babylonjs/core";
 
 import { groundPoint, groundRing, groundCross } from "./ground-marker";
 import { aboveTerrainLayers } from "./terrain-mesh";
+import { distance } from "../simulation/world";
 
 import type { Observer, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ActorRenderState } from "../simulation/actor";
-import { distance } from "../simulation/world";
 import type { WorldPosition } from "../simulation/world";
 
 const PATH_COLOR = new Color3(1, 0.78, 0.24);
@@ -35,7 +35,6 @@ export type MovementPathView = {
 type ActiveMovement = NonNullable<ActorRenderState["movement"]>;
 
 type Route = {
-  actorId: string;
   aggressive: boolean;
   movement: ActiveMovement;
   destinationMarker?: LinesMesh;
@@ -170,7 +169,7 @@ export function createMovementPathView(
       let route = routes.get(actor.id);
       if (
         !route ||
-        !isSameRoute(route, actor.id, movement) ||
+        !isSameRoute(route, movement) ||
         route.aggressive !== !!actor.attackMove
       ) {
         clearRoute(actor.id);
@@ -213,15 +212,10 @@ export function createMovementPathView(
 }
 
 /** Progress along a route does not change it; a new order or replan does. */
-function isSameRoute(
-  route: Route,
-  actorId: string,
-  movement: ActiveMovement,
-): boolean {
+function isSameRoute(route: Route, movement: ActiveMovement): boolean {
   const previous = route.movement;
   const waypoints = movement.waypoints!;
   return (
-    route.actorId === actorId &&
     samePoint(previous.target, movement.target) &&
     samePoint(previous.destination!, movement.destination!) &&
     previous.reachedTarget === movement.reachedTarget &&
@@ -242,7 +236,6 @@ function createRoute(
   const offset = groundOffset(map);
   const waypoints = movement.waypoints!;
   const route: Route = {
-    actorId: actor.id,
     aggressive: !!actor.attackMove,
     movement,
     dashes: [],

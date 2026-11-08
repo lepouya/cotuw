@@ -7,7 +7,7 @@ import { readTexture, uniqueTextureSources } from "./helpers/textures";
 import { clipCellRect } from "../src/content/texture-clip";
 import { GRASS_SHEETS, TILES_PER_REPEAT } from "../scripts/grass-sheet";
 
-import type { TileGraphics } from "../src/map";
+import type { TileGraphics } from "../src/content/terrain-style";
 import type { TextureClip } from "../src/content/texture-clip";
 
 const { tileTypes } = BASE_CONTENT.terrain;

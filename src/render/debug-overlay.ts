@@ -10,51 +10,38 @@ import {
 import type { TerrainMap } from "../map";
 
 const GRID_OFFSET = 0.035;
-/** Tiles between the default major grid lines. */
+/** Tiles between major grid lines. */
 const MAJOR_GRID_INTERVAL = 10;
 const TILE_GRID_COLOR = new Color3(0.12, 0.26, 0.27);
 const MAJOR_GRID_COLOR = new Color3(0.76, 0.59, 0.27);
 const BOUNDARY_COLOR = new Color3(0.95, 0.78, 0.35);
 
-export type GridStyle = {
+type GridStyle = {
   name: string;
   /** Tiles between lines. */
   interval: number;
   color: Color3;
 };
 
-export type DebugOverlayOptions = {
-  layerOffset: number;
-  grids?: GridStyle[];
-  boundaryColor?: Color3;
-};
+const GRIDS: readonly GridStyle[] = [
+  { name: "tile-grid", interval: 1, color: TILE_GRID_COLOR },
+  {
+    name: "major-grid",
+    interval: MAJOR_GRID_INTERVAL,
+    color: MAJOR_GRID_COLOR,
+  },
+];
 
 export type DebugOverlay = {
   dispose: () => void;
 };
 
+/** Grid lines and the map boundary, above terrain layers `layerOffset` apart. */
 export function createDebugOverlay(
   scene: Scene,
   map: TerrainMap,
-  {
-    layerOffset,
-    grids = [
-      { name: "tile-grid", interval: 1, color: TILE_GRID_COLOR },
-      {
-        name: "major-grid",
-        interval: MAJOR_GRID_INTERVAL,
-        color: MAJOR_GRID_COLOR,
-      },
-    ],
-    boundaryColor = BOUNDARY_COLOR,
-  }: DebugOverlayOptions,
+  layerOffset: number,
 ): DebugOverlay {
-  for (const { interval } of grids) {
-    if (!Number.isInteger(interval) || interval < 1) {
-      throw new RangeError("Grid intervals must be positive whole tiles.");
-    }
-  }
-
   let meshes: Mesh[] = [];
   const refresh = () => {
     for (const mesh of meshes) {
@@ -63,10 +50,10 @@ export function createDebugOverlay(
     meshes = [];
 
     const heightOffset = map.layerCount * layerOffset + GRID_OFFSET;
-    for (const grid of grids) {
+    for (const grid of GRIDS) {
       meshes.push(createGrid(scene, map, grid, heightOffset));
     }
-    meshes.push(createMapBoundary(scene, map, boundaryColor, heightOffset));
+    meshes.push(createMapBoundary(scene, map, heightOffset));
   };
 
   let refreshObserver: Observer<Scene> | undefined;
@@ -138,7 +125,6 @@ function createGrid(
 function createMapBoundary(
   scene: Scene,
   map: TerrainMap,
-  color: Color3,
   heightOffset: number,
 ): Mesh {
   const boundary = MeshBuilder.CreateLines(
@@ -154,7 +140,7 @@ function createMapBoundary(
     },
     scene,
   );
-  boundary.color = color;
+  boundary.color = BOUNDARY_COLOR;
   boundary.isPickable = false;
   return boundary;
 }

@@ -10,7 +10,8 @@ import {
   tileColor,
 } from "../src/render/minimap";
 
-import type { TerrainMapOptions, TileType } from "../src/map";
+import type { TileType } from "../src/content/terrain-style";
+import type { TerrainMapOptions } from "../src/map";
 import type { Rgb } from "../src/content/presentation";
 
 const BLACK: Rgb = [0, 0, 0];

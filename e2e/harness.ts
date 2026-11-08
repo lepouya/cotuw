@@ -8,15 +8,14 @@ import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { parseMission } from "../src/simulation/mission-file";
 import { createScenarioMap } from "../src/simulation/scenario";
 import type { TerrainGrid } from "../src/simulation/terrain";
-import {
-  createGameView,
-  createMinimap,
-  createTerrainMeshes,
-} from "../src/render";
+import { createGameView } from "../src/render/game-view";
+import { createMinimap } from "../src/render/minimap";
+import { createTerrainMeshes } from "../src/render/terrain-mesh";
 
 import type { ArcRotateCamera, Scene } from "@babylonjs/core";
-import type { TerrainMapOptions, TileType } from "../src/map";
-import type { GameViewOptions } from "../src/render";
+import type { TileType } from "../src/content/terrain-style";
+import type { TerrainMapOptions } from "../src/map";
+import type { GameViewOptions } from "../src/render/game-view";
 import type { GameSession } from "../src/session";
 
 declare global {
@@ -26,7 +25,8 @@ declare global {
   }
 }
 
-export { createMinimap, createTerrainMeshes } from "../src/render";
+export { createMinimap } from "../src/render/minimap";
+export { createTerrainMeshes } from "../src/render/terrain-mesh";
 export { currentContentPack } from "../src/content/packs";
 export { minimapProjection } from "../src/render/minimap";
 export { createFrameEffectsView } from "../src/render/frame-effects";

@@ -98,11 +98,8 @@ export function createFogOverlay(
 
 /** How much fog covers a tile: opaque, dimmed, or clear. */
 export function fogAlpha(fog: FogView, x: number, z: number): number {
-  return fog.isVisible(x, z)
-    ? 0
-    : fog.isExplored(x, z)
-      ? EXPLORED_FOG_ALPHA
-      : 1;
+  if (fog.isVisible(x, z)) return 0;
+  return fog.isExplored(x, z) ? EXPLORED_FOG_ALPHA : 1;
 }
 
 /** White RGBA per corner; the material's emissive color sets the shade. */
@@ -114,15 +111,12 @@ export function cornerColors(
   for (let z = 0; z <= map.height; z += 1)
     for (let x = 0; x <= map.width; x += 1) {
       let alpha = 0;
+      // Runs on every fog change, so it visits neighbors without allocating.
       if (fog)
-        for (const [tileX, tileZ] of [
-          [x - 1, z - 1],
-          [x, z - 1],
-          [x - 1, z],
-          [x, z],
-        ])
-          if (map.containsTile(tileX, tileZ))
-            alpha = Math.max(alpha, fogAlpha(fog, tileX, tileZ));
+        for (let tileZ = z - 1; tileZ <= z; tileZ += 1)
+          for (let tileX = x - 1; tileX <= x; tileX += 1)
+            if (map.containsTile(tileX, tileZ))
+              alpha = Math.max(alpha, fogAlpha(fog, tileX, tileZ));
       colors.push(1, 1, 1, alpha);
     }
   return colors;

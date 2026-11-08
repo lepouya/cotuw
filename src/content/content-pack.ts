@@ -40,7 +40,7 @@ import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
 import type { MovementProfile } from "../simulation/navigation";
-import type { TerrainStyle } from "../render/terrain-style";
+import type { TerrainStyle } from "./terrain-style";
 import type { TextureClip } from "./texture-clip";
 
 const FORMAT = "cotuw-content";
