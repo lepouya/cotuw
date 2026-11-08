@@ -1,4 +1,4 @@
-import { isCount, isId } from "./validation";
+import { hasOwn, isCount, isId } from "./validation";
 
 /** How combat destruction of an objective's actors resolves it. */
 export type ObjectiveKind = "destroy" | "protect";
@@ -150,7 +150,7 @@ export function validateObjectives(
       !objective ||
       !isId(objective.id) ||
       ids.has(objective.id) ||
-      !Object.keys(RULES).includes(objective.kind) ||
+      !hasOwn(RULES, objective.kind) ||
       !isId(objective.label) ||
       !isId(objective.directive) ||
       !Array.isArray(objective.actorIds)

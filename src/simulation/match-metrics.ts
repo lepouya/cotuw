@@ -338,11 +338,11 @@ export function validateMatchMetrics(
           job.paidCost;
     let knownTiles = tileCount;
     if (fog) {
-      const explored = hasOwn(fog.explored, owner.owner)
+      const exploredRows = hasOwn(fog.explored, owner.owner)
         ? fog.explored[owner.owner]!
         : "";
       knownTiles = 0;
-      for (const bit of explored) knownTiles += Number(bit === "1");
+      for (const bit of exploredRows) knownTiles += Number(bit === "1");
     }
     if (
       last.explored > knownTiles ||

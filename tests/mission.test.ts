@@ -120,6 +120,57 @@ test.each(["tick", "spawn", "remove", "submit", "dispose"] as const)(
   },
 );
 
+test("tick observers run around committed ticks and may queue commands", () => {
+  const simulation = mission([actor()]);
+  const calls: string[] = [];
+  simulation.observeTicks({
+    beforeTick: () => calls.push(`before ${simulation.completedTicks}`),
+    afterTick: (outcomes) => {
+      calls.push(`after ${simulation.completedTicks} ${outcomes.length}`);
+      if (simulation.completedTicks === 1)
+        simulation.submitCommand(move("trooper", 3, 0));
+    },
+  });
+  const remove = simulation.observeTicks({
+    afterTick: () => calls.push("second"),
+  });
+  simulation.tick();
+  remove();
+  expect(simulation.tick()).toMatchObject([{ accepted: true }]);
+  expect(calls).toEqual([
+    "before 0",
+    "after 1 0",
+    "second",
+    "before 1",
+    "after 2 1",
+  ]);
+});
+
+test.each(["tick", "dispose"] as const)(
+  "a tick observer cannot %s the mission",
+  (operation) => {
+    const simulation = mission([actor()]);
+    simulation.observeTicks({ afterTick: () => simulation[operation]() });
+    expect(() => simulation.tick()).toThrow(/during a tick|recursively/);
+    // The tick committed, and the mission is not faulted.
+    expect(simulation.completedTicks).toBe(1);
+    expect(simulation.submitCommand(move("trooper", 3, 0))).toBe(1);
+  },
+);
+
+test("a failing beforeTick leaves the mission unticked and running", () => {
+  const simulation = mission([actor()]);
+  const remove = simulation.observeTicks({
+    beforeTick: () => {
+      throw new Error("observer");
+    },
+  });
+  expect(() => simulation.tick()).toThrow("observer");
+  remove();
+  simulation.tick();
+  expect(simulation.completedTicks).toBe(1);
+});
+
 test.each(["move", "attack-move", "group-move", "group-attack-move"] as const)(
   "%s rejects missing targets without faulting the mission",
   (kind) => {

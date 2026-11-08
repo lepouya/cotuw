@@ -60,20 +60,17 @@ export const missionSource = (
   state: MissionState = mission.state,
   save?: SaveInfo,
 ) =>
-  serializeMission(
-    mission.scenario,
-    {
-      ...state,
-      // Scripted saves focus on their scenario rather than introductory guides.
+  serializeMission(mission.scenario, state, SIMULATION_TICK_SECONDS, {
+    save,
+    // Scripted saves focus on their scenario rather than introductory guides.
+    uiState: {
       dismissedPopups: [
         ...new Set([
-          ...(state.dismissedPopups ?? []),
+          ...(mission.uiState?.dismissedPopups ?? []),
           ...INTRODUCTORY_POPUPS.filter((id) =>
             mission.scenario.popups?.some((popup) => popup.id === id),
           ),
         ]),
       ],
     },
-    SIMULATION_TICK_SECONDS,
-    save,
-  );
+  });

@@ -75,7 +75,7 @@ product work in `TODO.md`, and remove temporary files in
 
 ### Tier 1: runtime and desktop host (`src/`, `index.html`, `src-tauri/`)
 
-- [ ] **Slice 1: simulation kernel, commands, authority, probe, and saves**
+- [x] **Slice 1: simulation kernel, commands, authority, probe, and saves**
   (17 files, ~4,998 LOC)
   - `src/simulation/`: `mission.ts`, `mission-file.ts`, `command.ts`,
     `authority.ts`, `loop.ts`, `clock.ts`, `world.ts`, `validation.ts`,
@@ -86,6 +86,35 @@ product work in `TODO.md`, and remove temporary files in
     `mission.ts`, `MissionFile.uiState` separation from `MissionState`,
     non-mutating tick controller/observer hooks replacing `simulation.tick`
     monkey-patching, and Phase C AI state/command readiness (`1.29-1.32`).
+  - [x] **Pass A** (modular assessment and refactor, base `60a0796`):
+    - Added `MissionSimulation.observeTicks` (`TickObserver` with
+      `beforeTick`/`afterTick`) so every driver runs observers; the
+      benchmark probe uses it instead of replacing `simulation.tick`.
+    - Moved `dismissedPopups` from `MissionState` to `MissionFile.uiState`;
+      `serializeMission` takes `{ save, uiState }`; mission file version
+      `18`; levels regenerated; `docs/mission-files.md` and `DESIGN.md`
+      updated.
+    - Checks: format, lint, typecheck, units, and the affected browser specs
+      (`economy`, `saves`, `skirmish-results`, `benchmark`) pass.
+    - Deferred: order-queue policy consolidation (`busy`,
+      `queuedOrderOf`, `canQueueOrder`, `sequence`) until `1.41` adds
+      order kinds; player-owner defaults on `submitCommand` and
+      `evaluatePlacement` (290 call sites) with Slice 2 `viewOf(owner)`;
+      AI director state slot in `MissionState` with `1.32`.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `mission.ts`: committed objective verdict cached per tick instead of
+      re-evaluated by every `result`, `objectives`, and mutation check; the
+      end-of-tick identity check reads frozen committed actors without
+      copying; queued-order rejection reasons moved into `queueRejection`.
+    - Local cleanups in `ownership.ts`, `objectives.ts` (own-property rule
+      lookup), `command.ts`, `mission-file.ts`, `match-metrics.ts`, and
+      `scenario.ts`; unused value exports `QUEUEABLE_KINDS`,
+      `RELATIONSHIPS`, and `SAVE_POLICIES` made module-private.
+    - Deferred to Slice 2: player-specific helpers in `ownership.ts`
+      (`createPlayerAccess`, `playerRelation`, `playerFactionOf`) and
+      `MissionSimulation.fog`/`playerFaction`, which `viewOf(owner)` replaces.
+    - Deferred to Slice 3: `evaluateSpawn` in `mission.ts` copies every used
+      ID per evaluation; `production.ts` only needs `has`.
 
 - [ ] **Slice 2: simulation actors, combat, vision, and owner projections**
   (5 files, ~2,147 LOC)

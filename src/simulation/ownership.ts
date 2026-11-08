@@ -9,7 +9,7 @@ export type Owner = {
   faction?: string;
 };
 
-export const RELATIONSHIPS = ["allied", "neutral", "hostile"] as const;
+const RELATIONSHIPS = ["allied", "neutral", "hostile"] as const;
 export type Relationship = (typeof RELATIONSHIPS)[number];
 
 /** A saved pair's mutual relationship; pairs without one are neutral. */
@@ -178,11 +178,12 @@ export function validateOwners(
         !owner ||
         !isId(owner.id) ||
         (owner.faction !== undefined && !isId(owner.faction)),
-    ) ||
-    new Set(owners.map(({ id }) => id)).size !== owners.length
+    )
   )
     throw new RangeError("Mission owners need distinct IDs and faction IDs.");
   const ids = new Set(owners.map(({ id }) => id));
+  if (ids.size !== owners.length)
+    throw new RangeError("Mission owners need distinct IDs and faction IDs.");
   if (!ids.has(playerOwner))
     throw new RangeError("Mission state has an unknown player owner.");
   return ids;

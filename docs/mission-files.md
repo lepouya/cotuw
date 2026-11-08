@@ -90,9 +90,11 @@ can be read, edited by hand, and loaded again.
     result tick, and permits saving after every result. The skirmish map
     preview uses it. Owner-based skirmish rules reject an explicit
     `"objectives"` policy.
+- `uiState` holds player interface state outside the simulation. Levels omit
+  it. `uiState.dismissedPopups` lists the popup IDs the player dismissed;
+  removing an ID shows that popup again.
 - `state` holds the complete simulation state. `state.scenarioId` must match
-  `scenario.id`. `state.dismissedPopups` lists the popup IDs the player
-  dismissed; removing an ID shows that popup again.
+  `scenario.id`.
 
 ## Owners
 

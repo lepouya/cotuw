@@ -20,6 +20,10 @@ These contracts describe where new behaviors, views, and services attach.
   their commanded actors. Only an explicit `script: true` grants script
   authority, and script grants reject unknown fields.
   Session feedback reads only outcomes the player owner issued.
+- Tick observers (`observeTicks`) run before and after every tick, whichever
+  driver ticks: the real-time loop, a headless runner, or a benchmark. They
+  run outside the transaction and may queue commands but not tick or dispose.
+  Their errors propagate from `tick` without faulting the mission.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates
   the current batch even if its hook immediately resumes.

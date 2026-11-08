@@ -410,8 +410,7 @@ test("custom maps keep their identity and restart from their registered level", 
         simulation.snapshot(),
         SIMULATION_TICK_SECONDS,
         {
-          name: "Alternate map",
-          savedAt: "2026-11-06T00:00:00.000Z",
+          save: { name: "Alternate map", savedAt: "2026-11-06T00:00:00.000Z" },
         },
       ),
     );

@@ -46,8 +46,7 @@ describe("mission files", () => {
   test("round-trip state and draw terrain from north to south", () => {
     const state = testMission();
     const source = serializeMission(scenario, state, 1, {
-      name: "Before the den",
-      savedAt: "2026-10-04T12:00:00.000Z",
+      save: { name: "Before the den", savedAt: "2026-10-04T12:00:00.000Z" },
     });
     const file = JSON.parse(source);
     expect(file.state.terrain.tiles).toEqual(["#.~", "#.."]);
@@ -310,9 +309,16 @@ test.each([
   [
     "dismissal of an unknown popup",
     (file: any) => {
-      file.state.dismissedPopups = ["intro"];
+      file.uiState = { dismissedPopups: ["intro"] };
     },
     "scenario's popups",
+  ],
+  [
+    "a non-object uiState",
+    (file: any) => {
+      file.uiState = ["intro"];
+    },
+    "uiState must be an object",
   ],
   [
     "a flock without birds",
@@ -501,11 +507,13 @@ test("dismissed popups and bird flocks survive saving and loading", () => {
   ]);
   const source = serializeMission(
     mission.scenario,
-    { ...mission.state, dismissedPopups: ["harvester-operations"] },
+    mission.state,
     SIMULATION_TICK_SECONDS,
+    { uiState: { dismissedPopups: ["harvester-operations"] } },
   );
   const loaded = loadMission(source);
-  expect(loaded.state.dismissedPopups).toEqual(["harvester-operations"]);
+  expect(loaded.uiState).toEqual({ dismissedPopups: ["harvester-operations"] });
+  expect(loaded.state).not.toHaveProperty("dismissedPopups");
   expect(loaded.scenario.flocks).toEqual(mission.scenario.flocks);
 });
 

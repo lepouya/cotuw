@@ -147,7 +147,7 @@ test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
     const restored = loadMission(
       view.save({ name: "Tutorial review", savedAt: "2026-10-15T12:00:00Z" }),
     );
-    return { rejected, dismissed: restored.state.dismissedPopups };
+    return { rejected, dismissed: restored.uiState?.dismissedPopups };
   });
   expect(result).toEqual({ rejected: true, dismissed: ["support-network"] });
 });

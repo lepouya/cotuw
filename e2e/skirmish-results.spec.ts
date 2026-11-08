@@ -46,7 +46,6 @@ for (const kind of ["victory", "defeat", "draw"] as const)
           }),
         );
         state.objectives = [];
-        state.dismissedPopups = [];
         state.owners.push({ id: "rival", faction: "arc" });
         state.relationships.push({
           owners: ["player", "rival"],

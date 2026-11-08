@@ -36,20 +36,19 @@ export type BenchmarkProbe = {
   /** Starts recording from the next tick. */
   measure: () => void;
   record: () => BenchmarkRecord;
-  /** Restores the simulation's own tick. */
+  /** Stops recording and reinforcing. */
   detach: () => void;
 };
 
 /**
- * Wraps `simulation.tick`. After every tick, each owner orders replacements
- * until its units and queued training reach its share of the target. The
- * orders depend only on simulation state, so runs stay reproducible.
+ * Observes every tick. After each one, each owner orders replacements until
+ * its units and queued training reach its share of the target. The orders
+ * depend only on simulation state, so runs stay reproducible.
  */
 export function attachBenchmarkProbe(
   simulation: MissionSimulation,
   { scale, reinforcement, sampleTicks, now }: BenchmarkProbeOptions,
 ): BenchmarkProbe {
-  const tick = simulation.tick;
   // Each owner with producers holds an equal share of the units.
   const owners = [
     ...new Set(
@@ -145,19 +144,22 @@ export function attachBenchmarkProbe(
   const rejection = ({ command, reason }: CommandOutcome) =>
     `${command.kind}${reason ? `: ${reason}` : ""}`;
 
-  simulation.tick = () => {
-    const started = measuring ? now() : 0;
-    const outcomes = tick();
-    if (measuring) {
-      record.ticks.push(now() - started);
-      record.attacks += simulation.attacks.length;
-      if (record.ticks.length % sampleTicks === 0) sample();
-    }
-    for (const outcome of outcomes)
-      if (!outcome.accepted) record.rejected.push(rejection(outcome));
-    reinforce();
-    return outcomes;
-  };
+  let started = 0;
+  const detach = simulation.observeTicks({
+    beforeTick: () => {
+      if (measuring) started = now();
+    },
+    afterTick: (outcomes) => {
+      if (measuring) {
+        record.ticks.push(now() - started);
+        record.attacks += simulation.attacks.length;
+        if (record.ticks.length % sampleTicks === 0) sample();
+      }
+      for (const outcome of outcomes)
+        if (!outcome.accepted) record.rejected.push(rejection(outcome));
+      reinforce();
+    },
+  });
 
   return {
     measure: () => {
@@ -171,8 +173,6 @@ export function attachBenchmarkProbe(
       gatheredMaterials: startRemaining - remaining(),
       deliveredMaterials: delivered() - startDelivered,
     }),
-    detach: () => {
-      simulation.tick = tick;
-    },
+    detach,
   };
 }

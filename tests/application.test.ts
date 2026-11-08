@@ -56,7 +56,7 @@ beforeEach(() => {
             controls.mission.scenario,
             simulation.snapshot(),
             simulation.tickSeconds,
-            info,
+            { save: info },
           ),
         disposeAsync: vi.fn(async () => {
           simulation.dispose();
@@ -337,8 +337,7 @@ test.each(["custom-skirmish", "skirmish"])(
     custom.state.scenarioId = custom.scenario.id;
     vi.mocked(platform.importFile).mockResolvedValue(
       serializeMission(custom.scenario, custom.state, 1 / 60, {
-        name: "Custom save",
-        savedAt: "2026-11-06T00:00:00.000Z",
+        save: { name: "Custom save", savedAt: "2026-11-06T00:00:00.000Z" },
       })
         .replace(/"west"/g, '"north"')
         .replace(/"east"/g, '"south"'),

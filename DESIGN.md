@@ -642,10 +642,11 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   placing a building type, or once the player owns a completed actor type. A
   popup pauses single-player until dismissed and keeps an active placement.
   Actor triggers are checked after committed ticks, independently of rendering.
-  Dismissals are mission state, so loading never repeats one and restarting
-  shows them again. Short action prompts guide ARC's opening: build a Refinery
-  and Harvester, connect support, gather Materials, train and rally units,
-  then scout and use Attack Move against the wolves.
+  Dismissals save with the mission as player interface state, so loading
+  never repeats one and restarting shows them again. Short action prompts
+  guide ARC's opening: build a Refinery and Harvester, connect support, gather
+  Materials, train and rally units, then scout and use Attack Move against the
+  wolves.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
   Load, Options, Restart, and Main menu; its Load panel lists saves and imports
   files. F5 quicksaves, F9 loads the quicksave, and F10 opens the menu. Escape

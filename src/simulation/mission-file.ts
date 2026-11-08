@@ -1,18 +1,18 @@
-import type { SkirmishRules } from "./skirmish";
-import type { MissionSetup } from "./mission-setup";
-import type { MissionState } from "./mission";
-import type { ObjectiveDefinition } from "./objectives";
-import type { MissionEventDefinition } from "./events";
-import type { ScriptControl } from "./authority";
 import { isTerrainTileShape } from "./terrain";
 import { isCount, isId, isIdList, isPositive, isRecord } from "./validation";
-
-import type { TerrainState, TerrainTile } from "./terrain";
 import { isFinitePosition } from "./world";
+
+import type { ScriptControl } from "./authority";
+import type { MissionEventDefinition } from "./events";
+import type { MissionState } from "./mission";
+import type { MissionSetup } from "./mission-setup";
+import type { ObjectiveDefinition } from "./objectives";
+import type { SkirmishRules } from "./skirmish";
+import type { TerrainState, TerrainTile } from "./terrain";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 17;
+export const MISSION_FILE_VERSION = 18;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -86,13 +86,20 @@ export type MissionScenario = {
 export type SaveInfo = { name: string; savedAt: string };
 
 /** Save permission and autosave rules; `src/save-policy.ts` applies them. */
-export const SAVE_POLICIES = ["objectives", "skirmish"] as const;
+const SAVE_POLICIES = ["objectives", "skirmish"] as const;
 export type SavePolicy = (typeof SAVE_POLICIES)[number];
+
+/** Player interface state a save keeps outside the simulation. */
+export type MissionUiState = {
+  /** Scenario popups the player dismissed. */
+  dismissedPopups?: string[];
+};
 
 /** A level is a mission file at tick 0; a save is the same format later on. */
 export type MissionFile = {
   scenario: MissionScenario;
   state: MissionState & { terrain: TerrainState };
+  uiState?: MissionUiState;
   /** Absent from authored levels. */
   save?: SaveInfo;
 };
@@ -122,7 +129,7 @@ export function serializeMission(
   scenario: MissionScenario,
   state: MissionState,
   tickSeconds: number,
-  save?: SaveInfo,
+  { save, uiState }: Pick<MissionFile, "save" | "uiState"> = {},
 ): string {
   if (!isPositive(tickSeconds))
     throw new RangeError("Mission tick seconds must be positive and finite.");
@@ -173,6 +180,7 @@ export function serializeMission(
       popups,
       flocks,
     },
+    uiState,
     state: {
       ...state,
       terrain: terrainToText(terrain),
@@ -218,7 +226,7 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     );
   }
   checkMissionHeader(file, tickSeconds);
-  const { scenario, state, save } = file;
+  const { scenario, state, uiState, save } = file;
   if (
     !isRecord(scenario) ||
     !isId(scenario.id) ||
@@ -283,7 +291,9 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     throw new RangeError(
       "Scenario popups need distinct IDs, text, and a placement or actor trigger.",
     );
-  const dismissed = state?.dismissedPopups;
+  if (uiState !== undefined && !isRecord(uiState))
+    throw new RangeError("Mission uiState must be an object.");
+  const dismissed = uiState?.dismissedPopups;
   if (
     dismissed !== undefined &&
     (!isIdList(dismissed) ||
@@ -358,7 +368,12 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
       ),
     };
   }
-  return { scenario: scenario as MissionScenario, state: parsed, save };
+  return {
+    scenario: scenario as MissionScenario,
+    state: parsed,
+    uiState,
+    save,
+  };
 }
 
 function terrainToText(terrain: TerrainState): TerrainText {
@@ -440,7 +455,7 @@ function terrainFromText(
         row.length !== width! + 1 ||
         !row.every(
           (value) =>
-            Number.isFinite(Math.fround(value)) && typeof value === "number",
+            typeof value === "number" && Number.isFinite(Math.fround(value)),
         ),
     )
   )

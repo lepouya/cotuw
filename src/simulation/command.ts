@@ -122,7 +122,7 @@ export const ECONOMY_COMMAND_KINDS = [
 ] as const satisfies readonly EconomyCommand["kind"][];
 
 /** Orders an actor's queue can hold. */
-export const QUEUEABLE_KINDS = [
+const QUEUEABLE_KINDS = [
   "move",
   "attack-move",
   "attack",
@@ -366,9 +366,8 @@ export function isOutcomeOf<K extends MissionCommand["kind"]>(
 }
 
 /** Checks a saved queued order's structure. */
-export function isQueuedOrder(value: unknown): value is QueuedOrder {
-  if (!value || typeof value !== "object") return false;
-  const order = value as Partial<Record<string, unknown>>;
+export function isQueuedOrder(order: unknown): order is QueuedOrder {
+  if (!isRecord(order)) return false;
   switch (order.kind) {
     case "move":
     case "attack-move":

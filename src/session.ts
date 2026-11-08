@@ -648,7 +648,7 @@ async function assembleGameSession(
   };
   const popups = mission.scenario.popups ?? [];
   const popupIds = new Set(popups.map(({ id }) => id));
-  const dismissedPopups = new Set(mission.state.dismissedPopups);
+  const dismissedPopups = new Set(mission.uiState?.dismissedPopups);
   let raisedPopup: string | undefined;
   const raisePopup = () => {
     if (halted()) return;
@@ -1172,14 +1172,14 @@ async function assembleGameSession(
     save: (info) =>
       serializeMission(
         mission.scenario,
-        {
-          ...simulation.snapshot(),
-          dismissedPopups: dismissedPopups.size
-            ? [...dismissedPopups]
-            : undefined,
-        },
+        simulation.snapshot(),
         SIMULATION_TICK_SECONDS,
-        info,
+        {
+          save: info,
+          ...(dismissedPopups.size > 0 && {
+            uiState: { dismissedPopups: [...dismissedPopups] },
+          }),
+        },
       ),
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;

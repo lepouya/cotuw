@@ -68,19 +68,18 @@ test(
   },
 );
 
-test("probe reinforcement is independent of timing and restores the tick", () => {
+test("probe reinforcement is independent of timing and stops on detach", () => {
   const mission = loadMission(createBenchmarkMission("normal"));
   mission.state.commands = [];
   let elapsed = 0;
   const runs = [() => 0, () => (elapsed += 0.25)].map((now) => {
     const simulation = createSessionSimulation(mission);
-    const nativeTick = simulation.tick;
     const lost = simulation.actors.find(
       (actor) => actor.owner === "west" && actor.definitionId === "arc-trooper",
     )!;
     simulation.removeActor(lost.id);
     const probe = attachBenchmarkProbe(simulation, probeOptions("normal", now));
-    return { simulation, nativeTick, probe };
+    return { simulation, probe };
   });
   try {
     for (const { simulation, probe } of runs) {
@@ -93,10 +92,27 @@ test("probe reinforcement is independent of timing and restores the tick", () =>
     expect(runs[0]!.simulation.snapshot()).toEqual(
       runs[1]!.simulation.snapshot(),
     );
-    for (const { simulation, nativeTick, probe } of runs) {
+    for (const { simulation, probe } of runs) {
       probe.detach();
-      expect(simulation.tick).toBe(nativeTick);
+      const measured = probe.record().ticks.length;
+      simulation.tick();
+      expect(probe.record().ticks).toHaveLength(measured);
     }
+    // Skirmish actors can only be removed at tick 0.
+    const detached = createSessionSimulation(mission);
+    attachBenchmarkProbe(
+      detached,
+      probeOptions("normal", () => 0),
+    ).detach();
+    detached.removeActor(
+      detached.actors.find(
+        (actor) =>
+          actor.owner === "west" && actor.definitionId === "arc-trooper",
+      )!.id,
+    );
+    detached.tick();
+    expect(detached.economy!.production).toEqual([]);
+    detached.dispose();
   } finally {
     for (const { simulation, probe } of runs) {
       probe.detach();

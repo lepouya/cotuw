@@ -222,8 +222,7 @@ test("a tick-zero save does not replace the authored restart level", async ({
       serializerPath
     )) as typeof import("../src/simulation/mission-file");
     return serializeMission(mission.scenario, mission.state, 1 / 60, {
-      name: "Immediate save",
-      savedAt: "2026-10-04T10:00:00Z",
+      save: { name: "Immediate save", savedAt: "2026-10-04T10:00:00Z" },
     });
   });
   await importMission(page, source);

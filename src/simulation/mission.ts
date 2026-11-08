@@ -268,8 +268,6 @@ export type MissionState = {
   metrics?: MatchMetrics;
   /** Progress for authored campaign objectives. */
   objectives: ObjectiveState[];
-  /** Scenario popups the player dismissed; the simulation only keeps them. */
-  dismissedPopups?: string[];
 };
 
 /** Defaults to one factionless player owner, as in free construction. */
@@ -399,6 +397,24 @@ export type MissionSimulation = {
    * Group moves report one move outcome per unique actor ID, in ID order.
    */
   tick: () => CommandOutcome[];
+  /**
+   * Runs an observer around every tick, in registration order, whichever
+   * driver ticks. Returns a function that removes it.
+   */
+  observeTicks: (observer: TickObserver) => () => void;
+};
+
+/**
+ * Hooks outside the tick transaction. They may submit commands, which apply
+ * from the next tick that starts, but cannot tick or dispose the mission. An
+ * error propagates from `tick` without faulting the mission; `afterTick`
+ * errors leave the tick committed and skip later observers.
+ */
+export type TickObserver = {
+  /** Runs before a tick, while the state still shows the previous tick. */
+  beforeTick?: () => void;
+  /** Runs after a tick commits; ended missions do not tick. */
+  afterTick?: (outcomes: readonly CommandOutcome[]) => void;
 };
 
 export function createMissionSimulation({
@@ -467,10 +483,10 @@ export function createMissionSimulation({
   deepFreeze(state.objectives);
   const objectivesFor = (states: readonly ObjectiveState[]) =>
     deepFreeze(evaluateObjectives(objectives, states));
-  const resultOf = (states: readonly ObjectiveState[]) =>
-    objectivesFor(states).result;
+  // Only committed ticks change objective progress.
+  let committedObjectives = objectivesFor(state.objectives);
   const currentResult = () =>
-    state.skirmishResult ?? resultOf(state.objectives);
+    state.skirmishResult ?? committedObjectives.result;
   const ended = () => missionEnded(currentResult());
   const savedTerrain = state.terrain;
   const restoringSnapshot = savedTerrain !== undefined;
@@ -569,14 +585,25 @@ export function createMissionSimulation({
   let actorVersion = 0;
   let faulted = false;
   let disposed = false;
-  let ticking = false;
+  /** Observers run between ticks, but the mission still cannot tick then. */
+  let phase: "idle" | "observing" | "ticking" = "idle";
+  const observers = new Set<TickObserver>();
+  const notify = (run: (observer: TickObserver) => void) => {
+    phase = "observing";
+    try {
+      for (const observer of observers) run(observer);
+    } finally {
+      phase = "idle";
+    }
+  };
   const ensureRunning = () => {
     if (disposed) throw new Error("Mission simulation is disposed.");
     if (faulted) throw new Error("Mission simulation is faulted.");
   };
   const ensureMutable = () => {
     ensureRunning();
-    if (ticking) throw new Error("Mission mutations cannot run during a tick.");
+    if (phase === "ticking")
+      throw new Error("Mission mutations cannot run during a tick.");
     if (ended()) throw new Error("The mission has ended.");
   };
   const ensureActorMutation = () => {
@@ -684,7 +711,7 @@ export function createMissionSimulation({
     )
       throw new RangeError(`Actor ${actor.id} has invalid queued orders.`);
     validateCombatActor(actor, definition, worldBounds);
-    behaviorFor(actor).validateActor?.(actor, definitionFor(actor));
+    behaviorFor(actor).validateActor?.(actor, definition);
   };
   const validateUpdate = (actor: Actor, before: ActorIdentity) => {
     if (
@@ -1292,19 +1319,13 @@ export function createMissionSimulation({
       isMobileActor(actor, definition) &&
       canQueueOrder(order, definition, !!working.economy);
     if (accepted) (actor.orders ??= []).push(order);
+    const reason = accepted ? undefined : queueRejection(order, definition);
     return {
       tick,
       command: structuredClone(command),
       accepted,
-      ...(accepted
-        ? { queued: true }
-        : order?.kind === "attack" && !definition.weapon
-          ? { reason: "unarmed" }
-          : order?.kind === "gather" &&
-              !definition.harvesting &&
-              !definition.cultivation
-            ? { reason: "invalid-harvester" }
-            : {}),
+      ...(accepted && { queued: true }),
+      ...(reason && { reason }),
     } as CommandResult;
   };
   // A rejected order leaves the current one and its queue running.
@@ -1714,7 +1735,7 @@ export function createMissionSimulation({
       return currentResult();
     },
     get objectives() {
-      return objectivesFor(state.objectives).views;
+      return committedObjectives.views;
     },
     get wrecks() {
       return state.wrecks;
@@ -1875,7 +1896,7 @@ export function createMissionSimulation({
     },
     dispose: () => {
       if (disposed) return;
-      if (ticking)
+      if (phase !== "idle")
         throw new Error("Mission disposal cannot run during a tick.");
       disposed = true;
       releaseTerrainRule?.();
@@ -1883,18 +1904,21 @@ export function createMissionSimulation({
     },
     tick: () => {
       ensureRunning();
-      if (ticking) throw new Error("Mission ticks cannot run recursively.");
+      if (phase !== "idle")
+        throw new Error("Mission ticks cannot run recursively.");
       if (ended()) return [];
+      notify((observer) => observer.beforeTick?.());
       const due = state.commands.filter(({ tick }) => tick <= state.tick);
       const terrainBefore =
         map && due.some(({ command }) => command.kind === "terrain")
           ? map.terrainState()
           : undefined;
       const versionBefore = map?.navigationChanges.version;
-      ticking = true;
+      let outcomes: CommandOutcome[];
+      phase = "ticking";
       try {
         const working = stageWorking();
-        const outcomes: CommandOutcome[] = due.flatMap(({ command, issuer }) =>
+        outcomes = due.flatMap(({ command, issuer }) =>
           applyCommand(command, issuer, state.tick, working).map((result) => ({
             ...result,
             issuer: structuredClone(issuer),
@@ -2037,11 +2061,9 @@ export function createMissionSimulation({
               leashAllows(actor, definition, point),
           );
         }
+        // Committed actors are frozen, so they serve as their own identity.
         for (const actor of working.actors)
-          validateUpdate(
-            actor,
-            actorIdentity(actorsById.get(actor.id) ?? actor),
-          );
+          validateUpdate(actor, actorsById.get(actor.id) ?? actor);
         if (working.economy) {
           // Credits can open a stockpile for one member of a pool.
           regroupStockpiles(
@@ -2115,6 +2137,7 @@ export function createMissionSimulation({
             !!skirmishResult,
           );
         state = nextState;
+        committedObjectives = verdict;
         if (
           state.wrecks.length !== previousWrecks.length ||
           state.wrecks.some(
@@ -2129,7 +2152,6 @@ export function createMissionSimulation({
         if (due.length > 0) queuedActorIds = queuedCreationIds();
         actorVersion += working.lifecycleChanges;
         if (nextRelations) relations = nextRelations;
-        return outcomes;
       } catch (error) {
         faulted = true;
         // Return the world to the last committed tick, so no partial terrain or
@@ -2141,8 +2163,16 @@ export function createMissionSimulation({
         }
         throw error;
       } finally {
-        ticking = false;
+        phase = "idle";
       }
+      notify((observer) => observer.afterTick?.(outcomes));
+      return outcomes;
+    },
+    observeTicks: (observer) => {
+      ensureRunning();
+      const entry = { ...observer };
+      observers.add(entry);
+      return () => observers.delete(entry);
     },
   };
 }
@@ -2157,6 +2187,21 @@ function canQueueOrder(
     (order.kind !== "gather" ||
       (hasEconomy && (!!definition.harvesting || !!definition.cultivation)))
   );
+}
+
+/** Why an actor can never carry out an order, if its definition decides. */
+function queueRejection(
+  order: QueuedOrder | undefined,
+  definition: ActorDefinition,
+): "unarmed" | "invalid-harvester" | undefined {
+  if (order?.kind === "attack" && !definition.weapon) return "unarmed";
+  if (
+    order?.kind === "gather" &&
+    !definition.harvesting &&
+    !definition.cultivation
+  )
+    return "invalid-harvester";
+  return undefined;
 }
 
 type ActorOrderCommand = Extract<

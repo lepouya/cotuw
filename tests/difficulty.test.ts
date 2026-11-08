@@ -109,7 +109,7 @@ test("scaled fights continue identically after saving and loading", () => {
     loaded.scenario,
     original.snapshot(),
     SIMULATION_TICK_SECONDS,
-    { name: "Mid-fight", savedAt: "2026-11-06T00:00:00.000Z" },
+    { save: { name: "Mid-fight", savedAt: "2026-11-06T00:00:00.000Z" } },
   );
   const restored = loadMission(source);
   expect(restored.scenario.setup).toEqual(loaded.scenario.setup);

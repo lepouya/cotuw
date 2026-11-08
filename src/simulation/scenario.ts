@@ -165,11 +165,10 @@ export function createScenarioState(
             },
           }),
         };
-  for (const actor of units)
-    if (economy)
-      enrollWorker(economy, actor.id, definitionFor(actor.definitionId));
-  // Owners that start sharing resources start with pooled stockpiles.
   if (economy) {
+    for (const actor of units)
+      enrollWorker(economy, actor.id, definitionFor(actor.definitionId));
+    // Owners that start sharing resources start with pooled stockpiles.
     const owners = new Set(scenario.owners.map(({ id }) => id));
     if (!isValidLedger(economy, owners))
       throw new RangeError("Scenario has invalid stockpiles.");
