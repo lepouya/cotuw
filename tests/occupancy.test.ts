@@ -87,9 +87,9 @@ describe("footprint occupancy", () => {
     expect(occupancy.ownerAt(1, 2, "surface")).toBe("command-center");
     expect(occupancy.ownerAt(2, 3, "surface")).toBe("command-center");
     expect(occupancy.ownerAt(2, 3, "air")).toBeUndefined();
-    expect(map.navigationChanges.since(0)).toEqual([
-      { minX: 1, minZ: 2, maxX: 2, maxZ: 3 },
-    ]);
+    expect(
+      map.navigationChanges.entriesSince(0)?.map(({ bounds }) => bounds),
+    ).toEqual([{ minX: 1, minZ: 2, maxX: 2, maxZ: 3 }]);
     expect(occupancy.placementByOwnerId("command-center")).toEqual(
       placement("command-center", 1, 2),
     );
@@ -123,9 +123,9 @@ describe("footprint occupancy", () => {
     expect(occupancy.ownerAt(0, 0, "surface")).toBeUndefined();
     expect(occupancy.ownerAt(4, 0, "surface")).toBe("right");
     expect(occupancy.placementByOwnerId("right")).toBeDefined();
-    expect(map.navigationChanges.since(2)).toEqual([
-      { minX: 0, minZ: 0, maxX: 1, maxZ: 1 },
-    ]);
+    expect(
+      map.navigationChanges.entriesSince(2)?.map(({ bounds }) => bounds),
+    ).toEqual([{ minX: 0, minZ: 0, maxX: 1, maxZ: 1 }]);
   });
 
   test.each([

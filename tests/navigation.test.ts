@@ -133,6 +133,31 @@ describe("terrain traversal", () => {
     expect(grid.bounds!.center).toEqual(center(map, 1, 1));
     expect(Object.isFrozen(grid.bounds!.center)).toBe(true);
   });
+  test("bounded views share their physical grid and its cost updates", () => {
+    const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
+    const occupancy = new OccupancyGrid(map);
+    const physical = new NavigationGrid(map, occupancy, ground);
+    const bounds = { center: center(map, 1, 1), radius: 1.5 };
+    const bounded = physical.within(bounds);
+    expect(physical.within({ ...bounds })).toBe(bounded);
+    expect(bounded.within(bounds)).toBe(bounded);
+    expect(bounded.unbounded()).toBe(physical);
+    expect(bounded.costAt(1, 2)).toBe(1);
+    expect(bounded.costAt(4, 4)).toBeUndefined();
+    expect(bounded.regionAt(1, 2)).toBe(bounded.regionAt(1, 1));
+    occupancy.place({
+      ownerId: "wall",
+      origin: { x: 1, z: 2 },
+      footprint: {
+        layer: "surface",
+        occupiedTiles: [{ x: 0, z: 0 }],
+        blocksMovement: true,
+      },
+    });
+    expect(bounded.costAt(1, 2)).toBeUndefined();
+    expect(bounded.regionAt(1, 2)).toBe(-1);
+    expect(physical.costAt(1, 2)).toBeUndefined();
+  });
   test("combines terrain type, authored overrides, and slope", () => {
     const tiles: TerrainTile[] = [
       { typeId: "plain" },

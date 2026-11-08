@@ -216,10 +216,8 @@ export function validateWildlife(
   for (const actor of actors) {
     const t = actor.territory;
     if (!t) continue;
-    validateTerritoryRoute(
-      actor,
-      definitions.get(actor.definitionId)!.territory!,
-    );
+    const territory = definitions.get(actor.definitionId)!.territory!;
+    validateTerritoryRoute(actor, territory);
     const investigated =
       t.investigation &&
       state.alerts.find((alert) => alert.id === t.investigation!.alertId);
@@ -237,10 +235,7 @@ export function validateWildlife(
     )
       throw new RangeError(`Actor ${actor.id} has invalid wolf history.`);
     if (!t.encounterId) continue;
-    const leash = leashBounds(
-      t,
-      definitions.get(actor.definitionId)!.territory!,
-    );
+    const leash = leashBounds(t, territory);
     const prior = encounters.get(t.encounterId);
     if (
       prior &&

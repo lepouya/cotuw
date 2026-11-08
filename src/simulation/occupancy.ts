@@ -1,5 +1,6 @@
 import { containsGridPoint, isTileCoord, tileBounds, tileKey } from "./grid";
 import { isId, isOneOf } from "./validation";
+
 import type { TerrainBounds, TileCoord } from "./grid";
 import type { TerrainEdit, TerrainGrid } from "./terrain";
 

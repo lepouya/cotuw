@@ -244,13 +244,50 @@ product work in `TODO.md`, and remove temporary files in
       closures in `advanceWorkerRoute`, and array spreads in
       `economySites`/`activeSites`.
 
-- [ ] **Slice 4: simulation spatial world, terrain, occupancy, and movement**
+- [x] **Slice 4: simulation spatial world, terrain, occupancy, and movement**
   (10 files, ~3,070 LOC)
   - `src/simulation/`: `grid.ts`, `terrain.ts`, `terrain-movement.ts`,
     `terrain-sightline.ts`, `occupancy.ts`, `territory.ts`, `navigation.ts`,
     `navigation-changes.ts`, `group-movement.ts`, `automatic-movement.ts`.
   - Focus: pathfinding/occupancy invariants, group movement tick cost, shared
     pursuit behavior for combat/unit-assist, and spatial query ergonomics.
+  - [x] **Pass A** (modular assessment and refactor, base `de4ff44`):
+    - `NavigationGrid.within(bounds)` caches bounded grids on their physical
+      grid and shares its tile-cost cache; `unbounded()` returns that grid.
+      This replaces the string-keyed cache in `terrain-movement.ts` and the
+      duplicate physical grid each bounded grid built.
+    - `navigationDestination` owns the reachable-destination point rule
+      shared by `findNavigationPath` and the mission's combat `destination`.
+    - Local repairs only; no persisted format change, so Pass B continued in
+      the same session.
+    - Kept: `followRoute` is already the shared pursuit module. `1.41`
+      support units are unarmed and run outside `updateCombat`'s armed loop,
+      so they should call `followRoute` with their own `RouteRetryState` and
+      the mission's bounded `move`/`destination` rather than an extracted
+      combat chase.
+    - Rejected: narrowing `NavigationGrid` to `blocksMovementAt` (worker
+      entrances still need a placement query), moving `RouteBounds` out of
+      `actor.ts` (type-only gain), and the type-only
+      `terrain`/`navigation-changes`/`occupancy` SCC.
+    - `WolfMode`/`WolfAlert` stay: DESIGN names the territorial state machine
+      and alerts after wolves (Slice 2 lead resolved).
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `terrain-sightline.ts`: crossing checks without per-call tuple arrays.
+    - `automatic-movement.ts`: remaining route distance without a slice.
+    - `navigation-changes.ts`: test-only `since` removed; `entriesSince`
+      filters in one pass; `layers` readonly.
+    - `terrain.ts`: `TerrainBounds`/`TileCoord` re-export shim removed;
+      importers use `grid.ts` (`map.ts` re-exports from there).
+    - `navigation.ts`: cost invalidation split into `forgetCosts`; imports
+      grouped. `group-movement.ts`, `territory.ts`, `occupancy.ts`,
+      `grid.ts`: import order, one definition lookup, inclusive-bounds doc.
+    - Reviewed without change: `terrain-movement.ts` beyond the grid cache.
+    - Checks: format, lint, typecheck, units (`1359` passed), and the
+      browser smoke checks (run outside the sandbox) pass.
+    - Deferred until profiling shows cost (`1.64`): per-tick allocations in
+      `separateMobileActors` (string bucket keys, maps), full-map slot scans
+      per group move, `entriesSince` copies per grid sync, and
+      `placementByOwnerId` cloning in worker entrance checks.
 
 - [ ] **Slice 5: session coordinator, shortcuts, world tools, and binders**
   (18 files, ~4,730 LOC)

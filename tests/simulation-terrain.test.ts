@@ -140,7 +140,9 @@ describe("simulation terrain", () => {
 
     const bounds = { minX: 0, minZ: 0, maxX: 1, maxZ: 1 };
     expect(changed).toHaveBeenCalledExactlyOnceWith(bounds);
-    expect(map.navigationChanges.since(0)).toEqual([bounds]);
+    expect(
+      map.navigationChanges.entriesSince(0)?.map(({ bounds }) => bounds),
+    ).toEqual([bounds]);
     expect(grid.costAt(1, 1)).toBeUndefined();
     expect(grid.regionAt(1, 1)).toBe(-1);
     expect(grid.costAt(4, 2)).toBe(1);

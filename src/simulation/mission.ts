@@ -85,7 +85,7 @@ import type {
   ObjectiveState,
   ObjectiveView,
 } from "./objectives";
-import { resolveNavigationDestination } from "./navigation";
+import { navigationDestination } from "./navigation";
 import {
   createOwnerVision,
   isValidFogState,
@@ -1936,18 +1936,9 @@ export function createMissionSimulation({
               definitionFor(actor),
               routeBounds,
             );
-            if (!grid) return point;
-            const resolved = resolveNavigationDestination(
-              grid,
-              actor.worldPosition,
-              point,
-            );
-            return (
-              resolved &&
-              (resolved.reachedTarget
-                ? point
-                : grid.map.tileCenter(resolved.end.x, resolved.end.z))
-            );
+            return grid
+              ? navigationDestination(grid, actor.worldPosition, point)
+              : point;
           },
           wrecks: working.wrecks,
           definitions: definitionsById,

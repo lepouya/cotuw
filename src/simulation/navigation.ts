@@ -3,8 +3,8 @@ import { deepFreeze, insideRouteBounds } from "./actor";
 import { hasOwn, isPositive } from "./validation";
 
 import type { DeepReadonly, RouteBounds } from "./actor";
-
-import type { TerrainView, TileCoord } from "./terrain";
+import type { TerrainBounds, TileCoord } from "./grid";
+import type { TerrainView } from "./terrain";
 import type { OccupancyLayer, OccupancyView } from "./occupancy";
 import type { WorldPosition } from "./world";
 
@@ -115,6 +115,7 @@ export function traversalCostAt(
 /**
  * One profile's tile costs and connected regions, cached until the map reports
  * a navigation change. The cache is derived data and never affects results.
+ * Grids from `within` share their physical grid's tile costs.
  */
 export class NavigationGrid {
   readonly map: TerrainView;
@@ -124,11 +125,13 @@ export class NavigationGrid {
   readonly bounds: DeepReadonly<RouteBounds> | undefined;
   /** Lowest cost per world unit, which keeps the A* estimate admissible. */
   readonly minimumCost: number;
-  private readonly costs: Float64Array;
+  /** Absent on a bounded grid, which reads its physical grid's costs. */
+  private readonly costs: Float64Array | undefined;
   private regions: Int32Array | undefined;
   private version: number;
   private generation: number;
   private physicalGrid: NavigationGrid | undefined;
+  private readonly boundedGrids = new Map<string, NavigationGrid>();
 
   constructor(
     map: TerrainView,
@@ -162,7 +165,9 @@ export class NavigationGrid {
         (cost): cost is number => cost !== null,
       ),
     );
-    this.costs = new Float64Array(map.width * map.height).fill(UNKNOWN_COST);
+    this.costs = bounds
+      ? undefined
+      : new Float64Array(map.width * map.height).fill(UNKNOWN_COST);
     this.version = map.navigationChanges.version;
     this.generation = map.navigationChanges.generation;
   }
@@ -178,23 +183,41 @@ export class NavigationGrid {
     ));
   }
 
+  /** The cached grid that restricts physical routes to `bounds` instead. */
+  within(bounds: RouteBounds): NavigationGrid {
+    const physical = this.unbounded();
+    const key = `${bounds.center.x},${bounds.center.z},${bounds.radius}`;
+    let grid = physical.boundedGrids.get(key);
+    if (!grid) {
+      grid = new NavigationGrid(
+        this.map,
+        this.occupancy,
+        this.profile,
+        this.occupancyLayer,
+        bounds,
+      );
+      grid.physicalGrid = physical;
+      physical.boundedGrids.set(key, grid);
+    }
+    return grid;
+  }
+
   costAt(x: number, z: number): number | undefined {
     if (!this.map.containsTile(x, z)) {
       return undefined;
     }
-    if (
-      this.bounds &&
-      !insideRouteBounds(this.bounds, this.map.tileCenter(x, z))
-    )
-      return undefined;
+    if (this.bounds)
+      return insideRouteBounds(this.bounds, this.map.tileCenter(x, z))
+        ? this.unbounded().costAt(x, z)
+        : undefined;
     this.sync();
     const index = this.map.tileIndex(x, z);
-    let cost = this.costs[index]!;
+    let cost = this.costs![index]!;
     if (Number.isNaN(cost)) {
       cost = this.occupancy.blocksMovementAt(x, z, this.occupancyLayer)
         ? BLOCKED_COST
         : (traversalCostAt(this.map, this.profile, x, z) ?? BLOCKED_COST);
-      this.costs[index] = cost;
+      this.costs![index] = cost;
     }
     return cost === BLOCKED_COST ? undefined : cost;
   }
@@ -232,21 +255,30 @@ export class NavigationGrid {
     const changes = entries
       ?.filter(({ effect }) => effect !== "none")
       .map(({ bounds }) => bounds);
+    if (this.costs) this.forgetCosts(this.costs, changes);
+    if (!changes || changes.length > 0) this.regions = undefined;
+    this.version = navigationChanges.version;
+    this.generation = navigationChanges.generation;
+  }
+
+  /** Clears changed tiles, or every tile when the changes are unknown. */
+  private forgetCosts(
+    costs: Float64Array,
+    changes: readonly Readonly<TerrainBounds>[] | undefined,
+  ): void {
     if (!changes) {
-      this.costs.fill(UNKNOWN_COST);
+      costs.fill(UNKNOWN_COST);
+      return;
     }
-    for (const bounds of changes ?? []) {
+    for (const bounds of changes) {
       for (let z = Math.max(bounds.minZ, 0); z <= bounds.maxZ; z += 1) {
         for (let x = Math.max(bounds.minX, 0); x <= bounds.maxX; x += 1) {
           if (this.map.containsTile(x, z)) {
-            this.costs[this.map.tileIndex(x, z)] = UNKNOWN_COST;
+            costs[this.map.tileIndex(x, z)] = UNKNOWN_COST;
           }
         }
       }
     }
-    if (!changes || changes.length > 0) this.regions = undefined;
-    this.version = navigationChanges.version;
-    this.generation = navigationChanges.generation;
   }
 
   /** Labels regions in tile order, so labels are deterministic. */
@@ -306,9 +338,7 @@ export function findNavigationPath(
   const route = (resolved.direct ? [] : searchTiles(grid, start, end))
     .slice(1)
     .map(({ x, z }) => map.tileCenter(x, z));
-  const destination = reachedTarget
-    ? { ...target }
-    : map.tileCenter(end.x, end.z);
+  const destination = destinationPoint(grid, resolved, target);
   const last = route[route.length - 1];
   if (!last || last.x !== destination.x || last.z !== destination.z) {
     route.push(destination);
@@ -323,6 +353,27 @@ export function findNavigationPath(
     destination,
     reachedTarget,
   };
+}
+
+/**
+ * Where a route towards `target` would end, without constructing it, or
+ * `undefined` when the source cannot move.
+ */
+export function navigationDestination(
+  grid: NavigationGrid,
+  from: WorldPosition,
+  target: WorldPosition,
+): WorldPosition | undefined {
+  const resolved = resolveNavigationDestination(grid, from, target);
+  return resolved && destinationPoint(grid, resolved, target);
+}
+
+function destinationPoint(
+  grid: NavigationGrid,
+  { end, reachedTarget }: { end: TileCoord; reachedTarget: boolean },
+  target: WorldPosition,
+): WorldPosition {
+  return reachedTarget ? { ...target } : grid.map.tileCenter(end.x, end.z);
 }
 
 /** Resolves reachable tiles without constructing a route to them. */
@@ -491,9 +542,8 @@ export function occupiedTile(
 ): TileCoord {
   const { map } = grid;
   const tile = map.tileAtWorldPosition(position.x, position.z);
-  const tolerance = CORNER_TOLERANCE;
   const onLowEdge = (world: number, min: number, index: number) =>
-    index > 0 && (world - min) / map.tileSize - index <= tolerance;
+    index > 0 && (world - min) / map.tileSize - index <= CORNER_TOLERANCE;
   const xs = onLowEdge(position.x, map.worldBounds.minX, tile.x)
     ? [tile.x, tile.x - 1]
     : [tile.x];

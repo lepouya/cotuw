@@ -8,14 +8,14 @@ export type NavigationChangeEffect = "increase" | "decrease" | "mixed" | "none";
 export type NavigationChange = {
   bounds: TerrainBounds;
   /** Omitted when every occupancy layer may be affected. */
-  layers?: OccupancyLayer[];
+  layers?: readonly OccupancyLayer[];
   effect: NavigationChangeEffect;
 };
 
 /** Queries for navigation consumers, which never record or restart. */
 export type NavigationChangeView = Pick<
   NavigationChangeLog,
-  "version" | "generation" | "since" | "entriesSince"
+  "version" | "generation" | "entriesSince"
 >;
 
 /**
@@ -77,12 +77,10 @@ export class NavigationChangeLog {
     }
   }
 
-  /** Changes after `version`, or `undefined` when retained history is too new. */
-  since(version: number): readonly Readonly<TerrainBounds>[] | undefined {
-    return this.entriesSince(version)?.map(({ bounds }) => bounds);
-  }
-
-  /** Detailed changes after `version`, optionally limited to one layer. */
+  /**
+   * Changes after `version`, optionally limited to one layer, or `undefined`
+   * when retained history is too new.
+   */
   entriesSince(
     version: number,
     layer?: OccupancyLayer,
@@ -100,12 +98,12 @@ export class NavigationChangeLog {
       return undefined;
     }
     return this.history
-      .filter((change) => change.version > version)
       .filter(
         (change) =>
-          layer === undefined ||
-          change.layers === undefined ||
-          change.layers.includes(layer),
+          change.version > version &&
+          (layer === undefined ||
+            change.layers === undefined ||
+            change.layers.includes(layer)),
       )
       .map(({ bounds, layers, effect }) => ({
         bounds: { ...bounds },

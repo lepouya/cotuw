@@ -50,10 +50,14 @@ export function followRoute(
 function remainingRouteDistance(actor: Actor, goal: WorldPosition): number {
   let from = actor.worldPosition;
   let remaining = 0;
-  const order = actor.movement;
-  for (const point of order?.waypoints?.slice(order.waypointIndex ?? 0) ?? []) {
-    remaining += distance(from, point);
-    from = point;
+  const waypoints = actor.movement?.waypoints ?? [];
+  for (
+    let index = actor.movement?.waypointIndex ?? 0;
+    index < waypoints.length;
+    index += 1
+  ) {
+    remaining += distance(from, waypoints[index]!);
+    from = waypoints[index]!;
   }
   return remaining + distance(from, goal);
 }

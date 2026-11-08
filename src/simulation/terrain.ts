@@ -5,7 +5,6 @@ import { isCount, isPositive } from "./validation";
 import type { NavigationChangeView } from "./navigation-changes";
 import type { TerrainBounds, TileCoord } from "./grid";
 import type { WorldBounds, WorldPosition } from "./world";
-export type { TerrainBounds, TileCoord } from "./grid";
 
 /** Absorbs floating-point error in positions derived from the map edge. */
 const EDGE_TOLERANCE_TILES = 1e-9;

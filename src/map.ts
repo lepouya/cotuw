@@ -1,14 +1,13 @@
 import { Color4, Observable, Vector3 } from "@babylonjs/core";
 import { TerrainGrid } from "./simulation/terrain";
+import type { TerrainBounds } from "./simulation/grid";
 import type {
   TerrainGridOptions,
-  TerrainBounds,
   TerrainTile,
   TerrainView,
 } from "./simulation/terrain";
+export type { TerrainBounds, TileCoord } from "./simulation/grid";
 export type {
-  TerrainBounds,
-  TileCoord,
   TerrainChangeOptions,
   TerrainTile,
   TerrainEdit,

@@ -17,7 +17,8 @@ import { tileAreaBounds } from "./terrain";
 import { withinRouteBounds } from "./actor";
 import { isCount, isPositive } from "./validation";
 
-import type { TerrainBounds, TerrainView } from "./terrain";
+import type { TerrainBounds } from "./grid";
+import type { TerrainView } from "./terrain";
 import type { OccupancyLayer, OccupancyView } from "./occupancy";
 import type {
   Actor,
@@ -66,23 +67,8 @@ export function createTerrainMoveBehavior(
     }
     return grid;
   };
-  const boundedGrids = new Map<string, NavigationGrid>();
-  const routeGrid = (grid: NavigationGrid, bounds?: RouteBounds) => {
-    if (!bounds) return grid;
-    const key = `${grid.profile.id}:${grid.occupancyLayer}:${bounds.center.x}:${bounds.center.z}:${bounds.radius}`;
-    let bounded = boundedGrids.get(key);
-    if (!bounded) {
-      bounded = new NavigationGrid(
-        map,
-        occupancy,
-        grid.profile,
-        grid.occupancyLayer,
-        bounds,
-      );
-      boundedGrids.set(key, bounded);
-    }
-    return bounded;
-  };
+  const routeGrid = (grid: NavigationGrid, bounds?: RouteBounds) =>
+    bounds ? grid.within(bounds) : grid;
   const changes = map.navigationChanges;
 
   const replan = (actor: Actor, order: MovementOrder, grid: NavigationGrid) => {

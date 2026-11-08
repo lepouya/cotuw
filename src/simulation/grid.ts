@@ -1,6 +1,7 @@
 /** Integer coordinates on a tile or corner grid. */
 export type TileCoord = { x: number; z: number };
 
+/** Inclusive tile bounds. */
 export type TerrainBounds = {
   minX: number;
   minZ: number;

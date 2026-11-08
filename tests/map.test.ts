@@ -199,8 +199,12 @@ describe("TerrainMap", () => {
     map.notifyChange(second, { affectsNavigation: false });
 
     expect(map.navigationChanges.version).toBe(1);
-    expect(map.navigationChanges.since(0)).toEqual([first]);
-    expect(map.navigationChanges.since(1)).toEqual([]);
+    expect(
+      map.navigationChanges.entriesSince(0)?.map(({ bounds }) => bounds),
+    ).toEqual([first]);
+    expect(
+      map.navigationChanges.entriesSince(1)?.map(({ bounds }) => bounds),
+    ).toEqual([]);
   });
 
   test("forgets navigation changes beyond its retained history", () => {
@@ -208,9 +212,15 @@ describe("TerrainMap", () => {
     const bounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0 };
     for (let change = 0; change < 200; change += 1) map.notifyChange(bounds);
 
-    expect(map.navigationChanges.since(199)).toEqual([bounds]);
-    expect(map.navigationChanges.since(0)).toBeUndefined();
-    expect(map.navigationChanges.since(201)).toBeUndefined();
+    expect(
+      map.navigationChanges.entriesSince(199)?.map(({ bounds }) => bounds),
+    ).toEqual([bounds]);
+    expect(
+      map.navigationChanges.entriesSince(0)?.map(({ bounds }) => bounds),
+    ).toBeUndefined();
+    expect(
+      map.navigationChanges.entriesSince(201)?.map(({ bounds }) => bounds),
+    ).toBeUndefined();
   });
 
   test("rebuilds changed tiles' layers before observers hear of the edit", () => {

@@ -1,10 +1,10 @@
 import { resolveNavigationDestination, segmentCost } from "./navigation";
 import { isTilePlacedActor } from "./placement";
 import { compareIds } from "./actor";
+import { distance, withinBounds } from "./world";
 
 import type { Actor, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
-import { distance, withinBounds } from "./world";
 import type { WorldBounds, WorldPosition } from "./world";
 
 export type DefinedActor = {
@@ -51,8 +51,8 @@ export function assignGroupDestinations(
   // Each region's tiles, nearest the click first, shared by movers on a grid.
   const slotsByGrid = new Map<NavigationGrid, Map<number, Slot[]>>();
   const slotsIn = (grid: NavigationGrid, region: number) => {
-    const byRegion = slotsByGrid.get(grid) ?? new Map<number, Slot[]>();
-    slotsByGrid.set(grid, byRegion);
+    let byRegion = slotsByGrid.get(grid);
+    if (!byRegion) slotsByGrid.set(grid, (byRegion = new Map()));
     let slots = byRegion.get(region);
     if (!slots) {
       slots = [];

@@ -10,9 +10,7 @@ test("navigation queries cannot mutate retained changes", () => {
   const expected = log.entriesSince(0);
   const entries = log.entriesSince(0)!;
   entries[0]!.bounds.minX = 99;
-  entries[0]!.layers![0] = "air";
-  const bounds = log.since(0)!;
-  (bounds[0]! as { minZ: number }).minZ = 99;
+  (entries[0]!.layers as string[])[0] = "air";
   expect(log.entriesSince(0, "surface")).toEqual(expected);
   expect(log.entriesSince(0, "air")).toEqual([]);
 });
