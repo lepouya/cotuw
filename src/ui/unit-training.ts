@@ -1,5 +1,5 @@
 import { isOutcomeOf } from "../simulation/command";
-import { PRODUCTION_QUEUE_LIMIT } from "../simulation/economy";
+import { PRODUCTION_QUEUE_LIMIT } from "../simulation/production";
 import { productionBlocker, setActionAvailability } from "./production-action";
 import { setText } from "./dom";
 

@@ -7,7 +7,7 @@ import type { ActorRenderState } from "../simulation/actor";
 import type { OwnerView } from "../simulation/owner-view";
 import type { Detectable } from "../simulation/vision";
 import { disconnectedBuildings } from "../simulation/support";
-import type { ProductionJob } from "../simulation/economy";
+import type { ProductionJob } from "../simulation/production";
 
 /** Adapts committed gameplay to the generic named-event audio interface. */
 export function createMissionAudio(

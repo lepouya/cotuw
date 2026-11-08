@@ -122,11 +122,11 @@ export function assignInfrastructure(
       rules.definitions.get(building.definitionId)?.infrastructure
         ? building
         : byId.get(building.headquartersId ?? "");
-    const next = emergency
-      ? undefined
-      : headquarters && hostsWork(headquarters, building, rules)
-        ? headquarters.id
-        : infrastructureHeadquarters(building, actors, rules)[0]?.id;
+    let next: string | undefined;
+    if (emergency) next = undefined;
+    else if (headquarters && hostsWork(headquarters, building, rules))
+      next = headquarters.id;
+    else next = infrastructureHeadquarters(building, actors, rules)[0]?.id;
     if (building.headquartersId === next) continue;
     if (next) building.headquartersId = next;
     else delete building.headquartersId;

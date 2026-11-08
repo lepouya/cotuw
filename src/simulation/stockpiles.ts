@@ -118,7 +118,7 @@ export const depositedBy = (
 ) => depositOf(ledger, owner, resource)?.amount ?? 0;
 
 /** Owners pooling resources, directly or through other members, by ID. */
-export function resourcePools(
+function resourcePools(
   owners: Iterable<string>,
   sharesResources: SharesResources,
 ): string[][] {
@@ -199,14 +199,11 @@ export function isValidLedger(
   const listed = new Set<string>();
   /** Whether an owner-resource pair is valid and not yet listed. */
   const list = (owner: unknown, resource: unknown) => {
-    const key = JSON.stringify([owner, resource]);
-    if (
-      !isId(owner) ||
-      !owners.has(owner) ||
-      !isOneOf(RESOURCE_IDS, resource) ||
-      listed.has(key)
-    )
+    if (!isId(owner) || !owners.has(owner) || !isOneOf(RESOURCE_IDS, resource))
       return false;
+    // Resource IDs contain no colon, so the key is unambiguous.
+    const key = `${resource}:${owner}`;
+    if (listed.has(key)) return false;
     listed.add(key);
     return true;
   };

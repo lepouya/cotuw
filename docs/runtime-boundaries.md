@@ -93,9 +93,14 @@ These contracts describe where new behaviors, views, and services attach.
   Affordability, payment, and refunds use the paying owner's stockpile. An
   owner without a stockpile of a resource cannot fund a job, even at zero
   cost. Pools follow `sharesResources` and regroup whenever sharing changes.
-- `simulation/economy.ts` owns workers, sites, gifts, and production.
-  `enrollWorker` creates worker state from an actor's definition. Shared
-  queries expose sites, compatible workers, and outstanding automatic orders;
+- `simulation/production.ts` owns paid production queues: admission,
+  payment-backed orders, advancing each producer's first order, exits,
+  cancellation, producer loss, and saved-queue validation. A Refinery holds
+  one Harvester, fielded or paid. `simulation/economy.ts` runs the queues
+  during its update and enrolls produced workers.
+- `simulation/economy.ts` owns workers, sites, and gifts. `enrollWorker`
+  creates worker state from an actor's definition. Shared queries expose
+  sites, compatible workers, and outstanding automatic orders;
   explicit actor commands interrupt either worker type without losing cargo.
   Building loss cancels affected automatic routes. Cultivators retain delivery
   work and queued orders while selecting a replacement drop-off.

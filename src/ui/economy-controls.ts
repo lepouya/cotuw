@@ -7,9 +7,9 @@ import {
   collectsLoot,
   lootAmount,
   lootResource,
-  refineryOccupied,
   saleRefund,
 } from "../simulation/economy";
+import { refineryOccupied } from "../simulation/production";
 import { costCurrency, costLabel, resourceName } from "../simulation/resources";
 import type {
   CultivationSite,

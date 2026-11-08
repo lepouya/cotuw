@@ -3,7 +3,8 @@ import { isTileCoord, tileBounds, tileKey } from "./grid";
 import { withinBounds } from "./world";
 import { isNonnegative } from "./validation";
 
-import type { TerrainView, TileCoord } from "./terrain";
+import type { TileCoord } from "./grid";
+import type { TerrainView } from "./terrain";
 import type { Actor, ActorDefinition } from "./actor";
 import type {
   FootprintPlacement,
@@ -12,7 +13,7 @@ import type {
 } from "./occupancy";
 import type { WorldPosition } from "./world";
 
-export const PLACEMENT_REASONS = [
+const PLACEMENT_REASONS = [
   "invalid-actor",
   "used-id",
   "unknown-definition",
@@ -54,7 +55,7 @@ export type ActorPlacement = {
   origin: TileCoord;
   /** Clockwise quarter turns around the origin; defaults to 0. */
   quarterTurns?: number;
-  /** Candidate workers chosen by the player; nearest reachable one tends. */
+  /** Candidate workers chosen by the issuer; nearest reachable one tends. */
   workerIds?: string[];
 };
 
@@ -172,10 +173,10 @@ export function evaluateFootprint(
   });
   const surface = layout!.layer === "surface";
   for (const { x, z } of tiles) {
-    if (!map.containsTile(x, z) || map.terrainAt(x, z).outOfBounds === true) {
+    const terrain = map.containsTile(x, z) ? map.terrainAt(x, z) : undefined;
+    if (!terrain || terrain.outOfBounds === true) {
       return reject("out-of-bounds");
     }
-    const terrain = map.terrainAt(x, z);
     if (surface && terrain.surfaceBuildable === false) {
       return reject("unbuildable-terrain");
     }
@@ -197,7 +198,7 @@ export function evaluateFootprint(
   return { accepted: true, tiles, footprint, actor };
 }
 
-/** Keys of tiles under mobile actors on a layer, ignoring actors off the map. */
+/** Keys of tiles under a layer's mobile actors, ignoring those off the map. */
 export function mobileActorTiles(
   map: TerrainView,
   actors: Iterable<Readonly<Actor>>,

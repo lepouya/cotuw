@@ -1,6 +1,6 @@
 // Holds a benchmark mission at its target scale and records what it did.
 // Only the headless runner and COTUW_BENCHMARK builds use it.
-import { PRODUCTION_QUEUE_LIMIT } from "./simulation/economy";
+import { PRODUCTION_QUEUE_LIMIT } from "./simulation/production";
 import { compareIds } from "./simulation/actor";
 
 import type { CommandOutcome } from "./simulation/command";

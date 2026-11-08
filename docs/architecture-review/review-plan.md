@@ -175,7 +175,7 @@ product work in `TODO.md`, and remove temporary files in
       state after one NPC; per-update `Uint8Array` in `createVision` and
       `occupiedTilesFor` in owner `detects` stay until profiling shows cost.
 
-- [ ] **Slice 3: simulation economy, infrastructure, growth, and production**
+- [x] **Slice 3: simulation economy, infrastructure, growth, and production**
   (11 files, ~2,835 LOC)
   - `src/simulation/`: `economy.ts`, `cultivation.ts`, `growth.ts`,
     `worker-navigation.ts`, `cargo.ts`, `stockpiles.ts`, `resources.ts`,
@@ -184,6 +184,65 @@ product work in `TODO.md`, and remove temporary files in
     `infrastructure.ts` from `EconomyState` for HQ-pooled construction and
     building repair (`1.40`), emergency Heartgrove rules (`1.49`), and AI
     economic planning (`1.33-1.34`, `1.55`).
+  - [x] **Pass A** (modular assessment and refactor, base `6ef1e5e`):
+    - `production.ts` owns the paid queue lifecycle: `ProductionJob`,
+      `PRODUCTION_QUEUE_LIMIT`, `refineryOccupied`, `productionRejection`
+      (affordability, queue limit, one Harvester per Refinery),
+      `createProductionJob`, `advanceProduction`, `cancelProduction`,
+      `removeProducer`, and `isValidProductionQueue`. `economy.ts` runs the
+      queue in `updateEconomy` and enrolls produced workers; `mission.ts`
+      keeps only the disconnection check and payment.
+    - `evaluateSpawn` checks used IDs through a `has` predicate instead of
+      copying the set per evaluation (Slice 1 deferral).
+    - No persisted format change or new value-import cycle (`0` runtime
+      SCCs in `src/`). Docs: `runtime-boundaries.md`.
+    - Checks: format, lint, typecheck, and units pass; browser smoke could
+      not launch Chromium in the sandbox, so `economy`, `sidebar`, and
+      `benchmark` specs are unverified here.
+    - Kept: `infrastructure.ts` on `EconomyState`, which it reads only for
+      growth tending; `1.40` repair needs the ledger for oldest-first
+      per-second payment, so repair jobs should join `updateInfrastructure`'s
+      work list and `claimSlot` rather than a new module.
+    - Rejected: moving the economy branch of `evaluatePlacement` into
+      `infrastructure.ts`; it would forward about ten closure fields through
+      a shallow wrapper.
+    - Deferred: a `harvesting.ts` split mirroring `cultivation.ts` (state,
+      commands, update, validation) until ARC harvesting next changes;
+      duplicated first-order and queue-count logic in `audio/mission.ts`
+      (Slice 9) and `benchmark-probe.ts`.
+    - Pass B leads: three hosting-rule shapes in `infrastructure.ts`
+      (`HostingRules`, `EmergencyRules`, `AffiliationRules`); the support
+      resolver's per-call `JSON.stringify` key for unfrozen staged actors,
+      reached several times per tick; per-call array spreads in
+      `economySites` and `activeSites`.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `production.ts`: saved-queue validation reads the producer definition
+      once.
+    - `economy.ts`: imports grouped; one actor lookup per economy command;
+      Refinery assignment phase without a nested ternary; harvester site
+      checks use the site-ID set; loot proximity helper moved beside its
+      loop; `HARVESTER_PHASES` made module-private.
+    - `cultivation.ts`: efficiency and status without nested ternaries;
+      worker capacity and rate read once per worker; routes take
+      `WorldPosition`.
+    - `infrastructure.ts`: headquarters affiliation choice flattened. The
+      three hosting-rule shapes stay, since each matches its callers.
+    - `stockpiles.ts`: ledger validation keys owner-resource pairs without
+      per-entry `JSON.stringify`; `resourcePools` made module-private.
+    - `placement.ts`: one terrain lookup per footprint tile; `TileCoord`
+      from `grid.ts`; "chosen by the player" -> "chosen by the issuer";
+      `PLACEMENT_REASONS` made module-private.
+    - `cargo.ts`, `support.ts`: hole-safe validation comment; imports
+      merged; over-long comments shortened.
+    - Reviewed without change: `growth.ts`, `worker-navigation.ts`,
+      `resources.ts`.
+    - Checks: format, lint, typecheck, units, and the full Vitest suite
+      (`1485` passed) pass; browser smoke could not launch Chromium in the
+      sandbox.
+    - Deferred until profiling shows cost: the support resolver's
+      `JSON.stringify` key for unfrozen staged actors, per-call navigation
+      closures in `advanceWorkerRoute`, and array spreads in
+      `economySites`/`activeSites`.
 
 - [ ] **Slice 4: simulation spatial world, terrain, occupancy, and movement**
   (10 files, ~3,070 LOC)

@@ -1,21 +1,6 @@
+import { clearCombatOrders, compareIds, healthOf, nearestTo } from "./actor";
 import { depositCargo, gatherCargo, validCargoSources } from "./cargo";
-import type { CargoSource } from "./cargo";
-import {
-  updateInfrastructure,
-  validateInfrastructure,
-  validateInfrastructureDefinitions,
-} from "./infrastructure";
-import { validateGrowthDefinitions } from "./growth";
-import {
-  costAmount,
-  definedPrices,
-  materialsCost,
-  RESOURCE_IDS,
-  RESOURCE_SCALE,
-} from "./resources";
-import { balanceOf, credit, isValidLedger } from "./stockpiles";
-import type { Resource } from "./resources";
-import type { Ledger, LedgerView, SharesResources } from "./stockpiles";
+import { secondsToTicks } from "./clock";
 import {
   applyCultivationCommand,
   createCultivatorState,
@@ -24,30 +9,52 @@ import {
   validateCultivation,
   validateCultivationDefinitions,
 } from "./cultivation";
-import type { CultivationState } from "./cultivation";
 import { isTileCoord, tileKey } from "./grid";
+import { validateGrowthDefinitions } from "./growth";
+import {
+  updateInfrastructure,
+  validateInfrastructure,
+  validateInfrastructureDefinitions,
+} from "./infrastructure";
 import { isTilePlacedActor } from "./placement";
-import { advanceWorkerRoute, workerNavigation } from "./worker-navigation";
+import {
+  advanceProduction,
+  cancelProduction,
+  isValidProductionQueue,
+  refineryOccupied,
+  removeProducer,
+} from "./production";
+import {
+  costAmount,
+  definedPrices,
+  materialsCost,
+  RESOURCE_IDS,
+  RESOURCE_SCALE,
+} from "./resources";
+import { balanceOf, credit, isValidLedger } from "./stockpiles";
 import { disconnectedBuildings } from "./support";
-import { secondsToTicks } from "./clock";
 import { isCount, isId, isNonnegative, isPositive } from "./validation";
+import { advanceWorkerRoute, workerNavigation } from "./worker-navigation";
+import { distance } from "./world";
 
 import type {
   Actor,
-  ActorDefinition,
   ActorBehavior,
+  ActorDefinition,
   ActorRenderState,
   DeepReadonly,
 } from "./actor";
-import type { TileCoord } from "./grid";
-import type { TerrainView } from "./terrain";
-import { clearCombatOrders, compareIds, healthOf, nearestTo } from "./actor";
-import { distance } from "./world";
-import type { WorldPosition } from "./world";
-import type { TrainingEvaluation } from "./production";
+import type { CargoSource } from "./cargo";
 import type { EconomyCommand } from "./command";
-import type { SupportView } from "./support";
+import type { CultivationState } from "./cultivation";
+import type { TileCoord } from "./grid";
 import type { SharesHeadquarters } from "./infrastructure";
+import type { ProductionJob, TrainingEvaluation } from "./production";
+import type { Resource } from "./resources";
+import type { Ledger, LedgerView, SharesResources } from "./stockpiles";
+import type { SupportView } from "./support";
+import type { TerrainView } from "./terrain";
+import type { WorldPosition } from "./world";
 
 export type MaterialsSite = {
   id: string;
@@ -65,7 +72,7 @@ export type ResourceLoot = {
   | { materials: number; lifebloom?: never }
   | { lifebloom: number; materials?: never }
 );
-export const HARVESTER_PHASES = [
+const HARVESTER_PHASES = [
   "idle",
   "travelling",
   "gathering",
@@ -113,15 +120,6 @@ export function enrollWorker(
   if (definition.cultivation)
     economy.cultivation!.workers.push(createCultivatorState(actorId));
 }
-export type ProductionJob = {
-  actorId: string;
-  producerId: string;
-  definitionId: string;
-  paidCost: number;
-  completedTicks: number;
-  totalTicks: number;
-  exitBlocked: boolean;
-};
 export type EconomyState = Ledger & {
   cultivation?: CultivationState;
   sites: MaterialsSite[];
@@ -199,7 +197,7 @@ export function interruptWorker(actor: Actor, economy?: EconomyState) {
   delete worker.retryNavigationVersion;
 }
 
-/** Automatic work owns the actor until it finishes or is explicitly replaced. */
+/** Automatic work owns the actor until it ends or is explicitly replaced. */
 export function workerHasOrder(
   economy: EconomyView | undefined,
   actorId: string,
@@ -221,6 +219,7 @@ export function workerHasOrder(
       ["travelling", "gathering", "returning"].includes(worker.phase),
   );
 }
+/** Workers gathering, or tending growth that holds an active slot. */
 export function workingWorkerIds(
   economy: EconomyView | undefined,
   actors: readonly ActorRenderState[],
@@ -253,9 +252,6 @@ export type EconomyReason =
   | "invalid-cultivator"
   | "invalid-growth"
   | "tender-occupied";
-
-/** Outstanding paid orders one producer may hold. */
-export const PRODUCTION_QUEUE_LIMIT = 5;
 
 export const lootResource = (loot: Readonly<ResourceLoot>): Resource =>
   RESOURCE_IDS.find((id) => loot[id] !== undefined)!;
@@ -428,9 +424,8 @@ export function validateEconomyState(
       (worker.retryNavigationVersion !== undefined &&
         !isCount(worker.retryNavigationVersion)) ||
       (worker.targetSiteId !== undefined &&
-        !economy.sites.some((site) => site.id === worker.targetSiteId)) ||
-      (worker.activeSiteId !== undefined &&
-        !economy.sites.some((site) => site.id === worker.activeSiteId))
+        !sourceIds.has(worker.targetSiteId)) ||
+      (worker.activeSiteId !== undefined && !sourceIds.has(worker.activeSiteId))
     )
       return invalid();
     workers.add(worker.actorId);
@@ -454,54 +449,15 @@ export function validateEconomyState(
       (actor) =>
         definitions.get(actor.definitionId)?.harvesting &&
         !workers.has(actor.id),
-    )
+    ) ||
+    !isValidProductionQueue(economy, {
+      actors: byId,
+      retiredIds,
+      definitions,
+      tickSeconds,
+    })
   )
     return invalid();
-  const jobIds = new Set([...byId.keys(), ...retiredIds]);
-  const queues = new Map<string, number>();
-  for (const job of economy.production) {
-    const producer = byId.get(job?.producerId);
-    const unit = job && definitions.get(job.definitionId);
-    if (
-      !producer ||
-      producer.construction !== undefined ||
-      !unit ||
-      !isId(job.actorId) ||
-      jobIds.has(job.actorId) ||
-      !definitions
-        .get(producer.definitionId)
-        ?.production?.unitDefinitionIds.includes(unit.id) ||
-      job.paidCost !== costAmount(unit) ||
-      !isCount(job.completedTicks) ||
-      job.totalTicks !== secondsToTicks(unit.trainingSeconds, tickSeconds) ||
-      job.completedTicks > job.totalTicks ||
-      typeof job.exitBlocked !== "boolean"
-    )
-      return invalid();
-    jobIds.add(job.actorId);
-    const count = (queues.get(job.producerId) ?? 0) + 1;
-    if (count > PRODUCTION_QUEUE_LIMIT) return invalid();
-    queues.set(job.producerId, count);
-    if (unit.harvesting) {
-      if (
-        assigned.has(job.producerId) ||
-        definitions.get(producer.definitionId)?.refinery
-          ?.harvesterDefinitionId !== unit.id
-      )
-        return invalid();
-      assigned.add(job.producerId);
-    }
-  }
-}
-
-export function refineryOccupied(
-  economy: Pick<EconomyView, "harvesters" | "production">,
-  refineryId: string,
-) {
-  return (
-    economy.harvesters.some((worker) => worker.refineryId === refineryId) ||
-    economy.production.some((job) => job.producerId === refineryId)
-  );
 }
 
 /** Cheapest Refinery and Harvester pair the owner of `actors` still needs. */
@@ -599,26 +555,22 @@ export function applyEconomyCommand(
   { retire, refund }: EconomyCommandHooks,
 ): EconomyReason | undefined {
   if (command.kind === "cancel-production") {
-    const index = economy.production.findIndex(
-      (job) => job.actorId === command.actorId,
-    );
-    if (index < 0) return "missing-order";
-    const [job] = economy.production.splice(index, 1);
+    const job = cancelProduction(economy.production, command.actorId);
+    if (!job) return "missing-order";
     const producer = actors.find((actor) => actor.id === job.producerId)!;
     refund(producer.owner, definitions.get(job.definitionId)!, job.paidCost);
     retire(job.actorId);
     return;
   }
-  const candidate = actors.find((actor) => actor.id === command.actorId);
+  const actor = actors.find((actor) => actor.id === command.actorId);
   if (
     command.kind === "tend" ||
-    (candidate && definitions.get(candidate.definitionId)?.cultivation)
+    (actor && definitions.get(actor.definitionId)?.cultivation)
   )
     return applyCultivationCommand(command, economy, actors, definitions);
   const worker = economy.harvesters.find(
     (worker) => worker.actorId === command.actorId,
   );
-  const actor = actors.find((actor) => actor.id === command.actorId);
   if (!worker || !actor) return "invalid-harvester";
   if (command.kind === "assign-refinery") {
     const refinery = actors.find((actor) => actor.id === command.refineryId);
@@ -636,11 +588,8 @@ export function applyEconomyCommand(
     )
       return "refinery-occupied";
     worker.refineryId = refinery.id;
-    worker.phase = worker.cargo
-      ? "returning"
-      : worker.targetSiteId
-        ? "travelling"
-        : "idle";
+    if (worker.cargo) worker.phase = "returning";
+    else worker.phase = worker.targetSiteId ? "travelling" : "idle";
   } else if (command.kind === "gather") {
     if (!economy.sites.some((site) => site.id === command.siteId))
       return "missing-site";
@@ -656,7 +605,6 @@ export function applyEconomyCommand(
   clearCombatOrders(actor);
   delete worker.activeSiteId;
   delete worker.retryNavigationVersion;
-  return;
 }
 
 /**
@@ -669,11 +617,7 @@ export function removeEconomyActor(
   retire: (id: string) => void,
 ): string[] {
   const interrupted: string[] = [];
-  for (const job of economy.production)
-    if (job.producerId === actorId) retire(job.actorId);
-  economy.production = economy.production.filter(
-    (job) => job.producerId !== actorId,
-  );
+  removeProducer(economy, actorId, retire);
   if (economy.cultivation) {
     economy.cultivation.workers = economy.cultivation.workers.filter(
       (worker) => worker.actorId !== actorId,
@@ -714,24 +658,20 @@ export function updateEconomy(
   updateInfrastructure(economy, world);
   const disconnected = disconnectedBuildings(world.support());
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
-  const producers = [
-    ...new Set(economy.production.map((job) => job.producerId)),
-  ].sort();
-  for (const id of producers) {
-    if (disconnected.has(id)) continue;
-    const job = economy.production.find((job) => job.producerId === id)!;
-    if (job.completedTicks < job.totalTicks) job.completedTicks += 1;
-    if (job.completedTicks < job.totalTicks) continue;
-    const result = world.evaluateSpawn(job);
-    job.exitBlocked = !result.accepted;
-    if (!("actor" in result)) continue;
-    economy.production.splice(economy.production.indexOf(job), 1);
-    enrollWorker(economy, job.actorId, definitions.get(job.definitionId)!, id);
-    world.spawn(result.actor, id);
-    byId.set(result.actor.id, result.actor);
-  }
-  const near = (actor: Actor, point: WorldPosition) =>
-    distance(actor.worldPosition, point) < map.tileSize * 0.3;
+  advanceProduction(economy.production, {
+    paused: (id) => disconnected.has(id),
+    evaluateSpawn: world.evaluateSpawn,
+    spawn: ({ actorId, definitionId, producerId }, actor) => {
+      enrollWorker(
+        economy,
+        actorId,
+        definitions.get(definitionId)!,
+        producerId,
+      );
+      world.spawn(actor, producerId);
+      byId.set(actor.id, actor);
+    },
+  });
   const { reachable, entrance } = workerNavigation(world);
   const block = (worker: HarvesterState) => {
     worker.phase = "blocked";
@@ -854,6 +794,8 @@ export function updateEconomy(
       delete worker.activeSiteId;
     }
   }
+  const near = (actor: Actor, point: WorldPosition) =>
+    distance(actor.worldPosition, point) < map.tileSize * 0.3;
   for (const loot of economy.loot) {
     if (loot.collected) continue;
     const point = map.tileCenter(loot.tile.x, loot.tile.z);

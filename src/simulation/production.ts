@@ -1,8 +1,11 @@
 import { withinBounds } from "./world";
 import type { WorldBounds } from "./world";
 import { createActor } from "./actor";
+import { secondsToTicks } from "./clock";
 import { tileKey } from "./grid";
-import { isId } from "./validation";
+import { costAmount } from "./resources";
+import { canAfford } from "./stockpiles";
+import { isCount, isId } from "./validation";
 import {
   adjacentTiles,
   isTilePlacedActor,
@@ -12,6 +15,7 @@ import {
 
 import type { Actor, ActorBehavior, ActorDefinition } from "./actor";
 import type { TrainUnitCommand } from "./command";
+import type { EconomyState, EconomyView } from "./economy";
 import type { TileCoord } from "./grid";
 import type { OccupancyView } from "./occupancy";
 import type { TerrainView } from "./terrain";
@@ -86,7 +90,7 @@ export function validateProductionDefinitions(
 
 export type ProductionWorld = {
   actors: readonly Actor[];
-  usedIds: ReadonlySet<string>;
+  usedIds: Pick<ReadonlySet<string>, "has">;
   definitions: ReadonlyMap<string, ActorDefinition>;
   canStandAt: (unit: ActorDefinition, tile: TileCoord) => boolean;
   map?: TerrainView;
@@ -94,7 +98,7 @@ export type ProductionWorld = {
   bounds: WorldBounds;
 };
 
-/** Checks the staged tick's world, including units trained earlier that tick. */
+/** Checks the staged world, including units trained earlier in the tick. */
 export function evaluateTraining(
   command: TrainUnitCommand,
   {
@@ -167,4 +171,173 @@ export function evaluateTraining(
     };
   }
   return reject("exit-blocked");
+}
+
+/** A paid order; only the first order for each producer advances. */
+export type ProductionJob = {
+  actorId: string;
+  producerId: string;
+  definitionId: string;
+  paidCost: number;
+  completedTicks: number;
+  totalTicks: number;
+  exitBlocked: boolean;
+};
+
+/** Outstanding paid orders one producer may hold. */
+export const PRODUCTION_QUEUE_LIMIT = 5;
+
+type Queues = Pick<EconomyView, "harvesters" | "production">;
+
+/** A Refinery holds one Harvester, fielded or paid. */
+export function refineryOccupied(economy: Queues, refineryId: string) {
+  return (
+    economy.harvesters.some((worker) => worker.refineryId === refineryId) ||
+    economy.production.some((job) => job.producerId === refineryId)
+  );
+}
+
+/** Why a paid order cannot join the producer's queue, if anything. */
+export function productionRejection(
+  economy: EconomyView,
+  producer: Pick<Actor, "id" | "owner">,
+  unit: ActorDefinition,
+): TrainingReason | undefined {
+  if (!canAfford(economy, producer.owner, unit))
+    return "insufficient-resources";
+  if (
+    economy.production.filter((job) => job.producerId === producer.id).length >=
+    PRODUCTION_QUEUE_LIMIT
+  )
+    return "queue-full";
+  if (unit.harvesting && refineryOccupied(economy, producer.id))
+    return "refinery-occupied";
+  return undefined;
+}
+
+export function createProductionJob(
+  { actorId, producerId }: Pick<TrainUnitCommand, "actorId" | "producerId">,
+  unit: ActorDefinition,
+  paidCost: number,
+  tickSeconds: number,
+): ProductionJob {
+  return {
+    actorId,
+    producerId,
+    definitionId: unit.id,
+    paidCost,
+    completedTicks: 0,
+    totalTicks: secondsToTicks(unit.trainingSeconds, tickSeconds),
+    exitBlocked: false,
+  };
+}
+
+/**
+ * Advances each unpaused producer's first order in producer-ID order. A
+ * finished order leaves its queue once its unit has an exit; otherwise it
+ * waits with `exitBlocked` set.
+ */
+export function advanceProduction(
+  production: ProductionJob[],
+  {
+    paused,
+    evaluateSpawn,
+    spawn,
+  }: {
+    paused: (producerId: string) => boolean;
+    evaluateSpawn: (job: ProductionJob) => TrainingEvaluation;
+    spawn: (job: ProductionJob, actor: Actor) => void;
+  },
+) {
+  const producers = [...new Set(production.map((job) => job.producerId))];
+  for (const id of producers.sort()) {
+    if (paused(id)) continue;
+    const job = production.find((job) => job.producerId === id)!;
+    if (job.completedTicks < job.totalTicks) job.completedTicks += 1;
+    if (job.completedTicks < job.totalTicks) continue;
+    const result = evaluateSpawn(job);
+    job.exitBlocked = !result.accepted;
+    if (!("actor" in result)) continue;
+    production.splice(production.indexOf(job), 1);
+    spawn(job, result.actor);
+  }
+}
+
+/** Removes a cancelled order and returns it for its refund. */
+export function cancelProduction(
+  production: ProductionJob[],
+  actorId: string,
+): ProductionJob | undefined {
+  const index = production.findIndex((job) => job.actorId === actorId);
+  return index < 0 ? undefined : production.splice(index, 1)[0];
+}
+
+/** A lost producer loses its paid orders without refunds. */
+export function removeProducer(
+  economy: Pick<EconomyState, "production">,
+  producerId: string,
+  retire: (actorId: string) => void,
+) {
+  for (const job of economy.production)
+    if (job.producerId === producerId) retire(job.actorId);
+  economy.production = economy.production.filter(
+    (job) => job.producerId !== producerId,
+  );
+}
+
+/**
+ * Whether saved orders match their producers, costs, and timings, and each
+ * reserves an ID no actor, retired actor, or other order uses.
+ */
+export function isValidProductionQueue(
+  economy: Queues,
+  {
+    actors,
+    retiredIds,
+    definitions,
+    tickSeconds,
+  }: {
+    actors: ReadonlyMap<string, Actor>;
+    retiredIds: readonly string[];
+    definitions: ReadonlyMap<string, ActorDefinition>;
+    tickSeconds: number;
+  },
+): boolean {
+  const ids = new Set([...actors.keys(), ...retiredIds]);
+  const queues = new Map<string, number>();
+  const refineries = new Set(
+    economy.harvesters.flatMap(({ refineryId }) => refineryId ?? []),
+  );
+  for (const job of economy.production) {
+    const producer = actors.get(job?.producerId);
+    const unit = job && definitions.get(job.definitionId);
+    const trains = producer && definitions.get(producer.definitionId);
+    if (
+      !producer ||
+      producer.construction !== undefined ||
+      !unit ||
+      !isId(job.actorId) ||
+      ids.has(job.actorId) ||
+      !trains?.production?.unitDefinitionIds.includes(unit.id) ||
+      job.paidCost !== costAmount(unit) ||
+      !isCount(job.completedTicks) ||
+      job.totalTicks !== secondsToTicks(unit.trainingSeconds, tickSeconds) ||
+      job.completedTicks > job.totalTicks ||
+      typeof job.exitBlocked !== "boolean"
+    )
+      return false;
+    ids.add(job.actorId);
+    const count = (queues.get(job.producerId) ?? 0) + 1;
+    if (count > PRODUCTION_QUEUE_LIMIT) return false;
+    queues.set(job.producerId, count);
+    if (unit.harvesting) {
+      if (
+        refineries.has(job.producerId) ||
+        trains.refinery?.harvesterDefinitionId !== unit.id
+      )
+        return false;
+      refineries.add(job.producerId);
+    }
+  }
+  return true;
 }

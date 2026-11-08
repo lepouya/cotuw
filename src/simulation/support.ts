@@ -1,8 +1,7 @@
-import { deepFreeze } from "./actor";
-import type { ActorDefinition, ActorRenderState, DeepReadonly } from "./actor";
-import { compareIds } from "./actor";
-import { distance } from "./world";
+import { compareIds, deepFreeze } from "./actor";
 import { isPositive } from "./validation";
+import { distance } from "./world";
+import type { ActorDefinition, ActorRenderState, DeepReadonly } from "./actor";
 import type { WorldPosition } from "./world";
 
 export type SupportNode = {
@@ -247,7 +246,7 @@ export function supportsPosition(
   );
 }
 
-/** Whether the recipient's own completed buildings cover a point, powered or not. */
+/** Whether the recipient's completed buildings cover a point, powered or not. */
 export function ownedCoverage(
   network: Pick<SupportView, "nodes">,
   point: Readonly<WorldPosition>,

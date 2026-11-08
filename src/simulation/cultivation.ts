@@ -13,6 +13,7 @@ import type { Actor, ActorDefinition, DeepReadonly } from "./actor";
 import type { EconomyCommand } from "./command";
 import type { EconomyReason, EconomyState, EconomyWorld } from "./economy";
 import type { TileCoord } from "./grid";
+import type { WorldPosition } from "./world";
 
 const rateUnits = (rate: number) => Math.round(rate * RESOURCE_SCALE);
 export type CultivationSite = {
@@ -86,20 +87,18 @@ export function createCultivationSite(
 export function cultivationEfficiency(
   site: DeepReadonly<CultivationSite>,
 ): number {
-  return site.dormant
-    ? 0
-    : site.reserve >= site.slowBelow
-      ? 1
-      : 0.5 +
-        (0.5 * Math.max(0, site.reserve - site.dormantBelow)) /
-          (site.slowBelow - site.dormantBelow);
+  if (site.dormant) return 0;
+  if (site.reserve >= site.slowBelow) return 1;
+  // Falls linearly from full speed to half speed at the dormancy threshold.
+  return (
+    0.5 +
+    (0.5 * Math.max(0, site.reserve - site.dormantBelow)) /
+      (site.slowBelow - site.dormantBelow)
+  );
 }
 export function cultivationStatus(site: DeepReadonly<CultivationSite>) {
-  return site.dormant
-    ? "Dormant"
-    : site.reserve < site.slowBelow
-      ? "Strained"
-      : "Healthy";
+  if (site.dormant) return "Dormant";
+  return site.reserve < site.slowBelow ? "Strained" : "Healthy";
 }
 export function interruptCultivation(actor: Actor, economy?: EconomyState) {
   const worker = economy?.cultivation?.workers.find(
@@ -172,7 +171,7 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
   const route = (
     actor: Actor,
     worker: CultivatorState,
-    point: { x: number; z: number },
+    point: WorldPosition,
   ) => {
     const result = advanceWorkerRoute(actor, point, world, map.tileSize * 0.75);
     if (result === "blocked") worker.phase = "blocked";
@@ -185,14 +184,13 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     compareIds(a.actorId, b.actorId),
   )) {
     const actor = byId.get(worker.actorId)!;
-    const definition = definitions.get(actor.definitionId)!;
+    const { capacity, rate } = definitions.get(
+      actor.definitionId,
+    )!.cultivation!;
     if (worker.tendingId || worker.phase === "idle") continue;
     const site = state.sites.find((site) => site.id === worker.siteId);
     // Full or stranded cargo goes home before more gathering.
-    if (
-      worker.cargo >= definition.cultivation!.capacity ||
-      (site?.dormant && worker.cargo)
-    )
+    if (worker.cargo >= capacity || (site?.dormant && worker.cargo))
       worker.phase = "returning";
     if (
       ["returning", "no-dropoff"].includes(worker.phase) ||
@@ -256,7 +254,7 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     }
     worker.phase = "gathering";
     worker.rateProgress +=
-      rateUnits(definition.cultivation!.rate) *
+      rateUnits(rate) *
       Math.round(cultivationEfficiency(site) * RESOURCE_SCALE);
     const available = Math.floor(
       worker.rateProgress / (perSecond * RESOURCE_SCALE),
@@ -265,8 +263,7 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     const amount = Math.min(
       available,
       site.reserve - site.dormantBelow,
-      (definition.cultivation!.capacity - worker.cargo) * RESOURCE_SCALE -
-        worker.gatherProgress,
+      (capacity - worker.cargo) * RESOURCE_SCALE - worker.gatherProgress,
     );
     site.reserve -= amount;
     gatherCargo(worker, site.id, amount);

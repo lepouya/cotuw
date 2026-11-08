@@ -26,7 +26,9 @@ import {
   separateMobileActors,
 } from "./group-movement";
 import {
+  createProductionJob,
   evaluateTraining as evaluateUnitTraining,
+  productionRejection,
   trainableUnitIds,
   validateProductionDefinitions,
 } from "./production";
@@ -104,8 +106,6 @@ import {
   economySites,
   interruptWorker,
   workerHasOrder,
-  PRODUCTION_QUEUE_LIMIT,
-  refineryOccupied,
   removeEconomyActor,
   saleRefund,
   updateEconomy,
@@ -915,7 +915,7 @@ export function createMissionSimulation({
   const evaluateTraining = (
     command: TrainUnitCommand,
     actors: readonly Actor[],
-    usedIds: ReadonlySet<string>,
+    usedIds: Pick<ReadonlySet<string>, "has">,
     economy?: EconomyState,
   ): TrainingEvaluation => {
     if (
@@ -937,22 +937,14 @@ export function createMissionSimulation({
       economy &&
       (evaluation.accepted || evaluation.reason === "exit-blocked")
     ) {
-      const definition = definitionsById.get(command.definitionId)!;
-      const producer = actors.find(({ id }) => id === command.producerId)!;
-      if (!canAfford(economy, producer.owner, definition))
-        return { accepted: false, reason: "insufficient-resources" };
-      if (
-        economy.production.filter(
-          (job) => job.producerId === command.producerId,
-        ).length >= PRODUCTION_QUEUE_LIMIT
-      )
-        return { accepted: false, reason: "queue-full" };
-      if (
-        definition.harvesting &&
-        refineryOccupied(economy, command.producerId)
-      )
-        return { accepted: false, reason: "refinery-occupied" };
-      return { accepted: true, queued: true };
+      const reason = productionRejection(
+        economy,
+        actors.find(({ id }) => id === command.producerId)!,
+        definitionsById.get(command.definitionId)!,
+      );
+      return reason
+        ? { accepted: false, reason }
+        : { accepted: true, queued: true };
     }
     if (evaluation.accepted && "actor" in evaluation) {
       try {
@@ -1632,16 +1624,14 @@ export function createMissionSimulation({
       if (working.economy) {
         const definition = definitionsById.get(applied.definitionId)!;
         const producer = working.actorsById.get(applied.producerId)!;
-        const cost = pay(working, producer.owner, definition);
-        working.economy.production.push({
-          actorId: applied.actorId,
-          producerId: applied.producerId,
-          definitionId: applied.definitionId,
-          paidCost: cost,
-          completedTicks: 0,
-          totalTicks: secondsToTicks(definition.trainingSeconds, tickSeconds),
-          exitBlocked: false,
-        });
+        working.economy.production.push(
+          createProductionJob(
+            applied,
+            definition,
+            pay(working, producer.owner, definition),
+            tickSeconds,
+          ),
+        );
         working.usedIds.add(applied.actorId);
       } else if ("actor" in evaluation) {
         stageProducedActor(working, evaluation.actor, applied.producerId);
@@ -2037,7 +2027,8 @@ export function createMissionSimulation({
                 evaluateTraining(
                   { kind: "train-unit", actorId, producerId, definitionId },
                   working.actors,
-                  new Set([...working.usedIds].filter((id) => id !== actorId)),
+                  // The job's own reserved ID is free for its unit.
+                  { has: (id) => id !== actorId && working.usedIds.has(id) },
                 ),
               support: () => supportFor(working.actors),
               income: working.match?.income,

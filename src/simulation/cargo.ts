@@ -60,6 +60,7 @@ export function validCargoSources(
   const sources = worker.cargoSources === undefined ? [] : worker.cargoSources;
   return (
     Array.isArray(sources) &&
+    // `Array.from` visits holes in untrusted arrays, which `every` skips.
     Array.from(sources).every(
       (source) =>
         source &&
