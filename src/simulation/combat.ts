@@ -519,8 +519,15 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     nearestTarget: (actor, radius, accept = () => true) => {
       let nearest: Actor | undefined;
       let nearestDistance = radius;
+      const { x, z } = actor.worldPosition;
       // Ascending IDs keep the first of equally near targets.
       for (const target of sorted) {
+        // Most actors are far away, and this scan runs for every idle guard.
+        if (
+          Math.abs(target.worldPosition.x - x) > nearestDistance ||
+          Math.abs(target.worldPosition.z - z) > nearestDistance
+        )
+          continue;
         const gap = distance(actor.worldPosition, target.worldPosition);
         if (
           gap > nearestDistance ||

@@ -539,6 +539,23 @@ describe("mission commands", () => {
 });
 
 describe("mission state", () => {
+  test("staged JSON data cannot inject inherited actor orders", () => {
+    const authored = {
+      ...actor(),
+      ["__proto__"]: { orders: [{ kind: "move", target: { x: 8, z: 8 } }] },
+    };
+    const simulation = mission([authored]);
+    try {
+      simulation.tick();
+      expect(simulation.actors[0]!.worldPosition).toEqual({ x: 0, z: 0 });
+      expect(JSON.stringify(simulation.snapshot().actors[0])).toBe(
+        JSON.stringify(authored),
+      );
+    } finally {
+      simulation.dispose();
+    }
+  });
+
   test("never changes the caller's state or actors", () => {
     const trooper = actor();
     const state = createMissionState([trooper]);

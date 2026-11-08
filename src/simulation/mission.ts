@@ -33,7 +33,7 @@ import {
 import type { BuildingActivity, TrainingEvaluation } from "./production";
 import type { TrainUnitCommand } from "./command";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
-import { clearCombatOrders, deepFreeze } from "./actor";
+import { clearCombatOrders, cloneData, deepFreeze } from "./actor";
 import {
   ACTOR_ORDER_KINDS,
   isCommandIssuer,
@@ -200,7 +200,7 @@ function actorIdentity(actor: Actor): ActorIdentity {
     definitionId: actor.definitionId,
     owner: actor.owner,
     occupancyLayer: actor.occupancyLayer,
-    tilePlacement: actor.tilePlacement && structuredClone(actor.tilePlacement),
+    tilePlacement: actor.tilePlacement && cloneData(actor.tilePlacement),
   };
 }
 
@@ -1054,7 +1054,7 @@ export function createMissionSimulation({
     });
   /** Copies committed state for changes that commit together. */
   const stageWorking = (): WorkingActors => {
-    const actors = state.actors.map((actor) => structuredClone(actor));
+    const actors = state.actors.map((actor) => cloneData(actor));
     return {
       match:
         state.metrics && recordMatch(state.metrics, matchContext!, state.tick),
@@ -1064,10 +1064,10 @@ export function createMissionSimulation({
       retiredIds: [...state.retiredActorIds],
       lifecycleChanges: 0,
       activity: [],
-      economy: state.economy && structuredClone(state.economy),
+      economy: state.economy && cloneData(state.economy),
       wrecks: [...state.wrecks],
-      wildlife: structuredClone(state.wildlife),
-      objectives: structuredClone(state.objectives),
+      wildlife: cloneData(state.wildlife),
+      objectives: cloneData(state.objectives),
     };
   };
 

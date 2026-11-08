@@ -20,7 +20,14 @@ export function containsGridPoint(
   width: number,
   height: number,
 ): boolean {
-  return isTileCoord({ x, z }) && x >= 0 && z >= 0 && x < width && z < height;
+  return (
+    Number.isSafeInteger(x) &&
+    Number.isSafeInteger(z) &&
+    x >= 0 &&
+    z >= 0 &&
+    x < width &&
+    z < height
+  );
 }
 
 export function tileBounds(tiles: readonly TileCoord[]): TerrainBounds {

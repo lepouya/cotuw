@@ -315,6 +315,26 @@ export function deepFreeze<T>(value: T): T {
   return value;
 }
 
+/** Copies JSON-shaped state; per-tick copies make `structuredClone` too slow. */
+export function cloneData<T>(value: T): T {
+  if (typeof value !== "object" || value === null) return value;
+  if (Array.isArray(value)) return value.map(cloneData) as T;
+  const copy: Record<string, unknown> = {};
+  for (const key of Object.keys(value)) {
+    const child = cloneData((value as Record<string, unknown>)[key]);
+    // JSON keys must remain data, including this inherited setter's name.
+    if (key === "__proto__")
+      Object.defineProperty(copy, key, {
+        value: child,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    else copy[key] = child;
+  }
+  return copy as T;
+}
+
 /** The immutable subset of actor state a renderer needs to present an actor. */
 export type ActorRenderState = DeepReadonly<
   Pick<
