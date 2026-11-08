@@ -2,7 +2,8 @@ import { Matrix, NullEngine, Scene, Vector3 } from "@babylonjs/core";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { TerrainMap } from "../src/map";
-import { createBuildingPlacement } from "../src/render/building-placement";
+import { createPlacementPreview } from "../src/render/placement-preview";
+import { createBuildingPlacement } from "../src/ui/building-placement";
 import {
   createMissionSimulation,
   createMissionState,
@@ -91,15 +92,19 @@ function fixture(
   });
   vi.spyOn(scene, "getTransformMatrix").mockReturnValue(Matrix.Identity());
   const onPlaced = vi.fn();
-  const placement = createBuildingPlacement(
+  const preview = createPlacementPreview(
     canvas as unknown as HTMLCanvasElement,
     scene,
     map,
+    [definition],
+    new Map([[definition.id, { height: 0.3, color: [0.2, 0.4, 0.6] }]]),
+  );
+  const placement = createBuildingPlacement(
+    canvas as unknown as HTMLCanvasElement,
+    map,
     simulation,
     {
-      appearances: new Map([
-        [definition.id, { height: 0.3, color: [0.2, 0.4, 0.6] }],
-      ]),
+      preview,
       buildings: [
         {
           definition,
@@ -109,7 +114,7 @@ function fixture(
       ],
       controls: controls as unknown as Parameters<
         typeof createBuildingPlacement
-      >[4]["controls"],
+      >[3]["controls"],
       onPlaced,
       onStart: () => {},
     },
@@ -134,6 +139,7 @@ function fixture(
     },
     dispose: () => {
       placement.dispose();
+      preview.dispose();
       simulation.dispose();
       engine.dispose();
     },

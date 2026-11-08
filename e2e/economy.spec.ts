@@ -663,8 +663,6 @@ test("Harvester controls use matching Refineries and type-specific load timing",
     const controls = createEconomyControls(
       sidebar.controls.economy!,
       {
-        actors: snapshot.actors,
-        playerOwner: "player",
         support: undefined,
         tickSeconds: 1 / 60,
         submitCommand: (command) => {
@@ -675,7 +673,10 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       {
         definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
         names: new Map(),
+        owner: "player",
         faction: "arc",
+        ownActors: () =>
+          snapshot.actors.filter((actor) => actor.owner === "player"),
         selectedActorId: () => worker.actorId,
         enabled: () => true,
         focus: () => {},
@@ -776,8 +777,6 @@ test("worker controls share delivery actions and tolerate missions without culti
       createEconomyControls(
         sidebar.controls.economy!,
         {
-          actors,
-          playerOwner: "player",
           support: undefined,
           tickSeconds: 1 / 60,
           submitCommand: (
@@ -790,7 +789,9 @@ test("worker controls share delivery actions and tolerate missions without culti
         {
           definitions,
           names,
+          owner: "player",
           faction: playerFaction,
+          ownActors: () => actors.filter((actor) => actor.owner === "player"),
           selectedActorId: () => selection,
           enabled: () => true,
           focus: () => {},

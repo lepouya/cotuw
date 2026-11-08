@@ -1,7 +1,9 @@
+import { setText } from "./dom";
+
+import type { ActorRenderState } from "../simulation/actor";
+import type { CommandOutcome } from "../simulation/command";
 import type { MissionSimulation } from "../simulation/mission";
 import type { WorldPosition } from "../simulation/world";
-import type { CommandOutcome } from "../simulation/command";
-import { setText } from "./dom";
 
 export type RallyControls = {
   rally?: {
@@ -16,10 +18,12 @@ export type RallyControls = {
 const RALLY_ACTIONS = ["set", "clear", "cancel"] as const;
 
 export function createRallyControls(
-  simulation: MissionSimulation,
+  simulation: Pick<MissionSimulation, "submitCommand" | "evaluateRallyPoint">,
   controls: RallyControls,
   options: {
-    selectedActorId: () => string | undefined;
+    /** The selected building the player controls. */
+    selectedActor: () =>
+      Pick<ActorRenderState, "id" | "definitionId" | "rallyPoint"> | undefined;
     isProducer: (definitionId: string) => boolean;
     enabled: () => boolean;
     onStart: () => void;
@@ -43,7 +47,7 @@ export function createRallyControls(
       "click",
       () => {
         if (!options.enabled()) return;
-        const id = options.selectedActorId();
+        const id = options.selectedActor()?.id;
         if (action === "cancel") cancel();
         else if (id && action === "set") {
           options.onStart();
@@ -77,8 +81,8 @@ export function createRallyControls(
       cancel();
     },
     refresh: () => {
-      const id = options.selectedActorId();
-      const actor = id && simulation.actorById(id);
+      const actor = options.selectedActor();
+      const id = actor?.id;
       const producer = !!actor && options.isProducer(actor.definitionId);
       if (id !== knownSelection) {
         result = "";
@@ -91,15 +95,14 @@ export function createRallyControls(
           const button = elements[action];
           button.hidden = action === "cancel" && !choosingFor;
           button.disabled =
-            !options.enabled() ||
-            (action === "clear" && (!actor || !actor.rallyPoint));
+            !options.enabled() || (action === "clear" && !actor?.rallyPoint);
         }
         setText(
           elements.status,
           result ||
             (choosingFor
               ? "Click or tap explored, passable ground. Cancel or Esc exits."
-              : actor && actor.rallyPoint
+              : actor?.rallyPoint
                 ? "New units move to the marked rally point."
                 : "New units exit and idle beside this building."),
         );
@@ -108,7 +111,7 @@ export function createRallyControls(
     onOutcome: (outcome: CommandOutcome) => {
       if (
         outcome.command.kind === "set-rally-point" &&
-        outcome.command.actorId === options.selectedActorId()
+        outcome.command.actorId === options.selectedActor()?.id
       )
         result = outcome.accepted
           ? ""

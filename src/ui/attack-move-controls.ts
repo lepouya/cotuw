@@ -1,4 +1,6 @@
 import { moveCommand } from "../simulation/command";
+import { setText } from "./dom";
+
 import type { MissionSimulation } from "../simulation/mission";
 import type { WorldPosition } from "../simulation/world";
 
@@ -9,7 +11,7 @@ export type AttackMoveControls = {
 };
 
 export function createAttackMoveControls(
-  simulation: MissionSimulation,
+  simulation: Pick<MissionSimulation, "submitCommand">,
   controls: AttackMoveControls,
   options: {
     selectedMobileIds: () => readonly string[];
@@ -20,9 +22,7 @@ export function createAttackMoveControls(
 ) {
   const controller = new AbortController();
   let choosingFor: string[] = [];
-  const message = (text: string) => {
-    if (controls.movementStatus) controls.movementStatus.textContent = text;
-  };
+  const message = (text: string) => setText(controls.movementStatus, text);
   const cancel = () => {
     if (!choosingFor.length) return false;
     choosingFor = [];
@@ -68,12 +68,10 @@ export function createAttackMoveControls(
     },
     refresh: () => {
       const ids = options.selectedMobileIds();
-      if (
-        choosingFor.length &&
-        (!options.enabled() ||
-          JSON.stringify(ids) !== JSON.stringify(choosingFor))
-      )
-        cancel();
+      const reselected =
+        ids.length !== choosingFor.length ||
+        ids.some((id, index) => id !== choosingFor[index]);
+      if (choosingFor.length && (!options.enabled() || reselected)) cancel();
       if (controls.attackMove) {
         controls.attackMove.hidden = !ids.length;
         controls.attackMove.disabled = !options.enabled();

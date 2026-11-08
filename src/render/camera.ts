@@ -8,11 +8,7 @@ import {
 
 import { createPointerGesture } from "./pointer-gesture";
 import { createEdgePan } from "./edge-pan";
-import {
-  worldInputAvailable,
-  worldKeyboardAvailable,
-  isTextEntry,
-} from "./input-focus";
+import { worldInputAvailable } from "./input-focus";
 
 import type { TerrainMap } from "../map";
 
@@ -48,12 +44,13 @@ const TRANSITION_SECONDS = 0.3;
 const FOLLOW_RATE = 8;
 const CONTINUOUS_PAN_SPEED = 3;
 const PAN_VIEW_FRACTION = 0.18;
-const PAN_KEYS: Readonly<Record<string, readonly [number, number]>> = {
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-};
+/** Screen directions by physical key (`KeyboardEvent.code`). */
+const PAN_KEYS: ReadonlyMap<string, readonly [number, number]> = new Map([
+  ["ArrowUp", [0, -1]],
+  ["ArrowDown", [0, 1]],
+  ["ArrowLeft", [-1, 0]],
+  ["ArrowRight", [1, 0]],
+]);
 
 /** Isometric faces a diagonal, Grid a cardinal direction, Top-down north. */
 export type CameraPreset = "isometric" | "top-down" | "grid";
@@ -73,6 +70,8 @@ export type StrategyCamera = {
   readonly primaryPanActive: boolean;
   readonly onPanChangedObservable: Observable<void>;
   setPanMode: (active: boolean) => void;
+  /** Ends Pan mode and held-key panning; returns whether either was active. */
+  cancelPan: () => boolean;
   readonly edgePanEnabled: boolean;
   setEdgePanEnabled: (active: boolean) => void;
   /**
@@ -431,30 +430,18 @@ export function createStrategyCamera(
       event.defaultPrevented ||
       event.ctrlKey ||
       event.metaKey ||
-      event.altKey
+      event.altKey ||
+      !ownsKeyboard()
     )
       return;
-    if (
-      event.key === "Escape" &&
-      primaryPanActive() &&
-      worldKeyboardAvailable(document) &&
-      !isTextEntry(document?.activeElement)
-    ) {
-      clearKeys();
-      setPanMode(false);
-      event.stopImmediatePropagation();
-      event.preventDefault();
-      return;
-    }
-    if (!ownsKeyboard()) return;
     if (event.code === "Space") {
       if (!spaceHeld) {
         spaceHeld = true;
         panChanged();
       }
-    } else if (PAN_KEYS[event.key]) {
+    } else if (PAN_KEYS.has(event.code)) {
       glide = undefined;
-      panKeys.add(event.key);
+      panKeys.add(event.code);
     } else return;
     event.preventDefault();
   };
@@ -462,7 +449,7 @@ export function createStrategyCamera(
     if (event.code === "Space" && spaceHeld) {
       spaceHeld = false;
       panChanged();
-    } else if (!panKeys.delete(event.key)) return;
+    } else if (!panKeys.delete(event.code)) return;
     event.preventDefault();
   };
   const edgePan = createEdgePan(canvas);
@@ -472,8 +459,9 @@ export function createStrategyCamera(
     let horizontal = 0;
     let vertical = 0;
     for (const key of panKeys) {
-      horizontal += PAN_KEYS[key][0];
-      vertical += PAN_KEYS[key][1];
+      const [x, z] = PAN_KEYS.get(key)!;
+      horizontal += x;
+      vertical += z;
     }
     // Keyboard direction takes precedence over an unattended cursor.
     const edge = edgePan.advance(seconds);
@@ -503,7 +491,6 @@ export function createStrategyCamera(
   const listeners = new AbortController();
   const { signal } = listeners;
   canvas.addEventListener("wheel", zoom, { passive: false, signal });
-  // Capture lets Escape leave Pan mode before world tools see it.
   host?.addEventListener("keydown", keyDown, { capture: true, signal });
   host?.addEventListener("keyup", keyUp, { signal });
   host?.addEventListener("blur", clearKeys, { signal });
@@ -542,6 +529,12 @@ export function createStrategyCamera(
     },
     onPanChangedObservable,
     setPanMode,
+    cancelPan: () => {
+      if (!primaryPanActive()) return false;
+      clearKeys();
+      setPanMode(false);
+      return true;
+    },
     get edgePanEnabled() {
       return edgePan.enabled;
     },

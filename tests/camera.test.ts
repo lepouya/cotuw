@@ -223,6 +223,21 @@ describe("keyboard camera navigation", () => {
     }
   });
 
+  test("cancelling Pan ends Pan mode and held Space panning", () => {
+    const fixture = navigationFixture();
+    try {
+      expect(fixture.navigation.cancelPan()).toBe(false);
+      fixture.navigation.setPanMode(true);
+      fixture.key("keydown", " ", "Space");
+      expect(fixture.navigation.cancelPan()).toBe(true);
+      expect(fixture.navigation.panMode).toBe(false);
+      expect(fixture.navigation.primaryPanActive).toBe(false);
+      expect(fixture.attributes.get("data-camera-pan-active")).toBe("false");
+    } finally {
+      fixture.dispose();
+    }
+  });
+
   test("keyboard navigation does not claim shortcuts outside the world or after disposal", () => {
     const fixture = navigationFixture();
     fixture.document.activeElement = null;

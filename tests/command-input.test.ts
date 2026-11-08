@@ -169,3 +169,15 @@ test("Shift or Queue Orders mode queues moves and attacks", () => {
     input.dispose();
   }
 });
+
+test("deselect clears selection and reports whether there was any", () => {
+  const { input } = fixture();
+  try {
+    expect(input.deselect()).toBe(false);
+    input.select("unit-1");
+    expect(input.deselect()).toBe(true);
+    expect(input.selectedActorIds).toEqual([]);
+  } finally {
+    input.dispose();
+  }
+});

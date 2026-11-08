@@ -122,17 +122,20 @@ export function createEconomyControls(
   elements: EconomyElements,
   simulation: Pick<
     MissionSimulation,
-    "actors" | "playerOwner" | "tickSeconds" | "submitCommand" | "support"
+    "tickSeconds" | "submitCommand" | "support"
   >,
   options: {
     definitions: readonly ActorDefinition[];
     names: ReadonlyMap<string, string>;
+    /** The player's owner ID. */
+    owner: string;
     /** The player's faction, for its roles and cultivation status. */
     faction: string | undefined;
+    /** The player's own committed actors. */
+    ownActors: () => readonly ActorRenderState[];
     selectedActorId: () => string | undefined;
     enabled: () => boolean;
     queueMode?: () => boolean;
-    canControl?: (actor: ActorRenderState) => boolean;
     focus: (tile: TileCoord) => void;
     /**
      * The player's own workers, production, and balances, with sites and
@@ -146,8 +149,6 @@ export function createEconomyControls(
   const definitions = new Map(
     options.definitions.map((definition) => [definition.id, definition]),
   );
-  const canControl =
-    options.canControl ?? ((actor) => actor.owner === simulation.playerOwner);
   const nameOf = (id: string | undefined) =>
     (id && options.names.get(id)) || "";
   const definitionWith = (
@@ -229,11 +230,9 @@ export function createEconomyControls(
     refresh: () => {
       const economy = options.economy()!;
       const id = options.selectedActorId();
-      const actors = new Map(
-        simulation.actors.map((actor) => [actor.id, actor]),
-      );
-      const selected = id ? actors.get(id) : undefined;
-      const actor = selected && canControl(selected) ? selected : undefined;
+      const owned = options.ownActors();
+      const actors = new Map(owned.map((actor) => [actor.id, actor]));
+      const actor = id ? actors.get(id) : undefined;
       const resourcePatches = patches(economy);
       const definition = actor && definitions.get(actor.definitionId);
       const roles = rolesFor(definition?.id);
@@ -270,9 +269,8 @@ export function createEconomyControls(
       const cultivationSites = cultivation?.sites ?? [];
       const enabled = options.enabled();
       const disconnected = disconnectedBuildings(simulation.support);
-      const refineries = simulation.actors.filter(
-        (actor) =>
-          canControl(actor) && definitions.get(actor.definitionId)?.refinery,
+      const refineries = owned.filter(
+        (actor) => definitions.get(actor.definitionId)?.refinery,
       );
       const details = elements.harvesterActions;
       details.hidden = !worker && !cultivating;
@@ -286,25 +284,25 @@ export function createEconomyControls(
         "aria-label",
         cultivating ? "Cultivation controls" : "Harvesting controls",
       );
+      const cultivatorPhase = ({
+        phase,
+        tendingId,
+      }: Pick<CultivatorState, "phase" | "tendingId">) => {
+        if (phase === "no-dropoff")
+          return `Delivery blocked: no reachable ${dropoff}`;
+        if (phase !== "tending") return CULTIVATOR_PHASES[phase];
+        const tending = actors.get(tendingId ?? "");
+        if (tending?.construction?.active) return "Tending growth";
+        if (!tending?.headquartersId)
+          return `Waiting for an operational ${headquarters}`;
+        if (actor?.movement?.blocked) return "Tending route blocked";
+        if (actor?.movement) return "Travelling to tend growth";
+        return `Waiting for ${headquarters} capacity`;
+      };
       if (cultivating) {
-        const tending = actors.get(cultivating.tendingId ?? "");
-        const phase =
-          cultivating.phase === "no-dropoff"
-            ? `Delivery blocked: no reachable ${dropoff}`
-            : cultivating.phase !== "tending"
-              ? CULTIVATOR_PHASES[cultivating.phase]
-              : tending?.construction?.active
-                ? "Tending growth"
-                : !tending?.headquartersId
-                  ? `Waiting for an operational ${headquarters}`
-                  : actor?.movement?.blocked
-                    ? "Tending route blocked"
-                    : actor?.movement
-                      ? "Travelling to tend growth"
-                      : `Waiting for ${headquarters} capacity`;
         setText(
           elements.harvesterDetails,
-          `Cargo ${cultivating.cargo}/${definition!.cultivation!.capacity} ${resourceName("lifebloom")} · ${phase}`,
+          `Cargo ${cultivating.cargo}/${definition!.cultivation!.capacity} ${resourceName("lifebloom")} · ${cultivatorPhase(cultivating)}`,
         );
         lists.refineryAssignments.update([]);
         lists.gatherSites.update([
@@ -322,12 +320,11 @@ export function createEconomyControls(
                 shiftKey,
               ),
           })),
-          ...simulation.actors
+          ...owned
             .filter(
               (building) =>
                 building.construction &&
-                definitions.get(building.definitionId)?.growth &&
-                canControl(building),
+                definitions.get(building.definitionId)?.growth,
             )
             .map((building) => ({
               key: `tend:${building.id}`,
@@ -415,30 +412,26 @@ export function createEconomyControls(
         lists.refineryAssignments.update([]);
         lists.gatherSites.update([]);
       }
-      const construction = simulation.actors.filter(
-        (actor) => canControl(actor) && actor.construction,
-      );
+      const construction = owned.filter((actor) => actor.construction);
       const constructionStatus = ({
         id,
         definitionId,
         construction,
         headquartersId,
-      }: ActorRenderState) =>
-        definitions.get(definitionId)?.growth
-          ? construction?.active
-            ? "Growing"
-            : !cultivation?.workers.some((worker) => worker.tendingId === id)
-              ? "Untended · Paused"
-              : !headquartersId
-                ? `No ${headquartersFor(definitionId)} · Paused`
-                : "Worker travelling or waiting for infrastructure"
-          : construction?.active
-            ? "Building"
-            : disconnected.has(id)
-              ? "Disconnected · Paused"
-              : !headquartersId
-                ? `No ${headquartersFor(definitionId)} · Paused`
-                : "Queued";
+      }: ActorRenderState) => {
+        const growth = !!definitions.get(definitionId)?.growth;
+        if (construction?.active) return growth ? "Growing" : "Building";
+        const tended = cultivation?.workers.some(
+          (worker) => worker.tendingId === id,
+        );
+        if (growth && !tended) return "Untended · Paused";
+        if (!growth && disconnected.has(id)) return "Disconnected · Paused";
+        if (!headquartersId)
+          return `No ${headquartersFor(definitionId)} · Paused`;
+        return growth
+          ? "Worker travelling or waiting for infrastructure"
+          : "Queued";
+      };
       lists.constructionQueue.update(
         construction.map((actor) => ({
           key: `construction:${actor.id}`,
@@ -477,7 +470,7 @@ export function createEconomyControls(
         })),
         ...economy.loot.map((cache) => {
           const collector =
-            mobile && collectsLoot(economy, simulation.playerOwner, cache)
+            mobile && collectsLoot(economy, options.owner, cache)
               ? mobile
               : undefined;
           return {
@@ -525,8 +518,8 @@ export function createEconomyControls(
         .find(Boolean);
       const stalled = harvestingStalled(
         economy,
-        simulation.playerOwner,
-        simulation.actors,
+        options.owner,
+        owned,
         definitions,
       );
       const idleWorker = harvesters.find(
@@ -535,9 +528,8 @@ export function createEconomyControls(
       );
       const cultivators = cultivation?.workers ?? [];
       let status: string;
-      const ownsCultivation = simulation.actors.some(
-        (actor) =>
-          canControl(actor) && definitions.get(actor.definitionId)?.growth,
+      const ownsCultivation = owned.some(
+        (actor) => definitions.get(actor.definitionId)?.growth,
       );
       const playsCultivation =
         options.faction !== undefined &&
@@ -559,9 +551,8 @@ export function createEconomyControls(
             ? `Select the ${headquarters} and train a ${cultivator} for ${costLabel(cultivatorDefinition)}.`
             : "No cultivation workers are available in this mission.";
         } else if (
-          !simulation.actors.some(
+          !owned.some(
             (actor) =>
-              canControl(actor) &&
               !actor.construction &&
               definitions.get(actor.definitionId)?.cultivationDropoff,
           )
@@ -610,9 +601,9 @@ export function createEconomyControls(
     },
     onOutcome: (outcome: CommandOutcome) => {
       if (isOutcomeOf(outcome, ...ECONOMY_COMMAND_KINDS)) {
-        const actor = simulation.actors.find(
-          ({ id }) => id === outcome.command.actorId,
-        );
+        const actor = options
+          .ownActors()
+          .find(({ id }) => id === outcome.command.actorId);
         const reasons = commandReasons(rolesFor(actor?.definitionId));
         lastResult = outcome.accepted
           ? outcome.queued

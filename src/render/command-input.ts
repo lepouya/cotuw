@@ -1,11 +1,7 @@
 import { isTerrainPickMesh } from "./terrain-mesh";
 import { createSelection } from "./selection";
 import { createPointerGesture } from "./pointer-gesture";
-import {
-  isTextEntry,
-  worldInputAvailable,
-  worldKeyboardAvailable,
-} from "./input-focus";
+import { worldInputAvailable } from "./input-focus";
 import { moveCommand } from "../simulation/command";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
@@ -121,8 +117,6 @@ export type CommandInputOptions = {
   focusActor?: (actorId: string) => void;
   canFollow?: (actorId: string) => boolean;
   followActor?: (actorId: string) => void;
-  /** Escape ends a camera focus or Follow before clearing selection. */
-  cancelFocus?: () => boolean;
   onWorldSelectionChanged?: (actorIds: readonly string[]) => void;
   onSelectionChanged?: (actorIds: readonly string[]) => void;
   enabled?: () => boolean;
@@ -156,6 +150,8 @@ export type CommandInput = {
   actorIdAt: (clientX: number, clientY: number) => string | undefined;
   /** Stops selected mobile actors. Returns how many stop orders it sent. */
   stop: () => number;
+  /** Abandons a gesture and clears selection; returns whether either was. */
+  deselect: () => boolean;
   /** Abandons an in-progress gesture; returns whether there was one. */
   cancelGesture: () => boolean;
   dispose: () => void;
@@ -187,7 +183,6 @@ export function createCommandInput(
     focusActor,
     canFollow = () => false,
     followActor,
-    cancelFocus,
   }: CommandInputOptions,
 ): CommandInput {
   const selection = createSelection(canMove);
@@ -391,32 +386,13 @@ export function createCommandInput(
     for (const actorId of ids) submitCommand({ kind: "stop", actorId });
     return ids.length;
   };
-  const key = (event: KeyboardEvent) => {
-    if (
-      !enabled() ||
-      !worldKeyboardAvailable(canvas.ownerDocument) ||
-      event.defaultPrevented ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
-    )
-      return;
-    if (isTextEntry(event.target)) return;
-    if (event.key === "Escape" && (cancelGroundTarget?.() || cancelFocus?.())) {
-      cancelGesture();
-      event.preventDefault();
-      return;
-    }
-    if (event.key === "Escape") {
-      const hadSelection = selection.ids.length > 0;
-      if (!cancelGesture() && !hadSelection) return;
-      if (hadSelection) select(undefined);
-    } else if (event.key.toLowerCase() === "s") {
-      if (stop() === 0) return;
-    } else return;
-    event.preventDefault();
+  const deselect = () => {
+    if (!enabled()) return false;
+    const hadSelection = selection.ids.length > 0;
+    const hadGesture = cancelGesture();
+    if (hadSelection) select(undefined);
+    return hadGesture || hadSelection;
   };
-  window.addEventListener("keydown", key);
   return {
     get selectedActorId() {
       return selection.ids.length === 1 ? selection.ids[0] : undefined;
@@ -454,11 +430,11 @@ export function createCommandInput(
     },
     actorIdAt,
     stop,
+    deselect,
     cancelGesture,
     dispose: () => {
       pointer.dispose();
       box.remove();
-      window.removeEventListener("keydown", key);
     },
   };
 }

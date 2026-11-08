@@ -1,4 +1,5 @@
 import { isOutcomeOf } from "../simulation/command";
+import { setText } from "./dom";
 
 import type { CommandInput } from "../render/command-input";
 import type { CommandOutcome } from "../simulation/command";
@@ -38,9 +39,7 @@ export function createUnitControls(
   },
 ) {
   const controller = new AbortController();
-  const message = (text: string) => {
-    if (controls.movementStatus) controls.movementStatus.textContent = text;
-  };
+  const message = (text: string) => setText(controls.movementStatus, text);
   const listen = (
     button: HTMLButtonElement | undefined,
     action: () => void,

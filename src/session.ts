@@ -65,7 +65,8 @@ import {
 import { isTilePlacedActor, occupiedTilesFor } from "./simulation/placement";
 import type { ActorTrigger, Rgb } from "./content/presentation";
 import { startSimulationLoop } from "./simulation/loop";
-import { createBuildingPlacement } from "./render/building-placement";
+import { createBuildingPlacement } from "./ui/building-placement";
+import { createPlacementPreview } from "./render/placement-preview";
 import { createUnitControls } from "./ui/unit-controls";
 import type { UnitControls } from "./ui/unit-controls";
 import { bindCameraControls } from "./ui/camera-controls";
@@ -85,7 +86,7 @@ import type { GameView, GameViewOptions } from "./render";
 import type { ActorAnimationState } from "./render/actor";
 import type { ObservedActor } from "./simulation/owner-view";
 import type { TileCoord } from "./simulation/grid";
-import type { BuildingPlacementControls } from "./render/building-placement";
+import type { BuildingPlacementControls } from "./ui/building-placement";
 import type { ViewStyle } from "./content/content-pack";
 import { createAlertTracker } from "./ui/mission-alerts";
 import type { MissionAlert } from "./ui/mission-alerts";
@@ -93,7 +94,7 @@ import { duePopup } from "./ui/popups";
 import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
-import { isTextEntry, worldKeyboardAvailable } from "./render/input-focus";
+import { bindWorldShortcuts } from "./ui/world-shortcuts";
 import type { ScenarioPopup } from "./simulation/mission-file";
 import type { WorldPosition } from "./simulation/world";
 import { createAudioScene } from "./audio/scene";
@@ -279,7 +280,7 @@ async function assembleGameSession(
   );
   const playerResource =
     factionResource(definitions, player.faction) ?? "materials";
-  const startingActor = simulation.actors.find(player.owns);
+  const startingActor = player.actors().own[0];
   if (startingActor) {
     const { x, z } = startingActor.worldPosition;
     view.camera.focusOnPoint(new Vector3(x, 0, z));
@@ -312,7 +313,7 @@ async function assembleGameSession(
       case "attack-move":
         return order.target;
       case "gather": {
-        const site = economySites(simulation.economy).find(
+        const site = economySites(player.economy()).find(
           ({ id }) => id === order.siteId,
         );
         return site && map.tileCenter(site.tile.x, site.tile.z);
@@ -492,7 +493,6 @@ async function assembleGameSession(
     focusActor: (actorId) => focusActors([actorId]),
     canFollow: (actorId) => followableIds([actorId]).length > 0,
     followActor: (actorId) => followActors([actorId]),
-    cancelFocus: view.camera.cancelFocus,
     tend: (buildingId) => {
       if (!canCommand() || !player.ownActor(buildingId)) return undefined;
       const workerId = simulation.tendWorker(
@@ -515,7 +515,7 @@ async function assembleGameSession(
     },
     submitCommand: (command) => {
       if (!canCommand()) return;
-      const economy = simulation.economy;
+      const economy = player.economy();
       if (
         (command.kind === "move" || command.kind === "group-move") &&
         economy
@@ -541,10 +541,7 @@ async function assembleGameSession(
       const actorId = ids.length === 1 ? ids[0] : undefined;
       actorViews.setSelectedActors(ids);
       tilePlacedViews.setSelectedActor(actorId);
-      // Other factions' routes would reveal their intent.
-      movementPath.setSelectedActors(
-        ids.filter((id) => player.actors().ownIds.has(id)),
-      );
+      movementPath.setSelectedActors(ids);
       minimap.refreshActors();
       canvas.dataset.actorSelected = String(ids.length > 0);
       canvas.dataset.selectedActors = JSON.stringify(ids);
@@ -605,14 +602,22 @@ async function assembleGameSession(
   let pendingRemovalId: string | undefined;
   let knownControlsTick = -1;
   let knownPlacementActive = false;
-  const refreshControls = () => {
+  /** The selected own building, while it can be sold, removed, or cancelled. */
+  const removableActor = () => {
     const actor = player.ownActor(input.selectedActorId);
-    const canRemove =
-      !!actor &&
-      isTilePlacedActor(actor) &&
-      !pendingRemovalId &&
-      canCommand() &&
-      !placement.active;
+    if (
+      !actor ||
+      !isTilePlacedActor(actor) ||
+      pendingRemovalId !== undefined ||
+      !canCommand() ||
+      placement.active
+    )
+      return undefined;
+    return actor;
+  };
+  const refreshControls = () => {
+    const canRemove = !!removableActor();
+    const economy = player.economy();
     if (controls.remove) controls.remove.disabled = !canRemove;
     placement.update();
     network.refresh();
@@ -632,8 +637,8 @@ async function assembleGameSession(
       paused: !playing,
       following: view.camera.following,
       canRemove,
-      ...(simulation.economy && {
-        balances: resourceBalances(simulation.economy, playerOwner),
+      ...(economy && {
+        balances: resourceBalances(economy, playerOwner),
         resource: playerResource,
       }),
       objectives: simulation.objectives,
@@ -654,12 +659,11 @@ async function assembleGameSession(
     const popup = duePopup(popups, dismissedPopups, {
       placing: placement.definitionId,
       owns: (id) =>
-        simulation.actors.some(
-          (actor) =>
-            actor.definitionId === id &&
-            !actor.construction &&
-            player.owns(actor),
-        ),
+        player
+          .actors()
+          .own.some(
+            (actor) => actor.definitionId === id && !actor.construction,
+          ),
     });
     if (!popup || popup.id === raisedPopup) return;
     raisedPopup = popup.id;
@@ -687,63 +691,56 @@ async function assembleGameSession(
         position: map.tileCenter(site.tile.x, site.tile.z),
       })),
     });
-  const placement = createBuildingPlacement(
-    canvas,
-    view.scene,
-    map,
-    simulation,
-    {
-      appearances: buildingAppearances,
-      buildings: definitions
-        .filter(
-          (definition) =>
-            definition.footprint && rosterIncludes(player.faction, definition),
-        )
-        .map((definition) => ({
-          definition,
-          name: names.get(definition.id)!,
-          build: controls.buildings?.find(
-            ({ definitionId }) => definitionId === definition.id,
-          )?.button,
-        })),
-      controls,
-      enabled: canCommand,
-      pointerEnabled: () => !view.camera.primaryPanActive,
-      workerIds: () => input.selectedActorIds,
-      onPlaced: (actorId) => {
-        input.select(actorId);
-        showActor(actorId);
-      },
-      onStart: (definition) => {
-        cancelGroundTargets();
-        input.setBoxMode(false);
-        input.setAdditiveMode(false);
-        input.setQueueMode(false);
-        // Selected workers are the candidates that will tend growth.
-        if (!definition.growth) input.select(undefined);
-        raisePopup();
-      },
-      onInvalid: () => audioScene.emit("command.invalid"),
-    },
+  const buildings = definitions.filter(
+    (definition) =>
+      definition.footprint && rosterIncludes(player.faction, definition),
   );
+  const placementPreview = own(
+    createPlacementPreview(
+      canvas,
+      view.scene,
+      map,
+      buildings,
+      buildingAppearances,
+    ),
+  );
+  const placement = createBuildingPlacement(canvas, map, simulation, {
+    preview: placementPreview,
+    buildings: buildings.map((definition) => ({
+      definition,
+      name: names.get(definition.id)!,
+      build: controls.buildings?.find(
+        ({ definitionId }) => definitionId === definition.id,
+      )?.button,
+    })),
+    controls,
+    enabled: canCommand,
+    pointerEnabled: () => !view.camera.primaryPanActive,
+    workerIds: () => input.selectedActorIds,
+    onPlaced: (actorId) => {
+      input.select(actorId);
+      showActor(actorId);
+    },
+    onStart: (definition) => {
+      cancelGroundTargets();
+      input.setBoxMode(false);
+      input.setAdditiveMode(false);
+      input.setQueueMode(false);
+      // Selected workers are the candidates that will tend growth.
+      if (!definition.growth) input.select(undefined);
+      raisePopup();
+    },
+    onInvalid: () => audioScene.emit("command.invalid"),
+  });
   own(placement);
   const removeSelected = () => {
-    const actor = player.ownActor(input.selectedActorId);
-    if (
-      !actor ||
-      !isTilePlacedActor(actor) ||
-      pendingRemovalId !== undefined ||
-      !canCommand() ||
-      placement.active
-    )
-      return;
+    const actor = removableActor();
+    if (!actor) return;
     pendingRemovalId = actor.id;
+    // Economy missions refund a sale; the construction sandbox removes freely.
+    const sale = simulation.economy ? "sell-actor" : "remove-actor";
     simulation.submitCommand({
-      kind: actor.construction
-        ? "cancel-construction"
-        : simulation.economy
-          ? "sell-actor"
-          : "remove-actor",
+      kind: actor.construction ? "cancel-construction" : sale,
       actorId: actor.id,
     });
     controlsDirty = true;
@@ -788,7 +785,7 @@ async function assembleGameSession(
     changed: () => {
       controlsDirty = true;
     },
-    selectedActorId: selectedOwnActorId,
+    selectedActor: () => player.ownActor(input.selectedActorId),
     isProducer: (id) => !!definitionsById.get(id)?.production,
     enabled: () => canCommand() && !placement.active,
     onStart: () => {
@@ -806,7 +803,6 @@ async function assembleGameSession(
     groundTargets.map((mode) => mode.cancel()).some(Boolean);
   const network = createNetworkControls(simulation, controls, {
     selectedActorId: selectedOwnActorId,
-    canControl: (id) => !!player.ownActor(id),
     tileSize: map.tileSize,
     supportHub: (actorId) => roles(actorId).supportHub,
   });
@@ -816,9 +812,10 @@ async function assembleGameSession(
       ? createEconomyControls(economyElements, simulation, {
           definitions,
           names,
+          owner: playerOwner,
           faction: player.faction,
+          ownActors: () => player.actors().own,
           selectedActorId: selectedOwnActorId,
-          canControl: player.owns,
           enabled: () => canCommand() && !placement.active,
           focus: (tile) => {
             const { x, z } = map.tileCenter(tile.x, tile.z);
@@ -875,6 +872,7 @@ async function assembleGameSession(
   let previousFrameTime = performance.now();
   let knownActorVersion = simulation.actorVersion;
   let knownWreckActorVersion = simulation.actorVersion;
+  let knownSelectionTick = simulation.completedTicks;
   /**
    * Selected actors and those in recent combat show health bars. Damaged and
    * regenerating actors show the effects their presentation names.
@@ -911,9 +909,6 @@ async function assembleGameSession(
       player.shownActor(actor.combat?.attack?.targetId),
       map,
     );
-
-  let knownSelectionTick = simulation.completedTicks;
-
   const cancelInteractions = () => {
     radial.close();
     input.cancelGesture();
@@ -1089,6 +1084,7 @@ async function assembleGameSession(
     actorViews.update(shownMobile, loop.tickProgress(), frameSeconds, (actor) =>
       animationStateOf(actor, gathering),
     );
+    // Other owners' routes would reveal their intent.
     movementPath.update(player.actors().ownMobile);
     // Other factions' queues would reveal their intent.
     queuedOrders.update(
@@ -1146,8 +1142,7 @@ async function assembleGameSession(
       loop.pause();
     },
     resume: () => {
-      if (halted() || disposal) return;
-      if (playing) return;
+      if (halted() || disposal || playing) return;
       // Paused rendering settles to committed poses; resume must not rewind.
       actorViews.capturePreviousPoses(player.actors().shownMobile);
       playing = true;
@@ -1209,26 +1204,34 @@ async function assembleGameSession(
       canvas.dataset.modelsReady = "true";
     },
   });
-  // World tools consume Escape before the menu fallback.
-  const menuKey = (event: KeyboardEvent) => {
-    if (
-      event.key !== "Escape" ||
-      event.defaultPrevented ||
-      event.repeat ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      isTextEntry(event.target) ||
-      !worldKeyboardAvailable(canvas.ownerDocument)
-    )
-      return;
-    if (controls.onMenu) {
-      event.preventDefault();
-      controls.onMenu();
-    }
+  const whilePlacing = (action: () => void) => () => {
+    if (!placement.active) return false;
+    action();
+    return true;
   };
-  window.addEventListener("keydown", menuKey);
-  lifetime.defer(() => window.removeEventListener("keydown", menuKey));
+  lifetime.defer(
+    bindWorldShortcuts(canvas.ownerDocument, {
+      // Pan mode, then tools, focus, and selection precede the menu.
+      Escape: [
+        view.camera.cancelPan,
+        whilePlacing(placement.cancel),
+        () => {
+          if (simulationFaulted) return false;
+          if (!cancelGroundTargets() && !view.camera.cancelFocus())
+            return false;
+          input.cancelGesture();
+          return true;
+        },
+        input.deselect,
+        () => {
+          controls.onMenu?.();
+          return !!controls.onMenu;
+        },
+      ],
+      KeyR: [whilePlacing(placement.rotate)],
+      KeyS: [() => input.stop() > 0],
+    }),
+  );
   try {
     if (import.meta.env.COTUW_BENCHMARK) {
       globalThis.cotuwBenchmark = {

@@ -29,6 +29,9 @@ accessible names remain stable through extraction where behavior is unchanged.
 Document/window listeners for input, audio unlock, and overlay dismissal
 belong to the subscribing feature's lifetime. World commands use the existing
 world input guard and preserve tool, tooltip, and dialog Escape ordering.
+Dialogs and contextual UI (tooltips, the radial menu, the camera views popup)
+take their keys in the capture phase; world shortcuts then route through
+`src/ui/world-shortcuts.ts`.
 Audio activation and modal-local input remain available while a dialog is open.
 
 ### Bootstrap and mission lifetime
@@ -176,9 +179,16 @@ Audio activation and modal-local input remain available while a dialog is open.
   HTML.
 - `src/session.ts` owns simulation, rendering, world input, and the command
   controls that depend on them. It coordinates exclusive world tools and
-  submits serializable commands. It receives control references and emits
-  player-visible updates, alerts, guides, and results; it does not load saves
-  or manage menu panels. Existing control binders need no wholesale rewrite.
+  submits serializable commands. It binds world shortcuts by physical
+  `KeyboardEvent.code`, one ordered handler list per key, so Escape
+  precedence (Pan mode, placement, targeting and camera focus, selection,
+  menu) reads in one place. World modules expose those actions instead of
+  listening for them; held camera navigation keys stay in
+  `src/render/camera.ts`. `src/ui/building-placement.ts` owns the placement
+  tool and `src/render/placement-preview.ts` draws its preview. The session
+  receives control references and emits player-visible updates, alerts,
+  guides, and results; it does not load saves or manage menu panels.
+  Existing control binders need no wholesale rewrite.
 - `simulation.viewOf(playerOwner)` in `src/simulation/owner-view.ts` remains
   the authority for what the player may see. UI does not reconstruct
   visibility from unrestricted simulation state. Layout changes preserve

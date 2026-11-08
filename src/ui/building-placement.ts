@@ -1,35 +1,21 @@
-import { groundRing, groundPoint } from "./ground-marker";
-import { Color3, MeshBuilder } from "@babylonjs/core";
-
-import {
-  createFootprintOverlay,
-  footprintOverlayOffset,
-} from "./footprint-overlay";
-import { isTerrainPickMesh } from "./terrain-mesh";
-import { createTilePlacedActor } from "../simulation/placement";
-import { footprintSize, tileKey } from "../simulation/grid";
+import { createPrimaryClick } from "../render/primary-click";
+import { worldInputAvailable } from "../render/input-focus";
 import { isOutcomeOf } from "../simulation/command";
-import { createTilePlacedActorViewRegistry } from "./tile-placed-actor-view";
-import { createPrimaryClick } from "./primary-click";
-import {
-  isTextEntry,
-  worldInputAvailable,
-  worldKeyboardAvailable,
-} from "./input-focus";
+import { footprintSize, tileKey } from "../simulation/grid";
 import { missionEnded } from "../simulation/mission-result";
-import { setText } from "../ui/dom";
-import { presentResult, SIMULATION_STOPPED } from "../ui/mission-result";
+import { setText } from "./dom";
+import { presentResult, SIMULATION_STOPPED } from "./mission-result";
 
-import type { Scene, LinesMesh } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
-import type { MissionSimulation } from "../simulation/mission";
-import type { AuthorityReason, CommandOutcome } from "../simulation/command";
-import type { ActorPlacement, PlacementReason } from "../simulation/placement";
-import type { ActorDefinition } from "../simulation/actor";
 import type {
-  TilePlacedActorAppearance,
-  TilePlacedActorAppearanceCatalog,
-} from "./tile-placed-actor-view";
+  PlacementCandidate,
+  PlacementPreview,
+  ScreenPoint,
+} from "../render/placement-preview";
+import type { ActorDefinition } from "../simulation/actor";
+import type { AuthorityReason, CommandOutcome } from "../simulation/command";
+import type { MissionSimulation } from "../simulation/mission";
+import type { ActorPlacement, PlacementReason } from "../simulation/placement";
 
 export type BuildingPlacementControls = {
   rotate?: HTMLButtonElement;
@@ -71,8 +57,8 @@ export type BuildingPlacementChoice = {
 
 export type BuildingPlacementOptions = {
   buildings: readonly BuildingPlacementChoice[];
-  /** Late asset loads also replace an active preview. */
-  appearances: TilePlacedActorAppearanceCatalog;
+  /** Draws the candidate; it must accept every building definition. */
+  preview: PlacementPreview;
   controls: BuildingPlacementControls;
   enabled?: () => boolean;
   pointerEnabled?: () => boolean;
@@ -82,17 +68,14 @@ export type BuildingPlacementOptions = {
   onInvalid?: () => void;
 };
 
-type ScreenPoint = { clientX: number; clientY: number };
-
 /** Preview is local UI state; placement is rechecked at the command's tick. */
 export function createBuildingPlacement(
   canvas: HTMLCanvasElement,
-  scene: Scene,
   map: TerrainMap,
   simulation: MissionSimulation,
   {
     buildings,
-    appearances,
+    preview,
     controls,
     enabled = () => true,
     pointerEnabled = () => true,
@@ -108,13 +91,6 @@ export function createBuildingPlacement(
     pointerEnabled() && worldInputAvailable(canvas.ownerDocument);
   let definition = buildings[0]?.definition;
   let name = buildings[0]?.name ?? "";
-  const preview = createTilePlacedActorViewRegistry(
-    scene,
-    map,
-    buildings.map(({ definition }) => definition),
-    appearances,
-    { preview: true },
-  );
   let active = false;
   let faulted = false;
   let quarterTurns = 0;
@@ -123,14 +99,8 @@ export function createBuildingPlacement(
   let pendingId: string | undefined;
   /** A tick-time rejection, shown until the player changes the placement. */
   let rejection: { text: string; placement: string } | undefined;
-  let overlay: ReturnType<typeof createFootprintOverlay> | undefined;
-  let overlayOffset = 0;
-  let workerMarker: LinesMesh | undefined;
-  let pickKey = "";
+  let shown: PlacementCandidate | undefined;
   let stateKey = "";
-  let lastAppearance: TilePlacedActorAppearance | undefined;
-  let overlayKey = "";
-  let markerKey = "";
   let uiKey = "";
   let terrainRevision = 0;
   const size = () => footprintSize(definition!.footprint!.occupiedTiles);
@@ -146,48 +116,27 @@ export function createBuildingPlacement(
         }
       : undefined;
   const placementKey = () => JSON.stringify([origin, quarterTurns]);
-  const clearMarker = () => {
-    workerMarker?.dispose();
-    workerMarker = undefined;
-    markerKey = "";
-  };
-  const clearOverlay = () => {
-    clearMarker();
-    overlay?.dispose();
-    overlay = undefined;
-    overlayKey = "";
-  };
-  const pickOrigin = (point: ScreenPoint) => {
-    const bounds = canvas.getBoundingClientRect();
-    const pick = scene.pick(
-      point.clientX - bounds.left,
-      point.clientY - bounds.top,
-      isTerrainPickMesh,
-    );
-    return pick?.hit && pick.pickedPoint
-      ? map.tileAtWorldPosition(pick.pickedPoint.x, pick.pickedPoint.z)
-      : undefined;
+  /** The candidate at the current state, evaluated as its command would be. */
+  const evaluate = (): PlacementCandidate | undefined => {
+    const candidate = active ? placement() : undefined;
+    if (!candidate) return undefined;
+    const evaluation = simulation.evaluatePlacement(candidate);
+    const tender =
+      evaluation.accepted && evaluation.workerId
+        ? simulation.actorById(evaluation.workerId)?.worldPosition
+        : undefined;
+    return {
+      definition: definition!,
+      placement: candidate,
+      owner: simulation.playerOwner,
+      evaluation,
+      ...(tender && { tender }),
+    };
   };
   const update = () => {
-    const appearance = definition && appearances.get(definition.id);
-    if (appearance !== lastAppearance) {
-      lastAppearance = appearance;
-      stateKey = "";
-    }
     const available = enabled();
-    if (active && pointer && !pendingId && acceptsPointer()) {
-      // Picking is costly, so repeat it only after the pointer or camera moves.
-      const nextPickKey = JSON.stringify([
-        pointer.clientX,
-        pointer.clientY,
-        scene.getTransformMatrix().updateFlag,
-        terrainRevision,
-      ]);
-      if (nextPickKey !== pickKey) {
-        pickKey = nextPickKey;
-        origin = pickOrigin(pointer);
-      }
-    }
+    if (active && pointer && !pendingId && acceptsPointer())
+      origin = preview.tileAt(pointer);
     if (rejection && rejection.placement !== placementKey())
       rejection = undefined;
     // Ticks can move units onto the footprint or change the terrain under it.
@@ -207,70 +156,15 @@ export function createBuildingPlacement(
       map.navigationChanges.generation,
       terrainRevision,
     ]);
-    if (nextStateKey === stateKey) return;
-    stateKey = nextStateKey;
-    const candidate = active ? placement() : undefined;
-    const evaluation = candidate
-      ? simulation.evaluatePlacement(candidate)
-      : undefined;
-    preview.update(
-      candidate
-        ? [
-            createTilePlacedActor(
-              map,
-              definition!,
-              { ...candidate, actorId: "building-preview" },
-              simulation.playerOwner,
-            ),
-          ]
-        : [],
-    );
-    const tender =
-      evaluation?.accepted && evaluation.workerId
-        ? simulation.actorById(evaluation.workerId)
-        : undefined;
-    const key = evaluation
-      ? JSON.stringify([
-          candidate,
-          evaluation.accepted,
-          map.navigationChanges.version,
-          map.navigationChanges.generation,
-          terrainRevision,
-        ])
-      : "";
-    if (key !== overlayKey) {
-      clearOverlay();
-      if (evaluation) {
-        overlay = createFootprintOverlay(scene, map, evaluation.tiles, {
-          name: "building-placement",
-          color: evaluation.accepted
-            ? new Color3(0.25, 0.95, 0.74)
-            : new Color3(1, 0.3, 0.18),
-          blocked: !evaluation.accepted,
-          heightOffset: overlayOffset,
-        });
-      }
-      overlayKey = key;
+    const changed = nextStateKey !== stateKey;
+    if (changed) {
+      stateKey = nextStateKey;
+      shown = evaluate();
     }
-    // The tender ring follows a moving worker without rebuilding the footprint.
-    const nextMarkerKey = JSON.stringify([tender?.worldPosition, key]);
-    if (nextMarkerKey !== markerKey) {
-      clearMarker();
-      if (tender) {
-        workerMarker = MeshBuilder.CreateLines(
-          "growth-worker-preview",
-          {
-            points: groundRing(tender.worldPosition, 0.55, 32, (point) =>
-              groundPoint(map, point, 0.08),
-            ),
-          },
-          scene,
-        );
-        workerMarker.color = new Color3(0.8, 0.5, 1);
-        workerMarker.isPickable = false;
-      }
-      markerKey = nextMarkerKey;
-    }
+    // Late asset loads also replace an unchanged preview.
+    preview.show(shown);
+    if (!changed) return;
+    const evaluation = shown?.evaluation;
     const nextUiKey = JSON.stringify([
       active,
       faulted,
@@ -327,10 +221,7 @@ export function createBuildingPlacement(
     active = true;
     origin = undefined;
     pointer = undefined;
-    pickKey = "";
     quarterTurns = 0;
-    // Layers rarely change, and counting them scans every tile.
-    overlayOffset = footprintOverlayOffset(map);
     onStart(building.definition);
     update();
   };
@@ -340,7 +231,6 @@ export function createBuildingPlacement(
     origin = undefined;
     pointer = undefined;
     message("Placement cancelled.");
-    clearOverlay();
     update();
   };
   const rotate = () => {
@@ -368,7 +258,7 @@ export function createBuildingPlacement(
   const click = createPrimaryClick(
     canvas,
     (event) => {
-      origin = pickOrigin(event);
+      origin = preview.tileAt(event);
       pointer = event.pointerType === "touch" ? undefined : event;
       update();
       // Touch taps choose a footprint so a finger never obscures confirmation.
@@ -378,24 +268,6 @@ export function createBuildingPlacement(
   );
   const leave = () => {
     pointer = undefined;
-    pickKey = "";
-  };
-  const key = (event: KeyboardEvent) => {
-    if (
-      !active ||
-      !worldKeyboardAvailable(canvas.ownerDocument) ||
-      isTextEntry(event.target) ||
-      event.defaultPrevented ||
-      event.repeat ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
-    )
-      return;
-    if (event.key === "Escape") cancel();
-    else if (event.key.toLowerCase() === "r") rotate();
-    else return;
-    event.preventDefault();
   };
   for (const building of buildings) {
     const startBuilding = () => start(building);
@@ -407,10 +279,8 @@ export function createBuildingPlacement(
   canvas.addEventListener("pointermove", move, { signal });
   canvas.addEventListener("pointerleave", leave, { signal });
   canvas.addEventListener("pointercancel", leave, { signal });
-  window.addEventListener("keydown", key, { signal });
   const terrainObserver = map.onChangedObservable.add(() => {
     terrainRevision += 1;
-    if (active) overlayOffset = footprintOverlayOffset(map);
   });
   update();
   message(
@@ -419,7 +289,9 @@ export function createBuildingPlacement(
       : "No buildings available.",
   );
   return {
+    /** Ends placement unless its command is pending. */
     cancel,
+    rotate,
     cancelGesture: () => {
       leave();
       return click.cancel();
@@ -444,7 +316,6 @@ export function createBuildingPlacement(
         active = false;
         origin = undefined;
         pointer = undefined;
-        clearOverlay();
         message(`${name} placed.`);
         onPlaced(command.actorId);
       } else {
@@ -461,7 +332,6 @@ export function createBuildingPlacement(
       faulted = true;
       active = false;
       pendingId = undefined;
-      clearOverlay();
       update();
       const { result } = simulation;
       message(
@@ -472,9 +342,7 @@ export function createBuildingPlacement(
     },
     dispose: () => {
       controller.abort();
-      preview.dispose();
       click.dispose();
-      clearOverlay();
       map.onChangedObservable.remove(terrainObserver);
     },
   };

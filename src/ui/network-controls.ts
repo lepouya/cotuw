@@ -6,12 +6,11 @@ export type NetworkControls = {
 };
 
 export function createNetworkControls(
-  simulation: MissionSimulation,
+  simulation: Pick<MissionSimulation, "support">,
   controls: NetworkControls,
   options: {
+    /** The selected actor the player controls. */
     selectedActorId: () => string | undefined;
-    /** Whether the player controls the actor with this ID. */
-    canControl?: (actorId: string) => boolean;
     /** World units per tile, for showing support radii in tiles. */
     tileSize: number;
     /** The headquarters name that support paths lead to. */
@@ -19,18 +18,15 @@ export function createNetworkControls(
   },
 ) {
   const elements = controls.network;
-  const canControl = options.canControl ?? (() => true);
   const toggle = elements?.toggle;
   return {
     get visible() {
       return toggle?.checked ?? false;
     },
     refresh: () => {
-      const network = simulation.support;
-      const node = network?.nodes.find(
-        (node) =>
-          node.actorId === options.selectedActorId() &&
-          canControl(node.actorId),
+      const id = options.selectedActorId();
+      const node = simulation.support?.nodes.find(
+        (node) => node.actorId === id,
       );
       const tiles = (radius: number) =>
         Math.round((radius / options.tileSize) * 10) / 10;

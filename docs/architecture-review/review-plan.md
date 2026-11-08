@@ -289,7 +289,7 @@ product work in `TODO.md`, and remove temporary files in
       per group move, `entriesSince` copies per grid sync, and
       `placementByOwnerId` cloning in worker entrance checks.
 
-- [ ] **Slice 5: session coordinator, shortcuts, world tools, and binders**
+- [x] **Slice 5: session coordinator, shortcuts, world tools, and binders**
   (18 files, ~4,730 LOC)
   - `src/session.ts`.
   - `src/render/`: `camera.ts`, `building-placement.ts`, `command-input.ts`,
@@ -302,6 +302,66 @@ product work in `TODO.md`, and remove temporary files in
     exclusive world-tool state machine, removing `render -> ui` imports from
     `building-placement.ts`, `viewOf(playerOwner)` and `MissionFile.uiState`
     wiring, and control-group readiness (`1.44`).
+  - Manifest after Pass A: `src/render/building-placement.ts` moved to
+    `src/ui/building-placement.ts`; added `src/render/placement-preview.ts`
+    and `src/ui/world-shortcuts.ts` (20 files).
+  - [x] **Pass A** (modular assessment and refactor, base `2689e90`):
+    - `src/ui/world-shortcuts.ts`: `bindWorldShortcuts` routes unmodified,
+      unrepeated world keys by `KeyboardEvent.code` to ordered handlers.
+      The session binds Escape (Pan mode, placement, targeting or camera
+      focus, selection, menu), `KeyR` (rotate while placing), and `KeyS`
+      (stop). Command input, placement, and the session menu fallback no
+      longer listen for keys; camera Escape became `cancelPan`, and command
+      input exposes `deselect` instead of taking `cancelFocus`.
+    - Placement split: `src/render/placement-preview.ts` owns the preview
+      model, footprint overlay and offset, tender ring, and cached terrain
+      picking; `src/ui/building-placement.ts` owns the tool state, controls,
+      copy, and probes. `render -> ui` value imports: `2 -> 0`.
+    - Intended input changes: letters match physical keys, as DESIGN
+      specifies; held keys no longer repeat Stop or step through Escape
+      stages; open tooltips take Escape before Pan mode exits.
+    - No persisted format change. Docs: `ui-ownership.md`.
+    - Checks: format, lint, typecheck, units (`1367` passed), and a Vite
+      build pass; new unit coverage for the router, `deselect`, and
+      `cancelPan`. The full Chromium browser suite (`test:visual`) passed
+      on the host.
+    - Kept: tool exclusivity through each tool's `onStart` until `1.45`
+      adds card shortcuts that wait for placement; contextual UI and dialog
+      capture listeners; held camera navigation in `camera.ts`.
+    - Rejected: splitting `session.ts` by size (forwards closures without
+      removing state tangle); sidebar-owned control binders
+      (`ui-ownership.md` assigns binding to the session).
+    - Deferred to `1.45`/Slice 8A: layout-aware labels for the static
+      `(R)`, `(S)`, and `(Esc)` hints in `sidebar-orders.ts`.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - HUD controls read the player's own actors: `economy-controls.ts` takes
+      `owner` and `ownActors` instead of `simulation.actors`, `playerOwner`,
+      and `canControl`; cultivator phase and construction status without
+      nested ternaries. Rally controls take the selected own actor instead
+      of `simulation.actorById` copies; network controls drop the redundant
+      `canControl`; rally, network, and attack-move controls take `Pick`
+      simulation parameters. Attack Move compares selections without
+      `JSON.stringify`; unit and Attack Move status use `setText`.
+    - `session.ts`: the starting actor, popup ownership, balances,
+      contextual-move workers, and queued gather sites read
+      `viewOf(playerOwner)`; the Slice 2 `ownIds` route filter is removed,
+      since only own mobile actors' routes are drawn; one removable-actor
+      check serves the Remove control and its action.
+    - `camera.ts`: arrow panning matches `KeyboardEvent.code` through a
+      `Map`; keyboard guards merged.
+    - Kept: omniscient reads that show observable posture (offline dimming
+      of detected buildings, gathering animation, seen attack effects) and
+      alert/health inputs, which `mission-alerts.ts` and
+      `session-effects.ts` filter (Slices 8A and 7).
+    - Reviewed without change: `pointer-gesture.ts`, `edge-pan.ts`,
+      `selection.ts`, `input-focus.ts`, `primary-click.ts`,
+      `unit-training.ts`, `radial-menu.ts`, `camera-controls.ts`,
+      `contextual-move.ts`, `placement-preview.ts`, `world-shortcuts.ts`.
+    - Checks: format, lint, typecheck, and units (`1367` passed) pass; the
+      e2e economy harness uses the new options. Affected browser specs
+      (`camera-navigation`, `interface`, `tile-placed-actor`, `economy`,
+      `sidebar`, `queued-orders`) pass on the host: `68` Chromium cases and
+      `20` tagged WebKit cases.
 
 - [ ] **Slice 6: world rendering, terrain, fog, minimap, and overlays**
   (20 files, ~3,550 LOC)
