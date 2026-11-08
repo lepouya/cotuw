@@ -44,6 +44,9 @@ The page also ships in the browser build.
   exploration and combat themes, using harmonic string plucks, breathy
   woodwinds, and wooden percussion. Combat adds interwoven notes and a
   stronger pulse. The player's faction selects the arrangement.
+- `circle-cultivation`: a work loop of sparse high plucks, airy swells, and
+  leaf-like rustling.
+- `circle-growth`: a separate, warmer plucked phrase for active construction.
 
 ## Source and provenance
 
@@ -75,8 +78,3 @@ The page also ships in the browser build.
 All cues and music arrangements are assigned through the base content pack.
 See [gameplay audio](audio.md) for controls, content bindings, runtime extension
 points, and verification. [DESIGN.md](../DESIGN.md#audio) owns the requirements.
-
-The Circle's `circle-cultivation` loop uses sparse high plucks, airy swells,
-and leaf-like rustling. `circle-growth` uses a separate, warmer plucked phrase
-for active construction. Both cues permit three voices with reduced gain for
-unselected work.

@@ -882,13 +882,14 @@ product work in `TODO.md`, and remove temporary files in
       replacement, generated models and clips, Harvester presentation and
       controls, wolf combat, audio decoding, and audio audition.
 
-- [ ] **Slice 11: level/build/benchmark scripts and documentation suite**
-  (17 script files + configs + 16 Markdown docs)
+- [x] **Slice 11: level/build/benchmark scripts and documentation suite**
+  (16 script files + configs + 16 Markdown docs)
   - `scripts/`: `generate-levels.ts`, `levels/base-content.ts`,
-    `levels/circle-wolf-den.ts`, `levels/index.ts`, `levels/m0-terrain.ts`,
-    `levels/m0.ts`, `levels/sandbox-level.ts`, `levels/sandbox.ts`,
+    `levels/circle-wolf-den.ts`, `levels/index.ts`,
+    `levels/prototype-terrain.ts`, `levels/arc-economy-opening.ts`,
+    `levels/sandbox-level.ts`, `levels/sandbox.ts`,
     `levels/skirmish-preview.ts`, `levels/wolf-den.ts`,
-    `levels/wolf-encounters.ts`, `benchmark.ts`, `benchmark/metrics.ts`,
+    `benchmark.ts`, `benchmark/metrics.ts`,
     `benchmark/workload.ts`, `check-runner.ts`, `playtest-build.ts`,
     `prepare-playtest.ts`.
   - Build configs: `package.json`, `tsconfig.json`, `vite.config.ts`,
@@ -901,6 +902,62 @@ product work in `TODO.md`, and remove temporary files in
     `runtime-boundaries.md`, `ui-ownership.md`, `verification.md`).
   - Focus: non-duplication across docs, accuracy against refactored `src/`
     seams, and `AGENTS.md` formatting compliance.
+  - [x] **Pass A** (modular assessment and refactor, base `3cec4db`):
+    - Benchmark seam: `probeOptions(workload)` is serializable, so the browser
+      spec no longer passes and discards a clock; `measureWorkload(workload)`
+      owns its clock. `metrics.ts` states why it stays free of Vite-only
+      modules; `REINFORCEMENT` made module-private.
+    - Level authoring: files named for what they hold, since the Circle and
+      sandbox levels share the terrain; wolf encounters folded into their one
+      caller. `npm run levels` output is byte-identical.
+    - `ui-ownership.md`: finished `1.22-1.24` plan removed, leaving interfaces,
+      lifetimes, trade-offs, and coverage. DESIGN and README pointers follow.
+    - `mission-files.md`: rules owned by DESIGN and `runtime-boundaries.md`
+      replaced with links. README: Circle walkthrough and status replaced with
+      links.
+    - Accuracy: DESIGN (per-owner exploration, resolved ownership versioning
+      notes, top bar resource, setup-driven opening), TODO (format number,
+      emergency recovery and launch status, unused link reference),
+      `runtime-boundaries.md` (owner is immutable).
+    - No persisted format change or structural redesign, so Pass B continued
+      in the same session.
+    - Rejected: merging `prepare-playtest.ts` into `playtest-build.ts` (no
+      friction; file count only); unifying `buildLevels` inputs (scenario and
+      sandbox shapes differ); moving `summarizeRecord` into `metrics.ts` (needs
+      `WORKLOADS`, which needs Vite); rewriting `design-questionnaire.md` to
+      rationale only (user-owned record; TODO and its header scope it);
+      splitting `createBenchmarkMission` (forwards closures).
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `prototype-terrain.ts`: type lookup without a nested ternary;
+      `TerrainLandmark` private. `sandbox-level.ts` uses `BASE_CONTENT`.
+      `workload.ts`: no shadowed `crossing`; imports grouped. `check-runner.ts`:
+      `Check` private. `vite.config.ts`: plain object config. `tsconfig.json`:
+      template comments removed.
+    - `audio-assets.md`: Circle work loops moved into the inventory.
+      `design-questionnaire.md`: dismissed popups are interface state; resolved
+      ownership and relationship follow-ups removed; spacing fixed.
+      `architecture-review.md` notes the `.claude/skills` link.
+    - Scripted checks: no broken links or anchors, no missing path references,
+      no tables, all lines within 80 columns. DESIGN prototype values match
+      `base.json`.
+    - Reviewed without change: `AGENTS.md`, `package.json`,
+      `prettier.config.mjs` (restates the default but records the width rule),
+      `generate-levels.ts`, `base-content.ts`, `circle-wolf-den.ts`,
+      `skirmish-preview.ts`, `sandbox.ts`, `index.ts`, `benchmark.ts` beyond the
+      seam, `playtest-build.ts` (nested publish rollback is tested and its flag
+      would otherwise cross a helper), `prepare-playtest.ts`, `actor-assets.md`,
+      `audio.md`, `content-packs.md`, `playtest-instructions.md`,
+      `playtest-report.md`, `verification.md`.
+    - Diff review: no actionable correctness or modularity findings.
+    - Checks: `npm run check`, all 127 asset tests, a production Vite build,
+      and the benchmark and levels CLIs pass. Regenerated levels are
+      byte-identical. All eight `e2e/benchmark.spec.ts` cases pass under
+      `COTUW_BENCHMARK` in Chromium and WebKit, covering both workloads at
+      1x and 2x. Browser checks run outside the sandbox for local-server and
+      browser access.
+    - Deferred to `1.70`: TODO task prose records delivery history by design;
+      prune it when closing M1. Whether `1.49` can close now that headless
+      checks cover emergency Heartgrove recovery is a task-status decision.
 
 ### Tier 3: verification suites (`tests/`, `e2e/` - lowest priority)
 

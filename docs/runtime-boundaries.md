@@ -8,7 +8,7 @@ These contracts describe where new behaviors, views, and services attach.
 - Actor behaviors modify their staged actor through `handleCommand` and
   `update`. They cannot call mission mutation, tick, or disposal methods during
   a tick. A violation faults the mission without publishing staged changes.
-- Behaviors preserve actor identity, tile placement, and occupancy layer.
+- Behaviors preserve actor identity, owner, tile placement, and occupancy layer.
   Layer transitions require explicit mission commands.
 - Each single-actor command kind has one mission handler; group moves expand
   into per-member moves. Non-object submissions throw before queuing. Objects

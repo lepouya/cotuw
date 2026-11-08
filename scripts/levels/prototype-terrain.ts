@@ -1,4 +1,4 @@
-// Procedural terrain for the economy opening, baked into its level file.
+// Procedural terrain the wolf-den levels and sandbox bake into their files.
 import type { TileCoord } from "../../src/simulation/grid.ts";
 import type { TerrainGridOptions } from "../../src/simulation/terrain.ts";
 
@@ -11,7 +11,7 @@ const MOUNTAIN_HEIGHT = 6;
 type Area = { x: readonly [number, number]; z: readonly [number, number] };
 
 /** Conical peaks that rise from mountain walls as navigation landmarks. */
-export type TerrainLandmark = {
+type TerrainLandmark = {
   readonly id: string;
   readonly peaks: readonly Readonly<TileCoord>[];
   readonly rise: number;
@@ -79,17 +79,16 @@ function prototypeWaterDepthAt(x: number, z: number): number {
   );
 }
 
+function prototypeTypeAt(x: number, z: number): string {
+  if (prototypeWaterDepthAt(x, z) > 0) return "water";
+  if (within(PATHS, x, z)) return "path";
+  if (within(ROUGH, x, z)) return "rough";
+  return "plain";
+}
+
 function prototypeTerrainAt(x: number, z: number) {
   const border = x < 3 || z < 3 || x >= MAP_SIZE - 3 || z >= MAP_SIZE - 3;
-  const typeId =
-    prototypeWaterDepthAt(x, z) > 0
-      ? "water"
-      : within(PATHS, x, z)
-        ? "path"
-        : within(ROUGH, x, z)
-          ? "rough"
-          : "plain";
-  return { typeId, outOfBounds: border || undefined };
+  return { typeId: prototypeTypeAt(x, z), outOfBounds: border || undefined };
 }
 
 function landmarkRiseAt(x: number, z: number): number {

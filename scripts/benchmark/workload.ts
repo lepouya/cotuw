@@ -19,14 +19,14 @@ import {
   createScenarioState,
   defineScenario,
 } from "../../src/simulation/scenario.ts";
+import { attachBenchmarkProbe } from "../../src/benchmark-probe.ts";
 import {
   BENCHMARK_TIMING,
   summarizePopulation,
   summarizeTimes,
 } from "./metrics.ts";
-import { attachBenchmarkProbe } from "../../src/benchmark-probe.ts";
-import type { BenchmarkRecord } from "../../src/benchmark-probe.ts";
 
+import type { BenchmarkRecord } from "../../src/benchmark-probe.ts";
 import type {
   MissionCommand,
   ScheduledCommand,
@@ -52,7 +52,7 @@ const SCOUT_SECONDS = 10;
 // Barracks replace combat losses, so stocks must outlast the run.
 const STOCKPILE = 1e7;
 /** The probe replaces losses with these, so the scene holds its scale. */
-export const REINFORCEMENT = {
+const REINFORCEMENT = {
   definitionId: "arc-trooper",
   producerDefinitionId: "arc-field-barracks",
 } as const;
@@ -90,7 +90,7 @@ const footprintTiles = (
 
 const tileKey = ({ x, z }: TileCoord) => `${x},${z}`;
 const crossingCenter = (id: string): TileCoord => {
-  const crossing = SKIRMISH_CROSSINGS.find((crossing) => crossing.id === id)!;
+  const crossing = SKIRMISH_CROSSINGS.find((each) => each.id === id)!;
   return { x: LAST >> 1, z: (crossing.minZ + crossing.maxZ) >> 1 };
 };
 
@@ -307,20 +307,21 @@ export function createBenchmarkMission(workload: Workload): string {
   return serializeMission(scenario, state, SIMULATION_TICK_SECONDS);
 }
 
-/** Probe options for a workload; `now` is a monotonic millisecond clock. */
-export const probeOptions = (workload: Workload, now: () => number) => ({
+/** Serializable probe options; each caller supplies its own clock. */
+export const probeOptions = (workload: Workload) => ({
   scale: WORKLOADS[workload],
   reinforcement: REINFORCEMENT,
   sampleTicks: ticksIn(sampleSeconds),
-  now,
 });
 
-/** Times simulation ticks; `now` is a monotonic millisecond clock. */
-export function measureWorkload(workload: Workload, now: () => number) {
+export function measureWorkload(workload: Workload) {
   const simulation = createSessionSimulation(
     loadMission(createBenchmarkMission(workload)),
   );
-  const probe = attachBenchmarkProbe(simulation, probeOptions(workload, now));
+  const probe = attachBenchmarkProbe(simulation, {
+    ...probeOptions(workload),
+    now: () => performance.now(),
+  });
   try {
     for (let tick = 0; tick < ticksIn(warmupSeconds); tick++) simulation.tick();
     probe.measure();

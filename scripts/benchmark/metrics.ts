@@ -1,10 +1,11 @@
+// Playwright imports this directly, so it stays free of Vite-only modules.
+import type { PopulationSample } from "../../src/benchmark-probe.ts";
+
 export const BENCHMARK_TIMING = {
   warmupSeconds: 10,
   measureSeconds: 60,
   sampleSeconds: 5,
 } as const;
-
-import type { PopulationSample } from "../../src/benchmark-probe.ts";
 
 export function summarizeTimes(values: readonly number[]) {
   if (!values.length) throw new RangeError("No timing samples collected.");

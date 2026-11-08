@@ -5,10 +5,10 @@ import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { serializeMission } from "../src/simulation/mission-file";
 import { BASE_CONTENT } from "./helpers/content";
 
-vi.mock("../scripts/levels/m0", () => {
+vi.mock("../scripts/levels/arc-economy-opening", () => {
   throw new Error("Sandbox authoring loaded the M0 mission.");
 });
-vi.mock("../scripts/levels/m0-terrain", () => {
+vi.mock("../scripts/levels/prototype-terrain", () => {
   throw new Error("The sandbox template loaded another level's terrain.");
 });
 

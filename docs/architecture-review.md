@@ -2,11 +2,12 @@
 
 ## Installed skills
 
-Eight project skills live in `.agents/skills/`. Each has a callable `SKILL.md`,
-the unchanged upstream prompt in `UPSTREAM.md`, and its supporting resources.
-The entry point loads the upstream instructions and applies the project rules
-below. [Source provenance](../.agents/skills/sources.json) records commits,
-licenses, paths, and SHA-256 hashes for the unchanged files.
+Eight project skills live in `.agents/skills/`, which `.claude/skills` links
+to. Each has a callable `SKILL.md`, the unchanged upstream prompt in
+`UPSTREAM.md`, and its supporting resources. The entry point loads the upstream
+instructions and applies the project rules below.
+[Source provenance](../.agents/skills/sources.json) records commits, licenses,
+paths, and SHA-256 hashes for the unchanged files.
 
 Primary skills:
 

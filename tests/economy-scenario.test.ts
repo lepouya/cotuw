@@ -6,7 +6,7 @@ import {
 } from "./helpers/content";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
-import { PROTOTYPE_LANDMARKS } from "../scripts/levels/m0-terrain";
+import { PROTOTYPE_LANDMARKS } from "../scripts/levels/prototype-terrain";
 import { createActor } from "../src/simulation/actor";
 import type { Actor } from "../src/simulation/actor";
 import type { TileCoord } from "../src/simulation/grid";

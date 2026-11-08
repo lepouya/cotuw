@@ -1,4 +1,4 @@
-import { PROTOTYPE_TERRAIN } from "./m0-terrain.ts";
+import { PROTOTYPE_TERRAIN } from "./prototype-terrain.ts";
 import { createSandboxLevel } from "./sandbox-level.ts";
 
 export const SANDBOX_LEVEL = createSandboxLevel({

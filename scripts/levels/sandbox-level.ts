@@ -1,6 +1,6 @@
-import { currentContentPack } from "../../src/content/packs.ts";
 import { createMissionState } from "../../src/simulation/mission.ts";
 import { TerrainGrid } from "../../src/simulation/terrain.ts";
+import { BASE_CONTENT } from "./base-content.ts";
 
 import type {
   MissionFile,
@@ -21,7 +21,7 @@ type SandboxOptions = Pick<
 export function createSandboxLevel({
   terrain,
   briefing,
-  content = currentContentPack("base"),
+  content = BASE_CONTENT,
   actors = [
     "arc-trooper",
     "arc-scout",

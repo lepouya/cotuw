@@ -54,22 +54,9 @@ Open `/?level=sandbox` for free construction and training. Explicit
 Use `/?level=skirmish-map` to inspect the rough M1 battlefield the same way.
 Use `/?skirmish=arc-circle&player=east&difficulty=hard` to start an assembled
 skirmish; the AI opponent does not act yet.
-Choose Circle in New mission or use `/?level=circle-wolf-den`. Start with a
-Heartgrove and 150 Lifebloom. Train a Cultivator for 50, select it, and grow a
-Conservatory for 100. Keep the worker nearby to tend construction, then send it
-to Gather Lifebloom. Deliveries fund a Musterhall, Sentinels, and Wayfinders.
-Sites regenerate; heavy staffing slows output and can trigger dormancy. Rotate
-between the two sites or let workers wait for recovery. Moving or stopping a
-worker pauses growth; select a replacement and use Tend to resume. Protect the
-Heartgrove and clear the wolves to win. Gift boxes beyond the lone wolf grant
-Lifebloom when a friendly unit walks over them.
-
-This development slice uses the existing single-player control model.
-Healing, defenses, constructs, faction AI, and skirmish balance
-remain pending. Owner economies, command authority, and headquarters queues
-are implemented; scenarios can enable owner-based elimination and emergency
-headquarters recovery with persisted per-owner match metrics. See the
-[slice scope](DESIGN.md#circle-wolf-den-development-slice).
+Choose Circle in New mission or use `/?level=circle-wolf-den` for the
+[Circle cultivation slice](DESIGN.md#circle-wolf-den-development-slice), which
+in-game guides introduce. It uses the existing single-player control model.
 
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all
@@ -91,8 +78,8 @@ focused and watch runs.
   milestone review workflow.
 - [Runtime boundaries](docs/runtime-boundaries.md): simulation and resource
   ownership contracts.
-- [UI ownership](docs/ui-ownership.md): feature boundaries and the dialog,
-  navigation, and sidebar extraction scope.
+- [UI ownership](docs/ui-ownership.md): feature boundaries, lifetimes, and
+  behavior checks.
 - [Mission files](docs/mission-files.md): level and save format and hand
   editing.
 - [Content packs](docs/content-packs.md): shared rules and presentation data.

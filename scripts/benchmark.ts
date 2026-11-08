@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { runnerImport } from "vite";
 import { hasOwn } from "../src/simulation/validation.ts";
 
+import type { Workload } from "./benchmark/workload.ts";
+
 const args = process.argv.slice(2);
 const written = args.indexOf("--write");
 const output = written >= 0 ? args.splice(written, 2)[1] : undefined;
@@ -12,7 +14,6 @@ const { module } = await runnerImport<typeof import("./benchmark/workload.ts")>(
   fileURLToPath(new URL("benchmark/workload.ts", import.meta.url)),
 );
 const { WORKLOADS, createBenchmarkMission, measureWorkload } = module;
-type Workload = keyof typeof WORKLOADS;
 
 const isWorkload = (value: string): value is Workload =>
   hasOwn(WORKLOADS, value);
@@ -28,11 +29,5 @@ if (output) {
   await writeFile(output, createBenchmarkMission(workloads[0]!));
 } else {
   for (const workload of workloads)
-    console.log(
-      JSON.stringify(
-        measureWorkload(workload, () => performance.now()),
-        null,
-        2,
-      ),
-    );
+    console.log(JSON.stringify(measureWorkload(workload), null, 2));
 }

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { finished } from "node:stream/promises";
 import { stripVTControlCharacters } from "node:util";
 
-export type Check = { name: string; command: string; args: string[] };
+type Check = { name: string; command: string; args: string[] };
 
 /** Streams detailed output to disk and stops at the first failed check. */
 export async function runChecks(checks: Check[], root: string) {

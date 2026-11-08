@@ -114,10 +114,10 @@ clock, and resource ownership boundaries.
   across updates. Session controls receive explicit typed element references
   and submit commands through the existing simulation boundary.
 - Preserve headless preparation, lazy renderer startup, deterministic gameplay,
-  and platform-service isolation. UI extraction does not change save formats.
+  and platform-service isolation.
 
-[UI ownership](docs/ui-ownership.md) defines the selected module interfaces,
-lifetime contracts, extraction order, and behavior checks for tasks 1.22-1.24.
+[UI ownership](docs/ui-ownership.md) defines the module interfaces, lifetime
+contracts, and behavior checks.
 
 ## Mission terminology
 
@@ -625,9 +625,9 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   time, and single-player pause and speed controls. The left holds Menu, Pause,
   and ½×, 1×, 2×, and 4× speed. The center shows the first unfinished victory
   objective with progress, or the result, and opens Goals. The right shows
-  Materials, elapsed simulation time, and the alert history toggle with its
-  unread count. Compact screens reduce the objective and resource label to
-  symbols. Speed changes only how many fixed ticks run per real second;
+  the player's resource, elapsed simulation time, and the alert history toggle
+  with its unread count. Compact screens reduce the objective and resource
+  label to symbols. Speed changes only how many fixed ticks run per real second;
   missions start at 1×. Changing speed preserves fractional tick progress.
 - Alerts report attacks, losses, completed construction and training, units
   whose routes become blocked, disconnected and reconnected buildings, and
@@ -1346,7 +1346,7 @@ Deterministic acceptance checks cover:
 
 ## Materials economy prototype
 
-- The default level file is the Materials opening, with a fixed Command Center
+- ARC's setup choice loads the Materials opening, with a fixed Command Center
   in the map-edge pocket. `/?level=sandbox` selects the free construction and
   training sandbox.
 - The opening starts with 150 Materials. Prototype costs are 300 for a Command
@@ -1454,10 +1454,9 @@ Deterministic acceptance checks cover:
   be targeted, damaged, or destroyed.
 - Actors save their controlling owner, and definitions name a faction type.
   Only hostile owners attack each other; allies share vision and detection.
-  The mission names the player's owner, whose exploration the fog records;
-  other owners derive current vision each tick without exploration memory.
-  An owner detects an actor when it currently sees the unit's tile or any of
-  a building's footprint tiles. Without fog, every owner detects everything.
+  The mission names the player's owner. An owner detects an actor when it
+  currently sees the unit's tile or any of a building's footprint tiles.
+  Without fog, every owner detects everything.
 - A weapon authors fixed damage, a damage type, a range, and a cooldown. Range
   runs from the attacker's center to the target's footprint or body edge.
   Weapons hit hostile actors on their own occupancy layer. Damage types are
@@ -2078,11 +2077,10 @@ are tracked in the checklist.
 - M1 saves also carry control groups as player interface state outside the
   authoritative simulation snapshot. Keyboard bindings stay in device
   preferences and are not restored from a mission save.
-- As ownership systems are implemented, saves preserve actor owners,
-  effective relationships, sharing permissions, pool balances and membership,
-  base affiliations,
-  infrastructure queues, Cultivator tending assignments, and owner-scoped
-  exploration and observations.
+- Saves preserve actor owners, effective relationships, sharing permissions,
+  pool balances and membership, base affiliations, infrastructure queues,
+  Cultivator tending assignments, and owner-scoped exploration and
+  observations.
 - Mission and AI state includes goals, assignments, observations, plans,
   cooldowns, deterministic random state when used, and persistent story flags,
   timers, and branches. Events retain progress, completed one-time triggers,
@@ -2110,10 +2108,7 @@ are tracked in the checklist.
   when its rules or balance change how an existing save plays. Keep only the
   current supported formats and rulesets; mismatches fail explicitly.
 - Apply version changes with the corresponding implementation, update validation
-  and format documentation, and regenerate bundled levels to match. Ownership
-  requires a mission-file version change when its state is implemented; other
-  version changes follow the affected contracts. Current versions remain in
-  use until those changes land.
+  and format documentation, and regenerate bundled levels to match.
 - Incompatible saves remain listed with an **Incompatible** label, an
   explanation of the mismatch, and an option to delete them. A failed load
   leaves the current mission and stored save unchanged. Incompatibility alone

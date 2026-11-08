@@ -38,7 +38,6 @@ for (const workload of ["normal", "stress"] satisfies Workload[])
         await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
         await expect(canvas).toHaveAttribute("data-models-ready", "true");
         // Reinforcement must run from the first tick, as it does headless.
-        const { now: _, ...options } = module.probeOptions(workload, () => 0);
         await page.evaluate(({ scale, reinforcement, sampleTicks }) => {
           const benchmark = globalThis.cotuwBenchmark;
           if (!benchmark) throw new Error("Expected a benchmark build.");
@@ -46,7 +45,7 @@ for (const workload of ["normal", "stress"] satisfies Workload[])
             benchmark.session.simulation,
             { scale, reinforcement, sampleTicks, now: () => performance.now() },
           );
-        }, options);
+        }, module.probeOptions(workload));
         await page.locator("#resume-mission").click();
         await expect(page.locator("#game-menu")).toBeHidden();
         await page.locator(`[data-speed="${speed}"]`).click();

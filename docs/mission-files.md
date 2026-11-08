@@ -19,8 +19,8 @@ can be read, edited by hand, and loaded again.
 - ARC and Circle introductions share `scripts/levels/wolf-den.ts` for terrain,
   starting headquarters placement, wildlife, objectives, and crossing gifts.
   Each opening supplies its economy, roster, guidance, and reward currency.
-  `base-content.ts` resolves actor definitions and prices for authored text;
-  neither introduction imports the other.
+  `scripts/levels/base-content.ts` resolves actor definitions and prices for
+  authored text; neither introduction imports the other.
 - Fixed-force scenarios can omit the authoring fields `stockpiles`, `sites`,
   and `loot` together. `createScenarioState` then supplies fog and actor state
   without an economy. The Circle level gives the player only a Lifebloom
@@ -108,38 +108,15 @@ can be read, edited by hand, and loaded again.
   b], "relationship": "allied" | "hostile" }`; every other pair is neutral.
   Each pair appears once. Allies may add `"sharesSupport": true`,
   `"sharesHeadquarters": true`, and `"sharesResources": true` independently.
-- Only hostile owners attack each other; Attack orders against neutral or
-  allied actors are rejected.
-- Support links connect same-faction buildings of owners that share support.
-  A building is powered only by a linked root whose owner shares support with
-  every relay along the path. Placement also requires sharing with both the
-  covering relay and its root; a relay cannot lend a third owner's support.
-- Construction uses the infrastructure queue of the nearest eligible
-  headquarters, a definition with `infrastructure.slots`, of its owner or of
-  an ally that shares headquarters. Circle growth uses its definition's
-  Heartgrove; other construction uses a headquarters of its faction whose
-  support powers the blueprint. Buildings retain their affiliation after
-  completion and while their headquarters remains eligible. Otherwise they
-  move to the nearest eligible one on the next tick. Paid work keeps payment,
-  progress, and placement priority without its slot, or pauses until a
-  headquarters is available. Completed headquarters affiliate with themselves.
-- `scenario.emergencyHeadquarters: true` applies the skirmish recovery rule.
-  An owner without a completed headquarters may place one: ARC within the
-  support radius of any completed owned building, even a disconnected one,
-  and the Circle with a tending Cultivator. Such a job has no
-  `headquartersId`, ignores support, and does not use infrastructure capacity;
-  each owner runs one at a time in placement order, independently of allied
-  queues. Other work needs an eligible operational headquarters.
-- Harvesters deliver only to their owner's Refineries and Cultivators tend
-  and deliver only to their owner's buildings, including when restoring saved
-  assignments. Deliveries credit the worker's owner.
-- With `fog`, every owner sees what its own and its allies' actors see and
-  keeps the terrain it explored, which remains after an alliance ends.
-  Harvesters choose explored sites using last-seen yields and investigate
-  unknown yields. Placement checks footprints against the owner's explored
-  terrain. Without `fog`, every owner sees everything.
-- Placement creates buildings for the issuing owner, and trained units
-  inherit their producer's owner. Behaviors cannot change an actor's owner.
+- The [ownership rules](../DESIGN.md#ownership-and-relationships) and
+  [runtime contracts](runtime-boundaries.md#economy-infrastructure-and-growth)
+  own what relationships and sharing do to combat, vision, support, and
+  headquarters queues.
+- `scenario.emergencyHeadquarters: true` applies the
+  [recovery rule](../DESIGN.md#m1-skirmish-results). Such a job has no
+  `headquartersId`, and each owner runs one at a time in placement order,
+  independently of allied queues.
+- Saved Harvester and Cultivator assignments must name their owner's buildings.
 - Scenario authoring assigns each building and unit without an explicit
   `owner` to the first owner playing its definition's faction, and rejects an
   actor that no owner plays. Wolf-den levels use a `player` owner and a

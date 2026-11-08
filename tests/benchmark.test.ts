@@ -45,10 +45,10 @@ test(
     const simulation = createSessionSimulation(
       loadMission(createBenchmarkMission("normal")),
     );
-    const probe = attachBenchmarkProbe(
-      simulation,
-      probeOptions("normal", () => 0),
-    );
+    const probe = attachBenchmarkProbe(simulation, {
+      ...probeOptions("normal"),
+      now: () => 0,
+    });
     probe.measure();
     for (let tick = 0; tick < 1_000; tick++) simulation.tick();
     expect(probe.record().rejected).toEqual([]);
@@ -78,7 +78,10 @@ test("probe reinforcement is independent of timing and stops on detach", () => {
       (actor) => actor.owner === "west" && actor.definitionId === "arc-trooper",
     )!;
     simulation.removeActor(lost.id);
-    const probe = attachBenchmarkProbe(simulation, probeOptions("normal", now));
+    const probe = attachBenchmarkProbe(simulation, {
+      ...probeOptions("normal"),
+      now,
+    });
     return { simulation, probe };
   });
   try {
@@ -100,10 +103,10 @@ test("probe reinforcement is independent of timing and stops on detach", () => {
     }
     // Skirmish actors can only be removed at tick 0.
     const detached = createSessionSimulation(mission);
-    attachBenchmarkProbe(
-      detached,
-      probeOptions("normal", () => 0),
-    ).detach();
+    attachBenchmarkProbe(detached, {
+      ...probeOptions("normal"),
+      now: () => 0,
+    }).detach();
     detached.removeActor(
       detached.actors.find(
         (actor) =>

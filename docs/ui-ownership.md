@@ -1,11 +1,10 @@
 # UI ownership
 
-[DESIGN.md](../DESIGN.md#ui-module-ownership) owns the selected direction.
-This document defines the implementation boundaries for tasks 1.22-1.24.
-Dialogs, application navigation, save panels, and sidebar sections have
-feature-owned markup, behavior, styles, and cleanup.
+[DESIGN.md](../DESIGN.md#ui-module-ownership) owns the direction. This document
+defines the module interfaces and lifetimes of dialogs, application navigation,
+save panels, and sidebar sections.
 
-## Current coupling
+## Composition
 
 - `src/main.ts` composes the application, dialogs, top bar, notifications,
   camera controls, and shortcuts. `src/application.ts` owns platform creation,
@@ -22,12 +21,12 @@ feature-owned markup, behavior, styles, and cleanup.
   controls to simulation and input. `createProductionCards` owns its tooltip
   and listeners.
 
-## Selected structure
+## Structure
 
 Each feature owns its DOM subtree, behavior, styles, and cleanup. Composition
 passes roots, state, and semantic callbacks. A feature queries only its root
-and owned overlays, never another feature's IDs. Existing public IDs and
-accessible names remain stable through extraction where behavior is unchanged.
+and owned overlays, never another feature's IDs. Public IDs and accessible
+names are contracts for browser specs, so changing them is deliberate.
 Document/window listeners for input, audio unlock, and overlay dismissal
 belong to the subscribing feature's lifetime. World commands use the existing
 world input guard and preserve tool, tooltip, and dialog Escape ordering.
@@ -71,8 +70,8 @@ Audio activation and modal-local input remain available while a dialog is open.
   usable. Exit waits for the save library's requested writes and deletions.
 - `src/mission-loading.ts` keeps headless preparation and validation.
   `src/saves.ts` keeps storage ordering and metadata; platform modules keep
-  storage and file dialogs. UI extraction does not add a second persistence
-  implementation or change mission/content versions.
+  storage and file dialogs. UI features add no second persistence
+  implementation.
 
 ### Dialogs and navigation
 
@@ -196,7 +195,6 @@ Audio activation and modal-local input remain available while a dialog is open.
   tool and `src/render/placement-preview.ts` draws its preview. The session
   receives control references and emits player-visible updates, alerts,
   guides, and results; it does not load saves or manage menu panels.
-  Existing control binders need no wholesale rewrite.
 - `simulation.viewOf(playerOwner)` in `src/simulation/owner-view.ts` remains
   the authority for what the player may see. UI does not reconstruct
   visibility from unrestricted simulation state. Layout changes preserve
@@ -212,8 +210,8 @@ Audio activation and modal-local input remain available while a dialog is open.
 - `src/ui/camera-controls.ts` mounts its markup into `#camera-controls` once
   for the application, so Edge panning keeps its setting between missions, and
   owns its styles. Each session binds its camera through `bind`.
-- The minimap host remains a distinct feature. Its owning module supplies
-  markup and styles when touched.
+- The minimap canvas and its sizing stay in the shell; `src/render/minimap.ts`
+  draws it and handles its pointer input.
 
 ### Markup and shared styles
 
@@ -231,8 +229,8 @@ Audio activation and modal-local input remain available while a dialog is open.
   framework, or design-system package.
 - Shell CSS owns column widths, viewport allocation, and shell breakpoints.
   Feature CSS owns internal scrolling, card density, local compact rules,
-  and pinned orders. Mixed media-query blocks split by owner while preserving
-  their conditions, cascade order, touch targets, and visible behavior.
+  and pinned orders. Media queries that span owners split by owner, keeping
+  their conditions and cascade order.
 
 ### Lifetime and asynchronous work
 
@@ -254,58 +252,29 @@ Audio activation and modal-local input remain available while a dialog is open.
   panel or replacing a session suppresses stale UI publication, not those
   writes. Separate UI pending state from mission startup/teardown busy state.
 
-## Alternatives and trade-offs
+## Trade-offs
 
-- Keeping static feature markup in `index.html` and only moving TypeScript
-  has the lowest conversion cost. It leaves private IDs and feature layout
-  shared with the document and does not satisfy feature-owned markup/styles.
-- Feature-owned DOM and adjacent CSS add explicit mounting and cleanup work.
-  They fit existing root-based modules and localize the committed dialog and
-  sidebar changes. This is the selected approach.
-- A UI framework or general component registry adds dependencies, lifecycle
-  conventions, and migration work without solving a requirement beyond these
-  existing roots and callbacks. It is outside the selected scope.
+- Feature-owned DOM and adjacent CSS need explicit mounting and cleanup. They
+  keep private IDs and layout out of the document and fit the root-based
+  modules.
+- A UI framework or general component registry would add dependencies,
+  lifecycle conventions, and migration work without solving a requirement
+  beyond these roots and callbacks.
 
-## Implementation and verification
+## Verification
 
-- **1.22:** Extract dialog ownership first, including menu and guide markup,
-  local CSS, focus, pause/resume, busy handling, and disposal. Application
-  operation callbacks may remain in `main.ts` until 1.23, but their DOM
-  rendering and handlers move with the markup into the dialog feature.
-  Save-panel extraction in 1.23 splits those private internals. Preserve menu
-  actions and save behavior; introduce no skirmish result or autosave rules
-  in this move.
-- **1.23:** Extract application/session navigation and save-panel presentation.
-  Apply its incompatible-save and skirmish save policies with the corresponding
-  mission rules. Keep request validity at the owner of each asynchronous action.
-  Scenarios select the skirmish save policy until skirmish launch assembly
-  (1.14) and results (1.25) exist.
-- **1.24:** Sidebar sections own TypeScript-created DOM and adjacent styles
-  behind root-based composition. Session binders use typed controls. Preserve
-  content-driven faction support and world-control behavior.
-- Preserve behavior coverage in `e2e/start-screen.spec.ts`,
-  `e2e/interface.spec.ts`, `e2e/saves.spec.ts`, and
-  `e2e/session-lifecycle.spec.ts`: lazy renderer startup, keyboard focus,
-  Escape, guide pausing, loaded inspection, save retry, ordered exit, restart,
-  and cleanup after failure. Extend these for reset during pending work,
-  deferred guides, and result precedence where coverage is missing.
-- Cover a delayed load resolving after Back, Inspect, Resume, or return to
-  title; neither session nor restart source may change. Cover late panel
-  success/failure after navigation, busy-state release preserving disabled
-  actions, and guide dismissal after a result without accidental resumption.
-  Preserve settings coverage in `e2e/audio.spec.ts`; extend it for audio unlock
-  inside dialogs, menu transitions, mission resets, and binding disposal
-  without duplicate subscriptions.
-- For sidebar work, preserve `e2e/sidebar.spec.ts`, production-card,
-  economy, Circle, and relationship/observation behavior coverage. Retain
-  partial-setup cleanup, recreation, custom content, pinned orders, touch
-  layouts, and information isolation. Fixtures may mount the feature instead
-  of cloning static markup; behavioral assertions remain.
-- Keep headless mission-loading, save-library, lifetime, and presentation tests.
-  Add unit tests for extracted state transitions only where they protect
-  behavior independently of real focus, native dialogs, and layout.
-- Run `npm run check` and affected browser specs for each implementation.
-  Use their tagged WebKit and mouse/touch profiles under
-  [verification](verification.md). Playtest both faction openings, guide and
-  menu cancellation, paused load inspection, save/load/restart, and return to
-  title.
+- `e2e/start-screen.spec.ts`, `e2e/interface.spec.ts`, `e2e/saves.spec.ts`,
+  `e2e/dialogs.spec.ts`, and `e2e/session-lifecycle.spec.ts` own lazy renderer
+  startup, keyboard focus, Escape, guide pausing, loaded inspection, save retry,
+  ordered exit, restart, cleanup after failure, delayed loads and panel work
+  after navigation, busy-state release, and deferred guides and result
+  precedence.
+- `e2e/audio.spec.ts` owns settings, audio unlock inside dialogs, menu
+  transitions, mission resets, and binding disposal.
+- `e2e/sidebar.spec.ts` and the production-card, economy, Circle, and
+  relationship and observation specs own partial-setup cleanup, recreation,
+  custom content, pinned orders, touch layouts, and information isolation.
+- Headless mission-loading, save-library, lifetime, and presentation tests own
+  state transitions independent of real focus, native dialogs, and layout.
+- Run `npm run check` and affected browser specs for UI changes, using their
+  tagged WebKit and mouse/touch profiles under [verification](verification.md).

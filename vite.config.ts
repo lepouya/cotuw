@@ -3,7 +3,7 @@ import process from "node:process";
 
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig(() => ({
+export default defineConfig({
   // Relative URLs let any static host serve the site from a subpath.
   base: "./",
   define: {
@@ -36,4 +36,4 @@ export default defineConfig(() => ({
       ],
     },
   },
-}));
+});

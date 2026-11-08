@@ -2,7 +2,7 @@ import { SIMULATION_TICK_SECONDS } from "../../src/simulation/clock.ts";
 import { createScenarioState } from "../../src/simulation/scenario.ts";
 import { serializeMission } from "../../src/simulation/mission-file.ts";
 import { BASE_CONTENT } from "./base-content.ts";
-import { ECONOMY_SCENARIO } from "./m0.ts";
+import { ECONOMY_SCENARIO } from "./arc-economy-opening.ts";
 import { SANDBOX_LEVEL } from "./sandbox.ts";
 import { SKIRMISH_PREVIEW } from "./skirmish-preview.ts";
 import { CIRCLE_WOLF_DEN } from "./circle-wolf-den.ts";

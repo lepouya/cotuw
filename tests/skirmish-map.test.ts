@@ -44,7 +44,7 @@ import type { TileCoord } from "../src/simulation/grid";
 import type { TerrainView } from "../src/simulation/terrain";
 import type { MissionSimulation } from "../src/simulation/mission";
 
-vi.mock("../scripts/levels/m0", () => {
+vi.mock("../scripts/levels/arc-economy-opening", () => {
   throw new Error("Skirmish authoring loaded the M0 mission.");
 });
 

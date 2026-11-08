@@ -1813,6 +1813,7 @@ commands coexist with camera pan, rotation, zoom, and minimap input.
   regardless of the characters produced. Other gameplay shortcuts also keep
   their positions. Rebinding lets players choose letters or positions they
   prefer.
+
 **Decision date:** 2026-10-22; construction-worker control and mixed-selection
 actions 2026-10-23.
 
@@ -2713,7 +2714,6 @@ from live information.
 - The adjacent compass ring uses the same north reference.
 - Camera presets and free rotation never rotate the minimap itself.
 
-
 **Depends on:** Q10 and Q13-Q16.
 
 ### Q18. What animation examples belong in the slice?
@@ -3006,9 +3006,8 @@ not commit the final campaign to that exact content.
   changes through the pack's `version`. Compatible updates keep their existing
   compatibility versions.
 - Version changes land with the corresponding implementation, validation,
-  documentation, and regenerated levels. Ownership requires a mission-file
-  version change when implemented. There is no need to retain older parsers,
-  content packs, or rulesets for development saves.
+  documentation, and regenerated levels. There is no need to retain older
+  parsers, content packs, or rulesets for development saves.
 - Incompatible saves remain visible with an **Incompatible** label, a reason,
   and a deletion action. Loading rejects them without altering the current
   mission or stored save. They are never deleted or rewritten merely for being
@@ -3169,8 +3168,8 @@ viewport with touch-style input and no keyboard, hover, or right-click.
 
 - Ordinary notifications and alerts are non-modal and never pause simulation.
 - Explanatory popups pause single-player until the player dismisses them.
-- Whether each popup has been dismissed is authoritative mission state and is
-  included in manual, quick, and automatic mission saves.
+- Whether each popup has been dismissed is player interface state saved with
+  manual, quick, and automatic mission saves.
 - Loading does not repeat a popup that had already been dismissed in that
   snapshot.
 - Restarting reconstructs the pristine mission state, so the popups may appear
@@ -4580,8 +4579,7 @@ M1 introduces faction strategic AI; TODO.md tracks its implementation.
 
 **Remaining strategic foundation follow-ups:**
 
-- How do simultaneous scripted actions resolve conflicts, and how do mission
-  events change faction relationships?
+- How do simultaneous scripted actions resolve conflicts?
 - How are historical strategic reports shared beyond the locked allied vision
   and detection rules, and how are uncertainty and verification tuned?
 

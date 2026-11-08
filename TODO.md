@@ -357,7 +357,7 @@ and bring up the rough skirmish map early for simulation and AI development.
   1.15 added owners, relationships with sharing, scenario events, and fired
   events to the format with their validation and documentation; 1.19 added
   per-owner exploration and observations; 1.23 added the scenario save policy.
-  Mission format 17 persists owner-based skirmish rules, verdicts, match
+  The mission format persists owner-based skirmish rules, verdicts, match
   metrics, and cargo provenance, with validated deterministic continuation,
   plus `scenario.setup` with difficulty, effective scaling, enemy owners, and
   skirmish factions, validated against the mission's owners.
@@ -542,8 +542,8 @@ verified; preview work is partial progress.
 - [ ] Base-loop integration: 1.15-1.18 provide owners, economies, command
   authority, and owner-neutral rules; 1.20, 1.24, and 1.27 provide information
   boundaries and persistence. The slice runs with single-player control.
-  Emergency Heartgrove recovery remains in 1.49. Difficulty and skirmish launch
-  remain in 1.60.
+  Headless checks cover emergency Heartgrove recovery; its acceptance remains
+  in 1.49. Normal-menu skirmish launch remains in 1.60.
 - [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
   and mechanic. Check interrupted work and deterministic saves under 1.56 as
   each system lands. Run the cohort introduction and cultivation acceptance
@@ -552,7 +552,7 @@ verified; preview work is partial progress.
   encounters. Wolves alone cannot validate structure counters. Circle AI
   remains 1.55; full skirmish integration and balance remain phases F and G.
 
-Next integration target: emergency Heartgrove recovery and skirmish launch.
+Next integration target: normal-menu skirmish launch.
 
 #### Circle tasks
 
@@ -727,5 +727,3 @@ Keep these outside the checklist unless an explicit scope decision adds them:
   corruption, and world-event escalation.
 - Air, underground and naval layers, transports, oversized deployables,
   stealth, and veterancy.
-
-[sites]: docs/design-questionnaire.md#q8g-do-resource-sites-deplete-or-recover
