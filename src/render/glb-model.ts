@@ -269,6 +269,9 @@ export function instantiateContainer(
   );
   const root = new TransformNode(name, assets.scene);
   for (const node of entries.rootNodes) node.parent = root;
+  // Empty glTF roots need no place in the active-mesh list.
+  for (const mesh of root.getChildMeshes())
+    if (mesh.getTotalVertices() === 0) mesh.isVisible = false;
   // Babylon clones morph managers but does not dispose them with the meshes.
   const morphManagers = new Set(
     root.getChildMeshes().flatMap((mesh) => mesh.morphTargetManager ?? []),

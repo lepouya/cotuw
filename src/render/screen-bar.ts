@@ -1,5 +1,6 @@
 import {
   Color3,
+  Mesh as BabylonMesh,
   MeshBuilder,
   StandardMaterial,
   TransformNode,
@@ -54,7 +55,6 @@ export function createScreenBar(
   },
 ): ScreenBar {
   const root = new TransformNode(name, scene);
-  root.billboardMode = TransformNode.BILLBOARDMODE_ALL;
   const plane = (part: string, planeWidth: number, height: number) => {
     const mesh = MeshBuilder.CreatePlane(
       `${name}-${part}`,
@@ -72,16 +72,31 @@ export function createScreenBar(
     BAR_HEIGHT + BORDER * 2,
   );
   background.material = frame;
+  background.alphaIndex = 0;
   const fill = plane("fill", width, BAR_HEIGHT);
+  fill.alphaIndex = 1;
   // Slightly towards the camera, which billboards face along -Z.
   fill.position.z = -0.001;
-  const meshes = [background, fill];
+  const parts: Mesh[] = [];
   for (let index = 1; index < segments; index += 1) {
     const divider = plane(`divider-${index}`, DIVIDER_WIDTH, BAR_HEIGHT);
-    divider.material = frame;
     divider.position.set((index / segments - 0.5) * width, 0, -0.002);
-    meshes.push(divider);
+    parts.push(divider);
   }
+  const meshes = [background, fill];
+  // Keep backgrounds behind fills and dividers while fading.
+  if (parts.length) {
+    const dividers = BabylonMesh.MergeMeshes(parts, true)!;
+    dividers.name = `${name}-dividers`;
+    dividers.material = frame;
+    dividers.isPickable = false;
+    dividers.renderingGroupId = RENDERING_GROUP;
+    dividers.parent = root;
+    dividers.alphaIndex = 2;
+    meshes.push(dividers);
+  }
+  // Merge in local space before billboarding bakes in the camera rotation.
+  root.billboardMode = TransformNode.BILLBOARDMODE_ALL;
   return {
     root,
     meshes,

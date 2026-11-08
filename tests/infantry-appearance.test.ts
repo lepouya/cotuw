@@ -151,6 +151,30 @@ describe.each(glbModels)("%s model", (id, graphics) => {
     },
   );
 
+  test("runs only the clips that currently shape the pose", async () => {
+    const { engine, scene, appearance } = await load(graphics);
+    const instance = appearance.instantiate("lazy", 0);
+    const running = () =>
+      scene.animationGroups
+        .filter(({ name, isStarted }) => name.startsWith("lazy-") && isStarted)
+        .map(({ name }) => name.slice("lazy-".length))
+        .sort();
+    const frames = (count: number, distance: number, turn = 0) => {
+      for (let frame = 0; frame < count; frame++)
+        instance.animate!({ distance, turn, seconds: 1 / 60 });
+    };
+
+    frames(1, 0);
+    expect(running()).toEqual([graphics.clips.idle]);
+    frames(10, 0.07, 0.05);
+    expect(running()).toContain(graphics.clips.locomotion);
+    expect(running()).toContain(graphics.clips.turn!.right);
+    // Settled gait weights release their clips.
+    frames(120, 0);
+    expect(running()).toEqual([graphics.clips.idle]);
+    engine.dispose();
+  });
+
   test.runIf(graphics.clips.death)(
     "falls once and holds the last pose",
     async () => {

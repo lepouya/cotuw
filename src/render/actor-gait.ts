@@ -6,6 +6,8 @@ const FULL_LEAN_TURN_RATE = Math.PI;
 /** How quickly each weight closes on its target, per second. */
 const LOCOMOTION_RESPONSE = 12;
 const LEAN_RESPONSE = 10;
+/** Weights this close to their target settle, so unused clips can stop. */
+const SETTLE_THRESHOLD = 1e-3;
 
 /** How an actor's rendered pose moved since the previous frame. */
 export type ActorMotion = {
@@ -57,7 +59,8 @@ export function stepGait(
 }
 
 function approach(value: number, target: number, rate: number): number {
-  return value + (target - value) * (1 - Math.exp(-rate));
+  const next = value + (target - value) * (1 - Math.exp(-rate));
+  return Math.abs(target - next) < SETTLE_THRESHOLD ? target : next;
 }
 
 function clamp(value: number, min: number, max: number): number {

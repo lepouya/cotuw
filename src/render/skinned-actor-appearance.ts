@@ -150,17 +150,21 @@ function instantiate(
   idle.start(true);
   idle.goToFrame(idle.from + seed * (idle.to - idle.from));
   idle.weight = 1;
-  // Paused clips only blend on frames that seek them with their weight.
+  // Clips run only while they contribute, so idle units carry one clip.
   const posed = clipList(groups).filter((group) => group !== idle);
-  for (const group of posed) {
-    group.start(true);
-    group.pause();
-    group.weight = 0;
-  }
+  for (const group of posed) group.weight = 0;
   const seek = (group: AnimationGroup, progress: number) => {
     if (group.weight > 0) {
+      if (!group.isStarted) {
+        group.start(true);
+        group.pause();
+      }
       group.goToFrame(group.from + progress * (group.to - group.from), true);
     }
+  };
+  const release = () => {
+    for (const group of posed)
+      if (group.weight === 0 && group.isStarted) group.stop();
   };
 
   const gait = createGaitState();
@@ -253,6 +257,7 @@ function instantiate(
           seek(group, progress);
         } else playing.delete(group);
       }
+      release();
     },
     play: (trigger) => {
       const group = groups[trigger];
@@ -276,11 +281,15 @@ function instantiate(
         }
         death.weight = 1;
         // A preference change must not stand fallen remains back up.
-        deathProgress = Math.max(
+        const progress = Math.max(
           deathProgress,
           reducedMotion() ? 1 : Math.min(seconds / clipSeconds(death), 1),
         );
+        if (progress === deathProgress && progress === 1) return;
+        deathProgress = progress;
         seek(death, deathProgress);
+        idle.stop();
+        release();
       }),
     freeze: () => {
       for (const group of [idle, ...posed]) group.pause();
