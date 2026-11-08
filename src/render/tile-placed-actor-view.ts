@@ -81,6 +81,8 @@ export type TilePlacedActorAppearance = {
   color: Rgb;
   minimapColor?: Rgb;
   createDetails?: TilePlacedActorDetailsFactory;
+  /** The loaded model's highest point above its seat, in tiles. */
+  modelTopHeight?: number;
   foundation?: ModelAsset;
   /** A unit-cube frame that construction stages scale around the footprint. */
   scaffold?: ModelAsset;
@@ -103,8 +105,11 @@ export type TilePlacedActorViewRegistry = {
   animate: (elapsedSeconds: number, frameSeconds?: number) => void;
   /** Starts an activity's motion unless motion is reduced. */
   play: (actorId: string, kind: BuildingActivityKind) => void;
-  /** The world height of a drawn building's highest point. */
-  topHeight: (actorId: string) => number | undefined;
+  /**
+   * The world height of a building's highest point as drawn, or as its
+   * placement and art would draw it when it has no view, such as remains.
+   */
+  topHeight: (actor: TilePlacedActorState) => number | undefined;
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   setSelectedActor: (actorId: string | undefined) => void;
   dispose: () => void;
@@ -236,6 +241,12 @@ export function createTilePlacedActorViewRegistry(
     heightAt(x, z + 1),
     heightAt(x + 1, z + 1),
   ];
+  const roofOf = (
+    tiles: readonly TileCoord[],
+    appearance: TilePlacedActorAppearance | undefined,
+  ) =>
+    Math.max(...tiles.flatMap(cornerHeights)) +
+    (appearance?.height ?? DEFAULT_HEIGHT);
 
   // One column per occupied tile, from its lowest corner to a shared roof, so
   // the body matches the footprint's shape and never floats on a slope.
@@ -255,18 +266,17 @@ export function createTilePlacedActorViewRegistry(
         new TransformNode(`tile-placed-actor-${actor.id}-root`, scene),
       );
       if (!preview) actorIds.set(root, actor.id);
+      const appearance = appearances.get(definition.id);
       const shared = materialFor(definition.id);
       const body = shared("material", (material) => {
         material.diffuseColor = new Color3(
-          ...(appearances.get(definition.id)?.color ?? DEFAULT_COLOR),
+          ...(appearance?.color ?? DEFAULT_COLOR),
         );
         material.specularColor = new Color3(0.16, 0.18, 0.19);
       });
       const tiles = occupiedTilesFor(actor, definition);
       const occupied = new Set(tiles.map(tileKey));
-      const roof =
-        Math.max(...tiles.flatMap(cornerHeights)) +
-        (appearances.get(definition.id)?.height ?? DEFAULT_HEIGHT);
+      const roof = roofOf(tiles, appearance);
       const foundations: ModelInstance[] = [];
       for (const tile of tiles) {
         const inset = (dx: number, dz: number) =>
@@ -284,7 +294,7 @@ export function createTilePlacedActorViewRegistry(
         const maxZ = low.z + map.tileSize - inset(0, 1);
         const foundation = lifetime.own(
           unitCubeInstance(
-            appearances.get(definition.id)?.foundation,
+            appearance?.foundation,
             `tile-placed-actor-${actor.id}-tile-${tile.x}-${tile.z}`,
             body,
             scene,
@@ -302,7 +312,6 @@ export function createTilePlacedActorViewRegistry(
         );
       }
       const { worldPosition, facing } = tilePlacedPose(map, actor, definition);
-      const appearance = appearances.get(definition.id);
       const details = appearance?.createDetails?.(
         root,
         {
@@ -351,14 +360,13 @@ export function createTilePlacedActorViewRegistry(
           if (scaffold) lifetime.own(scaffold);
         }
       }
-      if (disconnected)
+      if (disconnected) {
         materials.edit(root.getChildMeshes(), "offline", (dimmed) => {
           if (dimmed instanceof StandardMaterial)
             dimmed.diffuseColor = dimmed.diffuseColor.scale(0.35);
           else dimmed.albedoColor = dimmed.albedoColor.scale(0.35);
           dimmed.emissiveColor = Color3.Black();
         });
-      if (disconnected) {
         const badge = MeshBuilder.CreateLineSystem(
           `${root.name}-offline`,
           {
@@ -527,7 +535,18 @@ export function createTilePlacedActorViewRegistry(
       for (const view of roots.values()) view.animate(seconds, frameSeconds);
     },
     play: (actorId, kind) => roots.get(actorId)?.play(kind),
-    topHeight: (actorId) => roots.get(actorId)?.top,
+    topHeight: (actor) => {
+      const drawn = roots.get(actor.id)?.top;
+      if (drawn !== undefined) return drawn;
+      const appearance = appearances.get(actor.definitionId);
+      const definition = definitionsById.get(actor.definitionId);
+      if (!appearance || !definition) return undefined;
+      // Seated models are scaled to the tile size.
+      return (
+        roofOf(occupiedTilesFor(actor, definition), appearance) +
+        (appearance.modelTopHeight ?? 1) * map.tileSize
+      );
+    },
     actorIdForMesh: (mesh) => {
       for (
         let node = mesh as TransformNode | null;

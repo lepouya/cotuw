@@ -4,6 +4,7 @@ import {
   StandardMaterial,
   TransformNode,
 } from "@babylonjs/core";
+
 import { createMeshAppearance } from "./actor";
 
 import type { Mesh, Scene } from "@babylonjs/core";

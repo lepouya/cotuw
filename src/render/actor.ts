@@ -23,7 +23,7 @@ const SELECTION_RING_MARGIN = 0.15;
 const PICK_TESSELLATION = 12;
 /** Hostile inspection uses a broken ring, so shape as well as color differs. */
 const HOSTILE_MARKER_SEGMENTS = 8;
-export const ACTOR_PICK_KIND = "actor";
+const ACTOR_PICK_KIND = "actor";
 /** Shared by the minimap and fallback model when an actor names no color. */
 export const DEFAULT_ACTOR_COLOR: Rgb = [0.871, 0.345, 0.122];
 

@@ -4,6 +4,7 @@ import {
   StandardMaterial,
   TransformNode,
 } from "@babylonjs/core";
+
 import { stableUnit } from "./actor";
 import { unitCubeInstance } from "./glb-model";
 
@@ -101,11 +102,10 @@ export function createWreckView(
         chunk.root.rotation.y = seed * Math.PI;
         chunk.root.position.set(center.x, 0, center.z);
         const settled = chunk.root.scaling.y;
+        const extent = chunk.root.getHierarchyBoundingVectors(true);
         // The bottom's height per unit of vertical scale.
-        const bottom =
-          chunk.root.getHierarchyBoundingVectors(true).min.y / settled;
-        const fullHeight =
-          chunk.root.getHierarchyBoundingVectors(true).max.y / settled - bottom;
+        const bottom = extent.min.y / settled;
+        const fullHeight = extent.max.y / settled - bottom;
         const ground = () => {
           chunk.root.position.y =
             map.heightAtWorldPosition(center.x, center.z) -
@@ -189,13 +189,14 @@ export function createWreckView(
   };
   return {
     /**
-     * `age` is seconds since destruction and `frameSeconds` real time since
-     * the last update. Hidden remains are not drawn.
+     * `age` is seconds since destruction, `lifeSeconds` how long remains
+     * stay, and `frameSeconds` real time since the last update. Hidden
+     * remains are not drawn.
      */
     update: (
       wrecks: readonly Wreck[],
       age: (wreck: Wreck) => number,
-      lifetime: number,
+      lifeSeconds: number,
       visible: (wreck: Wreck) => boolean,
       frameSeconds: number,
     ) => {
@@ -227,7 +228,7 @@ export function createWreckView(
           if (terrainDirty) view.ground();
         }
         view.root.setEnabled(visible(wreck));
-        const opacity = Math.min(1, (lifetime - age(wreck)) / FADE_SECONDS);
+        const opacity = Math.min(1, (lifeSeconds - age(wreck)) / FADE_SECONDS);
         for (const mesh of view.meshes) mesh.visibility = Math.max(opacity, 0);
       }
       terrainDirty = false;

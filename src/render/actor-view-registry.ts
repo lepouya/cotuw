@@ -85,10 +85,16 @@ export function createActorViewRegistry(
   );
   hostileSelectionMaterial.emissiveColor = HOSTILE_SELECTION_COLOR;
   hostileSelectionMaterial.disableLighting = true;
-  const styleFor = (actor: ObservedActor): SelectionStyle =>
-    isHostile(actor)
-      ? { material: hostileSelectionMaterial, hostile: true }
-      : { material: selectionMaterial, hostile: false };
+  const friendlyStyle: SelectionStyle = {
+    material: selectionMaterial,
+    hostile: false,
+  };
+  const hostileStyle: SelectionStyle = {
+    material: hostileSelectionMaterial,
+    hostile: true,
+  };
+  const styleFor = (actor: ObservedActor) =>
+    isHostile(actor) ? hostileStyle : friendlyStyle;
   let fallback: ActorAppearance | undefined;
   lifetime.defer(() => fallback?.dispose());
   // A visible stand-in beats a crash in the render loop for unknown kinds.
@@ -184,11 +190,12 @@ export function createActorViewRegistry(
         engine.getRenderWidth(),
         engine.getRenderHeight(),
       );
+      const world = Matrix.Identity();
       const ids = [];
       for (const renderer of renderers.values()) {
         const point = Vector3.Project(
           renderer.selectionPoint(),
-          Matrix.Identity(),
+          world,
           scene.getTransformMatrix(),
           viewport,
         );
@@ -216,8 +223,8 @@ export function createActorViewRegistry(
         // Relationship changes can make an actor hostile after creation.
         renderer.setSelectionStyle(styleFor(actor));
         renderer.update(pose, seconds, stateOf?.(actor));
-        for (const trigger of pendingTriggers.get(actor.id) ?? [])
-          renderer.play(trigger);
+        const triggers = pendingTriggers.get(actor.id);
+        if (triggers) for (const trigger of triggers) renderer.play(trigger);
       }
       pendingTriggers.clear();
     },

@@ -133,12 +133,8 @@ function instantiate(
 ): ActorInstance {
   const used = clipList(clips);
   // Clones skeletons linked to the cloned joints and retargets the clips.
-  const { root, entries, dispose } = instantiateContainer(assets, name, used);
-  const sources = assets.animationGroups.filter((each) => used.includes(each));
-  const groups = mapClips(
-    clips,
-    (source) => entries.animationGroups[sources.indexOf(source)]!,
-  );
+  const { root, clipFor, dispose } = instantiateContainer(assets, name, used);
+  const groups = mapClips(clips, clipFor);
   const { idle, locomotion, turn, run, work, deploy, stow, aim, death } =
     groups;
   const indicators = (suffix: string) =>

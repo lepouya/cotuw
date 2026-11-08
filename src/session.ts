@@ -244,8 +244,7 @@ async function assembleGameSession(
       frameEffects,
     }),
   );
-  const { appearances, buildingAppearances, propAssets, buildingModelTops } =
-    assets;
+  const { appearances, buildingAppearances, propAssets } = assets;
   const playerOwner = simulation.playerOwner;
   const player = simulation.viewOf(playerOwner);
   const materialsView =
@@ -356,26 +355,9 @@ async function assembleGameSession(
     appearanceFor: (id) => appearances.get(id),
     rubble: () => propAssets.get("rubble"),
     reducedMotion,
-    topHeightFor: (wreck) => {
-      const drawn = tilePlacedViews.topHeight(wreck.actorId);
-      if (drawn !== undefined) return drawn;
-      const appearance = buildingAppearances.get(wreck.definitionId);
-      if (!appearance || !wreck.tilePlacement) return undefined;
-      const tiles = wreckTiles(wreck, definitionsById.get(wreck.definitionId)!);
-      const roof = Math.max(
-        ...tiles.flatMap(({ x, z }) => [
-          map.heightAt(x, z),
-          map.heightAt(x + 1, z),
-          map.heightAt(x, z + 1),
-          map.heightAt(x + 1, z + 1),
-        ]),
-      );
-      return (
-        roof +
-        appearance.height +
-        (buildingModelTops.get(wreck.definitionId) ?? 1) * map.tileSize
-      );
-    },
+    topHeightFor: ({ actorId, definitionId, tilePlacement }) =>
+      tilePlacement &&
+      tilePlacedViews.topHeight({ id: actorId, definitionId, tilePlacement }),
     tilesFor: (wreck) =>
       wreckTiles(wreck, definitionsById.get(wreck.definitionId)!),
   });
@@ -881,14 +863,13 @@ async function assembleGameSession(
    */
   const updateHealth = (frameSeconds: number) => {
     const { bars, damaged, regenerating } = extractHealthAndDamageEffects(
-      simulation.actors,
+      player.actors().shown,
       {
         definitions: definitionsById,
         appearances,
         presentationOf,
-        shows: player.shows,
         groundPositionOf: (id) => actorViews.groundPosition(id),
-        buildingTopHeightOf: (id) => tilePlacedViews.topHeight(id),
+        buildingTopHeightOf: tilePlacedViews.topHeight,
         map,
         completedTicks: simulation.completedTicks,
         tickSeconds: simulation.tickSeconds,

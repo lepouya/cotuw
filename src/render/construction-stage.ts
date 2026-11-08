@@ -77,11 +77,9 @@ export function stageBlueprint(
 /** Living models expose authored roots, ribs, and canopy layers. */
 export function stageGrowth(parts: readonly AbstractMesh[], stage: number) {
   for (const mesh of parts) {
-    const layer = mesh.name.includes("growth-canopy")
-      ? 2
-      : mesh.name.includes("growth-ribs")
-        ? 1
-        : 0;
+    let layer = 0;
+    if (mesh.name.includes("growth-canopy")) layer = 2;
+    else if (mesh.name.includes("growth-ribs")) layer = 1;
     mesh.setEnabled(layer <= stage);
     mesh.visibility = 0.85;
   }

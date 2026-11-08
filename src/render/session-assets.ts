@@ -42,7 +42,6 @@ export type SessionAssets = {
   appearances: ReadonlyMap<string, ActorAppearance>;
   buildingAppearances: ReadonlyMap<string, TilePlacedActorAppearance>;
   propAssets: ReadonlyMap<PropId, ModelAsset>;
-  buildingModelTops: ReadonlyMap<string, number>;
   /** Starts loading once consumers exist; repeated calls share completion. */
   load: (callbacks?: SessionAssetCallbacks) => Promise<void>;
   dispose: () => void;
@@ -124,7 +123,6 @@ export function createSessionAssets(
   );
 
   const propAssets = new Map<PropId, ModelAsset>();
-  const buildingModelTops = new Map<string, number>();
   const modelAssets = lifetime.own(createLifetime());
 
   const models = definitions.flatMap(({ id }) => {
@@ -190,10 +188,11 @@ export function createSessionAssets(
     };
 
     const propHandlers: Partial<Record<PropId, (asset: ModelAsset) => void>> = {
+      // Living buildings grow from the ground instead.
       foundation: (asset) =>
         setBuildings(
           definitions
-            .filter((definition) => !definition.growth)
+            .filter(({ id, growth }) => !growth && buildingAppearances.has(id))
             .map(({ id }) => id),
           { foundation: asset },
         ),
@@ -246,13 +245,12 @@ export function createSessionAssets(
         const graphics = presentationOf(id)?.building?.glb;
         return graphics
           ? [
-              loadModel(`Building ${id}`, graphics, (asset) => {
-                if (asset.topHeight !== undefined)
-                  buildingModelTops.set(id, asset.topHeight);
+              loadModel(`Building ${id}`, graphics, (asset) =>
                 setBuildings([id], {
                   createDetails: modelBuildingDetails(asset),
-                });
-              }),
+                  modelTopHeight: asset.topHeight,
+                }),
+              ),
             ]
           : [];
       }),
@@ -285,7 +283,6 @@ export function createSessionAssets(
     appearances,
     buildingAppearances,
     propAssets,
-    buildingModelTops,
     load,
     dispose: () => {
       disposed = true;

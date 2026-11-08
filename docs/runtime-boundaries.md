@@ -172,9 +172,10 @@ These contracts describe where new behaviors, views, and services attach.
   and payments stay private. Private workers, income, production, and
   balances belong to the owner, including explicitly shared balances.
   Support overlays include only usable, owned or detected buildings and links
-  between them. Session actor views and controls use these projections;
-  health, damage, alert, and audio consumers read live state filtered by
-  `shows`, and only the player's production queues sound.
+  between them. Session actor views, controls, health bars, and damage and
+  regeneration effects use these projections; alert and audio consumers read
+  live state filtered by `shows`, and only the player's production queues
+  sound.
 
 ## Content lookup
 

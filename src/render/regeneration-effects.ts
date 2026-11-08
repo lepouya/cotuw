@@ -1,7 +1,9 @@
 import { TransformNode } from "@babylonjs/core";
+
 import { stableUnit } from "./actor";
 import { createViewRegistry } from "./view-registry";
 import { hierarchyMeshes } from "./glb-model";
+
 import type { Scene, Vector3 } from "@babylonjs/core";
 import type { ModelAsset } from "./glb-model";
 
@@ -20,7 +22,6 @@ export function createRegenerationEffectsView(
   const clocks = new Map<string, number>();
   const effects = createViewRegistry({
     keyFor: () => assetFor(),
-    sameKey: (left, right) => left === right,
     create: (actor: RegeneratingActor, asset) => {
       const root = new TransformNode(`regeneration-${actor.id}`, scene);
       const model = asset?.instantiate(`${root.name}-model`);

@@ -253,7 +253,8 @@ describe("session assets", () => {
     expect(assets.propAssets.get("foundation")).toBe(prop);
     expect(callbacks.onPropLoaded).toHaveBeenCalledWith("foundation", prop);
     expect(assets.buildingAppearances.get("barracks")?.foundation).toBe(prop);
-    expect(assets.buildingModelTops.get("barracks")).toBe(3);
+    expect(assets.buildingAppearances.has("trooper")).toBe(false);
+    expect(assets.buildingAppearances.get("barracks")?.modelTopHeight).toBe(3);
     expect(assets.buildingAppearances.get("barracks")?.createDetails).not.toBe(
       previousDetails,
     );
@@ -308,7 +309,6 @@ describe("session assets", () => {
         buildingAppearance,
       );
       expect(assets.propAssets.size).toBe(0);
-      expect(assets.buildingModelTops.size).toBe(0);
       for (const callback of Object.values(callbacks))
         expect(callback).not.toHaveBeenCalled();
       for (const asset of [actor, prop, building])

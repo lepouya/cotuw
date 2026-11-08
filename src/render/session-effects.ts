@@ -8,8 +8,9 @@ import type { ActorAppearance, ActorAnimationState } from "./actor";
 import type { DamagedActor } from "./damage-effects";
 import type { HealthBar } from "./health-bars";
 import type { RegeneratingActor } from "./regeneration-effects";
-import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
+import type { ActorDefinition } from "../simulation/actor";
 import type { ObservedActor } from "../simulation/owner-view";
+import type { TilePlacedActorState } from "../simulation/placement";
 import type { ActorPresentation } from "../content/content-pack";
 import type { TerrainMap } from "../map";
 import type { WorldPosition } from "../simulation/world";
@@ -17,7 +18,7 @@ import type { WorldPosition } from "../simulation/world";
 /** Health bars sit this far above unit models and over buildings. */
 export const UNIT_BAR_CLEARANCE = 0.3;
 /** Clears a construction progress bar below it. */
-export const BUILDING_BAR_HEIGHT = 2.9;
+const BUILDING_BAR_HEIGHT = 2.9;
 
 export type ExtractedEffects = {
   bars: HealthBar[];
@@ -29,9 +30,8 @@ export type EffectContext = {
   definitions: ReadonlyMap<string, ActorDefinition>;
   appearances: ReadonlyMap<string, ActorAppearance>;
   presentationOf: (id: string) => ActorPresentation | undefined;
-  shows: (actor: ActorRenderState) => boolean;
   groundPositionOf: (id: string) => WorldPosition | undefined;
-  buildingTopHeightOf: (id: string) => number | undefined;
+  buildingTopHeightOf: (actor: TilePlacedActorState) => number | undefined;
   map: Pick<TerrainMap, "heightAtWorldPosition" | "tileSize">;
   completedTicks: number;
   tickSeconds: number;
@@ -40,17 +40,16 @@ export type EffectContext = {
 
 /**
  * Extracts visible health bars, damage effects, and regeneration effects for
- * committed actors on the current frame.
+ * the committed actors a viewer is shown on the current frame.
  */
 export function extractHealthAndDamageEffects(
-  actors: readonly ActorRenderState[],
+  actors: readonly ObservedActor[],
   context: EffectContext,
 ): ExtractedEffects {
   const {
     definitions,
     appearances,
     presentationOf,
-    shows,
     groundPositionOf,
     buildingTopHeightOf,
     map,
@@ -66,7 +65,7 @@ export function extractHealthAndDamageEffects(
 
   for (const actor of actors) {
     const maximum = definitions.get(actor.definitionId)?.health;
-    if (!maximum || !shows(actor)) continue;
+    if (!maximum) continue;
     const fraction = (actor.health ?? maximum) / maximum;
     const placed = isTilePlacedActor(actor);
     const worldPosition = placed
@@ -113,7 +112,7 @@ export function extractHealthAndDamageEffects(
         severity,
         position,
         height: placed
-          ? (buildingTopHeightOf(actor.id) ?? ground + 1) - ground
+          ? (buildingTopHeightOf(actor) ?? ground + 1) - ground
           : (bounds?.height ?? 1),
         radius,
       });

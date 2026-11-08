@@ -17,13 +17,17 @@ import {
   modelBuildingDetails,
   staticInstance,
 } from "../src/render/glb-model";
-import { constructionStage } from "../src/render/construction-stage";
+import {
+  constructionStage,
+  stageGrowth,
+} from "../src/render/construction-stage";
 import { createTilePlacedActorViewRegistry } from "../src/render/tile-placed-actor-view";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import { glbDataUrl } from "./helpers/assets";
 import { ARC_ACTOR_DEFINITIONS, BASE_CONTENT } from "./helpers/content";
 
 import type { ModelAsset } from "../src/render/glb-model";
+import type { TilePlacedActorAppearance } from "../src/render/tile-placed-actor-view";
 
 const barracks = ARC_ACTOR_DEFINITIONS.find(
   ({ id }) => id === "arc-field-barracks",
@@ -41,12 +45,12 @@ function setup(reducedMotion = () => false) {
     },
     dispose: () => {},
   };
-  const appearances = new Map([
+  const appearances = new Map<string, TilePlacedActorAppearance>([
     [
       barracks.id,
       {
         height: 0.25,
-        color: [0.3, 0.3, 0.3] as [number, number, number],
+        color: [0.3, 0.3, 0.3],
         createDetails: createBarracksDetails,
         scaffold,
       },
@@ -80,11 +84,53 @@ test("construction progress divides into three equal stages", () => {
   expect([0, 29, 30, 59, 60, 89].map(stage)).toEqual([0, 0, 1, 1, 2, 2]);
 });
 
+test("growth layers keep their stage when an actor ID contains growth-roots", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const parts = ["roots", "ribs", "canopy"].map((layer) =>
+      MeshBuilder.CreateBox(
+        `tile-placed-actor-growth-roots-root-model-growth-${layer}`,
+        {},
+        scene,
+      ),
+    );
+    for (const stage of [0, 1, 2]) {
+      stageGrowth(parts, stage);
+      expect(parts.map((mesh) => mesh.isEnabled())).toEqual([
+        true,
+        stage >= 1,
+        stage >= 2,
+      ]);
+    }
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("undrawn buildings estimate their top from placement and model height", () => {
+  const { engine, views, appearances, actor } = setup();
+  try {
+    // Flat terrain: the roof is the appearance height.
+    expect(views.topHeight(actor)).toBeCloseTo(0.25 + 1);
+    appearances.set(barracks.id, {
+      ...appearances.get(barracks.id)!,
+      modelTopHeight: 2,
+    });
+    expect(views.topHeight(actor)).toBeCloseTo(0.25 + 2);
+    views.update([actor]);
+    expect(views.topHeight(actor)).not.toBeCloseTo(0.25 + 2);
+  } finally {
+    views.dispose();
+    engine.dispose();
+  }
+});
+
 test("blueprints rise through stages inside a scaffold that completion removes", () => {
   const { engine, scene, views, actor } = setup();
   try {
     views.update([actor]);
-    const finished = views.topHeight(actor.id)!;
+    const finished = views.topHeight(actor)!;
     const roof = scene
       .getMeshByName("tile-placed-actor-barracks-tile-4-4")!
       .getBoundingInfo().boundingBox.maximumWorld.y;

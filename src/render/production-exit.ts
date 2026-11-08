@@ -1,6 +1,8 @@
 import { Color3, Mesh, StandardMaterial, VertexData } from "@babylonjs/core";
+
 import { footprintOverlayOffset } from "./footprint-overlay";
 import { clampToBounds } from "../simulation/world";
+
 import type { Scene, TransformNode } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 

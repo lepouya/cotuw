@@ -250,14 +250,18 @@ function seekClip(group: AnimationGroup, seconds: number, loop: boolean) {
 }
 
 /**
- * Clones a container's nodes under a new root with only the given clips.
- * Instances share the container's materials.
+ * Clones a container's nodes under a new root with only the given clips;
+ * `clipFor` finds a source clip's clone. Instances share the container's
+ * materials.
  */
 export function instantiateContainer(
   assets: AssetContainer,
   name: string,
   clips: readonly AnimationGroup[],
 ) {
+  const sources = assets.animationGroups.filter((group) =>
+    clips.includes(group),
+  );
   const entries = assets.instantiateModelsToScene(
     (source) => `${name}-${source}`,
     false,
@@ -278,7 +282,8 @@ export function instantiateContainer(
   );
   return {
     root,
-    entries,
+    clipFor: (source: AnimationGroup) =>
+      entries.animationGroups[sources.indexOf(source)]!,
     dispose: () => {
       entries.dispose();
       root.dispose();
@@ -347,18 +352,17 @@ export async function loadModelAsset(
   );
   const { idle, activities } = prepared;
   const used = [...(idle ? [idle] : []), ...activities.map(([, clip]) => clip)];
-  const sources = assets.animationGroups.filter((each) => used.includes(each));
   return {
     topHeight: prepared.topHeight,
     loopSeconds: idle && clipSeconds(idle),
     instantiate: (name) => {
-      const { root, entries, dispose } = instantiateContainer(
+      const { root, clipFor, dispose } = instantiateContainer(
         assets,
         name,
         used,
       );
       const clone = (source: AnimationGroup) => {
-        const group = entries.animationGroups[sources.indexOf(source)]!;
+        const group = clipFor(source);
         group.start(true);
         group.pause();
         group.goToFrame(group.from);

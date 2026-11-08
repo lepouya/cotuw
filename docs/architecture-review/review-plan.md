@@ -431,7 +431,7 @@ product work in `TODO.md`, and remove temporary files in
       `scripts/model-assets.ts` importing `MATERIALS_COLOR`/`SALVAGE_COLOR`
       from `render/materials-sites.ts`.
 
-- [ ] **Slice 7: actor views, models, session assets, and visual effects**
+- [x] **Slice 7: actor views, models, session assets, and visual effects**
   (25 files, ~3,810 LOC; check cross-slice caller `scripts/model-assets.ts`)
   - `src/render/`: `session-assets.ts`, `glb-model.ts`, `builtin-models.ts`,
     `view-registry.ts`, `actor-view-registry.ts`,
@@ -444,6 +444,65 @@ product work in `TODO.md`, and remove temporary files in
   - Focus: async asset lifetimes, `(definitionId, ownerColorKey)` marking
     material caches ahead of `1.43` and `1.53`, and isolating procedural mesh
     recipes shared with `scripts/model-assets.ts`.
+  - [x] **Pass A** (modular assessment and refactor, base `a7ae3c6`):
+    - The tile-placed view owns building top height: `topHeight(actor)`
+      returns the drawn top or estimates an undrawn one, such as fresh
+      remains, from its placement and art. `session.ts` no longer repeats
+      the roof formula; `SessionAssets.buildingModelTops` became
+      `TilePlacedActorAppearance.modelTopHeight`.
+    - Health bars, damage, and regeneration effects read
+      `viewOf(playerOwner).actors().shown` instead of `simulation.actors`
+      filtered by `shows` (Slice 5 deferral). Docs: `runtime-boundaries.md`.
+    - Local repairs with no persisted format change, so Pass B continued in
+      the same session.
+    - Kept: asset swaps through appearance identity in view-registry keys,
+      pull-based `assetFor` props beside pushed materials props, and the
+      hand-rolled wreck registry (state carries over across rebuilds and
+      wrecks have no `id`).
+    - Rejected as speculative: an owner-color marking cache. No owner color
+      or reserved model area exists yet, and shipped buildings are GLBs whose
+      instances share materials, so `1.43` should key per-owner copies of
+      named marking materials by `(appearance, owner color)` in the view
+      registries, not by `definitionId` in `materialFor`.
+    - Rejected: the type-only `tile-placed-actor-view`/`glb-model` SCC.
+    - Built-in procedural models stay in `src/render`: DESIGN makes them
+      content-named code, and `actor-assets.md` has them feed the exporter.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `session-assets.ts`: the foundation prop no longer adds building
+      appearances for mobile definitions (bug; now tested).
+    - `glb-model.ts`: `instantiateContainer` returns `clipFor`, replacing
+      the clip index mapping repeated in `skinned-actor-appearance.ts`.
+    - `actor-view-registry.ts`: shared selection styles and no empty trigger
+      array per actor per frame. `tile-placed-actor-view.ts`: one appearance
+      lookup per view; offline dimming and badge in one block.
+    - `construction-stage.ts`: growth layer without a nested ternary;
+      canopy/ribs precedence survives instance-name prefixes (tested).
+      `wrecks.ts`: one bounds query per chunk; `lifetime` -> `lifeSeconds`.
+      `regeneration-effects.ts`: default `sameKey`. `building-assembly.ts`:
+      stale `place` comment. Imports grouped in `production-exit.ts`,
+      `harvester.ts`, `wolf.ts`, `regeneration-effects.ts`, `wrecks.ts`;
+      `ACTOR_PICK_KIND` and `BUILDING_BAR_HEIGHT` made module-private.
+    - Reviewed without change: `builtin-models.ts`, `view-registry.ts`,
+      `actor.ts` beyond the export, `actor-gait.ts`, `texture-clip.ts`,
+      `material-copies.ts`, `command-center.ts`, `barracks.ts`,
+      `refinery.ts`, `combat-effects.ts`, `damage-effects.ts`,
+      `frame-effects.ts`.
+    - Checks: format, lint, typecheck, units (`1368` passed), and asset tests
+      (`127` passed) pass. Browser smoke (`5`) and focused actor, placement,
+      presentation, Circle, and relationship checks (`26`) pass on the host.
+    - Deferred to Slice 10: `scripts/model-assets.ts` finds runtime
+      instance nodes by name (`${name}-template`, `harvester-drill`,
+      `harvester-work-beacon`, `wolf-leg-N`); recipes should return named
+      parts to both adapters. Byte-identical GLB tests guard the change.
+      The Slice 6 color imports (`MATERIALS_COLOR`, `SALVAGE_COLOR`, and the
+      attack colors) stay: generated models must match runtime fallbacks.
+    - Deferred until profiling shows cost (`1.64`): per-frame emission arrays
+      and `stableUnit` string hashes in `damage-effects.ts`, `Vector3`s in
+      `selectionPoint` and `extractHealthAndDamageEffects`, and
+      `JSON.stringify` view keys in `tile-placed-actor-view.ts`.
+    - Deferred to Slices 8A/9: the wreck view, `mission-alerts.ts`, and
+      `audio/mission.ts` read `simulation.wrecks`; add an `OwnerView` wreck
+      projection when alerts and audio move onto `viewOf(playerOwner)`.
 
 - [ ] **Slice 8A: in-mission HUD, top bar, alerts, and sidebar**
   (29 files, ~2,350 LOC)

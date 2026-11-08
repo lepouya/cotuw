@@ -86,7 +86,6 @@ describe("session effects extraction", () => {
         ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as any],
       ]),
       presentationOf: (id: string) => presentations.get(id),
-      shows: () => true,
       groundPositionOf: () => undefined,
       buildingTopHeightOf: () => undefined,
       map,
@@ -128,7 +127,6 @@ describe("session effects extraction", () => {
         ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as any],
       ]),
       presentationOf: (id: string) => presentations.get(id),
-      shows: () => true,
       groundPositionOf: () => undefined,
       buildingTopHeightOf: () => undefined,
       map,
@@ -140,33 +138,6 @@ describe("session effects extraction", () => {
     const { regenerating } = extractHealthAndDamageEffects([actor], context);
     expect(regenerating).toHaveLength(1);
     expect(regenerating[0].id).toBe("unit-2");
-  });
-
-  test("skips hidden actors", () => {
-    const actor = createActor({
-      id: "unit-3",
-      definitionId: "trooper",
-      owner: "player",
-      worldPosition: { x: 4, z: 4 },
-    });
-    actor.health = 10;
-
-    const context = {
-      definitions,
-      appearances: new Map(),
-      presentationOf: (id: string) => presentations.get(id),
-      shows: () => false,
-      groundPositionOf: () => undefined,
-      buildingTopHeightOf: () => undefined,
-      map,
-      completedTicks: 10,
-      tickSeconds: 0.25,
-      selectedActorIds: ["unit-3"],
-    };
-
-    const { bars, damaged } = extractHealthAndDamageEffects([actor], context);
-    expect(bars).toHaveLength(0);
-    expect(damaged).toHaveLength(0);
   });
 });
 

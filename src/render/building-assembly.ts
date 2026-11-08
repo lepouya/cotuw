@@ -40,7 +40,7 @@ export function createBuildingAssembly(
       result.specularColor = Color3.FromArray(specular);
       if (glow) result.emissiveColor = result.diffuseColor.scale(0.75);
     });
-  /** Names a part and seats it under `parent`, the assembly by default. */
+  /** Seats a node under `parent` at a tile-scaled position. */
   const place = <T extends TransformNode>(
     node: T,
     [x, y, z]: Triple,
