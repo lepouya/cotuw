@@ -60,8 +60,17 @@ export function createSidebarProduction(
   context: SidebarContext,
   focusUnits: () => void,
 ) {
-  const { definitions, presentations, definitionById, nameFor, owns } = context;
-  const { trainedNames, economy, playerFaction, playerOwner } = context;
+  const {
+    definitions,
+    presentations,
+    definitionById,
+    nameFor,
+    owns,
+    trainedNames,
+    economy,
+    playerFaction,
+    playerOwner,
+  } = context;
   const buildOrder = ({ id }: ActorDefinition) =>
     presentations.get(id)?.build?.order ?? 0;
   const buildable = definitions
@@ -143,12 +152,7 @@ export function createSidebarProduction(
     trainingOptions,
     productionStatus,
     economyOverview,
-    el(
-      "details",
-      { class: "roster-disclosure", open: true },
-      el("summary", {}, "Field units"),
-      unitRoster,
-    ),
+    el("details", { open: true }, el("summary", {}, "Field units"), unitRoster),
   );
   const emptyRoster = el(
     "p",
@@ -206,6 +210,29 @@ export function createSidebarProduction(
       card.card.hidden = true;
       return card;
     });
+  /** Why this building cannot be ordered, apart from session blockers. */
+  const buildingBlocker = (
+    definition: ActorDefinition,
+    state: SidebarState,
+  ) => {
+    if (
+      definition.growth &&
+      !growthCandidates(
+        { definitionId: definition.id, owner: playerOwner },
+        state.selectedActorIds,
+        state.actors,
+        definitionById,
+      ).length
+    )
+      return `Select a ${nameFor(definition.growth.workerDefinitionId)} to tend construction.`;
+    const resource = costResource(definition);
+    const balance = state.balances?.[resource];
+    if (balance === undefined)
+      return economy ? `${resourceName(resource)} is unavailable.` : "";
+    return balance < costAmount(definition)
+      ? `Need ${costLabel(definition)}; available ${balance}.`
+      : "";
+  };
   let shownRoster = "";
   return {
     panelBuildings,
@@ -227,31 +254,12 @@ export function createSidebarProduction(
         },
         "build",
       );
-      for (const action of buildings) {
-        const definition = definitionById.get(action.definitionId)!;
-        const cost = costAmount(definition);
-        const resource = costResource(definition);
-        const balance = state.balances?.[resource];
-        const workerSelected =
-          !definition.growth ||
-          growthCandidates(
-            { definitionId: definition.id, owner: playerOwner },
-            state.selectedActorIds,
-            state.actors,
-            definitionById,
-          ).length > 0;
+      for (const action of buildings)
         setActionAvailability(
           action,
           blocker ||
-            (!workerSelected
-              ? `Select a ${nameFor(definition.growth!.workerDefinitionId)} to tend construction.`
-              : economy && balance === undefined
-                ? `${resourceName(resource)} is unavailable.`
-                : balance !== undefined && balance < cost
-                  ? `Need ${costLabel(definition)}; available ${balance}.`
-                  : ""),
+            buildingBlocker(definitionById.get(action.definitionId)!, state),
         );
-      }
       const inspected = inspectedActor(state);
       const trainable =
         inspected && owns(inspected)

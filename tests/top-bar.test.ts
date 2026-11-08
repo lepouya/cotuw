@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 
-import { formatElapsed, objectiveSummary } from "../src/ui/top-bar";
+import { formatElapsed } from "../src/format-time";
+import { objectiveSummary } from "../src/ui/top-bar";
 
 import type { ObjectiveView } from "../src/simulation/objectives";
 

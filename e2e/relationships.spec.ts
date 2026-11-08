@@ -146,7 +146,9 @@ async function openBetrayal(page: Page) {
       sites: [],
       loot: [],
     });
-    const notifications = createNotifications(document);
+    const notifications = createNotifications(
+      document.querySelector<HTMLElement>("#mission-alerts")!,
+    );
     let view: GameSession;
     const sidebar = createSidebar(
       document.querySelector<HTMLElement>("#game-sidebar")!,

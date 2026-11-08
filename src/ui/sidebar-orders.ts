@@ -4,6 +4,9 @@ import { ordersLocked, selectionLocked } from "./sidebar-context";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-orders.css";
 
+const setPressed = (button: HTMLButtonElement, pressed?: boolean) =>
+  button.setAttribute("aria-pressed", String(!!pressed));
+
 export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
   const rotateBuilding = createButton("Rotate 90° (R)", {
     id: "rotate-building",
@@ -145,27 +148,18 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
       boxSelect.disabled = selectionOff;
       addSelection.disabled = selectionOff;
       queueOrders.disabled = locked;
-      queueOrders.setAttribute(
-        "aria-pressed",
-        String(state.queueMode ?? false),
-      );
+      setPressed(queueOrders, state.queueMode);
       setText(
         queueOrders,
         state.queueMode ? "✓ Done queuing" : "⋯ Queue orders",
       );
-      boxSelect.setAttribute("aria-pressed", String(state.boxMode ?? false));
-      addSelection.setAttribute(
-        "aria-pressed",
-        String(state.additiveMode ?? false),
-      );
+      setPressed(boxSelect, state.boxMode);
+      setPressed(addSelection, state.additiveMode);
       stopUnits.disabled =
         locked || !!state.paused || !selectedMobile.some(owns);
       clearSelection.disabled = selectionOff || ids.length === 0;
       focusSelection.disabled = ids.length === 0;
-      followSelection.setAttribute(
-        "aria-pressed",
-        String(state.following ?? false),
-      );
+      setPressed(followSelection, state.following);
       followSelection.disabled =
         !state.following && selectedMobile.length === 0;
     },

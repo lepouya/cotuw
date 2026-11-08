@@ -172,10 +172,12 @@ These contracts describe where new behaviors, views, and services attach.
   and payments stay private. Private workers, income, production, and
   balances belong to the owner, including explicitly shared balances.
   Support overlays include only usable, owned or detected buildings and links
-  between them. Session actor views, controls, health bars, and damage and
-  regeneration effects use these projections; alert and audio consumers read
-  live state filtered by `shows`, and only the player's production queues
-  sound.
+  between them. Remains follow the same rule: own, or currently detected.
+  Session actor views, controls, alerts, health bars, and damage and
+  regeneration effects use these projections. Audio reads live state filtered
+  by `shows`, and only the player's production queues sound. The wreck view
+  keeps hidden remains undrawn, so a building's captured top height survives
+  until they come back into view.
 
 ## Content lookup
 

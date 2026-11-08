@@ -1,6 +1,7 @@
 import "./production-card.css";
 import type { PortraitId } from "../content/presentation";
 import { createActorPortrait } from "./actor-portrait";
+import { createElement as el } from "./dom";
 
 import type { ActorDefinition } from "../simulation/actor";
 import type { DefinitionButton } from "./production-action";
@@ -19,10 +20,11 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
   const window = document.defaultView!;
   const controller = new AbortController();
   const { signal } = controller;
-  const tooltip = document.createElement("div");
-  tooltip.className = "production-tooltip";
-  tooltip.setAttribute("role", "tooltip");
-  tooltip.hidden = true;
+  const tooltip = el("div", {
+    class: "production-tooltip",
+    role: "tooltip",
+    hidden: true,
+  });
   document.body.append(tooltip);
   let active: { card: HTMLElement; text: () => string } | undefined;
   let touchInput = false;
@@ -134,36 +136,38 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
         portrait?: PortraitId;
       },
     ): ProductionCard => {
-      const card = document.createElement("div");
-      card.className = "production-card";
-      const button = document.createElement("button");
-      button.type = "button";
-      button.id = action.id;
-      button.className = "build-option";
-      button.setAttribute("aria-label", action.label);
-      const label = document.createElement("strong");
-      label.textContent = content.name;
-      button.append(createActorPortrait(definition, content.portrait), label);
-      if (content.cost !== undefined) {
-        const cost = document.createElement("span");
-        cost.className = "option-cost";
-        cost.textContent = content.cost;
-        button.append(cost);
-      }
-      const description = document.createElement("span");
-      description.className = "sr-only";
+      const button = el(
+        "button",
+        {
+          type: "button",
+          id: action.id,
+          class: "build-option",
+          "aria-label": action.label,
+        },
+        createActorPortrait(definition, content.portrait),
+        el("strong", {}, content.name),
+      );
+      if (content.cost !== undefined)
+        button.append(el("span", { class: "option-cost" }, content.cost));
+      const description = el("span", { class: "sr-only" }, content.details);
       do {
         description.id = `production-description-${++nextDescriptionId}`;
       } while (
         description.id === button.id ||
         document.getElementById(description.id)
       );
-      description.textContent = content.details;
       button.setAttribute("aria-describedby", description.id);
-      card.setAttribute("role", "group");
-      card.setAttribute("aria-label", action.label);
-      card.setAttribute("aria-describedby", description.id);
-      card.append(button, description);
+      const card = el(
+        "div",
+        {
+          class: "production-card",
+          role: "group",
+          "aria-label": action.label,
+          "aria-describedby": description.id,
+        },
+        button,
+        description,
+      );
       container.append(card);
       const shown = {
         card,
@@ -188,12 +192,10 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
       card.addEventListener(
         "pointerdown",
         (event) => {
-          if (event.pointerType === "touch") {
-            if (button.disabled) {
-              card.focus({ preventScroll: true });
-              show(shown);
-            } else hide();
-          }
+          if (event.pointerType !== "touch") return;
+          if (!button.disabled) return hide();
+          card.focus({ preventScroll: true });
+          show(shown);
         },
         { signal },
       );

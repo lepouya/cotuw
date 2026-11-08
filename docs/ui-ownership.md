@@ -11,10 +11,10 @@ feature-owned markup, behavior, styles, and cleanup.
   and shortcuts. `src/application.ts` owns session startup, storage
   operations, and menu view data. `src/ui/dialogs.ts` owns modal interaction
   and panel state without querying application storage or simulation.
-- Dialog, audio, save-panel, and sidebar styles live beside their modules.
-  `index.html` and `src/styles.css` own the shell and remaining HUD internals.
-  Shell breakpoints allocate viewport space; sidebar sections own compact
-  rules for their contents.
+- Dialog, audio, save-panel, sidebar, top bar, and notification styles live
+  beside their modules. `index.html` and `src/styles.css` own the shell and the
+  camera controls and minimap internals. Shell breakpoints allocate viewport
+  space; sidebar sections and the top bar own compact rules for their contents.
 - `createSidebar` accepts a root, content, and selection callback, and returns
   controls, updates, navigation, and disposal. `createGameSession` binds those
   controls to simulation and input. `createProductionCards` owns its tooltip
@@ -193,9 +193,16 @@ Audio activation and modal-local input remain available while a dialog is open.
   the authority for what the player may see. UI does not reconstruct
   visibility from unrestricted simulation state. Layout changes preserve
   issuer-scoped feedback and private economy rules.
-- Top bar, camera controls, minimap host, notifications, and alert history
-  remain distinct features. Their owning modules supply markup and styles
-  when touched; 1.22 does not require moving every HUD feature at once.
+- `src/ui/top-bar.ts` mounts the top bar's markup into `#top-bar` and owns its
+  styles and controls. It reads the status it needs from the session's state
+  and shows the idle bar without one.
+- `src/ui/notifications.ts` mounts the toasts and alert history into
+  `#mission-alerts` and creates the alert toggle, which composition passes to
+  the top bar to host.
+- `src/ui/mission-alerts.ts` turns what the player may know, read through the
+  owner view, into grouped alerts.
+- Camera controls and the minimap host remain distinct features. Their owning
+  modules supply markup and styles when touched.
 
 ### Markup and shared styles
 

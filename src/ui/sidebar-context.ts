@@ -2,7 +2,7 @@ import { missionEnded } from "../simulation/mission-result";
 import type { ActorDefinition } from "../simulation/actor";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { Resource } from "../simulation/resources";
-import type { Relations } from "../simulation/ownership";
+import type { OwnerRelation } from "../simulation/ownership";
 import type { MissionResult } from "../simulation/mission-result";
 import type { ObjectiveView } from "../simulation/objectives";
 import type {
@@ -27,11 +27,9 @@ export type SidebarState = {
   canRemove: boolean;
   /** Present when the mission has an economy. */
   balances?: Partial<Record<Resource, number>>;
-  /** The player's spending resource, shown in the top bar. */
-  resource?: Resource;
   objectives?: readonly ObjectiveView[];
   result?: MissionResult;
-  relations: Pick<Relations, "relationship">;
+  relationTo: (actor: Pick<ObservedActor, "owner">) => OwnerRelation;
 };
 
 export type SidebarOptions = {

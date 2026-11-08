@@ -1,7 +1,15 @@
 import { createButton, createElement as el } from "./dom";
 import type { SidebarContext } from "./sidebar-context";
 
-export type SidebarPanels = {
+/** Moves focus within the tab list, given the current index and tab count. */
+const TAB_MOVES = new Map<string, (index: number, count: number) => number>([
+  ["ArrowRight", (index, count) => (index + 1) % count],
+  ["ArrowLeft", (index, count) => (index + count - 1) % count],
+  ["Home", () => 0],
+  ["End", (_index, count) => count - 1],
+]);
+
+type SidebarPanels = {
   buildings: HTMLElement;
   units: HTMLElement;
   goals: HTMLElement;
@@ -78,21 +86,12 @@ export function createSidebarNavigation(
     "keydown",
     (event) => {
       const index = tabs.findIndex(({ button }) => button === event.target);
-      if (index < 0) return;
-      const next =
-        event.key === "ArrowRight"
-          ? (index + 1) % tabs.length
-          : event.key === "ArrowLeft"
-            ? (index + tabs.length - 1) % tabs.length
-            : event.key === "Home"
-              ? 0
-              : event.key === "End"
-                ? tabs.length - 1
-                : undefined;
-      if (next === undefined) return;
+      const move = TAB_MOVES.get(event.key);
+      if (index < 0 || !move) return;
       event.preventDefault();
-      show(tabs[next]!.panel);
-      tabs[next]!.button.focus();
+      const next = tabs[move(index, tabs.length)]!;
+      show(next.panel);
+      next.button.focus();
     },
     { signal },
   );

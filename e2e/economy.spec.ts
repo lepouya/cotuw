@@ -52,8 +52,10 @@ async function controlledOpening(
       const { createNotifications } = (await import(
         notificationsPath
       )) as typeof import("../src/ui/notifications");
-      const notifications = createNotifications(document);
-      const { createTopBar, topBarState } = (await import(
+      const notifications = createNotifications(
+        document.querySelector<HTMLElement>("#mission-alerts")!,
+      );
+      const { createTopBar } = (await import(
         topBarPath
       )) as typeof import("../src/ui/top-bar");
       const mission = level();
@@ -80,6 +82,8 @@ async function controlledOpening(
       const topBar = createTopBar(
         document.querySelector<HTMLElement>("#top-bar")!,
         {
+          alertToggle: notifications.toggle,
+          openMenu: () => undefined,
           togglePause: () => (view.playing() ? view.pause() : view.resume()),
           setSpeed: (speed) => view.setSpeed(speed),
           showObjectives: sidebar.showGoals,
@@ -94,7 +98,7 @@ async function controlledOpening(
           mission,
           onStateChanged: (state) => {
             sidebar.update(state);
-            topBar.update(topBarState(view, state));
+            topBar.update(state);
           },
           showActor: sidebar.showActor,
           onDispose: sidebar.dispose,

@@ -1,0 +1,60 @@
+<div class="top-bar-group">
+  <button id="open-menu" type="button" title="Game menu (Escape / F10)">
+    Menu
+  </button>
+  <div class="time-controls" role="group" aria-label="Game speed">
+    <button id="pause-mission" type="button" aria-pressed="false">
+      ⏸ Pause
+    </button>
+    <button
+      type="button"
+      data-speed="0.5"
+      aria-pressed="false"
+      aria-label="Half speed"
+    >
+      ½×
+    </button>
+    <button
+      type="button"
+      data-speed="1"
+      aria-pressed="true"
+      aria-label="Normal speed"
+    >
+      1×
+    </button>
+    <button
+      type="button"
+      data-speed="2"
+      aria-pressed="false"
+      aria-label="Double speed"
+    >
+      2×
+    </button>
+    <button
+      type="button"
+      data-speed="4"
+      aria-pressed="false"
+      aria-label="Quadruple speed"
+    >
+      4×
+    </button>
+  </div>
+</div>
+<button id="objective-summary" class="objective-summary" type="button" hidden>
+  <span aria-hidden="true">◎</span>
+  <span id="objective-text" class="objective-text"></span>
+</button>
+<div id="top-bar-status" class="top-bar-group">
+  <span id="resource-bar" class="resource-bar" role="group" hidden
+    ><span class="resource-name"></span
+    ><span class="resource-symbol" aria-hidden="true">◆</span>
+    <strong id="materials-counter">0</strong></span
+  >
+  <span
+    id="mission-time"
+    class="mission-time"
+    role="timer"
+    title="Elapsed mission time"
+    >0:00</span
+  >
+</div>

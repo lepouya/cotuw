@@ -1,6 +1,7 @@
 import { factionName } from "./content/content-pack";
 import { LEVEL_SOURCES } from "./content/levels";
 import { errorMessage } from "./errors";
+import { formatElapsed } from "./format-time";
 import {
   assembleSkirmish,
   loadLevel,
@@ -17,7 +18,6 @@ import { DIFFICULTIES } from "./simulation/mission-setup";
 import { factionOf } from "./simulation/ownership";
 import { presentResult } from "./ui/mission-result";
 import { createSidebar } from "./ui/sidebar";
-import { formatElapsed, topBarState } from "./ui/top-bar";
 
 import type { AudioMixer } from "./audio/mixer";
 import type { SkirmishChoice } from "./content/skirmish";
@@ -114,7 +114,11 @@ export function createApplication({
   let missionGeneration = 0;
 
   const elapsed = () =>
-    session ? formatElapsed(topBarState(session).elapsedSeconds) : "";
+    session
+      ? formatElapsed(
+          session.simulation.completedTicks * session.simulation.tickSeconds,
+        )
+      : "";
   const missionName = () => mission?.scenario.name ?? "Mission";
   const missionSummary = () => {
     const setup = mission?.scenario.setup;
@@ -224,7 +228,7 @@ export function createApplication({
         else departingSidebar?.dispose();
       } finally {
         notifications.clear();
-        topBar.update(topBarState(undefined));
+        topBar.update();
       }
     }
   }
@@ -312,7 +316,7 @@ export function createApplication({
         onStateChanged: (state) => {
           if (!current()) return;
           activeSidebar.update(state);
-          topBar.update(topBarState(session, state));
+          topBar.update(state);
           const name = rules.onObjectives(state.objectives ?? []);
           if (name) void backgroundSave("auto", name);
         },

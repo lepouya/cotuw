@@ -2,23 +2,15 @@ import "./actor-portrait.css";
 import type { PortraitId } from "../content/presentation";
 import type { ActorDefinition } from "../simulation/actor";
 
-/** Uses authored art, falling back to a generic gameplay-role illustration. */
-export const portraitIdFor = (
-  definition: ActorDefinition,
-  portrait?: PortraitId,
-): PortraitId =>
-  portrait ??
-  (definition.footprint
-    ? definition.refinery
-      ? "refinery"
-      : definition.support?.root
-        ? "headquarters"
-        : "building"
-    : definition.harvesting
-      ? "harvester"
-      : definition.weapon
-        ? "armed"
-        : "unarmed");
+/** The generic illustration for a gameplay role without authored art. */
+function rolePortrait(definition: ActorDefinition): PortraitId {
+  if (definition.footprint) {
+    if (definition.refinery) return "refinery";
+    return definition.support?.root ? "headquarters" : "building";
+  }
+  if (definition.harvesting) return "harvester";
+  return definition.weapon ? "armed" : "unarmed";
+}
 
 const FOUNDATION = `
   <path fill="#233e42" d="M12 57 63 36 110 57 60 77Z"/>
@@ -142,7 +134,7 @@ export function createActorPortrait(
   svg.setAttribute("viewBox", "0 0 120 80");
   svg.setAttribute("aria-hidden", "true");
   svg.classList.add("actor-portrait");
-  const id = portraitIdFor(definition, portrait);
+  const id = portrait ?? rolePortrait(definition);
   svg.setAttribute("data-portrait", id);
   svg.innerHTML = PORTRAITS[id];
   return svg;

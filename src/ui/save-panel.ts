@@ -1,6 +1,6 @@
 import { SAVE_KIND_LABELS, saveCompleteMessage } from "../saves";
+import { formatElapsed } from "../format-time";
 import { mountFeature } from "./dom";
-import { formatElapsed } from "./top-bar";
 import markup from "./save-panel.html?raw";
 import "./save-panel.css";
 

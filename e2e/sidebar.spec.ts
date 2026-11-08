@@ -419,9 +419,13 @@ test(
         path
       )) as typeof import("../src/ui/sidebar");
       const ownershipPath: string = "/src/simulation/ownership.ts";
-      const { createRelations } = (await import(
+      const { createRelations, ownerRelation } = (await import(
         ownershipPath
       )) as typeof import("../src/simulation/ownership");
+      const relationTo =
+        (relations: ReturnType<typeof createRelations>) =>
+        ({ owner }: { owner: string }) =>
+          ownerRelation("player", owner, relations.relationship);
       const root = document.createElement("aside");
       root.className = "game-sidebar";
       root.id = "sidebar-fixture";
@@ -524,7 +528,7 @@ test(
         faulted: false,
         canRemove: true,
         balances: { lifebloom: 10 },
-        relations: createRelations([]),
+        relationTo: relationTo(createRelations([])),
       } satisfies SidebarState;
       let sidebar = createSidebar(root, options);
       try {
@@ -599,15 +603,17 @@ test(
             ...state,
             actors,
             selectedActorIds: ["visitor"],
-            relations: createRelations(
-              relationship === "neutral"
-                ? []
-                : [
-                    {
-                      owners: ["player", "rival"],
-                      relationship,
-                    },
-                  ],
+            relationTo: relationTo(
+              createRelations(
+                relationship === "neutral"
+                  ? []
+                  : [
+                      {
+                        owners: ["player", "rival"],
+                        relationship,
+                      },
+                    ],
+              ),
             ),
           });
           return root.querySelector("#selection-info")!.textContent;

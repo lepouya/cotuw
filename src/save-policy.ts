@@ -1,5 +1,5 @@
+import { formatElapsed } from "./format-time";
 import { evaluateObjectives } from "./simulation/objectives";
-import { formatElapsed } from "./ui/top-bar";
 
 import type { MissionFile, SavePolicy } from "./simulation/mission-file";
 import type { MissionResult } from "./simulation/mission-result";

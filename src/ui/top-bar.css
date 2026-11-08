@@ -1,0 +1,84 @@
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #5e654e;
+  background: #10201f;
+}
+.top-bar-group,
+.time-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+.top-bar button {
+  min-width: 2.75rem;
+  padding: 0.3rem 0.55rem;
+  text-align: center;
+}
+.top-bar button[aria-pressed="true"] {
+  color: #eac97f;
+  border-color: #d8bd79;
+  background: #304e4d;
+}
+.objective-summary {
+  flex: 1 1 auto;
+  min-width: 2.75rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.objective-summary[data-result="victory"] {
+  color: #98d5b0;
+}
+.objective-summary[data-result="defeat"] {
+  color: #f0a096;
+}
+.resource-bar {
+  display: flex;
+  gap: 0.35rem;
+  color: #eac97f;
+  font-size: 0.8rem;
+}
+.resource-symbol {
+  display: none;
+}
+.mission-time {
+  min-width: 3.2rem;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Compact screens keep Menu and time controls, reducing labels to symbols. */
+@media (max-height: 600px), (max-width: 500px) {
+  .objective-text {
+    display: none;
+  }
+  /* Screen readers still read the resource name. */
+  .resource-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .objective-summary {
+    flex: none;
+  }
+  .resource-symbol {
+    display: inline;
+  }
+}
+
+@media (max-width: 500px) {
+  .top-bar {
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    padding-inline: 0.2rem;
+  }
+}

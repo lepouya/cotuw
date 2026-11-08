@@ -11,6 +11,7 @@ import type {
   ActorDefinition,
   ActorRenderState,
 } from "../src/simulation/actor";
+import type { Wreck } from "../src/simulation/combat";
 import type { EconomyState } from "../src/simulation/economy";
 import type { OwnerKnowledge } from "../src/simulation/observations";
 import type { SupportView } from "../src/simulation/support";
@@ -58,6 +59,7 @@ function fixture() {
       simulation.seen.has(target.id!),
     economy: undefined as EconomyState | undefined,
     support: undefined as SupportView | undefined,
+    wrecks: [] as Wreck[],
   };
   const view = () =>
     createOwnerView({ simulation, knowledge, faction: "arc", definitions });
@@ -79,6 +81,29 @@ test("hidden hostiles stay out of the owner's lookups and groups", () => {
     "barracks",
     "wolf",
   ]);
+});
+
+test("hidden foreign remains stay out of the owner's wrecks", () => {
+  const { simulation, player } = fixture();
+  const remains = (id: string, owner: string) => ({
+    id,
+    actorId: id,
+    definitionId: "trooper",
+    owner,
+    worldPosition: { x: 0, z: 0 },
+    facing: 0,
+    tick: 1,
+  });
+  simulation.wrecks = [
+    remains("mine", "player"),
+    remains("theirs", "wildlife"),
+  ];
+  const shownIds = () => player.wrecks().map(({ actorId }) => actorId);
+  expect(shownIds()).toEqual(["mine"]);
+
+  simulation.seen.add("theirs");
+  simulation.actors = [...simulation.actors];
+  expect(shownIds()).toEqual(["mine", "theirs"]);
 });
 
 test("own lookups exclude hostiles, and mobile ones exclude buildings", () => {

@@ -6,7 +6,7 @@ export const SIMULATION_STOPPED =
   "Simulation stopped. Restart or load a mission from the menu.";
 
 /** Player-facing text and menu actions for a mission result. */
-export type ResultPresentation = {
+type ResultPresentation = {
   title: string;
   description: string;
   /** Compact top bar line. */

@@ -17,13 +17,15 @@ export type MissionAlert = {
   pulse?: boolean;
 };
 
-/** Committed mission state after one tick. */
+/** What the player may know of the committed mission after one tick. */
 export type AlertObservation = {
   tick: number;
   tickSeconds: number;
+  /** The player's own actors. */
   actors: readonly ActorRenderState[];
-  attacks: readonly AttackEvent[];
-  wrecks: readonly Wreck[];
+  /** This tick's hits; those on other owners' actors raise nothing. */
+  attacks: readonly Pick<AttackEvent, "targetId">[];
+  wrecks: readonly Pick<Wreck, "actorId">[];
   support?: SupportView;
   objectives: readonly ObjectiveView[];
   /** The player's economy workers; attacks on them are named and pulsed. */
@@ -31,7 +33,7 @@ export type AlertObservation = {
   /** Explored renewable sites. */
   sites?: readonly SiteObservation[];
 };
-export type SiteObservation = {
+type SiteObservation = {
   id: string;
   name: string;
   dormant: boolean;
@@ -50,15 +52,21 @@ const ATTACK_TEXT: Record<Exclude<AttackKind, "worker">, string> = {
 const plural = (count: number, noun: string) =>
   `${count} ${noun}${count === 1 ? "" : "s"}`;
 
+function attackKind(
+  target: ActorRenderState,
+  workers: ReadonlySet<string>,
+): AttackKind {
+  if (workers.has(target.id)) return "worker";
+  return target.tilePlacement ? "building" : "unit";
+}
+
 /**
  * Turns per-tick changes into grouped player alerts. The first observation
  * records a baseline, so loading a mission raises nothing.
  */
 export function createAlertTracker({
-  owns,
   nameOf,
 }: {
-  owns: (actor: Pick<ActorRenderState, "owner">) => boolean;
   nameOf: (definitionId: string) => string;
 }) {
   let previous: AlertObservation | undefined;
@@ -78,26 +86,21 @@ export function createAlertTracker({
       previousById = byId;
       if (!before) return [];
       const alerts: MissionAlert[] = [];
-      const own = current.actors.filter(owns);
 
       // A lethal hit removes the worker from the committed economy state.
       const workers = new Set([...before.workerIds, ...current.workerIds]);
       const hits = new Map<AttackKind, ActorRenderState>();
       for (const { targetId } of current.attacks) {
         const target = byId.get(targetId) ?? beforeById.get(targetId);
-        if (!target || !owns(target)) continue;
-        const kind = workers.has(targetId)
-          ? "worker"
-          : target.tilePlacement
-            ? "building"
-            : "unit";
+        if (!target) continue;
+        const kind = attackKind(target, workers);
         if (!hits.has(kind)) hits.set(kind, target);
       }
-      const window = ATTACK_ALERT_SECONDS / current.tickSeconds;
+      const groupTicks = ATTACK_ALERT_SECONDS / current.tickSeconds;
       for (const [kind, target] of hits) {
         const last = lastHitTicks.get(kind);
         lastHitTicks.set(kind, current.tick);
-        if (last !== undefined && current.tick - last <= window) continue;
+        if (last !== undefined && current.tick - last <= groupTicks) continue;
         alerts.push({
           priority: "high",
           text:
@@ -112,7 +115,7 @@ export function createAlertTracker({
 
       const wrecked = new Set(current.wrecks.map(({ actorId }) => actorId));
       const lost = [...beforeById.values()].filter(
-        (actor) => owns(actor) && !byId.has(actor.id) && wrecked.has(actor.id),
+        (actor) => !byId.has(actor.id) && wrecked.has(actor.id),
       );
       if (lost.length)
         alerts.push({
@@ -121,7 +124,7 @@ export function createAlertTracker({
           position: lost[0]!.worldPosition,
         });
 
-      const completed = own.filter(
+      const completed = current.actors.filter(
         (actor) =>
           actor.tilePlacement &&
           !actor.construction &&
@@ -134,7 +137,7 @@ export function createAlertTracker({
           position: building.worldPosition,
         });
 
-      const trained = own.filter(
+      const trained = current.actors.filter(
         (actor) => !actor.tilePlacement && !beforeById.has(actor.id),
       );
       if (trained.length)
@@ -144,7 +147,7 @@ export function createAlertTracker({
           position: trained[0]!.worldPosition,
         });
 
-      const blocked = own.filter(
+      const blocked = current.actors.filter(
         (actor) =>
           actor.movement?.blocked &&
           !beforeById.get(actor.id)?.movement?.blocked,
@@ -161,15 +164,12 @@ export function createAlertTracker({
           before.support?.nodes.map((node) => [node.actorId, node.connected]),
         );
         const changed = (connected: boolean) =>
-          (current.support?.nodes ?? []).filter((node) => {
-            const actor = byId.get(node.actorId);
-            return (
-              !!actor &&
-              owns(actor) &&
+          (current.support?.nodes ?? []).filter(
+            (node) =>
+              byId.has(node.actorId) &&
               node.connected === connected &&
-              connectedBefore.get(node.actorId) === !connected
-            );
-          });
+              connectedBefore.get(node.actorId) === !connected,
+          );
         for (const connected of [false, true]) {
           const nodes = changed(connected);
           if (!nodes.length) continue;

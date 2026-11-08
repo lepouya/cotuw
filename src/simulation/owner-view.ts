@@ -111,7 +111,7 @@ export function createOwnerView({
 }: {
   simulation: Pick<
     MissionSimulation,
-    "actors" | "economy" | "support" | "relations" | "detects"
+    "actors" | "economy" | "support" | "wrecks" | "relations" | "detects"
   >;
   knowledge: OwnerKnowledge;
   /** The owner's faction, for its labels, prices, and music. */
@@ -196,6 +196,11 @@ export function createOwnerView({
       };
     },
   );
+  /** Remains of own actors, and others' remains while detected. */
+  const wrecks = cached(
+    () => [simulation.wrecks, simulation.actors] as const,
+    ([committed]) => committed.filter(shows),
+  );
   const ownActor = (id: string | undefined) =>
     id === undefined ? undefined : actors().ownById.get(id);
   return {
@@ -210,6 +215,7 @@ export function createOwnerView({
     actors,
     economy,
     support,
+    wrecks,
     shownActor: (id: string | undefined) =>
       id === undefined ? undefined : actors().shownById.get(id),
     ownActor,

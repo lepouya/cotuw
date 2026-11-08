@@ -504,7 +504,7 @@ product work in `TODO.md`, and remove temporary files in
       `audio/mission.ts` read `simulation.wrecks`; add an `OwnerView` wreck
       projection when alerts and audio move onto `viewOf(playerOwner)`.
 
-- [ ] **Slice 8A: in-mission HUD, top bar, alerts, and sidebar**
+- [x] **Slice 8A: in-mission HUD, top bar, alerts, and sidebar**
   (29 files, ~2,350 LOC)
   - `src/ui/`: `dom.ts`, `top-bar.ts`, `mission-alerts.ts`,
     `notifications.ts`, `popups.ts`, `mission-result.ts`, `goals.ts`,
@@ -520,6 +520,81 @@ product work in `TODO.md`, and remove temporary files in
   - Focus: `docs/ui-ownership.md` feature extraction (`#top-bar`), removing
     `top-bar -> session` coupling, dynamic shortcut labels (`1.45`), and
     card/group UI readiness (`1.44-1.45`).
+  - Manifest after Pass A: added `src/format-time.ts`, `src/ui/top-bar.html`,
+    `src/ui/top-bar.css`, and `src/ui/notifications.css` (33 files); the
+    `index.html` and `src/styles.css` HUD rules moved out.
+  - [x] **Pass A** (modular assessment and refactor, base `b4b091c`):
+    - Top bar and notifications own their markup and styles. `createTopBar`
+      mounts `top-bar.html` and takes `openMenu`, so `main.ts` no longer
+      reaches for `#open-menu`. `createNotifications` mounts into
+      `#mission-alerts` and creates the toggle the top bar hosts, replacing
+      lookups across the whole document.
+    - `TopBarState` is what the top bar reads. The session state adds `speed`
+      and `elapsedSeconds`, `topBarState` is gone, and `update()` with no state
+      shows the idle bar. `top-bar -> session` and `top-bar -> sidebar` type
+      edges: `2 -> 0`.
+    - `formatElapsed` moved to `src/format-time.ts`, ending the
+      `save-policy -> ui/top-bar` and `save-panel -> top-bar` value imports.
+    - Alerts read `viewOf(playerOwner)`: own actors, usable support, and the
+      new `OwnerView.wrecks()`. The tracker lost its `owns` filter and takes
+      only attack target IDs. Docs: `ui-ownership.md`,
+      `runtime-boundaries.md`.
+    - No persisted format change. Substantial markup and style moves, so
+      Pass B runs in its own session.
+    - Checks: format, lint, typecheck, and units (`1369` passed) pass. Every
+      moved CSS rule and the top bar markup match `HEAD` by script. Browser
+      tests pass on the host.
+    - Kept: the wreck view reads `simulation.wrecks`, since dropping hidden
+      remains would lose a building's captured top height; `simulation.attacks`
+      as alert input, narrowed to target IDs, since a lethal hit's target has
+      already left the own-actor list.
+    - Rejected: layout-aware shortcut labels now. They belong to `1.45` with
+      the binding table; `R` and `S` match on the required AZERTY and QWERTZ
+      layouts, so the static hints are correct until then. Also rejected:
+      splitting sidebar sections, since `1.44` and `1.45` need only a panel
+      entry and a card `shortcut` field, not a new seam.
+    - Deferred to Slice 8B: `main.ts` F5/F9/F10 handling and the rest of the
+      app shell. Deferred to Slice 9: moving audio onto `OwnerView` (including
+      `wrecks()`) and removing its `MissionAlert` type import from `ui/`.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `SidebarState.relationTo` is the owner view's lookup, replacing
+      `relations` and the `playerOwner` rule rebuilt in `sidebar-selection.ts`.
+    - Nested ternaries flattened: `sidebar-selection.ts` (`moveHint`,
+      `titleOf`, `infoOf`), `sidebar-production.ts` (`buildingBlocker`, one
+      evaluation per card and none while a session blocker holds),
+      `sidebar-navigation.ts` (`TAB_MOVES` map), `actor-portrait.ts`
+      (`rolePortrait`), `mission-alerts.ts` (`attackKind`), `goals.ts`
+      (`progressLabel`).
+    - `production-card.ts`: builds elements with `dom.ts` helpers; touch
+      handling uses early returns. Its description ID collision loop stays,
+      since `production-card.spec.ts` covers that contract.
+    - `top-bar.ts`: one pass to find the summary goal; balance element named
+      for what it shows; `top-bar.html` drops the `Materials` defaults that
+      `update` always replaced. `sidebar-orders.ts`: `setPressed`.
+      `mission-alerts.ts`: local `window` renamed `groupTicks`.
+    - Unused type and value exports made module-private: `KeyedRow`,
+      `SiteObservation`, `ResultPresentation`, `ProductionBlockers`,
+      `GoalEntry`, `SidebarPanels`, `portraitIdFor`.
+    - CSS: the unused `roster-disclosure` class and a default
+      `pointer-events` removed; the `sidebar-selection.css` queue rule moved
+      before its media queries. A script found no dead selectors.
+    - Reviewed without change: `notifications.ts`, `notifications.css`,
+      `popups.ts`, `content-roles.ts`, `sidebar.ts`, `sidebar-goals.ts`,
+      `top-bar.css`, `actor-portrait.css`, `sidebar.css`,
+      `sidebar-production.css`, `sidebar-goals.css`, `sidebar-orders.css`,
+      `production-action.ts` and `mission-result.ts` beyond the exports.
+    - Kept: `setText` accepts `undefined`, since Slice 5 binders pass optional
+      status elements.
+    - Checks: `npm run check` passes (`1369` units and `5` Chromium smoke
+      checks). Focused sidebar, production-card, economy, interface,
+      relationship, Circle, session-lifecycle, and skirmish-result browser
+      specs pass on the host (`97` cases across Chromium and WebKit).
+    - Deferred until profiling shows cost (`1.64`): per-update
+      `JSON.stringify` keys in the roster and selection sections; per-tick
+      sets and maps in `createAlertTracker.observe` and the session's
+      `workerIds` and `sites` projections.
+    - Deferred: `session.ts` and `sidebar-selection.ts`
+      both set the Remove button's `disabled` from `canRemove`.
 
 - [ ] **Slice 8B: app shell, desktop host, persistence, and modal dialogs**
   (24 files, ~1,850 LOC)

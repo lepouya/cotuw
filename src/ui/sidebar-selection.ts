@@ -1,8 +1,8 @@
-import { ownerRelation } from "../simulation/ownership";
 import { isTilePlacedActor, occupiedTilesFor } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
 import { createButton, createElement as el, setText } from "./dom";
 import { countByDefinition, inspectedActor } from "./sidebar-context";
+import type { ObservedActor } from "../simulation/owner-view";
 import type { OwnerRelation } from "../simulation/ownership";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-selection.css";
@@ -13,13 +13,19 @@ const RELATION_LABELS: Record<Exclude<OwnerRelation, "own">, string> = {
   hostile: "Hostile",
 };
 
+function moveHint({ paused, boxMode }: SidebarState, subject: string) {
+  if (paused) return "Resume the mission to issue orders.";
+  return boxMode
+    ? `Turn off Box select to move ${subject}.`
+    : `Tap or click terrain to move ${subject}.`;
+}
+
 export function createSidebarSelection(
   {
     definitionById,
     nameFor,
     trainedNames,
     owns,
-    playerOwner,
     presentations,
     signal,
   }: SidebarContext,
@@ -136,6 +142,40 @@ export function createSidebarSelection(
   let selectionKey = "";
   let actorVersion: number | undefined;
   openTraining.addEventListener("click", showTraining, { signal });
+  const titleOf = (actor: ObservedActor | undefined) => {
+    if (!actor) return "Nothing selected";
+    const name = nameFor(actor.definitionId);
+    if (!isTilePlacedActor(actor)) return name;
+    const tiles = occupiedTilesFor(
+      actor,
+      definitionById.get(actor.definitionId)!,
+    );
+    return `${name} · ${footprintSize(tiles)} · ${actor.tilePlacement.quarterTurns * 90}°`;
+  };
+  const infoOf = (actor: ObservedActor | undefined, state: SidebarState) => {
+    if (!actor)
+      return "Choose a unit or building on the map, or a field unit in Units.";
+    const relation = state.relationTo(actor);
+    const description = presentations.get(actor.definitionId)?.description;
+    if (relation !== "own")
+      return [
+        RELATION_LABELS[relation],
+        description,
+        relation === "hostile"
+          ? "Select your units, then click or tap it to attack."
+          : "Not under your command.",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    const definition = definitionById.get(actor.definitionId);
+    if (definition?.production)
+      return `${description ?? "Unit production"} · Trains ${trainedNames(definition).join(" and ")}.`;
+    if (isTilePlacedActor(actor))
+      return `${description ?? "Building"} · Select Buildings to expand your base.`;
+    if (definition?.movement)
+      return `${description ?? "Unit"} · Movement speed ${definition.movement.speed} · ${moveHint(state, "this unit")}`;
+    return description ?? "Unit";
+  };
   return {
     root,
     remove: removeBuilding,
@@ -161,14 +201,12 @@ export function createSidebarSelection(
       removeBuilding,
     },
     update: (state: SidebarState) => {
-      const relationTo = ({ owner }: { owner: string }) =>
-        ownerRelation(playerOwner, owner, state.relations.relationship);
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
       removeBuilding.disabled = !state.canRemove;
       removeBuilding.hidden = !state.actors.some(
-        (actor) =>
-          selected.has(actor.id) && owns(actor) && isTilePlacedActor(actor),
+        (shown) =>
+          selected.has(shown.id) && owns(shown) && isTilePlacedActor(shown),
       );
       const actor = inspectedActor(state);
       const definition = actor && definitionById.get(actor.definitionId);
@@ -183,7 +221,9 @@ export function createSidebarSelection(
         ids,
         state.boxMode ?? false,
         state.paused ?? false,
-        state.actors.filter((actor) => selected.has(actor.id)).map(relationTo),
+        state.actors
+          .filter(({ id }) => selected.has(id))
+          .map((shown) => state.relationTo(shown)),
       ]);
       if (
         state.actorVersion === actorVersion &&
@@ -192,17 +232,10 @@ export function createSidebarSelection(
         return;
       actorVersion = state.actorVersion;
       selectionKey = nextSelectionKey;
-      const presentation = actor && presentations.get(actor.definitionId);
       openTraining.hidden = !actor || !owns(actor) || !definition?.production;
-      const moveSubject = ids.length > 1 ? "the group" : "this unit";
-      const moveHint = state.paused
-        ? "Resume the mission to issue orders."
-        : state.boxMode
-          ? `Turn off Box select to move ${moveSubject}.`
-          : `Tap or click terrain to move ${moveSubject}.`;
       if (ids.length > 1) {
         const actorsById = new Map(
-          state.actors.map((actor) => [actor.id, actor]),
+          state.actors.map((shown) => [shown.id, shown]),
         );
         const counts = countByDefinition(
           ids.flatMap((id) => actorsById.get(id) ?? []),
@@ -210,55 +243,12 @@ export function createSidebarSelection(
         setText(selectionDetails, `${ids.length} units selected`);
         setText(
           selectionInfo,
-          `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. ${moveHint}`,
+          `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. ${moveHint(state, "the group")}`,
         );
         return;
       }
-      setText(
-        selectionDetails,
-        actor
-          ? isTilePlacedActor(actor)
-            ? `${nameFor(actor.definitionId)} · ${footprintSize(occupiedTilesFor(actor, definition!))} · ${actor.tilePlacement.quarterTurns * 90}°`
-            : nameFor(actor.definitionId)
-          : "Nothing selected",
-      );
-      const relation = actor && relationTo(actor);
-      if (!actor) {
-        setText(
-          selectionInfo,
-          "Choose a unit or building on the map, or a field unit in Units.",
-        );
-      } else if (relation !== "own") {
-        setText(
-          selectionInfo,
-          [
-            RELATION_LABELS[relation!],
-            presentation?.description,
-            relation === "hostile"
-              ? "Select your units, then click or tap it to attack."
-              : "Not under your command.",
-          ]
-            .filter(Boolean)
-            .join(" · "),
-        );
-      } else if (definition?.production) {
-        setText(
-          selectionInfo,
-          `${presentation?.description ?? "Unit production"} · Trains ${trainedNames(definition).join(" and ")}.`,
-        );
-      } else if (isTilePlacedActor(actor)) {
-        setText(
-          selectionInfo,
-          `${presentation?.description ?? "Building"} · Select Buildings to expand your base.`,
-        );
-      } else if (definition?.movement) {
-        setText(
-          selectionInfo,
-          `${presentation?.description ?? "Unit"} · Movement speed ${definition.movement.speed} · ${moveHint}`,
-        );
-      } else {
-        setText(selectionInfo, presentation?.description ?? "Unit");
-      }
+      setText(selectionDetails, titleOf(actor));
+      setText(selectionInfo, infoOf(actor, state));
     },
   };
 }

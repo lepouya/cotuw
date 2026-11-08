@@ -32,7 +32,7 @@ export function setText(element: HTMLElement | undefined, text: string) {
 }
 
 /** A keyed list row: its node and how it presents the latest item. */
-export type KeyedRow<T> = {
+type KeyedRow<T> = {
   node: HTMLElement;
   update?: (item: T) => void;
   dispose?: () => void;

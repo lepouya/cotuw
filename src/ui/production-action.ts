@@ -10,7 +10,7 @@ export type DefinitionButton = {
 };
 
 /** Session conditions that block every production order. */
-export type ProductionBlockers = {
+type ProductionBlockers = {
   result?: MissionResult;
   faulted: boolean;
   paused: boolean;

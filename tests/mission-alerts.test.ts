@@ -46,7 +46,6 @@ const objective = (status: ObjectiveView["status"]): ObjectiveView => ({
 
 function tracker() {
   const alerts = createAlertTracker({
-    owns: ({ owner }) => owner === "player",
     nameOf: (id) => id[0]!.toUpperCase() + id.slice(1),
   });
   let tick = 0;
@@ -54,12 +53,13 @@ function tracker() {
     alerts.observe({
       tick: tick++,
       tickSeconds: TICK_SECONDS,
-      actors: [],
       attacks: [],
       wrecks: [],
       objectives: [],
       workerIds: [],
       ...state,
+      // The session observes through the player's view.
+      actors: (state.actors ?? []).filter(({ owner }) => owner === "player"),
     });
 }
 
@@ -162,24 +162,7 @@ describe("mission alerts", () => {
         actor("t2", "trooper"),
         actor("t3", "trooper"),
       ],
-      wrecks: [
-        {
-          actorId: "t1",
-          definitionId: "trooper",
-          owner: "player",
-          worldPosition: { x: 1, z: 2 },
-          facing: 0,
-          tick: 1,
-        },
-        {
-          actorId: "w1",
-          definitionId: "wolf",
-          owner: "wildlife",
-          worldPosition: { x: 1, z: 2 },
-          facing: 0,
-          tick: 1,
-        },
-      ] as AlertObservation["wrecks"],
+      wrecks: [{ actorId: "t1" }, { actorId: "w1" }],
     });
     expect(alerts.map(({ text, priority }) => [text, priority])).toEqual([
       ["Trooper lost", "high"],

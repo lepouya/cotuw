@@ -79,6 +79,7 @@ import { createQueuedOrderView } from "./render/queued-orders";
 import { createUnitTraining } from "./ui/unit-training";
 import type { UnitTrainingControls } from "./ui/unit-training";
 import type { SidebarState } from "./ui/sidebar";
+import type { TopBarState } from "./ui/top-bar";
 import type { DefinitionButton } from "./ui/production-action";
 import { trainableUnitIds } from "./simulation/production";
 import type { MissionSimulation } from "./simulation/mission";
@@ -159,7 +160,7 @@ export type GameSessionControls = BuildingPlacementControls &
     onReady?: (session: GameSession) => void;
     onDispose?: () => void;
     /** Updates after simulation ticks or changes to controls and selection. */
-    onStateChanged?: (state: SidebarState) => void;
+    onStateChanged?: (state: SidebarState & TopBarState) => void;
     /** Reveals details for an actor the player selected or placed. */
     showActor?: (actor: ObservedActor) => void;
     /** Receives grouped alerts after each tick. */
@@ -619,6 +620,8 @@ async function assembleGameSession(
       placementActive: placement.active,
       faulted: simulationFaulted,
       paused: !playing,
+      speed: loop.speed,
+      elapsedSeconds: simulation.completedTicks * simulation.tickSeconds,
       following: view.camera.following,
       canRemove,
       ...(economy && {
@@ -627,7 +630,7 @@ async function assembleGameSession(
       }),
       objectives: simulation.objectives,
       result: simulation.result,
-      relations: simulation.relations,
+      relationTo: player.relationTo,
     });
     knownControlsTick = simulation.completedTicks;
     knownPlacementActive = placement.active;
@@ -654,17 +657,16 @@ async function assembleGameSession(
     controls.onPopup?.(popup);
   };
   const alertTracker = createAlertTracker({
-    owns: player.owns,
     nameOf: (id) => names.get(id) ?? id,
   });
   const observeAlerts = () =>
     alertTracker.observe({
       tick: simulation.completedTicks,
       tickSeconds: simulation.tickSeconds,
-      actors: simulation.actors,
+      actors: player.actors().own,
       attacks: simulation.attacks,
-      wrecks: simulation.wrecks,
-      support: simulation.support,
+      wrecks: player.wrecks(),
+      support: player.support(),
       objectives: simulation.objectives,
       workerIds: economyWorkers(player.economy()).map(({ actorId }) => actorId),
       sites: (player.economy()?.cultivation?.sites ?? []).map((site) => ({

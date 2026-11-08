@@ -13,7 +13,7 @@ const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const canvas = byId<HTMLCanvasElement>("game-canvas");
 
-const notifications = createNotifications(document);
+const notifications = createNotifications(byId("mission-alerts"));
 const audio = createAudioMixer();
 // Dialog and top bar actions run only after the application below exists.
 const dialogs = createDialogs(byId("game-dialogs"), {
@@ -35,6 +35,8 @@ const dialogs = createDialogs(byId("game-dialogs"), {
   export: (name) => app.export(name),
 });
 const topBar = createTopBar(byId("top-bar"), {
+  alertToggle: notifications.toggle,
+  openMenu: () => app.openMenu(),
   togglePause: () => app.togglePause(),
   setSpeed: (speed) => app.setSpeed(speed),
   showObjectives: () => app.showObjectives(),
@@ -54,7 +56,6 @@ const app = createApplication({
     document.body.classList.toggle("at-title", atTitle),
 });
 
-byId("open-menu").addEventListener("click", app.openMenu);
 // F5 and F10 would otherwise reload the page or focus the browser menu.
 window.addEventListener("keydown", (event) => {
   const action = {

@@ -17,6 +17,11 @@
   margin-top: 1rem;
 }
 
+.game-sidebar #production-queue:not(:empty),
+.game-sidebar #return-cargo-actions {
+  margin-block: 0.75rem;
+}
+
 @media (max-height: 600px) {
   .game-sidebar #panel-selection {
     padding: 0.5rem 0.75rem;
@@ -27,9 +32,4 @@
   .game-sidebar #panel-selection {
     padding-inline: 0.5rem;
   }
-}
-
-.game-sidebar #production-queue:not(:empty),
-.game-sidebar #return-cargo-actions {
-  margin-block: 0.75rem;
 }

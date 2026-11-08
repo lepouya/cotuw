@@ -1,53 +1,27 @@
+import { formatElapsed } from "../format-time";
 import { missionEnded } from "../simulation/mission-result";
+import { resourceName } from "../simulation/resources";
+import { mountFeature, setText } from "./dom";
+import { presentResult } from "./mission-result";
+import markup from "./top-bar.html?raw";
 import type { MissionResult } from "../simulation/mission-result";
 import type { ObjectiveView } from "../simulation/objectives";
-import type { GameSession } from "../session";
-import type { SidebarState } from "./sidebar";
-import { setText } from "./dom";
-import { presentResult } from "./mission-result";
-import { resourceName } from "../simulation/resources";
+import type { Resource } from "../simulation/resources";
+import "./top-bar.css";
 
+/** The running mission's status. */
 export type TopBarState = {
-  /** Whether a mission is running and can resume. */
-  canPlay: boolean;
-  playing: boolean;
+  faulted: boolean;
+  paused?: boolean;
   speed: number;
   elapsedSeconds: number;
-  resource?: { name: string; balance: number };
-  objectives: readonly ObjectiveView[];
+  /** Present when the mission has an economy. */
+  balances?: Partial<Record<Resource, number>>;
+  /** The player's spending resource. */
+  resource?: Resource;
+  objectives?: readonly ObjectiveView[];
   result?: MissionResult;
 };
-
-/** Top bar state for a session's committed state, or for no mission. */
-export function topBarState(
-  session: Pick<GameSession, "playing" | "speed" | "simulation"> | undefined,
-  state?: SidebarState,
-): TopBarState {
-  return {
-    canPlay:
-      !!session && !!state && !state.faulted && !missionEnded(state.result),
-    playing: session?.playing() ?? false,
-    speed: session?.speed() ?? 1,
-    elapsedSeconds: session
-      ? session.simulation.completedTicks * session.simulation.tickSeconds
-      : 0,
-    resource: state?.resource && {
-      name: resourceName(state.resource),
-      balance: state.balances?.[state.resource] ?? 0,
-    },
-    objectives: state?.objectives ?? [],
-    result: state?.result,
-  };
-}
-
-export function formatElapsed(seconds: number) {
-  const whole = Math.floor(seconds);
-  const [hours, minutes] = [Math.floor(whole / 3600), Math.floor(whole / 60)];
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return hours
-    ? `${hours}:${pad(minutes % 60)}:${pad(whole % 60)}`
-    : `${minutes}:${pad(whole % 60)}`;
-}
 
 /** The compact objective line: the result, or the first unfinished goal. */
 export function objectiveSummary(
@@ -55,63 +29,87 @@ export function objectiveSummary(
   result?: MissionResult,
 ): string {
   if (result) return presentResult(result).summary;
-  const goals = objectives.filter(({ progress }) => progress);
-  const next = goals.find(({ status }) => status === "active");
-  if (!next) return "";
-  const { current, total } = next.progress!;
+  const next = objectives.find(
+    ({ progress, status }) => progress && status === "active",
+  );
+  if (!next?.progress) return "";
+  const { current, total } = next.progress;
   return `${next.label} ${current}/${total}`;
 }
 
-/** Binds the pause, speed, and objective controls and shows mission status. */
+/**
+ * Mounts the menu, pause, speed, and objective controls and mission status in
+ * `root`. Hosts the notification feature's `alertToggle`.
+ */
 export function createTopBar(
   root: HTMLElement,
-  actions: {
+  options: {
+    openMenu: () => void;
     togglePause: () => void;
     setSpeed: (speed: number) => void;
     showObjectives: () => void;
+    alertToggle: HTMLElement;
   },
 ) {
-  const element = <T extends HTMLElement>(id: string) =>
-    root.querySelector<T>(`#${id}`)!;
-  const pause = element<HTMLButtonElement>("pause-mission");
-  const speeds = [
-    ...root.querySelectorAll<HTMLButtonElement>("[data-speed]"),
-  ].map((button) => ({ button, speed: Number(button.dataset.speed) }));
-  const objective = element<HTMLButtonElement>("objective-summary");
-  const objectiveText = element("objective-text");
-  const time = element("mission-time");
-  const resource = element("resource-bar");
-  const resourceName = resource.querySelector<HTMLElement>(".resource-name")!;
-  const materials = element("materials-counter");
-  pause.addEventListener("click", actions.togglePause);
-  for (const { button, speed } of speeds)
-    button.addEventListener("click", () => actions.setSpeed(speed));
-  objective.addEventListener("click", actions.showObjectives);
-  return {
-    update: (state: TopBarState) => {
-      const paused = !state.playing;
-      pause.disabled = !state.canPlay;
-      pause.setAttribute("aria-pressed", String(paused));
-      setText(pause, paused ? "▶ Paused" : "⏸ Pause");
-      for (const { button, speed } of speeds) {
-        button.disabled = !state.canPlay;
-        button.setAttribute("aria-pressed", String(speed === state.speed));
-      }
-      setText(time, formatElapsed(state.elapsedSeconds));
-      const { name = "", balance = 0 } = state.resource ?? {};
-      resource.hidden = !state.resource;
-      setText(resourceName, name);
-      resource.title = name;
-      setText(materials, String(balance));
-      const resourceLabel = `${balance} ${name}`;
-      if (resource.getAttribute("aria-label") !== resourceLabel)
-        resource.setAttribute("aria-label", resourceLabel);
-      const summary = objectiveSummary(state.objectives, state.result);
-      objective.hidden = !summary;
-      setText(objectiveText, summary);
-      objective.title = summary ? `${summary} · Show objectives` : "";
-      objective.setAttribute("aria-label", objective.title);
-      objective.dataset.result = state.result?.kind ?? "";
-    },
-  };
+  return mountFeature(root, markup, ({ element, signal }) => {
+    const pause = element<HTMLButtonElement>("pause-mission");
+    const speeds = [
+      ...root.querySelectorAll<HTMLButtonElement>("[data-speed]"),
+    ].map((button) => ({ button, speed: Number(button.dataset.speed) }));
+    const objective = element<HTMLButtonElement>("objective-summary");
+    const objectiveText = element("objective-text");
+    const time = element("mission-time");
+    const resource = element("resource-bar");
+    const resourceLabel =
+      resource.querySelector<HTMLElement>(".resource-name")!;
+    const balanceText = element("materials-counter");
+    element("top-bar-status").append(options.alertToggle);
+    element("open-menu").addEventListener("click", options.openMenu, {
+      signal,
+    });
+    pause.addEventListener("click", options.togglePause, { signal });
+    for (const { button, speed } of speeds)
+      button.addEventListener("click", () => options.setSpeed(speed), {
+        signal,
+      });
+    objective.addEventListener("click", options.showObjectives, { signal });
+    return {
+      /** Shows a mission's status, or the idle bar without one. */
+      update: (state?: TopBarState) => {
+        const canPlay =
+          !!state && !state.faulted && !missionEnded(state.result);
+        const paused = !state || !!state.paused;
+        pause.disabled = !canPlay;
+        pause.setAttribute("aria-pressed", String(paused));
+        setText(pause, paused ? "▶ Paused" : "⏸ Pause");
+        for (const { button, speed } of speeds) {
+          button.disabled = !canPlay;
+          button.setAttribute(
+            "aria-pressed",
+            String(speed === (state?.speed ?? 1)),
+          );
+        }
+        setText(time, formatElapsed(state?.elapsedSeconds ?? 0));
+        const spending = state?.resource;
+        const name = spending ? resourceName(spending) : "";
+        const balance = (spending && state.balances?.[spending]) ?? 0;
+        resource.hidden = !spending;
+        setText(resourceLabel, name);
+        resource.title = name;
+        setText(balanceText, String(balance));
+        const label = `${balance} ${name}`;
+        if (resource.getAttribute("aria-label") !== label)
+          resource.setAttribute("aria-label", label);
+        const summary = objectiveSummary(
+          state?.objectives ?? [],
+          state?.result,
+        );
+        objective.hidden = !summary;
+        setText(objectiveText, summary);
+        objective.title = summary ? `${summary} · Show objectives` : "";
+        objective.setAttribute("aria-label", objective.title);
+        objective.dataset.result = state?.result?.kind ?? "";
+      },
+    };
+  });
 }

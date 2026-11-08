@@ -15,9 +15,15 @@ class ElementStub extends EventTarget {
   get lastElementChild() {
     return this.children[this.children.length - 1];
   }
-  append(...items: ElementStub[]) {
-    this.children.push(...items);
-    for (const item of items) item.parent = this;
+  append(...items: (ElementStub | string)[]) {
+    for (const item of items) {
+      if (typeof item === "string") {
+        this.textContent += item;
+        continue;
+      }
+      this.children.push(item);
+      item.parent = this;
+    }
   }
   prepend(...items: ElementStub[]) {
     this.children.unshift(...items);
@@ -49,19 +55,17 @@ function fixture() {
     createElement: (tag: string) =>
       tag === "button" ? new ButtonStub() : new ElementStub(),
   });
-  const elements = new Map(
-    [
-      "notifications",
-      "alert-history",
-      "alert-history-panel",
-      "alert-toggle",
-      "alert-unread",
-    ].map((id) => [`#${id}`, new ElementStub()]),
-  );
-  const notifications = createNotifications({
-    querySelector: (id: string) => elements.get(id),
-  } as unknown as ParentNode);
-  return { notifications, element: (id: string) => elements.get(`#${id}`)! };
+  const root = new ElementStub();
+  const notifications = createNotifications(root as unknown as HTMLElement);
+  const toggle = notifications.toggle as unknown as ElementStub;
+  const find = (from: ElementStub, id: string): ElementStub | undefined =>
+    from.attributes.get("id") === id
+      ? from
+      : from.children.map((child) => find(child, id)).find(Boolean);
+  return {
+    notifications,
+    element: (id: string) => (find(root, id) ?? find(toggle, id))!,
+  };
 }
 
 afterEach(() => {

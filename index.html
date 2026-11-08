@@ -14,106 +14,13 @@
         aria-label="Command sidebar"
       ></aside>
       <div class="game-viewport">
-        <header id="top-bar" class="top-bar" aria-label="Mission status">
-          <div class="top-bar-group">
-            <button
-              id="open-menu"
-              type="button"
-              title="Game menu (Escape / F10)"
-            >
-              Menu
-            </button>
-            <div class="time-controls" role="group" aria-label="Game speed">
-              <button id="pause-mission" type="button" aria-pressed="false">
-                ⏸ Pause
-              </button>
-              <button
-                type="button"
-                data-speed="0.5"
-                aria-pressed="false"
-                aria-label="Half speed"
-              >
-                ½×
-              </button>
-              <button
-                type="button"
-                data-speed="1"
-                aria-pressed="true"
-                aria-label="Normal speed"
-              >
-                1×
-              </button>
-              <button
-                type="button"
-                data-speed="2"
-                aria-pressed="false"
-                aria-label="Double speed"
-              >
-                2×
-              </button>
-              <button
-                type="button"
-                data-speed="4"
-                aria-pressed="false"
-                aria-label="Quadruple speed"
-              >
-                4×
-              </button>
-            </div>
-          </div>
-          <button
-            id="objective-summary"
-            class="objective-summary"
-            type="button"
-            hidden
-          >
-            <span aria-hidden="true">◎</span>
-            <span id="objective-text" class="objective-text"></span>
-          </button>
-          <div class="top-bar-group">
-            <span
-              id="resource-bar"
-              class="resource-bar"
-              role="group"
-              title="Materials"
-              hidden
-              ><span class="resource-name">Materials</span
-              ><span class="resource-symbol" aria-hidden="true">◆</span>
-              <strong id="materials-counter">0</strong></span
-            >
-            <span
-              id="mission-time"
-              class="mission-time"
-              role="timer"
-              title="Elapsed mission time"
-              >0:00</span
-            >
-            <button
-              id="alert-toggle"
-              type="button"
-              aria-expanded="false"
-              aria-controls="alert-history-panel"
-            >
-              ⚠ <span id="alert-unread" class="alert-unread"></span>
-            </button>
-          </div>
-        </header>
+        <header
+          id="top-bar"
+          class="top-bar"
+          aria-label="Mission status"
+        ></header>
         <div class="world-view">
-          <section
-            id="alert-history-panel"
-            class="alert-history"
-            aria-label="Alert history"
-            hidden
-          >
-            <h2>Alerts</h2>
-            <ol id="alert-history"></ol>
-          </section>
-          <div
-            id="notifications"
-            class="notifications"
-            role="status"
-            aria-live="polite"
-          ></div>
+          <div id="mission-alerts" class="mission-alerts"></div>
           <canvas
             id="game-canvas"
             aria-label="Game world"

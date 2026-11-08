@@ -1,7 +1,7 @@
 import type { ObjectiveStatus } from "../simulation/objectives";
 import { createElement as el, createKeyedList, setText } from "./dom";
 
-export type GoalEntry = {
+type GoalEntry = {
   id: string;
   label: string;
   status: ObjectiveStatus;
@@ -20,6 +20,12 @@ const CLASSES: Record<ObjectiveStatus, string> = {
   failed: "goal-failed",
 };
 
+function progressLabel(progress: GoalEntry["progress"]) {
+  if (!progress) return "";
+  const { current, total } = progress;
+  return total === undefined ? ` (${current})` : ` (${current}/${total})`;
+}
+
 /** Reconciles keyed entries while keeping unchanged nodes and focus intact. */
 export function createGoalList(list: HTMLElement, emphasis = false) {
   list.replaceChildren();
@@ -33,13 +39,9 @@ export function createGoalList(list: HTMLElement, emphasis = false) {
       return {
         node,
         update: (goal) => {
-          const progress = goal.progress;
           setText(
             label,
-            `${MARKS[goal.status]} ${goal.label}` +
-              (progress
-                ? ` (${progress.current}${progress.total === undefined ? "" : `/${progress.total}`})`
-                : ""),
+            `${MARKS[goal.status]} ${goal.label}${progressLabel(goal.progress)}`,
           );
           setText(directive, goal.directive ?? "");
           directive.hidden = !goal.directive;
