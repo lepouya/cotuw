@@ -12,7 +12,7 @@ export const AUDIO_VOICE_LIMIT = 24;
 const MAX_STEP_DELAY = 60;
 const MAX_SEQUENCE_STEPS = AUDIO_VOICE_LIMIT;
 
-export type AudioClip = { url: string; loop: boolean };
+type AudioClip = { url: string; loop: boolean };
 
 export type AudioCue = {
   /** Variants play in rotation; they all loop or all play once. */
@@ -36,7 +36,7 @@ export type AudioBindings = {
   loops?: Readonly<Record<string, string | null>>;
 };
 
-export type MusicArrangement = { default: string; combat?: string };
+type MusicArrangement = { default: string; combat?: string };
 
 export type AudioContent = {
   clips: Readonly<Record<string, AudioClip>>;
@@ -64,7 +64,7 @@ export function musicForFaction(
 type Invalid = (problem: string) => Error;
 
 /** Whether a validated cue's clips loop. */
-export const cueLoops = (audio: AudioContent, cue: string) =>
+const cueLoops = (audio: AudioContent, cue: string) =>
   audio.clips[audio.cues[cue]!.clips[0]!]!.loop;
 
 export function validateAudioContent(

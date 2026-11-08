@@ -700,7 +700,7 @@ product work in `TODO.md`, and remove temporary files in
       so `@tauri-apps/api/core` stays in the browser bundle, unlike the rest
       of the host code.
 
-- [ ] **Slice 9: content packs, presentation contracts, and audio**
+- [x] **Slice 9: content packs, presentation contracts, and audio**
   (13 TS files + JSON packs/levels, ~2,357 LOC)
   - `src/content/`: `content-pack.ts`, `packs.ts`, `levels.ts`,
     `presentation.ts`, `texture-clip.ts`, `terrain-style.ts`, `audio.ts`,
@@ -711,6 +711,78 @@ product work in `TODO.md`, and remove temporary files in
     `skirmish <-> skirmish-map` type loop, owner-palette content schemas, and
     switching `audio/mission.ts` onto `viewOf(playerOwner)` without `src/ui/`
     imports.
+  - [x] **Pass A** (modular assessment and refactor, base `fc0561f`):
+    - Mission audio reads `viewOf(playerOwner)`: shown actors, own production,
+      posture, and remains. Hit and activity participants resolve through the
+      view, and lethal hits sound from remains instead of the previous tick's
+      actor. `audio -> ui` type edge: `1 -> 0`; alert input is `{ priority }`.
+    - `OwnerView.workingIds` and `offlineIds` name shown actors visibly working
+      or cut off from support. The session and economy controls use them, so
+      `session.ts` no longer reads `simulation.actors` or `simulation.support`
+      for posture and `economy-controls.ts` no longer takes `support`.
+    - `AudioEmitter.audible` removed: hidden objects never reach the scene.
+    - Validators sit beside their schemas: `validateTerrainStyle` in
+      `terrain-style.ts` (Slice 6 deferral); `ActorPresentation`, `ActorModel`,
+      and `validateActorPresentation` in `presentation.ts`, as
+      `runtime-boundaries.md` states. `parseContentPack` shrinks accordingly.
+    - `skirmish-map.ts` owns the map schema and `SkirmishFaction`; the
+      `skirmish <-> skirmish-map` type loop is gone.
+    - No persisted format change. Docs: `audio.md`, `runtime-boundaries.md`,
+      `content-packs.md`. Interface and test changes span several subsystems,
+      so Pass B runs in its own session.
+    - Accepted behavior change: a newly detected foreign actor has no `moving`
+      loop until its next observation, since its route stays private.
+    - Rejected: owner-palette schemas (no owner color until `1.43`; Slices 6
+      and 7 reached the same result); an `OwnerView` attack feed (no AI caller
+      yet; consumers already resolve through the view); moving `ViewStyle` and
+      `PROP_IDS` (no change pressure).
+    - Pass B leads: exports `FactionOpening`, `ActorModel`, `AudioClip`,
+      `AUDIO_BUSES`, `clipFrameAt`, and `clipDuration`; `playerFaction` wording
+      in `scene.ts`; the Slice 3 first-order and queue-count duplication in
+      `audio/mission.ts` and `benchmark-probe.ts`; per-tick allocations in
+      `observe` and `desiredLoops`; whether `audio-assets.ts`, which only
+      scripts and tests import, belongs in Slice 10.
+    - Checks: format, lint, typecheck, units (`1371` passed), asset tests
+      (`127` passed), a Vite build, and the affected audio and economy browser
+      specs in Chromium and WebKit pass.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - Dead exports removed or made private across `mixer.ts`, `audio.ts`,
+      `content-pack.ts`, `presentation.ts`, `skirmish.ts`, `terrain-style.ts`,
+      and `texture-clip.ts`, including `FactionOpening`, `ActorModel`,
+      `AudioClip`, and `AUDIO_BUSES`. Unused `audioAssetUrl` and the test-only
+      `clipDuration` and `clipFrameAt` are gone; tests use
+      `compileTextureClip`.
+    - `mixer.ts`: `createChannels` replaces the try nested inside `unlock`;
+      `changed` renamed `notifyReady`.
+    - `scene.ts`: `playerFaction` renamed `musicFaction`; `Wanted.bus` replaces
+      a `music` flag that shadowed the arrangement; `schedule` derives one
+      `emitterId` instead of a `world` flag and a non-null assertion.
+    - `terrain-style.ts`: `isOptionalUv` replaces a tuple loop with a `positive`
+      flag; `isSlopeFade` uses `isNonnegative`. `presentation.ts`: model
+      validation drops two flags; materials stages use `deepFreeze`.
+    - `content-pack.ts`: clips validate before the presentation that names
+      them; casts over the untyped parse result removed.
+    - `skirmish-map.ts`: `ResourceArea.tiles` renamed `materialsTiles`, beside
+      `lifebloomTiles`. `skirmish.ts`: `isFaction` takes the string its callers
+      guarantee.
+    - Docs: `audio.md` states `priority` is nonnegative; ragged lists rewrapped.
+    - Reviewed without change: `levels.ts`, `packs.ts`, `packs/base.json`.
+      `levels/*.json` were not read line by line: `npm run levels` reproduces
+      them byte for byte.
+    - Kept: per-tick and per-frame allocations in `observe` and `desiredLoops`,
+      with no measurement requiring change and small emitter counts. The
+      `!source` guard on deferred steps, since it stops a world cue playing
+      nonspatially if the cancel invariant ever breaks.
+    - Rejected: a shared first-order helper. `audio/mission.ts` is the only site
+      building that map; `advanceProduction` scans live state during spawns, and
+      `benchmark-probe.ts` only counts.
+    - Deferred: whether `audio-assets.ts`, which only scripts and tests import,
+      moves to `scripts/` (Slice 10); `network-controls.ts` and
+      `unit-training.ts` still read `simulation.support` and `economy`.
+    - Checks: `npm run check` (`1371` unit tests and five browser smoke checks),
+      all `41` audio and economy browser checks in Chromium and WebKit, asset
+      tests (`127` passed), a Vite build, and unchanged `npm run levels` output
+      pass. Follow-up diff review found no actionable defects.
 
 ### Tier 2: generators, tooling, and documentation (`scripts/`, `docs/`)
 

@@ -107,8 +107,9 @@ bundled packs through the same parser future mod packs will use.
   - `coverage` shows the layer on that share of tiles in a fixed pattern.
   - `shoreFade` fades the layer from the terrain's edge to its center using
     `terrain.shore`.
-- The terrain style schema lives in `src/content/terrain-style.ts`;
-  `src/render/terrain-style.ts` builds each tile's layers from it.
+- The terrain style schema and its validation live in
+  `src/content/terrain-style.ts`; `src/render/terrain-style.ts` builds each
+  tile's layers from it.
 - `view` sets the background color and lighting.
 
 Built-in models and building details live in

@@ -421,7 +421,6 @@ for (const nativeHold of [true, false]) {
           id: "crane",
           definitionId: "crane",
           position: { x: 1, z: 0 },
-          audible: true,
           states: ["working"],
         };
         scene.sync([

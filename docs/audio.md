@@ -18,9 +18,9 @@ without it remain silent. The parser validates references and playback policies.
 - `audio.clips` maps clip IDs to `{ url, loop }`.
 - `audio.cues` maps cue IDs to a list of clip variants and mix policy:
   `gain` from zero to one, `cooldown` in real seconds, `voices` from one to 24,
-  and integer `priority`. Ready variants play in rotation; unavailable variants
-  are skipped. Optional `range` gives the fade distance in world units; omit
-  it for player feedback and music.
+  and nonnegative integer `priority`. Ready variants play in rotation;
+  unavailable variants are skipped. Optional `range` gives the fade distance
+  in world units; omit it for player feedback and music.
   Optional `unselectedGain` multiplies world cue gain when its object is not
   selected, from zero to one; it defaults to one and requires `range`.
 - `audio.events` maps global event names to sequences of `{ cue, at? }` steps.
@@ -77,25 +77,27 @@ registration in the [asset inventory](audio-assets.md).
   preserve loop fade-ins. Fade-outs hold the current level before retargeting;
   a fallback supports devices without the hold operation. `SILENT_AUDIO` plays
   nothing for sessions without a device.
-- `src/audio/scene.ts` resolves arbitrary event and state names. Supply emitter
-  IDs, definition IDs, world positions, visibility, and current states through
-  `sync`; call `emit(name, emitter)` for an object or `emit(name)` for global
-  feedback. Bindings can describe vehicles, buildings, props, or other objects.
+- `src/audio/scene.ts` resolves arbitrary event and state names. Supply the IDs,
+  definition IDs, world positions, and current states of objects the listener
+  may hear through `sync`; call `emit(name, emitter)` for an object or
+  `emit(name)` for global feedback. Bindings can describe vehicles, buildings,
+  props, or other objects.
   Camera focus is the listener position. World gain falls with distance and
   stereo pan follows horizontal displacement. `setSelection(ids)` updates
   selection gain immediately without a simulation tick or loop restart.
 - `src/audio/mission.ts` adapts committed mission observations to this
-  interface. Add new gameplay event or state detection here, after a successful
-  tick; simulation code never imports audio. Existing events are `attack`,
-  `damage`, `production.start`, `trained`, and `activity.<kind>`. States are
-  `moving`, `working`, `training`, `constructing`, and `idle`. Active
+  interface, reading actors, production, work, and remains through
+  `viewOf(playerOwner)`. Add new gameplay event or state detection here, after
+  a successful tick; simulation code never imports audio. Existing events are
+  `attack`, `damage`, `production.start`, `trained`, and `activity.<kind>`.
+  States are `moving`, `working`, `training`, `constructing`, and `idle`. Active
   construction of any faction uses `constructing`, which Circle buildings bind
   to their growth loop; paused construction and disconnected buildings have no
-  active loop states. Cultivators use `working` while gathering or
-  actively tending, with the same committed worker set used by animation. A
-  finished queue head waiting at a blocked exit has no `training` state.
-  Committed building activity identifies
-  the produced or delivering unit, so consumers share the same participant.
+  active loop states. Cultivators use `working` while gathering or actively
+  tending, with the same committed worker set used by animation. A finished
+  queue head waiting at a blocked exit has no `training` state. Committed
+  building activity identifies the produced or delivering unit, so consumers
+  share the same participant.
 - Global events are `command.accepted`, `command.invalid`, `alert`,
   `objective.complete`, `victory`, `defeat`, and `draw`. The base pack binds
   `draw` to the defeat cue. Command batches produce one response; cue
@@ -103,9 +105,10 @@ registration in the [asset inventory](audio-assets.md).
   most specific player feedback: a mission result replaces objective and alert
   cues, and an objective completion or owned unit's `trained` cue replaces
   the alert for routine alerts. High-priority alerts still sound.
-- World emitters use the session's fog and detection rules. Hidden or removed
-  emitters lose their voices, including scheduled sequence steps. Global
-  alerts for the player's actors remain audible. World loops give selected
+- World emitters are the actors and remains the owner view shows, so hidden
+  objects never reach the scene. Objects that leave the view lose their voices,
+  including scheduled sequence steps. Global alerts for the player's actors
+  remain audible. World loops give selected
   audible emitters slots first, then the nearest others, within each cue's
   voice limit and a total budget of 12. Selection never bypasses fog or range.
   Cues without a loaded variant do not reserve loop slots.

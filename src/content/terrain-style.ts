@@ -1,3 +1,12 @@
+import {
+  hasOwn,
+  isCount,
+  isId,
+  isNonnegative,
+  isPositive,
+  isRecord,
+} from "../simulation/validation";
+
 /** How a tile type is drawn. */
 export type TileGraphics = {
   /** An image that repeats once per tile, or a clip's sprite sheet. */
@@ -42,7 +51,7 @@ export type TileType = {
 };
 
 /** One visual layer that tiles of a terrain type carry. */
-export type TerrainLayerRule = {
+type TerrainLayerRule = {
   tileType: string;
   color: [number, number, number, number];
   /** Adds a gentle per-tile tint so large areas do not look flat. */
@@ -61,3 +70,91 @@ export type TerrainStyle = {
   /** Layers by terrain type ID, bottom first. */
   layers: Readonly<Record<string, readonly TerrainLayerRule[]>>;
 };
+
+const isAlpha = (value: unknown) => isNonnegative(value) && value <= 1;
+const isRgba = (value: unknown) =>
+  Array.isArray(value) &&
+  value.length === 4 &&
+  value.every(isNonnegative) &&
+  isAlpha(value[3]);
+const isOptionalBoolean = (value: unknown) =>
+  value === undefined || typeof value === "boolean";
+
+/** Two distinct, non-negative grades; either may be the steeper. */
+const isSlopeFade = (value: unknown) =>
+  isRecord(value) &&
+  isNonnegative(value.start) &&
+  isNonnegative(value.end) &&
+  value.start !== value.end;
+
+const isOptionalUv = (value: unknown, valid: (part: unknown) => boolean) =>
+  value === undefined || (isRecord(value) && valid(value.u) && valid(value.v));
+
+/** Checks a parsed style; `clips` holds the pack's texture clips by ID. */
+export function validateTerrainStyle(
+  style: TerrainStyle,
+  clips: Readonly<Record<string, unknown>>,
+  invalid: (problem: string) => Error,
+): void {
+  for (const [id, type] of Object.entries(style.tileTypes)) {
+    if (
+      !isRecord(type) ||
+      (type.slot !== undefined && !isCount(type.slot)) ||
+      !isOptionalBoolean(type.featherEdges) ||
+      (type.slopeFade !== undefined && !isSlopeFade(type.slopeFade))
+    )
+      throw invalid(`has invalid terrain tile type "${id}"`);
+    const graphics = type.graphics;
+    if (graphics !== undefined) {
+      if (
+        !graphics ||
+        !isId(graphics.url) ||
+        typeof graphics.hasAlpha !== "boolean" ||
+        !isOptionalBoolean(graphics.layerAlphaOnly) ||
+        !isRgba(graphics.minimapColor) ||
+        (graphics.clip !== undefined &&
+          (!isId(graphics.clip) || !hasOwn(clips, graphics.clip))) ||
+        (graphics.clipPhase !== undefined && graphics.clip === undefined)
+      )
+        throw invalid(`has invalid graphics for terrain tile type "${id}"`);
+      if (
+        !isOptionalUv(graphics.scale, isPositive) ||
+        !isOptionalUv(graphics.scrollSpeed, Number.isFinite) ||
+        !isOptionalUv(graphics.clipPhase, Number.isFinite)
+      )
+        throw invalid(`has invalid texture coordinates for "${id}"`);
+    }
+  }
+  const shore = style.shore;
+  if (
+    shore !== undefined &&
+    (!shore ||
+      !isAlpha(shore.shoreAlpha) ||
+      !isAlpha(shore.deepAlpha) ||
+      !isCount(shore.depthTiles) ||
+      shore.depthTiles === 0)
+  )
+    throw invalid("has invalid shore settings");
+  for (const [typeId, rules] of Object.entries(style.layers)) {
+    if (!Array.isArray(rules))
+      throw invalid(`needs a layer list for ${typeId}`);
+    for (const rule of rules) {
+      if (
+        !rule ||
+        !isId(rule.tileType) ||
+        !hasOwn(style.tileTypes, rule.tileType)
+      )
+        throw invalid(
+          `styles ${typeId} with unknown tile type "${rule?.tileType}"`,
+        );
+      if (
+        !isRgba(rule.color) ||
+        !isOptionalBoolean(rule.variation) ||
+        !isOptionalBoolean(rule.shoreFade) ||
+        (rule.coverage !== undefined && !isAlpha(rule.coverage)) ||
+        (rule.shoreFade && !shore)
+      )
+        throw invalid(`has invalid layer settings for ${typeId}`);
+    }
+  }
+}

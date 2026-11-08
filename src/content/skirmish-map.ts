@@ -1,9 +1,43 @@
 // The rough M1 skirmish map.
 import { deepFreeze } from "../simulation/actor";
 
-import type { TileCoord } from "../simulation/grid";
+import type { TerrainBounds, TileCoord } from "../simulation/grid";
 import type { TerrainGridOptions } from "../simulation/terrain";
-import type { ResourceArea, SkirmishMap } from "./skirmish";
+
+export type SkirmishFaction = "arc" | "circle";
+
+/** One player position. */
+export type SkirmishStart = {
+  readonly id: string;
+  /** Flat buildable ground around the headquarters. */
+  readonly baseArea: Readonly<TerrainBounds>;
+  /** Headquarters footprints differ by faction. */
+  readonly headquartersOrigins: Readonly<
+    Record<SkirmishFaction, Readonly<TileCoord>>
+  >;
+  /** Verified first drop-off placements. */
+  readonly dropoffOrigins: Readonly<
+    Record<SkirmishFaction, Readonly<TileCoord>>
+  >;
+  /** Income from this area is not an expansion. */
+  readonly startingResourceAreaId: string;
+};
+
+export type ResourceArea = {
+  readonly id: string;
+  readonly name: string;
+  readonly materialsTiles: readonly Readonly<TileCoord>[];
+  readonly lifebloomTiles: readonly Readonly<TileCoord>[];
+};
+
+/** Everything assembly needs from a map, whether authored or generated. */
+export type SkirmishMap = {
+  /** Stable scenario ID; distinct maps use distinct IDs. */
+  readonly id: string;
+  readonly terrain: TerrainGridOptions;
+  readonly starts: readonly [SkirmishStart, SkirmishStart];
+  readonly resourceAreas: readonly ResourceArea[];
+};
 
 /** Inclusive tile rows through the ridge; heights use the bounding corners. */
 export type RidgeCrossing = {
@@ -49,7 +83,7 @@ const westAreas = [
   {
     id: "home",
     name: "Home",
-    tiles: patch(25, 65),
+    materialsTiles: patch(25, 65),
     lifebloomTiles: [
       { x: 28, z: 62 },
       { x: 28, z: 67 },
@@ -58,7 +92,7 @@ const westAreas = [
   {
     id: "shelf",
     name: "Shelf expansion",
-    tiles: patch(29, 30),
+    materialsTiles: patch(29, 30),
     lifebloomTiles: [
       { x: 33, z: 31 },
       { x: 33, z: 35 },
@@ -67,7 +101,7 @@ const westAreas = [
   {
     id: "forward",
     name: "Forward expansion",
-    tiles: patch(45, 59),
+    materialsTiles: patch(45, 59),
     lifebloomTiles: [
       { x: 45, z: 63 },
       { x: 49, z: 63 },
@@ -75,7 +109,7 @@ const westAreas = [
   },
 ];
 const northCrossing = {
-  tiles: patch(59, 27),
+  materialsTiles: patch(59, 27),
   lifebloomTiles: [
     { x: 55, z: 24 },
     { x: 55, z: 31 },
@@ -93,14 +127,14 @@ export const SKIRMISH_RESOURCE_AREAS: readonly ResourceArea[] = deepFreeze([
     ...area,
     id: `east-${area.id}`,
     name: `East ${area.name}`,
-    tiles: area.tiles.map(mirror),
+    materialsTiles: area.materialsTiles.map(mirror),
     lifebloomTiles: area.lifebloomTiles.map(mirror),
   })),
   { ...northCrossing, id: "north-crossing", name: "North crossing" },
   {
     id: "south-crossing",
     name: "South crossing",
-    tiles: northCrossing.tiles.map(mirror),
+    materialsTiles: northCrossing.materialsTiles.map(mirror),
     lifebloomTiles: northCrossing.lifebloomTiles.map(mirror),
   },
 ]);

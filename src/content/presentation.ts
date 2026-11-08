@@ -3,18 +3,22 @@
 import {
   hasOwn,
   isId,
+  isNonnegative,
   isOneOf,
   isPositive,
   isRecord,
 } from "../simulation/validation";
+import { deepFreeze } from "../simulation/actor";
 import { BUILDING_ACTIVITY_KINDS } from "../simulation/production";
 
+import type { ActorDefinition } from "../simulation/actor";
 import type { BuildingActivityKind } from "../simulation/production";
+import type { AudioBindings } from "./audio";
 
 /** Built-in presentation names accepted by authored content. */
-export const BUILTIN_ACTOR_MODEL_IDS = ["harvester", "wolf"] as const;
+const BUILTIN_ACTOR_MODEL_IDS = ["harvester", "wolf"] as const;
 export type BuiltinActorModelId = (typeof BUILTIN_ACTOR_MODEL_IDS)[number];
-export const BUILTIN_BUILDING_DETAIL_IDS = [
+const BUILTIN_BUILDING_DETAIL_IDS = [
   "barracks",
   "command-center",
   "refinery",
@@ -22,7 +26,7 @@ export const BUILTIN_BUILDING_DETAIL_IDS = [
 export type BuiltinBuildingDetailId =
   (typeof BUILTIN_BUILDING_DETAIL_IDS)[number];
 
-export const PORTRAIT_IDS = [
+const PORTRAIT_IDS = [
   "refinery",
   "headquarters",
   "building",
@@ -209,7 +213,7 @@ export type FrameEffect = {
 export type FrameEffects = Partial<Record<ActorTrigger, FrameEffect>>;
 
 /** Throws unless each effect names a trigger, a known clip, and a placement. */
-export function validateFrameEffects(
+function validateFrameEffects(
   actorId: string,
   effects: unknown,
   clips: Readonly<Record<string, unknown>>,
@@ -234,27 +238,25 @@ export function validateFrameEffects(
 }
 
 /** How an attacker's hits are drawn. */
-export const ATTACK_EFFECT_STYLES = ["tracer", "bite", "bolt"] as const;
+const ATTACK_EFFECT_STYLES = ["tracer", "bite", "bolt"] as const;
 export type AttackEffectStyle = (typeof ATTACK_EFFECT_STYLES)[number];
 
 /** How damage on an actor is drawn. */
-export const DAMAGE_EFFECT_STYLES = [
-  "mechanical",
-  "biological",
-  "living",
-] as const;
+const DAMAGE_EFFECT_STYLES = ["mechanical", "biological", "living"] as const;
 export type DamageEffectStyle = (typeof DAMAGE_EFFECT_STYLES)[number];
 
 /** A marker scale for remaining fractions strictly greater than `above`. */
 export type MaterialsStage = { readonly above: number; readonly scale: number };
 
-export const DEFAULT_MATERIALS_STAGES: readonly MaterialsStage[] =
-  Object.freeze([
-    Object.freeze({ above: 0.75, scale: 1 }),
-    Object.freeze({ above: 0.5, scale: 0.8375 }),
-    Object.freeze({ above: 0.25, scale: 0.675 }),
-    Object.freeze({ above: 0, scale: 0.5125 }),
-  ]);
+export const DEFAULT_MATERIALS_STAGES: readonly MaterialsStage[] = deepFreeze([
+  { above: 0.75, scale: 1 },
+  { above: 0.5, scale: 0.8375 },
+  { above: 0.25, scale: 0.675 },
+  { above: 0, scale: 0.5125 },
+]);
+
+const isFraction = (value: unknown): value is number =>
+  typeof value === "number" && value >= 0 && value < 1;
 
 /** Cutoffs in [0, 1) descend to zero while scales shrink. */
 export function validateMaterialsStages(
@@ -278,5 +280,132 @@ export function validateMaterialsStages(
     );
 }
 
-const isFraction = (value: unknown): value is number =>
-  typeof value === "number" && value >= 0 && value < 1;
+/** A GLB asset, or a built-in procedural model at an optional scale. */
+type ActorModel =
+  { glb: ActorGraphics } | { builtin: BuiltinActorModelId; scale?: number };
+
+/** How the player sees and commands one actor definition. */
+export type ActorPresentation = {
+  audio?: AudioBindings;
+  name: string;
+  description: string;
+  portrait?: PortraitId;
+  build?: { id: string; label: string; order?: number };
+  train?: { id: string; label: string };
+  attackEffect?: AttackEffectStyle;
+  /** How damage shows once health drops; absent shows none. */
+  damageEffect?: DamageEffectStyle;
+  regenerationEffect?: boolean;
+  model?: ActorModel;
+  frameEffects?: FrameEffects;
+  building?: {
+    height: number;
+    color: Rgb;
+    minimapColor?: Rgb;
+    /** A built-in set of articulated parts. */
+    details?: BuiltinBuildingDetailId;
+    glb?: ModelGraphics;
+  };
+};
+
+/**
+ * Throws unless an actor's presentation is complete for its rules. `buttonIds`
+ * collects the pack's action IDs, which must stay unique across actors.
+ */
+export function validateActorPresentation(
+  actor: ActorDefinition,
+  presentation: ActorPresentation | undefined,
+  clips: Readonly<Record<string, unknown>>,
+  buttonIds: Set<string>,
+  invalid: (problem: string) => Error,
+): void {
+  if (
+    !presentation ||
+    !isId(presentation.name) ||
+    typeof presentation.description !== "string"
+  )
+    throw invalid(`needs a name and description for ${actor.id}`);
+  if (
+    presentation.portrait !== undefined &&
+    !isOneOf(PORTRAIT_IDS, presentation.portrait)
+  )
+    throw invalid(`gives ${actor.id} an unknown portrait`);
+  for (const action of [presentation.build, presentation.train]) {
+    if (
+      action !== undefined &&
+      (!action ||
+        !isId(action.id) ||
+        !isId(action.label) ||
+        buttonIds.has(action.id))
+    )
+      throw invalid(`gives ${actor.id} an invalid or duplicate button ID`);
+    if (action) buttonIds.add(action.id);
+  }
+  if (
+    presentation.build?.order !== undefined &&
+    !isNonnegative(presentation.build.order)
+  )
+    throw invalid(`gives ${actor.id} an invalid building order`);
+  if (presentation.build && !actor.footprint)
+    throw invalid(`gives ${actor.id} a build action without a footprint`);
+  if (presentation.train && (!actor.movement || actor.footprint))
+    throw invalid(`gives ${actor.id} a train action without a mobile unit`);
+  if (
+    presentation.attackEffect !== undefined &&
+    !isOneOf(ATTACK_EFFECT_STYLES, presentation.attackEffect)
+  )
+    throw invalid(`gives ${actor.id} an unknown attack effect`);
+  if (
+    presentation.damageEffect !== undefined &&
+    !isOneOf(DAMAGE_EFFECT_STYLES, presentation.damageEffect)
+  )
+    throw invalid(`gives ${actor.id} an unknown damage effect`);
+  if (
+    presentation.regenerationEffect !== undefined &&
+    typeof presentation.regenerationEffect !== "boolean"
+  )
+    throw invalid(`gives ${actor.id} an invalid regeneration effect`);
+  const model = presentation.model;
+  if (model !== undefined) {
+    if (!isRecord(model) || "glb" in model === "builtin" in model)
+      throw invalid(`gives ${actor.id} an invalid model`);
+    if ("glb" in model) validateActorGraphics(model.glb);
+    else {
+      if (!isOneOf(BUILTIN_ACTOR_MODEL_IDS, model.builtin))
+        throw invalid(
+          `gives ${actor.id} an unknown built-in model "${model.builtin}"`,
+        );
+      if (model.scale !== undefined && !isPositive(model.scale))
+        throw invalid(`gives ${actor.id} an invalid model scale`);
+    }
+  }
+  if (presentation.frameEffects !== undefined) {
+    if (!model || actor.footprint)
+      throw invalid(`needs a mobile model for ${actor.id}'s frame effects`);
+    validateFrameEffects(actor.id, presentation.frameEffects, clips);
+  }
+  const building = presentation.building;
+  if (building !== undefined) {
+    if (
+      !building ||
+      !isPositive(building.height) ||
+      !isRgb(building.color) ||
+      (building.minimapColor !== undefined && !isRgb(building.minimapColor))
+    )
+      throw invalid(`gives ${actor.id} invalid building colors or height`);
+    if (
+      building.details !== undefined &&
+      !isOneOf(BUILTIN_BUILDING_DETAIL_IDS, building.details)
+    )
+      throw invalid(
+        `gives ${actor.id} unknown building details "${building.details}"`,
+      );
+    if (building.glb !== undefined) {
+      validateModelGraphics(building.glb);
+      if (building.details !== undefined)
+        throw invalid(`gives ${actor.id} multiple building models`);
+    }
+  }
+  if (actor.footprint ? !building : actor.movement && !model)
+    throw invalid(`needs presentation for ${actor.id}'s geometry`);
+}

@@ -2,8 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   clipCellRect,
-  clipDuration,
-  clipFrameAt,
+  compileTextureClip,
   validateTextureClip,
 } from "../src/content/texture-clip";
 
@@ -21,11 +20,11 @@ const clip = (playback: TextureClip["playback"]): TextureClip => ({
   playback,
 });
 const at = (playback: TextureClip["playback"], times: number[]) =>
-  times.map((seconds) => clipFrameAt(clip(playback), seconds));
+  times.map((seconds) => compileTextureClip(clip(playback)).frameAt(seconds));
 
 describe("texture clips", () => {
   test("each frame holds for its own duration and loops", () => {
-    expect(clipDuration(clip("loop"))).toBeCloseTo(0.6);
+    expect(compileTextureClip(clip("loop")).duration).toBeCloseTo(0.6);
     expect(at("loop", [0, 0.05, 0.11, 0.29, 0.31, 0.59, 0.61, 0.65])).toEqual([
       0, 0, 1, 1, 2, 2, 0, 0,
     ]);
@@ -34,7 +33,7 @@ describe("texture clips", () => {
   });
 
   test("ping-pong returns without repeating its end frames", () => {
-    expect(clipDuration(clip("ping-pong"))).toBeCloseTo(0.8);
+    expect(compileTextureClip(clip("ping-pong")).duration).toBeCloseTo(0.8);
     expect(at("ping-pong", [0.05, 0.15, 0.35, 0.65, 0.75, 0.85])).toEqual([
       0, 1, 2, 1, 1, 0,
     ]);

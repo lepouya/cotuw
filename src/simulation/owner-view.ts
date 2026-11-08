@@ -1,8 +1,8 @@
-import { economyForOwner } from "./economy";
+import { economyForOwner, workingWorkerIds } from "./economy";
 import { knownEconomy } from "./observations";
 import { ownerRelation } from "./ownership";
 import { isMobileActor, isTilePlacedActor } from "./placement";
-import { supportForOwner } from "./support";
+import { disconnectedBuildings, supportForOwner } from "./support";
 
 import type {
   Actor,
@@ -201,6 +201,28 @@ export function createOwnerView({
     () => [simulation.wrecks, simulation.actors] as const,
     ([committed]) => committed.filter(shows),
   );
+  /** Shown workers visibly gathering or tending, whoever owns them. */
+  const workingIds = cached(
+    () => [simulation.economy, simulation.actors] as const,
+    ([live, committed]): ReadonlySet<string> => {
+      const { shownById } = actors();
+      return new Set(
+        [...workingWorkerIds(live, committed)].filter((id) =>
+          shownById.has(id),
+        ),
+      );
+    },
+  );
+  /** Shown buildings visibly cut off from support, whoever owns them. */
+  const offlineIds = cached(
+    () => [simulation.support, simulation.actors] as const,
+    ([live]): ReadonlySet<string> => {
+      const { shownById } = actors();
+      return new Set(
+        [...disconnectedBuildings(live)].filter((id) => shownById.has(id)),
+      );
+    },
+  );
   const ownActor = (id: string | undefined) =>
     id === undefined ? undefined : actors().ownById.get(id);
   return {
@@ -216,6 +238,8 @@ export function createOwnerView({
     economy,
     support,
     wrecks,
+    workingIds,
+    offlineIds,
     shownActor: (id: string | undefined) =>
       id === undefined ? undefined : actors().shownById.get(id),
     ownActor,

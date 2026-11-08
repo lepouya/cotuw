@@ -8,7 +8,7 @@ import { TerrainMap } from "../src/map";
 import { createActor } from "../src/simulation/actor";
 
 import type { ActorDefinition } from "../src/simulation/actor";
-import type { ActorPresentation } from "../src/content/content-pack";
+import type { ActorPresentation } from "../src/content/presentation";
 
 describe("session effects extraction", () => {
   const map = new TerrainMap({

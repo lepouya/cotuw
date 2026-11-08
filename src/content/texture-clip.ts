@@ -6,8 +6,7 @@ import {
   isRecord,
 } from "../simulation/validation";
 
-export const CLIP_PLAYBACK_MODES = ["loop", "ping-pong", "once"] as const;
-export type ClipPlayback = (typeof CLIP_PLAYBACK_MODES)[number];
+const CLIP_PLAYBACK_MODES = ["loop", "ping-pong", "once"] as const;
 
 /** A frame sequence over a sprite sheet laid out as a grid of equal cells. */
 export type TextureClip = {
@@ -15,8 +14,8 @@ export type TextureClip = {
   rows: number;
   /** Cells in play order, numbered row by row from the top left. */
   frames: readonly { cell: number; seconds: number }[];
-  /** Ping-pong plays back without repeating the end frames; once holds the last. */
-  playback: ClipPlayback;
+  /** Ping-pong omits repeated end frames; once holds the last. */
+  playback: (typeof CLIP_PLAYBACK_MODES)[number];
 };
 
 /** Throws when a clip's layout, frames, or playback mode is invalid. */
@@ -43,7 +42,8 @@ export function validateTextureClip(id: string, clip: unknown): void {
       !isPositive(frame.seconds)
     )
       throw invalid();
-  if (!Number.isFinite(clipDuration(clip as TextureClip))) throw invalid();
+  if (!Number.isFinite(compileTextureClip(clip as TextureClip).duration))
+    throw invalid();
 }
 
 /** Frame indices in the order one cycle plays them. */
@@ -54,7 +54,11 @@ function playOrder({ frames, playback }: TextureClip): number[] {
     : forward;
 }
 
-/** Compiles timing once so playback allocates nothing per rendered frame. */
+/**
+ * Compiles timing once so playback allocates nothing per rendered frame.
+ * `duration` is one cycle's seconds; `frameAt` gives the index into
+ * `clip.frames` showing that many seconds after playback started.
+ */
 export function compileTextureClip(clip: TextureClip) {
   const order = playOrder(clip);
   let duration = 0;
@@ -79,16 +83,6 @@ export function compileTextureClip(clip: TextureClip) {
     return order[low]!;
   };
   return { duration, frameAt };
-}
-
-/** Seconds in one cycle, including the last frame's hold. */
-export function clipDuration(clip: TextureClip): number {
-  return compileTextureClip(clip).duration;
-}
-
-/** The index into `clip.frames` showing `seconds` after playback started. */
-export function clipFrameAt(clip: TextureClip, seconds: number): number {
-  return compileTextureClip(clip).frameAt(seconds);
 }
 
 /** A cell's pixel rectangle in a sheet of the given size. */

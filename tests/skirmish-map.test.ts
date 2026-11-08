@@ -35,8 +35,11 @@ import {
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { TerrainGrid } from "../src/simulation/terrain";
 
-import type { SkirmishMap, SkirmishStart } from "../src/content/skirmish";
-import type { RidgeCrossing } from "../src/content/skirmish-map";
+import type {
+  RidgeCrossing,
+  SkirmishMap,
+  SkirmishStart,
+} from "../src/content/skirmish-map";
 import type { TileCoord } from "../src/simulation/grid";
 import type { TerrainView } from "../src/simulation/terrain";
 import type { MissionSimulation } from "../src/simulation/mission";
@@ -193,7 +196,7 @@ test.each(SKIRMISH_STARTS)(
     );
     const from = approach(map, start);
     for (const area of SKIRMISH_RESOURCE_AREAS) {
-      for (const tile of [...area.tiles, ...area.lifebloomTiles]) {
+      for (const tile of [...area.materialsTiles, ...area.lifebloomTiles]) {
         expect(grid.costAt(tile.x, tile.z)).toBeDefined();
         expect(
           findNavigationPath(grid, from, map.tileCenter(tile.x, tile.z))

@@ -11,7 +11,7 @@ import type { RegeneratingActor } from "./regeneration-effects";
 import type { ActorDefinition } from "../simulation/actor";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { TilePlacedActorState } from "../simulation/placement";
-import type { ActorPresentation } from "../content/content-pack";
+import type { ActorPresentation } from "../content/presentation";
 import type { TerrainMap } from "../map";
 import type { WorldPosition } from "../simulation/world";
 

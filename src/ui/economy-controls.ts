@@ -15,7 +15,6 @@ import type {
   CultivationSite,
   CultivatorState,
 } from "../simulation/cultivation";
-import { disconnectedBuildings } from "../simulation/support";
 import { ECONOMY_COMMAND_KINDS, isOutcomeOf } from "../simulation/command";
 import { contentRoles } from "./content-roles";
 import { createButton, createKeyedList, setText } from "./dom";
@@ -120,10 +119,7 @@ export type EconomyElements = {
 /** Buttons remain stable while live cargo and production progress change. */
 export function createEconomyControls(
   elements: EconomyElements,
-  simulation: Pick<
-    MissionSimulation,
-    "tickSeconds" | "submitCommand" | "support"
-  >,
+  simulation: Pick<MissionSimulation, "tickSeconds" | "submitCommand">,
   options: {
     definitions: readonly ActorDefinition[];
     names: ReadonlyMap<string, string>;
@@ -142,6 +138,8 @@ export function createEconomyControls(
      * salvage as the player last saw them.
      */
     economy: () => EconomyView | undefined;
+    /** Shown buildings cut off from support. */
+    offlineIds: () => ReadonlySet<string>;
     positionForTile: (tile: TileCoord) => WorldPosition;
   },
 ) {
@@ -268,7 +266,7 @@ export function createEconomyControls(
       );
       const cultivationSites = cultivation?.sites ?? [];
       const enabled = options.enabled();
-      const disconnected = disconnectedBuildings(simulation.support);
+      const disconnected = options.offlineIds();
       const refineries = owned.filter(
         (actor) => definitions.get(actor.definitionId)?.refinery,
       );

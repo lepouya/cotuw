@@ -13,52 +13,21 @@ import type { MaterialsSite } from "../simulation/economy";
 import type { Difficulty } from "../simulation/mission-setup";
 import type { OwnerRelationship } from "../simulation/ownership";
 import type { Resource } from "../simulation/resources";
-import type { TerrainBounds, TileCoord } from "../simulation/grid";
 import type { ScenarioDefinition } from "../simulation/scenario";
-import type { TerrainGridOptions } from "../simulation/terrain";
+import type {
+  ResourceArea,
+  SkirmishFaction,
+  SkirmishMap,
+} from "./skirmish-map";
 
 /** The starting package one faction receives at its start slot. */
-export type FactionOpening = {
+type FactionOpening = {
   readonly headquarters: string;
   readonly worker: string;
   readonly dropoff: string;
   readonly resource: Resource;
   /** Pays for the first worker and drop-off building. */
   readonly stockpile: number;
-};
-
-/** One player position. */
-export type SkirmishStart = {
-  readonly id: string;
-  /** Flat buildable ground around the headquarters. */
-  readonly baseArea: Readonly<TerrainBounds>;
-  /** Headquarters footprints differ by faction. */
-  readonly headquartersOrigins: Readonly<
-    Record<SkirmishFaction, Readonly<TileCoord>>
-  >;
-  /** Verified first drop-off placements. */
-  readonly dropoffOrigins: Readonly<
-    Record<SkirmishFaction, Readonly<TileCoord>>
-  >;
-  /** Income from this area is not an expansion. */
-  readonly startingResourceAreaId: string;
-};
-
-export type ResourceArea = {
-  readonly id: string;
-  readonly name: string;
-  /** Materials tiles. */
-  readonly tiles: readonly Readonly<TileCoord>[];
-  readonly lifebloomTiles: readonly Readonly<TileCoord>[];
-};
-
-/** Everything assembly needs from a map, whether authored or generated. */
-export type SkirmishMap = {
-  /** Stable scenario ID; distinct maps use distinct IDs. */
-  readonly id: string;
-  readonly terrain: TerrainGridOptions;
-  readonly starts: readonly [SkirmishStart, SkirmishStart];
-  readonly resourceAreas: readonly ResourceArea[];
 };
 
 const SITE_MATERIALS = 1000;
@@ -79,16 +48,14 @@ export const SKIRMISH_OPENINGS = deepFreeze({
     resource: "lifebloom",
     stockpile: 150,
   },
-} satisfies Record<string, FactionOpening>);
-
-export type SkirmishFaction = keyof typeof SKIRMISH_OPENINGS;
+} satisfies Record<SkirmishFaction, FactionOpening>);
 
 const materialsSiteId = (area: ResourceArea, index: number) =>
   `${area.id}-${index + 1}`;
 const lifebloomSiteId = (area: ResourceArea, index: number) =>
   `${area.id}-lifebloom-${index + 1}`;
 const areaSiteIds = (area: ResourceArea) => [
-  ...area.tiles.map((_, index) => materialsSiteId(area, index)),
+  ...area.materialsTiles.map((_, index) => materialsSiteId(area, index)),
   ...area.lifebloomTiles.map((_, index) => lifebloomSiteId(area, index)),
 ];
 
@@ -96,7 +63,7 @@ export function createSkirmishMaterialsSites({
   resourceAreas,
 }: SkirmishMap = SKIRMISH_MAP): MaterialsSite[] {
   return resourceAreas.flatMap((area) =>
-    area.tiles.map((tile, index) => ({
+    area.materialsTiles.map((tile, index) => ({
       id: materialsSiteId(area, index),
       name: `${area.name} Materials`,
       tile: { ...tile },
@@ -128,8 +95,8 @@ export type SkirmishChoice = {
   readonly difficulty: Difficulty;
 };
 
-const isFaction = (faction: unknown): faction is SkirmishFaction =>
-  typeof faction === "string" && hasOwn(SKIRMISH_OPENINGS, faction);
+const isFaction = (faction: string): faction is SkirmishFaction =>
+  hasOwn(SKIRMISH_OPENINGS, faction);
 
 /** Why a map cannot assemble these launch choices. */
 export function skirmishChoiceError(
@@ -190,7 +157,7 @@ export function createSkirmishScenario(
       startingResourceSites: Object.fromEntries(
         skirmishMap.starts.map(({ id, startingResourceAreaId }) => {
           const area = skirmishMap.resourceAreas.find(
-            (area) => area.id === startingResourceAreaId,
+            (candidate) => candidate.id === startingResourceAreaId,
           );
           if (!area)
             throw new RangeError(

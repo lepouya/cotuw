@@ -106,10 +106,12 @@ function layout(
   const hq = headquartersOrigins.arc;
   const reserved = new Set(
     [
-      ...SKIRMISH_MAP.resourceAreas.flatMap(({ tiles, lifebloomTiles }) => [
-        ...tiles,
-        ...lifebloomTiles,
-      ]),
+      ...SKIRMISH_MAP.resourceAreas.flatMap(
+        ({ materialsTiles, lifebloomTiles }) => [
+          ...materialsTiles,
+          ...lifebloomTiles,
+        ],
+      ),
       ...footprintTiles(hq, footprintSize(headquarters), 1),
     ].map(tileKey),
   );

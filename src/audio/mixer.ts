@@ -1,4 +1,4 @@
-export const AUDIO_BUSES = ["sound", "music"] as const;
+const AUDIO_BUSES = ["sound", "music"] as const;
 export type AudioBus = (typeof AUDIO_BUSES)[number];
 export const AUDIO_CHANNELS = ["master", ...AUDIO_BUSES] as const;
 type AudioChannel = (typeof AUDIO_CHANNELS)[number];
@@ -7,7 +7,7 @@ export type AudioSettings = Record<
   { volume: number; muted: boolean }
 >;
 export type AudioStatus = "waiting" | "ready" | "blocked" | "unavailable";
-export type AudioPlayOptions = {
+type AudioPlayOptions = {
   bus: AudioBus;
   loop: boolean;
   gain: number;
@@ -65,6 +65,29 @@ function holdGain(param: AudioParam, at: number) {
   param.setValueAtTime(value, at);
 }
 
+/** Builds the gain graph, releasing the device if any node fails. */
+function createChannels(device: AudioContext, settings: AudioSettings) {
+  const nodes: GainNode[] = [];
+  try {
+    const gains = Object.fromEntries(
+      AUDIO_CHANNELS.map((channel) => {
+        const node = device.createGain();
+        nodes.push(node);
+        const { muted, volume } = settings[channel];
+        node.gain.setValueAtTime(muted ? 0 : volume, device.currentTime);
+        return [channel, node];
+      }),
+    ) as Record<AudioChannel, GainNode>;
+    for (const bus of AUDIO_BUSES) gains[bus].connect(gains.master);
+    gains.master.connect(device.destination);
+    return gains;
+  } catch (error) {
+    for (const node of nodes) node.disconnect();
+    void device.close().catch(() => {});
+    throw error;
+  }
+}
+
 export function createAudioMixer({
   createContext = () => new AudioContext(),
   fetchBytes = async (url: string) => {
@@ -90,7 +113,7 @@ export function createAudioMixer({
     status = next;
     for (const listener of statusListeners) listener(status);
   };
-  const changed = () => {
+  const notifyReady = () => {
     for (const listener of readyListeners) listener();
   };
   const load = (url: string) => {
@@ -102,7 +125,7 @@ export function createAudioMixer({
       .then((buffer) => {
         if (disposed || !buffer) return;
         buffers.set(url, buffer);
-        changed();
+        notifyReady();
       })
       .catch(() => {
         if (!disposed) publish("unavailable");
@@ -143,29 +166,8 @@ export function createAudioMixer({
       try {
         if (!context) {
           const device = createContext();
-          const nodes: GainNode[] = [];
-          try {
-            const gains = Object.fromEntries(
-              AUDIO_CHANNELS.map((channel) => {
-                const node = device.createGain();
-                nodes.push(node);
-                const { muted, volume } = settings[channel];
-                node.gain.setValueAtTime(
-                  muted ? 0 : volume,
-                  device.currentTime,
-                );
-                return [channel, node];
-              }),
-            ) as Record<AudioChannel, GainNode>;
-            for (const bus of AUDIO_BUSES) gains[bus].connect(gains.master);
-            gains.master.connect(device.destination);
-            context = device;
-            channels = gains;
-          } catch (error) {
-            for (const node of nodes) node.disconnect();
-            void device.close().catch(() => {});
-            throw error;
-          }
+          channels = createChannels(device, settings);
+          context = device;
         }
         if (context.state !== "running") await context.resume();
         if (disposed) return;
@@ -175,7 +177,7 @@ export function createAudioMixer({
         }
         if (status !== "unavailable") publish("ready");
         for (const url of requested) load(url);
-        changed();
+        notifyReady();
       } catch {
         if (!disposed) publish("blocked");
       }

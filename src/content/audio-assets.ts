@@ -94,6 +94,3 @@ export const MUSIC_ASSETS = {
 } as const;
 
 export type MusicId = keyof typeof MUSIC_ASSETS;
-
-export const audioAssetUrl = (id: SoundId | MusicId) =>
-  `assets/audio/${id}.wav`;

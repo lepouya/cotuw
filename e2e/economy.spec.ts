@@ -667,7 +667,6 @@ test("Harvester controls use matching Refineries and type-specific load timing",
     const controls = createEconomyControls(
       sidebar.controls.economy!,
       {
-        support: undefined,
         tickSeconds: 1 / 60,
         submitCommand: (command) => {
           submitted.push(command);
@@ -685,6 +684,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
         enabled: () => true,
         focus: () => {},
         economy: () => snapshot.economy,
+        offlineIds: () => new Set(),
         positionForTile: () => ({ x: 0, z: 0 }),
         queueMode: () => true,
       },
@@ -781,7 +781,6 @@ test("worker controls share delivery actions and tolerate missions without culti
       createEconomyControls(
         sidebar.controls.economy!,
         {
-          support: undefined,
           tickSeconds: 1 / 60,
           submitCommand: (
             command: import("../src/simulation/command").MissionCommand,
@@ -805,6 +804,7 @@ test("worker controls share delivery actions and tolerate missions without culti
                 (actor) => actor.id === id && actor.owner === "player",
               ),
             ),
+          offlineIds: () => new Set(),
           positionForTile: () => ({ x: 0, z: 0 }),
         },
       );

@@ -136,15 +136,18 @@ describe("owner relationships", () => {
       ],
       events: [at(1, [rivals("allied")])],
     });
+    const view = simulation.viewOf("player");
     expect(disconnectedBuildings(simulation.support).has("barracks")).toBe(
       false,
     );
+    expect(view.offlineIds().has("barracks")).toBe(false);
     expect(simulation.evaluatePlacement(placement).accepted).toBe(true);
     advanceSeconds(simulation, 1);
     expect(simulation.relations.relationship("player", "rival")).toBe("allied");
     expect(disconnectedBuildings(simulation.support).has("barracks")).toBe(
       true,
     );
+    expect(view.offlineIds().has("barracks")).toBe(true);
     expect(simulation.evaluatePlacement(placement)).toMatchObject({
       accepted: false,
       reason: "outside-support",

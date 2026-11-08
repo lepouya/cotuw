@@ -5,7 +5,7 @@ import type {
   AudioCue,
   AudioStep,
 } from "../content/audio";
-import type { AudioMixer, AudioVoice } from "./mixer";
+import type { AudioBus, AudioMixer, AudioVoice } from "./mixer";
 import type { WorldPosition } from "../simulation/world";
 import { compareIds } from "../simulation/actor";
 
@@ -14,11 +14,11 @@ const MAX_PAN = 0.8;
 const PENDING_STEP_LIMIT = AUDIO_VOICE_LIMIT * 4;
 const MAX_STEP_LATENESS_MS = 250;
 
+/** An object the listener may hear; hidden objects are not emitters. */
 export type AudioEmitter = {
   id: string;
   definitionId: string;
   position: Readonly<WorldPosition>;
-  audible: boolean;
   states: readonly string[];
 };
 
@@ -31,7 +31,7 @@ type Playing = {
   loopKey?: string;
 };
 
-type Wanted = { cueId: string; emitter?: AudioEmitter; music?: boolean };
+type Wanted = { cueId: string; emitter?: AudioEmitter; bus?: AudioBus };
 
 type Resolved = {
   events: ReadonlyMap<string, readonly AudioStep[]>;
@@ -79,9 +79,9 @@ export function createAudioScene(
   bindings: Readonly<Record<string, { audio?: AudioBindings }>>,
   mixer: AudioMixer,
   listener: () => Readonly<WorldPosition>,
-  playerFaction?: string,
+  musicFaction?: string,
 ) {
-  const music = musicForFaction(content, playerFaction);
+  const music = musicForFaction(content, musicFaction);
   const cues = new Map(Object.entries(content?.cues ?? {}));
   const global = resolve({ events: content?.events });
   const defaults = resolve(content?.defaults);
@@ -139,11 +139,14 @@ export function createAudioScene(
     for (let i = playing.length - 1; i >= 0; i--)
       if (playing[i]!.voice.ended) playing.splice(i, 1);
   };
-  const start = ({ cueId, emitter, music }: Wanted, loopKey?: string) => {
+  const start = (
+    { cueId, emitter, bus = "sound" }: Wanted,
+    loopKey?: string,
+  ) => {
     const cue = cues.get(cueId);
     if (!content || !cue || disposed) return;
     const world = !!loopKey || cue.range !== undefined;
-    if (emitter && ((!active && world) || !emitter.audible)) return;
+    if (emitter && !active && world) return;
     const { gain, pan } = spatial(cue, emitter);
     if (!gain) return;
     prune();
@@ -169,7 +172,7 @@ export function createAudioScene(
       variant = (variant + 1) % cue.clips.length;
       if (!mixer.isLoaded(clip.url)) continue;
       voice = mixer.play(clip.url, {
-        bus: music ? "music" : "sound",
+        bus,
         loop: clip.loop,
         gain,
         pan,
@@ -195,9 +198,9 @@ export function createAudioScene(
   };
   const schedule = (step: AudioStep, emitter?: AudioEmitter) => {
     const cue = cues.get(step.cue);
-    if (disposed || !cue || (emitter && !emitter.audible)) return;
-    const world = !!emitter && cue.range !== undefined;
-    if (world && !active) return;
+    if (disposed || !cue) return;
+    const emitterId = cue.range === undefined ? undefined : emitter?.id;
+    if (emitterId && !active) return;
     if (!step.at) {
       start({ cueId: step.cue, emitter });
       return;
@@ -211,14 +214,12 @@ export function createAudioScene(
     const expiresAt = performance.now() + step.at * 1000 + MAX_STEP_LATENESS_MS;
     const task: PendingStep = {
       cue,
-      emitterId: world ? emitter!.id : undefined,
+      emitterId,
       timer: setTimeout(() => {
         pending.delete(task);
         if (performance.now() > expiresAt) return;
-        const source = task.emitterId
-          ? emitters.get(task.emitterId)
-          : undefined;
-        if (task.emitterId && !source) return;
+        const source = emitterId ? emitters.get(emitterId) : undefined;
+        if (emitterId && !source) return;
         start({ cueId: step.cue, emitter: source });
       }, step.at * 1000),
     };
@@ -227,14 +228,12 @@ export function createAudioScene(
   /** Selected emitters receive loop slots first, then the nearest others. */
   const desiredLoops = () => {
     const desired = new Map<string, Wanted>();
-    if (musicCue) desired.set("music", { cueId: musicCue, music: true });
+    if (musicCue) desired.set("music", { cueId: musicCue, bus: "music" });
     if (!active) return desired;
     const focus = listener();
-    const audible = [...emitters.values()]
-      .filter(
-        (emitter) =>
-          emitter.audible &&
-          emitter.states.some((state) => bindingsOf(emitter).loops.get(state)),
+    const looping = [...emitters.values()]
+      .filter((emitter) =>
+        emitter.states.some((state) => bindingsOf(emitter).loops.get(state)),
       )
       .map((emitter) => ({
         emitter,
@@ -252,7 +251,7 @@ export function createAudioScene(
       );
     let worldLoops = 0;
     const voicesByCue = new Map<string, number>();
-    for (const { emitter } of audible) {
+    for (const { emitter } of looping) {
       if (worldLoops >= WORLD_LOOP_LIMIT) break;
       for (const state of emitter.states) {
         const cueId = bindingsOf(emitter).loops.get(state);
@@ -279,14 +278,14 @@ export function createAudioScene(
     if (disposed || !content) return;
     prune();
     for (const step of pending)
-      if (step.emitterId && (!active || !emitters.get(step.emitterId)?.audible))
+      if (step.emitterId && (!active || !emitters.has(step.emitterId)))
         cancelStep(step);
     const desired = desiredLoops();
     for (const item of playing) {
       const emitter = item.emitterId ? emitters.get(item.emitterId) : undefined;
       if (
         (item.loopKey && desired.get(item.loopKey)?.cueId !== item.cueId) ||
-        (item.emitterId && (!active || !emitter?.audible))
+        (item.emitterId && (!active || !emitter))
       )
         item.voice.stop();
       else if (emitter) {

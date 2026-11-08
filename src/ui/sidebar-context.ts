@@ -9,7 +9,7 @@ import type {
   ScenarioBriefing,
   ScenarioGoal,
 } from "../simulation/mission-file";
-import type { ActorPresentation } from "../content/content-pack";
+import type { ActorPresentation } from "../content/presentation";
 
 export type SidebarState = {
   /** Own and currently detected actors only. */

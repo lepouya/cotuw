@@ -6,7 +6,6 @@ import {
   activeSites,
   economySites,
   workersForSite,
-  workingWorkerIds,
 } from "./simulation/economy";
 import { factionResource } from "./simulation/resources";
 import { attachBenchmarkProbe } from "./benchmark-probe";
@@ -19,7 +18,6 @@ import { missionEnded } from "./simulation/mission-result";
 import type { MissionResult } from "./simulation/mission-result";
 import { serializeMission } from "./simulation/mission-file";
 import type { SaveInfo } from "./simulation/mission-file";
-import { disconnectedBuildings } from "./simulation/support";
 import { rosterIncludes } from "./simulation/ownership";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay, limitToExplored } from "./render/fog";
@@ -314,7 +312,6 @@ async function assembleGameSession(
   own(tilePlacedViews);
   const networkView = createSupportNetworkView(view.scene, map);
   own(networkView);
-  const disconnected = () => disconnectedBuildings(simulation.support);
   const rallyView = createRallyPointView(view.scene, map);
   own(rallyView);
   const movementPath = createMovementPathView(view.scene, map);
@@ -383,7 +380,7 @@ async function assembleGameSession(
       seconds,
     );
   actorViews.update(player.actors().shownMobile, 1);
-  tilePlacedViews.update(player.actors().placed, disconnected());
+  tilePlacedViews.update(player.actors().placed, player.offlineIds());
   let simulationFaulted = false;
   let playing = !controls.startPaused;
   const audioScene = own(
@@ -818,6 +815,7 @@ async function assembleGameSession(
             view.camera.glideToPoint(new Vector3(x, 0, z));
           },
           economy: player.economy,
+          offlineIds: player.offlineIds,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
           queueMode: () => input.queueMode,
         })
@@ -957,7 +955,7 @@ async function assembleGameSession(
       }
       // Completion and activity can share a tick; pose the committed building.
       if (simulation.buildingActivity.length)
-        tilePlacedViews.update(player.actors().placed, disconnected());
+        tilePlacedViews.update(player.actors().placed, player.offlineIds());
       const markedTargets = new Set<string>();
       for (const hit of simulation.attacks) {
         const style = presentationOf(hit.attackerDefinitionId)?.attackEffect;
@@ -1040,7 +1038,7 @@ async function assembleGameSession(
       knownSelectionTick = simulation.completedTicks;
       input.retainSelection((id) => !!player.shownActor(id));
       const { placed } = player.actors();
-      tilePlacedViews.update(placed, disconnected());
+      tilePlacedViews.update(placed, player.offlineIds());
       canvas.dataset.tilePlacedActorCount = String(placed.length);
       minimap.refreshActors();
     }
@@ -1073,7 +1071,7 @@ async function assembleGameSession(
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
     birds.update(frameSeconds);
-    const gathering = workingWorkerIds(simulation.economy, simulation.actors);
+    const gathering = player.workingIds();
     actorViews.update(shownMobile, loop.tickProgress(), frameSeconds, (actor) =>
       animationStateOf(actor, gathering),
     );
@@ -1181,7 +1179,7 @@ async function assembleGameSession(
   };
   const modelsReady = assets.load({
     onBuildingUpdated: () => {
-      tilePlacedViews.update(player.actors().placed, disconnected());
+      tilePlacedViews.update(player.actors().placed, player.offlineIds());
     },
     onActorAppearanceUpdated: () => {
       actorViews.update(player.actors().shownMobile, loop.tickProgress());
