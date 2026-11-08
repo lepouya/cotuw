@@ -179,9 +179,10 @@ Audio activation and modal-local input remain available while a dialog is open.
   submits serializable commands. It receives control references and emits
   player-visible updates, alerts, guides, and results; it does not load saves
   or manage menu panels. Existing control binders need no wholesale rewrite.
-- `src/simulation/player-view.ts` remains the authority for what the player may
-  see. UI does not reconstruct visibility from unrestricted simulation state.
-  Layout changes preserve issuer-scoped feedback and private economy rules.
+- `simulation.viewOf(playerOwner)` in `src/simulation/owner-view.ts` remains
+  the authority for what the player may see. UI does not reconstruct
+  visibility from unrestricted simulation state. Layout changes preserve
+  issuer-scoped feedback and private economy rules.
 - Top bar, camera controls, minimap host, notifications, and alert history
   remain distinct features. Their owning modules supply markup and styles
   when touched; 1.22 does not require moving every HUD feature at once.

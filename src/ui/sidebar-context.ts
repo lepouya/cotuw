@@ -1,5 +1,6 @@
 import { missionEnded } from "../simulation/mission-result";
-import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
+import type { ActorDefinition } from "../simulation/actor";
+import type { ObservedActor } from "../simulation/owner-view";
 import type { Resource } from "../simulation/resources";
 import type { Relations } from "../simulation/ownership";
 import type { MissionResult } from "../simulation/mission-result";
@@ -12,7 +13,7 @@ import type { ActorPresentation } from "../content/content-pack";
 
 export type SidebarState = {
   /** Own and currently detected actors only. */
-  actors: readonly ActorRenderState[];
+  actors: readonly ObservedActor[];
   actorVersion: number;
   selectedActorIds: readonly string[];
   boxMode?: boolean;
@@ -66,7 +67,7 @@ export function createSidebarContext(
     nameFor,
     trainedNames: (definition: ActorDefinition) =>
       definition.production!.unitDefinitionIds.map(nameFor),
-    owns: (actor: Pick<ActorRenderState, "owner">) =>
+    owns: (actor: Pick<ObservedActor, "owner">) =>
       actor.owner === options.playerOwner,
   };
 }
@@ -88,7 +89,7 @@ export const selectionLocked = (state: SidebarState) =>
 export const ordersLocked = (state: SidebarState) =>
   selectionLocked(state) || missionEnded(state.result);
 
-export function countByDefinition(actors: Iterable<ActorRenderState>) {
+export function countByDefinition(actors: Iterable<ObservedActor>) {
   const counts = new Map<string, number>();
   for (const { definitionId } of actors)
     counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);

@@ -1,13 +1,13 @@
-import { playerRelation } from "../simulation/ownership";
+import { ownerRelation } from "../simulation/ownership";
 import { isTilePlacedActor, occupiedTilesFor } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
 import { createButton, createElement as el, setText } from "./dom";
 import { countByDefinition, inspectedActor } from "./sidebar-context";
-import type { PlayerRelation } from "../simulation/ownership";
+import type { OwnerRelation } from "../simulation/ownership";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-selection.css";
 
-const RELATION_LABELS: Record<Exclude<PlayerRelation, "own">, string> = {
+const RELATION_LABELS: Record<Exclude<OwnerRelation, "own">, string> = {
   allied: "Allied",
   neutral: "Neutral",
   hostile: "Hostile",
@@ -162,7 +162,7 @@ export function createSidebarSelection(
     },
     update: (state: SidebarState) => {
       const relationTo = ({ owner }: { owner: string }) =>
-        playerRelation(playerOwner, owner, state.relations.relationship);
+        ownerRelation(playerOwner, owner, state.relations.relationship);
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
       removeBuilding.disabled = !state.canRemove;

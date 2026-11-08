@@ -19,7 +19,7 @@ import {
 import type { ActorTrigger } from "../content/presentation";
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
-import type { ActorRenderState } from "../simulation/actor";
+import type { ObservedActor } from "../simulation/owner-view";
 import type {
   ActorAnimationState,
   ActorAppearance,
@@ -40,7 +40,7 @@ export type ActorAppearanceCatalog = ReadonlyMap<string, ActorAppearance>;
 export type ActorViewRegistry = {
   actorIdForMesh: (mesh: AbstractMesh | null) => string | undefined;
   /** Records poses to interpolate from. Call it right before each tick. */
-  capturePreviousPoses: (actors: readonly ActorRenderState[]) => void;
+  capturePreviousPoses: (actors: readonly ObservedActor[]) => void;
   dispose: () => void;
   setSelectedActors: (actorIds: readonly string[]) => void;
   /** Where an actor was last drawn, between ticks. */
@@ -57,10 +57,10 @@ export type ActorViewRegistry = {
    * Without `stateOf`, appearances keep their previous animation state.
    */
   update: (
-    actors: readonly ActorRenderState[],
+    actors: readonly ObservedActor[],
     tickProgress: number,
     seconds?: number,
-    stateOf?: (actor: ActorRenderState) => ActorAnimationState,
+    stateOf?: (actor: ObservedActor) => ActorAnimationState,
   ) => void;
 };
 
@@ -72,7 +72,7 @@ export function createActorViewRegistry(
   scene: Scene,
   map: TerrainMap,
   appearances: ActorAppearanceCatalog,
-  isHostile: (actor: ActorRenderState) => boolean = () => false,
+  isHostile: (actor: ObservedActor) => boolean = () => false,
 ): ActorViewRegistry {
   const lifetime = createLifetime();
   const selectionMaterial = lifetime.own(
@@ -85,7 +85,7 @@ export function createActorViewRegistry(
   );
   hostileSelectionMaterial.emissiveColor = HOSTILE_SELECTION_COLOR;
   hostileSelectionMaterial.disableLighting = true;
-  const styleFor = (actor: ActorRenderState): SelectionStyle =>
+  const styleFor = (actor: ObservedActor): SelectionStyle =>
     isHostile(actor)
       ? { material: hostileSelectionMaterial, hostile: true }
       : { material: selectionMaterial, hostile: false };
@@ -103,7 +103,7 @@ export function createActorViewRegistry(
 
   const renderers = lifetime.own(
     createViewRegistry({
-      keyFor: (actor: ActorRenderState) => ({
+      keyFor: (actor: ObservedActor) => ({
         definitionId: actor.definitionId,
         appearance: appearanceFor(actor.definitionId),
       }),

@@ -10,7 +10,7 @@ import { createLifetime } from "../lifetime";
 
 import type { Material, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
-import type { ActorRenderState } from "../simulation/actor";
+import type { ObservedActor } from "../simulation/owner-view";
 import type { ActorMotion } from "./actor-gait";
 import type { Rgb, ActorTrigger } from "../content/presentation";
 
@@ -103,7 +103,7 @@ export type ActorRenderer = {
 export function createActorRenderer(
   scene: Scene,
   map: TerrainMap,
-  initialState: ActorRenderState,
+  initialState: ObservedActor,
   appearance: ActorAppearance,
   initialSelection: SelectionStyle,
 ): ActorRenderer {

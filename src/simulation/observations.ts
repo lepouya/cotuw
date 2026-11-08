@@ -1,4 +1,4 @@
-import { compareIds } from "./actor";
+import { cloneData, compareIds } from "./actor";
 import { secondsToTicks } from "./clock";
 import {
   isValidTilePlacement,
@@ -19,8 +19,7 @@ import type { EconomyView } from "./economy";
 import type { TileCoord } from "./grid";
 import type { Resource } from "./resources";
 import type { TerrainView } from "./terrain";
-import type { FogView } from "./vision";
-import type { Detectable } from "./ownership";
+import type { Detectable, FogView } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
 /** What an owner last saw of another, non-allied owner's actor. */
@@ -195,7 +194,7 @@ const actorSighting = (
   owner: actor.owner,
   worldPosition: { ...actor.worldPosition },
   ...(actor.tilePlacement && {
-    tilePlacement: structuredClone(actor.tilePlacement),
+    tilePlacement: cloneData(actor.tilePlacement),
   }),
   ...(actor.health !== undefined && { health: actor.health }),
   ...(actor.construction && {

@@ -76,7 +76,7 @@ const leaf = (scene: Scene) =>
 
 test("construction progress divides into three equal stages", () => {
   const stage = (completedTicks: number) =>
-    constructionStage({ paidCost: 0, completedTicks, totalTicks: 90 });
+    constructionStage({ completedTicks, totalTicks: 90 });
   expect([0, 29, 30, 59, 60, 89].map(stage)).toEqual([0, 0, 1, 1, 2, 2]);
 });
 

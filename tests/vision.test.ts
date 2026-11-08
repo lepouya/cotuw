@@ -101,7 +101,11 @@ function fixture(
       ],
     ]),
   });
-  return { simulation, map, fog: simulation.fog! };
+  return {
+    simulation,
+    map,
+    fog: simulation.viewOf(simulation.playerOwner).knowledge.fog!,
+  };
 }
 
 function placed(id: string, definitionId: string, x: number, z: number) {
@@ -193,7 +197,9 @@ describe("fog of war", () => {
     const { simulation } = fixture(
       parseMission(JSON.stringify(saved), 1).state,
     );
-    expect(simulation.fog).toBeUndefined();
+    expect(
+      simulation.viewOf(simulation.playerOwner).knowledge.fog,
+    ).toBeUndefined();
     saved.state.fog = {
       explored: { player: ["2".repeat(scenario.terrain.width)] },
     };

@@ -9,6 +9,7 @@ import type { DamagedActor } from "./damage-effects";
 import type { HealthBar } from "./health-bars";
 import type { RegeneratingActor } from "./regeneration-effects";
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
+import type { ObservedActor } from "../simulation/owner-view";
 import type { ActorPresentation } from "../content/content-pack";
 import type { TerrainMap } from "../map";
 import type { WorldPosition } from "../simulation/world";
@@ -123,10 +124,10 @@ export function extractHealthAndDamageEffects(
 
 /** What a shown mobile actor's appearance reflects from committed state. */
 export function actorAnimationState(
-  actor: ActorRenderState,
+  actor: ObservedActor,
   gathering: ReadonlySet<string>,
   definitions: ReadonlyMap<string, ActorDefinition>,
-  shownTarget: ActorRenderState | undefined,
+  shownTarget: ObservedActor | undefined,
   map: TerrainMap,
 ): ActorAnimationState {
   const weapon = definitions.get(actor.definitionId)?.weapon;

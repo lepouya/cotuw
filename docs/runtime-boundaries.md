@@ -51,17 +51,17 @@ These contracts describe where new behaviors, views, and services attach.
   combat. Production records peaks before a same-tick loss can hide them.
   Histories share immutable samples without traversing them each tick. The
   verdict and final sample commit together after knowledge and active vision
-  update. This omniscient reporting data stays outside `knowledgeOf` and
-  player views.
+  update. This omniscient reporting data stays outside owner views.
 - Direct actor spawn and removal hooks accept skirmish setup edits only at
   tick 0. Live skirmish changes use commands so every snapshot retains the
   end-of-tick elimination checkpoint.
-- `simulation/observations.ts` owns each owner's memory and `knowledgeOf`,
-  the boundary for what an owner may know beyond its own actors and economy:
-  authored site locations, its explored terrain and vision, and its
-  sightings. AI planning reads only this view. Player presentation shows
-  sites and loot through `knownEconomy`, so others' unseen gathering and
-  pickups stay hidden until the player looks again.
+- `simulation/observations.ts` owns each owner's memory and its
+  `OwnerKnowledge`: what an owner may know beyond its own actors and economy,
+  meaning authored site locations, its explored terrain and vision, and its
+  sightings. AI planning reads only `viewOf(owner)`, which carries it.
+  Player presentation shows sites and loot through `knownEconomy`, so
+  others' unseen gathering and pickups stay hidden until the player looks
+  again.
 
 ## Economy, infrastructure, and growth
 
@@ -158,13 +158,18 @@ These contracts describe where new behaviors, views, and services attach.
 - `content/presentation.ts` owns serializable presentation contracts and their
   validation. Renderer catalogs implement every accepted built-in identifier;
   rendering owns loaded-asset checks, playback, and disposal.
-- `simulation/player-view.ts` owns ownership and fog-limited actor lookups.
-  Sidebar actors are owned or detected; private workers, income, production,
-  and balances belong to the player, including explicitly shared balances.
+- `simulation/owner-view.ts` owns `viewOf(owner)`, the projection that player
+  presentation and AI planning share. Own actors are committed state, except
+  that a latest hit names its attacker only while the owner detects it.
+  Detected others show pose, health, construction progress, turret aim,
+  recent combat, territory mode, and an attack on an actor the owner also
+  sees. Their orders, routes, Attack Moves, rally points, headquarters links,
+  and payments stay private. Private workers, income, production, and
+  balances belong to the owner, including explicitly shared balances.
   Support overlays include only usable, owned or detected buildings and links
-  between them. Session views and controls use these projections; simulation
-  and world-animation consumers retain live state, except that only the
-  player's production queues sound.
+  between them. Session actor views and controls use these projections;
+  health, damage, alert, and audio consumers read live state filtered by
+  `shows`, and only the player's production queues sound.
 
 ## Content lookup
 

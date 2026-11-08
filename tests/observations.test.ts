@@ -5,7 +5,6 @@ import { createActor } from "../src/simulation/actor";
 import { createCultivationSite } from "../src/simulation/cultivation";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { knownEconomy } from "../src/simulation/observations";
-import { createPlayerView } from "../src/simulation/player-view";
 import { createScenarioState } from "../src/simulation/scenario";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 
@@ -14,7 +13,7 @@ import type { ResourceLoot } from "../src/simulation/economy";
 
 const rival = { owner: "rival" };
 const memoryOf = (simulation: MissionSimulation, owner = "player") =>
-  simulation.knowledgeOf(owner).observations;
+  simulation.viewOf(owner).knowledge.observations;
 const sighting = (simulation: MissionSimulation, id: string, owner?: string) =>
   memoryOf(simulation, owner).actors.find(({ actorId }) => actorId === id);
 const moveRival = (simulation: MissionSimulation, actorId: string, x: number) =>
@@ -162,12 +161,7 @@ describe("owner observations", () => {
       },
     };
     const { simulation } = fixture(setup);
-    const player = createPlayerView(
-      simulation,
-      new Map(
-        ARC_ACTOR_DEFINITIONS.map((definition) => [definition.id, definition]),
-      ),
-    );
+    const player = simulation.viewOf("player");
     const initial = player.economy();
     expect(player.economy()).toBe(initial);
     expect(initial!.cultivation!.sites[0]!.reserve).toBe(100000);
@@ -293,15 +287,19 @@ describe("owner observations", () => {
     const { simulation } = fixture({
       units: [unit("trooper", 4), unit("scout", 30, "rival", "arc-scout")],
     });
-    const knowledge = simulation.knowledgeOf("rival");
+    const knowledge = simulation.viewOf("rival").knowledge;
     expect(knowledge.fog!.isExplored(30, 10)).toBe(true);
     expect(knowledge.fog!.isExplored(4, 10)).toBe(false);
     moveRival(simulation, "scout", 55);
     advanceSeconds(simulation, 6);
     expect(knowledge.seesTile({ x: 30, z: 10 })).toBe(false);
     expect(knowledge.knowsTile({ x: 30, z: 10 })).toBe(true);
-    expect(simulation.fog!.isExplored(30, 10)).toBe(false);
-    expect(() => simulation.knowledgeOf("nobody")).toThrow("Unknown owner");
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .knowledge.fog!.isExplored(30, 10),
+    ).toBe(false);
+    expect(() => simulation.viewOf("nobody")).toThrow("Unknown owner");
   });
 
   test("sites keep last-seen yields and authored locations stay known", () => {
@@ -324,7 +322,7 @@ describe("owner observations", () => {
         },
       ],
     });
-    const knowledge = simulation.knowledgeOf("player");
+    const knowledge = simulation.viewOf("player").knowledge;
     expect(knowledge.sites.map(({ id }) => id)).toEqual(["near", "far"]);
     expect(knowledge.observations.sites).toEqual([
       { siteId: "near", amount: 60, tick: 0 },

@@ -122,16 +122,13 @@ export function createEconomyControls(
   elements: EconomyElements,
   simulation: Pick<
     MissionSimulation,
-    | "actors"
-    | "playerOwner"
-    | "playerFaction"
-    | "tickSeconds"
-    | "submitCommand"
-    | "support"
+    "actors" | "playerOwner" | "tickSeconds" | "submitCommand" | "support"
   >,
   options: {
     definitions: readonly ActorDefinition[];
     names: ReadonlyMap<string, string>;
+    /** The player's faction, for its roles and cultivation status. */
+    faction: string | undefined;
     selectedActorId: () => string | undefined;
     enabled: () => boolean;
     queueMode?: () => boolean;
@@ -179,7 +176,7 @@ export function createEconomyControls(
   const rolesFor = (definitionId?: string) =>
     contentRoles(options.definitions, options.names, {
       definitionId,
-      faction: simulation.playerFaction,
+      faction: options.faction,
     });
   const materials = resourceName("materials");
   const percent = (amount: number, total: number) =>
@@ -242,7 +239,7 @@ export function createEconomyControls(
       const roles = rolesFor(definition?.id);
       const { harvester, refinery } = roles;
       const phases = harvesterPhases(materials, roles);
-      const faction = definition?.faction ?? simulation.playerFaction;
+      const faction = definition?.faction ?? options.faction;
       const cultivatorDefinition = definition?.cultivation
         ? definition
         : definitionWith(({ cultivation }) => cultivation, faction);
@@ -543,11 +540,10 @@ export function createEconomyControls(
           canControl(actor) && definitions.get(actor.definitionId)?.growth,
       );
       const playsCultivation =
-        simulation.playerFaction !== undefined &&
+        options.faction !== undefined &&
         options.definitions.some(
           (definition) =>
-            definition.faction === simulation.playerFaction &&
-            definition.cultivation,
+            definition.faction === options.faction && definition.cultivation,
         );
       if (cultivators.length || ownsCultivation || playsCultivation) {
         const hasPhase = (phase: string) =>

@@ -7,7 +7,7 @@ import {
   missionTerrain,
 } from "../src/mission-loading";
 import { createScenarioMap } from "../src/simulation/scenario";
-import { playerFactionOf } from "../src/simulation/ownership";
+import { factionOf } from "../src/simulation/ownership";
 import { serializeMission } from "../src/simulation/mission-file";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { advanceSeconds, balance, deposited } from "./helpers/scenario";
@@ -24,7 +24,9 @@ const sentinelIds = Array.from(
 test("the Circle opening uses shared wildlife, a paid worker bootstrap, and normal fog", () => {
   const circle = opening();
   const arc = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
-  expect(playerFactionOf(circle.state)).toBe("circle");
+  expect(factionOf(circle.state.owners, circle.state.playerOwner)).toBe(
+    "circle",
+  );
   expect(circle.state.terrain).toEqual(arc.state.terrain);
   expect(circle.scenario.flocks).toEqual(arc.scenario.flocks);
   expect(circle.scenario.flocks).toHaveLength(1);
@@ -45,7 +47,9 @@ test("the Circle opening uses shared wildlife, a paid worker bootstrap, and norm
   ).toBe(false);
   const simulation = createSessionSimulation(circle);
   try {
-    expect(simulation.fog).toBeDefined();
+    expect(
+      simulation.viewOf(simulation.playerOwner).knowledge.fog,
+    ).toBeDefined();
     expect(
       simulation.detects("player", simulation.actorById("lone-wolf")!),
     ).toBe(false);
@@ -198,7 +202,11 @@ test("the authored paid opening delivers Lifebloom and reveals the second cultiv
     const second = sim.economy!.cultivation!.sites[1]!;
     expect(balance(sim, "lifebloom")).toBe(30);
     expect(balance(sim)).toBe(0);
-    expect(sim.fog!.isExplored(second.tile.x, second.tile.z)).toBe(true);
+    expect(
+      sim
+        .viewOf(sim.playerOwner)
+        .knowledge.fog!.isExplored(second.tile.x, second.tile.z),
+    ).toBe(true);
   } finally {
     sim.dispose();
   }
@@ -218,7 +226,12 @@ test("Circle gifts reward Lifebloom once and retain collection through a save", 
   let restored: MissionSimulation | undefined;
   try {
     expect(
-      gifts.every(({ tile }) => !sim.fog!.isExplored(tile.x, tile.z)),
+      gifts.every(
+        ({ tile }) =>
+          !sim
+            .viewOf(sim.playerOwner)
+            .knowledge.fog!.isExplored(tile.x, tile.z),
+      ),
     ).toBe(true);
     sim.spawnActor(
       createActor({

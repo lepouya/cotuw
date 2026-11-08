@@ -14,7 +14,7 @@ import { createSaveLibrary, saveCompleteMessage } from "./saves";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { missionEnded } from "./simulation/mission-result";
 import { DIFFICULTIES } from "./simulation/mission-setup";
-import { playerFactionOf } from "./simulation/ownership";
+import { factionOf } from "./simulation/ownership";
 import { presentResult } from "./ui/mission-result";
 import { createSidebar } from "./ui/sidebar";
 import { formatElapsed, topBarState } from "./ui/top-bar";
@@ -283,7 +283,10 @@ export function createApplication({
       mission = next;
       const rules = createSaveRules(next, SIMULATION_TICK_SECONDS);
       saveRules = rules;
-      const playerFaction = playerFactionOf(next.state);
+      const playerFaction = factionOf(
+        next.state.owners,
+        next.state.playerOwner,
+      );
       // Registered before session creation, so a failed start releases it.
       const activeSidebar = createSidebar(roots.sidebar, {
         definitions: next.definitions,

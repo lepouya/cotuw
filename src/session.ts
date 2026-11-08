@@ -83,11 +83,10 @@ import type { BuildingActivityKind } from "./simulation/production";
 
 import type { GameView, GameViewOptions } from "./render";
 import type { ActorAnimationState } from "./render/actor";
-import type { ActorRenderState } from "./simulation/actor";
+import type { ObservedActor } from "./simulation/owner-view";
 import type { TileCoord } from "./simulation/grid";
 import type { BuildingPlacementControls } from "./render/building-placement";
 import type { ViewStyle } from "./content/content-pack";
-import { createPlayerView } from "./simulation/player-view";
 import { createAlertTracker } from "./ui/mission-alerts";
 import type { MissionAlert } from "./ui/mission-alerts";
 import { duePopup } from "./ui/popups";
@@ -159,7 +158,7 @@ export type GameSessionControls = BuildingPlacementControls &
     /** Updates after simulation ticks or changes to controls and selection. */
     onStateChanged?: (state: SidebarState) => void;
     /** Reveals details for an actor the player selected or placed. */
-    showActor?: (actor: ActorRenderState) => void;
+    showActor?: (actor: ObservedActor) => void;
     /** Receives grouped alerts after each tick. */
     onAlerts?: (alerts: readonly MissionAlert[]) => void;
     /** Shows a scenario popup once each time its trigger first holds. */
@@ -244,6 +243,8 @@ async function assembleGameSession(
   );
   const { appearances, buildingAppearances, propAssets, buildingModelTops } =
     assets;
+  const playerOwner = simulation.playerOwner;
+  const player = simulation.viewOf(playerOwner);
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(
@@ -254,7 +255,7 @@ async function assembleGameSession(
     );
   if (materialsView) own(materialsView);
   const explored = ({ x, z }: TileCoord) =>
-    simulation.fog?.isExplored(x, z) ?? true;
+    player.knowledge.fog?.isExplored(x, z) ?? true;
   /** A gathering site the player knows under a world point. */
   const siteAt = (point: WorldPosition) => {
     const { x, z } = map.tileAtWorldPosition(point.x, point.z);
@@ -268,7 +269,7 @@ async function assembleGameSession(
     new Color3(...content.view.clearColor),
   );
   own(fogOverlay);
-  const fog = simulation.fog;
+  const fog = player.knowledge.fog;
   if (fog)
     view.camera.setFocusLimit((point) =>
       limitToExplored(map, fog, point, CAMERA_FRONTIER_MARGIN),
@@ -276,10 +277,8 @@ async function assembleGameSession(
   const definitionsById = new Map(
     definitions.map((definition) => [definition.id, definition]),
   );
-  const playerOwner = simulation.playerOwner;
-  const player = createPlayerView(simulation, definitionsById);
   const playerResource =
-    factionResource(definitions, simulation.playerFaction) ?? "materials";
+    factionResource(definitions, player.faction) ?? "materials";
   const startingActor = simulation.actors.find(player.owns);
   if (startingActor) {
     const { x, z } = startingActor.worldPosition;
@@ -399,7 +398,7 @@ async function assembleGameSession(
       ),
       controls.audio ?? SILENT_AUDIO,
       () => view.camera.focusPoint,
-      simulation.playerFaction,
+      player.faction,
     ),
   );
   /** World sounds play only while the mission runs; music continues. */
@@ -417,7 +416,7 @@ async function assembleGameSession(
   const canCommand = () => playing && !halted();
   let controlsDirty = true;
   const showActor = (actorId: string) => {
-    const actor = player.actor(actorId);
+    const actor = player.shownActor(actorId);
     if (actor) controls.showActor?.(actor);
   };
   const radial = createRadialMenu(document.body, canvas);
@@ -443,7 +442,7 @@ async function assembleGameSession(
   };
   const followableIds = (ids: readonly string[]) =>
     ids.filter((id) => {
-      const actor = player.actor(id);
+      const actor = player.shownActor(id);
       return !!actor && player.isMobile(actor);
     });
   const followActors = (ids: readonly string[]) => {
@@ -555,7 +554,7 @@ async function assembleGameSession(
   });
   own(input);
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
-    fog: () => simulation.fog,
+    fog: () => player.knowledge.fog,
     reducedMotion,
     commandMode: () => attackMove.active,
     onCommand: (target, shiftKey) => {
@@ -698,8 +697,7 @@ async function assembleGameSession(
       buildings: definitions
         .filter(
           (definition) =>
-            definition.footprint &&
-            rosterIncludes(simulation.playerFaction, definition),
+            definition.footprint && rosterIncludes(player.faction, definition),
         )
         .map((definition) => ({
           definition,
@@ -759,7 +757,7 @@ async function assembleGameSession(
   const roles = (actorId: string | undefined) =>
     contentRoles(definitions, names, {
       definitionId: player.ownActor(actorId)?.definitionId,
-      faction: simulation.playerFaction,
+      faction: player.faction,
     });
   const training = createUnitTraining(simulation, controls, {
     names,
@@ -818,6 +816,7 @@ async function assembleGameSession(
       ? createEconomyControls(economyElements, simulation, {
           definitions,
           names,
+          faction: player.faction,
           selectedActorId: selectedOwnActorId,
           canControl: player.owns,
           enabled: () => canCommand() && !placement.active,
@@ -902,7 +901,7 @@ async function assembleGameSession(
   };
   /** What a shown mobile actor's appearance reflects from committed state. */
   const animationStateOf = (
-    actor: ActorRenderState,
+    actor: ObservedActor,
     gathering: ReadonlySet<string>,
   ): ActorAnimationState =>
     actorAnimationState(
@@ -950,7 +949,8 @@ async function assembleGameSession(
     paused: controls.startPaused,
     pumpMilliseconds: SIMULATION_PUMP_MILLISECONDS,
     maxCatchUpSeconds: MAX_CATCH_UP_SECONDS,
-    beforeTick: () => actorViews.capturePreviousPoses(player.actors().mobile),
+    beforeTick: () =>
+      actorViews.capturePreviousPoses(player.actors().shownMobile),
     onFault: () => {
       simulationFaulted = true;
       syncAudioActivity();
@@ -1061,9 +1061,8 @@ async function assembleGameSession(
       controlsDirty = true;
     }
     if (placement.active) placement.update();
-    fogOverlay.update(simulation.fog);
-    if (simulation.fog)
-      canvas.dataset.exploredTiles = String(simulation.fog.exploredCount);
+    fogOverlay.update(fog);
+    if (fog) canvas.dataset.exploredTiles = String(fog.exploredCount);
     const known = player.economy();
     if (known) materialsView?.update(known);
     if (
@@ -1090,7 +1089,7 @@ async function assembleGameSession(
     actorViews.update(shownMobile, loop.tickProgress(), frameSeconds, (actor) =>
       animationStateOf(actor, gathering),
     );
-    movementPath.update(shownMobile);
+    movementPath.update(player.actors().ownMobile);
     // Other factions' queues would reveal their intent.
     queuedOrders.update(
       input.selectedActorIds.flatMap((id) => player.ownActor(id) ?? []),
@@ -1150,7 +1149,7 @@ async function assembleGameSession(
       if (halted() || disposal) return;
       if (playing) return;
       // Paused rendering settles to committed poses; resume must not rewind.
-      actorViews.capturePreviousPoses(player.actors().mobile);
+      actorViews.capturePreviousPoses(player.actors().shownMobile);
       playing = true;
       syncAudioActivity();
       controlsDirty = true;

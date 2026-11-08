@@ -64,7 +64,10 @@ export type TilePlacedActor = Actor & { tilePlacement: TilePlacement };
 
 export type TilePlacedActorState = Readonly<
   Pick<Actor, "id" | "definitionId"> & {
-    construction?: Readonly<NonNullable<Actor["construction"]>>;
+    /** Presentation needs construction progress, not payment. */
+    construction?: Readonly<
+      Omit<NonNullable<Actor["construction"]>, "paidCost">
+    >;
     tilePlacement: Readonly<TilePlacement>;
   }
 >;

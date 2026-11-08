@@ -87,7 +87,11 @@ describe("owner relationships", () => {
       events: [at(1, [rivals("neutral")])],
     });
     const scout = () => simulation.actorById("scout")!;
-    expect(simulation.fog!.isExplored(50, 10)).toBe(true);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .knowledge.fog!.isExplored(50, 10),
+    ).toBe(true);
     expect(simulation.detects("player", scout())).toBe(true);
     expect(simulation.detects("rival", simulation.actorById("cc")!)).toBe(true);
     advanceSeconds(simulation, 1);
@@ -95,7 +99,11 @@ describe("owner relationships", () => {
     expect(simulation.detects("rival", simulation.actorById("cc")!)).toBe(
       false,
     );
-    expect(simulation.fog!.isExplored(50, 10)).toBe(true);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .knowledge.fog!.isExplored(50, 10),
+    ).toBe(true);
   });
 
   test("support-sharing allies power and authorize construction until revoked", () => {
@@ -242,7 +250,11 @@ describe("owner relationships", () => {
       ],
       sites: [site("home", 50), site("hidden", 8)],
     });
-    expect(simulation.fog!.isExplored(50, 12)).toBe(false);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .knowledge.fog!.isExplored(50, 12),
+    ).toBe(false);
     expect(simulation.sees("rival", contentMap.tileCenter(50, 12))).toBe(true);
     const rival = { owner: "rival" };
     simulation.submitCommand(
@@ -624,7 +636,11 @@ describe("command authority", () => {
   test("placement builds for the issuing owner within that owner's knowledge", () => {
     const simulation = authorityFixture();
     const placement = barracks("rival-barracks");
-    expect(simulation.fog!.isExplored(44, 6)).toBe(false);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .knowledge.fog!.isExplored(44, 6),
+    ).toBe(false);
     expect(simulation.evaluatePlacement(placement)).toMatchObject({
       accepted: false,
       reason: "unexplored",
@@ -728,8 +744,14 @@ describe("command authority", () => {
     const simulation = authorityFixture();
     const target = contentMap.tileCenter(46, 8);
     const hidden = contentMap.tileCenter(8, 8);
-    expect(simulation.fog!.isExplored(46, 8)).toBe(false);
-    expect(simulation.fog!.isExplored(8, 8)).toBe(true);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .knowledge.fog!.isExplored(46, 8),
+    ).toBe(false);
+    expect(
+      simulation.viewOf(simulation.playerOwner).knowledge.fog!.isExplored(8, 8),
+    ).toBe(true);
     expect(simulation.evaluateRallyPoint("rival-refinery", target)).toBe(true);
     expect(simulation.evaluateRallyPoint("rival-refinery", hidden)).toBe(false);
     for (const point of [target, hidden])

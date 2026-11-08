@@ -1,14 +1,13 @@
-import { occupiedTilesFor } from "./placement";
+import { isTilePlacedActor, occupiedTilesFor } from "./placement";
 import { disconnectedBuildings } from "./support";
 import { terrainSightlineClear } from "./terrain-sightline";
 import { hasOwn, isPositive, isRecord } from "./validation";
+import { distance } from "./world";
 
 import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
-import type { Detectable } from "./ownership";
 import type { TileCoord } from "./grid";
 import type { SupportView } from "./support";
 import type { TerrainGrid } from "./terrain";
-import { distance } from "./world";
 import type { WorldPosition } from "./world";
 
 /** Sightline heights above the ground, in world units. */
@@ -27,13 +26,13 @@ export type FogState = {
 };
 
 /** Tiles a faction currently sees, without memory. */
-export type VisionView = {
+type VisionView = {
   /** Changes whenever visible tiles change. */
   readonly version: number;
   isVisible: (x: number, z: number) => boolean;
 };
 
-export type Vision = VisionView & {
+type Vision = VisionView & {
   readonly visibleCount: number;
   /** Replaces current vision; returns one `0` or `1` per tile. */
   update: (sources: readonly VisionSource[]) => Readonly<Uint8Array>;
@@ -46,7 +45,7 @@ export type FogView = VisionView & {
   isExplored: (x: number, z: number) => boolean;
 };
 
-export type Fog = FogView & {
+type Fog = FogView & {
   readonly visibleCount: number;
   /** Replaces current vision and adds it to explored terrain. */
   update: (sources: readonly VisionSource[]) => void;
@@ -55,7 +54,14 @@ export type Fog = FogView & {
   dispose: () => void;
 };
 
-export type VisionSource = { origin: WorldPosition; radius: number };
+type VisionSource = { origin: WorldPosition; radius: number };
+
+/** Anything with a definition and position, such as an actor or its remains. */
+export type Detectable = Pick<
+  ActorRenderState,
+  "worldPosition" | "definitionId"
+> &
+  Partial<Pick<ActorRenderState, "id" | "tilePlacement">>;
 
 export function validateVisionDefinition(definition: ActorDefinition) {
   const vision = definition.vision;
@@ -88,7 +94,7 @@ export function isValidFogState(
  * center so their vision only changes when they enter another tile.
  * Blueprints and disconnected buildings provide no vision.
  */
-export function visionSources(
+function visionSources(
   actors: readonly ActorRenderState[],
   definitions: ReadonlyMap<string, ActorDefinition>,
   support: SupportView | undefined,
@@ -120,7 +126,7 @@ function eye(map: TerrainGrid, origin: WorldPosition) {
 }
 
 /** Whether the tile's center is within `radius` and its sightline is clear. */
-function seesTile(
+function tileInSight(
   map: TerrainGrid,
   observer: ReturnType<typeof eye>,
   radius: number,
@@ -137,8 +143,9 @@ function seesTile(
   );
 }
 
-export function createVision(map: TerrainGrid): Vision {
+function createVision(map: TerrainGrid): Vision {
   let visible = new Uint8Array(map.width * map.height);
+  let visibleCount = 0;
   let version = 0;
   const viewpoints = new Map<string, readonly number[]>();
   const releaseTerrain = map.onChanged(() => viewpoints.clear());
@@ -157,16 +164,22 @@ export function createVision(map: TerrainGrid): Vision {
       return version;
     },
     get visibleCount() {
-      return visible.reduce((sum, bit) => sum + bit, 0);
+      return visibleCount;
     },
     isVisible: (x, z) =>
       map.containsTile(x, z) && visible[z * map.width + x] === 1,
     update: (sources) => {
       const next = new Uint8Array(visible.length);
+      let count = 0;
       for (const source of sources)
-        for (const tile of tilesSeenFrom(source)) next[tile] = 1;
+        for (const tile of tilesSeenFrom(source))
+          if (!next[tile]) {
+            next[tile] = 1;
+            count += 1;
+          }
       if (next.some((bit, tile) => bit !== visible[tile])) version += 1;
       visible = next;
+      visibleCount = count;
       return visible;
     },
     dispose: releaseTerrain,
@@ -174,7 +187,7 @@ export function createVision(map: TerrainGrid): Vision {
 }
 
 /** Current vision plus the terrain it has ever revealed. */
-export function createFog(map: TerrainGrid, tiles: string): Fog {
+function createFog(map: TerrainGrid, tiles: string): Fog {
   const explored = Uint8Array.from(tiles, (bit) => Number(bit));
   let exploredCount = explored.reduce((sum, bit) => sum + bit, 0);
   const vision = createVision(map);
@@ -330,7 +343,8 @@ export function visibleTiles(
   const tiles: number[] = [];
   for (let z = minZ; z <= maxZ; z += 1) {
     for (let x = minX; x <= maxX; x += 1) {
-      if (seesTile(map, observer, radius, x, z)) tiles.push(z * map.width + x);
+      if (tileInSight(map, observer, radius, x, z))
+        tiles.push(z * map.width + x);
     }
   }
   return tiles;
@@ -349,16 +363,13 @@ export function personallyDetects(
   const observer = eye(map, visionOrigin(actor, map));
   const definition = definitions.get(target.definitionId)!;
   const tiles =
-    target.tilePlacement && definition.footprint
-      ? occupiedTilesFor(
-          { ...target, tilePlacement: target.tilePlacement },
-          definition,
-        )
+    isTilePlacedActor(target) && definition.footprint
+      ? occupiedTilesFor(target, definition)
       : [
           map.tileAtWorldPosition(
             target.worldPosition.x,
             target.worldPosition.z,
           ),
         ];
-  return tiles.some(({ x, z }) => seesTile(map, observer, radius, x, z));
+  return tiles.some(({ x, z }) => tileInSight(map, observer, radius, x, z));
 }

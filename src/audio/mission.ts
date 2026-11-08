@@ -4,7 +4,8 @@ import type { MissionSimulation } from "../simulation/mission";
 import type { CommandOutcome } from "../simulation/command";
 import type { MissionAlert } from "../ui/mission-alerts";
 import type { ActorRenderState } from "../simulation/actor";
-import type { Detectable, PlayerAccess } from "../simulation/ownership";
+import type { OwnerView } from "../simulation/owner-view";
+import type { Detectable } from "../simulation/vision";
 import { disconnectedBuildings } from "../simulation/support";
 import type { ProductionJob } from "../simulation/economy";
 
@@ -12,7 +13,7 @@ import type { ProductionJob } from "../simulation/economy";
 export function createMissionAudio(
   scene: AudioScene,
   simulation: MissionSimulation,
-  access: Pick<PlayerAccess, "owns" | "shows">,
+  access: Pick<OwnerView, "owns" | "shows">,
   combatHoldSeconds: number,
 ) {
   let previous = new Map<string, ActorRenderState>();

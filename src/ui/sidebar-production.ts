@@ -13,12 +13,13 @@ import { createProductionCards } from "./production-card";
 import { productionBlocker, setActionAvailability } from "./production-action";
 import { createButton, createElement as el, createKeyedList } from "./dom";
 import { inspectedActor, selectionLocked } from "./sidebar-context";
-import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
+import type { ActorDefinition } from "../simulation/actor";
+import type { ObservedActor } from "../simulation/owner-view";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-production.css";
 
 type RosterRow = {
-  actor: ActorRenderState;
+  actor: ObservedActor;
   selected: boolean;
   disabled: boolean;
 };

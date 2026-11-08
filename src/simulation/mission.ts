@@ -95,6 +95,8 @@ import {
   validateObservations,
 } from "./observations";
 import type { ObservationState, OwnerKnowledge } from "./observations";
+import { createOwnerView } from "./owner-view";
+import type { OwnerView } from "./owner-view";
 import {
   applyEconomyCommand as applyEconomy,
   enrollWorker,
@@ -165,16 +167,11 @@ import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import {
   createRelations,
-  playerFactionOf,
+  factionOf,
   validateOwners,
   validateRelationships,
 } from "./ownership";
-import type {
-  Detectable,
-  Owner,
-  OwnerRelationship,
-  Relations,
-} from "./ownership";
+import type { Owner, OwnerRelationship, Relations } from "./ownership";
 import { fireEvents, validateEvents } from "./events";
 import type { MissionEventDefinition } from "./events";
 import {
@@ -185,7 +182,7 @@ import {
   isPositive,
   isRecord,
 } from "./validation";
-import type { FogState, FogView } from "./vision";
+import type { Detectable, FogState } from "./vision";
 import type { WorldBounds, WorldPosition } from "./world";
 
 /** Actor state that behaviors must leave unchanged. */
@@ -334,12 +331,9 @@ export type MissionSimulation = {
   readonly tickSeconds: number;
   readonly economy: EconomyView | undefined;
   readonly support: SupportView | undefined;
-  /** The player's explored and visible terrain; absent without fog. */
-  readonly fog: FogView | undefined;
   readonly owners: readonly Owner[];
+  /** The owner the human player controls, for presentation and results. */
   readonly playerOwner: string;
-  /** The player owner's faction, for labels, prices, and music. */
-  readonly playerFaction: string | undefined;
   /** Hits resolved during the latest tick. */
   readonly attacks: readonly AttackEvent[];
   /** Unit exits and cargo deliveries during the latest tick. */
@@ -356,8 +350,11 @@ export type MissionSimulation = {
   detects: (owner: string, actor: Detectable) => boolean;
   /** Whether an owner currently sees the tile under a point. */
   sees: (owner: string, point: WorldPosition) => boolean;
-  /** What an owner may know of the world beyond its own actors and economy. */
-  knowledgeOf: (owner: string) => OwnerKnowledge;
+  /**
+   * What one owner may see and know, for its player presentation or AI.
+   * Unknown owners throw.
+   */
+  viewOf: (owner: string) => OwnerView;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
   /**
@@ -1699,7 +1696,8 @@ export function createMissionSimulation({
       issuer,
     );
 
-  return {
+  const views = new Map<string, OwnerView>();
+  const simulation: MissionSimulation = {
     get metrics() {
       return state.metrics;
     },
@@ -1719,12 +1717,8 @@ export function createMissionSimulation({
     get economy() {
       return state.economy;
     },
-    get fog() {
-      return ownerVision.fogOf(playerOwner);
-    },
     owners: state.owners,
     playerOwner,
-    playerFaction: playerFactionOf(state),
     get attacks() {
       return attacks;
     },
@@ -1745,9 +1739,18 @@ export function createMissionSimulation({
     },
     detects,
     sees,
-    knowledgeOf: (owner) => {
-      const view = knowledge.get(owner);
-      if (!view) throw new RangeError(`Unknown owner: ${owner}.`);
+    viewOf: (owner) => {
+      let view = views.get(owner);
+      if (view) return view;
+      const known = knowledge.get(owner);
+      if (!known) throw new RangeError(`Unknown owner: ${owner}.`);
+      view = createOwnerView({
+        simulation,
+        knowledge: known,
+        faction: factionOf(state.owners, owner),
+        definitions: definitionsById,
+      });
+      views.set(owner, view);
       return view;
     },
     actorById: (id) => {
@@ -2175,6 +2178,7 @@ export function createMissionSimulation({
       return () => observers.delete(entry);
     },
   };
+  return simulation;
 }
 
 function canQueueOrder(

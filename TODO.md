@@ -241,11 +241,12 @@ and bring up the rough skirmish map early for simulation and AI development.
   [observations](docs/mission-files.md#observations) of non-allied actors,
   site yields, and loot under the
   [memory rules](DESIGN.md#fog-stealth-and-detection); threats are hostile
-  sightings. `knowledgeOf` exposes authored site locations, exploration,
-  vision, and memory. Headless checks cover last-seen units and buildings,
-  observed and unobserved destruction, alliances, per-owner exploration,
-  site yields, unseen pickups and depletion, saved continuation, malformed
-  memory, and owner IDs that match inherited object properties.
+  sightings. `viewOf(owner).knowledge` exposes authored site locations,
+  exploration, vision, and memory. Headless checks cover last-seen units and
+  buildings, observed and unobserved destruction, alliances, per-owner
+  exploration, site yields, unseen pickups and depletion, saved
+  continuation, malformed memory, and owner IDs that match inherited object
+  properties.
 - [x] **1.20** Keep player alerts, audio, minimap pulses, and sidebar data
   limited to the player's own actors and detections. Verify that hidden AI
   activity does not leak through these presentation paths. Browser checks
@@ -389,8 +390,8 @@ AI tasks are developed and verified with them.
 - [ ] **1.29** Add a deterministic director with mission profiles, concurrent
   priorities, shared spending and force allocation, and counted work limits
   per tick. All actions enter through the normal command boundary.
-  Plan from `knowledgeOf` and the owner's own state, hiding the attacker on
-  its units' latest hits unless detected.
+  Plan only from `viewOf(owner)`, which hides foreign intent and names the
+  attacker on its units' latest hits only while detected.
 - [ ] **1.30** Add a headless AI-versus-AI runner reporting each match summary
   and result. Accept profiles and start-slot assignments as case inputs rather
   than depending on random seeds in a simulation that has no randomness.

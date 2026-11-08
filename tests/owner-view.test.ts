@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 
 import { createActor } from "../src/simulation/actor";
-import { createPlayerView } from "../src/simulation/player-view";
+import { createOwnerView } from "../src/simulation/owner-view";
 import { createRelations } from "../src/simulation/ownership";
 import { createHarvesterState } from "../src/simulation/economy";
 import { createCultivatorState } from "../src/simulation/cultivation";
@@ -11,9 +11,10 @@ import type {
   ActorDefinition,
   ActorRenderState,
 } from "../src/simulation/actor";
-import type { Detectable } from "../src/simulation/ownership";
 import type { EconomyState } from "../src/simulation/economy";
+import type { OwnerKnowledge } from "../src/simulation/observations";
 import type { SupportView } from "../src/simulation/support";
+import type { Detectable } from "../src/simulation/vision";
 
 const movement = { speed: 1, profileId: "ground" };
 const definitions = new Map<string, ActorDefinition>(
@@ -33,6 +34,14 @@ const barracks: ActorRenderState = {
   ...actor("barracks", "barracks", "player"),
   tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
 };
+const knowledge: OwnerKnowledge = {
+  owner: "player",
+  fog: undefined,
+  knowsTile: () => true,
+  seesTile: () => true,
+  sites: [],
+  observations: createObservations(),
+};
 
 function fixture() {
   const simulation = {
@@ -41,47 +50,48 @@ function fixture() {
       barracks,
       actor("wolf", "wolf", "wildlife"),
     ],
-    playerOwner: "player",
     relations: createRelations([
       { owners: ["player", "wildlife"], relationship: "hostile" },
     ]),
     seen: new Set<string>(),
-    detects: (_owner: string | undefined, target: Detectable) =>
+    detects: (_owner: string, target: Detectable) =>
       simulation.seen.has(target.id!),
-    economy: undefined,
-    support: undefined,
-    knowledgeOf: () => {
-      throw new Error("No economy to know.");
-    },
+    economy: undefined as EconomyState | undefined,
+    support: undefined as SupportView | undefined,
   };
-  return { simulation, player: createPlayerView(simulation, definitions) };
+  const view = () =>
+    createOwnerView({ simulation, knowledge, faction: "arc", definitions });
+  return { simulation, view, player: view() };
 }
 
-test("hidden hostiles stay out of the player's lookups and groups", () => {
+test("hidden hostiles stay out of the owner's lookups and groups", () => {
   const { simulation, player } = fixture();
 
-  expect(player.actor("wolf")?.id).toBe("wolf");
   expect(player.shownActor("wolf")).toBeUndefined();
   expect(player.shownActor("trooper")?.id).toBe("trooper");
   expect(player.actors().shownMobile.map(({ id }) => id)).toEqual(["trooper"]);
-  expect(player.actors().mobile.map(({ id }) => id)).toEqual([
-    "trooper",
-    "wolf",
-  ]);
 
   simulation.seen.add("wolf");
+  simulation.actors = [...simulation.actors];
   expect(player.shownActor("wolf")?.id).toBe("wolf");
+  expect(player.actors().shown.map(({ id }) => id)).toEqual([
+    "trooper",
+    "barracks",
+    "wolf",
+  ]);
 });
 
 test("own lookups exclude hostiles, and mobile ones exclude buildings", () => {
   const { player } = fixture();
 
+  expect(player.faction).toBe("arc");
   expect(player.ownActor("barracks")?.id).toBe("barracks");
   expect(player.ownActor("wolf")).toBeUndefined();
   expect(player.ownActor(undefined)).toBeUndefined();
   expect(player.ownMobileActor("trooper")?.id).toBe("trooper");
   expect(player.ownMobileActor("barracks")).toBeUndefined();
   expect([...player.actors().ownIds]).toEqual(["trooper", "barracks"]);
+  expect(player.actors().ownMobile.map(({ id }) => id)).toEqual(["trooper"]);
   expect(player.actors().placed.map(({ id }) => id)).toEqual(["barracks"]);
 });
 
@@ -92,12 +102,84 @@ test("groups follow each committed actor list", () => {
 
   simulation.actors = simulation.actors.filter(({ id }) => id !== "trooper");
 
-  expect(player.actor("trooper")).toBeUndefined();
+  expect(player.ownActor("trooper")).toBeUndefined();
   expect(player.actors().ownIds.has("trooper")).toBe(false);
 });
 
-test("the player economy keeps private work and income scoped to ownership", () => {
-  const { simulation } = fixture();
+test("detected foreign actors show posture without orders, routes, or payment", () => {
+  const { simulation, player } = fixture();
+  const point = { x: 4, z: 4 };
+  const wolf: ActorRenderState = {
+    ...actor("wolf", "wolf", "wildlife"),
+    health: 5,
+    movement: { target: point, waypoints: [point] },
+    attackMove: { target: point },
+    orders: [{ kind: "move", target: point }],
+    rallyPoint: point,
+    headquartersId: "den",
+    construction: {
+      paidCost: 10,
+      active: true,
+      completedTicks: 1,
+      totalTicks: 4,
+    },
+    combat: {
+      attack: { targetId: "trooper", lastKnown: point, post: point },
+      weaponReadyTick: 9,
+      activeTick: 3,
+      lastHit: { attackerId: "trooper", tick: 3 },
+    },
+    territory: { home: point, mode: "pursuing", seenTargets: ["trooper"] },
+  };
+  simulation.actors = [actor("trooper", "trooper", "player"), wolf];
+  simulation.seen.add("wolf");
+
+  expect(player.shownActor("wolf")).toEqual({
+    id: "wolf",
+    definitionId: "wolf",
+    owner: "wildlife",
+    worldPosition: { x: 0, z: 0 },
+    facing: 0,
+    occupancyLayer: "surface",
+    health: 5,
+    construction: { active: true, completedTicks: 1, totalTicks: 4 },
+    combat: { activeTick: 3, attack: { targetId: "trooper" } },
+    territory: { mode: "pursuing" },
+  });
+
+  // An attack on an actor the viewer cannot see names no target.
+  simulation.actors = [
+    actor("hidden", "trooper", "rival"),
+    {
+      ...wolf,
+      combat: { attack: { targetId: "hidden", lastKnown: point } },
+    },
+  ];
+  expect(player.shownActor("wolf")?.combat).toEqual({});
+});
+
+test("own units name their latest attacker only while it is detected", () => {
+  const { simulation, player } = fixture();
+  const hit = { attackerId: "wolf", tick: 2 };
+  const trooper: ActorRenderState = {
+    ...actor("trooper", "trooper", "player"),
+    combat: { activeTick: 2, lastHit: hit },
+  };
+  simulation.actors = [trooper, actor("wolf", "wolf", "wildlife")];
+
+  expect(player.ownActor("trooper")?.combat).toEqual({ activeTick: 2 });
+
+  simulation.seen.add("wolf");
+  simulation.actors = [...simulation.actors];
+  expect(player.ownActor("trooper")).toBe(trooper);
+
+  // Remains do not reveal who fired.
+  simulation.actors = [trooper];
+  expect(player.ownActor("trooper")?.combat).toEqual({ activeTick: 2 });
+});
+
+test("the owner economy keeps private work and income scoped to ownership", () => {
+  const { simulation, view } = fixture();
   const economy: EconomyState = {
     stockpiles: [
       { resource: "materials", owners: ["player", "ally"], amount: 100 },
@@ -127,25 +209,13 @@ test("the player economy keeps private work and income scoped to ownership", () 
       exitBlocked: false,
     })),
   };
-  const state = {
-    ...simulation,
-    actors: [
-      ...simulation.actors,
-      actor("ally", "trooper", "ally"),
-      actor("rival", "trooper", "rival"),
-    ],
-    economy,
-    knowledgeOf: () => ({
-      owner: "player",
-      fog: undefined,
-      knowsTile: () => true,
-      seesTile: () => true,
-      sites: [],
-      observations: createObservations(),
-    }),
-  };
-  const player = createPlayerView(state, definitions);
-  const known = player.economy()!;
+  simulation.actors = [
+    ...simulation.actors,
+    actor("ally", "trooper", "ally"),
+    actor("rival", "trooper", "rival"),
+  ];
+  simulation.economy = economy;
+  const known = view().economy()!;
   expect(known.stockpiles).toEqual([economy.stockpiles[0]]);
   expect(known.deposited.map(({ owner }) => owner)).toEqual(["player"]);
   expect(known.harvesters.map(({ actorId }) => actorId)).toEqual(["trooper"]);
@@ -159,7 +229,7 @@ test("the player economy keeps private work and income scoped to ownership", () 
 });
 
 test("support shows usable detected nodes and keeps links within that view", () => {
-  const { simulation } = fixture();
+  const { simulation, view } = fixture();
   const actors = [
     barracks,
     { ...barracks, id: "ally", owner: "ally" },
@@ -184,21 +254,18 @@ test("support shows usable detected nodes and keeps links within that view", () 
       active: false,
     })),
   };
-  const state = {
-    ...simulation,
-    actors,
-    support,
-    relations: createRelations([
-      {
-        owners: ["player", "ally"],
-        relationship: "allied",
-        sharesSupport: true,
-      },
-    ]),
-  };
+  simulation.actors = actors;
+  simulation.support = support;
+  simulation.relations = createRelations([
+    {
+      owners: ["player", "ally"],
+      relationship: "allied",
+      sharesSupport: true,
+    },
+  ]);
   simulation.seen.add("ally");
   simulation.seen.add("enemy");
-  const player = createPlayerView(state, definitions);
+  const player = view();
   const shown = player.support()!;
   expect(player.support()).toBe(shown);
   expect(shown.nodes.map(({ actorId }) => actorId)).toEqual([
@@ -211,15 +278,15 @@ test("support shows usable detected nodes and keeps links within that view", () 
 
   // Vision changes with a committed actor list, even if support stays fixed.
   simulation.seen.delete("ally");
-  state.actors = [...actors];
+  simulation.actors = [...actors];
   expect(player.support()?.nodes.map(({ actorId }) => actorId)).toEqual([
     "barracks",
   ]);
   expect(player.support()?.links).toEqual([]);
   simulation.seen.add("ally");
-  state.actors = [...actors];
+  simulation.actors = [...actors];
   expect(player.support()?.nodes).toHaveLength(2);
-  state.relations = createRelations([]);
+  simulation.relations = createRelations([]);
   expect(player.support()?.nodes.map(({ actorId }) => actorId)).toEqual([
     "barracks",
   ]);

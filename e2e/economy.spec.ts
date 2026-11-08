@@ -665,7 +665,6 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       {
         actors: snapshot.actors,
         playerOwner: "player",
-        playerFaction: "arc",
         support: undefined,
         tickSeconds: 1 / 60,
         submitCommand: (command) => {
@@ -676,6 +675,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       {
         definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
         names: new Map(),
+        faction: "arc",
         selectedActorId: () => worker.actorId,
         enabled: () => true,
         focus: () => {},
@@ -778,7 +778,6 @@ test("worker controls share delivery actions and tolerate missions without culti
         {
           actors,
           playerOwner: "player",
-          playerFaction,
           support: undefined,
           tickSeconds: 1 / 60,
           submitCommand: (
@@ -791,6 +790,7 @@ test("worker controls share delivery actions and tolerate missions without culti
         {
           definitions,
           names,
+          faction: playerFaction,
           selectedActorId: () => selection,
           enabled: () => true,
           focus: () => {},

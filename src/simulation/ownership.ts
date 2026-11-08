@@ -1,6 +1,6 @@
 import { isId, isOneOf, isRecord } from "./validation";
 
-import type { ActorDefinition, ActorRenderState } from "./actor";
+import type { ActorDefinition } from "./actor";
 
 /** A participant that controls actors, independent of their faction types. */
 export type Owner = {
@@ -139,30 +139,31 @@ export function validateRelationships(
     throw new RangeError("Mission state has invalid owner relationships.");
 }
 
-export type PlayerRelation = "own" | Relationship;
+/** How a viewing owner relates to an actor's owner. */
+export type OwnerRelation = "own" | Relationship;
 
-export function playerRelation(
-  playerOwner: string,
+export function ownerRelation(
+  viewer: string,
   owner: string,
   relationship: (left: string, right: string) => Relationship,
-): PlayerRelation {
-  return owner === playerOwner ? "own" : relationship(playerOwner, owner);
+): OwnerRelation {
+  return owner === viewer ? "own" : relationship(viewer, owner);
 }
 
-/** The faction the player plays, if the mission names one. */
-export function playerFactionOf(state: {
-  owners: readonly Owner[];
-  playerOwner: string;
-}): string | undefined {
-  return state.owners.find(({ id }) => id === state.playerOwner)?.faction;
+/** The faction an owner plays, if the mission names one. */
+export function factionOf(
+  owners: readonly Owner[],
+  ownerId: string,
+): string | undefined {
+  return owners.find(({ id }) => id === ownerId)?.faction;
 }
 
-/** Without a player faction, as in free construction, every type is listed. */
+/** Without a faction, as in free construction, every type is listed. */
 export function rosterIncludes(
-  playerFaction: string | undefined,
+  faction: string | undefined,
   definition: Pick<ActorDefinition, "faction">,
 ): boolean {
-  return playerFaction === undefined || definition.faction === playerFaction;
+  return faction === undefined || definition.faction === faction;
 }
 
 /** Returns the owner IDs; throws unless distinct and including the player. */
@@ -188,29 +189,3 @@ export function validateOwners(
     throw new RangeError("Mission state has an unknown player owner.");
   return ids;
 }
-
-/** Anything with a definition and position, such as an actor or its remains. */
-export type Detectable = Pick<
-  ActorRenderState,
-  "worldPosition" | "definitionId"
-> &
-  Partial<Pick<ActorRenderState, "id" | "tilePlacement">>;
-
-/** Shared ownership and visibility rules for player presentation and controls. */
-export function createPlayerAccess(
-  playerOwner: string,
-  relationship: (left: string, right: string) => Relationship,
-  detects: (owner: string, actor: Detectable) => boolean = () => true,
-) {
-  const owns = (actor: Pick<ActorRenderState, "owner">) =>
-    actor.owner === playerOwner;
-  return {
-    relationTo: (actor: Pick<ActorRenderState, "owner">) =>
-      playerRelation(playerOwner, actor.owner, relationship),
-    owns,
-    shows: (actor: Detectable & Pick<ActorRenderState, "owner">) =>
-      owns(actor) || detects(playerOwner, actor),
-  };
-}
-
-export type PlayerAccess = ReturnType<typeof createPlayerAccess>;

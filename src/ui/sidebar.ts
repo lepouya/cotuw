@@ -5,7 +5,7 @@ import { createSidebarNavigation } from "./sidebar-navigation";
 import { createSidebarOrders } from "./sidebar-orders";
 import { createSidebarProduction } from "./sidebar-production";
 import { createSidebarSelection } from "./sidebar-selection";
-import type { ActorRenderState } from "../simulation/actor";
+import type { ObservedActor } from "../simulation/owner-view";
 import type {
   SidebarOptions,
   SidebarSection,
@@ -75,7 +75,7 @@ export function createSidebar(root: HTMLElement, options: SidebarOptions) {
             }
           : undefined,
       },
-      showActor: (actor: Pick<ActorRenderState, "definitionId" | "owner">) => {
+      showActor: (actor: Pick<ObservedActor, "definitionId" | "owner">) => {
         if (
           context.owns(actor) &&
           context.definitionById.get(actor.definitionId)?.production

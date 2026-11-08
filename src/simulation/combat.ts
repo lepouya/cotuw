@@ -206,52 +206,57 @@ export function validateCombatActor(
     blocked === undefined ||
     (!!blocked && point(blocked.at) && isTick(blocked.navigationVersion));
   const { attack, returning, aimFacing } = combat ?? {};
-  if (
-    (attackMove !== undefined &&
-      (!attackMove ||
-        !definition.movement ||
-        definition.footprint ||
-        !point(attackMove.target) ||
-        !retry(attackMove) ||
-        (attackMove.requestedTarget !== undefined &&
-          !point(attackMove.requestedTarget)) ||
-        returning !== undefined ||
-        attack?.post !== undefined)) ||
-    (health !== undefined &&
-      !(
-        definition.health !== undefined &&
-        Number.isFinite(health) &&
-        health > 0 &&
-        health <= definition.health
-      )) ||
-    (combat !== undefined &&
-      (!combat ||
-        typeof combat !== "object" ||
-        (attack !== undefined &&
-          (!definition.weapon ||
-            !attack ||
-            !isId(attack.targetId) ||
-            !point(attack.lastKnown) ||
-            (attack.post !== undefined && !point(attack.post)) ||
-            !retry(attack))) ||
-        (returning !== undefined &&
-          ((!definition.guard && !definition.territory) ||
-            !returning ||
-            attack !== undefined ||
-            !point(returning.point) ||
-            !retry(returning))) ||
-        (aimFacing !== undefined &&
-          (!definition.weapon ||
-            !definition.footprint ||
-            !Number.isFinite(aimFacing))) ||
-        (combat.weaponReadyTick !== undefined &&
-          (!definition.weapon || !isTick(combat.weaponReadyTick))) ||
-        (combat.activeTick !== undefined && !isTick(combat.activeTick)) ||
-        (combat.lastHit !== undefined &&
-          (!combat.lastHit ||
-            !isId(combat.lastHit.attackerId) ||
-            !isTick(combat.lastHit.tick)))))
-  )
+  // Attack Moves belong to units, and automatic engagements cannot drive one.
+  const validAttackMove =
+    attackMove === undefined ||
+    (!!attackMove &&
+      !!definition.movement &&
+      !definition.footprint &&
+      point(attackMove.target) &&
+      retry(attackMove) &&
+      (attackMove.requestedTarget === undefined ||
+        point(attackMove.requestedTarget)) &&
+      returning === undefined &&
+      attack?.post === undefined);
+  const validHealth =
+    health === undefined ||
+    (definition.health !== undefined &&
+      Number.isFinite(health) &&
+      health > 0 &&
+      health <= definition.health);
+  const validAttack =
+    attack === undefined ||
+    (!!definition.weapon &&
+      !!attack &&
+      isId(attack.targetId) &&
+      point(attack.lastKnown) &&
+      (attack.post === undefined || point(attack.post)) &&
+      retry(attack));
+  const validReturn =
+    returning === undefined ||
+    ((!!definition.guard || !!definition.territory) &&
+      !!returning &&
+      attack === undefined &&
+      point(returning.point) &&
+      retry(returning));
+  const validCombat =
+    combat === undefined ||
+    (!!combat &&
+      typeof combat === "object" &&
+      validAttack &&
+      validReturn &&
+      (aimFacing === undefined ||
+        (!!definition.weapon &&
+          !!definition.footprint &&
+          Number.isFinite(aimFacing))) &&
+      (combat.weaponReadyTick === undefined ||
+        (!!definition.weapon && isTick(combat.weaponReadyTick))) &&
+      (combat.activeTick === undefined || isTick(combat.activeTick)) &&
+      (combat.lastHit === undefined ||
+        (!!combat.lastHit &&
+          isId(combat.lastHit.attackerId) &&
+          isTick(combat.lastHit.tick))));
+  if (!validAttackMove || !validHealth || !validCombat)
     throw new RangeError(`Actor ${actor.id} has invalid combat state.`);
   validateTerritoryActor(actor, definition, bounds);
 }
@@ -417,15 +422,16 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
             bounds.radius),
     );
   };
-  const personal = new Map<string, boolean>();
+  const personal = new Map<Actor, Map<Actor, boolean>>();
   const sees = (actor: Actor, target: Actor) => {
-    const key = JSON.stringify([actor.id, target.id]);
-    if (!personal.has(key))
-      personal.set(
-        key,
-        personallyDetects(actor, target, definitions, world.map),
-      );
-    return personal.get(key)!;
+    let seen = personal.get(actor);
+    if (!seen) personal.set(actor, (seen = new Map()));
+    let result = seen.get(target);
+    if (result === undefined) {
+      result = personallyDetects(actor, target, definitions, world.map);
+      seen.set(target, result);
+    }
+    return result;
   };
   const detected = (actor: Actor, target: Actor) =>
     controllerOf(actor)?.personalSight
@@ -721,8 +727,11 @@ function canTarget(
 
 /** Distance from the attacker's center to the target's footprint or body. */
 export function weaponReach(
-  attacker: ActorRenderState,
-  target: ActorRenderState,
+  attacker: Pick<ActorRenderState, "worldPosition">,
+  target: Pick<
+    ActorRenderState,
+    "id" | "definitionId" | "worldPosition" | "tilePlacement"
+  >,
   definitions: ReadonlyMap<string, ActorDefinition>,
   map: TerrainGrid | undefined,
 ): number {

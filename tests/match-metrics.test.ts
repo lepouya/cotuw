@@ -674,7 +674,7 @@ test("exploration and active vision histories sample the committed owner views",
   });
   advanceSeconds(sim, 5);
   const sample = player(sim).history[1]!;
-  const fog = sim.knowledgeOf("player").fog!;
+  const fog = sim.viewOf("player").knowledge.fog!;
   let visible = 0;
   for (let z = 0; z < terrain.height; z++)
     for (let x = 0; x < terrain.width; x++)
@@ -686,7 +686,7 @@ test("exploration and active vision histories sample the committed owner views",
   });
   expect(sample.explored).toBeGreaterThan(player(sim).history[0]!.explored);
   expect(sample.explored).toBeGreaterThan(sample.visible);
-  expect(sim.knowledgeOf("player")).not.toHaveProperty("metrics");
+  expect(sim.viewOf("player")).not.toHaveProperty("metrics");
   expect(roundtrip(sim).snapshot()).toEqual(sim.snapshot());
 });
 

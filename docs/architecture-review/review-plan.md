@@ -116,7 +116,7 @@ product work in `TODO.md`, and remove temporary files in
     - Deferred to Slice 3: `evaluateSpawn` in `mission.ts` copies every used
       ID per evaluation; `production.ts` only needs `has`.
 
-- [ ] **Slice 2: simulation actors, combat, vision, and owner projections**
+- [x] **Slice 2: simulation actors, combat, vision, and owner projections**
   (5 files, ~2,147 LOC)
   - `src/simulation/`: `actor.ts`, `combat.ts`, `vision.ts`,
     `observations.ts`, `player-view.ts`.
@@ -124,6 +124,56 @@ product work in `TODO.md`, and remove temporary files in
     single-player `createPlayerView`, redacting foreign intent and unseen
     `combat.lastHit.attackerId` (`1.29`) while preserving observable posture,
     plus unit-assist (`1.41`, `1.52`) and demolition (`1.42`) seams.
+  - [x] **Pass A** (modular assessment and refactor, base `c3037ef`):
+    - Replaced `player-view.ts` with `owner-view.ts`:
+      `MissionSimulation.viewOf(owner)` returns one memoized `OwnerView` per
+      owner and replaces `knowledgeOf`, `fog`, and `playerFaction`
+      (`view.knowledge`, `view.faction`). Unknown owners throw.
+    - Detected foreign actors are `ObservedActor` projections: pose, health,
+      construction progress and activity, turret aim, `activeTick`, territory
+      mode, and an attack target only when the viewer also sees it. Own
+      actors drop `combat.lastHit` unless the owner detects the attacker.
+    - The view exposes no omniscient lookups; session interpolation, follow,
+      and `showActor` read shown actors, and route previews read own mobile
+      actors. Render and sidebar parameters take `ObservedActor`;
+      `TilePlacedActorState` omits `paidCost`.
+    - `ownership.ts`: `createPlayerAccess`/`PlayerAccess` folded into the
+      view; `playerRelation` -> `ownerRelation`, `playerFactionOf` ->
+      `factionOf(owners, id)`; `Detectable` moved to `vision.ts`. Economy
+      controls take `faction` as an option.
+    - No persisted format change. Docs: `runtime-boundaries.md`,
+      `ui-ownership.md`, and `TODO.md` (`1.19`, `1.29`).
+    - Checks: format, lint, typecheck, units, the browser smoke checks, and
+      the affected browser specs pass.
+    - Deferred to Slice 5: remaining omniscient session reads
+      (`simulation.actors` for health/damage effects, alerts, popups, and
+      audio; `simulation.economy` for gathering posture and balances) and
+      dropping the now-redundant `ownIds` route filter.
+    - Deferred to `1.41`/Slice 4: extracting pursuit (`chase`,
+      `followOrder`, route retry) from `updateCombat` for unit assistance.
+      `1.42` needs only the single damage site in `updateCombat`.
+    - Deferred: player-owner defaults on `submitCommand` and
+      `evaluatePlacement` (mostly test call sites) until an AI caller lands.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `combat.ts`: personal-sight cache keyed by actor objects instead of a
+      `JSON.stringify` pair per lookup; `validateCombatActor` split into
+      named attack-move, health, attack, return, and combat checks.
+    - `vision.ts`: visible tile count kept during `update` instead of reduced
+      on every read; module `seesTile` renamed `tileInSight` so the owner
+      vision's `seesTile` no longer shadows it; `personallyDetects` narrows
+      with `isTilePlacedActor`; unused value exports `visionSources`,
+      `createVision`, and `createFog` made module-private.
+    - `observations.ts`: sightings copy tile placements with `cloneData`
+      rather than per-tick `structuredClone`.
+    - `actor.ts`: `ActorRenderState` is `DeepReadonly<Actor>`, documented as
+      published committed state; stale player and legacy wording removed.
+    - `owner-view.ts`: inner hit redaction renamed so it no longer shadows
+      `ownActor`.
+    - Checks: format, lint, typecheck, and units pass; browser smoke could
+      not launch Chromium in the sandbox.
+    - Deferred to Slice 4: `WOLF_MODES`/`WolfMode` name a generic territory
+      state after one NPC; per-update `Uint8Array` in `createVision` and
+      `occupiedTilesFor` in owner `detects` stay until profiling shows cost.
 
 - [ ] **Slice 3: simulation economy, infrastructure, growth, and production**
   (11 files, ~2,835 LOC)

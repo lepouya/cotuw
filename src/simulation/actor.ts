@@ -1,9 +1,9 @@
+import { distance } from "./world";
+
 import type { AppliedActorCommand } from "./command";
 import type { Footprint, OccupancyLayer } from "./occupancy";
 import type { TileCoord } from "./grid";
 import type { NavigationGrid } from "./navigation";
-import { distance } from "./world";
-
 import type { WorldPosition } from "./world";
 
 /** Immutable, data-driven capabilities shared by a type of actor. */
@@ -133,7 +133,7 @@ export type Actor = {
   combat?: CombatState;
   /** Present for actors whose definition has a territory. */
   territory?: TerritoryState;
-  /** Player orders that start in sequence once the current one ends. */
+  /** Orders that start in sequence once the current one ends. */
   orders?: QueuedOrder[];
 };
 
@@ -270,7 +270,7 @@ export type MovementOrder = {
   reachedTarget?: boolean;
   /** Stops retries until navigation changes after a route becomes blocked. */
   blocked?: boolean;
-  /** Route points; absent on legacy or behavior-specific orders. */
+  /** Route points; absent until the behavior plans a route. */
   waypoints?: WorldPosition[];
   waypointIndex?: number;
   navigationVersion?: number;
@@ -335,28 +335,11 @@ export function cloneData<T>(value: T): T {
   return copy as T;
 }
 
-/** The immutable subset of actor state a renderer needs to present an actor. */
-export type ActorRenderState = DeepReadonly<
-  Pick<
-    Actor,
-    | "id"
-    | "definitionId"
-    | "owner"
-    | "worldPosition"
-    | "facing"
-    | "occupancyLayer"
-    | "tilePlacement"
-    | "movement"
-    | "attackMove"
-    | "construction"
-    | "headquartersId"
-    | "rallyPoint"
-    | "health"
-    | "combat"
-    | "orders"
-    | "territory"
-  >
->;
+/**
+ * Committed actor state as the simulation publishes it. Owner views project
+ * it before presentation.
+ */
+export type ActorRenderState = DeepReadonly<Actor>;
 
 export type ActorOptions = {
   id: string;

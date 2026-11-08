@@ -372,7 +372,11 @@ describe("authored wolf encounters", () => {
           map.tileCenter(loot.tile.x, loot.tile.z),
         )?.reachedTarget,
       ).toBe(true);
-      expect(simulation.fog!.isExplored(loot.tile.x, loot.tile.z)).toBe(false);
+      expect(
+        simulation
+          .viewOf(simulation.playerOwner)
+          .knowledge.fog!.isExplored(loot.tile.x, loot.tile.z),
+      ).toBe(false);
     }
   });
 
