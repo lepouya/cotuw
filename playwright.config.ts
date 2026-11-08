@@ -41,8 +41,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `npm run dev -- --host 127.0.0.1 --port ${testPort} --strictPort`,
+    // Performance acceptance measures the production build.
+    command: process.env.COTUW_BENCHMARK
+      ? `npm run build && npm run preview -- --host 127.0.0.1 --port ${testPort} --strictPort`
+      : `npm run dev -- --host 127.0.0.1 --port ${testPort} --strictPort`,
     url: testUrl,
+    timeout: 180_000,
     reuseExistingServer: false,
   },
 });

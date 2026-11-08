@@ -165,6 +165,31 @@ planned M1 acceptance checks; current M0 browser checks do not establish them.
   percentiles, and simulation backlog. Repeat at 2x to verify simulation pace
   and report rendering performance. Measure stress-case degradation separately.
 
+`npm run benchmark -- [normal|stress]` runs a scripted ARC mirror headlessly and
+reports tick-time percentiles, rejected orders, and population samples. Scenes
+start at the named scale, and a probe orders replacements for combat losses.
+Replacements count toward the target while they train, so the reported units
+run slightly below it.
+Orders to scouts lost in combat account for any `move` rejections. Add Node's
+`--cpu-prof` to attribute the cost. The scene has no AI until phase C.
+
+Measure the production build in Chromium and WebKit at 1x and 2x, watching the
+center crossing with a 1920 x 1080 canvas:
+
+```sh
+COTUW_BENCHMARK=1 npx playwright test e2e/benchmark.spec.ts --repeat-each=3
+```
+
+Each case prints and saves its results as `.checks/benchmark-*.json`, including
+the game's WebGL renderer, so a software fallback is visible. Cases check scene
+integrity; judge the budgets from the reported timings and population. A
+sustained `ticksPerSecond` below 60 times the speed means the simulation is
+falling behind. Only builds made with `COTUW_BENCHMARK` set expose the session
+the collector needs, so run this spec alone. Playwright's WebKit stands in for
+the packaged app until 1.64 measures it directly.
+`npm run benchmark -- normal --write <file>` writes the scene for loading by
+hand. Without the probe, that scene does not replace its losses.
+
 ## Mission flow
 
 The full ARC M0 browser mission starts at the title screen and uses the authored

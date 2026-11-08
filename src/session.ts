@@ -9,6 +9,7 @@ import {
   workingWorkerIds,
 } from "./simulation/economy";
 import { factionResource } from "./simulation/resources";
+import { attachBenchmarkProbe } from "./benchmark-probe";
 import { resourceBalances } from "./simulation/stockpiles";
 import { createSessionSimulation, missionTerrain } from "./mission-loading";
 import type { LoadedMission } from "./mission-loading";
@@ -167,6 +168,13 @@ export type GameSessionControls = BuildingPlacementControls &
     animate?: HTMLInputElement;
     cameraControls?: HTMLElement;
   };
+
+declare global {
+  /** Available only in COTUW_BENCHMARK builds. */
+  var cotuwBenchmark:
+    | { session: GameSession; attachProbe: typeof attachBenchmarkProbe }
+    | undefined;
+}
 
 export async function createGameSession(
   canvas: HTMLCanvasElement,
@@ -1223,6 +1231,16 @@ async function assembleGameSession(
   window.addEventListener("keydown", menuKey);
   lifetime.defer(() => window.removeEventListener("keydown", menuKey));
   try {
+    if (import.meta.env.COTUW_BENCHMARK) {
+      globalThis.cotuwBenchmark = {
+        session,
+        attachProbe: attachBenchmarkProbe,
+      };
+      lifetime.defer(() => {
+        if (globalThis.cotuwBenchmark?.session === session)
+          globalThis.cotuwBenchmark = undefined;
+      });
+    }
     controls.onReady?.(session);
   } catch (error) {
     try {

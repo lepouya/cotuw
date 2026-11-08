@@ -13,6 +13,7 @@
     "playtest:build": "npm run typecheck:ts && node --no-experimental-webstorage scripts/prepare-playtest.ts",
     "tauri": "tauri",
     "levels": "node --no-experimental-webstorage scripts/generate-levels.ts",
+    "benchmark": "node --no-experimental-webstorage scripts/benchmark.ts",
     "assets": "node --no-experimental-webstorage scripts/generate-assets.ts",
     "assets:audio": "node --no-experimental-webstorage scripts/generate-audio.ts",
     "assets:terrain": "node --no-experimental-webstorage scripts/generate-terrain.ts",

@@ -6,6 +6,9 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   // Relative URLs let any static host serve the site from a subpath.
   base: "./",
+  define: {
+    "import.meta.env.COTUW_BENCHMARK": !!process.env.COTUW_BENCHMARK,
+  },
   // Keep Rust build errors visible during `tauri dev`.
   clearScreen: false,
   server: {
