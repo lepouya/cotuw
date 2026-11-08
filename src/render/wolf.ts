@@ -14,14 +14,9 @@ import type { ActorAppearance } from "./actor";
 const STRIDE = 1.1;
 const LEG_SWING = 0.55;
 
-/** A low-poly stand-in wolf whose legs swing with distance travelled. */
-export function createWolfAppearance(
-  scene: Scene,
-  reducedMotion: () => boolean = () => false,
-  scale = 1,
-): ActorAppearance {
-  const root = new TransformNode("wolf-template", scene);
-  root.scaling.setAll(scale);
+/** The wolf's parts, for the stand-in below and the generated model. */
+export function createWolfParts(scene: Scene, rootName: string) {
+  const root = new TransformNode(rootName, scene);
   const fur = new StandardMaterial("wolf-fur", scene);
   fur.diffuseColor = new Color3(0.42, 0.4, 0.37);
   fur.specularColor = Color3.Black();
@@ -72,7 +67,17 @@ export function createWolfAppearance(
     box(`leg-${index}-mesh`, [0.09, 0.45, 0.1], [0, -0.22, 0], dark, hip);
     return hip;
   });
+  return { root, head, legs };
+}
 
+/** A low-poly stand-in wolf whose legs swing with distance travelled. */
+export function createWolfAppearance(
+  scene: Scene,
+  reducedMotion: () => boolean = () => false,
+  scale = 1,
+): ActorAppearance {
+  const { root, legs } = createWolfParts(scene, "wolf-template");
+  root.scaling.setAll(scale);
   const body = createMeshAppearance(
     root,
     { radius: 0.5 * scale, height: 0.95 * scale },

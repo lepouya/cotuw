@@ -11,8 +11,6 @@ import {
 import type { PNG } from "pngjs";
 import type { Frame, Rgba } from "./sprite-sheet.ts";
 
-export const TERRAIN_TEXTURES = ["dirt", "water", "clutter", "rock"] as const;
-export type TerrainTexture = (typeof TERRAIN_TEXTURES)[number];
 const PERIOD = 1023;
 /** Toward the upper left and above, matching the sun's usual screen side. */
 const LIGHT = [-0.45, -0.55, 0.7].map(
@@ -357,12 +355,10 @@ function rock(frame: Frame) {
   }
 }
 
-const BUILDERS: Record<TerrainTexture, (frame: Frame) => void> = {
-  dirt,
-  water,
-  clutter,
-  rock,
-};
+const BUILDERS = { dirt, water, clutter, rock };
+
+type TerrainTexture = keyof typeof BUILDERS;
+export const TERRAIN_TEXTURES = Object.keys(BUILDERS) as TerrainTexture[];
 
 /** Builds original terrain pixels without reading an image or editor source. */
 export function buildTerrainTexture(kind: TerrainTexture): PNG {

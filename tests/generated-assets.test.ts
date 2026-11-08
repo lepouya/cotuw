@@ -42,13 +42,12 @@ test("every file asset has a generator", () => {
   expect(files.sort()).toEqual(assets.map(([path]) => path).sort());
 });
 
-test.each(
-  families.flatMap(([, family]) =>
-    Object.entries("clips" in family ? family.clips : {}),
-  ),
-)("the base pack's %s clip matches its generator", (id, clip) => {
-  expect(BASE_CONTENT.clips![id]).toEqual(clip);
-});
+test.each(families.flatMap(([, family]) => Object.entries(family.clips ?? {})))(
+  "the base pack's %s clip matches its generator",
+  (id, clip) => {
+    expect(BASE_CONTENT.clips![id]).toEqual(clip);
+  },
+);
 
 // Only the bundled pack is required to use local registered generators.
 test("every base-pack asset URL names a registered generated file", () => {

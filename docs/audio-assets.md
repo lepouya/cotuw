@@ -52,11 +52,10 @@ The page also ships in the browser build.
   libraries, third-party melodies, pretrained audio models, or external assets.
   The repository's [LICENSE](../LICENSE) applies; no additional attribution or
   sample license is required.
-- `src/content/audio-assets.ts` owns IDs, titles, durations, music moods,
-  instrument arrangements, and URLs. Each sound ID needs a recipe in
-  `scripts/audio-assets.ts`; type checking rejects a missing one.
-  `scripts/assets.ts` registers the generated WAVs and audition HTML.
-  Generator tests compare committed bytes with fresh output.
+- `scripts/audio-assets.ts` also owns IDs, titles, durations, music moods, and
+  instrument arrangements. Each sound ID needs a recipe there; type checking
+  rejects a missing one. `scripts/assets.ts` registers the generated WAVs and
+  audition HTML. Generator tests compare committed bytes with fresh output.
 - Files use uncompressed 16-bit little-endian PCM WAV at 32 kHz. Cues are mono
   for world positioning; music is stereo. The complete batch is about
   26 MB, with no encoder or audio package dependency.

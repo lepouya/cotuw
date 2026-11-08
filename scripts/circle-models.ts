@@ -1,6 +1,10 @@
-import { MeshBuilder, TransformNode, Vector3 } from "@babylonjs/core";
-import type { Mesh, Scene, StandardMaterial } from "@babylonjs/core";
-import { surface } from "./model-surface.ts";
+import { Mesh, MeshBuilder, TransformNode, Vector3 } from "@babylonjs/core";
+
+import { clip, merge, surface } from "./model-toolkit.ts";
+
+import type { Scene, StandardMaterial } from "@babylonjs/core";
+
+type Vec3 = readonly [number, number, number];
 
 type StructureRecipe = {
   halfWidth: number;
@@ -14,7 +18,8 @@ type StructureRecipe = {
   owned: boolean;
 };
 
-type Builder = {
+/** What a frame draws with. */
+type FrameContext = {
   name: string;
   scene: Scene;
   root: TransformNode;
@@ -23,22 +28,22 @@ type Builder = {
   core: StandardMaterial;
   stem: (
     id: string,
-    points: number[][],
+    points: readonly Vec3[],
     radius: number,
-    surface?: StandardMaterial,
+    material?: StandardMaterial,
   ) => Mesh;
   plate: (
     id: string,
-    position: number[],
-    size: number[],
-    surface?: StandardMaterial,
+    position: Vec3,
+    size: Vec3,
+    material?: StandardMaterial,
   ) => Mesh;
 };
 
 /** Frames build each structure's ribs and canopy above the shared roots. */
 const FRAMES = {
   /** A central trunk with arched ribs and a raised canopy. */
-  tree: ({ stem, plate }: Builder) => {
+  tree: ({ stem, plate }: FrameContext) => {
     stem(
       "growth-ribs-trunk",
       [
@@ -51,8 +56,8 @@ const FRAMES = {
     );
     for (let i = 0; i < 6; i++) {
       const angle = (i * Math.PI) / 3;
-      const x = Math.cos(angle),
-        z = Math.sin(angle);
+      const x = Math.cos(angle);
+      const z = Math.sin(angle);
       stem(
         `growth-ribs-arch-${i}`,
         [
@@ -79,7 +84,16 @@ const FRAMES = {
     }
   },
   /** A hall of arched ribs under leaf roofing. */
-  arches: ({ name, scene, root, recipe, wood, core, stem, plate }: Builder) => {
+  arches: ({
+    name,
+    scene,
+    root,
+    recipe,
+    wood,
+    core,
+    stem,
+    plate,
+  }: FrameContext) => {
     const { halfWidth, halfDepth, height } = recipe;
     for (let i = 0; i < 4; i++) {
       const z = -halfDepth + (i * halfDepth * 2) / 3;
@@ -116,11 +130,11 @@ const FRAMES = {
     }
   },
   /** A ring of flowering stems. */
-  bloom: ({ stem, plate, core }: Builder) => {
+  bloom: ({ stem, plate, core }: FrameContext) => {
     for (let i = 0; i < 7; i++) {
       const angle = (i * Math.PI * 2) / 7;
-      const x = Math.cos(angle) * 0.45,
-        z = Math.sin(angle) * 0.45;
+      const x = Math.cos(angle) * 0.45;
+      const z = Math.sin(angle) * 0.45;
       stem(
         `growth-ribs-stem-${i}`,
         [
@@ -141,7 +155,7 @@ const FRAMES = {
   },
 };
 
-export const CIRCLE_STRUCTURES = {
+const CIRCLE_STRUCTURES = {
   "circle-heartgrove": {
     halfWidth: 1.15,
     halfDepth: 1.3,
@@ -176,24 +190,19 @@ export const CIRCLE_STRUCTURES = {
     owned: false,
   },
 } satisfies Record<string, StructureRecipe>;
-export type CircleStructureId = keyof typeof CIRCLE_STRUCTURES;
+type CircleStructureId = keyof typeof CIRCLE_STRUCTURES;
 
 /** Named growth layers let presentation reveal living architecture in thirds. */
-export function createCircleStructure(scene: Scene, id: CircleStructureId) {
-  const recipe: StructureRecipe = CIRCLE_STRUCTURES[id];
-  const name = id;
+function buildCircleStructure(scene: Scene, name: CircleStructureId) {
+  const recipe: StructureRecipe = CIRCLE_STRUCTURES[name];
   const root = new TransformNode(name, scene);
-  const material = (
-    id: string,
-    color: readonly [number, number, number],
-    glow = 0,
-  ) => surface(scene, `${name}-${id}`, color, glow);
-  const wood = material("wood", [0.82, 0.74, 0.52]);
-  const bark = material("roots", [0.28, 0.19, 0.12]);
-  const leaf = material("leaves", [0.12, 0.34, 0.22]);
-  const core = material("core", [0.58, 0.28, 0.88], 0.6);
-  const owner = material("owner", [0.48, 0.76, 0.59]);
-  const stem: Builder["stem"] = (id, points, radius, surface = wood) => {
+  const finish = (part: string, color: Vec3, glow = 0) =>
+    surface(scene, `${name}-${part}`, color, glow);
+  const wood = finish("wood", [0.82, 0.74, 0.52]);
+  const bark = finish("roots", [0.28, 0.19, 0.12]);
+  const leaf = finish("leaves", [0.12, 0.34, 0.22]);
+  const core = finish("core", [0.58, 0.28, 0.88], 0.6);
+  const stem: FrameContext["stem"] = (id, points, radius, material = wood) => {
     const mesh = MeshBuilder.CreateTube(
       `${name}-${id}`,
       {
@@ -205,26 +214,31 @@ export function createCircleStructure(scene: Scene, id: CircleStructureId) {
       scene,
     );
     mesh.parent = root;
-    mesh.material = surface;
+    mesh.material = material;
     return mesh;
   };
-  const plate: Builder["plate"] = (id, position, size, surface = leaf) => {
+  const plate: FrameContext["plate"] = (
+    id,
+    position,
+    size,
+    material = leaf,
+  ) => {
     const mesh = MeshBuilder.CreateSphere(
       `${name}-${id}`,
       { diameter: 1, segments: 6 },
       scene,
     );
     mesh.parent = root;
-    mesh.material = surface;
-    mesh.position.copyFromFloats(position[0]!, position[1]!, position[2]!);
-    mesh.scaling.copyFromFloats(size[0]!, size[1]!, size[2]!);
+    mesh.material = material;
+    mesh.position.set(...position);
+    mesh.scaling.set(...size);
     return mesh;
   };
   const { halfWidth, halfDepth, height } = recipe;
   for (let index = 0; index < 6; index++) {
     const angle = (index * Math.PI) / 3;
-    const x = Math.cos(angle) * halfWidth,
-      z = Math.sin(angle) * halfDepth;
+    const x = Math.cos(angle) * halfWidth;
+    const z = Math.sin(angle) * halfDepth;
     stem(
       `growth-roots-${index}`,
       [
@@ -251,23 +265,50 @@ export function createCircleStructure(scene: Scene, id: CircleStructureId) {
       "growth-canopy-owner",
       [0, height * 0.62, halfDepth * 0.85],
       [0.35, 0.3, 0.12],
-      owner,
+      finish("owner", [0.48, 0.76, 0.59]),
     );
-  else owner.dispose();
   const pulse = plate(
     "growth-canopy-focus",
     [0, recipe.focusHeight, 0],
     [0.3, 0.45, 0.3],
     core,
   );
-  return {
+  // Keep the animated focus separate; static parts batch by growth layer.
+  for (const layer of ["roots", "ribs", "canopy"]) {
+    const groups = new Map<StandardMaterial, Mesh[]>();
+    for (const mesh of root.getChildMeshes()) {
+      if (
+        !(mesh instanceof Mesh) ||
+        !mesh.name.includes(`growth-${layer}`) ||
+        mesh.name.endsWith("-focus")
+      )
+        continue;
+      const material = mesh.material as StandardMaterial;
+      const group = groups.get(material) ?? [];
+      group.push(mesh);
+      groups.set(material, group);
+    }
+    for (const [material, parts] of groups)
+      merge(root, `${name}-growth-${layer}-${material.name}`, parts, material);
+  }
+  clip(
     root,
-    pose: (seconds: number) => {
+    "idle",
+    2,
+    (seconds) => {
       pulse.scaling.set(
         0.3,
         0.45 * (1 + Math.sin(seconds * Math.PI) * 0.12),
         0.3,
       );
     },
-  };
+    false,
+  );
 }
+
+export const CIRCLE_MODELS = Object.fromEntries(
+  (Object.keys(CIRCLE_STRUCTURES) as CircleStructureId[]).map((id) => [
+    id,
+    (scene: Scene) => buildCircleStructure(scene, id),
+  ]),
+) as Record<CircleStructureId, (scene: Scene) => void>;

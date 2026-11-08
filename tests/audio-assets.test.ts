@@ -7,7 +7,7 @@ import {
   SOUND_ASSETS,
   soundLoops,
   soundPeak,
-} from "../src/content/audio-assets";
+} from "../scripts/audio-assets";
 
 const entries = [
   ...Object.entries(SOUND_ASSETS).map(([id, asset]) => ({

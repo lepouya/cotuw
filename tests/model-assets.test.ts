@@ -5,6 +5,8 @@ import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearan
 import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
 
+import type { PBRMaterial } from "@babylonjs/core";
+
 test.each(["wolf", "alpha-wolf", "arc-harvester"])(
   "%s loads its generated clips and holds its death pose",
   async (id) => {
@@ -24,17 +26,15 @@ test.each(["wolf", "alpha-wolf", "arc-harvester"])(
           root.getChildMeshes().find((mesh) => mesh.skeleton)!.skeleton;
         expect(rig(first.root)).not.toBe(rig(second.root));
         const legs = () =>
-          scene.getTransformNodeByName("first-wolf-wolf-leg-0")!
-            .rotationQuaternion!.x;
+          scene.getTransformNodeByName("first-wolf-leg-0")!.rotationQuaternion!
+            .x;
         first.animate!({ distance: 0.1, seconds: 0.1, turn: 0 });
         scene.animate();
         expect(Math.abs(legs())).toBeGreaterThan(0.01);
         first.play!("attack");
         first.animate!({ distance: 0, seconds: 0.1, turn: 0 });
         scene.animate();
-        const head = scene.getTransformNodeByName(
-          "first-wolf-wolf-head-joint",
-        )!;
+        const head = scene.getTransformNodeByName("first-wolf-head-joint")!;
         expect(head.rotationQuaternion!.x).toBeLessThan(-0.1);
       } else {
         first.setAnimationState!({ working: true });
@@ -46,6 +46,15 @@ test.each(["wolf", "alpha-wolf", "arc-harvester"])(
         expect(scene.getMeshByName("first-working-signal")!.isEnabled()).toBe(
           true,
         );
+        // DESIGN: generated amber and green lamps show state without motion.
+        const lamp = (signal: string) =>
+          (scene.getMeshByName(signal)!.material as PBRMaterial).albedoColor;
+        expect(lamp("second-idle-signal").r).toBeGreaterThan(
+          lamp("second-idle-signal").b * 4,
+        );
+        expect(lamp("first-working-signal").g).toBeGreaterThan(
+          lamp("first-working-signal").r * 4,
+        );
         expect(scene.getMeshByName("second-working-signal")!.isEnabled()).toBe(
           false,
         );
@@ -55,9 +64,7 @@ test.each(["wolf", "alpha-wolf", "arc-harvester"])(
       const height = () => {
         if (id === "arc-harvester")
           return first.root.getHierarchyBoundingVectors(true).max.y;
-        const head = scene.getTransformNodeByName(
-          "first-wolf-wolf-head-joint",
-        )!;
+        const head = scene.getTransformNodeByName("first-wolf-head-joint")!;
         head.computeWorldMatrix(true);
         return head.getAbsolutePosition().y;
       };

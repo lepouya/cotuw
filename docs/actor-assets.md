@@ -40,9 +40,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   untended or capacity-blocked work holds still with a grey progress bar.
   Saved tick progress restores the layer. Static parts batch by layer and
   material, keeping the animated focus separate. Falling leaves show damage.
-- Building and vehicle geometry builders in `src/render` supply the export
-  script. A building's details declare `loopSeconds`, the period of their
-  motion, which becomes the exported idle clip, and `activities`, whose
+- Building details and the wolf and Harvester parts in `src/render` supply both
+  the built-in models and the export script, which receives named parts and
+  adds rigging and clips. A building's details declare `loopSeconds`, the period
+  of their motion, which becomes the exported idle clip, and `activities`, whose
   one-shot motions become clips named for each activity. The base pack loads
   the resulting GLBs during gameplay.
 - Models use generated materials and vertex colors. They require no separate
@@ -61,7 +62,7 @@ clips match their generators, and reject unregistered files in `public/assets`.
 
 Each command prints its textures' minimap colors and its clip definitions;
 update matching content-pack graphics when changing the art.
-Generated terrain edges match by construction and need no reconciliation pass.
+Generated terrain edges match by construction.
 Foundations and rubble are unit-cube models scaled to their placement.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
 

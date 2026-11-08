@@ -11,9 +11,9 @@ export function wrap(value: number, period: number): number {
 
 /** The color `t` of the way from `from` to `to`. */
 export function mixRgba(from: Rgba, to: Rgba, t: number): Rgba {
-  return [0, 1, 2, 3].map(
-    (channel) => from[channel]! + (to[channel]! - from[channel]!) * t,
-  ) as unknown as Rgba;
+  const channel = (index: 0 | 1 | 2 | 3) =>
+    from[index] + (to[index] - from[index]) * t;
+  return [channel(0), channel(1), channel(2), channel(3)];
 }
 
 /** A frame that repeats every `period` pixels, in premultiplied 0-1 RGBA. */

@@ -1,9 +1,4 @@
-import { createCircleStructure } from "./circle-models.ts";
-import type { CircleStructureId } from "./circle-models.ts";
-import { surface } from "./model-surface.ts";
 import {
-  Animation,
-  AnimationGroup,
   Bone,
   Color3,
   Matrix,
@@ -17,115 +12,37 @@ import {
   VertexData,
 } from "@babylonjs/core";
 
-import { createCommandCenterDetails } from "../src/render/command-center.ts";
 import { createBarracksDetails } from "../src/render/barracks.ts";
-import { createRefineryDetails } from "../src/render/refinery.ts";
-import { createHarvesterAppearance } from "../src/render/harvester.ts";
-import { createWolfAppearance } from "../src/render/wolf.ts";
 import {
   BITE_COLOR,
   BOLT_COLOR,
   TRACER_COLOR,
 } from "../src/render/combat-effects.ts";
+import { createCommandCenterDetails } from "../src/render/command-center.ts";
+import {
+  addHarvesterWorkParts,
+  createHarvesterBody,
+  HARVESTER_IDLE_LIGHT,
+  HARVESTER_WORK_LIGHT,
+} from "../src/render/harvester.ts";
 import {
   MATERIALS_COLOR,
   SALVAGE_COLOR,
 } from "../src/render/materials-sites.ts";
-import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
+import { createRefineryDetails } from "../src/render/refinery.ts";
+import { createWolfParts } from "../src/render/wolf.ts";
+import { CIRCLE_MODELS } from "./circle-models.ts";
+import { exportGlb, rigidSkin } from "./glb-export.ts";
+import { clip, merge, surface, unlit } from "./model-toolkit.ts";
 import { seededRandom } from "./sprite-sheet.ts";
 
 import type { Scene } from "@babylonjs/core";
-import type { ActorAppearance } from "../src/render/actor.ts";
 import type { TilePlacedActorDetailsFactory } from "../src/render/tile-placed-actor-view.ts";
 
-/** Samples authored poses into glTF node channels; playback needs no builder. */
-function clip(
-  root: TransformNode,
-  name: string,
-  seconds: number,
-  pose: (seconds: number) => void,
-  completePose = true,
-) {
-  const nodes = [
-    root,
-    ...root
-      .getDescendants(false)
-      .filter((node): node is TransformNode => node instanceof TransformNode),
-  ];
-  const rest = nodes.map((node) => ({
-    position: node.position.clone(),
-    rotation: node.rotation.clone(),
-    scaling: node.scaling.clone(),
-  }));
-  const restore = () =>
-    nodes.forEach((node, index) => {
-      node.position.copyFrom(rest[index]!.position);
-      node.rotation.copyFrom(rest[index]!.rotation);
-      node.scaling.copyFrom(rest[index]!.scaling);
-    });
-  const endFrame = seconds * FRAMES_PER_SECOND;
-  const frames = Math.ceil(endFrame);
-  const keys = nodes.map(() => ({
-    position: [] as { frame: number; value: Vector3 }[],
-    rotationQuaternion: [] as { frame: number; value: Quaternion }[],
-    scaling: [] as { frame: number; value: Vector3 }[],
-  }));
-  for (let frame = 0; frame <= frames; frame++) {
-    restore();
-    // Include the exact endpoint between sample frames.
-    const keyFrame = Math.min(frame, endFrame);
-    pose(keyFrame / FRAMES_PER_SECOND);
-    nodes.forEach((node, index) => {
-      keys[index]!.position.push({
-        frame: keyFrame,
-        value: node.position.clone(),
-      });
-      keys[index]!.rotationQuaternion.push({
-        frame: keyFrame,
-        value: Quaternion.FromEulerVector(node.rotation),
-      });
-      keys[index]!.scaling.push({
-        frame: keyFrame,
-        value: node.scaling.clone(),
-      });
-    });
-  }
-  const group = new AnimationGroup(name, root.getScene());
-  restore();
-  nodes.forEach((node, index) => {
-    node.rotationQuaternion = Quaternion.FromEulerVector(node.rotation);
-    for (const property of [
-      "position",
-      "rotationQuaternion",
-      "scaling",
-    ] as const) {
-      const values = keys[index]![property];
-      const first = values[0]!.value.asArray();
-      if (
-        !completePose &&
-        values.every(({ value }) =>
-          value
-            .asArray()
-            .every((component, channel) => component === first[channel]),
-        )
-      )
-        continue;
-      const animation = new Animation(
-        `${name}-${node.name}-${property}`,
-        property,
-        FRAMES_PER_SECOND,
-        property === "rotationQuaternion"
-          ? Animation.ANIMATIONTYPE_QUATERNION
-          : Animation.ANIMATIONTYPE_VECTOR3,
-      );
-      animation.setKeys(keys[index]![property]);
-      group.addTargetedAnimation(animation, node);
-    }
-  });
-  return group;
-}
-
-/** Rigid weights preserve the part hierarchy while exporting a real skin. */
+/**
+ * Rigid weights preserve the part hierarchy while exporting a real skin. Joints
+ * replace the parts, so this returns each part's joint.
+ */
 function skin(root: TransformNode) {
   const scene = root.getScene();
   const parts = root
@@ -148,8 +65,7 @@ function skin(root: TransformNode) {
     for (const child of part.getChildren()) child.parent = joint;
     return joint;
   });
-  const skeleton = new Skeleton("wolf-rig", "wolf-rig", scene);
-  skeleton.useTextureToStoreBoneMatrices = true;
+  const skeleton = new Skeleton(`${root.name}-rig`, `${root.name}-rig`, scene);
   const bones = new Map<TransformNode, Bone>();
   const add = (node: TransformNode): Bone | null => {
     if (node === root) return null;
@@ -167,68 +83,27 @@ function skin(root: TransformNode) {
     return bone;
   };
   for (const joint of joints) add(joint);
-  for (const material of new Set(parts.map((part) => part.material)))
+  const pieces = parts.map((part, index) => ({
+    material: part.material!,
+    vertices: vertices[index]!,
+    bone: skeleton.bones.indexOf(bones.get(joints[index]!)!),
+  }));
+  for (const material of new Set(pieces.map((piece) => piece.material)))
     rigidSkin(
-      `wolf-${material!.name}-skin`,
-      parts.flatMap((part, index) =>
-        part.material === material
-          ? [
-              {
-                vertices: vertices[index]!,
-                bone: skeleton.bones.indexOf(bones.get(joints[index]!)!),
-              },
-            ]
-          : [],
-      ),
+      `${root.name}-${material.name}-skin`,
+      pieces.filter((piece) => piece.material === material),
       skeleton,
-      material!,
+      material,
       root,
     );
   for (const part of parts) part.dispose(false, false);
-}
-
-function unlit(scene: Scene, name: string, color: Color3) {
-  const material = surface(scene, name, color);
-  material.disableLighting = true;
-  material.emissiveColor = material.diffuseColor;
-  return material;
-}
-
-/** Bakes parts that share a material into one mesh, keeping draw calls low. */
-function merge(
-  root: TransformNode,
-  name: string,
-  parts: Mesh[],
-  material: StandardMaterial,
-) {
-  const mesh = Mesh.MergeMeshes(parts, true, true)!;
-  mesh.convertToFlatShadedMesh();
-  mesh.name = name;
-  mesh.material = material;
-  mesh.parent = root;
-}
-
-/** Instantiates a built-in actor's parts as the model, without its template. */
-function actorParts(
-  scene: Scene,
-  name: string,
-  create: (scene: Scene) => ActorAppearance,
-) {
-  const instance = create(scene).instantiate(name, 0);
-  // Remove the hidden template without releasing the instance's materials.
-  scene.getTransformNodeByName(`${name}-template`)!.dispose(false, false);
-  return instance.root;
+  return new Map(parts.map((part, index) => [part, joints[index]!]));
 }
 
 function wolf(scene: Scene, name: string) {
-  const root = actorParts(scene, name, createWolfAppearance);
-  skin(root);
-  const hips = root
-    .getChildTransformNodes()
-    .filter((node) => /wolf-leg-\d$/.test(node.name));
-  const head = root
-    .getChildTransformNodes()
-    .find((node) => node.name.endsWith("wolf-head-joint"))!;
+  const parts = createWolfParts(scene, name);
+  const { root, legs: hips } = parts;
+  const head = skin(root).get(parts.head)!;
   clip(root, "idle", 2, (seconds) => {
     head.rotation.x = -0.15 + Math.sin(seconds * Math.PI) * 0.025;
   });
@@ -248,13 +123,13 @@ function wolf(scene: Scene, name: string) {
     root.position.y = (1 - Math.cos(phase * 2)) * 0.035;
     head.rotation.x = -0.15 - Math.sin(phase) * 0.08;
   });
-  for (const [name, sign] of [
+  for (const [turn, sign] of [
     ["turn-left", -1],
     ["turn-right", 1],
   ] as const)
     clip(
       root,
-      name,
+      turn,
       0.3,
       (seconds) => {
         const amount = seconds / 0.3;
@@ -296,12 +171,18 @@ function wolf(scene: Scene, name: string) {
 }
 
 function harvester(scene: Scene, name: string) {
-  const root = actorParts(scene, name, createHarvesterAppearance);
-  const drill = scene.getTransformNodeByName("harvester-drill")!;
-  const amber = scene.getMeshByName("harvester-work-beacon")!;
+  const body = createHarvesterBody(scene, name);
+  const { root, steel } = body;
+  const { drill, beacon: amber } = addHarvesterWorkParts(
+    scene,
+    root,
+    name,
+    body,
+  );
   amber.name = "idle-signal";
+  amber.material = surface(scene, "idle-light", HARVESTER_IDLE_LIGHT, 0.25);
   const green = amber.clone("working-signal", root)!;
-  green.material = surface(scene, "working-light", [0.2, 1, 0.65], 0.25);
+  green.material = surface(scene, "working-light", HARVESTER_WORK_LIGHT, 0.25);
   const hopper = MeshBuilder.CreateBox(
     "harvester-hopper",
     {
@@ -313,7 +194,7 @@ function harvester(scene: Scene, name: string) {
   );
   hopper.parent = root;
   hopper.position.set(0, 0.73, -0.35);
-  hopper.material = scene.getMaterialByName("harvester-steel");
+  hopper.material = steel;
   clip(root, "idle", 2, () => {});
   clip(root, "transit", 1, (seconds) => {
     root.position.y = Math.sin(seconds * Math.PI * 4) * 0.018;
@@ -481,13 +362,11 @@ function bite(scene: Scene, name: string) {
 }
 
 /** A unit cube that placement scales to fit. */
-function cube(color: [number, number, number]) {
-  return (scene: Scene, name: string) => {
-    const root = new TransformNode(name, scene);
-    const mesh = MeshBuilder.CreateBox(name, { size: 1 }, scene);
-    mesh.parent = root;
-    mesh.material = surface(scene, name, color);
-  };
+function foundation(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const mesh = MeshBuilder.CreateBox(name, { size: 1 }, scene);
+  mesh.parent = root;
+  mesh.material = surface(scene, name, [0.35, 0.42, 0.46]);
 }
 
 /** A tall crystal ringed by shorter ones leaning outward, on a stony bed. */
@@ -563,11 +442,11 @@ function materialsMound(scene: Scene, name: string) {
 function rubble(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
   const random = seededRandom(0x5ab0);
-  const pieces = new Map<string, Mesh[]>([
-    ["concrete", []],
-    ["scorched", []],
-    ["metal", []],
-  ]);
+  const pieces = {
+    concrete: [] as Mesh[],
+    scorched: [] as Mesh[],
+    metal: [] as Mesh[],
+  };
   for (let index = 0; index < 16; index++) {
     const width = 0.14 + random() * 0.3;
     const height = 0.25 + random() * 0.65;
@@ -587,7 +466,7 @@ function rubble(scene: Scene, name: string) {
       random() * Math.PI,
       (random() - 0.5) * 0.5,
     );
-    pieces.get(random() < 0.3 ? "scorched" : "concrete")!.push(chunk);
+    pieces[random() < 0.3 ? "scorched" : "concrete"].push(chunk);
   }
   for (let index = 0; index < 3; index++) {
     const beam = MeshBuilder.CreateBox(
@@ -597,19 +476,14 @@ function rubble(scene: Scene, name: string) {
     );
     beam.position.set((random() - 0.5) * 0.5, -0.25, (random() - 0.5) * 0.3);
     beam.rotation.set(0.35 + random() * 0.3, random() * Math.PI, 0);
-    pieces.get("metal")!.push(beam);
+    pieces.metal.push(beam);
   }
   for (const [part, color] of [
     ["concrete", [0.3, 0.29, 0.27]],
     ["scorched", [0.12, 0.11, 0.1]],
     ["metal", [0.4, 0.38, 0.35]],
   ] as const)
-    merge(
-      root,
-      part,
-      pieces.get(part)!,
-      surface(scene, `rubble-${part}`, [...color]),
-    );
+    merge(root, part, pieces[part], surface(scene, `rubble-${part}`, color));
 }
 
 /** A ribboned gift box that bobs and turns. */
@@ -783,6 +657,17 @@ function fire(scene: Scene, name: string) {
   });
 }
 
+/** A flat falling leaf for damaged living buildings. */
+function leaf(scene: Scene, name: string) {
+  const mesh = MeshBuilder.CreateSphere(
+    name,
+    { diameter: 1, segments: 4 },
+    scene,
+  );
+  mesh.scaling.set(0.35, 0.06, 0.16);
+  mesh.material = surface(scene, name, [0.24, 0.42, 0.19]);
+}
+
 /** A falling drop for wounded biological actors. */
 function wound(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
@@ -880,40 +765,9 @@ function bird(scene: Scene, name: string) {
   });
 }
 
-const circleBuilding =
-  (id: CircleStructureId) => (scene: Scene, name: string) => {
-    const { root, pose } = createCircleStructure(scene, id);
-    // Keep the animated focus separate; static parts batch by growth layer.
-    for (const layer of ["roots", "ribs", "canopy"]) {
-      const groups = new Map<StandardMaterial, Mesh[]>();
-      for (const mesh of root.getChildMeshes()) {
-        if (
-          !(mesh instanceof Mesh) ||
-          !mesh.name.includes(`growth-${layer}`) ||
-          mesh.name.endsWith("-focus")
-        )
-          continue;
-        const material = mesh.material as StandardMaterial;
-        const group = groups.get(material) ?? [];
-        group.push(mesh);
-        groups.set(material, group);
-      }
-      for (const [material, parts] of groups)
-        merge(
-          root,
-          `${name}-growth-${layer}-${material.name}`,
-          parts,
-          material,
-        );
-    }
-    clip(root, "idle", 2, pose, false);
-  };
 /** Each model's builder fills an empty scene with nodes, materials, and clips. */
 const BUILDERS = {
-  "circle-heartgrove": circleBuilding("circle-heartgrove"),
-  "circle-conservatory": circleBuilding("circle-conservatory"),
-  "circle-musterhall": circleBuilding("circle-musterhall"),
-  "cultivation-site": circleBuilding("cultivation-site"),
+  ...CIRCLE_MODELS,
   "command-center": building(createCommandCenterDetails),
   barracks: building(createBarracksDetails),
   refinery: building(createRefineryDetails),
@@ -922,28 +776,20 @@ const BUILDERS = {
   "materials-mound": materialsMound,
   salvage,
   rubble,
-  foundation: cube([0.35, 0.42, 0.46]),
+  foundation,
   scaffold,
   tracer,
   bolt,
   bite,
   smoke,
   fire,
-  leaf: (scene, name) => {
-    const leaf = MeshBuilder.CreateSphere(
-      name,
-      { diameter: 1, segments: 4 },
-      scene,
-    );
-    leaf.scaling.set(0.35, 0.06, 0.16);
-    leaf.material = surface(scene, name, [0.24, 0.42, 0.19]);
-  },
+  leaf,
   wound,
   bird,
   regeneration,
 } satisfies Record<string, (scene: Scene, name: string) => void>;
 
-export type ModelAsset = keyof typeof BUILDERS;
+type ModelAsset = keyof typeof BUILDERS;
 export const MODEL_ASSETS = Object.keys(BUILDERS) as ModelAsset[];
 
 /** Exports model geometry, materials, rigs, and clips from code alone. */

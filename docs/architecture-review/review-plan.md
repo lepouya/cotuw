@@ -786,7 +786,7 @@ product work in `TODO.md`, and remove temporary files in
 
 ### Tier 2: generators, tooling, and documentation (`scripts/`, `docs/`)
 
-- [ ] **Slice 10: procedural model, texture, and audio generators**
+- [x] **Slice 10: procedural model, texture, and audio generators**
   (20 files, ~3,625 LOC)
   - `scripts/`: `assets.ts`, `write-assets.ts`, `model-assets.ts`,
     `infantry-model.ts`, `circle-models.ts`, `model-surface.ts`,
@@ -797,6 +797,90 @@ product work in `TODO.md`, and remove temporary files in
     `generate-grass.ts`, `generate-effects.ts`, `generate-audio.ts`.
   - Focus: shared procedural geometry/rigging/material abstractions and
     synthesis modularity ahead of `1.43` and `1.53`.
+  - Manifest after Pass A (12 files in `scripts/`, plus `src/render/wolf.ts`
+    and `src/render/harvester.ts` for the changed seam): `assets.ts`,
+    `generate-assets.ts`, `model-assets.ts`, `model-toolkit.ts`,
+    `infantry-model.ts`, `circle-models.ts`, `glb-export.ts`,
+    `terrain-textures.ts`, `grass-sheet.ts`, `muzzle-flash-sheet.ts`,
+    `sprite-sheet.ts`, `audio-assets.ts`. Removed: the six
+    `generate-<family>.ts` wrappers, `write-assets.ts`, `model-surface.ts`,
+    `reconcile-texture-edges.ts`, and `src/content/audio-assets.ts`.
+  - [x] **Pass A** (modular assessment and refactor, base `5c059ba`):
+    - Wolf and Harvester return named parts to both adapters (Slice 7
+      deferral): `createWolfParts`, `createHarvesterBody`, and
+      `addHarvesterWorkParts`. The exporter no longer instantiates a stand-in,
+      disposes `${name}-template`, or finds nodes and materials by string.
+    - Bug fixed: the exporter never ran `setAnimationState`, so the shipped
+      Harvester's `idle-signal` lamp was grey. DESIGN requires amber. It now
+      uses `HARVESTER_IDLE_LIGHT`, shared with the stand-in; tested.
+    - `harvester.glb` and `wolf.glb` regenerated. Binary chunks are identical
+      and JSON differs only by the doubled name prefix and the amber material
+      (script diff). `wolf-wolf-*` tests became `wolf-*`.
+    - `model-toolkit.ts` owns `surface`, `unlit`, `merge`, and `clip`.
+      `circle-models.ts` owns the whole structure build and exports
+      `CIRCLE_MODELS`, ending the split with `model-assets.ts` ahead of `1.53`.
+    - `generate-assets.ts [family...]` replaces the wrappers and
+      `write-assets.ts`, rejecting unknown families. The `npm run assets:*`
+      names stay. `reconcile-texture-edges.ts` removed: no script, test, or doc
+      called it, and DESIGN makes generators the source of art.
+    - The audio inventory moved into `scripts/audio-assets.ts` (Slice 9
+      deferral): nothing at runtime imported it.
+    - No persisted format change. All generated files other than the two GLBs
+      stayed byte-identical. Docs: `actor-assets.md`, `audio-assets.md`.
+      Substantial moves and interface changes, so Pass B runs in its own
+      session.
+    - Checks: format, lint, typecheck, units (`1371` passed), asset tests
+      (`127` passed), and a Vite build pass. The five smoke checks and the
+      affected `presentation`, `audio-assets`, `economy`, and `actor` specs
+      pass on the host.
+    - Kept: `ASSET_FAMILIES` and `TilePlacedActorDetailsFactory`, a real
+      two-adapter seam; runtime color imports in `model-assets.ts`, since
+      generated models must match runtime fallbacks.
+    - Rejected: merging the infantry and model clip samplers (different key
+      cadence and channels; every GLB would change), sharing one RNG between
+      audio and sprites (different distributions; rewrites 26 MB of WAVs), and
+      splitting effect and prop builders (line count only, no change pressure).
+    - Deferred to `1.43`: infantry `accent` parts bake into the vertex-colored
+      body, so owner colors need a separate marking mesh and regenerated GLBs.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `audio-assets.ts`: `ARRANGEMENTS` gives each arrangement its pad, motif,
+      and percussion, replacing `buildMusic`'s `organic` branches; audition
+      entries take their assets instead of filtering by a bus flag; pluck note
+      tuples are `as const`.
+    - `circle-models.ts`: `Builder` -> `FrameContext`; `stem` and `plate` no
+      longer shadow `surface`; `Vec3` tuples replace `number[]` indexing; the
+      owner material is created only when used, not created and disposed.
+    - `model-assets.ts`: imports grouped; `skin` names its rig from the root and
+      groups pieces by material without `flatMap`; a no-op bone-texture setting
+      removed (it is Babylon's default); `foundation` and `leaf` are named
+      builders; `rubble` uses a keyed object; `turn` no longer shadows `name`;
+      `ModelAsset` made module-private.
+    - `model-toolkit.ts`: `clip` returns nothing, since no caller used its
+      group, and documents `completePose`.
+    - `infantry-model.ts`: a `SHAPES` table replaces the nested ternary;
+      `PARTS` -> `ARC_PARTS`; `skinned` no longer shadows `parts`.
+    - `assets.ts`: families use one `AssetFamily` type, so callers read
+      `family.clips` without `in` checks; unused `AssetFamilyName` removed.
+      `sprite-sheet.ts`: `mixRgba` without a double cast. `grass-sheet.ts`: one
+      density read per placement; `GrassStyle` module-private.
+      `terrain-textures.ts`: IDs derive from `BUILDERS`.
+    - Reviewed without change: `glb-export.ts`, `muzzle-flash-sheet.ts`,
+      `generate-assets.ts` beyond its comment and clip read, `wolf.ts`,
+      `harvester.ts`.
+    - The Babylon bone-uniform warning during export is benign: `NullEngine`
+      reports zero vertex uniforms, and it does not affect the GLB.
+    - Kept: `seededRandom` in `sprite-sheet.ts`, since a one-function module
+      adds a file without removing a cost; `ARC_SKIN`, since every palette
+      defining every finish keeps `palette[finish]` total; separate clip and
+      rig code; the unused fourth grass offset and duplicate `healing-cross`
+      node names, since changing them alters committed art.
+    - Review: no actionable code findings. The two changed GLBs retain
+      identical binary chunks; JSON changes are names and the amber lamp.
+      Focused CLI checks cover named-family generation and unknown-family
+      rejection. Asset tests (`127` passed) verify all committed output.
+      Focused Chromium and WebKit checks (`25` passed) cover stand-in
+      replacement, generated models and clips, Harvester presentation and
+      controls, wolf combat, audio decoding, and audio audition.
 
 - [ ] **Slice 11: level/build/benchmark scripts and documentation suite**
   (17 script files + configs + 16 Markdown docs)

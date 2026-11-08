@@ -30,7 +30,7 @@ export const GRASS_CLIP = {
   playback: "loop",
 } as const;
 
-export type GrassStyle = {
+type GrassStyle = {
   seed: number;
   tufts: number;
   /** Short blades scattered between tufts. */
@@ -62,7 +62,8 @@ type Blade = {
 export function buildGrassSheet(style: GrassStyle): PNG {
   const random = seededRandom(style.seed);
   const between = (low: number, high: number) => low + (high - low) * random();
-  // Whole waves per period keep the field seamless.
+  // Whole waves per period keep the field seamless. The unused fourth offset
+  // holds the seeded sequence the committed sheets came from.
   const offsets = Array.from({ length: 4 }, () => random() * Math.PI * 2);
   const wave = (x: number, y: number, fx: number, fy: number, k: number) =>
     Math.sin(((fx * x + fy * y) / PERIOD) * Math.PI * 2 + offsets[k]!);
@@ -78,7 +79,8 @@ export function buildGrassSheet(style: GrassStyle): PNG {
     for (;;) {
       const x = random() * PERIOD;
       const y = random() * PERIOD;
-      if (random() < density(x, y)) return { x, y, dense: density(x, y) };
+      const dense = density(x, y);
+      if (random() < dense) return { x, y, dense };
     }
   };
   /** Sparse ground looks drier. */

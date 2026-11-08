@@ -75,7 +75,7 @@ const JOINTS: Joint[] = [
 ];
 
 /** Positions are in the model's rest pose, relative to the ground point. */
-const PARTS: Part[] = [
+const ARC_PARTS: Part[] = [
   part("waist", "pelvis", "box", [0.47, 0.2, 0.3], [0, 0.91, 0], "dark"),
   part("chest", "spine", "box", [0.63, 0.47, 0.34], [0, 1.31, 0], "cloth"),
   part(
@@ -503,7 +503,7 @@ const INFANTRY_RECIPES = {
       visor: [0.19, 0.72, 0.79],
       skin: ARC_SKIN,
     },
-    parts: PARTS,
+    parts: ARC_PARTS,
     stride: 1,
     stance: ARMS_AT_SIDES,
     attack: RIFLE_FIRE,
@@ -517,7 +517,7 @@ const INFANTRY_RECIPES = {
       visor: [0.91, 0.76, 0.34],
       skin: ARC_SKIN,
     },
-    parts: PARTS.filter(({ name }) => !name.startsWith("rifle-")),
+    parts: ARC_PARTS.filter(({ name }) => !name.startsWith("rifle-")),
     stride: 1,
     stance: ARMS_AT_SIDES,
   },
@@ -598,10 +598,10 @@ function buildInfantry(
   visor.metallic = 0;
   visor.roughness = 0.3;
 
-  const skinned = (label: string, parts: Part[], material: PBRMaterial) =>
+  const skinned = (label: string, pieces: Part[], material: PBRMaterial) =>
     rigidSkin(
       `${name}-${label}`,
-      parts.map((each) => ({
+      pieces.map((each) => ({
         vertices: partVertices(scene, each, linear(palette[each.finish])),
         bone: skeleton.bones.indexOf(bones.get(each.joint)!),
       })),
@@ -670,6 +670,7 @@ function buildInfantry(
       if (joint.endsWith("arm")) return [-0.4 + Math.sin(phase) * 0.12, 0, 0];
       return neutral(joint);
     });
+    // Keys the pelvis at rest because blending needs idle's channels.
     shift(work, 60, () => [0, 0, 0]);
   }
   const walk = clip("walk", 30, (joint, phase) => {
@@ -788,30 +789,32 @@ function keyed(
   return animation;
 }
 
+const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
+  box: (scene, name) => MeshBuilder.CreateBox(name, { size: 1 }, scene),
+  sphere: (scene, name) =>
+    MeshBuilder.CreateSphere(name, { diameter: 1, segments: 10 }, scene),
+  cylinder: (scene, name) =>
+    MeshBuilder.CreateCylinder(
+      name,
+      { height: 1, diameter: 1, tessellation: 10 },
+      scene,
+    ),
+  torus: (scene, name) =>
+    MeshBuilder.CreateTorus(
+      name,
+      { diameter: 1, thickness: 0.16, tessellation: 16 },
+      scene,
+    ),
+  leaf: leafMesh,
+};
+
 /** One part's vertices in the rest pose, colored per vertex. */
 function partVertices(
   scene: Scene,
   { name, shape, size, position, tiltX = 0, tiltZ = 0 }: Part,
   color: Color3,
 ): VertexData {
-  const mesh =
-    shape === "sphere"
-      ? MeshBuilder.CreateSphere(name, { diameter: 1, segments: 10 }, scene)
-      : shape === "cylinder"
-        ? MeshBuilder.CreateCylinder(
-            name,
-            { height: 1, diameter: 1, tessellation: 10 },
-            scene,
-          )
-        : shape === "torus"
-          ? MeshBuilder.CreateTorus(
-              name,
-              { diameter: 1, thickness: 0.16, tessellation: 16 },
-              scene,
-            )
-          : shape === "leaf"
-            ? leafMesh(scene, name)
-            : MeshBuilder.CreateBox(name, { size: 1 }, scene);
+  const mesh = SHAPES[shape](scene, name);
   mesh.scaling.set(...size);
   mesh.position.set(...position);
   mesh.rotation.x = tiltX;

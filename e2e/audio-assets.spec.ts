@@ -5,7 +5,7 @@ import {
   MUSIC_ASSETS,
   SOUND_ASSETS,
   soundLoops,
-} from "../src/content/audio-assets";
+} from "../scripts/audio-assets";
 
 test(
   "the browser decodes every audio asset",

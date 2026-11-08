@@ -170,8 +170,8 @@ test.each(["wolf", "alpha-wolf"])(
       expect(node("wolf").position.y).toBeGreaterThan(0.01);
       const lean = node("wolf").rotationQuaternion!.z;
       expect(Math.abs(lean)).toBeGreaterThan(0.005);
-      expect(node("wolf-wolf-leg-0").rotationQuaternion!.x).toBeCloseTo(
-        node("wolf-wolf-leg-1").rotationQuaternion!.x,
+      expect(node("wolf-leg-0").rotationQuaternion!.x).toBeCloseTo(
+        node("wolf-leg-1").rotationQuaternion!.x,
       );
       first.setAnimationState!({ running: false });
       step(0.1, 0.2, -0.2);

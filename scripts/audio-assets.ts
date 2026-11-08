@@ -1,23 +1,108 @@
 // Original synthesis and composition; no recordings or instrument samples.
-import {
-  AUDIO_SAMPLE_RATE,
-  MUSIC_ASSETS,
-  SOUND_ASSETS,
-  soundLoops,
-  soundPeak,
-} from "../src/content/audio-assets.ts";
+export const AUDIO_SAMPLE_RATE = 32_000;
 
-import type { MusicId, SoundId } from "../src/content/audio-assets.ts";
+export const SOUND_ASSETS = {
+  "command-accepted": { seconds: 0.25, label: "Command accepted" },
+  "command-invalid": { seconds: 0.38, label: "Invalid action" },
+  "rifle-1": { seconds: 0.65, label: "Trooper rifle · variant 1" },
+  "rifle-2": { seconds: 0.65, label: "Trooper rifle · variant 2" },
+  "rifle-3": { seconds: 0.65, label: "Trooper rifle · variant 3" },
+  "circle-cast-1": { seconds: 0.8, label: "Living focus · variant 1" },
+  "circle-cast-2": { seconds: 0.8, label: "Living focus · variant 2" },
+  "circle-cultivation": {
+    seconds: 8,
+    label: "Lifebloom cultivation",
+    loop: true,
+    peak: 0.22,
+  },
+  "circle-growth": {
+    seconds: 4,
+    label: "Living construction",
+    loop: true,
+    peak: 0.3,
+  },
+  "living-hit": { seconds: 0.5, label: "Living impact" },
+  "wolf-attack": { seconds: 0.75, label: "Wolf attack" },
+  "damage-1": { seconds: 0.45, label: "Damage · variant 1" },
+  "damage-2": { seconds: 0.45, label: "Damage · variant 2" },
+  alert: { seconds: 1.1, label: "Player alert" },
+  "objective-complete": { seconds: 2.4, label: "Objective complete" },
+  victory: { seconds: 4.8, label: "Victory" },
+  defeat: { seconds: 4.8, label: "Defeat" },
+  "training-start": { seconds: 0.9, label: "Barracks training started" },
+  "unit-trained": { seconds: 1.4, label: "Unit trained" },
+  "harvester-work": {
+    seconds: 4,
+    label: "Harvester drilling",
+    loop: true,
+    peak: 0.42,
+  },
+  "harvester-engine": {
+    seconds: 4,
+    label: "Harvester moving engine",
+    loop: true,
+    peak: 0.38,
+  },
+  "refinery-door-open": { seconds: 0.8, label: "Refinery garage opening" },
+  "refinery-door-close": { seconds: 0.8, label: "Refinery garage closing" },
+} as const;
+
+export type SoundId = keyof typeof SOUND_ASSETS;
+
+export function soundLoops(id: SoundId): boolean {
+  const asset = SOUND_ASSETS[id];
+  return "loop" in asset && asset.loop;
+}
+
+export function soundPeak(id: SoundId): number {
+  const asset = SOUND_ASSETS[id];
+  return "peak" in asset ? asset.peak : 0.72;
+}
+
+export const MUSIC_ASSETS = {
+  "unquiet-frontier": {
+    arrangement: "synth",
+    seconds: 48,
+    label: "Unquiet Frontier",
+    tension: false,
+    description: "Exploration: warm pads, glass notes, and a sparse low pulse.",
+  },
+  "beneath-the-ridge": {
+    arrangement: "synth",
+    seconds: 48,
+    label: "Beneath the Ridge",
+    tension: true,
+    description:
+      "Tension: darker pads, a muted sequence, and restrained drums.",
+  },
+  "circle-frontier": {
+    arrangement: "organic",
+    seconds: 48,
+    label: "Unquiet Frontier · Circle",
+    tension: false,
+    description:
+      "Exploration: plucked strings, breathy woodwinds, and soft wooden percussion.",
+  },
+  "circle-ridge": {
+    arrangement: "organic",
+    seconds: 48,
+    label: "Beneath the Ridge · Circle",
+    tension: true,
+    description:
+      "Tension: interwoven strings, airy reeds, and a stronger wood-and-skin pulse.",
+  },
+} as const;
+
+export type MusicId = keyof typeof MUSIC_ASSETS;
 
 const TAU = Math.PI * 2;
-const RATE = AUDIO_SAMPLE_RATE;
 type Mix = { channels: Float64Array[]; loop: boolean };
 
 function mix(seconds: number, stereo = false, loop = false): Mix {
   return {
     channels: Array.from(
       { length: stereo ? 2 : 1 },
-      () => new Float64Array(Math.round(seconds * RATE)),
+      () => new Float64Array(Math.round(seconds * AUDIO_SAMPLE_RATE)),
     ),
     loop,
   };
@@ -38,16 +123,16 @@ function voice(
   sample: (time: number) => number,
   pan = 0,
 ) {
-  const offset = Math.round(start * RATE);
+  const offset = Math.round(start * AUDIO_SAMPLE_RATE);
   const frames = target.channels[0]!.length;
   const gains =
     target.channels.length === 1
       ? [1]
       : [Math.sqrt((1 - pan) / 2), Math.sqrt((1 + pan) / 2)];
-  for (let i = 0; i < Math.round(seconds * RATE); i++) {
+  for (let i = 0; i < Math.round(seconds * AUDIO_SAMPLE_RATE); i++) {
     const position = offset + i;
     if (!target.loop && position >= frames) break;
-    const value = sample(i / RATE);
+    const value = sample(i / AUDIO_SAMPLE_RATE);
     for (const [channel, samples] of target.channels.entries())
       samples[position % frames]! += value * gains[channel]!;
   }
@@ -127,7 +212,9 @@ function echo(target: Mix, seconds: number, amount: number, repeats: number) {
   for (const [channel, samples] of target.channels.entries()) {
     const dry = samples.slice();
     for (let repeat = 1; repeat <= repeats; repeat++) {
-      const offset = Math.round((seconds + channel * 0.013) * RATE * repeat);
+      const offset = Math.round(
+        (seconds + channel * 0.013) * AUDIO_SAMPLE_RATE * repeat,
+      );
       const gain = amount ** repeat;
       for (let i = 0; i < dry.length; i++) {
         const position = i + offset;
@@ -146,7 +233,10 @@ function wav(target: Mix, peak: number): Uint8Array {
     for (let i = 0; i < frames; i++) {
       // One-shots settle to silence; loops preserve their periodic tails.
       if (!target.loop)
-        samples[i]! *= Math.min(1, (frames - 1 - i) / (RATE * 0.02));
+        samples[i]! *= Math.min(
+          1,
+          (frames - 1 - i) / (AUDIO_SAMPLE_RATE * 0.02),
+        );
       maximum = Math.max(maximum, Math.abs(samples[i]!));
     }
   const bytes = new Uint8Array(44 + frames * channels * 2);
@@ -162,8 +252,8 @@ function wav(target: Mix, peak: number): Uint8Array {
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
   view.setUint16(22, channels, true);
-  view.setUint32(24, RATE, true);
-  view.setUint32(28, RATE * channels * 2, true);
+  view.setUint32(24, AUDIO_SAMPLE_RATE, true);
+  view.setUint32(28, AUDIO_SAMPLE_RATE * channels * 2, true);
   view.setUint16(32, channels * 2, true);
   view.setUint16(34, 16, true);
   tag(36, "data");
@@ -180,7 +270,7 @@ function wav(target: Mix, peak: number): Uint8Array {
 }
 
 function harvesterLoop(target: Mix, drilling: boolean) {
-  const seconds = target.channels[0]!.length / RATE;
+  const seconds = target.channels[0]!.length / AUDIO_SAMPLE_RATE;
   const next = random(drilling ? 701 : 702);
   // Integer cycles keep the textured machinery bed periodic at the seam.
   const partials = Array.from({ length: 48 }, () => ({
@@ -341,8 +431,8 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
       [3.1, 76],
       [5.4, 81],
       [6.7, 74],
-    ])
-      pluck(target, start!, midi!, 0.16, 0);
+    ] as const)
+      pluck(target, start, midi, 0.16, 0);
     // Wrapped swells keep the loop seamless without a machine-like drone.
     for (const start of [0.6, 4.8]) {
       voice(
@@ -362,8 +452,8 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
       [0, 60],
       [1.1, 67],
       [2.7, 62],
-    ])
-      pluck(target, start!, midi!, 0.18, 0);
+    ] as const)
+      pluck(target, start, midi, 0.18, 0);
     voice(
       target,
       0,
@@ -436,72 +526,50 @@ export function buildSound(id: SoundId): Uint8Array {
   return wav(target, soundPeak(id));
 }
 
-export function buildMusic(id: MusicId): Uint8Array {
-  const { seconds, tension, arrangement } = MUSIC_ASSETS[id];
-  const organic = arrangement === "organic";
-  const target = mix(seconds, true, true);
-  const beat = 60 / 80;
-  // Six-second chords form a sixteen-bar D-minor phrase at 80 BPM.
-  const chords = [
-    [38, 53, 57, 64],
-    [34, 53, 57, 60],
-    [41, 53, 57, 60],
-    [36, 55, 60, 62],
-    [38, 53, 57, 64],
-    [34, 53, 60, 65],
-    [43, 53, 58, 62],
-    [33, 52, 57, 64],
-  ];
-  chords.forEach((chord, index) => {
-    chord.forEach((midi, degree) => {
-      const frequency = hz(midi);
-      const pan = [-0.2, -0.75, 0.65, 0.2][degree]!;
-      const breath = random(1100 + index * 4 + degree);
-      let air = 0;
-      voice(
-        target,
-        index * 6,
-        8.5,
-        (t) => {
-          const envelope = Math.sin((Math.PI * t) / 8.5) ** 2;
-          if (organic) {
-            air += 0.07 * (breath() - air);
-            const phase = TAU * frequency * t + 0.035 * sine(4.8, t);
-            return (
-              envelope *
-              (degree === 0 ? 0.1 : 0.055) *
-              (Math.sin(phase) +
-                0.2 * Math.sin(phase * 2) +
-                0.07 * Math.sin(phase * 3) +
-                0.12 * air)
-            );
-          }
-          return (
-            envelope *
-            (degree === 0 ? 0.16 : 0.1) *
-            (sine(frequency, t) +
-              0.3 * sine(frequency * 1.002, t) +
-              (tension ? 0.18 : 0.08) * sine(frequency * 2, t))
-          );
-        },
-        pan,
-      );
-    });
-    const motif = tension ? [1, 2, 1, 3, 2, 1, 3, 2] : [2, 3, 1, 2];
-    motif.forEach((degree, step) => {
-      const start = index * 6 + step * (tension ? beat : beat * 2);
-      if (organic) {
-        pluck(
-          target,
-          start,
-          chord[degree]! + 12,
-          tension ? 0.12 : 0.14,
-          step % 2 ? 0.5 : -0.5,
-        );
-        if (tension && step % 2 === 0)
-          pluck(target, start + beat / 2, chord[(degree % 3) + 1]!, 0.065, 0.2);
-        return;
-      }
+const BEAT = 60 / 80;
+// Six-second chords form a sixteen-bar D-minor phrase at 80 BPM.
+const CHORDS = [
+  [38, 53, 57, 64],
+  [34, 53, 57, 60],
+  [41, 53, 57, 60],
+  [36, 55, 60, 62],
+  [38, 53, 57, 64],
+  [34, 53, 60, 65],
+  [43, 53, 58, 62],
+  [33, 52, 57, 64],
+];
+const PAD_PANS = [-0.2, -0.75, 0.65, 0.2];
+
+/** How a track voices the shared chords. */
+type Arrangement = {
+  pad: (
+    frequency: number,
+    root: boolean,
+    tension: boolean,
+    seed: number,
+  ) => { level: number; tone: (time: number) => number };
+  /** Plays one step of the chord's figure. */
+  motif: (
+    target: Mix,
+    start: number,
+    chord: readonly number[],
+    degree: number,
+    step: number,
+    tension: boolean,
+  ) => void;
+  percussion: (target: Mix, bar: number, tension: boolean) => void;
+};
+
+const ARRANGEMENTS: Record<"synth" | "organic", Arrangement> = {
+  synth: {
+    pad: (frequency, root, tension) => ({
+      level: root ? 0.16 : 0.1,
+      tone: (t) =>
+        sine(frequency, t) +
+        0.3 * sine(frequency * 1.002, t) +
+        (tension ? 0.18 : 0.08) * sine(frequency * 2, t),
+    }),
+    motif: (target, start, chord, degree, step, tension) =>
       note(
         target,
         start,
@@ -509,53 +577,125 @@ export function buildMusic(id: MusicId): Uint8Array {
         2.2,
         tension ? 0.07 : 0.09,
         step % 2 ? 0.55 : -0.55,
-      );
-    });
-    if (organic) {
-      woodenBeat(target, index * 6, tension ? 0.14 : 0.055, 1200 + index);
-      if (tension)
-        for (const step of [2, 4, 5, 7])
-          woodenBeat(
-            target,
-            index * 6 + step * beat,
-            step === 4 ? 0.1 : 0.045,
-            1240 + index * 8 + step,
-          );
-      return;
-    }
-    thump(target, index * 6, tension ? 0.2 : 0.1);
-    if (tension) {
-      thump(target, index * 6 + beat * 4, 0.13);
+      ),
+    percussion: (target, bar, tension) => {
+      const start = bar * 6;
+      thump(target, start, tension ? 0.2 : 0.1);
+      if (!tension) {
+        noise(target, start + BEAT * 6, 0.5, 0.09, 600 + bar, 0.12, 0.45);
+        return;
+      }
+      thump(target, start + BEAT * 4, 0.13);
       for (const step of [2, 5, 7])
         noise(
           target,
-          index * 6 + step * beat,
+          start + step * BEAT,
           0.18,
           0.13,
-          500 + index * 8 + step,
+          500 + bar * 8 + step,
           0.6,
           step % 2 ? 0.5 : -0.5,
         );
-    } else {
-      noise(target, index * 6 + beat * 6, 0.5, 0.09, 600 + index, 0.12, 0.45);
-    }
+    },
+  },
+  organic: {
+    pad: (frequency, root, _tension, seed) => {
+      const breath = random(seed);
+      let air = 0;
+      return {
+        level: root ? 0.1 : 0.055,
+        tone: (t) => {
+          air += 0.07 * (breath() - air);
+          const phase = TAU * frequency * t + 0.035 * sine(4.8, t);
+          return (
+            Math.sin(phase) +
+            0.2 * Math.sin(phase * 2) +
+            0.07 * Math.sin(phase * 3) +
+            0.12 * air
+          );
+        },
+      };
+    },
+    motif: (target, start, chord, degree, step, tension) => {
+      pluck(
+        target,
+        start,
+        chord[degree]! + 12,
+        tension ? 0.12 : 0.14,
+        step % 2 ? 0.5 : -0.5,
+      );
+      if (tension && step % 2 === 0)
+        pluck(target, start + BEAT / 2, chord[(degree % 3) + 1]!, 0.065, 0.2);
+    },
+    percussion: (target, bar, tension) => {
+      const start = bar * 6;
+      woodenBeat(target, start, tension ? 0.14 : 0.055, 1200 + bar);
+      if (!tension) return;
+      for (const step of [2, 4, 5, 7])
+        woodenBeat(
+          target,
+          start + step * BEAT,
+          step === 4 ? 0.1 : 0.045,
+          1240 + bar * 8 + step,
+        );
+    },
+  },
+};
+
+export function buildMusic(id: MusicId): Uint8Array {
+  const { seconds, tension, arrangement } = MUSIC_ASSETS[id];
+  const { pad, motif, percussion } = ARRANGEMENTS[arrangement];
+  const target = mix(seconds, true, true);
+  CHORDS.forEach((chord, index) => {
+    chord.forEach((midi, degree) => {
+      const { level, tone } = pad(
+        hz(midi),
+        degree === 0,
+        tension,
+        1100 + index * 4 + degree,
+      );
+      voice(
+        target,
+        index * 6,
+        8.5,
+        (t) => Math.sin((Math.PI * t) / 8.5) ** 2 * level * tone(t),
+        PAD_PANS[degree],
+      );
+    });
+    const figure = tension ? [1, 2, 1, 3, 2, 1, 3, 2] : [2, 3, 1, 2];
+    figure.forEach((degree, step) =>
+      motif(
+        target,
+        index * 6 + step * (tension ? BEAT : BEAT * 2),
+        chord,
+        degree,
+        step,
+        tension,
+      ),
+    );
+    percussion(target, index, tension);
   });
   // Wrap dry voices and echo tails across the boundary for continuous loops.
-  echo(target, beat * 0.75, 0.34, 4);
+  echo(target, BEAT * 0.75, 0.34, 4);
   return wav(target, 0.28);
 }
 
 export function buildAudioPreview(): Uint8Array {
-  const entries = (bus: "music" | "machine" | "cue") => {
-    const music = bus === "music";
-    return Object.entries(music ? MUSIC_ASSETS : SOUND_ASSETS)
-      .filter(
-        ([id]) => music || soundLoops(id as SoundId) === (bus === "machine"),
-      )
+  type Entry = [
+    id: string,
+    asset: { seconds: number; label: string; description?: string },
+  ];
+  const sounds: Entry[] = Object.entries(SOUND_ASSETS);
+  const loops = ([id]: Entry) => soundLoops(id as SoundId);
+  const entries = (
+    bus: "music" | "machine" | "cue",
+    assets: readonly Entry[],
+  ) =>
+    assets
       .map(
         ([id, asset]) => `<article>
 <h3>${asset.label}</h3>
-${"description" in asset ? `<p>${asset.description}</p>` : ""}
+${asset.description ? `<p>${asset.description}</p>` : ""}
 <button type="button" data-play="${id}">Play ${asset.label}</button>
 <p>${asset.seconds} seconds${bus !== "cue" ? " · loop" : ""}</p>
 <audio id="${id}" data-bus="${bus}" controls preload="none"${bus !== "cue" ? " loop" : ""}
@@ -564,7 +704,6 @@ ${"description" in asset ? `<p>${asset.description}</p>` : ""}
 </article>`,
       )
       .join("\n");
-  };
   return new TextEncoder().encode(`<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -586,9 +725,12 @@ Original synthesized audio. Music repeats every 48 seconds at 80 BPM.
 Play machinery and cues over either track to compare the mix.</p>
 <button type="button" id="stop">Stop all</button>
 <p id="status" role="status"></p>
-<h2>Background music</h2><section>${entries("music")}</section>
-<h2>Machinery loops</h2><section>${entries("machine")}</section>
-<h2>Gameplay cues</h2><section>${entries("cue")}</section>
+<h2>Background music</h2><section>${entries("music", Object.entries(MUSIC_ASSETS))}</section>
+<h2>Machinery loops</h2><section>${entries("machine", sounds.filter(loops))}</section>
+<h2>Gameplay cues</h2><section>${entries(
+    "cue",
+    sounds.filter((sound) => !loops(sound)),
+  )}</section>
 <script>
 const players = [...document.querySelectorAll('audio')];
 for (const button of document.querySelectorAll('[data-play]')) {
