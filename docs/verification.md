@@ -186,9 +186,10 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
 ## M0 baseline playtest preparation
 
 Task 1.01 uses a fixed revision so reports and saved reproductions identify
-one build. Recruit five to eight players spanning RTS-familiar and less
-experienced players. Agree on a host and report-return channel before sending
-the bundle. Recruitment and distribution are organizer actions.
+one build. Builds are hosted on GitHub Pages. Recruit five to eight players
+spanning RTS-familiar and less experienced players, and agree on a
+report-return channel before sending the bundle. Recruitment and distribution
+are organizer actions.
 
 From a clean checkout of the selected revision, using Node.js 26:
 
@@ -217,6 +218,21 @@ unchanged while building. Preparation uses a private output directory and
 leaves `dist/` intact. A failed build or packaging step preserves the previous
 `playtest/` bundle; publication failure attempts to restore it. If restoration
 also fails, the error identifies the retained backup's recovery path.
+
+Publish the checked files by replacing the `gh-pages` branch, with the
+repository's Pages source set to that branch. Pages then serves the bundle at
+`https://lepouya.github.io/cotuw/`. Asset URLs are relative, so the site works
+under this subpath. `.nojekyll` stops Pages from dropping files that start with
+an underscore.
+
+```sh
+cd playtest/site
+git init -b gh-pages
+git add -A
+git commit -m "Publish playtest build"
+git push --force https://github.com/lepouya/cotuw.git gh-pages
+rm -rf .git
+```
 
 Smoke-test the served production bundle from the title screen. Verify model
 and audio loading, the opening guide, one construction and training cycle,

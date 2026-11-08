@@ -19,9 +19,10 @@ experience.
 
 ## Play
 
-Open the supplied link at its root, without a `?level=` parameter. Choose
-**New mission**, then **Anomaly Response Command**, and try to complete the
-mission using only the game and its in-game guidance. Play at your own pace.
+Open the supplied link as given, without a `?level=` parameter. Choose
+**New mission**, keep **Normal** difficulty, then choose **Anomaly Response
+Command**. This playtest covers ARC only. Try to complete the mission using
+only the game and its in-game guidance. Play at your own pace.
 The organizer should not give a walkthrough unless you ask for help or cannot
 continue.
 
@@ -35,10 +36,11 @@ saves when useful. Ask the organizer where to send your report.
 
 ## Organizer: serve the bundle
 
-`site/` contains the production website. Upload its contents to the root of
-an HTTPS static host. Share the root URL, the revision in `build.json`, and
-these instructions and the report template. Keep `build.json` alongside the
-original bundle so reports can identify the exact artifact. The JSON lists
+`site/` contains the production website. Asset URLs are relative, so serve its
+contents from any directory of an HTTPS static host. `docs/verification.md`
+covers publishing to GitHub Pages. Share the URL, the revision in `build.json`,
+and these instructions and the report template. Keep `build.json` alongside
+the original bundle so reports can identify the exact artifact. The JSON lists
 SHA-256 hashes and byte counts for every bundled file except itself.
 
 For a local session, run this from the bundle directory with Python 3:

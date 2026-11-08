@@ -11,6 +11,7 @@ record simulation time separately where available.
 - Build revision from `build.json`:
 - Bundle `distributionReady` value:
 - Play URL:
+- Difficulty:
 - Operating system and version:
 - Browser and version:
 - Input: mouse and keyboard / touch / other:

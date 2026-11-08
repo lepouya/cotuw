@@ -5,7 +5,6 @@ import {
   AUDIO_SAMPLE_RATE,
   MUSIC_ASSETS,
   SOUND_ASSETS,
-  audioAssetUrl,
   soundLoops,
   soundPeak,
 } from "../src/content/audio-assets";
@@ -80,8 +79,8 @@ test.each(entries)("$id is a usable PCM asset with mix headroom", (asset) => {
 test("the audition page offers every asset without autoplay", () => {
   const page = readFileSync("public/assets/audio/index.html", "utf8");
   for (const id of Object.keys(SOUND_ASSETS) as (keyof typeof SOUND_ASSETS)[])
-    expect(page).toContain(`src="${audioAssetUrl(id)}"`);
+    expect(page).toContain(`src="${id}.wav"`);
   for (const id of Object.keys(MUSIC_ASSETS) as (keyof typeof MUSIC_ASSETS)[])
-    expect(page).toContain(`src="${audioAssetUrl(id)}"`);
+    expect(page).toContain(`src="${id}.wav"`);
   expect(page).not.toContain("autoplay");
 });

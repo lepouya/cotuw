@@ -74,6 +74,7 @@ export async function preparePlaytest(
       root,
       build: { outDir: join(bundle, "site"), emptyOutDir: true },
     });
+    await writeFile(join(bundle, "site/.nojekyll"), "");
     await cp(
       join(root, "docs/playtest-instructions.md"),
       join(bundle, "README.md"),

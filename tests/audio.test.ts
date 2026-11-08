@@ -103,14 +103,14 @@ test("preloading follows bindings and the selected arrangement, including all cu
   const urls = vi.mocked(mixer.preload).mock.calls[0]![0];
   expect(urls).toEqual(
     expect.arrayContaining([
-      "/assets/audio/circle-frontier.wav",
-      "/assets/audio/circle-ridge.wav",
-      "/assets/audio/circle-cast-1.wav",
-      "/assets/audio/circle-cast-2.wav",
-      "/assets/audio/wolf-attack.wav",
-      "/assets/audio/command-invalid.wav",
-      "/assets/audio/damage-1.wav",
-      "/assets/audio/damage-2.wav",
+      "assets/audio/circle-frontier.wav",
+      "assets/audio/circle-ridge.wav",
+      "assets/audio/circle-cast-1.wav",
+      "assets/audio/circle-cast-2.wav",
+      "assets/audio/wolf-attack.wav",
+      "assets/audio/command-invalid.wav",
+      "assets/audio/damage-1.wav",
+      "assets/audio/damage-2.wav",
     ]),
   );
   expect(
@@ -132,14 +132,14 @@ test.each([
     const { scene, calls } = setup(faction);
     scene.sync([]);
     expect(calls.map(({ url }) => url)).toEqual([
-      `/assets/audio/${exploration}.wav`,
+      `assets/audio/${exploration}.wav`,
     ]);
     scene.setMusic(true);
     expect(calls[0]!.ended).toBe(true);
-    expect(calls[calls.length - 1]!.url).toBe(`/assets/audio/${combat}.wav`);
+    expect(calls[calls.length - 1]!.url).toBe(`assets/audio/${combat}.wav`);
     scene.setMusic(false);
     expect(calls[calls.length - 1]!.url).toBe(
-      `/assets/audio/${exploration}.wav`,
+      `assets/audio/${exploration}.wav`,
     );
     scene.dispose();
   },
@@ -160,10 +160,7 @@ test("Circle casting and living damage use tonal cues without metallic impacts",
     calls
       .filter(({ options }) => options.bus === "sound")
       .map(({ url }) => url),
-  ).toEqual([
-    "/assets/audio/circle-cast-1.wav",
-    "/assets/audio/living-hit.wav",
-  ]);
+  ).toEqual(["assets/audio/circle-cast-1.wav", "assets/audio/living-hit.wav"]);
   scene.dispose();
 });
 test("state loops resume when buffers arrive, without replaying past events", () => {
@@ -175,8 +172,8 @@ test("state loops resume when buffers arrive, without replaying past events", ()
   ready(true);
   expect(calls.map((call) => call.url)).toEqual(
     expect.arrayContaining([
-      "/assets/audio/harvester-engine.wav",
-      "/assets/audio/unquiet-frontier.wav",
+      "assets/audio/harvester-engine.wav",
+      "assets/audio/unquiet-frontier.wav",
     ]),
   );
   expect(calls.some((call) => call.url.includes("command"))).toBe(false);
@@ -277,10 +274,10 @@ test("combat variants and event bursts obey cooldown and voice limits", () => {
   expect(
     calls.filter((call) => call.url.includes("rifle")).map((call) => call.url),
   ).toEqual([
-    "/assets/audio/rifle-1.wav",
-    "/assets/audio/rifle-2.wav",
-    "/assets/audio/rifle-3.wav",
-    "/assets/audio/rifle-1.wav",
+    "assets/audio/rifle-1.wav",
+    "assets/audio/rifle-2.wav",
+    "assets/audio/rifle-3.wav",
+    "assets/audio/rifle-1.wav",
   ]);
 });
 test("custom action and state names need only data bindings", () => {
@@ -303,10 +300,10 @@ test("custom action and state names need only data bindings", () => {
   scene.emit("lift", crane);
   scene.emit("constructor", crane);
   expect(backend.calls.map((call) => call.url)).toContain(
-    "/assets/audio/harvester-work.wav",
+    "assets/audio/harvester-work.wav",
   );
   expect(backend.calls.map((call) => call.url)).toContain(
-    "/assets/audio/refinery-door-open.wav",
+    "assets/audio/refinery-door-open.wav",
   );
   scene.dispose();
   backend.ready(true);
@@ -331,7 +328,7 @@ test("object bindings inherit pack defaults and can silence them", () => {
   expect(backend.calls).toHaveLength(1);
   scene.emit("damage", crane);
   expect(backend.calls.map((call) => call.url)).toContain(
-    "/assets/audio/damage-1.wav",
+    "assets/audio/damage-1.wav",
   );
 });
 test("full voice budgets replace the lowest-priority one-shot", () => {
@@ -369,7 +366,7 @@ test("music switches without leaving the previous track running", () => {
   scene.setMusic(true);
   scene.setMusic(false);
   expect(calls.filter((call) => !call.ended).map((call) => call.url)).toEqual([
-    "/assets/audio/unquiet-frontier.wav",
+    "assets/audio/unquiet-frontier.wav",
   ]);
   expect(calls.every((call) => call.options.bus === "music")).toBe(true);
 });
@@ -664,7 +661,7 @@ test("hidden attacks stay silent while own damage and alerts trigger combat musi
     calls
       .filter((call) => !call.ended && call.options.bus === "music")
       .map((call) => call.url),
-  ).toEqual(["/assets/audio/beneath-the-ridge.wav"]);
+  ).toEqual(["assets/audio/beneath-the-ridge.wav"]);
   simulation.attacks = [];
   simulation.completedTicks = 481;
   time(19);
@@ -673,7 +670,7 @@ test("hidden attacks stay silent while own damage and alerts trigger combat musi
     calls
       .filter((call) => !call.ended && call.options.bus === "music")
       .map((call) => call.url),
-  ).toEqual(["/assets/audio/unquiet-frontier.wav"]);
+  ).toEqual(["assets/audio/unquiet-frontier.wav"]);
 });
 
 test("other owners' queues stay silent and their fights set combat music only when seen", () => {
@@ -743,14 +740,14 @@ test("other owners' queues stay silent and their fights set combat music only wh
     calls
       .filter((call) => !call.ended && call.options.bus === "music")
       .map((call) => call.url),
-  ).toEqual(["/assets/audio/unquiet-frontier.wav"]);
+  ).toEqual(["assets/audio/unquiet-frontier.wav"]);
   simulation.attacks = [{ attackerId: "hidden-unit", targetId: "seen" }];
   adapter.observe();
   expect(
     calls
       .filter((call) => !call.ended && call.options.bus === "music")
       .map((call) => call.url),
-  ).toEqual(["/assets/audio/beneath-the-ridge.wav"]);
+  ).toEqual(["assets/audio/beneath-the-ridge.wav"]);
 });
 
 test("per-cue budgets hand loops to nearer emitters", () => {
@@ -827,9 +824,9 @@ test("missing variants do not silence ready variants or consume their rotation",
   expect(
     calls.filter((call) => call.url.includes("rifle")).map((call) => call.url),
   ).toEqual([
-    "/assets/audio/rifle-2.wav",
-    "/assets/audio/rifle-3.wav",
-    "/assets/audio/rifle-2.wav",
+    "assets/audio/rifle-2.wav",
+    "assets/audio/rifle-3.wav",
+    "assets/audio/rifle-2.wav",
   ]);
   scene.dispose();
 });

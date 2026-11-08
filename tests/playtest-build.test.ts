@@ -107,6 +107,7 @@ test("publishes a complete clean bundle with reproducible hashes without changin
   expect(manifest.files.map(({ path }) => path)).toEqual([
     "README.md",
     "playtest-report.md",
+    "site/.nojekyll",
     "site/assets/game.js",
     "site/index.html",
   ]);

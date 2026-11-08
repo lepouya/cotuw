@@ -549,7 +549,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/actors/circle-sentinel.glb",
+          "url": "assets/actors/circle-sentinel.glb",
           "minimapColor": [0.47, 0.68, 0.85],
           "bounds": {
             "radius": 0.58,
@@ -591,7 +591,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/actors/circle-wayfinder.glb",
+          "url": "assets/actors/circle-wayfinder.glb",
           "minimapColor": [0.47, 0.68, 0.85],
           "bounds": {
             "radius": 0.5,
@@ -627,7 +627,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/actors/arc-trooper.glb",
+          "url": "assets/actors/arc-trooper.glb",
           "minimapColor": [0.82, 0.28, 0.1],
           "bounds": {
             "radius": 0.45,
@@ -651,7 +651,7 @@
       "frameEffects": {
         "attack": {
           "clip": "muzzle-flash",
-          "url": "/assets/effects/muzzle-flash.png",
+          "url": "assets/effects/muzzle-flash.png",
           "size": 0.6,
           "anchor": [0.12, 1.15, 1.15]
         }
@@ -676,7 +676,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/actors/arc-scout.glb",
+          "url": "assets/actors/arc-scout.glb",
           "minimapColor": [0.12, 0.62, 0.82],
           "bounds": {
             "radius": 0.4,
@@ -709,7 +709,7 @@
         "color": [0.28, 0.38, 0.42],
         "minimapColor": [0.36, 0.7, 0.76],
         "glb": {
-          "url": "/assets/models/command-center.glb",
+          "url": "assets/models/command-center.glb",
           "idle": "idle"
         }
       }
@@ -728,7 +728,7 @@
         "color": [0.28, 0.34, 0.26],
         "minimapColor": [0.65, 0.72, 0.32],
         "glb": {
-          "url": "/assets/models/barracks.glb",
+          "url": "assets/models/barracks.glb",
           "idle": "idle",
           "activities": {
             "exit": "exit"
@@ -759,7 +759,7 @@
         "color": [0.45, 0.38, 0.22],
         "minimapColor": [0.85, 0.65, 0.2],
         "glb": {
-          "url": "/assets/models/refinery.glb",
+          "url": "assets/models/refinery.glb",
           "idle": "idle",
           "activities": {
             "exit": "exit",
@@ -805,7 +805,7 @@
       "damageEffect": "mechanical",
       "model": {
         "glb": {
-          "url": "/assets/models/harvester.glb",
+          "url": "assets/models/harvester.glb",
           "rig": "rigid",
           "minimapColor": [0.94, 0.7, 0.22],
           "bounds": {
@@ -839,7 +839,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/models/wolf.glb",
+          "url": "assets/models/wolf.glb",
           "minimapColor": [0.86, 0.22, 0.2],
           "bounds": {
             "radius": 0.5,
@@ -884,7 +884,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/models/wolf.glb",
+          "url": "assets/models/wolf.glb",
           "minimapColor": [0.86, 0.22, 0.2],
           "bounds": {
             "radius": 0.625,
@@ -932,7 +932,7 @@
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "/assets/actors/circle-cultivator.glb",
+          "url": "assets/actors/circle-cultivator.glb",
           "minimapColor": [0.47, 0.68, 0.85],
           "bounds": {
             "radius": 0.5,
@@ -979,7 +979,7 @@
         "color": [0.38, 0.29, 0.18],
         "minimapColor": [0.58, 0.79, 0.51],
         "glb": {
-          "url": "/assets/models/circle-heartgrove.glb",
+          "url": "assets/models/circle-heartgrove.glb",
           "idle": "idle"
         }
       },
@@ -1011,7 +1011,7 @@
         "color": [0.38, 0.29, 0.18],
         "minimapColor": [0.58, 0.79, 0.51],
         "glb": {
-          "url": "/assets/models/circle-conservatory.glb",
+          "url": "assets/models/circle-conservatory.glb",
           "idle": "idle"
         }
       },
@@ -1043,7 +1043,7 @@
         "color": [0.38, 0.29, 0.18],
         "minimapColor": [0.58, 0.79, 0.51],
         "glb": {
-          "url": "/assets/models/circle-musterhall.glb",
+          "url": "assets/models/circle-musterhall.glb",
           "idle": "idle"
         }
       },
@@ -1132,7 +1132,7 @@
       "dirt": {
         "slot": 0,
         "graphics": {
-          "url": "/assets/terrain/dirt.png",
+          "url": "assets/terrain/dirt.png",
           "hasAlpha": false,
           "minimapColor": [0.466, 0.345, 0.243, 1],
           "scale": {
@@ -1145,7 +1145,7 @@
         "slot": 1,
         "featherEdges": true,
         "graphics": {
-          "url": "/assets/terrain/water.png",
+          "url": "assets/terrain/water.png",
           "hasAlpha": true,
           "layerAlphaOnly": true,
           "scrollSpeed": {
@@ -1163,7 +1163,7 @@
         "slot": 2,
         "featherEdges": true,
         "graphics": {
-          "url": "/assets/terrain/water.png",
+          "url": "assets/terrain/water.png",
           "hasAlpha": true,
           "scale": {
             "u": 0.343,
@@ -1179,7 +1179,7 @@
       "clutter": {
         "slot": 3,
         "graphics": {
-          "url": "/assets/terrain/clutter.png",
+          "url": "assets/terrain/clutter.png",
           "hasAlpha": true,
           "minimapColor": [0.386, 0.354, 0.314, 0.037]
         }
@@ -1188,7 +1188,7 @@
         "slot": 4,
         "featherEdges": true,
         "graphics": {
-          "url": "/assets/terrain/grass.png",
+          "url": "assets/terrain/grass.png",
           "clip": "grass-sway",
           "clipPhase": {
             "u": 0.09,
@@ -1210,7 +1210,7 @@
         "slot": 4,
         "featherEdges": true,
         "graphics": {
-          "url": "/assets/terrain/grass-sparse.png",
+          "url": "assets/terrain/grass-sparse.png",
           "clip": "grass-sway",
           "clipPhase": {
             "u": 0.09,
@@ -1231,7 +1231,7 @@
       "rock": {
         "slot": 5,
         "graphics": {
-          "url": "/assets/terrain/rock.png",
+          "url": "assets/terrain/rock.png",
           "hasAlpha": false,
           "scale": {
             "u": 0.25,
@@ -1343,55 +1343,55 @@
   },
   "props": {
     "foundation": {
-      "url": "/assets/models/foundation.glb"
+      "url": "assets/models/foundation.glb"
     },
     "scaffold": {
-      "url": "/assets/models/scaffold.glb"
+      "url": "assets/models/scaffold.glb"
     },
     "rubble": {
-      "url": "/assets/models/rubble.glb"
+      "url": "assets/models/rubble.glb"
     },
     "materials-mound": {
-      "url": "/assets/models/materials-mound.glb"
+      "url": "assets/models/materials-mound.glb"
     },
     "salvage": {
-      "url": "/assets/models/salvage.glb",
+      "url": "assets/models/salvage.glb",
       "idle": "idle"
     },
     "tracer": {
-      "url": "/assets/models/tracer.glb"
+      "url": "assets/models/tracer.glb"
     },
     "bolt": {
-      "url": "/assets/models/bolt.glb",
+      "url": "assets/models/bolt.glb",
       "idle": "idle"
     },
     "bite": {
-      "url": "/assets/models/bite.glb"
+      "url": "assets/models/bite.glb"
     },
     "smoke": {
-      "url": "/assets/models/smoke.glb"
+      "url": "assets/models/smoke.glb"
     },
     "fire": {
-      "url": "/assets/models/fire.glb",
+      "url": "assets/models/fire.glb",
       "idle": "flicker"
     },
     "wound": {
-      "url": "/assets/models/wound.glb"
+      "url": "assets/models/wound.glb"
     },
     "bird": {
-      "url": "/assets/models/bird.glb",
+      "url": "assets/models/bird.glb",
       "idle": "flap"
     },
     "regeneration": {
-      "url": "/assets/models/regeneration.glb",
+      "url": "assets/models/regeneration.glb",
       "idle": "pulse"
     },
     "cultivation-site": {
-      "url": "/assets/models/cultivation-site.glb",
+      "url": "assets/models/cultivation-site.glb",
       "idle": "idle"
     },
     "leaf": {
-      "url": "/assets/models/leaf.glb"
+      "url": "assets/models/leaf.glb"
     }
   },
   "materialsStages": [
@@ -1415,111 +1415,111 @@
   "audio": {
     "clips": {
       "command-accepted": {
-        "url": "/assets/audio/command-accepted.wav",
+        "url": "assets/audio/command-accepted.wav",
         "loop": false
       },
       "command-invalid": {
-        "url": "/assets/audio/command-invalid.wav",
+        "url": "assets/audio/command-invalid.wav",
         "loop": false
       },
       "rifle-1": {
-        "url": "/assets/audio/rifle-1.wav",
+        "url": "assets/audio/rifle-1.wav",
         "loop": false
       },
       "rifle-2": {
-        "url": "/assets/audio/rifle-2.wav",
+        "url": "assets/audio/rifle-2.wav",
         "loop": false
       },
       "rifle-3": {
-        "url": "/assets/audio/rifle-3.wav",
+        "url": "assets/audio/rifle-3.wav",
         "loop": false
       },
       "wolf-attack": {
-        "url": "/assets/audio/wolf-attack.wav",
+        "url": "assets/audio/wolf-attack.wav",
         "loop": false
       },
       "circle-cast-1": {
-        "url": "/assets/audio/circle-cast-1.wav",
+        "url": "assets/audio/circle-cast-1.wav",
         "loop": false
       },
       "circle-cast-2": {
-        "url": "/assets/audio/circle-cast-2.wav",
+        "url": "assets/audio/circle-cast-2.wav",
         "loop": false
       },
       "living-hit": {
-        "url": "/assets/audio/living-hit.wav",
+        "url": "assets/audio/living-hit.wav",
         "loop": false
       },
       "circle-frontier": {
-        "url": "/assets/audio/circle-frontier.wav",
+        "url": "assets/audio/circle-frontier.wav",
         "loop": true
       },
       "circle-ridge": {
-        "url": "/assets/audio/circle-ridge.wav",
+        "url": "assets/audio/circle-ridge.wav",
         "loop": true
       },
       "damage-1": {
-        "url": "/assets/audio/damage-1.wav",
+        "url": "assets/audio/damage-1.wav",
         "loop": false
       },
       "damage-2": {
-        "url": "/assets/audio/damage-2.wav",
+        "url": "assets/audio/damage-2.wav",
         "loop": false
       },
       "alert": {
-        "url": "/assets/audio/alert.wav",
+        "url": "assets/audio/alert.wav",
         "loop": false
       },
       "objective-complete": {
-        "url": "/assets/audio/objective-complete.wav",
+        "url": "assets/audio/objective-complete.wav",
         "loop": false
       },
       "victory": {
-        "url": "/assets/audio/victory.wav",
+        "url": "assets/audio/victory.wav",
         "loop": false
       },
       "defeat": {
-        "url": "/assets/audio/defeat.wav",
+        "url": "assets/audio/defeat.wav",
         "loop": false
       },
       "training-start": {
-        "url": "/assets/audio/training-start.wav",
+        "url": "assets/audio/training-start.wav",
         "loop": false
       },
       "unit-trained": {
-        "url": "/assets/audio/unit-trained.wav",
+        "url": "assets/audio/unit-trained.wav",
         "loop": false
       },
       "refinery-door-open": {
-        "url": "/assets/audio/refinery-door-open.wav",
+        "url": "assets/audio/refinery-door-open.wav",
         "loop": false
       },
       "refinery-door-close": {
-        "url": "/assets/audio/refinery-door-close.wav",
+        "url": "assets/audio/refinery-door-close.wav",
         "loop": false
       },
       "harvester-work": {
-        "url": "/assets/audio/harvester-work.wav",
+        "url": "assets/audio/harvester-work.wav",
         "loop": true
       },
       "harvester-engine": {
-        "url": "/assets/audio/harvester-engine.wav",
+        "url": "assets/audio/harvester-engine.wav",
         "loop": true
       },
       "unquiet-frontier": {
-        "url": "/assets/audio/unquiet-frontier.wav",
+        "url": "assets/audio/unquiet-frontier.wav",
         "loop": true
       },
       "beneath-the-ridge": {
-        "url": "/assets/audio/beneath-the-ridge.wav",
+        "url": "assets/audio/beneath-the-ridge.wav",
         "loop": true
       },
       "circle-growth": {
-        "url": "/assets/audio/circle-growth.wav",
+        "url": "assets/audio/circle-growth.wav",
         "loop": true
       },
       "circle-cultivation": {
-        "url": "/assets/audio/circle-cultivation.wav",
+        "url": "assets/audio/circle-cultivation.wav",
         "loop": true
       }
     },

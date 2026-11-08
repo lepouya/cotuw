@@ -23,7 +23,7 @@ const textures = new Map<string, Promise<PNG>>();
 export function readTexture(url: string): Promise<PNG> {
   let texture = textures.get(url);
   if (!texture) {
-    texture = readFile(new URL(`../../public${url}`, import.meta.url)).then(
+    texture = readFile(new URL(`../../public/${url}`, import.meta.url)).then(
       (bytes) => PNG.sync.read(bytes),
     );
     textures.set(url, texture);

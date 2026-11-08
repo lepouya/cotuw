@@ -3,7 +3,6 @@ import {
   AUDIO_SAMPLE_RATE,
   MUSIC_ASSETS,
   SOUND_ASSETS,
-  audioAssetUrl,
   soundLoops,
   soundPeak,
 } from "../src/content/audio-assets.ts";
@@ -560,8 +559,8 @@ ${"description" in asset ? `<p>${asset.description}</p>` : ""}
 <button type="button" data-play="${id}">Play ${asset.label}</button>
 <p>${asset.seconds} seconds${bus !== "cue" ? " · loop" : ""}</p>
 <audio id="${id}" data-bus="${bus}" controls preload="none"${bus !== "cue" ? " loop" : ""}
-  aria-label="${asset.label}" src="${audioAssetUrl(id as SoundId | MusicId)}"></audio>
-<a href="${audioAssetUrl(id as SoundId | MusicId)}" download>Download WAV</a>
+  aria-label="${asset.label}" src="${id}.wav"></audio>
+<a href="${id}.wav" download>Download WAV</a>
 </article>`,
       )
       .join("\n");

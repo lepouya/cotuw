@@ -34,6 +34,8 @@ bundled packs through the same parser future mod packs will use.
 - Optional `factionNames` maps simulation faction IDs to nonempty display
   names for the sidebar heading. Unnamed factions use a generic heading.
 - `movementProfiles` prices each terrain type and slope for ground movement.
+- Relative asset `url` values resolve against the page. The bundled pack uses
+  paths such as `assets/models/wolf.glb` to support hosting under a subpath.
 - `presentation` maps actor IDs to what the player sees:
   - `name`, `description`, and optional `build` or `train` button labels.
     `build.order` optionally sets the construction card's nonnegative sort

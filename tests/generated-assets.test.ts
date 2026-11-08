@@ -52,7 +52,7 @@ test.each(
 
 // Only the bundled pack is required to use local registered generators.
 test("every base-pack asset URL names a registered generated file", () => {
-  const registered = new Set(assets.map(([path]) => `/assets/${path}`));
+  const registered = new Set(assets.map(([path]) => `assets/${path}`));
   const visit = (value: unknown) => {
     if (!value || typeof value !== "object") return;
     for (const [key, child] of Object.entries(value)) {

@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 
 /** A committed GLB as a data URL, so loaders read it without a server. */
 export const glbDataUrl = (url: string) =>
-  `data:model/gltf-binary;base64,${readFileSync(`public${url}`).toString("base64")}`;
+  `data:model/gltf-binary;base64,${readFileSync(`public/${url}`).toString("base64")}`;
 
 /** Alters a GLB's JSON for contract rejection tests, preserving binary data. */
 export function editedGlbDataUrl(
   url: string,
   edit: (gltf: any) => void,
 ): string {
-  const source = readFileSync(`public${url}`);
+  const source = readFileSync(`public/${url}`);
   const length = source.readUInt32LE(12);
   const gltf = JSON.parse(source.subarray(20, 20 + length).toString());
   edit(gltf);
