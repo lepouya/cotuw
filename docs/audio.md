@@ -90,14 +90,16 @@ registration in the [asset inventory](audio-assets.md).
   `viewOf(playerOwner)`. Add new gameplay event or state detection here, after
   a successful tick; simulation code never imports audio. Existing events are
   `attack`, `damage`, `production.start`, `trained`, and `activity.<kind>`.
-  States are `moving`, `working`, `training`, `constructing`, and `idle`. Active
-  construction of any faction uses `constructing`, which Circle buildings bind
-  to their growth loop; paused construction and disconnected buildings have no
-  active loop states. Cultivators use `working` while gathering or actively
-  tending, with the same committed worker set used by animation. A finished
-  queue head waiting at a blocked exit has no `training` state. Committed
-  building activity identifies the produced or delivering unit, so consumers
-  share the same participant.
+  States are `moving`, `working`, `training`, `constructing`, and `idle`.
+  `moving` compares positions between observations; only own actors can use a
+  route on first sight, so a newly detected foreign actor has no `moving` loop
+  until its next observation. Active construction of any faction uses
+  `constructing`, which Circle buildings bind to their growth loop; paused
+  construction and disconnected buildings have no active loop states.
+  Cultivators use `working` while gathering or actively tending, with the same
+  committed worker set used by animation. A finished queue head waiting at a
+  blocked exit has no `training` state. Committed building activity identifies
+  the produced or delivering unit, so consumers share the same participant.
 - Global events are `command.accepted`, `command.invalid`, `alert`,
   `objective.complete`, `victory`, `defeat`, and `draw`. The base pack binds
   `draw` to the defeat cue. Command batches produce one response; cue

@@ -519,7 +519,7 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   static `(R)`, `(S)`, and `(Esc)` hints in `ui/sidebar-orders.ts` with binding
   labels. Replace the tools' `onStart` cancellation with one active-tool state
   so card shortcuts can wait for placement. Add a device preferences module for
-  bindings and `audio-controls.ts`, the two `localStorage` callers.
+  bindings and `audio-controls.ts`, the two preferences in `localStorage`.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
   expansion, defense, recovery, and combat content.
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
@@ -717,7 +717,8 @@ and producer-based progression scope from 1.06.
     `extractHealthAndDamageEffects`.
   - Interface and audio: `JSON.stringify` keys in the sidebar roster and
     selection, `createAlertTracker.observe`, the session's alert `workerIds` and
-    `sites` projections, and `observe` and `desiredLoops` in `audio/mission.ts`.
+    `sites` projections, `observe` in `audio/mission.ts`, and `desiredLoops` in
+    `audio/scene.ts`.
 
 Phase gate: either faction can enter a complete skirmish through the normal
 menu, and both matchups meet the agreed automated behavior and scale targets.

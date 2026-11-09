@@ -3,6 +3,15 @@
 [DESIGN.md](../DESIGN.md#technical-direction) owns the simulation requirements.
 These contracts describe where new behaviors, views, and services attach.
 
+## Module dependencies
+
+- Imports between `src/` directories run one way. `simulation` and `platform`
+  import no other directory, `content` imports only `simulation`, and `audio`
+  and `render` import neither `ui` nor each other.
+- `src/` has no value-import cycles. Cycles through `import type`, such as those
+  around `simulation/actor.ts`, have no runtime effect and do not justify
+  splitting a module.
+
 ## Simulation and timing
 
 - Actor behaviors modify their staged actor through `handleCommand` and
@@ -165,6 +174,10 @@ These contracts describe where new behaviors, views, and services attach.
 - Mission loading and simulation preparation live in `mission-loading.ts` and
   run without initializing graphics, DOM, or platform services. Session assembly
   consumes the prepared mission and supplies its rendered terrain.
+- `TerrainMap` in `map.ts` extends `TerrainGrid`, so a session gives the
+  simulation one grid whose terrain commands update rendered views, without
+  copied arrays or forwarded methods. Headless preparation builds a plain
+  `TerrainGrid` and never imports `map.ts`.
 - `content/presentation.ts` owns serializable presentation contracts and their
   validation. Renderer catalogs implement every accepted built-in identifier;
   rendering owns loaded-asset checks, playback, and disposal.

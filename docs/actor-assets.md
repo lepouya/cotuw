@@ -45,7 +45,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   adds rigging and clips. A building's details declare `loopSeconds`, the period
   of their motion, which becomes the exported idle clip, and `activities`, whose
   one-shot motions become clips named for each activity. The base pack loads
-  the resulting GLBs during gameplay.
+  the resulting GLBs during gameplay. The script also imports runtime colors,
+  such as `MATERIALS_COLOR`, so generated models match the stand-ins.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
 - `npm run assets:terrain`: `scripts/terrain-textures.ts` generates seamless
@@ -65,6 +66,8 @@ update matching content-pack graphics when changing the art.
 Generated terrain edges match by construction.
 Foundations and rubble are unit-cube models scaled to their placement.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
+Model export can log Babylon's bone uniform warning. `NullEngine` reports only
+16 vertex uniform vectors, and the warning does not affect the GLB.
 
 ## Production portraits
 

@@ -40,8 +40,9 @@ Audio activation and modal-local input remain available while a dialog is open.
 - `src/main.ts` composes audio, application operations, shell roots, and UI.
   It installs application shortcuts and starts the
   initial title or explicit level route. Session code stays dynamically
-  imported so title controls work before the renderer loads. Application and
-  UI modules use type-only session imports outside that creation path.
+  imported so title controls work before the renderer loads. The application
+  uses a type-only session import outside that creation path; UI modules do
+  not import the session.
 - `src/application.ts` owns the active mission/session, level registry,
   resolved restart source, mission replacement, and the validity of pending
   load requests. Its operations are start, load, restart, return to title,
@@ -223,7 +224,8 @@ Audio activation and modal-local input remain available while a dialog is open.
   `src/styles.css` keeps base typography, element defaults, `[hidden]`,
   shell/viewport sizing, and the title backdrop. Feature roots scope local
   selectors; owned overlays such as production tooltips use feature classes
-  even when mounted under the document body.
+  even when mounted under the document body. `src/render` imports no CSS, so
+  `src/styles.css` holds `.selection-box`, which `command-input.ts` creates.
 - Share the existing button treatment, muted text, eyebrow text, and
   `.action-row` layout. Add no generic widget registry, template engine, UI
   framework, or design-system package.
@@ -260,6 +262,10 @@ Audio activation and modal-local input remain available while a dialog is open.
 - A UI framework or general component registry would add dependencies,
   lifecycle conventions, and migration work without solving a requirement
   beyond these roots and callbacks.
+- `src/session.ts` and `src/application.ts` are large because their code shares
+  closure state, such as the application's `session`, `mission`, and `busy`.
+  Splitting them by size only forwards those closures; extract a part when it
+  owns its own state, as the placement tool does.
 
 ## Verification
 

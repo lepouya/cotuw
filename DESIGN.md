@@ -658,8 +658,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   modifier held, these keys stay with the host, as in Ctrl+F5's hard reload.
   Escape opens the menu after closing contextual UI, canceling active world
   tools, ending camera modes, and clearing selection. In the menu, Escape backs
-  out of a panel, then closes the menu, preserving whether the mission was paused.
-  An available continue action, such as Resume, leads the menu. Audio
+  out of a panel, then closes the menu, preserving whether the mission was
+  paused. An available continue action, such as Resume, leads the menu. Audio
   settings open from Options, on the title screen and in missions. Mission
   menus name the difficulty, including right after loading a save.
 - The minimap is north-up, distinguishes explored terrain from current vision,
