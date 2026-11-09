@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { runnerImport } from "vite";
 import { expect, test } from "./fixtures";
-import { importMission } from "./prototype-helpers";
+import { attachScreenshot, importMission } from "./page-helpers";
 import { WEBKIT } from "./tags";
 import { BENCHMARK_TIMING, summarizeTimes } from "../scripts/benchmark/metrics";
 
@@ -133,13 +133,10 @@ for (const workload of ["normal", "stress"] satisfies Workload[])
         expect(result.activity.attacks).toBeGreaterThan(0);
         expect(result.activity.gatheredMaterials).toBeGreaterThan(0);
         expect(result.rejected.filter((kind) => kind !== "move")).toEqual([]);
-        await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+        await expect(canvas).not.toHaveAttribute(
           "data-simulation-fault",
           "true",
         );
-        await info.attach("view", {
-          body: await page.screenshot(),
-          contentType: "image/png",
-        });
+        await attachScreenshot(page, info, "view");
       },
     );

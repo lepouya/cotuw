@@ -1,16 +1,20 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
-import { terrainPoint, trainTestUnits } from "./prototype-helpers";
+import {
+  attachScreenshot,
+  terrainPoint,
+  touchDrag,
+  trainTestUnits,
+} from "./page-helpers";
 import { WEBKIT } from "./tags";
+
 import type { Page } from "@playwright/test";
 
 async function groupBounds(page: Page) {
   return page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore, Vector3, projectToCanvas } = (await import(
-      path
-    )) as typeof import("./harness");
-    const scene = EngineStore.Instances[0].scenes[0];
+    const { gameScene, Vector3, projectToCanvas } =
+      await import("/e2e/harness.ts");
+    const scene = gameScene();
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     const points = scene.transformNodes
       .filter((node) => /^actor-trained-unit-\d+-root$/.test(node.name))
@@ -30,6 +34,7 @@ async function groupBounds(page: Page) {
     };
   });
 }
+
 const selected = (page: Page) =>
   page.evaluate(
     () =>
@@ -38,47 +43,17 @@ const selected = (page: Page) =>
           .selectedActors ?? "[]",
       ) as string[],
   );
+
 async function cameraPose(page: Page) {
   return page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore } = (await import(path)) as typeof import("./harness");
-    const camera = EngineStore.Instances[0].scenes[0].activeCamera!;
+    const { gameScene } = await import("/e2e/harness.ts");
+    const camera = gameScene().activeCamera!;
     return {
       position: camera.position.asArray(),
       view: camera.getViewMatrix().asArray(),
       projection: camera.getProjectionMatrix().asArray(),
     };
   });
-}
-
-// Synthetic touch drags exercise the app's pointer contract on both webviews.
-async function touchDrag(
-  page: Page,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-) {
-  await page.evaluate(
-    ({ from, to }) => {
-      const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
-      for (const [type, point] of [
-        ["pointerdown", from],
-        ["pointermove", to],
-        ["pointerup", to],
-      ] as const)
-        canvas.dispatchEvent(
-          new PointerEvent(type, {
-            pointerId: 31,
-            pointerType: "touch",
-            button: 0,
-            buttons: type === "pointerup" ? 0 : 1,
-            clientX: point.x,
-            clientY: point.y,
-            bubbles: true,
-          }),
-        );
-    },
-    { from, to },
-  );
 }
 
 /** Browser frames keep running while simulation time advances explicitly. */
@@ -91,6 +66,14 @@ async function advanceSimulationTime(page: Page, milliseconds: number) {
     });
   }, milliseconds);
 }
+
+const routeCount = (page: Page) =>
+  page.evaluate(async () => {
+    const { gameScene } = await import("/e2e/harness.ts");
+    return gameScene().meshes.filter(
+      (mesh) => mesh.name === "movement-path-route",
+    ).length;
+  });
 
 test.use({ deviceScaleFactor: 2 });
 
@@ -144,41 +127,14 @@ test(
     await expect(page.locator("#movement-status")).toHaveText(
       "8 move orders accepted.",
     );
-    await expect
-      .poll(() =>
-        page.evaluate(async () => {
-          const path: string = "/e2e/harness.ts";
-          const { EngineStore } = (await import(
-            path
-          )) as typeof import("./harness");
-          return EngineStore.Instances[0].scenes[0].meshes.filter(
-            (mesh) => mesh.name === "movement-path-route",
-          ).length;
-        }),
-      )
-      .toBe(8);
-    await testInfo.attach("selected-group-routes", {
-      body: await page.screenshot(),
-      contentType: "image/png",
-    });
+    await expect.poll(() => routeCount(page)).toBe(8);
+    await attachScreenshot(page, testInfo, "selected-group-routes");
     await page.locator("#stop-units").click();
     await advanceSimulationTime(page, 34);
     await expect(page.locator("#movement-status")).toHaveText(
       "Selected units stopped.",
     );
-    await expect
-      .poll(() =>
-        page.evaluate(async () => {
-          const path: string = "/e2e/harness.ts";
-          const { EngineStore } = (await import(
-            path
-          )) as typeof import("./harness");
-          return EngineStore.Instances[0].scenes[0].meshes.filter(
-            (mesh) => mesh.name === "movement-path-route",
-          ).length;
-        }),
-      )
-      .toBe(0);
+    await expect.poll(() => routeCount(page)).toBe(0);
     await expect.poll(async () => (await selected(page)).length).toBe(8);
     await page.locator("#clear-selection").click();
     await advanceSimulationTime(page, 34);
@@ -211,7 +167,7 @@ test(
 
 forEachProfile([PHONE_PROFILE], (profile) => {
   test(
-    `touch controls support additive and box selection, movement, and camera actions`,
+    "touch controls support additive and box selection, movement, and camera actions",
     { tag: WEBKIT },
     async ({ page }, testInfo) => {
       await page.goto("/?level=sandbox");
@@ -270,10 +226,7 @@ forEachProfile([PHONE_PROFILE], (profile) => {
       await touchDrag(page, empty, { x: empty.x + 50, y: empty.y + 15 });
       await expect.poll(() => cameraPose(page)).not.toEqual(moved);
       await expect.poll(async () => (await selected(page)).length).toBe(3);
-      await testInfo.attach(`group-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, testInfo, `group-${profile.name}`);
     },
   );
 });

@@ -1,8 +1,9 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
-import type { Page } from "@playwright/test";
-import { activate, trainTestUnits } from "./prototype-helpers";
+import { activate, openWithTrooper } from "./page-helpers";
 import { WEBKIT } from "./tags";
+
+import type { Page } from "@playwright/test";
 
 /**
  * Legs in tiles to the screen's right and down from the centered trooper. At
@@ -18,13 +19,7 @@ const ROUTE = [
 const REPLACEMENT = [-4, -3] as const;
 
 async function opening(page: Page, touch = false) {
-  await page.goto("/?level=sandbox");
-  await trainTestUnits(page, ["trooper"], touch);
-  await activate(page.locator("#unit-roster button").first(), touch);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-selected-actors",
-    '["trained-unit-1"]',
-  );
+  await openWithTrooper(page, touch);
   await activate(page.locator('[data-speed="0.5"]'), touch);
   await activate(page.locator("#focus-selection"), touch);
   // Outlasts the 0.3 second glide.
@@ -37,10 +32,9 @@ async function routePoints(
   offsets: readonly (readonly [number, number])[],
 ) {
   const points = await page.evaluate(async (offsets) => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore, Vector3, projectToCanvas, prototypeTerrainMap } =
-      (await import(path)) as typeof import("./harness");
-    const scene = EngineStore.Instances[0].scenes[0];
+    const { gameScene, Vector3, projectToCanvas, prototypeTerrainMap } =
+      await import("/e2e/harness.ts");
+    const scene = gameScene();
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     const map = prototypeTerrainMap();
     const unit = scene
@@ -72,18 +66,15 @@ async function routePoints(
 /** Whether the queued-order preview is drawn. */
 async function preview(page: Page) {
   return page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore } = (await import(path)) as typeof import("./harness");
-    return !!EngineStore.Instances[0].scenes[0].getMeshByName("queued-orders");
+    const { gameScene } = await import("/e2e/harness.ts");
+    return !!gameScene().getMeshByName("queued-orders");
   });
 }
 
 async function minimapTarget(page: Page) {
   return page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { minimapProjection, prototypeTerrainMap } = (await import(
-      path
-    )) as typeof import("./harness");
+    const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+    const { minimapProjection } = await import("/src/render/minimap.ts");
     const map = prototypeTerrainMap();
     const canvas = document.querySelector<HTMLCanvasElement>("#minimap")!;
     const bounds = canvas.getBoundingClientRect();
@@ -124,7 +115,7 @@ test("Shift-click queues moves behind the current one with a route preview", asy
   const status = page.locator("#movement-status");
   const [first, ...queued] = await routePoints(page, ROUTE);
   const [replacement] = await routePoints(page, [REPLACEMENT]);
-  await page.mouse.click(first!.x, first!.y);
+  await page.mouse.click(first.x, first.y);
   await expect(status).toContainText("1 move order accepted");
   await page.keyboard.down("Shift");
   for (const point of queued) {
@@ -134,7 +125,7 @@ test("Shift-click queues moves behind the current one with a route preview", asy
   await page.keyboard.up("Shift");
   await expect.poll(() => preview(page)).toBe(true);
   // An unqueued order replaces the queue and its preview.
-  await page.mouse.click(replacement!.x, replacement!.y);
+  await page.mouse.click(replacement.x, replacement.y);
   await expect(status).toContainText("1 move order accepted");
   await expect.poll(() => preview(page)).toBe(false);
 });
@@ -149,7 +140,7 @@ forEachProfile([PHONE_PROFILE], () => {
       const status = page.locator("#movement-status");
       const [first, ...queued] = await routePoints(page, ROUTE);
       const [replacement] = await routePoints(page, [REPLACEMENT]);
-      await page.touchscreen.tap(first!.x, first!.y);
+      await page.touchscreen.tap(first.x, first.y);
       await expect(status).toContainText("1 move order accepted");
       await queue.tap();
       await expect(queue).toHaveAttribute("aria-pressed", "true");
@@ -160,7 +151,7 @@ forEachProfile([PHONE_PROFILE], () => {
       await expect.poll(() => preview(page)).toBe(true);
       await queue.tap();
       await expect(queue).toHaveAttribute("aria-pressed", "false");
-      await page.touchscreen.tap(replacement!.x, replacement!.y);
+      await page.touchscreen.tap(replacement.x, replacement.y);
       await expect(status).toContainText("1 move order accepted");
       await expect.poll(() => preview(page)).toBe(false);
     },

@@ -1,8 +1,6 @@
-import { trainTestUnits } from "./prototype-helpers";
 import { expect, test } from "./fixtures";
+import { holdRequests, trainTestUnits } from "./page-helpers";
 
-import type { Page } from "@playwright/test";
-import type { AbstractMesh } from "@babylonjs/core";
 import type { GameSession } from "../src/session";
 
 type ActorInteractionTest = {
@@ -20,17 +18,6 @@ declare global {
 }
 
 test.use({ deviceScaleFactor: 2 });
-
-/** In-page test helpers, loaded by `openHarness`. */
-declare const harness: typeof import("./harness");
-
-async function openHarness(page: Page): Promise<void> {
-  await page.goto("/?level=sandbox");
-  await page.evaluate(async () => {
-    const harnessPath: string = "/e2e/harness.ts";
-    Object.assign(window, { harness: await import(harnessPath) });
-  });
-}
 
 test("starts with stand-ins while actor models load", async ({ page }) => {
   let releaseLoads = () => {};
@@ -54,13 +41,12 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
   await expect(canvas).toHaveAttribute("data-selected-actor", "trained-unit-1");
   expect(
     await page.evaluate(async () => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(harnessPath);
-      const scene = EngineStore.Instances[0].scenes[0];
+      const { gameScene } = await import("/e2e/harness.ts");
+      const scene = gameScene();
       return scene
         .getTransformNodeByName("actor-trained-unit-1-root")!
         .getChildMeshes()
-        .every((mesh: AbstractMesh) => mesh.skeleton === null);
+        .every((mesh) => mesh.skeleton === null);
     }),
   ).toBe(true);
 
@@ -69,13 +55,12 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
     .poll(
       async () =>
         page.evaluate(async () => {
-          const harnessPath: string = "/e2e/harness.ts";
-          const { EngineStore } = await import(harnessPath);
-          const scene = EngineStore.Instances[0].scenes[0];
+          const { gameScene } = await import("/e2e/harness.ts");
+          const scene = gameScene();
           return scene
             .getTransformNodeByName("actor-trained-unit-1-root")!
             .getChildMeshes()
-            .some((mesh: AbstractMesh) => mesh.skeleton !== null);
+            .some((mesh) => mesh.skeleton !== null);
         }),
       { timeout: 10_000 },
     )
@@ -83,14 +68,10 @@ test("starts with stand-ins while actor models load", async ({ page }) => {
 });
 
 test("replaces each stand-in when its own model loads", async ({ page }) => {
-  let releaseScout = () => {};
-  const heldScout = new Promise<void>((resolve) => {
-    releaseScout = resolve;
-  });
-  await page.route("**/assets/actors/arc-scout.glb", async (route) => {
-    await heldScout;
-    await route.continue();
-  });
+  const releaseScout = await holdRequests(
+    page,
+    "**/assets/actors/arc-scout.glb",
+  );
 
   await page.goto("/?level=sandbox", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#game-canvas")).toHaveAttribute(
@@ -100,13 +81,12 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
   await trainTestUnits(page);
   const hasSkin = (actorId: string) =>
     page.evaluate(async (id) => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(harnessPath);
-      const scene = EngineStore.Instances[0].scenes[0];
+      const { gameScene } = await import("/e2e/harness.ts");
+      const scene = gameScene();
       return scene
         .getTransformNodeByName(`actor-${id}-root`)
         ?.getChildMeshes()
-        .some((mesh: AbstractMesh) => mesh.skeleton !== null);
+        .some((mesh) => mesh.skeleton !== null);
     }, actorId);
 
   await expect
@@ -123,21 +103,14 @@ test("replaces each stand-in when its own model loads", async ({ page }) => {
 test("clicking a selected actor issues terrain-aware movement", async ({
   page,
 }) => {
-  await openHarness(page);
-
+  await page.goto("/?level=sandbox");
   const targets = await page.evaluate(async () => {
-    const { Vector3, frames, projectToCanvas } = harness;
-    const prototypePath: string = "/src/session.ts";
-    const missionsPath: string = "/e2e/missions.ts";
-    const { createGameSession } = (await import(
-      prototypePath
-    )) as typeof import("../src/session");
-    const { level, missionMap } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
+    const { Vector3, frames, projectToCanvas } =
+      await import("/e2e/harness.ts");
+    const { createGameSession } = await import("/src/session.ts");
+    const { level, missionMap } = await import("/e2e/missions.ts");
     const mission = level("sandbox");
-    const actorPath: string = "/src/simulation/actor.ts";
-    const { createActor } = await import(actorPath);
+    const { createActor } = await import("/src/simulation/actor.ts");
     const canvas = document.createElement("canvas");
     const minimap = document.createElement("canvas");
     Object.assign(canvas.style, {
@@ -149,7 +122,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       height: "480px",
     });
     document.body.append(canvas, minimap);
-    const view: GameSession = await createGameSession(canvas, minimap, {
+    const view = await createGameSession(canvas, minimap, {
       mission,
     });
     const map = missionMap(mission);
@@ -266,6 +239,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
     );
   });
   const legSwing = await page.evaluate(async () => {
+    const { frames } = await import("/e2e/harness.ts");
     const scene = window.actorInteractionTest!.view.scene;
     const mesh = scene
       .getTransformNodeByName("actor-prototype-trooper-root")!
@@ -276,9 +250,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
       .getTransformNode()!;
     let largestRotation = 0;
     for (let frame = 0; frame < 20; frame++) {
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
+      await frames(1);
       largestRotation = Math.max(
         largestRotation,
         Math.abs(leg.rotationQuaternion?.x ?? 0),
@@ -289,10 +261,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
   expect(legSwing).toBeGreaterThan(0.04);
   await page.waitForFunction(() => {
     const test = window.actorInteractionTest;
-    if (!test) {
-      return false;
-    }
-
+    if (!test) return false;
     const trooper = test.view.scene.getTransformNodeByName(
       "actor-prototype-trooper-root",
     );
@@ -312,10 +281,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
   );
   await page.waitForFunction(() => {
     const test = window.actorInteractionTest;
-    if (!test) {
-      return false;
-    }
-
+    if (!test) return false;
     const scout = test.view.scene.getTransformNodeByName(
       "actor-prototype-scout-root",
     );

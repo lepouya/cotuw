@@ -1,10 +1,22 @@
 import { expect, test } from "./fixtures";
-import { openOpening, importMission, placeBuilding } from "./prototype-helpers";
+import {
+  expectTerrainReady,
+  importMission,
+  openOpening,
+  placeBuilding,
+} from "./page-helpers";
 import { MissionDriver } from "./mission-driver";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
+
+declare global {
+  interface Window {
+    /** Set by the routed browser platform while a write is held. */
+    finishSave: () => void;
+  }
+}
 
 const materials = (page: Page) => page.locator("#materials-counter");
 
@@ -55,9 +67,7 @@ test("Exit waits for a save still writing after returning to the title", async (
   );
   await openOpening(page);
   await page.keyboard.press("F5");
-  await page.waitForFunction(
-    () => typeof Reflect.get(window, "finishSave") === "function",
-  );
+  await page.waitForFunction(() => typeof window.finishSave === "function");
   await page.locator("#open-menu").click();
   await page.locator("#exit-mission").click();
   await page.locator("#quit-game").click();
@@ -65,7 +75,7 @@ test("Exit waits for a save still writing after returning to the title", async (
   await expect(page.locator("#game-menu-title")).toHaveText(
     "Citadels of the Unquiet World",
   );
-  await page.evaluate(() => Reflect.get(window, "finishSave")());
+  await page.evaluate(() => window.finishSave());
   await expect(page.locator("#game-menu-title")).toHaveText(
     "Thanks for playing",
   );
@@ -100,14 +110,18 @@ test(
     await expect(page.locator("#notifications")).toContainText(
       "Quick save complete: Quicksave",
     );
-    await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
+    await placeBuilding(page, "build-refinery", 12, 49, {
+      explanation: "Support Network",
+    });
     await expect(materials(page)).toHaveText("50");
 
     await page.keyboard.press("F9");
     await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
     await expect(materials(page)).toHaveText("150");
     await page.locator("#resume-mission").click();
-    await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
+    await placeBuilding(page, "build-refinery", 12, 49, {
+      explanation: "Support Network",
+    });
     await expect(materials(page)).toHaveText("50");
 
     await openLoadPanel(page);
@@ -133,19 +147,10 @@ test(
 
 test("completing an objective writes the autosave", async ({ page }) => {
   await openOpening(page);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   const source = await page.evaluate(async () => {
-    const missionsPath: string = "/e2e/missions.ts";
-    const actorPath: string = "/src/simulation/actor.ts";
-    const { level, missionSource } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
-    const { createActor } = (await import(
-      actorPath
-    )) as typeof import("../src/simulation/actor");
+    const { level, missionSource } = await import("/e2e/missions.ts");
+    const { createActor } = await import("/src/simulation/actor.ts");
     const mission = level();
     const wolf = mission.state.actors.find(({ id }) => id === "lone-wolf")!;
     wolf.health = 1;
@@ -180,10 +185,7 @@ test(
   { tag: WEBKIT },
   async ({ page }) => {
     await page.goto("/?level=sandbox");
-    await expect(page.locator("#game-canvas")).toHaveAttribute(
-      "data-terrain-ready",
-      "true",
-    );
+    await expectTerrainReady(page);
     await page.locator("#open-menu").click();
     await page.locator("#save-mission").click();
     await page.locator("#save-name").fill("Sandbox base");
@@ -208,19 +210,13 @@ test("a tick-zero save does not replace the authored restart level", async ({
   page,
 }) => {
   await openOpening(page);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   const source = await page.evaluate(async () => {
-    const path: string = "/e2e/missions.ts";
-    const { level } = (await import(path)) as typeof import("./missions");
+    const { level } = await import("/e2e/missions.ts");
     const mission = level();
     mission.state.economy!.stockpiles[0].amount = 77;
-    const serializerPath: string = "/src/simulation/mission-file.ts";
-    const { serializeMission } = (await import(
-      serializerPath
-    )) as typeof import("../src/simulation/mission-file");
+    const { serializeMission } =
+      await import("/src/simulation/mission-file.ts");
     return serializeMission(mission.scenario, mission.state, 1 / 60, {
       save: { name: "Immediate save", savedAt: "2026-10-04T10:00:00Z" },
     });
@@ -238,10 +234,7 @@ test("invalid scenario metadata leaves the current session intact", async ({
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   const source = await page.evaluate(async () => {
-    const path: string = "/e2e/missions.ts";
-    const { level, missionSource } = (await import(
-      path
-    )) as typeof import("./missions");
+    const { level, missionSource } = await import("/e2e/missions.ts");
     const file = JSON.parse(missionSource(level()));
     file.scenario.goals = [null];
     return JSON.stringify(file);
@@ -253,7 +246,9 @@ test("invalid scenario metadata leaves the current session intact", async ({
   await expect(materials(page)).toHaveText("150");
   await page.locator("#cancel-load").click();
   await page.locator("#resume-mission").click();
-  await placeBuilding(page, "build-refinery", 12, 49, "Support Network");
+  await placeBuilding(page, "build-refinery", 12, 49, {
+    explanation: "Support Network",
+  });
   await expect(materials(page)).toHaveText("50");
 });
 
@@ -261,15 +256,9 @@ test("opening and closing the menu during inspection preserves a way to resume",
   page,
 }) => {
   await page.goto("/?level=sandbox");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   const source = await page.evaluate(async () => {
-    const path: string = "/e2e/missions.ts";
-    const { level, missionSource } = (await import(
-      path
-    )) as typeof import("./missions");
+    const { level, missionSource } = await import("/e2e/missions.ts");
     return missionSource(level("sandbox"));
   });
   await importMission(page, source);
@@ -292,7 +281,7 @@ forEachProfile([PHONE_PROFILE], () => {
     "the game menu saves, quicksaves, loads, and deletes by touch",
     { tag: WEBKIT },
     async ({ page }) => {
-      const mission = new MissionDriver(page, true, false);
+      const mission = new MissionDriver(page, { touch: true });
       await mission.opening();
       await mission.press("#open-menu");
       await expect(page.locator("#game-menu-title")).toHaveText("Paused");
@@ -340,10 +329,7 @@ test(
   async ({ page }) => {
     await page.goto("/");
     await page.evaluate(async () => {
-      const path: string = "/e2e/missions.ts";
-      const { level, missionSource } = (await import(
-        path
-      )) as typeof import("./missions");
+      const { level, missionSource } = await import("/e2e/missions.ts");
       const mission = level();
       mission.state.tick = 60;
       const save = (name: string) =>
@@ -387,7 +373,7 @@ test(
 test("skirmish missions autosave at the start and every five minutes", async ({
   page,
 }) => {
-  const mission = new MissionDriver(page, false, false);
+  const mission = new MissionDriver(page);
   await mission.level("skirmish-map");
   await expect(page.locator("#notifications")).toContainText(
     "Auto save complete: Autosave: Match start",
@@ -417,10 +403,7 @@ test(
   async ({ page }) => {
     await openOpening(page);
     const checkpoint = await page.evaluate(async () => {
-      const path: string = "/e2e/missions.ts";
-      const { level, missionSource } = (await import(
-        path
-      )) as typeof import("./missions");
+      const { level, missionSource } = await import("/e2e/missions.ts");
       const original = level();
       const mission = {
         ...original,

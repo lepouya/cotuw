@@ -1,36 +1,22 @@
 import { expect, test } from "./fixtures";
+import { expectTerrainReady } from "./page-helpers";
+
+import type { ArcRotateCamera } from "@babylonjs/core";
 
 test("building visibility follows fog in a mission without an economy", async ({
   page,
 }) => {
   await page.goto("/");
   const result = await page.evaluate(async () => {
-    const sessionPath: string = "/src/session.ts";
-    const missionsPath: string = "/e2e/missions.ts";
-    const harnessPath: string = "/e2e/harness.ts";
-    const missionPath: string = "/src/simulation/mission.ts";
-    const placementPath: string = "/src/simulation/placement.ts";
-    const terrainPath: string = "/src/simulation/terrain.ts";
-    const { createGameSession } = (await import(
-      sessionPath
-    )) as typeof import("../src/session");
-    const { level } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
-    const { frames } = (await import(
-      harnessPath
-    )) as typeof import("./harness");
-    const { createMissionState } = (await import(
-      missionPath
-    )) as typeof import("../src/simulation/mission");
-    const { createTilePlacedActor } = (await import(
-      placementPath
-    )) as typeof import("../src/simulation/placement");
-    const { TerrainGrid } = (await import(
-      terrainPath
-    )) as typeof import("../src/simulation/terrain");
+    const { createGameSession } = await import("/src/session.ts");
+    const { level } = await import("/e2e/missions.ts");
+    const { frames } = await import("/e2e/harness.ts");
+    const { createMissionState } = await import("/src/simulation/mission.ts");
+    const { createTilePlacedActor } =
+      await import("/src/simulation/placement.ts");
+    const { TerrainGrid } = await import("/src/simulation/terrain.ts");
     const mission = level("sandbox");
-    const definitions = mission.definitions;
+    const { definitions } = mission;
     const building = definitions.find(
       ({ production, refinery }) => production && !refinery,
     )!;
@@ -125,40 +111,17 @@ test("a restored mission renders its own map and saved terrain", async ({
   page,
 }) => {
   await page.goto("/?level=sandbox");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   const result = await page.evaluate(async () => {
-    const harnessPath: string = "/e2e/harness.ts";
-    const prototypePath: string = "/src/session.ts";
-    const loadingPath: string = "/src/mission-loading.ts";
-    const contentPath: string = "/src/content/packs.ts";
-    const scenarioPath: string = "/src/simulation/scenario.ts";
-    const fileFormatPath: string = "/src/simulation/mission-file.ts";
-    const terrainPath: string = "/src/simulation/terrain.ts";
-    const { frames } = (await import(
-      harnessPath
-    )) as typeof import("./harness");
-    const { createGameSession } = (await import(
-      prototypePath
-    )) as typeof import("../src/session");
-    const { loadMission } = (await import(
-      loadingPath
-    )) as typeof import("../src/mission-loading");
-    const { currentContentPack } = (await import(
-      contentPath
-    )) as typeof import("../src/content/packs");
+    const { frames } = await import("/e2e/harness.ts");
+    const { createGameSession } = await import("/src/session.ts");
+    const { loadMission } = await import("/src/mission-loading.ts");
+    const { currentContentPack } = await import("/src/content/packs.ts");
+    const { createScenarioState } = await import("/src/simulation/scenario.ts");
+    const { serializeMission } =
+      await import("/src/simulation/mission-file.ts");
+    const { TerrainGrid } = await import("/src/simulation/terrain.ts");
     const content = currentContentPack("base");
-    const { createScenarioState } = (await import(
-      scenarioPath
-    )) as typeof import("../src/simulation/scenario");
-    const { serializeMission } = (await import(
-      fileFormatPath
-    )) as typeof import("../src/simulation/mission-file");
-    const { TerrainGrid } = (await import(
-      terrainPath
-    )) as typeof import("../src/simulation/terrain");
     const map = new TerrainGrid({
       width: 20,
       height: 12,
@@ -209,8 +172,7 @@ test("a restored mission renders its own map and saved terrain", async ({
       const water = view.scene.getMeshByName("terrain-0-0-layer-1-tile-water")!;
       const bounds = dirt.getBoundingInfo().boundingBox;
       const waterBounds = water.getBoundingInfo().boundingBox;
-      const camera = view.scene
-        .activeCamera as import("@babylonjs/core").ArcRotateCamera;
+      const camera = view.scene.activeCamera as ArcRotateCamera;
       return {
         terrain: view.simulation.snapshot().terrain,
         expectedTerrain: mission.state.terrain,

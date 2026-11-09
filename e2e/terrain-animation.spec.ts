@@ -1,15 +1,18 @@
 import { expect, test } from "./fixtures";
 import { WEBKIT } from "./tags";
 
+import type { StandardMaterial } from "@babylonjs/core";
+
 test(
   "terrain clips load, advance, freeze, and release their frame textures",
   { tag: WEBKIT },
   async ({ page }) => {
     await page.goto("/?level=sandbox");
     const result = await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { createTestView, createTerrainMeshes, currentContentPack, color } =
-        (await import(path)) as typeof import("./harness");
+      const { createTestView, color, frames } = await import("/e2e/harness.ts");
+      const { createTerrainMeshes } =
+        await import("/src/render/terrain-mesh.ts");
+      const { currentContentPack } = await import("/src/content/packs.ts");
       const content = currentContentPack("base");
       const graphics = content.terrain.tileTypes.grass.graphics!;
       const testView = createTestView({
@@ -30,7 +33,7 @@ test(
       });
       const materials = scene.materials.filter(({ name }) =>
         name.includes("terrain-material"),
-      ) as import("@babylonjs/core").StandardMaterial[];
+      ) as StandardMaterial[];
       const before = map.terrainState();
       const initialTextures = scene.textures.length;
       try {
@@ -39,9 +42,7 @@ test(
         while (materials.some(({ alpha }) => alpha === 0)) {
           if (performance.now() > deadline)
             throw new Error("Grass clip did not load.");
-          await new Promise<void>((resolve) =>
-            requestAnimationFrame(() => resolve()),
-          );
+          await frames(1);
           scene.render();
         }
         const distinct = new Set(
@@ -49,7 +50,7 @@ test(
         ).size;
         still = true;
         scene.render();
-        const first = materials[0]!.diffuseTexture!;
+        const first = materials[0].diffuseTexture!;
         const frozen = materials.every(
           ({ diffuseTexture }) => diffuseTexture === first,
         );
@@ -58,7 +59,7 @@ test(
         const played = new Set();
         for (let i = 0; i < 16; i++) {
           scene.render();
-          played.add(materials[0]!.diffuseTexture);
+          played.add(materials[0].diffuseTexture);
         }
         still = true;
         scene.render();

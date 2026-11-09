@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { withoutApp } from "./prototype-helpers";
+import { withoutApp } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 test(
@@ -9,10 +9,7 @@ test(
     await withoutApp(page);
     await page.goto("/");
     const retained = await page.evaluate(async () => {
-      const path: string = "/src/ui/dom.ts";
-      const { createKeyedList } = (await import(
-        path
-      )) as typeof import("../src/ui/dom");
+      const { createKeyedList } = await import("/src/ui/dom.ts");
       const root = document.createElement("div");
       document.body.append(root);
       const nodes = new Map<string, HTMLButtonElement>();
@@ -43,10 +40,7 @@ test("a setup error survives failing cleanup while all resources release", async
   await withoutApp(page);
   await page.goto("/");
   const result = await page.evaluate(async () => {
-    const path: string = "/src/ui/dom.ts";
-    const { mountFeature } = (await import(
-      path
-    )) as typeof import("../src/ui/dom");
+    const { mountFeature } = await import("/src/ui/dom.ts");
     const root = document.createElement("div");
     document.body.append(root);
     const setup = new Error("Setup failed");

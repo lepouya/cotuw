@@ -961,11 +961,101 @@ product work in `TODO.md`, and remove temporary files in
 
 ### Tier 3: verification suites (`tests/`, `e2e/` - lowest priority)
 
-- [ ] **Slice 12: browser E2E harness and specs**
+- [x] **Slice 12: browser E2E harness and specs**
   (37 `e2e/` files + `playwright.config.ts`, ~11,610 LOC)
   - Shared drivers (`e2e/mission-driver.ts`, `missions.ts`, `harness.ts`,
-    `fixtures.ts`, `profiles.ts`, `prototype-helpers.ts`, `tags.ts`) and all
+    `fixtures.ts`, `profiles.ts`, `page-helpers.ts`, `tags.ts`) and all
     30 `e2e/*.spec.ts` files.
+  - Manifest after Pass A: `prototype-helpers.ts` renamed `page-helpers.ts`;
+    added `e2e/sidebar-session.ts` (38 `e2e/` files, ~11,100 LOC).
+  - [x] **Pass A** (modular assessment and refactor, base `fccc1e1`):
+    - In-page code is type-checked. All 150 in-page imports use the served path
+      as a literal (`await import("/src/session.ts")`); `paths` in
+      `tsconfig.json` maps `/e2e/*` and `/src/*`. String-path variables, `as
+      typeof import` casts, `any` parameters, and compensating annotations
+      are gone. Literal specifiers pass in Chromium and WebKit, and they
+      surfaced only test fixtures needing types, no stale production calls.
+      Docs: `verification.md`.
+    - `e2e/sidebar-session.ts`: `startSidebarSession(mission, options)` owns
+      the sidebar and session wiring that `economy`, `presentation`,
+      `observations`, and `relationships` each repeated. It derives owner,
+      faction, and economy from the mission. A separate module, since the
+      sidebar's styles must not reach pages that load only the harness.
+    - `presentation.spec.ts` uses `controlSessionClock` instead of its copy of
+      the clock override and a second window global.
+    - Write-only canvas probes removed from `session.ts`: `trainingStatus`,
+      `attackStatus`, and `tilePlacedActorCommand` had no reader anywhere.
+    - `prototype-helpers.ts` -> `page-helpers.ts`: generic Playwright page
+      flows, unrelated to the prototype terrain.
+    - No persisted format change. Edits span about 35 files (net `-344` lines
+      in `e2e/`), so Pass B runs in its own session.
+    - Checks: `npm run check` (units and five smoke cases) passes. All
+      browser specs on the host: `282` passed across Chromium and WebKit, and
+      `8` benchmark cases skipped without `COTUW_BENCHMARK`. The `minimap`
+      spec (`9` cases) reran after a final fixture typing edit. The listed
+      test inventory matches `HEAD`.
+    - Kept: separate `MissionDriver` and session clocks. The driver installs
+      before the app loads and overrides frame delta with the render loop
+      stopped; the session clock starts after creation. `MissionDriver` flows
+      beside `page-helpers.ts`, since driver steps advance that clock.
+      Babylon re-exports in `harness.ts`, since bare specifiers do not resolve
+      in a page. `group-control` and `sidebar` clock overrides, whose frames
+      and restoration differ.
+    - Rejected: a typed `page.evaluate` wrapper (`new Function` and a new
+      interface versus one config entry); relative specifiers (resolve against
+      the page URL, so `/assets/audio/index.html` breaks them); a page-object
+      layer over stable public IDs; splitting `economy.spec.ts` by size (its
+      tests share one setup); mounting notifications and the top bar in the
+      shared setup (only two specs want them, and overlays could intercept
+      input elsewhere).
+    - Pass B leads: `harness.ts` re-exports of `src` modules, now unnecessary;
+      `window.harness` and `declare const harness` in `actor` and `terrain`;
+      untyped `Reflect.get(window, ...)` globals; remaining annotations that
+      are now inferred; positional booleans on `new MissionDriver` (`10` of
+      `13` sites pass `false, false`); repeated `EngineStore.Instances[0]`,
+      `#game-canvas`, and render-loop stop code; repeated fresh-canvas setup in
+      `scenario.spec.ts`; the mid-file `import type` in `minimap.spec.ts`.
+    - Deferred to Slice 13: whether browser checks of session rules, such as
+      tutorial dismissal in `economy.spec.ts`, can move to units.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - `page-helpers.ts` owns repeated flows: `pressPoint`, `touchDrag`,
+      `expectTerrainReady`, `attachScreenshot`, `holdRequests`,
+      `openWithTrooper`, `quickSave`, and `selectInSession`. `placeBuilding`
+      takes options; `importMission` drops its unused `touch`.
+    - `harness.ts`: `src` re-exports and unused `Matrix` removed, so specs
+      import owning modules; `gameScene()` replaces
+      `EngineStore.Instances[0].scenes[0]` where only the scene is used;
+      `TEST_VIEW_OPTIONS` and `TestViewOptions` private. `missions.ts`:
+      `withScenario`.
+    - `MissionDriver` takes `{ touch, realTime }` and `opening` takes
+      `{ dismissGuide, faction }`, ending positional booleans; one
+      `stopRendering`; `step` no longer shares its import's name.
+    - Window state is typed: `window.harness` removed from `actor`, `terrain`,
+      and `minimap` in favor of in-page imports; `Reflect.get`/`set` globals in
+      `audio`, `circle-wolf-den`, `economy`, `minimap`, and `saves` became
+      `declare global` fields. Inline `import()` types moved to import blocks,
+      and the remaining `as any` became `as AttackEvent`.
+    - `economy.spec.ts`: `controlledOpening` takes options; `action`, `place`,
+      and `upload` sit before the tests; `ARC_ACTOR_DEFINITIONS`, which held
+      every faction, renamed. `production-card.spec.ts`: phone test no longer
+      repeats its `beforeEach` setup. `relationships.spec.ts`: assertions
+      replace `Object.assign` result accumulation.
+    - Nested ternaries removed from `mission-load` and `session-lifecycle`;
+      `terrain` shares `WORLD_ONLY`, `terrainBounds`, and `nextFrame`;
+      `group-control` shares `routeCount`; `dialogs` shares `harnessState`.
+      Stale "prototype" test title renamed; imports grouped; over-long comments
+      shortened.
+    - Reviewed without change: `fixtures.ts`, `tags.ts`, `playwright.config.ts`,
+      `sidebar-session.ts`, and `mission.spec.ts` beyond helper calls.
+    - Kept: the `sidebar` performance override, which restores the clock its
+      session outlives; repeated fresh canvases in `scenario.spec.ts`, whose
+      sizes differ; long scripted evaluates that assert one rendered behavior.
+    - Checks: `npm run check` passes (units and five smoke cases). All browser
+      specs on the host: `282` passed across Chromium and WebKit, and `8`
+      benchmark cases skipped without `COTUW_BENCHMARK`. The test inventory
+      matches `HEAD` except that one renamed title.
+    - Deferred to Slice 13: whether browser checks of session rules can move to
+      units.
 
 - [ ] **Slice 13: unit and asset test suite**
   (97 `tests/` files + `vitest.config.ts`, ~30,175 LOC)

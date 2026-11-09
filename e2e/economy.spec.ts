@@ -1,32 +1,53 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import {
+  activate,
   advance,
+  attachScreenshot,
   collectPageErrors,
   dismissExplanation,
+  expectTerrainReady,
   importMission,
   openOpening,
+  pressPoint,
+  selectInSession,
   startOpening,
   terrainPoint,
   withoutApp,
-} from "./prototype-helpers";
+} from "./page-helpers";
+
+import type { ArcRotateCamera } from "@babylonjs/core";
 import type { Page } from "@playwright/test";
-import type { GameSession } from "../src/session";
+import type { Actor } from "../src/simulation/actor";
+import type { MissionCommand } from "../src/simulation/command";
+import type { EconomyState } from "../src/simulation/economy";
 import type { ActorPlacement } from "../src/simulation/placement";
 
-/** Uses real tick callbacks with a controlled clock, so 60 seconds need no wall-time wait. */
+declare global {
+  interface Window {
+    startupErrors: string[];
+  }
+}
+
+/** Runs real tick callbacks on a controlled clock, so waits take no wall time. */
 async function controlledOpening(
   page: Page,
-  materials = 150,
-  playerOwner = "player",
-  extraBuildings: ActorPlacement[] = [],
-  startPaused = false,
+  {
+    materials = 150,
+    playerOwner = "player",
+    extraBuildings = [],
+    startPaused = false,
+  }: {
+    materials?: number;
+    playerOwner?: string;
+    extraBuildings?: ActorPlacement[];
+    startPaused?: boolean;
+  } = {},
 ) {
   await page.addInitScript(() => {
-    const errors: string[] = [];
-    Reflect.set(window, "startupErrors", errors);
+    window.startupErrors = [];
     window.addEventListener("unhandledrejection", (event) =>
-      errors.push(String(event.reason)),
+      window.startupErrors.push(String(event.reason)),
     );
   });
   // The harness owns one session and its mounted sidebar.
@@ -34,51 +55,20 @@ async function controlledOpening(
   await page.goto("/");
   const hiddenUnitsAtLoad = await page.evaluate(
     async ({ materials, playerOwner, extraBuildings, startPaused }) => {
-      const prototypePath: string = "/src/session.ts";
-      const sidebarPath: string = "/src/ui/sidebar.ts";
-      const missionsPath: string = "/e2e/missions.ts";
-      const notificationsPath: string = "/src/ui/notifications.ts";
-      const topBarPath: string = "/src/ui/top-bar.ts";
-      const harnessPath: string = "/e2e/harness.ts";
-      const { createGameSession } = (await import(
-        prototypePath
-      )) as typeof import("../src/session");
-      const { createSidebar } = (await import(
-        sidebarPath
-      )) as typeof import("../src/ui/sidebar");
-      const { level, placeBuildings } = (await import(
-        missionsPath
-      )) as typeof import("./missions");
-      const { createNotifications } = (await import(
-        notificationsPath
-      )) as typeof import("../src/ui/notifications");
+      const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
+      const { level, placeBuildings } = await import("/e2e/missions.ts");
+      const { createNotifications } = await import("/src/ui/notifications.ts");
+      const { createTopBar } = await import("/src/ui/top-bar.ts");
+      const { controlSessionClock } = await import("/e2e/harness.ts");
       const notifications = createNotifications(
         document.querySelector<HTMLElement>("#mission-alerts")!,
       );
-      const { createTopBar } = (await import(
-        topBarPath
-      )) as typeof import("../src/ui/top-bar");
       const mission = level();
       mission.state.playerOwner = playerOwner;
       mission.state.economy!.stockpiles = [
         { resource: "materials", owners: [playerOwner], amount: materials },
       ];
       placeBuildings(mission, extraBuildings);
-      let view: GameSession;
-      const sidebar = createSidebar(
-        document.querySelector<HTMLElement>("#game-sidebar")!,
-        {
-          definitions: mission.definitions,
-          presentations: new Map(Object.entries(mission.content.presentation)),
-          economy: true,
-          playerOwner,
-          playerFaction: mission.state.owners.find(
-            ({ id }) => id === playerOwner,
-          )?.faction,
-          goals: [{ definitionId: "arc-trooper", label: "Train a Trooper" }],
-          selectActor: (id, additive) => view.selectActor(id, additive),
-        },
-      );
       const topBar = createTopBar(
         document.querySelector<HTMLElement>("#top-bar")!,
         {
@@ -86,31 +76,18 @@ async function controlledOpening(
           openMenu: () => undefined,
           togglePause: () => (view.playing() ? view.pause() : view.resume()),
           setSpeed: (speed) => view.setSpeed(speed),
-          showObjectives: sidebar.showGoals,
+          showObjectives: () => sidebar.showGoals(),
         },
       );
-      view = await createGameSession(
-        document.querySelector<HTMLCanvasElement>("#game-canvas")!,
-        document.querySelector<HTMLCanvasElement>("#minimap")!,
-        {
-          ...sidebar.controls,
-          startPaused,
-          mission,
-          onStateChanged: (state) => {
-            sidebar.update(state);
-            topBar.update(state);
-          },
-          showActor: sidebar.showActor,
-          onDispose: sidebar.dispose,
-          onAlerts: (alerts) => {
-            for (const alert of alerts) notifications.alert(alert, "");
-          },
+      const { view, sidebar } = await startSidebarSession(mission, {
+        goals: [{ definitionId: "arc-trooper", label: "Train a Trooper" }],
+        startPaused,
+        onStateChanged: (state) => topBar.update(state),
+        onAlerts: (alerts) => {
+          for (const alert of alerts) notifications.alert(alert, "");
         },
-      );
+      });
       notifications.setFocus(view.focus);
-      const { controlSessionClock } = (await import(
-        harnessPath
-      )) as typeof import("./harness");
       controlSessionClock(view);
       return view.simulation.actors
         .filter(
@@ -123,14 +100,56 @@ async function controlledOpening(
     },
     { materials, playerOwner, extraBuildings, startPaused },
   );
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   expect(hiddenUnitsAtLoad).toEqual([]);
-  expect(
-    await page.evaluate(() => Reflect.get(window, "startupErrors")),
-  ).toEqual([]);
+  expect(await page.evaluate(() => window.startupErrors)).toEqual([]);
+}
+
+async function action(page: Page, selector: string, touch = false) {
+  await activate(page.locator(selector), touch);
+}
+
+async function place(
+  page: Page,
+  button: string,
+  x: number,
+  z: number,
+  touch = false,
+  complete = true,
+) {
+  await action(page, "#tab-buildings", touch);
+  await action(page, button, touch);
+  const point = await terrainPoint(page, x, z);
+  if (touch) {
+    await page.touchscreen.tap(point.x, point.y);
+    await expect(page.locator("#confirm-building")).toBeEnabled();
+    await page.locator("#confirm-building").tap();
+  } else {
+    await page.mouse.move(point.x, point.y);
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-placement-status",
+      "valid",
+    );
+    await page.mouse.click(point.x, point.y);
+  }
+  await advance(page, 0.1);
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-placement-active",
+    "false",
+  );
+  await expect(page.locator("#construction-queue button")).toContainText(
+    "8s remaining",
+  );
+  if (complete) {
+    await advance(page, 8);
+    await expect(page.locator("#construction-queue button")).toHaveCount(0);
+  }
+}
+
+/** Imports a save through the menu, which stays open for the next step. */
+async function upload(page: Page, source: string) {
+  await importMission(page, source);
+  await expect(page.locator("#game-menu")).toBeVisible();
 }
 
 test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
@@ -138,8 +157,7 @@ test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
 }) => {
   await controlledOpening(page);
   const result = await page.evaluate(async () => {
-    const path: string = "/src/mission-loading.ts";
-    const { loadMission } = await import(path);
+    const { loadMission } = await import("/src/mission-loading.ts");
     const { view } = window.sessionHarness;
     view.dismissPopup("support-network");
     let rejected = false;
@@ -159,10 +177,9 @@ test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
 test("paused inspection allows selection but blocks orders and placement", async ({
   page,
 }) => {
-  await controlledOpening(page, 150, "player", [], true);
+  await controlledOpening(page, { startPaused: true });
   const hiddenSelection = await page.evaluate(async () => {
-    const path: string = "/src/simulation/actor.ts";
-    const { createActor } = await import(path);
+    const { createActor } = await import("/src/simulation/actor.ts");
     const { view } = window.sessionHarness;
     view.selectActors(["lone-wolf", "den-alpha-wolf"]);
     const hiddenSelection =
@@ -277,12 +294,6 @@ test("command feedback follows the player issuer and ignores AI and scripts", as
   await expect(page.locator("#movement-status")).toHaveText(status!);
 });
 
-async function action(page: Page, selector: string, touch = false) {
-  const locator = page.locator(selector);
-  if (touch) await locator.tap();
-  else await locator.click();
-}
-
 test("scouting reveals the mountain den and its larger alpha", async ({
   page,
 }, testInfo) => {
@@ -325,48 +336,8 @@ test("scouting reveals the mountain den and its larger alpha", async ({
   const normal = revealed.find((actor) => actor.id === "den-wolf-1")!;
   expect(alpha.height / normal.height).toBeCloseTo(1.25);
   await expect(page.locator("#selection-details")).toContainText("Alpha wolf");
-  await testInfo.attach("wolf-den", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await attachScreenshot(page, testInfo, "wolf-den");
 });
-
-async function place(
-  page: Page,
-  button: string,
-  x: number,
-  z: number,
-  touch = false,
-  complete = true,
-) {
-  await action(page, "#tab-buildings", touch);
-  await action(page, button, touch);
-  const point = await terrainPoint(page, x, z);
-  if (touch) {
-    await page.touchscreen.tap(point.x, point.y);
-    await expect(page.locator("#confirm-building")).toBeEnabled();
-    await page.locator("#confirm-building").tap();
-  } else {
-    await page.mouse.move(point.x, point.y);
-    await expect(page.locator("#game-canvas")).toHaveAttribute(
-      "data-placement-status",
-      "valid",
-    );
-    await page.mouse.click(point.x, point.y);
-  }
-  await advance(page, 0.1);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-placement-active",
-    "false",
-  );
-  await expect(page.locator("#construction-queue button")).toContainText(
-    "8s remaining",
-  );
-  if (complete) {
-    await advance(page, 8);
-    await expect(page.locator("#construction-queue button")).toHaveCount(0);
-  }
-}
 
 test("default opening shows the Command Center, starting Materials, and paid content", async ({
   page,
@@ -392,18 +363,21 @@ test("default opening shows the Command Center, starting Materials, and paid con
 test("construction order and training cards follow the selected building", async ({
   page,
 }) => {
-  await controlledOpening(page, 500, "player", [
-    {
-      actorId: "test-refinery",
-      definitionId: "arc-materials-refinery",
-      origin: { x: 12, z: 49 },
-    },
-    {
-      actorId: "test-barracks",
-      definitionId: "arc-field-barracks",
-      origin: { x: 16, z: 54 },
-    },
-  ]);
+  await controlledOpening(page, {
+    materials: 500,
+    extraBuildings: [
+      {
+        actorId: "test-refinery",
+        definitionId: "arc-materials-refinery",
+        origin: { x: 12, z: 49 },
+      },
+      {
+        actorId: "test-barracks",
+        definitionId: "arc-field-barracks",
+        origin: { x: 16, z: 54 },
+      },
+    ],
+  });
   expect(
     await page
       .locator("#building-options button")
@@ -413,26 +387,22 @@ test("construction order and training cards follow the selected building", async
   const cards = page.locator("#training-options button:visible");
   await expect(cards).toHaveCount(0);
   await expect(page.locator("#production-status")).toContainText("on the map");
-  const select = async (id: string) => {
-    await page.evaluate((id) => window.sessionHarness.view.selectActor(id), id);
-    await advance(page, 0.1);
-  };
-  await select("test-refinery");
+  await selectInSession(page, "test-refinery");
   await expect(cards).toHaveAttribute("id", "train-harvester");
   await expect(cards).toBeInViewport({ ratio: 1 });
   await page.locator("#train-harvester").click();
   await advance(page, 0.1);
   await expect(cards).toHaveCount(1);
   await expect(cards).toBeDisabled();
-  await select("test-barracks");
+  await selectInSession(page, "test-barracks");
   await expect(cards).toHaveCount(2);
   expect(
     await cards.evaluateAll((buttons) => buttons.map(({ id }) => id)),
   ).toEqual(["train-trooper", "train-scout"]);
-  await select("starting-command-center");
+  await selectInSession(page, "starting-command-center");
   await expect(cards).toHaveCount(0);
   await expect(page.locator("#production-status")).toContainText("on the map");
-  await select("test-refinery");
+  await selectInSession(page, "test-refinery");
   await expect(cards).toHaveAttribute("id", "train-harvester");
   await page.locator("#clear-selection").click();
   await advance(page, 0.1);
@@ -454,8 +424,7 @@ test("fog keeps the camera near explored terrain", async ({ page }) => {
   const target = await page.evaluate(() => {
     const view = window.sessionHarness.view;
     view.camera.focusOnTile(90, 90);
-    const camera = view.scene
-      .activeCamera as import("@babylonjs/core").ArcRotateCamera;
+    const camera = view.scene.activeCamera as ArcRotateCamera;
     return { x: camera.target.x, z: camera.target.z };
   });
   // The Command Center sees about 14 tiles east of the west map edge.
@@ -541,18 +510,15 @@ test.describe("hovering salvage", () => {
         page.locator('[data-economy-action="loot:salvage-1"]'),
       ).toContainText("Collect salvage");
       const point = await page.evaluate(async () => {
-        const harnessPath: string = "/e2e/harness.ts";
-        const terrainPath: string = "/src/render/terrain-mesh.ts";
-        const { projectToCanvas, prototypeTerrainMap } = await import(
-          harnessPath
-        );
-        const { isTerrainPickMesh } = await import(terrainPath);
+        const { projectToCanvas, prototypeTerrainMap } =
+          await import("/e2e/harness.ts");
+        const { isTerrainPickMesh } =
+          await import("/src/render/terrain-mesh.ts");
         const map = prototypeTerrainMap();
         const view = window.sessionHarness.view;
         view.engine.stopRenderLoop();
         view.camera.focusOnTile(25, 52);
-        const camera = view.scene
-          .activeCamera as import("@babylonjs/core").ArcRotateCamera;
+        const camera = view.scene.activeCamera as ArcRotateCamera;
         camera.beta = 1.2;
         camera.alpha = -Math.PI / 2;
         view.scene.render();
@@ -580,8 +546,7 @@ test.describe("hovering salvage", () => {
         };
       });
       expect(point.terrainBehind).not.toEqual({ x: 25, z: 52 });
-      if (touch) await page.touchscreen.tap(point.x, point.y);
-      else await page.mouse.click(point.x, point.y);
+      await pressPoint(page, point, touch);
       await advance(page, 0.1);
       const target = await page.evaluate(() => {
         const simulation = window.sessionHarness.view.simulation;
@@ -610,19 +575,11 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   await page.locator("#train-harvester").click();
   await advance(page, 7);
   await page.evaluate(async () => {
-    const sidebarPath: string = "/src/ui/sidebar.ts";
-    const { createSidebar } = (await import(
-      sidebarPath
-    )) as typeof import("../src/ui/sidebar");
-    const controlsPath: string = "/src/ui/economy-controls.ts";
-    const contentPath: string = "/src/content/packs.ts";
-    const { createEconomyControls } = (await import(
-      controlsPath
-    )) as typeof import("../src/ui/economy-controls");
-    const { currentContentPack } = (await import(
-      contentPath
-    )) as typeof import("../src/content/packs");
-    const ARC_ACTOR_DEFINITIONS = currentContentPack("base").actors;
+    const { createSidebar } = await import("/src/ui/sidebar.ts");
+    const { createEconomyControls } =
+      await import("/src/ui/economy-controls.ts");
+    const { currentContentPack } = await import("/src/content/packs.ts");
+    const actors = currentContentPack("base").actors;
     const snapshot = window.sessionHarness.view.simulation.snapshot();
     window.sessionHarness.view.engine.stopRenderLoop();
     const refinery = snapshot.actors.find(
@@ -632,13 +589,13 @@ test("Harvester controls use matching Refineries and type-specific load timing",
     worker.phase = "gathering";
     worker.targetSiteId = worker.activeSiteId = snapshot.economy!.sites[0].id;
     const otherWorker = {
-      ...ARC_ACTOR_DEFINITIONS.find((definition) => definition.harvesting)!,
+      ...actors.find((definition) => definition.harvesting)!,
       id: "other-worker",
       materialsCost: 10,
       harvesting: { capacity: 50, loadSeconds: 30, patchRadius: 2 },
     };
     const otherRefinery = {
-      ...ARC_ACTOR_DEFINITIONS.find((definition) => definition.refinery)!,
+      ...actors.find((definition) => definition.refinery)!,
       id: "other-refinery",
       materialsCost: 200,
       refinery: { harvesterDefinitionId: otherWorker.id },
@@ -649,11 +606,12 @@ test("Harvester controls use matching Refineries and type-specific load timing",
       id: "other-refinery",
       definitionId: otherRefinery.id,
     });
+    const definitions = [otherWorker, otherRefinery, ...actors];
     const root = document.createElement("aside");
     root.className = "game-sidebar";
     root.id = "review-economy-root";
     const sidebar = createSidebar(root, {
-      definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
+      definitions,
       presentations: new Map(),
       playerOwner: "player",
       playerFaction: "arc",
@@ -663,7 +621,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
     });
     for (const panel of root.querySelectorAll<HTMLElement>("[role=tabpanel]"))
       panel.hidden = false;
-    const submitted: import("../src/simulation/command").MissionCommand[] = [];
+    const submitted: MissionCommand[] = [];
     const controls = createEconomyControls(
       sidebar.controls.economy!,
       {
@@ -674,7 +632,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
         },
       },
       {
-        definitions: [otherWorker, otherRefinery, ...ARC_ACTOR_DEFINITIONS],
+        definitions,
         names: new Map(),
         owner: "player",
         faction: "arc",
@@ -730,30 +688,15 @@ test("worker controls share delivery actions and tolerate missions without culti
   await withoutApp(page);
   await page.goto("/");
   const result = await page.evaluate(async () => {
-    const sidebarPath: string = "/src/ui/sidebar.ts";
-    const { createSidebar } = (await import(
-      sidebarPath
-    )) as typeof import("../src/ui/sidebar");
-    const controlsPath: string = "/src/ui/economy-controls.ts";
-    const contentPath: string = "/src/content/packs.ts";
-    const workersPath: string = "/src/simulation/economy.ts";
-    const cultivationPath: string = "/src/simulation/cultivation.ts";
-    const actorsPath: string = "/src/simulation/actor.ts";
-    const { createEconomyControls } = (await import(
-      controlsPath
-    )) as typeof import("../src/ui/economy-controls");
-    const { currentContentPack } = (await import(
-      contentPath
-    )) as typeof import("../src/content/packs");
-    const { createHarvesterState, economyForOwner } = (await import(
-      workersPath
-    )) as typeof import("../src/simulation/economy");
-    const { createCultivatorState } = (await import(
-      cultivationPath
-    )) as typeof import("../src/simulation/cultivation");
-    const { createActor } = (await import(
-      actorsPath
-    )) as typeof import("../src/simulation/actor");
+    const { createSidebar } = await import("/src/ui/sidebar.ts");
+    const { createEconomyControls } =
+      await import("/src/ui/economy-controls.ts");
+    const { currentContentPack } = await import("/src/content/packs.ts");
+    const { createHarvesterState, economyForOwner } =
+      await import("/src/simulation/economy.ts");
+    const { createCultivatorState } =
+      await import("/src/simulation/cultivation.ts");
+    const { createActor } = await import("/src/simulation/actor.ts");
     const content = currentContentPack("base");
     const root = document.querySelector<HTMLElement>("#game-sidebar")!;
     const sidebar = createSidebar(root, {
@@ -770,11 +713,11 @@ test("worker controls share delivery actions and tolerate missions without culti
         presentation.name ?? id,
       ]),
     );
-    const submitted: import("../src/simulation/command").MissionCommand[] = [];
+    const submitted: MissionCommand[] = [];
     let selection: string | undefined;
     const setup = (
-      economy: import("../src/simulation/economy").EconomyState,
-      actors: import("../src/simulation/actor").Actor[],
+      economy: EconomyState,
+      actors: Actor[],
       definitions = content.actors,
       playerFaction = "arc",
     ) =>
@@ -782,9 +725,7 @@ test("worker controls share delivery actions and tolerate missions without culti
         sidebar.controls.economy!,
         {
           tickSeconds: 1 / 60,
-          submitCommand: (
-            command: import("../src/simulation/command").MissionCommand,
-          ) => {
+          submitCommand: (command) => {
             submitted.push(command);
             return 0;
           },
@@ -808,7 +749,7 @@ test("worker controls share delivery actions and tolerate missions without culti
           positionForTile: () => ({ x: 0, z: 0 }),
         },
       );
-    const empty = (): import("../src/simulation/economy").EconomyState => ({
+    const empty = (): EconomyState => ({
       stockpiles: [],
       deposited: [],
       sites: [],
@@ -937,14 +878,11 @@ test("Harvester training cancellation refunds and frees its slot", async ({
     "true",
   );
   expect(errors).toEqual([]);
-  await testInfo.attach(`training-cancellation`, {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await attachScreenshot(page, testInfo, `training-cancellation`);
 });
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
-  test(`rally points support placement, cancellation, and production`, async ({
+  test("rally points support placement, cancellation, and production", async ({
     page,
   }, testInfo) => {
     await controlledOpening(page);
@@ -952,8 +890,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     const panel = page.locator("#panel-selection");
     await action(page, '#panel-selection [data-rally-action="set"]', touch);
     const occupied = await terrainPoint(page, 8, 50);
-    if (touch) await page.touchscreen.tap(occupied.x, occupied.y);
-    else await page.mouse.click(occupied.x, occupied.y);
+    await pressPoint(page, occupied, touch);
     await expect(panel.locator("[data-rally-status]")).toContainText(
       "passable ground",
     );
@@ -985,8 +922,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
       await action(page, '#panel-selection [data-rally-action="set"]');
     }
 
-    if (touch) await page.touchscreen.tap(destination.x, destination.y);
-    else await page.mouse.click(destination.x, destination.y);
+    await pressPoint(page, destination, touch);
     await advance(page, 0.1);
     await expect(panel.locator("[data-rally-status]")).toContainText(
       "marked rally point",
@@ -996,10 +932,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
         () => !!window.sessionHarness.view.scene.getMeshByName("rally-point"),
       ),
     ).toBe(true);
-    await testInfo.attach(`rally-${name}`, {
-      body: await page.screenshot(),
-      contentType: "image/png",
-    });
+    await attachScreenshot(page, testInfo, `rally-${name}`);
     await action(page, "#train-harvester", touch);
     await advance(page, 15);
     const result = await page.evaluate(() => {
@@ -1027,7 +960,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
 test("selling a support bridge pauses production and rebuilding restores it", async ({
   page,
 }, testInfo) => {
-  await controlledOpening(page, 500);
+  await controlledOpening(page, { materials: 500 });
   await place(page, "#build-barracks", 16, 50);
   await place(page, "#build-barracks", 22, 50);
   const [bridgeId, remoteId] = await page.evaluate(() =>
@@ -1035,19 +968,11 @@ test("selling a support bridge pauses production and rebuilding restores it", as
       .filter((actor) => actor.definitionId === "arc-field-barracks")
       .map((actor) => actor.id),
   );
-  await page.evaluate(
-    (id) => window.sessionHarness.view.selectActor(id),
-    remoteId,
-  );
-  await advance(page, 0.1);
+  await selectInSession(page, remoteId);
   await page.locator("#tab-units").click();
   await page.locator("#train-trooper").click();
   await advance(page, 1);
-  await page.evaluate(
-    (id) => window.sessionHarness.view.selectActor(id),
-    bridgeId,
-  );
-  await advance(page, 0.1);
+  await selectInSession(page, bridgeId);
   await page.locator("#remove-building").click();
   await advance(page, 0.1);
   const networkAlerts = page
@@ -1060,11 +985,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     .filter({ hasText: "1 building disconnected" })
     .click();
   await page.locator("#alert-toggle").click();
-  await page.evaluate(
-    (id) => window.sessionHarness.view.selectActor(id),
-    remoteId,
-  );
-  await advance(page, 0.1);
+  await selectInSession(page, remoteId);
   await page.locator("#tab-units").click();
   await expect(page.locator("#train-trooper")).toBeDisabled();
   await expect(
@@ -1093,27 +1014,16 @@ test("selling a support bridge pauses production and rebuilding restores it", as
       ),
     ),
   ).toBe(true);
-  await testInfo.attach("disconnected-network", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await attachScreenshot(page, testInfo, "disconnected-network");
   await place(page, "#build-barracks", 16, 50);
   await advance(page, 5);
   await expect(page.locator("#unit-roster button")).toHaveCount(1);
   await expect(networkAlerts.first()).toHaveText("• 1 building reconnected");
   await page.evaluate(async () => {
-    const contentPath: string = "/src/content/packs.ts";
-    const harnessPath: string = "/e2e/harness.ts";
-    const placementPath: string = "/src/simulation/placement.ts";
-    const { currentContentPack } = (await import(
-      contentPath
-    )) as typeof import("../src/content/packs");
-    const { prototypeTerrainMap } = (await import(
-      harnessPath
-    )) as typeof import("./harness");
-    const { createTilePlacedActor } = (await import(
-      placementPath
-    )) as typeof import("../src/simulation/placement");
+    const { currentContentPack } = await import("/src/content/packs.ts");
+    const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+    const { createTilePlacedActor } =
+      await import("/src/simulation/placement.ts");
     const simulation = window.sessionHarness.view.simulation;
     const replacement = simulation.actors.find(
       (actor) =>
@@ -1182,15 +1092,11 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
   // A shot within the rifle's one-second cooldown flashes at the Trooper.
   const flashed = await page.evaluate(() => {
     const harness = window.sessionHarness;
+    const { scene } = harness.view;
     for (let step = 0; step < 40; step++) {
       harness.now += 50;
-      harness.view.scene.onBeforeAnimationsObservable.notifyObservers(
-        harness.view.scene,
-      );
-      harness.view.scene.onBeforeRenderObservable.notifyObservers(
-        harness.view.scene,
-      );
-      const { scene } = harness.view;
+      scene.onBeforeAnimationsObservable.notifyObservers(scene);
+      scene.onBeforeRenderObservable.notifyObservers(scene);
       const flash = scene.meshes.find(({ name }) => name === "frame-effect");
       if (flash)
         return flash.isDescendantOf(
@@ -1231,13 +1137,16 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
 test("hostile buildings require detection and expose inspection without player controls", async ({
   page,
 }) => {
-  await controlledOpening(page, 150, "wildlife", [
-    {
-      actorId: "enemy-barracks",
-      definitionId: "arc-field-barracks",
-      origin: { x: 12, z: 49 },
-    },
-  ]);
+  await controlledOpening(page, {
+    playerOwner: "wildlife",
+    extraBuildings: [
+      {
+        actorId: "enemy-barracks",
+        definitionId: "arc-field-barracks",
+        origin: { x: 12, z: 49 },
+      },
+    ],
+  });
   await advance(page, 0.1);
   const initiallyHidden = await page.evaluate(() => {
     const { view } = window.sessionHarness;
@@ -1342,7 +1251,7 @@ test("damaged building sale feedback matches the credited refund", async ({
 });
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
-  test(`Attack Move supports cancellation, combat, and resumption`, async ({
+  test("Attack Move supports cancellation, combat, and resumption", async ({
     page,
   }, testInfo) => {
     await controlledOpening(page);
@@ -1377,11 +1286,9 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await action(page, "#attack-move");
     }
     const point = await terrainPoint(page, 52, 32);
-    if (profile.touch) await page.touchscreen.tap(point.x, point.y);
-    else await page.mouse.click(point.x, point.y);
+    await pressPoint(page, point, profile.touch);
     const destination = await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { prototypeTerrainMap } = await import(path);
+      const { prototypeTerrainMap } = await import("/e2e/harness.ts");
       const order = window.sessionHarness.view.simulation
         .snapshot()
         .commands.find(({ command }) => command.kind === "attack-move");
@@ -1424,10 +1331,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
     expect(result.point.x).toBeCloseTo(destination.target.x, 6);
     expect(result.point.z).toBeCloseTo(destination.target.z, 6);
     expect(result.health).toBeGreaterThan(0);
-    await testInfo.attach(`attack-move-${profile.name}`, {
-      body: await page.screenshot(),
-      contentType: "image/png",
-    });
+    await attachScreenshot(page, testInfo, `attack-move-${profile.name}`);
   });
 });
 
@@ -1435,10 +1339,7 @@ test("Goals tracks victory and restores free play", async ({
   page,
 }, testInfo) => {
   await openOpening(page);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   await action(page, "#tab-goals");
   await expect(page.locator("#mission-objectives")).toContainText(
     "Defeat the lone wolf (0/1)",
@@ -1456,19 +1357,11 @@ test("Goals tracks victory and restores free play", async ({
   await expect(page.locator("#scenario-description")).toContainText(
     "Defeat all six wolves",
   );
-  await testInfo.attach(`goals`, {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await attachScreenshot(page, testInfo, `goals`);
   const saves = await page.evaluate(async () => {
-    const missionsPath: string = "/e2e/missions.ts";
-    const actorPath: string = "/src/simulation/actor.ts";
-    const { level, missionSource, simulateMission } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
-    const { createActor } = (await import(
-      actorPath
-    )) as typeof import("../src/simulation/actor");
+    const { level, missionSource, simulateMission } =
+      await import("/e2e/missions.ts");
+    const { createActor } = await import("/src/simulation/actor.ts");
     const mission = level();
     const { state } = mission;
     for (const wolf of state.actors.filter((actor) => actor.territory)) {
@@ -1506,11 +1399,7 @@ test("Goals tracks victory and restores free play", async ({
     };
   });
   expect(saves.result).toBe("victory");
-  const upload = async (source: string) => {
-    await importMission(page, source, "mission.json");
-    await expect(page.locator("#game-menu")).toBeVisible();
-  };
-  await upload(saves.partial);
+  await upload(page, saves.partial);
   await action(page, "#inspect-loaded-mission");
   await action(page, "#tab-buildings");
   await expect(page.locator("#build-barracks")).toBeDisabled();
@@ -1527,7 +1416,7 @@ test("Goals tracks victory and restores free play", async ({
   await expect(page.locator('[data-goal-id="wolf-den"]')).not.toHaveClass(
     "goal-complete",
   );
-  await upload(saves.pending);
+  await upload(page, saves.pending);
   await action(page, "#resume-mission");
   await expect(page.locator("#game-menu-title")).toHaveText("Victory", {
     timeout: 15_000,
@@ -1539,10 +1428,7 @@ test("Goals tracks victory and restores free play", async ({
   await expect(page.locator("#resume-mission")).toHaveText(
     "Continue free play",
   );
-  await testInfo.attach(`victory`, {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await attachScreenshot(page, testInfo, `victory`);
   await action(page, "#resume-mission");
   await action(page, "#tab-goals");
   await expect(page.locator("#mission-objectives .goal-complete")).toHaveCount(
@@ -1551,7 +1437,7 @@ test("Goals tracks victory and restores free play", async ({
   await expect(page.locator("#mission-directive")).toContainText(
     "Victory secured",
   );
-  await upload(saves.victory);
+  await upload(page, saves.victory);
   await expect(page.locator("#game-menu-title")).toHaveText("Victory");
   await action(page, "#restart-mission");
   await dismissExplanation(page, "Welcome, Commander");
@@ -1569,23 +1455,16 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
 }, testInfo) => {
   const errors = collectPageErrors(page);
   await openOpening(page);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   const saves = await page.evaluate(async () => {
-    const missionsPath: string = "/e2e/missions.ts";
-    const { level, missionSource, simulateMission } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
+    const { level, missionSource, simulateMission } =
+      await import("/e2e/missions.ts");
     const mission = level();
     const { state } = mission;
     state.actors.find(
-      (actor: { id: string }) => actor.id === "starting-command-center",
+      (actor) => actor.id === "starting-command-center",
     )!.health = 1;
-    const wolf = state.actors.find(
-      (actor: { id: string }) => actor.id === "lone-wolf",
-    )!;
+    const wolf = state.actors.find((actor) => actor.id === "lone-wolf")!;
     wolf.worldPosition = { x: -39.5, z: 0.5 };
     wolf.territory = { home: { ...wolf.worldPosition } };
     const info = { name: "Before defeat", savedAt: new Date().toISOString() };
@@ -1596,11 +1475,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
     simulation.dispose();
     return { pending, defeated };
   });
-  const upload = async (source: string) => {
-    await importMission(page, source);
-    await expect(page.locator("#game-menu")).toBeVisible();
-  };
-  await upload(saves.pending);
+  await upload(page, saves.pending);
   await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
   await page.locator("#inspect-loaded-mission").click();
   await expect(page.locator("#pause-mission")).toHaveText("▶ Paused");
@@ -1628,16 +1503,13 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
   );
   await expect(page.locator("#restart-mission")).toBeVisible();
   await expect(page.locator("#load-mission")).toBeVisible();
-  await testInfo.attach("defeat", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
-  await upload('{"version":0}');
+  await attachScreenshot(page, testInfo, "defeat");
+  await upload(page, '{"version":0}');
   await expect(page.locator("#game-menu-status")).toContainText(
     "not a mission file",
   );
   await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
-  await upload(saves.defeated);
+  await upload(page, saves.defeated);
   await expect(page.locator("#game-menu-status")).toHaveText("");
   await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await expect(page.locator("#resume-mission")).toBeHidden();
@@ -1649,7 +1521,7 @@ test("Command Center defeat pauses, rejects bad loads, restores, restarts, and e
     "data-mission-result",
     "defeat",
   );
-  await upload(saves.defeated);
+  await upload(page, saves.defeated);
   await expect(page.locator("#game-menu-title")).toHaveText("Defeat");
   await page.locator("#exit-mission").click();
   await expect(page.locator("#game-menu-title")).toHaveText(

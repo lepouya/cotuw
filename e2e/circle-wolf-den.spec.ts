@@ -1,14 +1,24 @@
 import { expect, test } from "./fixtures";
 import {
   activate,
+  attachScreenshot,
   collectPageErrors,
   dismissExplanation,
-  terrainPoint,
   placeBuilding,
-} from "./prototype-helpers";
+  pressPoint,
+  terrainPoint,
+} from "./page-helpers";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
 import { MissionDriver } from "./mission-driver";
+
+import type { AttackEvent } from "../src/simulation/combat";
+
+declare global {
+  interface Window {
+    expireCircleShowcase: () => boolean;
+  }
+}
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
   test(
@@ -20,8 +30,8 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       page.on("request", (request) => {
         if (request.url().endsWith(".wav")) requestedAudio.push(request.url());
       });
-      const mission = new MissionDriver(page, touch, true);
-      await mission.opening(false, "circle");
+      const mission = new MissionDriver(page, { touch, realTime: true });
+      await mission.opening({ dismissGuide: false, faction: "circle" });
       const canvas = page.locator("#game-canvas");
       await expect(canvas).toHaveAttribute("data-models-ready", "true");
       await dismissExplanation(page, "Welcome, Guide", touch);
@@ -34,8 +44,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       );
       await expect(page.locator("#build-circle-conservatory")).toBeDisabled();
       const heart = await terrainPoint(page, 9, 51);
-      if (touch) await page.touchscreen.tap(heart.x, heart.y);
-      else await page.mouse.click(heart.x, heart.y);
+      await pressPoint(page, heart, touch);
       await expect(page.locator("#selection-details")).toContainText(
         "Heartgrove",
       );
@@ -52,14 +61,10 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       await expect(roster.filter({ hasText: "Cultivator" })).toHaveCount(1);
       await activate(roster.filter({ hasText: "Cultivator" }), touch);
       await expect(page.locator("#harvester-details")).toContainText("Idle");
-      await placeBuilding(
-        page,
-        "build-circle-conservatory",
-        16,
-        50,
-        "Tending growth",
+      await placeBuilding(page, "build-circle-conservatory", 16, 50, {
+        explanation: "Tending growth",
         touch,
-      );
+      });
       await expect(page.locator("#materials-counter")).toHaveText("0");
       await dismissExplanation(page, "Cultivating Lifebloom", touch);
       await expect(page.locator("#construction-queue button")).toHaveCount(0);
@@ -95,10 +100,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       await expect(page.locator("#worker-activity-heading")).toHaveText(
         "Cultivation and tending",
       );
-      await testInfo.attach(`circle-cultivation-${name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, testInfo, `circle-cultivation-${name}`);
       await activate(page.locator("#open-menu"), touch);
       await activate(page.locator("#quicksave-mission"), touch);
       await expect(page.locator("#game-menu-status")).toHaveText(
@@ -140,21 +142,14 @@ test(
     await page.goto("/?level=circle-wolf-den");
     await dismissExplanation(page, "Welcome, Guide");
     const result = await page.evaluate(async () => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const actorPath: string = "/src/render/skinned-actor-appearance.ts";
-      const modelPath: string = "/src/render/glb-model.ts";
-      const effectPath: string = "/src/render/combat-effects.ts";
-      const { createTestView, currentContentPack, frames, Vector3 } =
-        (await import(harnessPath)) as typeof import("./harness");
-      const { loadSkinnedActorAppearance } = (await import(
-        actorPath
-      )) as typeof import("../src/render/skinned-actor-appearance");
-      const { loadModelAsset } = (await import(
-        modelPath
-      )) as typeof import("../src/render/glb-model");
-      const { createCombatEffectsView } = (await import(
-        effectPath
-      )) as typeof import("../src/render/combat-effects");
+      const { createTestView, frames, Vector3 } =
+        await import("/e2e/harness.ts");
+      const { currentContentPack } = await import("/src/content/packs.ts");
+      const { loadSkinnedActorAppearance } =
+        await import("/src/render/skinned-actor-appearance.ts");
+      const { loadModelAsset } = await import("/src/render/glb-model.ts");
+      const { createCombatEffectsView } =
+        await import("/src/render/combat-effects.ts");
       const view = createTestView({
         map: { width: 12, height: 12, tileSize: 1 },
         size: { width: 1000, height: 600 },
@@ -201,7 +196,7 @@ test(
         () => reduced,
       );
       effects.hit(
-        { from: { x: -1.3, z: 0.6 }, to: { x: 0.7, z: 2.7 } } as any,
+        { from: { x: -1.3, z: 0.6 }, to: { x: 0.7, z: 2.7 } } as AttackEvent,
         "bolt",
       );
       effects.update(0.08);
@@ -209,18 +204,18 @@ test(
       const strands = view.scene.meshes.filter(({ name }) =>
         name.includes("living-strand"),
       );
-      const normal = strands[0]!.scaling.x;
+      const normal = strands[0].scaling.x;
       reduced = true;
       effects.update(0.01);
       await frames(2);
-      const held = strands[0]!.scaling.x;
+      const held = strands[0].scaling.x;
       effects.update(0.01);
       await frames(2);
-      const stable = strands[0]!.scaling.x === held;
-      Reflect.set(window, "expireCircleShowcase", () => {
+      const stable = strands[0].scaling.x === held;
+      window.expireCircleShowcase = () => {
         effects.update(1);
         return strands.every((strand) => strand.isDisposed());
-      });
+      };
       return {
         strands: strands.length,
         animates: normal !== held,
@@ -236,11 +231,7 @@ test(
         .screenshot({ path: testInfo.outputPath("circle-showcase.png") }),
       contentType: "image/png",
     });
-    expect(
-      await page.evaluate(() => {
-        return Reflect.get(window, "expireCircleShowcase")();
-      }),
-    ).toBe(true);
+    expect(await page.evaluate(() => window.expireCircleShowcase())).toBe(true);
     expect(errors).toEqual([]);
   },
 );
@@ -253,14 +244,9 @@ test(
     await page.goto("/?level=circle-wolf-den");
     await dismissExplanation(page, "Welcome, Guide");
     const ids = await page.evaluate(async () => {
-      const cardsPath: string = "/src/ui/production-card.ts";
-      const contentPath: string = "/src/content/packs.ts";
-      const { createProductionCards } = (await import(
-        cardsPath
-      )) as typeof import("../src/ui/production-card");
-      const { currentContentPack } = (await import(
-        contentPath
-      )) as typeof import("../src/content/packs");
+      const { createProductionCards } =
+        await import("/src/ui/production-card.ts");
+      const { currentContentPack } = await import("/src/content/packs.ts");
       const content = currentContentPack("base");
       const root = document.createElement("section");
       root.id = "circle-portrait-review";

@@ -1,8 +1,13 @@
 import { expect, test } from "./fixtures";
-import { advance, withoutApp } from "./prototype-helpers";
+import {
+  advance,
+  expectTerrainReady,
+  selectInSession,
+  withoutApp,
+} from "./page-helpers";
 import { WEBKIT } from "./tags";
+
 import type { Page } from "@playwright/test";
-import type { GameSession } from "../src/session";
 
 declare global {
   interface Window {
@@ -16,31 +21,12 @@ async function openBetrayal(page: Page) {
   await withoutApp(page);
   await page.goto("/");
   await page.evaluate(async () => {
-    const sessionPath: string = "/src/session.ts";
-    const missionsPath: string = "/e2e/missions.ts";
-    const scenarioPath: string = "/src/simulation/scenario.ts";
-    const sidebarPath: string = "/src/ui/sidebar.ts";
-    const notificationsPath: string = "/src/ui/notifications.ts";
-    const terrainPath: string = "/src/simulation/terrain.ts";
-    const harnessPath: string = "/e2e/harness.ts";
-    const { createGameSession } = (await import(
-      sessionPath
-    )) as typeof import("../src/session");
-    const { level } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
-    const { createScenarioState, defineScenario } = (await import(
-      scenarioPath
-    )) as typeof import("../src/simulation/scenario");
-    const { createSidebar } = (await import(
-      sidebarPath
-    )) as typeof import("../src/ui/sidebar");
-    const { createNotifications } = (await import(
-      notificationsPath
-    )) as typeof import("../src/ui/notifications");
-    const { TerrainGrid } = (await import(
-      terrainPath
-    )) as typeof import("../src/simulation/terrain");
+    const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
+    const { level, withScenario } = await import("/e2e/missions.ts");
+    const { defineScenario } = await import("/src/simulation/scenario.ts");
+    const { createNotifications } = await import("/src/ui/notifications.ts");
+    const { TerrainGrid } = await import("/src/simulation/terrain.ts");
+    const { controlSessionClock } = await import("/e2e/harness.ts");
     const mission = level();
     const map = new TerrainGrid({
       width: 60,
@@ -149,52 +135,20 @@ async function openBetrayal(page: Page) {
     const notifications = createNotifications(
       document.querySelector<HTMLElement>("#mission-alerts")!,
     );
-    let view: GameSession;
-    const sidebar = createSidebar(
-      document.querySelector<HTMLElement>("#game-sidebar")!,
+    const { view } = await startSidebarSession(
+      withScenario(mission, scenario),
       {
-        definitions: mission.definitions,
-        presentations: new Map(Object.entries(mission.content.presentation)),
-        economy: true,
-        goals: [],
-        playerOwner: "player",
-        playerFaction: "arc",
-        selectActor: (id, additive) => view.selectActor(id, additive),
-      },
-    );
-    view = await createGameSession(
-      document.querySelector<HTMLCanvasElement>("#game-canvas")!,
-      document.querySelector<HTMLCanvasElement>("#minimap")!,
-      {
-        ...sidebar.controls,
-        mission: {
-          ...mission,
-          scenario,
-          state: createScenarioState(
-            scenario,
-            mission.definitions,
-          ) as typeof mission.state,
-        },
         onStateChanged: (state) => {
-          sidebar.update(state);
           window.presentedActorIds = state.actors.map(({ id }) => id);
         },
-        showActor: sidebar.showActor,
-        onDispose: sidebar.dispose,
         onAlerts: (alerts) => {
           for (const alert of alerts) notifications.alert(alert, "");
         },
       },
     );
-    const { controlSessionClock } = (await import(
-      harnessPath
-    )) as typeof import("./harness");
     controlSessionClock(view);
   });
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
 }
 
 /** The visitor's selection marker: a ring, or segments when hostile. */
@@ -220,34 +174,25 @@ const coverage = (page: Page) =>
 
 test(
   "a relationship event updates hostile markers, shared coverage, and owner alerts",
-  {
-    tag: WEBKIT,
-  },
+  { tag: WEBKIT },
   async ({ page }) => {
     await openBetrayal(page);
-    const select = async (id: string) => {
-      await page.evaluate(
-        (id) => window.sessionHarness.view.selectActor(id),
-        id,
-      );
-      await advance(page, 0.1);
-    };
     const networkStatus = page.locator(
       "#panel-selection [data-network-status]",
     );
     await advance(page, 0.1);
-    await select("visitor");
-    const allied = { marker: await marker(page) };
+    await selectInSession(page, "visitor");
+    expect(await marker(page)).toBe("ring");
     await expect(page.locator("#selection-info")).toContainText("Allied");
-    await select("outpost");
-    Object.assign(allied, { coverage: await coverage(page) });
+    await selectInSession(page, "outpost");
+    expect(await coverage(page)).toEqual({ areas: 4, radii: 4 });
     await expect(networkStatus).toContainText("Connected");
 
     await advance(page, 2);
-    const hostile = { coverage: await coverage(page) };
+    expect(await coverage(page)).toEqual({ areas: 0, radii: 1 });
     await expect(networkStatus).toContainText("Disconnected");
-    await select("visitor");
-    Object.assign(hostile, { marker: await marker(page) });
+    await selectInSession(page, "visitor");
+    expect(await marker(page)).toBe("segments");
     await expect(page.locator("#selection-info")).toContainText("Hostile");
 
     // Rival training and losses beyond the player's vision raise nothing.
@@ -278,14 +223,6 @@ test(
       };
     });
 
-    expect(allied).toEqual({
-      marker: "ring",
-      coverage: { areas: 4, radii: 4 },
-    });
-    expect(hostile).toEqual({
-      marker: "segments",
-      coverage: { areas: 0, radii: 1 },
-    });
     expect(hidden).toEqual({
       recruited: true,
       scoutLost: true,

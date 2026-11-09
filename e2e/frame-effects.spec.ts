@@ -7,13 +7,11 @@ test(
   async ({ page }) => {
     await page.goto("/?level=sandbox");
     const result = await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const {
-        createTestView,
-        createFrameEffectsView,
-        currentContentPack,
-        TransformNode,
-      } = (await import(path)) as typeof import("./harness");
+      const { createTestView, frames, TransformNode } =
+        await import("/e2e/harness.ts");
+      const { createFrameEffectsView } =
+        await import("/src/render/frame-effects.ts");
+      const { currentContentPack } = await import("/src/content/packs.ts");
       const content = currentContentPack("base");
       const flash = content.presentation["arc-trooper"]!.frameEffects!.attack!;
       const { scene } = createTestView({
@@ -40,9 +38,7 @@ test(
       ) {
         if (performance.now() > deadline)
           throw new Error("Muzzle flash did not load.");
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => resolve()),
-        );
+        await frames(1);
       }
       effects.play(flash, actor);
       const firstVisible = shown()[0]?.isVisible;

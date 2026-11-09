@@ -1,5 +1,8 @@
 import { expect } from "@playwright/test";
-import type { Locator, Page } from "@playwright/test";
+
+import type { Locator, Page, TestInfo } from "@playwright/test";
+
+type ScreenPoint = { x: number; y: number };
 
 /** Records uncaught page errors, plus console errors when requested. */
 export function collectPageErrors(page: Page, { console = false } = {}) {
@@ -21,18 +24,87 @@ export async function activate(locator: Locator, touch = false) {
   else await locator.click();
 }
 
+/** Taps or clicks a screen point in the flow's input modality. */
+export async function pressPoint(
+  page: Page,
+  { x, y }: ScreenPoint,
+  touch = false,
+) {
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
+/** Synthetic drags exercise the app's pointer contract on both webviews. */
+export async function touchDrag(
+  page: Page,
+  from: ScreenPoint,
+  to: ScreenPoint,
+) {
+  await page.evaluate(
+    ({ from, to }) => {
+      const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
+      for (const [type, point] of [
+        ["pointerdown", from],
+        ["pointermove", to],
+        ["pointerup", to],
+      ] as const)
+        canvas.dispatchEvent(
+          new PointerEvent(type, {
+            pointerId: 31,
+            pointerType: "touch",
+            button: 0,
+            buttons: type === "pointerup" ? 0 : 1,
+            clientX: point.x,
+            clientY: point.y,
+            bubbles: true,
+          }),
+        );
+    },
+    { from, to },
+  );
+}
+
+export async function expectTerrainReady(page: Page) {
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-terrain-ready",
+    "true",
+  );
+}
+
+export async function attachScreenshot(
+  page: Page,
+  info: TestInfo,
+  name: string,
+) {
+  await info.attach(name, {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+}
+
+/** Holds matching requests until the returned function runs. */
+export async function holdRequests(page: Page, url: string) {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(url, async (route) => {
+    await held;
+    await route.continue();
+  });
+  return release;
+}
+
 export async function terrainPoint(page: Page, x: number, z: number) {
   return page.evaluate(
     async ({ x, z }) => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const { EngineStore, Vector3, projectToCanvas, prototypeTerrainMap } =
-        await import(harnessPath);
+      const { gameScene, Vector3, projectToCanvas, prototypeTerrainMap } =
+        await import("/e2e/harness.ts");
       const map = prototypeTerrainMap();
       const point = map.tileCenter(x, z);
-      const scene = EngineStore.Instances[0].scenes[0];
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
       return projectToCanvas(
-        scene,
+        gameScene(),
         canvas,
         new Vector3(
           point.x,
@@ -86,9 +158,14 @@ export async function placeBuilding(
   buttonId: string,
   x: number,
   z: number,
-  /** The popup title that starting this placement shows. */
-  explanation?: string,
-  touch = false,
+  {
+    explanation,
+    touch = false,
+  }: {
+    /** The popup title that starting this placement shows. */
+    explanation?: string;
+    touch?: boolean;
+  } = {},
 ) {
   const canvas = page.locator("#game-canvas");
   const count = Number(
@@ -100,16 +177,10 @@ export async function placeBuilding(
   const point = await terrainPoint(page, x, z);
   if (touch) await page.touchscreen.tap(point.x, point.y);
   else await page.mouse.move(point.x, point.y);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-placement-status",
-    "valid",
-  );
+  await expect(canvas).toHaveAttribute("data-placement-status", "valid");
   if (touch) await page.locator("#confirm-building").tap();
   else await page.mouse.click(point.x, point.y);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-placement-active",
-    "false",
-  );
+  await expect(canvas).toHaveAttribute("data-placement-active", "false");
   await expect(canvas).toHaveAttribute(
     "data-tile-placed-actor-count",
     String(count + 1),
@@ -121,11 +192,8 @@ export async function trainTestUnits(
   units = ["trooper", "scout"],
   touch = false,
 ) {
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
-  await placeBuilding(page, "build-barracks", 49, 39, undefined, touch);
+  await expectTerrainReady(page);
+  await placeBuilding(page, "build-barracks", 49, 39, { touch });
   await activate(page.locator("#tab-units"), touch);
   for (const [index, unit] of units.entries()) {
     const button = page.locator(`#train-${unit}`);
@@ -135,9 +203,8 @@ export async function trainTestUnits(
     await expect
       .poll(() =>
         page.evaluate(async (id) => {
-          const path: string = "/e2e/harness.ts";
-          const { EngineStore } = await import(path);
-          return !!EngineStore.Instances[0].scenes[0].getTransformNodeByName(
+          const { gameScene } = await import("/e2e/harness.ts");
+          return !!gameScene().getTransformNodeByName(
             `actor-trained-unit-${id}-root`,
           );
         }, index + 1),
@@ -146,19 +213,29 @@ export async function trainTestUnits(
   }
 }
 
+/** Opens the sandbox with one trained trooper selected. */
+export async function openWithTrooper(page: Page, touch = false) {
+  await page.goto("/?level=sandbox");
+  await trainTestUnits(page, ["trooper"], touch);
+  await activate(page.locator("#unit-roster button").first(), touch);
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-selected-actors",
+    '["trained-unit-1"]',
+  );
+}
+
 /** Imports a mission file through the game menu's Load panel. */
 export async function importMission(
   page: Page,
   source: string,
   name = "mission.json",
-  touch = false,
 ) {
   if (!(await page.locator("#game-menu").isVisible()))
-    await activate(page.locator("#open-menu"), touch);
+    await page.locator("#open-menu").click();
   if (await page.locator("#load-panel").isHidden())
-    await activate(page.locator("#load-mission"), touch);
+    await page.locator("#load-mission").click();
   const chooser = page.waitForEvent("filechooser");
-  await activate(page.locator("#import-mission"), touch);
+  await page.locator("#import-mission").click();
   await (
     await chooser
   ).setFiles({
@@ -166,6 +243,13 @@ export async function importMission(
     mimeType: "application/json",
     buffer: Buffer.from(source),
   });
+}
+
+export async function quickSave(page: Page) {
+  await page.keyboard.press("F5");
+  await expect(page.locator("#notifications")).toContainText(
+    "Quick save complete",
+  );
 }
 
 /**
@@ -183,4 +267,10 @@ export async function advance(page: Page, seconds: number) {
     }
     scene.render();
   }, seconds);
+}
+
+/** Selects an actor in a session under `controlSessionClock`. */
+export async function selectInSession(page: Page, id: string) {
+  await page.evaluate((id) => window.sessionHarness.view.selectActor(id), id);
+  await advance(page, 0.1);
 }

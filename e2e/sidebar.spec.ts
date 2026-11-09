@@ -5,11 +5,16 @@ import {
   PROFILES,
   TOUCH_PROFILES,
 } from "./profiles";
-
-import { activate, placeBuilding, terrainPoint } from "./prototype-helpers";
+import {
+  activate,
+  attachScreenshot,
+  expectTerrainReady,
+  placeBuilding,
+  terrainPoint,
+} from "./page-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
-import type { GameSession, GameSessionControls } from "../src/session";
+import type { GameSessionControls } from "../src/session";
 import type {
   ActorDefinition,
   ActorRenderState,
@@ -21,8 +26,7 @@ test("partial sidebar setup releases its tooltip and listeners", async ({
 }) => {
   await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
-    const path: string = "/src/ui/sidebar.ts";
-    const { createSidebar } = await import(path);
+    const { createSidebar } = await import("/src/ui/sidebar.ts");
     const root = document.createElement("aside");
     root.id = "failed-sidebar";
     document.body.append(root);
@@ -42,7 +46,7 @@ test("partial sidebar setup releases its tooltip and listeners", async ({
               name: "Broken",
               description: "",
               train: { id: "train-broken", label: "Train broken" },
-              get portrait() {
+              get portrait(): undefined {
                 throw new Error("Card setup failed");
               },
             },
@@ -66,18 +70,13 @@ test("partial sidebar setup releases its tooltip and listeners", async ({
 
 forEachProfile(PROFILES, (profile) => {
   test(
-    `orders stay visible while panels scroll`,
+    "orders stay visible while panels scroll",
     { tag: WEBKIT },
     async ({ page }, info) => {
       await page.goto("/?level=sandbox");
-      await placeBuilding(
-        page,
-        "build-barracks",
-        55,
-        39,
-        undefined,
-        profile.touch,
-      );
+      await placeBuilding(page, "build-barracks", 55, 39, {
+        touch: profile.touch,
+      });
       await activate(page.locator("#train-trooper"), profile.touch);
       await activate(page.locator("#unit-roster button"), profile.touch);
       await page.evaluate(() => {
@@ -159,10 +158,7 @@ test("goal lists reconcile changed content, order, and failure status", async ({
 }) => {
   await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
-    const path: string = "/src/ui/goals.ts";
-    const { createGoalList } = (await import(
-      path
-    )) as typeof import("../src/ui/goals");
+    const { createGoalList } = await import("/src/ui/goals.ts");
     const list = document.createElement("ul");
     const goals = createGoalList(list, true);
     goals.update([
@@ -288,10 +284,7 @@ test(
     await expect(page.locator("#panel-selection")).toBeVisible();
     await page.mouse.click(barracks.x, barracks.y);
     await expect(page.locator("#panel-units")).toBeVisible();
-    await testInfo.attach("sidebar-desktop", {
-      body: await page.screenshot(),
-      contentType: "image/png",
-    });
+    await attachScreenshot(page, testInfo, "sidebar-desktop");
     await page.locator("#tab-goals").click();
     await expect(page.locator("#scenario-goals .goal-complete")).toHaveCount(4);
     await expect(page.locator("#scenario-goals")).toContainText(
@@ -308,10 +301,7 @@ test("blocked exits disable training until a unit moves away", async ({
   page,
 }) => {
   await page.goto("/?level=sandbox");
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-terrain-ready",
-    "true",
-  );
+  await expectTerrainReady(page);
   await placeBuilding(page, "build-barracks", 49, 39);
   for (let i = 0; i < 10; i++) {
     await page.locator("#train-trooper").click();
@@ -330,15 +320,14 @@ test("blocked exits disable training until a unit moves away", async ({
   );
   await page.locator("#tab-units").click();
   const barracks = await page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore, projectToCanvas } = await import(path);
-    const scene = EngineStore.Instances[0].scenes[0];
+    const { gameScene, projectToCanvas } = await import("/e2e/harness.ts");
+    const scene = gameScene();
     const root = scene.getTransformNodeByName(
       "tile-placed-actor-arc-field-barracks-1-root",
     )!;
     const roof = root
       .getChildMeshes()
-      .find((mesh: { name: string }) => mesh.name.endsWith("-roof"))!;
+      .find((mesh) => mesh.name.endsWith("-roof"))!;
     roof.computeWorldMatrix(true);
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     return projectToCanvas(
@@ -355,16 +344,11 @@ test("blocked exits disable training until a unit moves away", async ({
 
 forEachProfile(TOUCH_PROFILES, (profile) => {
   test(
-    `touch layout can build a barracks and train both unit types`,
-    {
-      tag: profile === PHONE_PROFILE ? [QUICK, WEBKIT] : WEBKIT,
-    },
+    "touch layout can build a barracks and train both unit types",
+    { tag: profile === PHONE_PROFILE ? [QUICK, WEBKIT] : WEBKIT },
     async ({ page }, testInfo) => {
       await page.goto("/?level=sandbox");
-      await expect(page.locator("#game-canvas")).toHaveAttribute(
-        "data-terrain-ready",
-        "true",
-      );
+      await expectTerrainReady(page);
       await page.locator("#build-barracks").tap();
       await expect(page.locator("#placement-panel")).toBeVisible();
       for (const button of await page
@@ -400,10 +384,7 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
       const bounds = (await page.locator("#game-canvas").boundingBox())!;
       expect(bounds.x).toBe(sidebar.x + sidebar.width);
       expect(bounds.x + bounds.width).toBe(profile.viewport.width);
-      await testInfo.attach(`sidebar-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, testInfo, `sidebar-${profile.name}`);
     },
   );
 });
@@ -414,14 +395,9 @@ test(
   async ({ page }) => {
     await page.goto("/?level=sandbox");
     const result = await page.evaluate(async () => {
-      const path: string = "/src/ui/sidebar.ts";
-      const { createSidebar } = (await import(
-        path
-      )) as typeof import("../src/ui/sidebar");
-      const ownershipPath: string = "/src/simulation/ownership.ts";
-      const { createRelations, ownerRelation } = (await import(
-        ownershipPath
-      )) as typeof import("../src/simulation/ownership");
+      const { createSidebar } = await import("/src/ui/sidebar.ts");
+      const { createRelations, ownerRelation } =
+        await import("/src/simulation/ownership.ts");
       const relationTo =
         (relations: ReturnType<typeof createRelations>) =>
         ({ owner }: { owner: string }) =>
@@ -463,7 +439,7 @@ test(
         },
       ];
       definitions.push({
-        ...definitions[1]!,
+        ...definitions[1],
         id: "circle-hub",
         faction: "circle",
         support: { root: true, radius: 10 },
@@ -496,7 +472,7 @@ test(
         factionName: "Foundry <crew>",
         economy: true,
         goals: [{ definitionId: "runner", label: "Train a Runner" }],
-        selectActor: (id: string) => {
+        selectActor: (id) => {
           selected = id;
         },
       } satisfies SidebarOptions;
@@ -519,7 +495,7 @@ test(
           facing: 0,
         },
       ];
-      actors.push({ ...actors[0]!, id: "visitor", owner: "rival" });
+      actors.push({ ...actors[0], id: "visitor", owner: "rival" });
       const state = {
         actors: actors.filter(({ id }) => id !== "visitor"),
         actorVersion: 0,
@@ -530,13 +506,15 @@ test(
         balances: { lifebloom: 10 },
         relationTo: relationTo(createRelations([])),
       } satisfies SidebarState;
+      const runnerCard = () =>
+        root
+          .querySelector<HTMLElement>("#train-runner")!
+          .closest<HTMLElement>(".production-card")!;
       let sidebar = createSidebar(root, options);
       try {
         sidebar.update(state);
         const title = root.querySelector("#selection-details")!.textContent;
-        const foreignRosterVisible = !root
-          .querySelector<HTMLElement>("#train-runner")!
-          .closest<HTMLElement>(".production-card")!.hidden;
+        const foreignRosterVisible = !runnerCard().hidden;
         const descriptionFor = (id: string) =>
           document.getElementById(
             root.querySelector(`#${id}`)!.getAttribute("aria-describedby")!,
@@ -566,17 +544,15 @@ test(
           actorVersion: 1,
           actors: [
             ...state.actors,
-            { ...actors[0]!, id: "captured-hub", definitionId: "circle-hub" },
+            { ...actors[0], id: "captured-hub", definitionId: "circle-hub" },
           ],
         });
         const ownedForeignNetworkVisible = !network.hidden;
         sidebar.update({ ...state, balances: { materials: 1000 } });
         const missingCurrencyBlocked = buildButton.disabled;
         sidebar.update(state);
-        (root.querySelector("#tab-units") as HTMLButtonElement).click();
-        const trainingCard = root
-          .querySelector<HTMLElement>("#train-runner")!
-          .closest<HTMLElement>(".production-card")!;
+        root.querySelector<HTMLButtonElement>("#tab-units")!.click();
+        const trainingCard = runnerCard();
         trainingCard.tabIndex = 0;
         trainingCard.focus();
         sidebar.update({ ...state, selectedActorIds: ["unit"] });
@@ -607,21 +583,14 @@ test(
               createRelations(
                 relationship === "neutral"
                   ? []
-                  : [
-                      {
-                        owners: ["player", "rival"],
-                        relationship,
-                      },
-                    ],
+                  : [{ owners: ["player", "rival"], relationship }],
               ),
             ),
           });
           return root.querySelector("#selection-info")!.textContent;
         };
         const alliedInfo = inspectVisitor("allied");
-        const visitorTrainingHidden = root
-          .querySelector<HTMLElement>("#train-runner")!
-          .closest<HTMLElement>(".production-card")!.hidden;
+        const visitorTrainingHidden = runnerCard().hidden;
         const neutralInfo = inspectVisitor("neutral");
         const hostileInfo = inspectVisitor("hostile");
         sidebar.dispose();
@@ -698,23 +667,15 @@ test(
   },
 );
 
-test("prototype controls skip unchanged frames and removal works without a sidebar", async ({
+test("session controls skip unchanged frames and removal works without a sidebar", async ({
   page,
 }) => {
   await page.goto("/?level=sandbox");
   const result = await page.evaluate(async () => {
-    const prototypePath: string = "/src/session.ts";
-    const placementPath: string = "/src/simulation/placement.ts";
-    const missionsPath: string = "/e2e/missions.ts";
-    const { createGameSession } = (await import(
-      prototypePath
-    )) as typeof import("../src/session");
-    const { createTilePlacedActor } = (await import(
-      placementPath
-    )) as typeof import("../src/simulation/placement");
-    const { level, missionMap } = (await import(
-      missionsPath
-    )) as typeof import("./missions");
+    const { createGameSession } = await import("/src/session.ts");
+    const { createTilePlacedActor } =
+      await import("/src/simulation/placement.ts");
+    const { level, missionMap } = await import("/e2e/missions.ts");
     const mission = level("sandbox");
     const canvas = document.createElement("canvas");
     const minimap = document.createElement("canvas");
@@ -736,11 +697,7 @@ test("prototype controls skip unchanged frames and removal works without a sideb
         updates += 1;
       },
     };
-    const view: GameSession = await createGameSession(
-      canvas,
-      minimap,
-      controls,
-    );
+    const view = await createGameSession(canvas, minimap, controls);
     view.engine.stopRenderLoop();
     let now = performance.now();
     const nowDescriptor = Object.getOwnPropertyDescriptor(performance, "now");

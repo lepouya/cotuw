@@ -3,18 +3,32 @@ import { MissionDriver } from "./mission-driver";
 import { forEachProfile, PROFILES } from "./profiles";
 import {
   activate,
+  attachScreenshot,
   collectPageErrors,
+  expectTerrainReady,
   openOpening,
+  pressPoint,
   startOpening,
   withoutApp,
-} from "./prototype-helpers";
+} from "./page-helpers";
 import { WEBKIT } from "./tags";
+
+import type { createAudioMixer } from "../src/audio/mixer";
+import type { AudioEmitter, createAudioScene } from "../src/audio/scene";
 
 declare global {
   interface Window {
     audioStarts: { duration: number; loop: boolean; stopped: boolean }[];
     audioDecoded: number;
     audioVoiceGains: (GainNode | undefined)[];
+    audioSequenceHarness: {
+      scene: ReturnType<typeof createAudioScene>;
+      device: ReturnType<typeof createAudioMixer>;
+      starts: number[];
+      emitter: AudioEmitter;
+      readonly ready: boolean;
+      readonly loopStarts: number;
+    };
   }
 }
 
@@ -66,10 +80,7 @@ forEachProfile(PROFILES, (profile) => {
     { tag: WEBKIT },
     async ({ page }, info) => {
       await openOpening(page, profile.touch);
-      await expect(page.locator("#game-canvas")).toHaveAttribute(
-        "data-terrain-ready",
-        "true",
-      );
+      await expectTerrainReady(page);
       await activate(page.locator("#open-menu"), profile.touch);
       await expect(page.locator("#menu-audio")).toBeHidden();
       await activate(page.locator("#open-options"), profile.touch);
@@ -82,34 +93,25 @@ forEachProfile(PROFILES, (profile) => {
         const slider = page.locator(`#audio-${bus}-volume`);
         await slider.scrollIntoViewIfNeeded();
         const box = (await slider.boundingBox())!;
-        const x = box.x + box.width * 0.25;
-        const y = box.y + box.height / 2;
-        if (profile.touch) await page.touchscreen.tap(x, y);
-        else await page.mouse.click(x, y);
+        await pressPoint(
+          page,
+          { x: box.x + box.width * 0.25, y: box.y + box.height / 2 },
+          profile.touch,
+        );
         expect(Number(await slider.inputValue())).toBeLessThan(40);
         const mute = page.locator(`#audio-${bus}-mute`);
-        await expect(mute).toHaveAccessibleName(
-          `Mute ${bus === "master" ? "all audio" : bus}`,
-        );
+        const label = bus === "master" ? "all audio" : bus;
+        await expect(mute).toHaveAccessibleName(`Mute ${label}`);
         await expect(mute).toHaveText("");
         await expect(mute.locator("svg")).toBeVisible();
         await activate(mute, profile.touch);
-        await expect(mute).toHaveAttribute(
-          "title",
-          `Unmute ${bus === "master" ? "all audio" : bus}`,
-        );
-        await expect(page.locator(`#audio-${bus}-mute`)).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        );
+        await expect(mute).toHaveAttribute("title", `Unmute ${label}`);
+        await expect(mute).toHaveAttribute("aria-pressed", "true");
       }
       const saved = await page.evaluate(() =>
         localStorage.getItem("cotuw.audio.settings"),
       );
-      await info.attach(`audio-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, info, `audio-${profile.name}`);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -120,10 +122,7 @@ forEachProfile(PROFILES, (profile) => {
       await activate(page.locator("#restart-mission"), profile.touch);
       await page.reload();
       await startOpening(page, profile.touch);
-      await expect(page.locator("#game-canvas")).toHaveAttribute(
-        "data-terrain-ready",
-        "true",
-      );
+      await expectTerrainReady(page);
       await activate(page.locator("#open-menu"), profile.touch);
       expect(
         await page.evaluate(() => localStorage.getItem("cotuw.audio.settings")),
@@ -185,8 +184,8 @@ test(
         return source;
       };
     });
-    const mission = new MissionDriver(page, false, false);
-    await mission.opening(false);
+    const mission = new MissionDriver(page);
+    await mission.opening({ dismissGuide: false });
     // The New mission press unlocks audio, so only music may start yet.
     expect(
       await page.evaluate(() =>
@@ -200,7 +199,9 @@ test(
     await expect
       .poll(() =>
         page.evaluate(() =>
-          window.audioStarts.some((v) => v.loop && v.duration === 48),
+          window.audioStarts.some(
+            (voice) => voice.loop && voice.duration === 48,
+          ),
         ),
       )
       .toBe(true);
@@ -274,29 +275,31 @@ test(
     for (const duration of [0.25, 0.9, 1.4, 0.8])
       expect(
         starts
-          .filter((v) => !v.loop)
-          .map((v) => Math.round(v.duration * 1000) / 1000),
+          .filter((voice) => !voice.loop)
+          .map((voice) => Math.round(voice.duration * 1000) / 1000),
       ).toContain(duration);
-    expect(starts.some((v) => v.loop && v.duration === 4)).toBe(true);
+    expect(starts.some((voice) => voice.loop && voice.duration === 4)).toBe(
+      true,
+    );
     await mission.press("#open-menu");
     expect(
       await page.evaluate(() =>
         window.audioStarts.filter(
-          (v) => v.loop && v.duration === 4 && !v.stopped,
+          (voice) => voice.loop && voice.duration === 4 && !voice.stopped,
         ),
       ),
     ).toEqual([]);
     expect(
       await page.evaluate(() =>
         window.audioStarts.filter(
-          (v) => v.loop && v.duration === 48 && !v.stopped,
+          (voice) => voice.loop && voice.duration === 48 && !voice.stopped,
         ),
       ),
     ).toHaveLength(1);
     await page.locator("#exit-mission").click();
     expect(
       await page.evaluate(() =>
-        window.audioStarts.filter((v) => v.loop && !v.stopped),
+        window.audioStarts.filter((voice) => voice.loop && !voice.stopped),
       ),
     ).toEqual([]);
   },
@@ -318,7 +321,7 @@ test(
         },
       );
     });
-    const mission = new MissionDriver(page, false, false);
+    const mission = new MissionDriver(page);
     await mission.opening();
     await mission.press("#open-menu");
     await expect(page.locator("#audio-status")).toHaveAttribute(
@@ -350,14 +353,8 @@ for (const nativeHold of [true, false]) {
         });
       await page.goto("/");
       await page.evaluate(async () => {
-        const mixerPath: string = "/src/audio/mixer.ts";
-        const scenePath: string = "/src/audio/scene.ts";
-        const { createAudioMixer } = (await import(
-          mixerPath
-        )) as typeof import("../src/audio/mixer");
-        const { createAudioScene } = (await import(
-          scenePath
-        )) as typeof import("../src/audio/scene");
+        const { createAudioMixer } = await import("/src/audio/mixer.ts");
+        const { createAudioScene } = await import("/src/audio/scene.ts");
         const starts: number[] = [];
         let loopStarts = 0;
         const device = createAudioMixer({
@@ -444,7 +441,7 @@ for (const nativeHold of [true, false]) {
           void device.unlock();
         });
         document.getElementById("top-bar")!.append(unlock);
-        Reflect.set(window, "audioSequenceHarness", {
+        window.audioSequenceHarness = {
           scene,
           device,
           starts,
@@ -455,21 +452,17 @@ for (const nativeHold of [true, false]) {
           get loopStarts() {
             return loopStarts;
           },
-        });
+        };
       });
       await page.locator("#unlock-audio").click();
       await expect
-        .poll(() =>
-          page.evaluate(
-            () => Reflect.get(window, "audioSequenceHarness").loopStarts,
-          ),
-        )
+        .poll(() => page.evaluate(() => window.audioSequenceHarness.loopStarts))
         .toBe(1);
-      // The first notification unlocks the device; this response ensures decoding.
+      // The first notification unlocks; this response ensures decoding.
       await expect
         .poll(() =>
           page.evaluate(() => {
-            const harness = Reflect.get(window, "audioSequenceHarness");
+            const harness = window.audioSequenceHarness;
             if (!harness.ready) return false;
             const voice = harness.device.play(
               "/assets/audio/command-accepted.wav",
@@ -483,29 +476,24 @@ for (const nativeHold of [true, false]) {
         )
         .toBe(true);
       await page.evaluate(() => {
-        const { scene, emitter } = Reflect.get(window, "audioSequenceHarness");
+        const { scene, emitter } = window.audioSequenceHarness;
         scene.sync([{ ...emitter, position: { x: 10, z: 0 } }]);
         scene.emit("pattern");
       });
       await expect
         .poll(() =>
-          page.evaluate(
-            () => Reflect.get(window, "audioSequenceHarness").starts.length,
-          ),
+          page.evaluate(() => window.audioSequenceHarness.starts.length),
         )
         .toBe(3);
-      const times: number[] = await page.evaluate(() => {
-        const { scene, device, starts } = Reflect.get(
-          window,
-          "audioSequenceHarness",
-        );
+      const times = await page.evaluate(() => {
+        const { scene, device, starts } = window.audioSequenceHarness;
         scene.setActive(false);
         scene.dispose();
         device.dispose();
         return starts;
       });
-      expect(times[1]! - times[0]!).toBeGreaterThan(350);
-      expect(times[2]! - times[1]!).toBeGreaterThan(350);
+      expect(times[1] - times[0]).toBeGreaterThan(350);
+      expect(times[2] - times[1]).toBeGreaterThan(350);
       expect(missingRequests).toBe(1);
       expect(errors).toEqual([]);
     },

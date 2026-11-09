@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { collectPageErrors, withoutApp } from "./prototype-helpers";
+import { collectPageErrors, withoutApp } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
@@ -8,7 +8,6 @@ import type { GameSession } from "../src/session";
 declare global {
   interface Window {
     presentation: GameSession;
-    presentationNow: number;
   }
 }
 
@@ -23,22 +22,11 @@ async function openPresentation(
   await page.goto("/");
   await page.evaluate(
     async ({ levelId, variant }) => {
-      const sessionPath: string = "/src/session.ts";
-      const sidebarPath: string = "/src/ui/sidebar.ts";
-      const missionsPath: string = "/e2e/missions.ts";
-      const clockPath: string = "/src/simulation/clock.ts";
-      const { createGameSession } = (await import(
-        sessionPath
-      )) as typeof import("../src/session");
-      const { createSidebar } = (await import(
-        sidebarPath
-      )) as typeof import("../src/ui/sidebar");
-      const { level, placeBuildings, missionMap } = (await import(
-        missionsPath
-      )) as typeof import("./missions");
-      const { SIMULATION_TICK_SECONDS, secondsToTicks } = (await import(
-        clockPath
-      )) as typeof import("../src/simulation/clock");
+      const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
+      const { level, placeBuildings, missionMap } =
+        await import("/e2e/missions.ts");
+      const { SIMULATION_TICK_SECONDS, secondsToTicks } =
+        await import("/src/simulation/clock.ts");
       const mission = level(levelId);
       if (levelId === "arc-economy-opening") {
         placeBuildings(mission, [
@@ -66,10 +54,7 @@ async function openPresentation(
         actor("starting-command-center").health = 500;
       }
       if (variant) {
-        const actorPath: string = "/src/simulation/actor.ts";
-        const { createActor } = (await import(
-          actorPath
-        )) as typeof import("../src/simulation/actor");
+        const { createActor } = await import("/src/simulation/actor.ts");
         const map = missionMap(mission);
         if (variant === "healing") {
           mission.state.tick = 600;
@@ -122,30 +107,18 @@ async function openPresentation(
           });
         }
       }
-      const sidebar = createSidebar(
-        document.querySelector<HTMLElement>("#game-sidebar")!,
-        {
-          definitions: mission.definitions,
-          presentations: new Map(Object.entries(mission.content.presentation)),
-          economy: !!mission.state.economy,
-          playerOwner: "player",
-          playerFaction: "arc",
-          goals: [],
-          selectActor: () => {},
-        },
-      );
-      window.presentation = await createGameSession(
-        document.querySelector<HTMLCanvasElement>("#game-canvas")!,
-        document.querySelector<HTMLCanvasElement>("#minimap")!,
-        { ...sidebar.controls, mission, startPaused: true },
-      );
+      const { view } = await startSidebarSession(mission, {
+        startPaused: true,
+      });
+      window.presentation = view;
     },
     { levelId, variant },
   );
-  const canvas = page.locator("#game-canvas");
-  await expect(canvas).toHaveAttribute("data-models-ready", "true", {
-    timeout: 20_000,
-  });
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-models-ready",
+    "true",
+    { timeout: 20_000 },
+  );
   // A few rendered frames compile the clipped and translucent materials.
   await page.evaluate(
     () =>
@@ -161,6 +134,14 @@ async function openPresentation(
       }),
   );
   return errors;
+}
+
+async function freezePresentationTime(page: Page) {
+  await page.evaluate(async () => {
+    const { controlSessionClock } = await import("/e2e/harness.ts");
+    controlSessionClock(window.presentation);
+    window.presentation.resume();
+  });
 }
 
 test(
@@ -238,17 +219,6 @@ test("a building placed and producing in one tick plays its generated exit clip"
   expect(errors).toEqual([]);
 });
 
-async function freezePresentationTime(page: Page) {
-  await page.evaluate(() => {
-    window.presentationNow = performance.now();
-    Object.defineProperty(performance, "now", {
-      configurable: true,
-      value: () => window.presentationNow,
-    });
-    window.presentation.resume();
-  });
-}
-
 test("resuming keeps a paused unit at its committed pose", async ({ page }) => {
   const errors = await openPresentation(page, "arc-economy-opening", "healing");
   await freezePresentationTime(page);
@@ -260,7 +230,7 @@ test("resuming keeps a paused unit at its committed pose", async ({ page }) => {
       actorId: "watcher",
       target: { x: start.x, z: start.z - 1 },
     });
-    window.presentationNow += 20;
+    window.sessionHarness.now += 20;
     scene.render();
     const root = scene.getTransformNodeByName("actor-watcher-root")!;
     const moving = root.position.z;
@@ -270,7 +240,7 @@ test("resuming keeps a paused unit at its committed pose", async ({ page }) => {
     window.presentation.resume();
     scene.render();
     const resumed = root.position.z;
-    window.presentationNow += 20;
+    window.sessionHarness.now += 20;
     scene.render();
     return { moving, paused, resumed, next: root.position.z };
   });
@@ -285,10 +255,7 @@ test("committed combat animates both survivors, aiming, and wolf pursuit", async
 }) => {
   const errors = await openPresentation(page);
   await page.evaluate(async () => {
-    const path: string = "/src/simulation/actor.ts";
-    const { createActor } = (await import(
-      path
-    )) as typeof import("../src/simulation/actor");
+    const { createActor } = await import("/src/simulation/actor.ts");
     const session = window.presentation;
     session.simulation.spawnActor(
       createActor({
@@ -306,7 +273,7 @@ test("committed combat animates both survivors, aiming, and wolf pursuit", async
     const { scene } = session;
     const played = new Set<string>();
     for (let frame = 0; frame < 160; frame++) {
-      window.presentationNow += 50;
+      window.sessionHarness.now += 50;
       scene.render();
       for (const group of scene.animationGroups)
         if (group.weight > 0) played.add(group.name);
@@ -344,7 +311,7 @@ test("loaded healing shows a frozen cue and removes it when the wolf becomes hid
       "regeneration-lone-wolf-model-healing-mark-0",
     )!;
     const height = mark.position.y;
-    window.presentationNow += 100;
+    window.sessionHarness.now += 100;
     scene.render();
     const held = mark.position.y === height;
     session.simulation.submitCommand({
@@ -353,7 +320,7 @@ test("loaded healing shows a frozen cue and removes it when the wolf becomes hid
       target: { x: 5.5, z: 0 },
     });
     for (let frame = 0; frame < 60; frame++) {
-      window.presentationNow += 100;
+      window.sessionHarness.now += 100;
       scene.render();
     }
     session.pause();
@@ -393,7 +360,7 @@ test("a committed delivery unloads the Harvester, gathering deploys it, and Stop
     const played = new Set<string>();
     let stopped = false;
     for (let frame = 0; frame < 180; frame++) {
-      window.presentationNow += 100;
+      window.sessionHarness.now += 100;
       scene.render();
       for (const group of scene.animationGroups)
         if (group.weight > 0) played.add(group.name);

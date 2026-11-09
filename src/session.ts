@@ -991,10 +991,7 @@ async function assembleGameSession(
         rally.onOutcome(outcome);
         economyControls?.onOutcome(outcome);
         const { command, accepted } = outcome;
-        if (command.kind === "train-unit")
-          canvas.dataset.trainingStatus = accepted ? "accepted" : "rejected";
         if (command.kind === "attack") {
-          canvas.dataset.attackStatus = accepted ? "accepted" : "rejected";
           const target = player.shownActor(command.targetId);
           if (accepted && target && !markedTargets.has(target.id)) {
             markedTargets.add(target.id);
@@ -1009,11 +1006,6 @@ async function assembleGameSession(
         const removal = isCommandOf(command, ACTOR_REMOVAL_KINDS);
         if (removal && command.actorId === pendingRemovalId)
           pendingRemovalId = undefined;
-        if (removal || command.kind === "place-actor") {
-          canvas.dataset.tilePlacedActorCommand = accepted
-            ? "accepted"
-            : "rejected";
-        }
       }
       showMissionResult();
       raisePopup();

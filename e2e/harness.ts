@@ -1,6 +1,6 @@
 // Runs inside the page under test: the specs load it through the Vite dev
 // server, so its imports resolve to the same module instances as the app's.
-import { Color3, Color4, Matrix, Vector3 } from "@babylonjs/core";
+import { Color3, Color4, EngineStore, Matrix, Vector3 } from "@babylonjs/core";
 
 import { TerrainMap } from "../src/map";
 import { LEVEL_SOURCES } from "../src/content/levels";
@@ -20,17 +20,16 @@ import type { GameSession } from "../src/session";
 
 declare global {
   interface Window {
-    /** A session whose clock only `advance` in prototype-helpers moves. */
+    /** A session whose clock only `advance` in page-helpers moves. */
     sessionHarness: { view: GameSession; now: number };
   }
 }
 
-export { createMinimap } from "../src/render/minimap";
-export { createTerrainMeshes } from "../src/render/terrain-mesh";
-export { currentContentPack } from "../src/content/packs";
-export { minimapProjection } from "../src/render/minimap";
-export { createFrameEffectsView } from "../src/render/frame-effects";
-export { EngineStore, Matrix, TransformNode, Vector3 } from "@babylonjs/core";
+// Bare specifiers do not resolve in a page, so specs get Babylon from here.
+export { EngineStore, TransformNode, Vector3 } from "@babylonjs/core";
+
+/** The scene of the app's or session's own engine, the first one created. */
+export const gameScene = () => EngineStore.Instances[0].scenes[0];
 
 /** Freezes `performance.now`, so frames advance only through the harness. */
 export function controlSessionClock(view: GameSession) {
@@ -57,7 +56,7 @@ export function prototypeTerrainMap(): TerrainGrid {
   return authoredTerrain;
 }
 
-export const TEST_VIEW_OPTIONS = {
+const TEST_VIEW_OPTIONS = {
   clearColor: new Color3(0.035, 0.07, 0.09),
   lighting: {
     skyColor: new Color3(0.6, 0.78, 0.77),
@@ -115,7 +114,7 @@ export const TEST_TILE_TYPES = {
   },
 } satisfies Record<string, TileType>;
 
-export type TestViewOptions = {
+type TestViewOptions = {
   map?: TerrainMapOptions;
   /** Canvas size in CSS pixels. */
   size?: { width: number; height: number };

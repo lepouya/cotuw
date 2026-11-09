@@ -1,10 +1,13 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
-import { withoutApp } from "./prototype-helpers";
+import { withoutApp } from "./page-helpers";
+
 import type { Page } from "@playwright/test";
-import type { ProductionCard } from "../src/ui/production-card";
-import type { createProductionCards } from "../src/ui/production-card";
+import type {
+  createProductionCards,
+  ProductionCard,
+} from "../src/ui/production-card";
 
 declare global {
   interface Window {
@@ -23,10 +26,10 @@ async function setupCard(page: Page) {
   await withoutApp(page);
   await page.goto("/");
   await page.evaluate(async () => {
-    const cardsPath: string = "/src/ui/production-card.ts";
-    const actionPath: string = "/src/ui/production-action.ts";
-    const { createProductionCards } = await import(cardsPath);
-    const { setActionAvailability } = await import(actionPath);
+    const { createProductionCards } =
+      await import("/src/ui/production-card.ts");
+    const { setActionAvailability } =
+      await import("/src/ui/production-action.ts");
     const root = document.createElement("section");
     root.id = "card-review";
     Object.assign(root.style, {
@@ -224,7 +227,6 @@ forEachProfile([PHONE_PROFILE], () => {
     "touch can inspect an unavailable card without activating it",
     { tag: WEBKIT },
     async ({ page }) => {
-      await setupCard(page);
       await page.locator("#card-review .production-card").tap();
       await expect(page.getByRole("tooltip")).toContainText(
         "Need 20 Materials",

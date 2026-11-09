@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { activate } from "./page-helpers";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
 import {
@@ -56,11 +57,8 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
     { tag: WEBKIT },
     async ({ page }) => {
       await page.goto("/assets/audio/index.html");
-      const press = async (selector: string) => {
-        const button = page.locator(selector);
-        if (profile.touch) await button.tap();
-        else await button.click();
-      };
+      const press = (selector: string) =>
+        activate(page.locator(selector), profile.touch);
       const playing = (id: string) =>
         page
           .locator(`#${id}`)

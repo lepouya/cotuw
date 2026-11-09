@@ -1,43 +1,45 @@
-import { expect, test } from "./fixtures";
 import { PNG } from "pngjs";
+import { expect, test } from "./fixtures";
 import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
 
-/** Summed channel distance that separates terrain from antialiased clear color. */
+/** Summed channel distance separating terrain from antialiased clear color. */
 const CLEAR_COLOR_TOLERANCE = 40;
 
-/** In-page test helpers, loaded by `openHarness`. */
-declare const harness: typeof import("./harness");
+/** Hides overlays that would read as terrain in canvas screenshots. */
+const WORLD_ONLY = { style: ".camera-controls { visibility: hidden; }" };
 
-async function openHarness(page: Page): Promise<void> {
-  await page.goto("/?level=sandbox");
+async function terrainBounds(page: Page, screenshot: Buffer) {
+  const clearColor = await page.evaluate(async () => {
+    const { clearColorBytes } = await import("/e2e/harness.ts");
+    return clearColorBytes();
+  });
+  return findTerrainBounds(PNG.sync.read(screenshot), clearColor);
+}
+
+async function nextFrame(page: Page) {
   await page.evaluate(async () => {
-    const harnessPath: string = "/e2e/harness.ts";
-    Object.assign(window, { harness: await import(harnessPath) });
+    const { frames } = await import("/e2e/harness.ts");
+    await frames(1);
   });
 }
 
 test("the initial view starts close enough to read tile detail", async ({
   page,
 }, testInfo) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await expect(canvas).toHaveAttribute("data-actor-ready", "true");
-  const screenshot = await canvas.screenshot({
-    style: ".camera-controls { visibility: hidden; }",
-  });
+  const screenshot = await canvas.screenshot(WORLD_ONLY);
   await testInfo.attach("initial-terrain", {
     body: screenshot,
     contentType: "image/png",
   });
 
-  const bounds = findTerrainBounds(
-    PNG.sync.read(screenshot),
-    await page.evaluate(() => harness.clearColorBytes()),
-  );
+  const bounds = await terrainBounds(page, screenshot);
 
   expect(bounds.left).toBeLessThan(5);
   expect(bounds.right).toBeGreaterThan(bounds.width - 5);
@@ -48,29 +50,21 @@ test("the initial view starts close enough to read tile detail", async ({
 test("zooming out from the start reveals the whole map", async ({
   page,
 }, testInfo) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
   await page.mouse.move(640, 360);
   await page.mouse.wheel(0, 6_000);
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
-  );
+  await nextFrame(page);
 
-  const screenshot = await canvas.screenshot({
-    style: ".camera-controls { visibility: hidden; }",
-  });
+  const screenshot = await canvas.screenshot(WORLD_ONLY);
   await testInfo.attach("zoomed-out-terrain", {
     body: screenshot,
     contentType: "image/png",
   });
 
-  const bounds = findTerrainBounds(
-    PNG.sync.read(screenshot),
-    await page.evaluate(() => harness.clearColorBytes()),
-  );
+  const bounds = await terrainBounds(page, screenshot);
 
   expect(bounds.left).toBeGreaterThan(20);
   expect(bounds.right).toBeLessThan(bounds.width - 20);
@@ -81,10 +75,11 @@ test("zooming out from the start reveals the whole map", async ({
 test("zoom limits span a handful of tiles to the whole map", async ({
   page,
 }) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
 
-  const zoom = await page.evaluate(() => {
-    const { createTestView, viewHeight, wheel, projectToCanvas } = harness;
+  const zoom = await page.evaluate(async () => {
+    const { createTestView, viewHeight, wheel, projectToCanvas } =
+      await import("/e2e/harness.ts");
     const { canvas, camera, map, scene, dispose } = createTestView();
 
     const initial = viewHeight(camera);
@@ -128,10 +123,11 @@ test(
   "wheel zoom normalizes line and page deltas to pixels",
   { tag: WEBKIT },
   async ({ page }) => {
-    await openHarness(page);
+    await page.goto("/?level=sandbox");
 
-    const zooms = await page.evaluate(() => {
-      const { createTestView, viewHeight, wheel } = harness;
+    const zooms = await page.evaluate(async () => {
+      const { createTestView, viewHeight, wheel } =
+        await import("/e2e/harness.ts");
       const { canvas, camera, dispose } = createTestView();
       /** How much one wheel event scales the visible height. */
       const zoomFactor = (deltaY: number, deltaMode: number) => {
@@ -163,10 +159,11 @@ test(
   "dragging carries the ground with the pointer at every zoom",
   { tag: WEBKIT },
   async ({ page }) => {
-    await openHarness(page);
+    await page.goto("/?level=sandbox");
 
     const drags = await page.evaluate(async () => {
-      const { createTestView, frames, pointer, viewHeight, wheel } = harness;
+      const { createTestView, frames, pointer, viewHeight, wheel } =
+        await import("/e2e/harness.ts");
       const { canvas, camera, dispose } = createTestView();
       /** World units the ground travels per dragged pixel. */
       const measureDrag = async (zoomDelta: number) => {
@@ -197,10 +194,10 @@ test(
 test("primary drag leaves the camera fixed, secondary pans, and Shift-secondary rotates", async ({
   page,
 }) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
 
   const drags = await page.evaluate(async () => {
-    const { createTestView, frames, pointer } = harness;
+    const { createTestView, frames, pointer } = await import("/e2e/harness.ts");
     const { canvas, camera, dispose } = createTestView();
     const drag = async (button: number, shift = false) => {
       const before = {
@@ -242,7 +239,7 @@ test("primary drag leaves the camera fixed, secondary pans, and Shift-secondary 
 test("a close, low-angle view keeps foreground terrain visible", async ({
   page,
 }, testInfo) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
   const canvas = page.locator("#game-canvas");
 
   await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
@@ -255,34 +252,26 @@ test("a close, low-angle view keeps foreground terrain visible", async ({
   // The drag can end over the top bar, whose height depends on system fonts.
   await page.mouse.move(640, 360);
   await page.mouse.wheel(0, -1600);
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
-  );
+  await nextFrame(page);
 
-  const screenshot = await canvas.screenshot({
-    style: ".camera-controls { visibility: hidden; }",
-  });
+  const screenshot = await canvas.screenshot(WORLD_ONLY);
   await testInfo.attach("low-angle-terrain", {
     body: screenshot,
     contentType: "image/png",
   });
 
-  const bounds = findTerrainBounds(
-    PNG.sync.read(screenshot),
-    await page.evaluate(() => harness.clearColorBytes()),
-  );
+  const bounds = await terrainBounds(page, screenshot);
   expect(bounds.bottom).toBeGreaterThan(bounds.height * 0.82);
 });
 
 test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
   page,
 }) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
 
   const view = await page.evaluate(async () => {
     const { createTestView, frames, viewAspectRatio, viewHeight, wheel } =
-      harness;
+      await import("/e2e/harness.ts");
     const { canvas, camera, dispose } = createTestView();
 
     wheel(canvas, -800);
@@ -307,10 +296,11 @@ test("resizing keeps the current zoom and re-fits the aspect ratio", async ({
 test("a canvas that loses its size does not strand the camera", async ({
   page,
 }) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
 
   const view = await page.evaluate(async () => {
-    const { createTestView, frames, viewAspectRatio, viewHeight } = harness;
+    const { createTestView, frames, viewAspectRatio, viewHeight } =
+      await import("/e2e/harness.ts");
     const { canvas, camera, dispose } = createTestView();
 
     const before = viewHeight(camera);
@@ -336,10 +326,10 @@ test("a canvas that loses its size does not strand the camera", async ({
 });
 
 test("terraforming refreshes height and layer geometry", async ({ page }) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
 
   const heights = await page.evaluate(async () => {
-    const { color, createTestView, frames } = harness;
+    const { color, createTestView, frames } = await import("/e2e/harness.ts");
     const { map, scene, view, dispose } = createTestView({
       map: { width: 1, height: 1, tileSize: 1 },
       size: { width: 240, height: 240 },
@@ -416,10 +406,11 @@ test(
   "a feathered layer fades to clear at the tiles that lack it",
   { tag: WEBKIT },
   async ({ page }) => {
-    await openHarness(page);
+    await page.goto("/?level=sandbox");
 
-    const water = await page.evaluate(() => {
-      const { color, createTestView, TEST_TILE_TYPES } = harness;
+    const water = await page.evaluate(async () => {
+      const { color, createTestView, TEST_TILE_TYPES } =
+        await import("/e2e/harness.ts");
       // One row of three tiles, with water only in the middle one.
       const { scene, dispose } = createTestView({
         map: {
@@ -445,9 +436,8 @@ test(
           .getMeshByName("terrain-0-0-layer-0-tile-dirt")
           ?.getVerticesData("color") ?? [];
       const alphas = [];
-      for (let index = 3; index < colors.length; index += 4) {
+      for (let index = 3; index < colors.length; index += 4)
         alphas.push(colors[index]);
-      }
 
       dispose();
       return { alphas, dirtAlphas: [dirtColors[3], dirtColors[7]] };
@@ -464,10 +454,11 @@ test(
 test("feathering invalidates the neighboring chunk at a tile edit", async ({
   page,
 }) => {
-  await openHarness(page);
+  await page.goto("/?level=sandbox");
 
   const alpha = await page.evaluate(async () => {
-    const { color, createTestView, frames, TEST_TILE_TYPES } = harness;
+    const { color, createTestView, frames, TEST_TILE_TYPES } =
+      await import("/e2e/harness.ts");
     const { map, scene, dispose } = createTestView({
       map: {
         width: 33,
@@ -511,10 +502,11 @@ test(
   "loads layered terrain textures and advances both water passes",
   { tag: WEBKIT },
   async ({ page }) => {
-    await openHarness(page);
+    await page.goto("/?level=sandbox");
 
     const textureState = await page.evaluate(async () => {
-      const { color, createTestView, frames, TEST_TILE_TYPES } = harness;
+      const { color, createTestView, frames, TEST_TILE_TYPES } =
+        await import("/e2e/harness.ts");
       const { scene, dispose } = createTestView({
         map: {
           width: 3,
@@ -635,15 +627,9 @@ test(
     const canvas = page.locator("#game-canvas");
 
     await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
-    const before = PNG.sync.read(
-      await canvas.screenshot({
-        style: ".camera-controls { visibility: hidden; }",
-      }),
-    );
+    const before = PNG.sync.read(await canvas.screenshot(WORLD_ONLY));
     await page.waitForTimeout(500);
-    const afterBuffer = await canvas.screenshot({
-      style: ".camera-controls { visibility: hidden; }",
-    });
+    const afterBuffer = await canvas.screenshot(WORLD_ONLY);
     const after = PNG.sync.read(afterBuffer);
 
     await testInfo.attach("animated-water", {

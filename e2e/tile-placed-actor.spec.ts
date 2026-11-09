@@ -1,10 +1,10 @@
-import { terrainPoint, placeBuilding } from "./prototype-helpers";
 import { expect, test } from "./fixtures";
+import { placeBuilding, terrainPoint } from "./page-helpers";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
 
+import type { ArcRotateCamera } from "@babylonjs/core";
 import type { Page } from "@playwright/test";
-import type { AbstractMesh, TransformNode } from "@babylonjs/core";
 
 async function ready(page: Page) {
   await page.goto("/?level=sandbox");
@@ -17,9 +17,8 @@ async function ready(page: Page) {
 
 async function buildingPreview(page: Page) {
   return page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore } = await import(path);
-    const scene = EngineStore.Instances[0].scenes[0];
+    const { gameScene } = await import("/e2e/harness.ts");
+    const scene = gameScene();
     const root = scene.getTransformNodeByName(
       "tile-placed-actor-building-preview-root",
     );
@@ -27,21 +26,19 @@ async function buildingPreview(page: Page) {
     const assembly = scene.getTransformNodeByName(`${root.name}-model`)!;
     const canopy = root
       .getChildMeshes()
-      .find((mesh: AbstractMesh) => mesh.name.endsWith("-entry-canopy"))!;
+      .find((mesh) => mesh.name.endsWith("-entry-canopy"))!;
     canopy.computeWorldMatrix(true);
     return {
       facing: assembly.rotation.y,
       transparent: root
         .getChildMeshes()
-        .filter((mesh: AbstractMesh) => mesh.getTotalVertices() > 0)
-        .every((mesh: AbstractMesh) => {
+        .filter((mesh) => mesh.getTotalVertices() > 0)
+        .every((mesh) => {
           if (mesh.visibility !== 0.42)
             throw new Error(`${mesh.name}: visibility ${mesh.visibility}`);
           return true;
         }),
-      pickable: root
-        .getChildMeshes()
-        .some((mesh: AbstractMesh) => mesh.isPickable),
+      pickable: root.getChildMeshes().some((mesh) => mesh.isPickable),
       entranceOffset: canopy
         .getAbsolutePosition()
         .subtract(assembly.getAbsolutePosition())
@@ -88,9 +85,8 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
   );
   expect(
     await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(path);
-      const scene = EngineStore.Instances[0].scenes[0];
+      const { gameScene } = await import("/e2e/harness.ts");
+      const scene = gameScene();
       const root = scene.getTransformNodeByName(
         "tile-placed-actor-arc-command-center-prototype-1-root",
       )!;
@@ -99,7 +95,7 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
         tiles: root
           .getChildMeshes()
           .filter(
-            (mesh: AbstractMesh) =>
+            (mesh) =>
               mesh.name.includes("-tile-") && mesh.getTotalVertices() > 0,
           ).length,
         detailCount: root.getChildMeshes().length,
@@ -142,9 +138,8 @@ test("rejects occupied terrain and units without changing the world, and cancels
   await page.mouse.click(occupied.x, occupied.y);
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "2");
   const unitTile = await page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore, prototypeTerrainMap } = await import(path);
-    const point = EngineStore.Instances[0].scenes[0]
+    const { gameScene, prototypeTerrainMap } = await import("/e2e/harness.ts");
+    const point = gameScene()
       .getTransformNodeByName("actor-trained-unit-1-root")!
       .getAbsolutePosition();
     return prototypeTerrainMap().tileAtWorldPosition(point.x, point.z);
@@ -163,11 +158,8 @@ test("rejects occupied terrain and units without changing the world, and cancels
   expect(await buildingPreview(page)).toBeNull();
   expect(
     await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(path);
-      return !!EngineStore.Instances[0].scenes[0].getMeshByName(
-        "building-placement-outline",
-      );
+      const { gameScene } = await import("/e2e/harness.ts");
+      return !!gameScene().getMeshByName("building-placement-outline");
     }),
   ).toBe(false);
 });
@@ -179,8 +171,7 @@ test("selects a constructed building and freezes idle equipment when disabled", 
   await placeBuilding(page, "build-command-center", 49, 39);
 
   const point = await page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore, projectToCanvas } = await import(path);
+    const { EngineStore, projectToCanvas } = await import("/e2e/harness.ts");
     const engine = EngineStore.Instances[0];
     const scene = engine.scenes[0];
     const mesh = scene
@@ -188,7 +179,7 @@ test("selects a constructed building and freezes idle equipment when disabled", 
         "tile-placed-actor-arc-command-center-prototype-1-root",
       )!
       .getChildMeshes()
-      .find((mesh: AbstractMesh) => mesh.name.endsWith("-command-cabin"))!;
+      .find(({ name }) => name.endsWith("-command-cabin"))!;
     mesh.computeWorldMatrix(true);
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     return projectToCanvas(scene, canvas, mesh.getAbsolutePosition());
@@ -204,14 +195,13 @@ test("selects a constructed building and freezes idle equipment when disabled", 
   await page.locator("#animate-building").uncheck();
   const angle = () =>
     page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(path);
-      return EngineStore.Instances[0].scenes[0]
+      const { gameScene } = await import("/e2e/harness.ts");
+      return gameScene()
         .getTransformNodeByName(
           "tile-placed-actor-arc-command-center-prototype-1-root",
         )!
         .getChildTransformNodes()
-        .find((node: TransformNode) => node.name.endsWith("-radar"))!
+        .find((node) => node.name.endsWith("-radar"))!
         .rotationQuaternion!.asArray();
     });
   const frozen = await angle();
@@ -232,7 +222,7 @@ test("selects a constructed building and freezes idle equipment when disabled", 
 
 forEachProfile([PHONE_PROFILE], () => {
   test(
-    `touch previews before explicit confirmation`,
+    "touch previews before explicit confirmation",
     { tag: WEBKIT },
     async ({ page }) => {
       await ready(page);
@@ -261,15 +251,13 @@ test("previews reject water, cliffs, and the playable-map boundary", async ({
   ]) {
     await page.evaluate(
       async ({ x, z }) => {
-        const harnessPath: string = "/e2e/harness.ts";
-        const { EngineStore, Vector3, frames, prototypeTerrainMap } =
-          await import(harnessPath);
+        const { gameScene, Vector3, frames, prototypeTerrainMap } =
+          await import("/e2e/harness.ts");
         const map = prototypeTerrainMap();
         const point = map.tileCenter(x, z);
-        const scene = EngineStore.Instances[0].scenes[0];
+        const scene = gameScene();
         // View the cliff from its exposed side.
-        const camera =
-          scene.activeCamera as import("@babylonjs/core").ArcRotateCamera;
+        const camera = scene.activeCamera as ArcRotateCamera;
         camera.alpha = -Math.PI / 4;
         camera.setTarget(
           new Vector3(

@@ -6,13 +6,17 @@ import {
   loadMission,
   missionTerrain,
 } from "../src/mission-loading";
-import { createScenarioMap } from "../src/simulation/scenario";
+import {
+  createScenarioMap,
+  createScenarioState,
+} from "../src/simulation/scenario";
 import { serializeMission } from "../src/simulation/mission-file";
 import { createTilePlacedActor } from "../src/simulation/placement";
 
 import type { LoadedMission } from "../src/mission-loading";
 import type { MissionState } from "../src/simulation/mission";
 import type { ActorPlacement } from "../src/simulation/placement";
+import type { ScenarioDefinition } from "../src/simulation/scenario";
 import type { SaveInfo } from "../src/simulation/mission-file";
 
 /** A fresh copy of a bundled level. */
@@ -21,6 +25,19 @@ export const level = (id = "arc-economy-opening") =>
 
 export const missionMap = (mission: LoadedMission) =>
   createScenarioMap(missionTerrain(mission));
+
+/** The mission's content with a scripted scenario in place of its own. */
+export const withScenario = (
+  mission: LoadedMission,
+  scenario: ScenarioDefinition,
+) => ({
+  ...mission,
+  scenario,
+  state: createScenarioState(
+    scenario,
+    mission.definitions,
+  ) as LoadedMission["state"],
+});
 
 /** Adds buildings after the authored ones, as if the level placed them. */
 export function placeBuildings(

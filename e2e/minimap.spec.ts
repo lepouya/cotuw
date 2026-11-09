@@ -1,18 +1,19 @@
 import { expect, test } from "./fixtures";
 import { WEBKIT } from "./tags";
 
+import type { Page } from "@playwright/test";
+import type { StrategyCamera } from "../src/render/camera";
+import type { MinimapActor } from "../src/render/minimap";
+
 test("refreshes footprint geometry and in-place color changes at the same center", async ({
   page,
 }) => {
   await page.goto("/?level=sandbox");
   const results = await page.evaluate(async () => {
-    const minimapPath: string = "/src/render/minimap.ts";
-    const mapPath: string = "/src/map.ts";
-    const corePath: string = "/e2e/harness.ts";
-    const { createMinimap } = await import(minimapPath);
-    const { TerrainMap } = await import(mapPath);
-    const { EngineStore } = await import(corePath);
-    const scene = EngineStore.Instances[0].scenes[0];
+    const { createMinimap } = await import("/src/render/minimap.ts");
+    const { TerrainMap } = await import("/src/map.ts");
+    const { gameScene, Vector3 } = await import("/e2e/harness.ts");
+    const scene = gameScene();
     const map = new TerrainMap({ width: 4, height: 4, tileSize: 1 });
     const canvas = document.createElement("canvas");
     canvas.style.cssText = "width:200px;height:200px";
@@ -38,23 +39,24 @@ test("refreshes footprint geometry and in-place color changes at the same center
       fills.push({ corners, color: context.fillStyle });
       fill();
     };
-    const actor = {
+    const color: [number, number, number] = [1, 0, 0];
+    const actor: MinimapActor = {
       id: "structure",
       worldPosition: { x: 0, z: 0 },
       tiles: [{ x: 1, z: 1 }],
-      color: [1, 0, 0],
+      color,
     };
     const minimap = createMinimap(
       scene,
       map,
       {
         viewFootprint: () => [
-          { x: -1, z: -1 },
-          { x: 1, z: -1 },
-          { x: 1, z: 1 },
-          { x: -1, z: 1 },
+          new Vector3(-1, 0, -1),
+          new Vector3(1, 0, -1),
+          new Vector3(1, 0, 1),
+          new Vector3(-1, 0, 1),
         ],
-      },
+      } as StrategyCamera,
       canvas,
       { actors: () => [actor] },
     );
@@ -70,8 +72,8 @@ test("refreshes footprint geometry and in-place color changes at the same center
       scene.onAfterRenderObservable.notifyObservers(scene);
       const geometry = fills[0];
       fills.length = 0;
-      actor.color[0] = 0;
-      actor.color[2] = 1;
+      color[0] = 0;
+      color[2] = 1;
       minimap.refreshActors();
       scene.onAfterRenderObservable.notifyObservers(scene);
       return { first, geometry, color: fills[0] };
@@ -85,24 +87,23 @@ test("refreshes footprint geometry and in-place color changes at the same center
   expect(results.color).toEqual({ corners: 2, color: "#0000ff" });
 });
 
-import type { Page } from "@playwright/test";
+/** The view `openMinimapView` publishes for later in-page checks. */
+declare const testView: ReturnType<typeof import("./harness").createTestView>;
 
-/** In-page test helpers, loaded by `openHarness`. */
-declare const harness: typeof import("./harness");
-declare const testView: ReturnType<typeof harness.createTestView>;
+declare global {
+  interface Window {
+    commandTargets: { x: number; z: number; shiftKey: boolean }[];
+  }
+}
 
 const MINIMAP_SIZE = 200;
 
-async function openMinimapView(page: Page): Promise<void> {
+async function openMinimapView(page: Page) {
   await page.goto("/?level=sandbox");
   await page.evaluate(async (minimapSize) => {
-    const harnessPath: string = "/e2e/harness.ts";
-    const loaded: typeof harness = await import(harnessPath);
-    Object.assign(window, {
-      harness: loaded,
-      testView: loaded.createTestView({ minimapSize }),
-    });
-    await loaded.frames(2);
+    const { createTestView, frames } = await import("/e2e/harness.ts");
+    Object.assign(window, { testView: createTestView({ minimapSize }) });
+    await frames(2);
   }, MINIMAP_SIZE);
 }
 
@@ -113,27 +114,37 @@ const cameraTarget = (page: Page) =>
   });
 
 const viewportOutline = (page: Page) =>
-  page.evaluate((size) => {
-    const projection = harness.minimapProjection(testView.map, size, size);
+  page.evaluate(async (size) => {
+    const { minimapProjection } = await import("/src/render/minimap.ts");
+    const projection = minimapProjection(testView.map, size, size);
     return testView.view.camera.viewFootprint().map(projection.toMinimap);
   }, MINIMAP_SIZE);
 
 /** The world point under a minimap pixel, per the minimap's own projection. */
 const worldAt = (page: Page, x: number, y: number) =>
   page.evaluate(
-    ({ x, y, size }) => {
-      const point = harness
-        .minimapProjection(testView.map, size, size)
-        .toWorld({ x, y });
+    async ({ x, y, size }) => {
+      const { minimapProjection } = await import("/src/render/minimap.ts");
+      const point = minimapProjection(testView.map, size, size).toWorld({
+        x,
+        y,
+      });
       return { x: point.x, z: point.z };
     },
     { x, y, size: MINIMAP_SIZE },
   );
 
-async function settle(page: Page): Promise<void> {
+async function nextFrames(page: Page) {
+  await page.evaluate(async () => {
+    const { frames } = await import("/e2e/harness.ts");
+    await frames(2);
+  });
+}
+
+async function settle(page: Page) {
   // Outlasts the glide, then lets the minimap redraw.
   await page.waitForTimeout(500);
-  await page.evaluate(() => harness.frames(2));
+  await nextFrames(page);
 }
 
 test("clicking the minimap glides the camera to that point", async ({
@@ -178,7 +189,7 @@ test(
     );
     await page.mouse.move(endPoint.x, endPoint.y, { steps: 4 });
     await page.mouse.up();
-    await page.evaluate(() => harness.frames(2));
+    await nextFrames(page);
 
     const after = await cameraTarget(page);
     expect(after.x - before.x).toBeCloseTo(end.x - start.x, 1);
@@ -192,12 +203,15 @@ test(
   async ({ page }) => {
     await openMinimapView(page);
     const viewHeight = () =>
-      page.evaluate(() => harness.viewHeight(testView.camera));
+      page.evaluate(async () => {
+        const { viewHeight } = await import("/e2e/harness.ts");
+        return viewHeight(testView.camera);
+      });
     const heightBefore = await viewHeight();
 
     await page.mouse.move(100, 100);
     await page.mouse.wheel(0, 2_000);
-    await page.evaluate(() => harness.frames(2));
+    await nextFrames(page);
 
     expect(await viewHeight()).toBe(heightBefore);
   },
@@ -208,10 +222,10 @@ test("actor markers redraw at their current world positions", async ({
 }) => {
   await page.goto("/?level=sandbox");
   const pixels = await page.evaluate(async () => {
-    const harnessPath: string = "/e2e/harness.ts";
-    const { createMinimap, createTestView, frames, minimapProjection } =
-      await import(harnessPath);
-    const test = createTestView({
+    const { createTestView, frames } = await import("/e2e/harness.ts");
+    const { createMinimap, minimapProjection } =
+      await import("/src/render/minimap.ts");
+    const view = createTestView({
       map: { width: 10, height: 10, tileSize: 1 },
       size: { width: 200, height: 200 },
     });
@@ -227,9 +241,9 @@ test("actor markers redraw at their current world positions", async ({
     document.body.append(canvas);
     const actor = { id: "trooper", worldPosition: { x: -2, z: 0 } };
     const minimap = createMinimap(
-      test.scene,
-      test.map,
-      test.view.camera,
+      view.scene,
+      view.map,
+      view.view.camera,
       canvas,
       {
         actors: () => [actor],
@@ -238,7 +252,7 @@ test("actor markers redraw at their current world positions", async ({
     await frames(2);
 
     const pixelAt = (worldPosition: { x: number; z: number }) => {
-      const point = minimapProjection(test.map, 200, 200).toMinimap(
+      const point = minimapProjection(view.map, 200, 200).toMinimap(
         worldPosition,
       );
       const ratio = canvas.width / canvas.clientWidth;
@@ -261,7 +275,7 @@ test("actor markers redraw at their current world positions", async ({
     const oldPosition = pixelAt(previousPosition);
     const second = pixelAt(actor.worldPosition);
 
-    test.dispose();
+    view.dispose();
     canvas.remove();
     return { first, oldPosition, second };
   });
@@ -277,27 +291,25 @@ test(
   async ({ page }) => {
     await page.goto("/?level=sandbox");
     await page.evaluate(async () => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const loaded: typeof harness = await import(harnessPath);
-      const view = loaded.createTestView({ size: { width: 200, height: 200 } });
+      const { createTestView, frames } = await import("/e2e/harness.ts");
+      const { createMinimap } = await import("/src/render/minimap.ts");
+      const view = createTestView({ size: { width: 200, height: 200 } });
       const canvas = document.createElement("canvas");
       canvas.id = "command-minimap";
       canvas.style.cssText =
         "position:fixed;top:0;left:0;width:200px;height:200px;z-index:20;touch-action:none";
       document.body.append(canvas);
-      const targets: { x: number; z: number; shiftKey: boolean }[] = [];
-      loaded.createMinimap(view.scene, view.map, view.view.camera, canvas, {
+      window.commandTargets = [];
+      createMinimap(view.scene, view.map, view.view.camera, canvas, {
         commandMode: () => true,
-        onCommand: (target: { x: number; z: number }, shiftKey: boolean) => {
-          targets.push({ ...target, shiftKey });
+        onCommand: (target, shiftKey) => {
+          window.commandTargets.push({ ...target, shiftKey });
           return true;
         },
       });
-      Object.assign(window, { commandTargets: targets });
-      await loaded.frames(2);
+      await frames(2);
     });
-    const count = () =>
-      page.evaluate(() => Reflect.get(window, "commandTargets").length);
+    const count = () => page.evaluate(() => window.commandTargets.length);
     await page.mouse.move(150, 60);
     await page.mouse.down();
     expect(await count()).toBe(0);
@@ -328,9 +340,7 @@ test(
     await page.keyboard.up("Shift");
     expect(
       await page.evaluate(() =>
-        Reflect.get(window, "commandTargets").map(
-          (target: { shiftKey: boolean }) => target.shiftKey,
-        ),
+        window.commandTargets.map(({ shiftKey }) => shiftKey),
       ),
     ).toEqual([false, false, true]);
 

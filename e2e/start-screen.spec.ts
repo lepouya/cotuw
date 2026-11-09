@@ -7,10 +7,12 @@ import {
 } from "./profiles";
 import {
   activate,
+  attachScreenshot,
   collectPageErrors,
   dismissExplanation,
   importMission,
-} from "./prototype-helpers";
+  pressPoint,
+} from "./page-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
 test("title controls work before the mission renderer loads", async ({
@@ -58,10 +60,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       await expect(page.locator(".game-shell")).toBeHidden();
       await expect(page.locator("#save-mission")).toBeHidden();
       await expect(page.locator("#restart-mission")).toBeHidden();
-      await info.attach(`title-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, info, `title-${profile.name}`);
 
       await press("open-options");
       await expect(page.locator("#game-menu-title")).toHaveText("Options");
@@ -70,8 +69,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       await slider.scrollIntoViewIfNeeded();
       const box = (await slider.boundingBox())!;
       const point = { x: box.x + box.width / 4, y: box.y + box.height / 2 };
-      if (profile.touch) await page.touchscreen.tap(point.x, point.y);
-      else await page.mouse.click(point.x, point.y);
+      await pressPoint(page, point, profile.touch);
       const volume = await slider.inputValue();
       expect(Number(volume)).toBeLessThan(40);
       await press("audio-sound-mute");
@@ -99,10 +97,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       await expect(page.locator("#choose-circle")).not.toContainText(
         /development|pending/i,
       );
-      await info.attach(`faction-choice-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, info, `faction-choice-${profile.name}`);
       await press("cancel-mission-setup");
       await expect(page.locator("#new-mission")).toBeFocused();
       await press("new-mission");
@@ -125,8 +120,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       await expect(page.locator(".game-shell")).toBeHidden();
       expect(
         await page.evaluate(async () => {
-          const path: string = "/e2e/harness.ts";
-          const { EngineStore } = await import(path);
+          const { EngineStore } = await import("/e2e/harness.ts");
           return EngineStore.Instances.length;
         }),
       ).toBe(0);
@@ -146,10 +140,7 @@ test(
     );
     await expect(page.locator(".game-shell")).toBeHidden();
     await page.evaluate(async () => {
-      const path: string = "/e2e/missions.ts";
-      const { level, missionSource } = (await import(
-        path
-      )) as typeof import("./missions");
+      const { level, missionSource } = await import("/e2e/missions.ts");
       const mission = level();
       mission.state.tick = 60;
       mission.state.economy!.stockpiles[0].amount = 77;
@@ -286,10 +277,7 @@ test.describe("skirmish links", () => {
         await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
         await expect(canvas).toHaveAttribute("data-models-ready", "true");
         await expect(page.locator("body")).toContainText(resource);
-        await info.attach(`skirmish-${faction}`, {
-          body: await page.screenshot(),
-          contentType: "image/png",
-        });
+        await attachScreenshot(page, info, `skirmish-${faction}`);
         await page.keyboard.press("Escape");
         await expect(page.locator("#restart-mission")).toBeVisible();
         await page.locator("#restart-mission").click();

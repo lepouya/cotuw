@@ -70,6 +70,13 @@ software WebGL can time out under parallel load. Browser checks write
 screenshots and attachments to `playwright-report/`. Some use `e2e/harness.ts`
 to inspect views or drive a controlled simulation clock.
 
+Code inside `page.evaluate` imports modules by the path Vite serves, as in
+`await import("/src/session.ts")`. The `paths` mapping in `tsconfig.json` points
+those specifiers at the source files, so `tsc` checks in-page code too.
+Babylon's bare specifiers do not resolve in a page, so `harness.ts` re-exports
+what specs need. Specs that replace the app use `withoutApp` and
+`e2e/sidebar-session.ts`.
+
 Browser checks start their own Vite server on `127.0.0.1:4173`, separate from
 the development server. Set `COTUW_TEST_PORT` if that port is occupied. Checks
 never reuse an existing server, which could serve another checkout.

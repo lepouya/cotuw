@@ -1,7 +1,14 @@
 import { expect, test } from "./fixtures";
 import { MissionDriver } from "./mission-driver";
-import { importMission, openOpening } from "./prototype-helpers";
+import { importMission, openOpening, quickSave } from "./page-helpers";
 import { WEBKIT } from "./tags";
+
+import type { Page } from "@playwright/test";
+
+const storedQuicksave = (page: Page) =>
+  page.evaluate(() =>
+    JSON.parse(localStorage.getItem("cotuw.save.quicksave")!),
+  );
 
 for (const kind of ["victory", "defeat", "draw"] as const)
   test(
@@ -10,13 +17,9 @@ for (const kind of ["victory", "defeat", "draw"] as const)
     async ({ page }) => {
       await openOpening(page);
       const checkpoint = await page.evaluate(async (kind) => {
-        const path: string = "/e2e/missions.ts";
         const { level, placeBuildings, missionSource, simulateMission } =
-          (await import(path)) as typeof import("./missions");
-        const actorPath: string = "/src/simulation/actor.ts";
-        const { createActor } = (await import(
-          actorPath
-        )) as typeof import("../src/simulation/actor");
+          await import("/e2e/missions.ts");
+        const { createActor } = await import("/src/simulation/actor.ts");
         const mission = level();
         const definitionId = "arc-command-center-prototype";
         mission.scenario = {
@@ -118,13 +121,8 @@ for (const kind of ["victory", "defeat", "draw"] as const)
       await expect(observer).toBeEnabled();
       await observer.click();
       await expect(observer).toHaveAttribute("aria-pressed", "true");
-      await page.keyboard.press("F5");
-      await expect(page.locator("#notifications")).toContainText(
-        "Quick save complete",
-      );
-      const saved = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem("cotuw.save.quicksave")!),
-      );
+      await quickSave(page);
+      const saved = await storedQuicksave(page);
       expect(saved.state.tick).toBe(18_000);
       expect(saved.state.skirmishResult).toMatchObject({ kind, tick: 17_999 });
       for (const owner of saved.state.metrics.owners) {
@@ -149,13 +147,11 @@ test(
   "skirmish metrics follow a playable economy and production opening",
   { tag: WEBKIT },
   async ({ page }, testInfo) => {
-    const driver = new MissionDriver(page, false, false);
+    const driver = new MissionDriver(page);
     await driver.opening();
     const source = await page.evaluate(async () => {
-      const path: string = "/e2e/missions.ts";
-      const { level, placeBuildings, missionSource } = (await import(
-        path
-      )) as typeof import("./missions");
+      const { level, placeBuildings, missionSource } =
+        await import("/e2e/missions.ts");
       const mission = level();
       mission.scenario = {
         ...mission.scenario,
@@ -204,13 +200,8 @@ test(
     await driver.press("#train-scout");
     await driver.press("#train-trooper");
     await driver.advance(7);
-    await page.keyboard.press("F5");
-    await expect(page.locator("#notifications")).toContainText(
-      "Quick save complete",
-    );
-    const saved = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("cotuw.save.quicksave")!),
-    );
+    await quickSave(page);
+    const saved = await storedQuicksave(page);
     const owner = saved.state.metrics.owners[0];
     expect(owner).toMatchObject({
       unitsProduced: 3,
@@ -238,13 +229,8 @@ test(
     await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
     await driver.press("#resume-mission");
     await driver.advance(1);
-    await page.keyboard.press("F5");
-    await expect(page.locator("#notifications")).toContainText(
-      "Quick save complete",
-    );
-    const restored = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("cotuw.save.quicksave")!),
-    );
+    await quickSave(page);
+    const restored = await storedQuicksave(page);
     expect(restored.state.metrics.owners[0].milestones).toEqual(
       owner.milestones,
     );

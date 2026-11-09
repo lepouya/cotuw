@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { terrainPoint } from "./prototype-helpers";
+import { holdRequests, terrainPoint } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 test(
@@ -12,23 +12,15 @@ test(
       timeout: 15_000,
     });
     await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { EngineStore } = (await import(
-        path
-      )) as typeof import("./harness");
-      const texture =
-        EngineStore.Instances[0].scenes[0].environmentBRDFTexture!;
+      const { gameScene } = await import("/e2e/harness.ts");
+      const texture = gameScene().environmentBRDFTexture!;
       Object.defineProperty(texture, "loadingError", { get: () => true });
       texture.isReady = () => false;
     });
-    let release = () => {};
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await page.route("**/assets/models/command-center.glb", async (route) => {
-      await held;
-      await route.continue();
-    });
+    const release = await holdRequests(
+      page,
+      "**/assets/models/command-center.glb",
+    );
     try {
       await page.locator("#open-menu").click();
       await page.locator("#restart-mission").click();
@@ -47,14 +39,10 @@ test(
 test("an active building preview refreshes when its generated model loads", async ({
   page,
 }) => {
-  let release = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/assets/models/command-center.glb", async (route) => {
-    await held;
-    await route.continue();
-  });
+  const release = await holdRequests(
+    page,
+    "**/assets/models/command-center.glb",
+  );
   try {
     await page.goto("/?level=sandbox", { waitUntil: "domcontentloaded" });
     await expect(page.locator("#game-canvas")).toHaveAttribute(
@@ -70,11 +58,8 @@ test("an active building preview refreshes when its generated model loads", asyn
     );
     const hasModel = () =>
       page.evaluate(async () => {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = (await import(
-          path
-        )) as typeof import("./harness");
-        return EngineStore.Instances[0].scenes[0]
+        const { gameScene } = await import("/e2e/harness.ts");
+        return gameScene()
           .getTransformNodeByName("tile-placed-actor-building-preview-root")!
           .getChildMeshes()
           .some((mesh) => mesh.name.endsWith("-command-cabin"));
@@ -97,18 +82,11 @@ test(
       "true",
     );
     const result = await page.evaluate(async () => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const actorPath: string = "/src/render/skinned-actor-appearance.ts";
-      const propPath: string = "/src/render/glb-model.ts";
-      const { createTestView, currentContentPack, frames } = (await import(
-        harnessPath
-      )) as typeof import("./harness");
-      const { loadSkinnedActorAppearance } = (await import(
-        actorPath
-      )) as typeof import("../src/render/skinned-actor-appearance");
-      const { loadModelAsset } = (await import(
-        propPath
-      )) as typeof import("../src/render/glb-model");
+      const { createTestView, frames } = await import("/e2e/harness.ts");
+      const { currentContentPack } = await import("/src/content/packs.ts");
+      const { loadSkinnedActorAppearance } =
+        await import("/src/render/skinned-actor-appearance.ts");
+      const { loadModelAsset } = await import("/src/render/glb-model.ts");
       const { scene, canvas, camera } = createTestView({
         map: { width: 20, height: 12, tileSize: 1, createHeight: () => 0 },
         size: { width: 1000, height: 600 },

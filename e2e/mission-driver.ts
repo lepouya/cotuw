@@ -1,6 +1,12 @@
 import { expect } from "@playwright/test";
+import {
+  activate,
+  expectTerrainReady,
+  pressPoint,
+  terrainPoint,
+} from "./page-helpers";
+
 import type { Locator, Page } from "@playwright/test";
-import { activate, terrainPoint } from "./prototype-helpers";
 
 declare global {
   interface Window {
@@ -12,11 +18,16 @@ declare global {
 
 /** Runs the production mission through its mouse or touch controls. */
 export class MissionDriver {
+  readonly touch: boolean;
+  readonly realTime: boolean;
+
   constructor(
     readonly page: Page,
-    readonly touch: boolean,
-    readonly realTime: boolean,
-  ) {}
+    { touch = false, realTime = false } = {},
+  ) {
+    this.touch = touch;
+    this.realTime = realTime;
+  }
 
   /** Opens a page whose clock advances only through `advance`, unless real. */
   private async goto(url: string) {
@@ -34,36 +45,32 @@ export class MissionDriver {
   /** Opens an explicit level link and renders only through `advance`. */
   async level(id: string) {
     await this.goto(`/?level=${id}`);
-    await expect(this.page.locator("#game-canvas")).toHaveAttribute(
-      "data-terrain-ready",
-      "true",
-    );
-    if (!this.realTime)
-      await this.page.evaluate(async () => {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = await import(path);
-        EngineStore.Instances[0].stopRenderLoop();
-      });
+    await expectTerrainReady(this.page);
+    await this.stopRendering();
   }
 
-  async opening(dismissGuide = true, faction: "arc" | "circle" = "arc") {
+  private async stopRendering() {
+    if (this.realTime) return;
+    await this.page.evaluate(async () => {
+      const { EngineStore } = await import("/e2e/harness.ts");
+      EngineStore.Instances[0].stopRenderLoop();
+    });
+  }
+
+  async opening({
+    dismissGuide = true,
+    faction = "arc",
+  }: { dismissGuide?: boolean; faction?: "arc" | "circle" } = {}) {
     await this.goto("/");
     await activate(this.page.locator("#new-mission"), this.touch);
     await activate(this.page.locator(`#choose-${faction}`), this.touch);
-    await expect(this.page.locator("#game-canvas")).toHaveAttribute(
-      "data-terrain-ready",
-      "true",
-    );
+    await expectTerrainReady(this.page);
     if (dismissGuide)
       await this.explanation(
         faction === "arc" ? "Welcome, Commander" : "Welcome, Guide",
       );
-    await this.page.evaluate(async (realTime) => {
-      if (!realTime) {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = await import(path);
-        EngineStore.Instances[0].stopRenderLoop();
-      }
+    await this.stopRendering();
+    await this.page.evaluate(() => {
       window.missionStartedAt = performance.now();
       window.missionVictoryAt = null;
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
@@ -76,15 +83,14 @@ export class MissionDriver {
         attributes: true,
         attributeFilter: ["data-mission-result"],
       });
-    }, this.realTime);
+    });
   }
 
   async advance(seconds: number) {
     if (this.realTime) await this.page.waitForTimeout(seconds * 1000);
     else
       await this.page.evaluate(async (seconds) => {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = await import(path);
+        const { EngineStore } = await import("/e2e/harness.ts");
         const engine = EngineStore.Instances[0];
         const scene = engine.scenes[0];
         const frameDelta = engine.getDeltaTime;
@@ -95,7 +101,7 @@ export class MissionDriver {
             engine.getDeltaTime = () => milliseconds;
             scene.onBeforeAnimationsObservable.notifyObservers(scene);
             scene.onBeforeRenderObservable.notifyObservers(scene);
-            // Record result changes at this frame rather than the whole batch's end.
+            // Record result changes at this frame, not the whole batch's end.
             await Promise.resolve();
           }
         } finally {
@@ -109,25 +115,20 @@ export class MissionDriver {
     );
   }
 
-  private async activate(locator: Locator) {
+  private async step(locator: Locator) {
     await activate(locator, this.touch);
     await this.advance(0.05);
   }
 
-  private async point(point: { x: number; y: number }) {
-    if (this.touch) await this.page.touchscreen.tap(point.x, point.y);
-    else await this.page.mouse.click(point.x, point.y);
-  }
-
   async press(selector: string) {
-    await this.activate(this.page.locator(selector));
+    await this.step(this.page.locator(selector));
   }
 
   async focus(x: number, z: number) {
     const point = await this.page.evaluate(
       async ({ x, z }) => {
-        const path: string = "/e2e/harness.ts";
-        const { minimapProjection, prototypeTerrainMap } = await import(path);
+        const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+        const { minimapProjection } = await import("/src/render/minimap.ts");
         const map = prototypeTerrainMap();
         const canvas = document.querySelector<HTMLCanvasElement>("#minimap")!;
         const bounds = canvas.getBoundingClientRect();
@@ -140,7 +141,7 @@ export class MissionDriver {
       },
       { x, z },
     );
-    await this.point(point);
+    await pressPoint(this.page, point, this.touch);
     await this.advance(0.4);
   }
 
@@ -152,13 +153,12 @@ export class MissionDriver {
     expect(point.y).toBeGreaterThan(bounds.y);
     expect(point.y).toBeLessThan(bounds.y + bounds.height);
     const hit = await this.page.evaluate(async (point) => {
-      const path: string = "/e2e/harness.ts";
-      const terrainPath: string = "/src/render/terrain-mesh.ts";
-      const { EngineStore, prototypeTerrainMap } = await import(path);
-      const { isTerrainPickMesh } = await import(terrainPath);
+      const { gameScene, prototypeTerrainMap } =
+        await import("/e2e/harness.ts");
+      const { isTerrainPickMesh } = await import("/src/render/terrain-mesh.ts");
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
       const bounds = canvas.getBoundingClientRect();
-      const picked = EngineStore.Instances[0].scenes[0].pick(
+      const picked = gameScene().pick(
         point.x - bounds.left,
         point.y - bounds.top,
         isTerrainPickMesh,
@@ -171,7 +171,7 @@ export class MissionDriver {
       hit,
       "Destination must be visible past foreground mountains",
     ).toEqual({ x, z });
-    await this.point(point);
+    await pressPoint(this.page, point, this.touch);
     await this.advance(0.05);
   }
 
@@ -217,7 +217,7 @@ export class MissionDriver {
 
   async select(name: string) {
     await this.press("#tab-units");
-    await this.activate(
+    await this.step(
       this.page
         .locator("#unit-roster button")
         .filter({ hasText: name })
@@ -234,7 +234,7 @@ export class MissionDriver {
       .filter({ hasText: "Trooper" });
     const count = await troopers.count();
     for (let i = 1; i < count; i++) {
-      await this.activate(troopers.nth(i));
+      await this.step(troopers.nth(i));
       await this.press("#tab-units");
     }
     await this.press("#add-selection");

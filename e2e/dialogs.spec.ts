@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { withoutApp } from "./prototype-helpers";
+import { withoutApp } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
@@ -34,10 +34,7 @@ async function mountDialogs(page: Page) {
   await withoutApp(page);
   await page.goto("/");
   await page.evaluate(async () => {
-    const path: string = "/src/ui/dialogs.ts";
-    const { createDialogs } = (await import(
-      path
-    )) as typeof import("../src/ui/dialogs");
+    const { createDialogs } = await import("/src/ui/dialogs.ts");
     const state: DialogHarness["state"] = {
       playing: true,
       resumes: 0,
@@ -129,6 +126,9 @@ async function mountDialogs(page: Page) {
   });
 }
 
+const harnessState = (page: Page) =>
+  page.evaluate(() => window.dialogHarness.state);
+
 test(
   "panel feedback clears when leaving a failed operation",
   { tag: WEBKIT },
@@ -149,10 +149,10 @@ test(
   async ({ page }) => {
     await mountDialogs(page);
     await page.evaluate(() => {
-      const h = window.dialogHarness;
-      h.options.listSaves = () =>
+      const harness = window.dialogHarness;
+      harness.options.listSaves = () =>
         new Promise((resolve, reject) => {
-          h.finishList = (fail) => {
+          harness.finishList = (fail) => {
             if (fail) reject(new Error("Listing failed"));
             else resolve([]);
           };
@@ -260,15 +260,19 @@ test(
     });
     await expect(page.locator("dialog[open]")).toHaveCount(1);
     await expect(page.locator("#explanation")).toBeHidden();
-    expect(await page.evaluate(() => window.dialogHarness.state)).toMatchObject(
-      { playing: false, resumes: 1, dismissals: [] },
-    );
+    expect(await harnessState(page)).toMatchObject({
+      playing: false,
+      resumes: 1,
+      dismissals: [],
+    });
     await page.locator("#resume-mission").click();
     await expect(page.locator("#explanation")).toBeVisible();
     await page.keyboard.press("Escape");
-    expect(await page.evaluate(() => window.dialogHarness.state)).toMatchObject(
-      { playing: true, resumes: 3, dismissals: ["guide"] },
-    );
+    expect(await harnessState(page)).toMatchObject({
+      playing: true,
+      resumes: 3,
+      dismissals: ["guide"],
+    });
   },
 );
 
@@ -313,31 +317,28 @@ test(
     await page.locator("#save-mission").click();
     await page.locator("#confirm-save").click();
     const reset = await page.evaluate(async () => {
-      const h = window.dialogHarness;
-      const audio = h.host.querySelector("#audio-controls");
-      h.ui.resetMission();
-      h.ui.showMenu(h.view);
-      const sameAudio = audio === h.host.querySelector("#audio-controls");
-      const beforeDispose = h.state.cancellations;
-      h.ui.dispose();
-      const afterDispose = h.state.cancellations;
-      h.ui.dispose();
+      const harness = window.dialogHarness;
+      const audio = harness.host.querySelector("#audio-controls");
+      harness.ui.resetMission();
+      harness.ui.showMenu(harness.view);
+      const sameAudio = audio === harness.host.querySelector("#audio-controls");
+      const beforeDispose = harness.state.cancellations;
+      harness.ui.dispose();
+      const afterDispose = harness.state.cancellations;
+      harness.ui.dispose();
       const canceledOnce =
         afterDispose === beforeDispose + 1 &&
-        h.state.cancellations === afterDispose;
-      const empty = h.host.childElementCount === 0;
-      const path: string = "/src/ui/dialogs.ts";
-      const { createDialogs } = (await import(
-        path
-      )) as typeof import("../src/ui/dialogs");
-      h.ui = createDialogs(h.host, h.options);
-      h.ui.showMenu(h.view);
-      h.finishSave(true);
+        harness.state.cancellations === afterDispose;
+      const empty = harness.host.childElementCount === 0;
+      const { createDialogs } = await import("/src/ui/dialogs.ts");
+      harness.ui = createDialogs(harness.host, harness.options);
+      harness.ui.showMenu(harness.view);
+      harness.finishSave(true);
       return {
         sameAudio,
         empty,
         canceledOnce,
-        subscriptions: h.state.subscriptions,
+        subscriptions: harness.state.subscriptions,
       };
     });
     expect(reset).toEqual({
@@ -348,19 +349,13 @@ test(
     });
     await expect(page.locator("#game-menu-status")).toHaveText("");
     await page.locator("#open-options").click();
-    const before = await page.evaluate(
-      () => window.dialogHarness.state.unlocks,
-    );
+    const { unlocks } = await harnessState(page);
     await page.locator("#audio-sound-mute").click();
-    expect(await page.evaluate(() => window.dialogHarness.state.unlocks)).toBe(
-      before + 1,
-    );
-    expect(await page.evaluate(() => window.dialogHarness.state.settings)).toBe(
-      3,
-    );
-    expect(await page.evaluate(() => window.dialogHarness.state.resumes)).toBe(
-      0,
-    );
+    expect(await harnessState(page)).toMatchObject({
+      unlocks: unlocks + 1,
+      settings: 3,
+      resumes: 0,
+    });
   },
 );
 
@@ -370,18 +365,15 @@ test(
   async ({ page }) => {
     await mountDialogs(page);
     const result = await page.evaluate(async () => {
-      const h = window.dialogHarness;
-      h.ui.dispose();
-      const path: string = "/src/ui/dialogs.ts";
-      const { createDialogs } = (await import(
-        path
-      )) as typeof import("../src/ui/dialogs");
+      const harness = window.dialogHarness;
+      harness.ui.dispose();
+      const { createDialogs } = await import("/src/ui/dialogs.ts");
       let error = "";
       try {
-        createDialogs(h.host, {
-          ...h.options,
+        createDialogs(harness.host, {
+          ...harness.options,
           audio: {
-            ...h.options.audio,
+            ...harness.options.audio,
             onStatus: () => {
               throw new Error("Status subscription failed");
             },
@@ -390,19 +382,15 @@ test(
       } catch (fault) {
         error = (fault as Error).message;
       }
-      return { error, children: h.host.childElementCount };
+      return { error, children: harness.host.childElementCount };
     });
     expect(result).toEqual({
       error: "Status subscription failed",
       children: 0,
     });
-    const before = await page.evaluate(
-      () => window.dialogHarness.state.unlocks,
-    );
+    const { unlocks } = await harnessState(page);
     await page.keyboard.press("Space");
-    expect(await page.evaluate(() => window.dialogHarness.state.unlocks)).toBe(
-      before,
-    );
+    expect((await harnessState(page)).unlocks).toBe(unlocks);
   },
 );
 

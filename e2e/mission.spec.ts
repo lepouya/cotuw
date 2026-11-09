@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { collectPageErrors } from "./prototype-helpers";
+import { attachScreenshot, collectPageErrors } from "./page-helpers";
 import { MissionDriver } from "./mission-driver";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
@@ -8,12 +8,15 @@ const realTime = process.env.COTUW_REALTIME_PLAYTHROUGH === "1";
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
   test(
-    `complete M0 mission from the authored opening`,
+    "complete M0 mission from the authored opening",
     { tag: WEBKIT },
     async ({ page }, testInfo) => {
       if (realTime) test.setTimeout(20 * 60 * 1000);
       const errors = collectPageErrors(page);
-      const mission = new MissionDriver(page, profile.touch, realTime);
+      const mission = new MissionDriver(page, {
+        touch: profile.touch,
+        realTime,
+      });
       await mission.opening();
       for (let i = 0; i < 3; i++)
         await mission.press('[data-camera-action="tilt-up"]');
@@ -80,10 +83,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
           page.locator(`[data-economy-action="loot:${id}"]`),
         ).toHaveCount(0);
       }
-      await testInfo.attach(`crossing-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, testInfo, `crossing-${profile.name}`);
 
       await mission.focus(16, 54);
       await mission.press("#tab-units");
@@ -131,10 +131,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
         }),
         contentType: "application/json",
       });
-      await testInfo.attach(`victory-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, testInfo, `victory-${profile.name}`);
       await mission.press("#resume-mission");
       await expect(page.locator("#game-menu")).not.toBeVisible();
       await mission.press("#tab-goals");

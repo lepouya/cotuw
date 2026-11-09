@@ -2,10 +2,12 @@ import { expect, test } from "./fixtures";
 import { forEachProfile, TOUCH_PROFILES } from "./profiles";
 import { MissionDriver } from "./mission-driver";
 import {
+  attachScreenshot,
   collectPageErrors,
   importMission,
+  quickSave,
   terrainPoint,
-} from "./prototype-helpers";
+} from "./page-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
@@ -24,8 +26,8 @@ for (const { faction, guide, prompt } of [
     `${faction}: the opening guide pauses, saves, and restarts with shared time controls`,
     { tag: [QUICK, WEBKIT] },
     async ({ page }) => {
-      const mission = new MissionDriver(page, false, false);
-      await mission.opening(false, faction);
+      const mission = new MissionDriver(page);
+      await mission.opening({ dismissGuide: false, faction });
       await expect(page.locator("#explanation-title")).toHaveText(guide);
       await expect(page.locator("#explanation-text")).toContainText(prompt);
       await mission.advance(15);
@@ -45,10 +47,7 @@ for (const { faction, guide, prompt } of [
         "aria-pressed",
         "true",
       );
-      await page.keyboard.press("F5");
-      await expect(page.locator("#notifications")).toContainText(
-        "Quick save complete",
-      );
+      await quickSave(page);
       await page.keyboard.press("F9");
       await expect(page.locator("#game-menu-title")).toHaveText(
         "Mission loaded",
@@ -70,7 +69,7 @@ test(
   "Escape cancels placement and selection before opening the pause menu",
   { tag: WEBKIT },
   async ({ page }) => {
-    const mission = new MissionDriver(page, false, false);
+    const mission = new MissionDriver(page);
     await mission.opening();
     const canvas = page.locator("#game-canvas");
     const menu = page.locator("#game-menu");
@@ -135,14 +134,9 @@ test(
     await page.keyboard.press("Escape");
     await expect(page.locator("#game-menu")).toBeHidden();
     const source = await page.evaluate(async () => {
-      const path: string = "/e2e/missions.ts";
-      const actorPath: string = "/src/simulation/actor.ts";
-      const { level, missionMap, missionSource } = (await import(
-        path
-      )) as typeof import("./missions");
-      const { createActor } = (await import(
-        actorPath
-      )) as typeof import("../src/simulation/actor");
+      const { level, missionMap, missionSource } =
+        await import("/e2e/missions.ts");
+      const { createActor } = await import("/src/simulation/actor.ts");
       const mission = level("skirmish-map");
       mission.state.actors.push(
         createActor({
@@ -185,12 +179,9 @@ test(
   "a ten-second stall catches up while rendering is stopped",
   { tag: WEBKIT },
   async ({ page }) => {
-    const mission = new MissionDriver(page, false, false);
+    const mission = new MissionDriver(page);
     await mission.opening();
-    await page.keyboard.press("F5");
-    await expect(page.locator("#notifications")).toContainText(
-      "Quick save complete",
-    );
+    await quickSave(page);
     const initialTick = await page.evaluate(
       () =>
         JSON.parse(localStorage.getItem("cotuw.save.quicksave")!).state
@@ -221,7 +212,7 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   page,
 }, testInfo) => {
   const errors = collectPageErrors(page);
-  const mission = new MissionDriver(page, false, false);
+  const mission = new MissionDriver(page);
   await mission.opening();
   await expect(page.locator("#objective-summary")).toContainText(
     "Defeat the lone wolf 0/1",
@@ -302,10 +293,7 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   await expect(page.locator("#notifications")).toContainText("Harvester ready");
 
   // A loaded save keeps the dismissal, so the popup does not return.
-  await page.keyboard.press("F5");
-  await expect(page.locator("#notifications")).toContainText(
-    "Quick save complete",
-  );
+  await quickSave(page);
   await page.keyboard.press("F9");
   await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
   await mission.press("#resume-mission");
@@ -365,10 +353,7 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   await mission.press("#pause-mission");
   await rightClick(page, 20, 50);
   await expect(menu.locator(".radial-default")).toContainText("Gather");
-  await testInfo.attach("radial-menu", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await attachScreenshot(page, testInfo, "radial-menu");
   await mission.press(".radial-menu .radial-default");
   await expect(menu).toBeHidden();
   await mission.advance(2);
@@ -383,7 +368,7 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
     "the top bar and popups work without a keyboard or hover",
     { tag: WEBKIT },
     async ({ page }, testInfo) => {
-      const mission = new MissionDriver(page, true, false);
+      const mission = new MissionDriver(page, { touch: true });
       await mission.opening();
       for (const selector of [
         "#open-menu",
@@ -423,10 +408,7 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
       );
       await mission.press("#alert-toggle");
       await expect(page.locator("#alert-history-panel")).toBeVisible();
-      await testInfo.attach(`top-bar-${profile.name}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
+      await attachScreenshot(page, testInfo, `top-bar-${profile.name}`);
     },
   );
 });

@@ -1,28 +1,17 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
-import type { Page } from "@playwright/test";
-import { activate, terrainPoint, trainTestUnits } from "./prototype-helpers";
+import { openWithTrooper, terrainPoint, touchDrag } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
-async function opening(page: Page, touch = false) {
-  await page.goto("/?level=sandbox");
-  await trainTestUnits(page, ["trooper"], touch);
-  await activate(page.locator("#unit-roster button").first(), touch);
-  await expect(page.locator("#game-canvas")).toHaveAttribute(
-    "data-selected-actors",
-    '["trained-unit-1"]',
-  );
-}
+import type { ArcRotateCamera } from "@babylonjs/core";
+import type { Page } from "@playwright/test";
 
 async function pose(page: Page) {
   return page.evaluate(async () => {
-    const path: string = "/e2e/harness.ts";
-    const { EngineStore, Vector3, projectToCanvas, viewHeight } = (await import(
-      path
-    )) as typeof import("./harness");
-    const scene = EngineStore.Instances[0].scenes[0];
-    const camera =
-      scene.activeCamera as import("@babylonjs/core").ArcRotateCamera;
+    const { gameScene, Vector3, projectToCanvas, viewHeight } =
+      await import("/e2e/harness.ts");
+    const scene = gameScene();
+    const camera = scene.activeCamera as ArcRotateCamera;
     const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
     const unit = scene.getTransformNodeByName("actor-trained-unit-1-root")!;
     return {
@@ -79,7 +68,7 @@ test(
   "Pan mode reserves clicks, drags, and trackpad scrolling without losing troops",
   { tag: WEBKIT },
   async ({ page }) => {
-    await opening(page);
+    await openWithTrooper(page);
     const pan = page.getByRole("button", { name: "Pan mode", exact: true });
     await pan.click();
     await expect(pan).toHaveAttribute("aria-pressed", "true");
@@ -126,7 +115,7 @@ test(
   "Space-drag and arrow keys preserve Box selection and stop on release or blur",
   { tag: WEBKIT },
   async ({ page }) => {
-    await opening(page);
+    await openWithTrooper(page);
     await page.locator("#box-select").click();
     const canvas = page.locator("#game-canvas");
     await canvas.focus();
@@ -170,7 +159,7 @@ test(
 test("Pan mode preserves an active building preview without placing from world taps", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const canvas = page.locator("#game-canvas");
   const count = await canvas.getAttribute("data-tile-placed-actor-count");
   await page.locator("#tab-buildings").click();
@@ -194,7 +183,7 @@ test("Pan mode preserves an active building preview without placing from world t
 test("Space navigation cancels an in-progress selection gesture without issuing an order", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const before = await pose(page);
   await page.mouse.move(before.point.x, before.point.y);
   await page.mouse.down();
@@ -218,7 +207,7 @@ test("Space navigation cancels an in-progress selection gesture without issuing 
 
 for (const mode of ["selection", "placement"] as const) {
   test(`${mode} shortcuts respect text entry and dialogs`, async ({ page }) => {
-    await opening(page);
+    await openWithTrooper(page);
     const canvas = page.locator("#game-canvas");
     const selected = await canvas.getAttribute("data-selected-actors");
     if (mode === "placement") {
@@ -280,7 +269,7 @@ for (const mode of ["selection", "placement"] as const) {
 test("mouse hover pans all world edges and corners while keeping troops selected", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const canvas = page.locator("#game-canvas");
   const bounds = (await canvas.boundingBox())!;
   for (const [horizontal, vertical] of [
@@ -321,7 +310,7 @@ test("mouse hover pans all world edges and corners while keeping troops selected
 test("edge panning stops over UI, during box drags, on blur, and in dialogs", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const canvas = page.locator("#game-canvas");
   const bounds = (await canvas.boundingBox())!;
   const edge = {
@@ -371,7 +360,7 @@ test("edge panning stops over UI, during box drags, on blur, and in dialogs", as
 test("view presets ease between headings and keep the focal point", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const start = await pose(page);
   await openViews(page);
   const grid = page.locator("button[data-camera-view=grid]");
@@ -402,7 +391,7 @@ test("view presets ease between headings and keep the focal point", async ({
 test("Follow tracks a moving unit until a pan, and Escape ends it before clearing selection", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const canvas = page.locator("#game-canvas");
   const follow = page.locator("#follow-selection");
   await follow.click();
@@ -411,10 +400,7 @@ test("Follow tracks a moving unit until a pan, and Escape ends it before clearin
   await page.mouse.click(point.x + 150, point.y + 30);
   await expect(canvas).toHaveAttribute("data-move-status", "accepted");
   const near = (view: Awaited<ReturnType<typeof pose>>) =>
-    Math.hypot(
-      view.target[0]! - view.unit[0]!,
-      view.target[2]! - view.unit[2]!,
-    );
+    Math.hypot(view.target[0] - view.unit[0], view.target[2] - view.unit[2]);
   const moving = await pose(page);
   await expect
     .poll(async () => (await pose(page)).unit)
@@ -437,7 +423,7 @@ test("Follow tracks a moving unit until a pan, and Escape ends it before clearin
 });
 
 test("the radial menu offers Focus and Follow on units", async ({ page }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const { point } = await pose(page);
   await page.mouse.click(point.x, point.y, { button: "right" });
   const menu = page.getByRole("menu", { name: "Context actions" });
@@ -452,7 +438,7 @@ test("the radial menu offers Focus and Follow on units", async ({ page }) => {
 test("camera views dismiss on Escape before clearing selection and on outside presses", async ({
   page,
 }) => {
-  await opening(page);
+  await openWithTrooper(page);
   const pan = page.getByRole("button", { name: "Pan mode", exact: true });
   await pan.click();
   await openViews(page);
@@ -478,31 +464,14 @@ forEachProfile([PHONE_PROFILE], () => {
     "one-finger Pan drags over troops preserve selection and work without keyboard",
     { tag: WEBKIT },
     async ({ page }) => {
-      await opening(page, true);
+      await openWithTrooper(page, true);
       const pan = page.getByRole("button", { name: "Pan mode", exact: true });
       await pan.tap();
       const before = await pose(page);
-      // Touchscreen drag events exercise the same contract in both webviews.
-      await page.evaluate((point) => {
-        const canvas =
-          document.querySelector<HTMLCanvasElement>("#game-canvas")!;
-        for (const [type, x, y] of [
-          ["pointerdown", point.x, point.y],
-          ["pointermove", point.x + 70, point.y - 50],
-          ["pointerup", point.x + 70, point.y - 50],
-        ] as const)
-          canvas.dispatchEvent(
-            new PointerEvent(type, {
-              pointerId: 41,
-              pointerType: "touch",
-              button: 0,
-              buttons: type === "pointerup" ? 0 : 1,
-              clientX: x,
-              clientY: y,
-              bubbles: true,
-            }),
-          );
-      }, before.point);
+      await touchDrag(page, before.point, {
+        x: before.point.x + 70,
+        y: before.point.y - 50,
+      });
       preserved(before, await pose(page));
       await pan.tap();
       await expect(pan).toHaveAttribute("aria-pressed", "false");
@@ -525,7 +494,7 @@ forEachProfile([PHONE_PROFILE], () => {
     "camera views, Focus, and Follow work by touch alone",
     { tag: WEBKIT },
     async ({ page }) => {
-      await opening(page, true);
+      await openWithTrooper(page, true);
       await page.getByRole("button", { name: "Camera views" }).tap();
       await page.getByRole("button", { name: "Top-down" }).tap();
       await expect.poll(async () => (await pose(page)).beta).toBeLessThan(0.05);

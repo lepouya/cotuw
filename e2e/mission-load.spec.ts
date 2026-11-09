@@ -1,6 +1,7 @@
 import { expect, test } from "./fixtures";
-import { openOpening, importMission } from "./prototype-helpers";
+import { importMission, openOpening } from "./page-helpers";
 import { WEBKIT } from "./tags";
+
 import type { MissionFile } from "../src/simulation/mission-file";
 
 declare global {
@@ -25,10 +26,7 @@ for (const action of [
       const canvas = page.locator("#game-canvas");
       await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
       const source = await page.evaluate(async () => {
-        const missionsPath: string = "/e2e/missions.ts";
-        const { level, missionSource } = (await import(
-          missionsPath
-        )) as typeof import("./missions");
+        const { level, missionSource } = await import("/e2e/missions.ts");
         const mission = level();
         mission.state.economy!.stockpiles[0].amount = 77;
         // A save, not a level, so loading it never replaces the restart level.
@@ -82,8 +80,7 @@ for (const action of [
       }
       await page.evaluate(async () => {
         window.finishMissionRead();
-        const path: string = "/e2e/harness.ts";
-        const { frames } = await import(path);
+        const { frames } = await import("/e2e/harness.ts");
         await frames(2);
       });
       if (action === "exit") {
@@ -99,9 +96,10 @@ for (const action of [
         await expect(page.locator("#materials-counter")).toHaveText("150");
       } else {
         await expect(page.locator("#game-menu")).not.toBeVisible();
-        await expect(page.locator("#materials-counter")).toHaveText(
-          action === "restart" ? "150" : action === "newer load" ? "99" : "77",
-        );
+        let materials = "77";
+        if (action === "restart") materials = "150";
+        if (action === "newer load") materials = "99";
+        await expect(page.locator("#materials-counter")).toHaveText(materials);
       }
     },
   );

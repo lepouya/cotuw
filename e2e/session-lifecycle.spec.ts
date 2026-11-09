@@ -1,13 +1,21 @@
 import { expect, test } from "./fixtures";
-
 import { MissionDriver } from "./mission-driver";
 import {
   collectPageErrors,
   dismissExplanation,
   openOpening,
   startOpening,
-} from "./prototype-helpers";
+} from "./page-helpers";
 import { WEBKIT } from "./tags";
+
+import type { Page } from "@playwright/test";
+import type { GameSession } from "../src/session";
+
+const engineCount = (page: Page) =>
+  page.evaluate(async () => {
+    const { EngineStore } = await import("/e2e/harness.ts");
+    return EngineStore.Instances.length;
+  });
 
 test(
   "startup and sidebar cleanup failures leave title navigation usable",
@@ -107,8 +115,7 @@ for (const action of ["exit-mission", "restart-mission"]) {
     const errors = collectPageErrors(page);
     await openOpening(page);
     await page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(path);
+      const { EngineStore } = await import("/e2e/harness.ts");
       const engine = EngineStore.Instances[0];
       const dispose = engine.dispose.bind(engine);
       engine.dispose = () => {
@@ -122,13 +129,7 @@ for (const action of ["exit-mission", "restart-mission"]) {
     await expect(page.locator("#game-menu-title")).toHaveText(
       "Citadels of the Unquiet World",
     );
-    expect(
-      await page.evaluate(async () => {
-        const path: string = "/e2e/harness.ts";
-        const { EngineStore } = await import(path);
-        return EngineStore.Instances.length;
-      }),
-    ).toBe(0);
+    expect(await engineCount(page)).toBe(0);
     await page.locator("#new-mission").click();
     await page.locator("#choose-arc").click();
     await expect(page.locator("#explanation-title")).toHaveText(
@@ -142,18 +143,14 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
   test(`${failure} failure releases the session and its controls`, async ({
     page,
   }) => {
-    const mission = new MissionDriver(page, false, false);
+    const mission = new MissionDriver(page);
     await mission.opening();
     const result = await page.evaluate(async (failure) => {
-      const harnessPath: string = "/e2e/harness.ts";
-      const sessionPath: string = "/src/session.ts";
-      const loadingPath: string = "/src/mission-loading.ts";
-      const levelsPath: string = "/src/content/levels.ts";
-      const { EngineStore } = await import(harnessPath);
-      const { createGameSession } = await import(sessionPath);
-      const { loadMission } = await import(loadingPath);
-      const { LEVEL_SOURCES } = await import(levelsPath);
-      const loaded = loadMission(LEVEL_SOURCES.get("arc-economy-opening"));
+      const { EngineStore } = await import("/e2e/harness.ts");
+      const { createGameSession } = await import("/src/session.ts");
+      const { loadMission } = await import("/src/mission-loading.ts");
+      const { LEVEL_SOURCES } = await import("/src/content/levels.ts");
+      const loaded = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
       if (failure === "simulation") loaded.state.tick = -1;
       const canvases = [
         document.createElement("canvas"),
@@ -169,13 +166,13 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
         ".radial-menu, .selection-box",
       ).length;
       let disposed = 0;
-      let created: any;
+      let created: GameSession | undefined;
       let error = "";
       try {
         await createGameSession(canvases[0], canvases[1], {
           mission: loaded,
           onDispose: () => disposed++,
-          onReady: (session: any) => {
+          onReady: (session) => {
             created = session;
             if (failure === "disposal")
               created.pause = () => {
@@ -184,7 +181,7 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
             else throw new Error("ready failed");
           },
         });
-        if (failure === "disposal") await created.disposeAsync();
+        if (failure === "disposal") await created!.disposeAsync();
       } catch (fault) {
         error = (fault as Error).message;
       }
@@ -210,11 +207,11 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
       };
     }, failure);
     expect(result.error).toContain(
-      failure === "simulation"
-        ? "state tick"
-        : failure === "ready"
-          ? "ready failed"
-          : "pause failed",
+      {
+        simulation: "state tick",
+        ready: "ready failed",
+        disposal: "pause failed",
+      }[failure],
     );
     expect(result.disposed).toBe(1);
     expect(result.extraEngines).toBe(0);
@@ -231,12 +228,6 @@ test("repeated loads, restarts, and returns to title release each session", asyn
 }) => {
   const errors = collectPageErrors(page);
   await openOpening(page);
-  const engines = () =>
-    page.evaluate(async () => {
-      const path: string = "/e2e/harness.ts";
-      const { EngineStore } = await import(path);
-      return EngineStore.Instances.length;
-    });
   const cards = page.locator("#building-options > *");
   const cardCount = await cards.count();
   expect(cardCount).toBeGreaterThan(0);
@@ -246,16 +237,16 @@ test("repeated loads, restarts, and returns to title release each session", asyn
   for (let round = 0; round < 3; round++) {
     await page.keyboard.press("F9");
     await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
-    expect(await engines()).toBe(1);
+    expect(await engineCount(page)).toBe(1);
     await page.locator("#restart-mission").click();
     await dismissExplanation(page, "Welcome, Commander");
-    expect(await engines()).toBe(1);
+    expect(await engineCount(page)).toBe(1);
     await page.locator("#open-menu").click();
     await page.locator("#exit-mission").click();
     await expect(page.locator("#new-mission")).toBeEnabled();
-    expect(await engines()).toBe(0);
+    expect(await engineCount(page)).toBe(0);
     await startOpening(page);
-    expect(await engines()).toBe(1);
+    expect(await engineCount(page)).toBe(1);
     await expect(cards).toHaveCount(cardCount);
   }
   // A single application shortcut and session remain subscribed.

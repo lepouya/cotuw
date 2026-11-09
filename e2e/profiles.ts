@@ -1,4 +1,5 @@
 import { test } from "./fixtures";
+
 import type { ViewportSize } from "@playwright/test";
 
 /** A viewport and input modality that browser flows are verified with. */
@@ -33,12 +34,12 @@ export const TABLET_PROFILE = {
   touch: true,
 } as const satisfies BrowserProfile;
 
-/** Compact landscape browser profiles that M0 verifies with touch input. */
+/** Compact landscape profiles verified with touch input. */
 export const TOUCH_PROFILES = [PHONE_PROFILE, TABLET_PROFILE] as const;
 
 export const PROFILES = [MOUSE_PROFILE, ...TOUCH_PROFILES] as const;
 
-/** Mouse and phone cover flows whose tablet layout adds no distinct behavior. */
+/** Covers flows whose tablet layout adds no distinct behavior. */
 export const MOUSE_AND_PHONE_PROFILES = [MOUSE_PROFILE, PHONE_PROFILE] as const;
 
 /** Declares the tests in `body` once per profile, under its name. */
