@@ -21,6 +21,7 @@ import { isCount, isId, isRecord } from "./simulation/validation";
 import type { ContentPack } from "./content/content-pack";
 import type { SkirmishChoice } from "./content/skirmish";
 import type { ActorDefinition } from "./simulation/actor";
+import type { AiConcern } from "./simulation/director";
 import type { Difficulty } from "./simulation/mission-setup";
 import type { MissionSimulation } from "./simulation/mission";
 import type { MissionFile } from "./simulation/mission-file";
@@ -39,10 +40,14 @@ export const missionTerrain = (mission: MissionFile): ScenarioTerrain => ({
   terrain: mission.state.terrain,
 });
 
-/** A headless simulation unless `map` supplies rendered terrain. */
+/**
+ * A headless simulation unless `map` supplies rendered terrain. `aiConcerns`
+ * supplies the concerns the mission's AI profiles name.
+ */
 export function createSessionSimulation(
   mission: LoadedMission,
   map: TerrainGrid = createScenarioMap(missionTerrain(mission)),
+  aiConcerns?: ReadonlyMap<string, AiConcern>,
 ): MissionSimulation {
   const occupancy = new OccupancyGrid(map);
   const { content } = mission;
@@ -62,6 +67,7 @@ export function createSessionSimulation(
         );
       return { owner, profile };
     }),
+    aiConcerns,
     behaviorRegistry: new Map([
       [
         "terrain-move",

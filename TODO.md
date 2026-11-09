@@ -108,14 +108,11 @@ AI tasks are developed and verified with them.
   shared budgets and force claims, and counted per-tick limits. It runs as a
   mission tick step through `viewOf(owner)` and owner-issued commands.
   `submitCommand` requires an issuer. Profiles have no concerns until 1.33.
-- [ ] **1.30** Add a headless AI-versus-AI runner reporting each match summary
-  and result. Accept profiles and start-slot assignments as case inputs rather
-  than depending on random seeds in a simulation that has no randomness.
-  Exercise the runner with the ARC mirror harness first. Support player-side
-  AI and opposing enemy difficulty scaling through configurable cases; the
-  full 12-case ARC-versus-Circle matrix runs in 1.63 after Circle is playable.
-  Stop unfinished baseline cases at 30 simulation minutes, report Incomplete /
-  stalled as a failed completion check, and preserve state and AI diagnostics.
+- [x] **1.30** Headless AI-versus-AI runner (`npm run ai:match`) with ARC
+  mirror cases by player slot and difficulty. It reports results, milestones,
+  totals, scaling, and AI diagnostics, and preserves Incomplete / stalled
+  cases at the 30-minute cutoff. `createSessionSimulation` accepts concerns.
+  The 12-case ARC-versus-Circle matrix belongs to 1.63.
 - [ ] **1.31** Add a development overlay showing posture, operations, budgets,
   and remembered observations without exposing them in normal player UI.
   Read per-tick data through `observeTicks`. Keep it separate from

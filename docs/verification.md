@@ -154,6 +154,21 @@ Use the matrix, pacing windows, and simulation-time cutoff in
   Verify difficulty scaling, completed results, and save/load for Easy and
   Hard. Run recovery and disruption cases separately from the baseline matrix.
 
+`npm run ai:match -- [case-or-set...] [--cutoff <minutes>]` plays AI-versus-AI
+skirmish cases headlessly, every case set by default. `skirmishCases` in
+`scripts/ai-match/runner.ts` builds a set from start-slot factions: each slot
+uses its faction's standard profile and stands in for the player at each
+difficulty. The simulation has no randomness, so a case and revision
+reproduce one outcome. The cutoff counts match time, so a saved mission
+resumes toward the same limit.
+
+Reports in `.checks/ai-matches/<case>.json` give the revision, wall-clock and
+simulation time, status, result, effective scaling, and each owner's
+milestones, totals, latest sample, and AI diagnostics. An Incomplete / stalled
+case, or one whose tick throws, also saves its mission as
+`<case>.mission.json` and fails the run; other cases still run. Tests can
+drive `playMatch` with their own concerns and profiles.
+
 ## M1 performance measurement
 
 Use the reference Mac, workloads, and budgets in
