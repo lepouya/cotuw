@@ -42,6 +42,8 @@ const topBar = createTopBar(byId("top-bar"), {
   setSpeed: (speed) => app.setSpeed(speed),
   showObjectives: () => app.showObjectives(),
 });
+// Explicit links remain available for authoring and browser checks.
+const link = new URLSearchParams(location.search);
 const app = createApplication({
   canvas,
   minimap: byId<HTMLCanvasElement>("minimap"),
@@ -53,6 +55,8 @@ const app = createApplication({
   topBar,
   setTitleScreen: (atTitle) =>
     document.body.classList.toggle("at-title", atTitle),
+  // Development links that assign AI also offer its diagnostics.
+  aiOverlay: link.has("ai"),
 });
 
 const APPLICATION_KEYS = new Map<string, () => unknown>([
@@ -84,8 +88,6 @@ document.addEventListener("contextmenu", (event) => {
   if (!isTextEntry(event.target)) event.preventDefault();
 });
 
-// Explicit links remain available for authoring and browser checks.
-const link = new URLSearchParams(location.search);
 void app.initialize({
   level: link.get("level") ?? undefined,
   skirmish: skirmishLink(link),

@@ -169,6 +169,13 @@ case, or one whose tick throws, also saves its mission as
 `<case>.mission.json` and fails the run; other cases still run. Tests can
 drive `playMatch` with their own concerns and profiles.
 
+Development links that assign AI, such as
+`?skirmish=arc-arc&ai=east:arc-skirmish`, also enable the AI overlay in dev
+and playtest builds. Backquote cycles it through each AI owner's posture,
+budgets, claims, recent and refused commands, concern memory, and remembered
+sightings, then hides it. Links without `ai` and normal menu launches never
+show it.
+
 ## M1 performance measurement
 
 Use the reference Mac, workloads, and budgets in

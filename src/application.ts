@@ -86,6 +86,8 @@ export type ApplicationOptions = {
   >;
   topBar: Pick<ReturnType<typeof createTopBar>, "update">;
   setTitleScreen: (atTitle: boolean) => void;
+  /** Offers each session's AI diagnostics panel, for development links. */
+  aiOverlay?: boolean;
 };
 
 /**
@@ -102,6 +104,7 @@ export function createApplication({
   notifications,
   topBar,
   setTitleScreen,
+  aiOverlay,
 }: ApplicationOptions) {
   /** Level sources by scenario ID; loading a level file adds or replaces one. */
   const levels = new Map(LEVEL_SOURCES);
@@ -307,6 +310,7 @@ export function createApplication({
         mission: next,
         audio,
         startPaused: loaded,
+        aiOverlay,
         onMenu: () => {
           if (current()) openMenu();
         },

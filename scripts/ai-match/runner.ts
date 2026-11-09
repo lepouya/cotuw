@@ -9,6 +9,7 @@ import {
   secondsToTicks,
   SIMULATION_TICK_SECONDS,
 } from "../../src/simulation/clock.ts";
+import { aiDiagnostics } from "../../src/simulation/director.ts";
 import { serializeMission } from "../../src/simulation/mission-file.ts";
 import { DIFFICULTY_IDS } from "../../src/simulation/mission-setup.ts";
 import { isCount, isPositive } from "../../src/simulation/validation.ts";
@@ -16,7 +17,10 @@ import { isCount, isPositive } from "../../src/simulation/validation.ts";
 import type { SkirmishChoice } from "../../src/content/skirmish.ts";
 import type { SkirmishFaction } from "../../src/content/skirmish-map.ts";
 import type { LoadedMission } from "../../src/mission-loading.ts";
-import type { AiConcern, OwnerAiState } from "../../src/simulation/director.ts";
+import type {
+  AiConcern,
+  AiDiagnostics,
+} from "../../src/simulation/director.ts";
 import type {
   MatchSample,
   OwnerMetrics,
@@ -71,21 +75,6 @@ export const CASE_SETS: ReadonlyMap<string, readonly MatchCase[]> = new Map([
   ["arc-mirror", ARC_MIRROR_CASES],
 ]);
 
-export type AiDiagnostics = Pick<
-  OwnerAiState,
-  "posture" | "requestedPosture" | "budgets" | "memory"
-> & {
-  /** Claimed actors by concern. */
-  claims: Record<string, number>;
-  /** Refused commands still waiting for their concerns' next turns. */
-  rejections: {
-    concern: string;
-    tick: number;
-    kind: string;
-    reason?: string;
-  }[];
-};
-
 export type OwnerReport = Omit<OwnerMetrics, "history"> & {
   faction?: string;
   profileId?: string;
@@ -132,32 +121,6 @@ export function runMatch(
   aiConcerns?: ReadonlyMap<string, AiConcern>,
 ): MatchRun {
   return playMatch(id, assembleSkirmish(choice), { cutoffMinutes, aiConcerns });
-}
-
-function diagnose({
-  posture,
-  requestedPosture,
-  budgets,
-  claims,
-  rejections,
-  memory,
-}: OwnerAiState): AiDiagnostics {
-  const claimed = new Map<string, number>();
-  for (const concern of Object.values(claims))
-    claimed.set(concern, (claimed.get(concern) ?? 0) + 1);
-  return {
-    posture,
-    ...(requestedPosture && { requestedPosture }),
-    budgets,
-    claims: Object.fromEntries(claimed),
-    rejections: rejections.map(({ concern, tick, command, reason }) => ({
-      concern,
-      tick,
-      kind: command.kind,
-      ...(reason && { reason }),
-    })),
-    memory,
-  };
 }
 
 const outcome = (
@@ -224,7 +187,7 @@ export function playMatch(
           profileId: profiles.get(owner),
           ...totals,
           latest: history[history.length - 1],
-          ai: state.ai[owner] && diagnose(state.ai[owner]!),
+          ai: state.ai[owner] && aiDiagnostics(state.ai[owner]!),
         }),
       ),
     };

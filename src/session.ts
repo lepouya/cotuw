@@ -96,6 +96,7 @@ import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
 import { bindWorldShortcuts } from "./ui/world-shortcuts";
+import { createAiOverlay } from "./ui/ai-overlay";
 import type { ScenarioPopup } from "./simulation/mission-file";
 import type { WorldPosition } from "./simulation/world";
 import { createAudioScene } from "./audio/scene";
@@ -168,6 +169,8 @@ export type GameSessionControls = BuildingPlacementControls &
     remove?: HTMLButtonElement;
     animate?: HTMLInputElement;
     cameraControls?: Pick<CameraControls, "bind">;
+    /** Lets Backquote cycle a diagnostics panel through the mission's AI owners. */
+    aiOverlay?: boolean;
   };
 
 declare global {
@@ -1179,6 +1182,12 @@ async function assembleGameSession(
       canvas.dataset.modelsReady = "true";
     },
   });
+  const aiControllers = mission.scenario.ai ?? [];
+  const aiOverlay =
+    controls.aiOverlay && aiControllers.length
+      ? createAiOverlay(canvas.parentElement!, simulation, aiControllers)
+      : undefined;
+  if (aiOverlay) lifetime.defer(aiOverlay.dispose);
   const whilePlacing = (action: () => void) => () => {
     if (!placement.active) return false;
     action();
@@ -1205,6 +1214,14 @@ async function assembleGameSession(
       ],
       KeyR: [whilePlacing(placement.rotate)],
       KeyS: [() => input.stop() > 0],
+      ...(aiOverlay && {
+        Backquote: [
+          () => {
+            aiOverlay.toggle();
+            return true;
+          },
+        ],
+      }),
     }),
   );
   try {

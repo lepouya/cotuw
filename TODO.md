@@ -113,10 +113,10 @@ AI tasks are developed and verified with them.
   totals, scaling, and AI diagnostics, and preserves Incomplete / stalled
   cases at the 30-minute cutoff. `createSessionSimulation` accepts concerns.
   The 12-case ARC-versus-Circle matrix belongs to 1.63.
-- [ ] **1.31** Add a development overlay showing posture, operations, budgets,
-  and remembered observations without exposing them in normal player UI.
-  Read per-tick data through `observeTicks`. Keep it separate from
-  `render/debug-overlay.ts`, which draws the terrain grid.
+- [x] **1.31** Development AI overlay (`ui/ai-overlay.ts`), offered by `ai=`
+  development links in dev and playtest builds. Backquote cycles AI owners'
+  posture, budgets, claims, recent and refused commands, concern memory, and
+  sightings. Add an operations view with 1.36.
 - [ ] **1.32** Serialize authoritative AI state in `state.ai` as each part is
   added, covering plans and operations beyond the director's budgets, claims,
   timers, and memory from 1.29. Reuse the saved observations from 1.19.
