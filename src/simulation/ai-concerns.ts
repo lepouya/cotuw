@@ -7,6 +7,7 @@ import {
   stepToward,
   train,
 } from "./ai-planning";
+import { scouting } from "./ai-scouting";
 import { ARC_CONCERNS } from "./arc-concerns";
 
 import type { AiConcern } from "./director";
@@ -63,4 +64,5 @@ export const trainForces: AiConcern = (context) => {
 export const BUILT_IN_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map([
   ...ARC_CONCERNS,
   ["forces", trainForces],
+  ["scouting", scouting],
 ]);

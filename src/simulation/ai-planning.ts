@@ -159,24 +159,25 @@ export function place(
   );
 }
 
-/** Queues one unit when funds allow and the producer accepts it. */
+/**
+ * Queues one unit when funds allow and the producer accepts it. Returns the
+ * queued unit's ID.
+ */
 export function train(
   context: AiConcernContext,
   producer: Building,
   definition: ActorDefinition,
-) {
-  if (!affords(context, definition)) return false;
+): string | undefined {
+  if (!affords(context, definition)) return;
   const command = {
     kind: "train-unit" as const,
     producerId: producer.id,
     actorId: PROBE_ID,
     definitionId: definition.id,
   };
-  if (!context.view.evaluateTraining(command).accepted) return false;
-  return context.issue({
-    ...command,
-    actorId: context.newActorId(definition.id),
-  });
+  if (!context.view.evaluateTraining(command).accepted) return;
+  const actorId = context.newActorId(definition.id);
+  return context.issue({ ...command, actorId }) ? actorId : undefined;
 }
 
 /**

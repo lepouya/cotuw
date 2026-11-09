@@ -297,6 +297,14 @@ export const isArmyUnit = (definition: ActorDefinition) =>
   !definition.footprint &&
   !isWorkerDefinition(definition);
 
+/** Unarmed mobile units that neither gather nor build, such as scouts. */
+export const isScoutUnit = (definition: ActorDefinition) =>
+  !!definition.movement &&
+  !!definition.vision &&
+  !definition.weapon &&
+  !definition.footprint &&
+  !isWorkerDefinition(definition);
+
 /** Scenario rosters may omit some of a producer's units. */
 export const trainsArmy = (
   definition: ActorDefinition,

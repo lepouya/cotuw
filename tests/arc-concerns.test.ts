@@ -1,11 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
 
-import { ARC_MIRROR_CASES } from "../scripts/ai-match/runner";
-import {
-  assembleSkirmish,
-  createSessionSimulation,
-  loadMission,
-} from "../src/mission-loading";
+import { dueRound, MIRROR, resumeMirror, runTicks } from "./helpers/ai-mirror";
+import { createSessionSimulation, loadMission } from "../src/mission-loading";
 import {
   secondsToTicks,
   SIMULATION_TICK_SECONDS,
@@ -16,7 +12,6 @@ import { BUILT_IN_AI_CONCERNS } from "../src/simulation/ai-concerns";
 import { createHarvesterState } from "../src/simulation/harvesting";
 
 import type { CommandOutcome } from "../src/simulation/command";
-import type { AiConcern } from "../src/simulation/director";
 import type {
   MissionSimulation,
   MissionState,
@@ -27,40 +22,21 @@ const STARTING_MATERIALS = 150;
 const minutes = (count: number) =>
   secondsToTicks(count * 60, SIMULATION_TICK_SECONDS);
 
-const mission = assembleSkirmish(
-  ARC_MIRROR_CASES.find(({ id }) => id === "arc-mirror-west-normal")!.choice,
-);
 let simulation: MissionSimulation;
 const outcomes: CommandOutcome[] = [];
 let saved: string;
 let atSave: MissionState;
 let afterSave: MissionState;
 
-const run = (sim: MissionSimulation, ticks: number) => {
-  const recorded: CommandOutcome[] = [];
-  for (let tick = 0; tick < ticks; tick++) recorded.push(...sim.tick());
-  return recorded;
-};
-
-const resume = (
-  state: MissionState,
-  concerns?: ReadonlyMap<string, AiConcern>,
-) =>
-  createSessionSimulation(
-    { ...mission, state: { ...state, terrain: state.terrain! } },
-    undefined,
-    concerns,
-  );
-
 // One undisturbed opening, inspected at three and five minutes.
 beforeAll(() => {
-  simulation = createSessionSimulation(mission);
-  outcomes.push(...run(simulation, minutes(3)));
+  simulation = createSessionSimulation(MIRROR);
+  outcomes.push(...runTicks(simulation, minutes(3)));
   atSave = simulation.snapshot();
-  saved = serializeMission(mission.scenario, atSave, SIMULATION_TICK_SECONDS);
-  outcomes.push(...run(simulation, minutes(0.5)));
+  saved = serializeMission(MIRROR.scenario, atSave, SIMULATION_TICK_SECONDS);
+  outcomes.push(...runTicks(simulation, minutes(0.5)));
   afterSave = simulation.snapshot();
-  outcomes.push(...run(simulation, minutes(1.5)));
+  outcomes.push(...runTicks(simulation, minutes(1.5)));
 });
 afterAll(() => simulation.dispose());
 
@@ -119,9 +95,9 @@ test("the ARC AI's commands stay valid", () => {
 });
 
 test("the developing base reaches its income and production targets", () => {
-  const sim = resume(simulation.snapshot());
+  const sim = resumeMirror(simulation.snapshot());
   try {
-    const results = run(sim, minutes(5));
+    const results = runTicks(sim, minutes(5));
     expect(results.filter(({ accepted }) => !accepted)).toEqual([]);
     for (const owner of OWNERS) {
       const completed = sim.actors.filter(
@@ -152,7 +128,7 @@ test("a saved ARC AI continues exactly as an uninterrupted one", () => {
   const resumed = createSessionSimulation(loadMission(saved));
   try {
     expect(resumed.snapshot()).toEqual(atSave);
-    run(resumed, minutes(0.5));
+    runTicks(resumed, minutes(0.5));
     expect(resumed.snapshot()).toEqual(afterSave);
   } finally {
     resumed.dispose();
@@ -184,13 +160,11 @@ test.each([1, 2])(
     )!.history;
     history[history.length - 1]!.units += workers - 1;
     state.economy!.stockpiles.forEach((stockpile) => (stockpile.amount = 1000));
-    const ai = state.ai.west!;
-    ai.nextRoundTick = state.tick;
-    delete ai.cursor;
+    dueRound(state);
     const concerns = new Map(BUILT_IN_AI_CONCERNS);
     concerns.set("arc-production", () => {});
     concerns.set("forces", () => {});
-    const sim = resume(state, concerns);
+    const sim = resumeMirror(state, concerns);
     try {
       const results = sim
         .tick()
@@ -224,12 +198,9 @@ test.each(["missing", "blocked"])(
         ...state.actors.find(({ id }) => id === "west-headquarters")!
           .worldPosition,
       };
-    const ai = state.ai.west!;
-    ai.nextRoundTick = state.tick;
-    delete ai.cursor;
-    const sim = resume(state);
+    const sim = resumeMirror(dueRound(state));
     try {
-      run(sim, 2);
+      runTicks(sim, 2);
       const target = sim.actorById(producer.id)!.rallyPoint;
       expect(target).toBeDefined();
       expect(sim.viewOf("west").evaluateRallyPoint(producer.id, target!)).toBe(

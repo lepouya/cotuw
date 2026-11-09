@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 1,
   "id": "base",
-  "version": 4,
+  "version": 5,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -529,9 +529,11 @@
             "essential": true
           },
           { "concern": "arc-production", "budget": 2, "forces": 0 },
+          { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "forces", "budget": 1, "forces": 1 }
         ],
         "developing": [
+          { "concern": "scouting", "budget": 1, "forces": 1 },
           {
             "concern": "arc-income",
             "budget": 2,

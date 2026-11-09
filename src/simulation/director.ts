@@ -106,6 +106,7 @@ export type AiState = Record<string, OwnerAiState>;
  */
 export type AiConcernContext = {
   readonly tick: number;
+  readonly tickSeconds: number;
   readonly view: OwnerView;
   /** The authored map; absent from missions without terrain. */
   readonly terrain: TerrainView | undefined;
@@ -504,6 +505,7 @@ function concernContext(
   ai.rejections = ai.rejections.filter((entry) => entry.concern !== concern);
   return {
     tick,
+    tickSeconds: host.tickSeconds,
     view,
     terrain: host.terrain,
     definitions: host.definitions,

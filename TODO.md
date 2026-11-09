@@ -127,15 +127,15 @@ AI tasks are developed and verified with them.
   `forces` concern, which sessions use by default. It opens with a Refinery and
   Harvester, then a Field Barracks, and grows to three Refineries and two
   Barracks while training Troopers to a rally point. The undisturbed mirror
-  reaches first income near 1:15, military production near 2:25, and a first
-  Trooper near 2:30 through ordinary placement and costs.
+  reaches first income near 1:15, military production near 2:30, and a first
+  Trooper near 2:40 through ordinary placement and costs.
 - [ ] **1.34** Add recovery plans for ordinary worker, production, and
   support-link losses. Verify recovery without free replacements or resources.
-- [ ] **1.35** Add scouting and observation-driven goals. The AI may know
-  authored terrain, routes, and resource locations; enemy state and current
-  yields require observation. Test stale reports and lost contact. Home
-  Materials run out near minute 24 in the undisturbed mirror, and Gather
-  needs explored sites, so scouting must find other deposits before then.
+- [x] **1.35** Faction-neutral `scouting` concern in
+  `simulation/ai-scouting.ts` explores authored sites, refreshes stale reports,
+  retreats after damage, skips failed approaches, and replaces lost scouts at
+  normal cost. The undisturbed mirror sights every site and enemy income;
+  Harvesters can use scouted deposits after home Materials run out.
 - [ ] **1.36** Add group operations for local defense, raids on exposed income,
   and attacks. Implement assignment, retreat, regrouping, bounded replanning,
   and release of forces under the existing [AI rules](DESIGN.md#npc-ai).
@@ -206,7 +206,9 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   one active-tool state so card shortcuts wait during placement. Share device
   preference storage with audio; keep it independent of mission saves.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
-  expansion, defense, recovery, and combat content.
+  expansion, defense, recovery, and combat content. Include Refineries at
+  scouted remote deposits, which need support reach; Harvesters otherwise
+  haul to home Refineries.
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
   units, and controls with the 1.02 cohort, in the same sessions as 1.02 and
   1.57. Play against the harness AI on the rough
