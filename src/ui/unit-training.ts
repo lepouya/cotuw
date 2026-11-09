@@ -47,7 +47,7 @@ export function createUnitTraining(
     MissionSimulation,
     "result" | "unusedActorId" | "submitCommand"
   >,
-  player: Pick<OwnerView, "economy" | "evaluateTraining">,
+  player: Pick<OwnerView, "owner" | "economy" | "evaluateTraining">,
   controls: UnitTrainingControls,
   options: {
     names: ReadonlyMap<string, string>;
@@ -142,7 +142,7 @@ export function createUnitTraining(
           text: reasonsFor(command.producerId)[evaluation.reason],
         };
       } else {
-        simulation.submitCommand(command);
+        simulation.submitCommand(command, { owner: player.owner });
         pending = command;
       }
       refresh();

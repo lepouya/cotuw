@@ -491,11 +491,14 @@ test.describe("hovering salvage", () => {
         const trooper = simulation.actors.find(
           (actor) => actor.definitionId === "arc-trooper",
         )!;
-        simulation.submitCommand({
-          kind: "move",
-          actorId: trooper.id,
-          target: { x: -28.5, z: 2.5 },
-        });
+        simulation.submitCommand(
+          {
+            kind: "move",
+            actorId: trooper.id,
+            target: { x: -28.5, z: 2.5 },
+          },
+          { owner: simulation.playerOwner },
+        );
       });
       await advance(page, 4);
       await expect(
@@ -1039,7 +1042,10 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     };
     simulation.spawnActor(backup);
     document.querySelector("#alert-history")!.replaceChildren();
-    simulation.submitCommand({ kind: "sell-actor", actorId: replacement.id });
+    simulation.submitCommand(
+      { kind: "sell-actor", actorId: replacement.id },
+      { owner: simulation.playerOwner },
+    );
   });
   // One render frame commits both the outage and the backup's completion.
   await advance(page, 0.1);

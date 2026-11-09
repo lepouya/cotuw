@@ -514,6 +514,17 @@
       }
     }
   ],
+  "aiProfiles": [
+    {
+      "id": "arc-skirmish",
+      "roundSeconds": 1,
+      "concernsPerTick": 2,
+      "commandsPerTick": 8,
+      "postures": {
+        "establishing": []
+      }
+    }
+  ],
   "movementProfiles": [
     {
       "id": "surface-ground",

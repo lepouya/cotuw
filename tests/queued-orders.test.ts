@@ -80,27 +80,39 @@ const scouts = [unit("a", "arc-scout", 8, 10), unit("b", "arc-scout", 8, 12)];
 
 /** Scout "a" moves and queues a second move behind it. */
 function moveThenQueue(simulation: MissionSimulation) {
-  simulation.submitCommand({ kind: "move", actorId: "a", target: at(14, 10) });
-  simulation.submitCommand({
-    kind: "move",
-    actorId: "a",
-    target: at(14, 15),
-    queued: true,
-  });
+  simulation.submitCommand(
+    { kind: "move", actorId: "a", target: at(14, 10) },
+    { owner: simulation.playerOwner },
+  );
+  simulation.submitCommand(
+    {
+      kind: "move",
+      actorId: "a",
+      target: at(14, 15),
+      queued: true,
+    },
+    { owner: simulation.playerOwner },
+  );
 }
 
 describe("queued orders", () => {
   test("queued moves wait behind the current order and run in sequence", () => {
     const simulation = fixture(scouts);
     const route = [at(14, 10), at(14, 15), at(20, 15)];
-    simulation.submitCommand({ kind: "move", actorId: "a", target: route[0]! });
+    simulation.submitCommand(
+      { kind: "move", actorId: "a", target: route[0]! },
+      { owner: simulation.playerOwner },
+    );
     for (const target of route.slice(1))
-      simulation.submitCommand({
-        kind: "move",
-        actorId: "a",
-        target,
-        queued: true,
-      });
+      simulation.submitCommand(
+        {
+          kind: "move",
+          actorId: "a",
+          target,
+          queued: true,
+        },
+        { owner: simulation.playerOwner },
+      );
     const outcomes = simulation.tick();
     expect(outcomes.map(({ accepted }) => accepted)).toEqual([
       true,
@@ -141,12 +153,15 @@ describe("queued orders", () => {
 
   test("an idle actor starts a queued order at once", () => {
     const simulation = fixture(scouts);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "a",
-      target: at(14, 10),
-      queued: true,
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "a",
+        target: at(14, 10),
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
     const [outcome] = simulation.tick();
     expect(outcome!.queued).toBeUndefined();
     expect(simulation.actorById("a")!.movement).toBeDefined();
@@ -163,6 +178,7 @@ describe("queued orders", () => {
         kind === "stop"
           ? { kind, actorId: "a" }
           : { kind, actorId: "a", target: at(8, 15) },
+        { owner: simulation.playerOwner },
       );
       simulation.tick();
       expect(simulation.actorById("a")!.orders).toBeUndefined();
@@ -173,7 +189,10 @@ describe("queued orders", () => {
     const simulation = fixture(scouts);
     moveThenQueue(simulation);
     simulation.tick();
-    simulation.submitCommand({ kind: "gather", actorId: "a", siteId: "none" });
+    simulation.submitCommand(
+      { kind: "gather", actorId: "a", siteId: "none" },
+      { owner: simulation.playerOwner },
+    );
     const [outcome] = simulation.tick();
     expect(outcome!.accepted).toBe(false);
     expect(simulation.actorById("a")!.movement).toBeDefined();
@@ -189,17 +208,23 @@ describe("queued orders", () => {
       unit("scout", "arc-scout", 20, 10),
       unit("wolf", "wolf", 30, 10),
     ]);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: at(12, 14),
-    });
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "trooper",
-      targetId: "wolf",
-      queued: true,
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: at(12, 14),
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "trooper",
+        targetId: "wolf",
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(simulation.actorById("trooper")!.combat?.attack).toBeUndefined();
     for (let tick = 0; tick < 200; tick++) {
@@ -213,23 +238,32 @@ describe("queued orders", () => {
 
   test("queues refuse orders the actor can never carry out", () => {
     const simulation = fixture(scouts);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "a",
-      target: at(14, 10),
-    });
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "a",
-      targetId: "b",
-      queued: true,
-    });
-    simulation.submitCommand({
-      kind: "gather",
-      actorId: "a",
-      siteId: "site",
-      queued: true,
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "a",
+        target: at(14, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "a",
+        targetId: "b",
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "gather",
+        actorId: "a",
+        siteId: "site",
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
     const [, attack, gather] = simulation.tick();
     expect([attack!.accepted, gather!.accepted]).toEqual([false, false]);
     expect(attack!.reason).toBe("unarmed");
@@ -239,17 +273,23 @@ describe("queued orders", () => {
 
   test("a queued group move gives each busy member its own slot", () => {
     const simulation = fixture(scouts);
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["a", "b"],
-      target: at(14, 11),
-    });
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["a", "b"],
-      target: at(20, 11),
-      queued: true,
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["a", "b"],
+        target: at(14, 11),
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["a", "b"],
+        target: at(20, 11),
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const [a, b] = ["a", "b"].map((id) => simulation.actorById(id)!.orders);
     expect(a).toHaveLength(1);
@@ -259,23 +299,32 @@ describe("queued orders", () => {
 
   test("a rejected queued target gives way to the following order", () => {
     const simulation = fixture([unit("trooper", "arc-trooper", 8, 10)]);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: at(12, 10),
-    });
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "trooper",
-      targetId: "missing",
-      queued: true,
-    });
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: at(12, 14),
-      queued: true,
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: at(12, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "trooper",
+        targetId: "missing",
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: at(12, 14),
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
     advanceTicks(simulation, 200);
     expect(simulation.actorById("trooper")!.orders).toBeUndefined();
     expect(
@@ -310,17 +359,23 @@ describe("queued orders", () => {
         delete state.economy;
       },
     });
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "worker",
-      target: at(12, 10),
-    });
-    simulation.submitCommand({
-      kind: "gather",
-      actorId: "worker",
-      siteId: "missing",
-      queued: true,
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "worker",
+        target: at(12, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "gather",
+        actorId: "worker",
+        siteId: "missing",
+        queued: true,
+      },
+      { owner: simulation.playerOwner },
+    );
     const [, outcome] = simulation.tick();
     expect(outcome!.accepted).toBe(false);
     expect(simulation.actorById("worker")!.orders).toBeUndefined();

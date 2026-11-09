@@ -23,6 +23,35 @@ describe("content packs", () => {
     },
   );
 
+  test.each<[string, (pack: any) => void, string]>([
+    ["a non-list", (pack) => (pack.aiProfiles = {}), "distinct IDs"],
+    [
+      "repeated IDs",
+      (pack) => pack.aiProfiles.push(pack.aiProfiles[0]),
+      "distinct IDs",
+    ],
+    [
+      "an invalid round time",
+      (pack) => (pack.aiProfiles[0].roundSeconds = 0),
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "an unknown posture",
+      (pack) => (pack.aiProfiles[0].postures.sleeping = []),
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "a negative share",
+      (pack) =>
+        (pack.aiProfiles[0].postures.establishing = [
+          { concern: "economy", budget: -1, forces: 0 },
+        ]),
+      "AI profile arc-skirmish needs",
+    ],
+  ])("rejects AI profiles with %s", (_, edit, message) => {
+    expect(withEdit(edit)).toThrow(message);
+  });
+
   test("faction names ignore unnamed factions and inherited keys", () => {
     expect(factionName(BASE_CONTENT, "circle")).toBe("Circle of Repose");
     expect(factionName(BASE_CONTENT, "toString")).toBeUndefined();

@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 18,
+  "version": 20,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "circle-wolf-den",
@@ -227,6 +227,7 @@
     ],
     "playerOwner": "player",
     "observations": {},
+    "ai": {},
     "relationships": [
       { "owners": ["player", "wildlife"], "relationship": "hostile" }
     ],

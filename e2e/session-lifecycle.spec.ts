@@ -187,7 +187,10 @@ for (const failure of ["simulation", "ready", "disposal"] as const)
       }
       let mutationError = "";
       try {
-        created?.simulation.submitCommand({ kind: "stop", actorId: "missing" });
+        created?.simulation.submitCommand(
+          { kind: "stop", actorId: "missing" },
+          { owner: created?.simulation.playerOwner },
+        );
       } catch (fault) {
         mutationError = (fault as Error).message;
       }

@@ -179,7 +179,10 @@ describe("combat", () => {
       unit("wolf", "wolf", 35, 10),
     ]);
     const outcome = (actorId: string, targetId: string) => {
-      simulation.submitCommand({ kind: "attack", actorId, targetId });
+      simulation.submitCommand(
+        { kind: "attack", actorId, targetId },
+        { owner: simulation.playerOwner },
+      );
       const [result] = simulation.tick();
       return result!.reason ?? result!.accepted;
     };
@@ -195,19 +198,25 @@ describe("combat", () => {
       unit("trooper", "arc-trooper", 12, 10),
       unit("wolf", "wolf", 30, 14),
     ]);
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "trooper",
-      targetId: "wolf",
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "trooper",
+        targetId: "wolf",
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0]!.accepted).toBe(true);
     simulation.tick();
     expect(simulation.actorById("trooper")!.movement).toBeDefined();
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: at(5, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: at(5, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(simulation.actorById("trooper")!.combat?.attack).toBeUndefined();
   });
@@ -226,11 +235,14 @@ describe("combat", () => {
     expect(simulation.actorById("wolf")!.combat?.attack?.targetId).toBe(
       "scout",
     );
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "scout",
-      target: at(5, 17),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "scout",
+        target: at(5, 17),
+      },
+      { owner: simulation.playerOwner },
+    );
     runUntil(
       simulation,
       () => !!simulation.actorById("wolf")!.combat?.returning,
@@ -311,7 +323,10 @@ describe("combat", () => {
         actorIn(state, "cc").health = 1640;
       },
     });
-    simulation.submitCommand({ kind: "sell-actor", actorId: "cc" });
+    simulation.submitCommand(
+      { kind: "sell-actor", actorId: "cc" },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(balance(simulation)).toBe(123);
   });
@@ -464,11 +479,14 @@ describe("combat edge cases", () => {
         unit("wolf", "wolf", 30, 14),
       ];
       const { simulation } = fixture(units, { content });
-      simulation.submitCommand({
-        kind: "attack",
-        actorId: "trooper",
-        targetId: "wolf",
-      });
+      simulation.submitCommand(
+        {
+          kind: "attack",
+          actorId: "trooper",
+          targetId: "wolf",
+        },
+        { owner: simulation.playerOwner },
+      );
       simulation.tick();
       const lastKnown =
         simulation.actorById("trooper")!.combat!.attack!.lastKnown;
@@ -557,7 +575,9 @@ describe("combat edge cases", () => {
           },
         },
       );
-      simulation.submitCommand(trooperOrders[kind]);
+      simulation.submitCommand(trooperOrders[kind], {
+        owner: simulation.playerOwner,
+      });
       simulation.tick();
       expect(
         simulation.actorById("trooper")!.combat?.returning,
@@ -628,11 +648,14 @@ describe("combat edge cases", () => {
       });
       const { simulation } = fixture([unit("wolf", "wolf", 6, 3)], { content });
       const facing = simulation.actorById("cc")!.facing;
-      simulation.submitCommand({
-        kind: "attack",
-        actorId: "cc",
-        targetId: "wolf",
-      });
+      simulation.submitCommand(
+        {
+          kind: "attack",
+          actorId: "cc",
+          targetId: "wolf",
+        },
+        { owner: simulation.playerOwner },
+      );
       expect(simulation.tick()[0]!.accepted).toBe(true);
       expect(simulation.attacks).toContainEqual(
         expect.objectContaining({ attackerId: "cc" }),
@@ -721,11 +744,14 @@ describe("combat edge cases", () => {
           content,
         },
       );
-      simulation.submitCommand({
-        kind: "attack",
-        actorId: "trooper",
-        targetId: "wolf",
-      });
+      simulation.submitCommand(
+        {
+          kind: "attack",
+          actorId: "trooper",
+          targetId: "wolf",
+        },
+        { owner: simulation.playerOwner },
+      );
       expect(simulation.tick()[0]!.accepted).toBe(true);
       expect(
         simulation.attacks.some(({ attackerId }) => attackerId === "trooper"),
@@ -747,20 +773,26 @@ describe("combat edge cases", () => {
       ],
       { content },
     );
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "trooper",
-      targetId: "wolf",
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "trooper",
+        targetId: "wolf",
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const lastKnown =
       simulation.actorById("trooper")!.combat!.attack!.lastKnown;
     simulation.removeActor("scout");
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "wolf",
-      target: at(35, 14),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "wolf",
+        target: at(35, 14),
+      },
+      { owner: simulation.playerOwner },
+    );
     runUntil(
       simulation,
       () => !simulation.actorById("trooper")!.combat?.attack,
@@ -825,16 +857,22 @@ describe("combat edge cases", () => {
         },
       },
     );
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "wolf-a",
-      targetId: "refinery",
-    });
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "wolf-b",
-      targetId: "barracks",
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "wolf-a",
+        targetId: "refinery",
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "wolf-b",
+        targetId: "barracks",
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(simulation.actorById("refinery")).toBeUndefined();
     expect(simulation.actorById("barracks")).toBeUndefined();
@@ -1271,11 +1309,14 @@ describe("combat retries and immobile attackers", () => {
         },
       }),
     });
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "cc",
-      targetId: "wolf",
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "cc",
+        targetId: "wolf",
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0]!.accepted).toBe(true);
     expect(simulation.actorById("cc")!.combat?.attack).toBeUndefined();
     expect(simulation.attacks).toEqual([]);
@@ -1289,11 +1330,14 @@ describe("Attack Move", () => {
       unit("wolf", "wolf", 23, 10),
     ];
     const { simulation } = fixture(units);
-    simulation.submitCommand({
-      kind: "attack-move",
-      actorId: "trooper",
-      target: at(32, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack-move",
+        actorId: "trooper",
+        target: at(32, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     runUntil(
       simulation,
       () => !!simulation.actorById("trooper")!.combat?.attack,
@@ -1318,11 +1362,14 @@ describe("Attack Move", () => {
       unit("trooper", "arc-trooper", 12, 10),
       unit("scout", "arc-scout", 12, 12),
     ]);
-    simulation.submitCommand({
-      kind: "group-attack-move",
-      actorIds: ["trooper", "scout", "trooper"],
-      target: at(28, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-attack-move",
+        actorIds: ["trooper", "scout", "trooper"],
+        target: at(28, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(
       outcomes.map(({ command, accepted }) => [command.kind, accepted]),
@@ -1348,14 +1395,19 @@ describe("Attack Move", () => {
         unit("trooper", "arc-trooper", 12, 10),
         unit("wolf", "wolf", 18, 10),
       ]);
-      simulation.submitCommand({
-        kind: "attack-move",
-        actorId: "trooper",
-        target: at(32, 10),
-      });
+      simulation.submitCommand(
+        {
+          kind: "attack-move",
+          actorId: "trooper",
+          target: at(32, 10),
+        },
+        { owner: simulation.playerOwner },
+      );
       simulation.tick();
       expect(simulation.actorById("trooper")!.combat?.attack).toBeDefined();
-      simulation.submitCommand(trooperOrders[kind]);
+      simulation.submitCommand(trooperOrders[kind], {
+        owner: simulation.playerOwner,
+      });
       expect(simulation.tick()[0]!.accepted).toBe(true);
       expect(simulation.actorById("trooper")!.attackMove).toBeUndefined();
     },
@@ -1363,17 +1415,23 @@ describe("Attack Move", () => {
 
   test("a rejected replacement preserves the current aggressive order", () => {
     const { simulation } = fixture([unit("trooper", "arc-trooper", 12, 10)]);
-    simulation.submitCommand({
-      kind: "attack-move",
-      actorId: "trooper",
-      target: at(32, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack-move",
+        actorId: "trooper",
+        target: at(32, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
-    simulation.submitCommand({
-      kind: "attack-move",
-      actorId: "trooper",
-      target: { x: NaN, z: 0 },
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack-move",
+        actorId: "trooper",
+        target: { x: NaN, z: 0 },
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0]!.accepted).toBe(false);
     expect(simulation.actorById("trooper")!.attackMove?.target).toEqual(
       at(32, 10),
@@ -1392,20 +1450,26 @@ describe("Attack Move", () => {
       unit("wolf", "wolf", 18, 13),
     ];
     const { simulation } = fixture(units, { content });
-    simulation.submitCommand({
-      kind: "attack-move",
-      actorId: "trooper",
-      target: at(30, 5),
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack-move",
+        actorId: "trooper",
+        target: at(30, 5),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const lastKnown =
       simulation.actorById("trooper")!.combat!.attack!.lastKnown;
     simulation.removeActor("scout");
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "wolf",
-      target: at(35, 14),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "wolf",
+        target: at(35, 14),
+      },
+      { owner: simulation.playerOwner },
+    );
     runUntil(
       simulation,
       () => !simulation.actorById("trooper")!.combat?.attack,
@@ -1462,11 +1526,14 @@ describe("Attack Move", () => {
         };
       },
     });
-    simulation.submitCommand({
-      kind: "attack-move",
-      actorId: "wolf",
-      target: at(35, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack-move",
+        actorId: "wolf",
+        target: at(35, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const wolf = simulation.actorById("wolf")!;
     expect(wolf.attackMove).toBeUndefined();
@@ -1510,11 +1577,14 @@ describe("Command Center defeat", () => {
       },
       objectives: PROTECT_CC,
     });
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "scout",
-      target: at(30, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "scout",
+        target: at(30, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(simulation.result).toEqual({
       kind: "defeat",
@@ -1534,7 +1604,10 @@ describe("Command Center defeat", () => {
     expect(restored.snapshot()).toEqual(saved);
     expect(simulation.snapshot()).toEqual(saved);
     expect(() =>
-      restored.submitCommand({ kind: "stop", actorId: "scout" }),
+      restored.submitCommand(
+        { kind: "stop", actorId: "scout" },
+        { owner: restored.playerOwner },
+      ),
     ).toThrow("ended");
     for (const sim of [simulation, restored]) {
       expect(() => sim.removeActor("scout")).toThrow("ended");
@@ -1578,11 +1651,14 @@ test("combat state matches across frequent, sparse, and stalled clock pumps", ()
       unit("trooper", "arc-trooper", 12, 10),
       unit("wolf", "wolf", 23, 10),
     ]);
-    simulation.submitCommand({
-      kind: "attack-move",
-      actorId: "trooper",
-      target: at(32, 10),
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack-move",
+        actorId: "trooper",
+        target: at(32, 10),
+      },
+      { owner: simulation.playerOwner },
+    );
     let now = 0;
     const loop = startSimulationLoop(simulation, {
       pumpMilliseconds: 60_000,

@@ -77,11 +77,14 @@ test("building visibility follows fog in a mission without an economy", async ({
         );
       const initial = drawn();
       const visit = (x: number) => {
-        view.simulation.submitCommand({
-          kind: "move",
-          actorId: "scout",
-          target: map.tileCenter(x, 10),
-        });
+        view.simulation.submitCommand(
+          {
+            kind: "move",
+            actorId: "scout",
+            target: map.tileCenter(x, 10),
+          },
+          { owner: view.simulation.playerOwner },
+        );
         for (let tick = 0; tick < 180; tick++) view.simulation.tick();
         view.scene.render();
         return drawn();

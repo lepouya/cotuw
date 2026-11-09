@@ -111,11 +111,14 @@ function placed(id: string, definitionId: string, x: number, z: number) {
 function scouted() {
   const { simulation, map, fog } = fixture();
   spawnUnit(simulation, "scout", "arc-scout", map.tileCenter(10, 11));
-  simulation.submitCommand({
-    kind: "move",
-    actorId: "scout",
-    target: map.tileCenter(40, 11),
-  });
+  simulation.submitCommand(
+    {
+      kind: "move",
+      actorId: "scout",
+      target: map.tileCenter(40, 11),
+    },
+    { owner: simulation.playerOwner },
+  );
   advanceTicks(simulation, 8);
   expect(simulation.actorById("scout")!.movement).toBeUndefined();
   return { simulation, map, fog };
@@ -214,7 +217,10 @@ test("harvesters cannot be ordered to undiscovered sites", () => {
   const { simulation, map } = fixture();
   spawnUnit(simulation, "harvester", "arc-harvester", map.tileCenter(6, 16));
   const gather = (siteId: string) => {
-    simulation.submitCommand({ kind: "gather", actorId: "harvester", siteId });
+    simulation.submitCommand(
+      { kind: "gather", actorId: "harvester", siteId },
+      { owner: simulation.playerOwner },
+    );
     return simulation.tick()[0];
   };
   expect(gather("far")).toMatchObject({ reason: "missing-site" });
@@ -264,11 +270,14 @@ test("automatic harvesting waits for unexplored patch tiles to be discovered", (
   expect(fog.isExplored(30, 11)).toBe(true);
   expect(fog.isExplored(32, 11)).toBe(false);
   const gather = () => {
-    simulation.submitCommand({
-      kind: "gather",
-      actorId: "worker",
-      siteId: "known",
-    });
+    simulation.submitCommand(
+      {
+        kind: "gather",
+        actorId: "worker",
+        siteId: "known",
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
   };
   gather();

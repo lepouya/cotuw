@@ -33,6 +33,30 @@ test.each([...LEVEL_SOURCES])(
   },
 );
 
+test("rejects scenario AI the content pack or file format cannot supply", () => {
+  const level = () => JSON.parse(LEVEL_SOURCES.get("skirmish-map")!);
+  const edited = (edit: (file: any) => void) => () => {
+    const file = level();
+    edit(file);
+    return loadMission(JSON.stringify(file));
+  };
+  expect(edited((file) => (file.scenario.ai = [{ owner: "player" }]))).toThrow(
+    "need an owner and a profile ID",
+  );
+  expect(
+    edited(
+      (file) =>
+        (file.scenario.ai = [{ owner: "player", profileId: "missing" }]),
+    ),
+  ).toThrow('no AI profile named "missing"');
+  expect(
+    edited(
+      (file) =>
+        (file.scenario.ai = [{ owner: "player", profileId: "arc-skirmish" }]),
+    ),
+  ).toThrow("invalid AI state");
+});
+
 test("explains why this build cannot load a stored mission", () => {
   const level = () => JSON.parse(LEVEL_SOURCES.get("arc-economy-opening")!);
   expect(missionIncompatibility(level())).toBeUndefined();

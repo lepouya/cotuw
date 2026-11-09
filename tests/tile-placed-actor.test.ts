@@ -121,7 +121,9 @@ describe("tile-placed actors", () => {
     const placed = world({ width: 6, height: 6 });
     const { occupancy } = placed;
     const mission = simulation(placed);
-    mission.submitCommand(placeWall("wall-1", 3, 2, 1));
+    mission.submitCommand(placeWall("wall-1", 3, 2, 1), {
+      owner: mission.playerOwner,
+    });
 
     expect(mission.tick()[0]?.accepted).toBe(true);
     const expected = wall(placed, "wall-1", 3, 2, 1);
@@ -140,7 +142,9 @@ describe("tile-placed actors", () => {
   test("keeps outcomes separate from committed actor state", () => {
     const placed = world();
     const mission = simulation(placed);
-    mission.submitCommand(placeWall("wall-1", 2, 1));
+    mission.submitCommand(placeWall("wall-1", 2, 1), {
+      owner: mission.playerOwner,
+    });
 
     const [outcome] = mission.tick();
 
@@ -155,7 +159,10 @@ describe("tile-placed actors", () => {
   ])("rejects a malformed placement's %s", (_name, change) => {
     const placed = world();
     const mission = simulation(placed);
-    mission.submitCommand({ ...placeWall("wall-1", 2, 1), ...change });
+    mission.submitCommand(
+      { ...placeWall("wall-1", 2, 1), ...change },
+      { owner: mission.playerOwner },
+    );
 
     expect(mission.tick()[0]).toMatchObject({
       accepted: false,
@@ -301,9 +308,11 @@ describe("tile-placed actors", () => {
     mission.dispose();
     mission.dispose();
     expect(() => mission.tick()).toThrow("disposed");
-    expect(() => mission.submitCommand(placeWall("new-wall", 1, 2))).toThrow(
-      "disposed",
-    );
+    expect(() =>
+      mission.submitCommand(placeWall("new-wall", 1, 2), {
+        owner: mission.playerOwner,
+      }),
+    ).toThrow("disposed");
     expect(() => mission.spawnActor(trooper(placed, "unit", 0, 0))).toThrow(
       "disposed",
     );
@@ -397,8 +406,12 @@ describe("tile-placed actors", () => {
       reason: "out-of-bounds",
     });
 
-    mission.submitCommand(placeWall("first", 1, 2));
-    mission.submitCommand(placeWall("overlap", 2, 2));
+    mission.submitCommand(placeWall("first", 1, 2), {
+      owner: mission.playerOwner,
+    });
+    mission.submitCommand(placeWall("overlap", 2, 2), {
+      owner: mission.playerOwner,
+    });
     expect(mission.tick().map(({ accepted }) => accepted)).toEqual([
       true,
       false,
@@ -409,9 +422,14 @@ describe("tile-placed actors", () => {
   test("removes through the shared actor lifecycle and never reuses IDs", () => {
     const placed = world();
     const mission = simulation(placed);
-    mission.submitCommand(placeWall("wall-1", 2, 1));
+    mission.submitCommand(placeWall("wall-1", 2, 1), {
+      owner: mission.playerOwner,
+    });
     mission.tick();
-    mission.submitCommand({ kind: "remove-actor", actorId: "wall-1" });
+    mission.submitCommand(
+      { kind: "remove-actor", actorId: "wall-1" },
+      { owner: mission.playerOwner },
+    );
 
     expect(mission.tick()[0]?.accepted).toBe(true);
     expect(placed.occupancy.ownerAt(2, 1, "surface")).toBeUndefined();
@@ -420,7 +438,9 @@ describe("tile-placed actors", () => {
     expect(() => mission.spawnActor(trooper(placed, "wall-1", 0, 0))).toThrow(
       "Duplicate or retired actor ID",
     );
-    mission.submitCommand(placeWall("wall-1", 3, 1));
+    mission.submitCommand(placeWall("wall-1", 3, 1), {
+      owner: mission.playerOwner,
+    });
     expect(mission.tick()[0]).toMatchObject({
       accepted: false,
       reason: "used-id",
@@ -429,7 +449,9 @@ describe("tile-placed actors", () => {
 
   test("rebuilds derived occupancy during save restoration", () => {
     const original = simulation(world());
-    original.submitCommand(placeWall("wall-1", 2, 1));
+    original.submitCommand(placeWall("wall-1", 2, 1), {
+      owner: original.playerOwner,
+    });
     original.tick();
     const saved = JSON.parse(JSON.stringify(original.snapshot()));
 
@@ -553,6 +575,7 @@ describe("tile-placed actors", () => {
         kind === "place"
           ? placeWall("new-wall", 2, 1)
           : { kind: "remove-actor", actorId: "wall-1" },
+        { owner: mission.playerOwner },
       );
       // A removal needs a remaining actor to fault the tick.
       if (kind === "remove") mission.spawnActor(trooper(placed, "unit", 0, 0));
@@ -566,7 +589,10 @@ describe("tile-placed actors", () => {
       expect(map.navigationChanges.generation).toBeGreaterThan(generation);
       expect(mission.completedTicks).toBe(0);
       expect(() =>
-        mission.submitCommand({ kind: "remove-actor", actorId: "unit" }),
+        mission.submitCommand(
+          { kind: "remove-actor", actorId: "unit" },
+          { owner: mission.playerOwner },
+        ),
       ).toThrow("faulted");
     },
   );
@@ -580,7 +606,9 @@ describe("tile-placed actors", () => {
       new Map([["idle", invalidFacing]]),
     );
     const terrain = map.terrainState();
-    mission.submitCommand(placeWall("wall-1", 2, 1));
+    mission.submitCommand(placeWall("wall-1", 2, 1), {
+      owner: mission.playerOwner,
+    });
     mission.submitCommand(
       {
         kind: "terrain",
@@ -602,8 +630,12 @@ describe("tile-placed actors", () => {
         .viewOf(mission.playerOwner)
         .evaluatePlacement(placeWall("second", 2, 1)).accepted,
     ).toBe(true);
-    mission.submitCommand(placeWall("first", 2, 1));
-    mission.submitCommand(placeWall("second", 2, 1));
+    mission.submitCommand(placeWall("first", 2, 1), {
+      owner: mission.playerOwner,
+    });
+    mission.submitCommand(placeWall("second", 2, 1), {
+      owner: mission.playerOwner,
+    });
     expect(mission.tick()[1]).toMatchObject({
       accepted: false,
       reason: "occupancy-conflict",

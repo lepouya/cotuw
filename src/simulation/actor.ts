@@ -285,6 +285,11 @@ export function healthOf(actor: Pick<Actor, "health">, max: number): number {
   return actor.health ?? max;
 }
 
+/** Whether a definition's units gather a resource for their owner. */
+export const isWorkerDefinition = (
+  definition: Pick<ActorDefinition, "harvesting" | "cultivation">,
+) => !!definition.harvesting || !!definition.cultivation;
+
 /** Orders actor IDs for deterministic iteration and tie-breaking. */
 export function compareIds(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;

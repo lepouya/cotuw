@@ -256,7 +256,10 @@ export function createBuildingPlacement(
     }
     pendingId = candidate.actorId;
     rejection = undefined;
-    simulation.submitCommand({ kind: "place-actor", ...candidate });
+    simulation.submitCommand(
+      { kind: "place-actor", ...candidate },
+      { owner: player.owner },
+    );
     update();
   };
   const move = (event: PointerEvent) => {

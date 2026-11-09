@@ -345,16 +345,22 @@ describe("owner observations", () => {
     };
     const { simulation } = fixture(setup);
     simulation.removeActor("spotter");
-    simulation.submitCommand({
-      kind: "assign-refinery",
-      actorId: "worker",
-      refineryId: "refinery",
-    });
-    simulation.submitCommand({
-      kind: "gather",
-      actorId: "worker",
-      siteId: "far",
-    });
+    simulation.submitCommand(
+      {
+        kind: "assign-refinery",
+        actorId: "worker",
+        refineryId: "refinery",
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "gather",
+        actorId: "worker",
+        siteId: "far",
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(simulation.economy!.harvesters[0]!.phase).toBe("travelling");
     const saved = simulation.snapshot();

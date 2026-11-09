@@ -216,6 +216,7 @@ export function createEconomyControls(
         (shiftKey || options.queueMode?.())
         ? { ...command, queued: true }
         : command,
+      { owner: options.owner },
     );
     setText(elements.harvesterStatus, "Order submitted.");
   };

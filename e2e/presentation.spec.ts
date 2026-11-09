@@ -186,18 +186,24 @@ test("a building placed and producing in one tick plays its generated exit clip"
   const errors = await openPresentation(page, "sandbox");
   await page.evaluate(() => {
     const session = window.presentation;
-    session.simulation.submitCommand({
-      kind: "place-actor",
-      actorId: "new-barracks",
-      definitionId: "arc-field-barracks",
-      origin: { x: 12, z: 12 },
-    });
-    session.simulation.submitCommand({
-      kind: "train-unit",
-      actorId: "new-trooper",
-      producerId: "new-barracks",
-      definitionId: "arc-trooper",
-    });
+    session.simulation.submitCommand(
+      {
+        kind: "place-actor",
+        actorId: "new-barracks",
+        definitionId: "arc-field-barracks",
+        origin: { x: 12, z: 12 },
+      },
+      { owner: session.simulation.playerOwner },
+    );
+    session.simulation.submitCommand(
+      {
+        kind: "train-unit",
+        actorId: "new-trooper",
+        producerId: "new-barracks",
+        definitionId: "arc-trooper",
+      },
+      { owner: session.simulation.playerOwner },
+    );
     session.resume();
   });
   await expect
@@ -225,11 +231,14 @@ test("resuming keeps a paused unit at its committed pose", async ({ page }) => {
   const positions = await page.evaluate(() => {
     const { simulation, scene } = window.presentation;
     const start = simulation.actorById("watcher")!.worldPosition;
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "watcher",
-      target: { x: start.x, z: start.z - 1 },
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "watcher",
+        target: { x: start.x, z: start.z - 1 },
+      },
+      { owner: simulation.playerOwner },
+    );
     window.sessionHarness.now += 20;
     scene.render();
     const root = scene.getTransformNodeByName("actor-watcher-root")!;
@@ -314,11 +323,14 @@ test("loaded healing shows a frozen cue and removes it when the wolf becomes hid
     window.sessionHarness.now += 100;
     scene.render();
     const held = mark.position.y === height;
-    session.simulation.submitCommand({
-      kind: "move",
-      actorId: "watcher",
-      target: { x: 5.5, z: 0 },
-    });
+    session.simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "watcher",
+        target: { x: 5.5, z: 0 },
+      },
+      { owner: session.simulation.playerOwner },
+    );
     for (let frame = 0; frame < 60; frame++) {
       window.sessionHarness.now += 100;
       scene.render();
@@ -365,10 +377,13 @@ test("a committed delivery unloads the Harvester, gathering deploys it, and Stop
       for (const group of scene.animationGroups)
         if (group.weight > 0) played.add(group.name);
       if (!stopped && played.has("actor-present-worker-harvest")) {
-        session.simulation.submitCommand({
-          kind: "stop",
-          actorId: "present-worker",
-        });
+        session.simulation.submitCommand(
+          {
+            kind: "stop",
+            actorId: "present-worker",
+          },
+          { owner: session.simulation.playerOwner },
+        );
         stopped = true;
       }
     }

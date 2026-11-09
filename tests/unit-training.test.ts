@@ -234,12 +234,15 @@ test("success feedback belongs to its producer and cannot leak into another sele
 
 test("restored pending training keeps its ID and cannot complete a new request", () => {
   const original = fixture();
-  original.simulation.submitCommand({
-    kind: "train-unit",
-    actorId: "trained-unit-1",
-    producerId: "two",
-    definitionId: "scout",
-  });
+  original.simulation.submitCommand(
+    {
+      kind: "train-unit",
+      actorId: "trained-unit-1",
+      producerId: "two",
+      definitionId: "scout",
+    },
+    { owner: original.simulation.playerOwner },
+  );
   const saved = original.simulation.snapshot();
   original.controller.dispose();
   original.simulation.dispose();
@@ -266,7 +269,10 @@ test("restored pending training keeps its ID and cannot complete a new request",
 test("tick-time rejection clears pending work and faulting disables every training action", () => {
   const { simulation, controller, scout, trooper, status, tick, select } =
     fixture();
-  simulation.submitCommand({ kind: "remove-actor", actorId: "one" });
+  simulation.submitCommand(
+    { kind: "remove-actor", actorId: "one" },
+    { owner: simulation.playerOwner },
+  );
   scout.click();
   tick();
   expect(status.textContent).toContain("Select a production building");

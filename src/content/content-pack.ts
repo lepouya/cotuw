@@ -1,4 +1,5 @@
 import { deepFreeze } from "../simulation/actor";
+import { validateAiProfile } from "../simulation/director";
 import { validateMovementProfile } from "../simulation/navigation";
 import {
   hasOwn,
@@ -20,6 +21,7 @@ import { validateTerrainStyle } from "./terrain-style";
 import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
+import type { AiProfile } from "../simulation/director";
 import type { MovementProfile } from "../simulation/navigation";
 import type { AudioBindings, AudioContent } from "./audio";
 import type {
@@ -77,6 +79,8 @@ export type ContentPack = ContentReference & {
   factionNames?: Readonly<Record<string, string>>;
   actors: readonly ActorDefinition[];
   movementProfiles: readonly MovementProfile[];
+  /** Behavior that scenarios assign to AI-controlled owners. */
+  aiProfiles?: readonly AiProfile[];
   presentation: Readonly<Record<string, ActorPresentation>>;
   /** Sprite-sheet frame sequences that textures name by ID. */
   clips?: Readonly<Record<string, TextureClip>>;
@@ -140,6 +144,13 @@ export function parseContentPack(source: string): ContentPack {
       "needs an id, version, actors, movementProfiles, presentation, terrain, and view",
     );
   for (const profile of pack.movementProfiles) validateMovementProfile(profile);
+  if (
+    pack.aiProfiles !== undefined &&
+    (!Array.isArray(pack.aiProfiles) ||
+      !isIdList(pack.aiProfiles.map((profile: AiProfile) => profile?.id)))
+  )
+    throw invalid("needs aiProfiles with distinct IDs");
+  for (const profile of pack.aiProfiles ?? []) validateAiProfile(profile);
   if (
     pack.factionNames !== undefined &&
     (!isRecord(pack.factionNames) ||

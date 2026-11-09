@@ -207,12 +207,15 @@ test("tick-time rejection survives a later valid evaluation until placement chan
 
 test("placement avoids IDs held by restored pending placement commands", () => {
   const original = fixture();
-  original.simulation.submitCommand({
-    kind: "place-actor",
-    actorId: "store-1",
-    definitionId: definition.id,
-    origin: { x: 4, z: 4 },
-  });
+  original.simulation.submitCommand(
+    {
+      kind: "place-actor",
+      actorId: "store-1",
+      definitionId: definition.id,
+      origin: { x: 4, z: 4 },
+    },
+    { owner: original.simulation.playerOwner },
+  );
   const saved = original.simulation.snapshot();
   original.dispose();
   current = fixture([], [], saved);

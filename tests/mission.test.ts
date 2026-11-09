@@ -119,7 +119,9 @@ test.each(["tick", "spawn", "remove", "submit", "dispose"] as const)(
                 simulation.spawnActor(actor("scout-1", "scout"));
               if (operation === "remove") simulation.removeActor("trooper");
               if (operation === "submit")
-                simulation.submitCommand(move("trooper", 3, 0));
+                simulation.submitCommand(move("trooper", 3, 0), {
+                  owner: simulation.playerOwner,
+                });
               if (operation === "dispose") simulation.dispose();
             },
           },
@@ -146,7 +148,9 @@ test("tick observers run around committed ticks and may queue commands", () => {
     afterTick: (outcomes) => {
       calls.push(`after ${simulation.completedTicks} ${outcomes.length}`);
       if (simulation.completedTicks === 1)
-        simulation.submitCommand(move("trooper", 3, 0));
+        simulation.submitCommand(move("trooper", 3, 0), {
+          owner: simulation.playerOwner,
+        });
     },
   });
   const remove = simulation.observeTicks({
@@ -172,7 +176,11 @@ test.each(["tick", "dispose"] as const)(
     expect(() => simulation.tick()).toThrow(/during a tick|recursively/);
     // The tick committed, and the mission is not faulted.
     expect(simulation.completedTicks).toBe(1);
-    expect(simulation.submitCommand(move("trooper", 3, 0))).toBe(1);
+    expect(
+      simulation.submitCommand(move("trooper", 3, 0), {
+        owner: simulation.playerOwner,
+      }),
+    ).toBe(1);
   },
 );
 
@@ -194,15 +202,20 @@ test.each(["move", "attack-move", "group-move", "group-attack-move"] as const)(
   (kind) => {
     const simulation = mission([actor()]);
     for (const target of [null, undefined]) {
-      simulation.submitCommand({
-        kind,
-        actorId: "trooper",
-        actorIds: ["trooper"],
-        target,
-      } as unknown as MissionCommand);
+      simulation.submitCommand(
+        {
+          kind,
+          actorId: "trooper",
+          actorIds: ["trooper"],
+          target,
+        } as unknown as MissionCommand,
+        { owner: simulation.playerOwner },
+      );
       expect(simulation.tick()[0]!.accepted).toBe(false);
     }
-    simulation.submitCommand(move("trooper", 4, 0));
+    simulation.submitCommand(move("trooper", 4, 0), {
+      owner: simulation.playerOwner,
+    });
     expect(simulation.tick()[0]!.accepted).toBe(true);
   },
 );
@@ -228,7 +241,9 @@ test.each(["handleCommand", "update"] as const)(
         ],
       ]),
     });
-    simulation.submitCommand(move("trooper", 3, 0));
+    simulation.submitCommand(move("trooper", 3, 0), {
+      owner: simulation.playerOwner,
+    });
     const before = simulation.snapshot();
     expect(() => simulation.tick()).toThrow("layer");
     expect(simulation.snapshot()).toEqual(before);
@@ -322,7 +337,9 @@ describe("mission definitions", () => {
       tickSeconds: 0.25,
     });
 
-    simulation.submitCommand(move("custom-1", 2, 3));
+    simulation.submitCommand(move("custom-1", 2, 3), {
+      owner: simulation.playerOwner,
+    });
     simulation.tick();
 
     const custom = simulation.actorById("custom-1")!;
@@ -334,8 +351,12 @@ describe("mission definitions", () => {
 
   test("uses definition movement properties instead of storing them on actors", () => {
     const simulation = mission([actor(), actor("scout-1", "scout")]);
-    simulation.submitCommand(move("trooper", 10, 0));
-    simulation.submitCommand(move("scout-1", 10, 0));
+    simulation.submitCommand(move("trooper", 10, 0), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(move("scout-1", 10, 0), {
+      owner: simulation.playerOwner,
+    });
 
     simulation.tick();
 
@@ -394,7 +415,11 @@ describe("mission commands", () => {
   test("changes nothing until the next tick", () => {
     const simulation = mission([actor()]);
 
-    expect(simulation.submitCommand(move("trooper", 3, 0))).toBe(0);
+    expect(
+      simulation.submitCommand(move("trooper", 3, 0), {
+        owner: simulation.playerOwner,
+      }),
+    ).toBe(0);
     expect(simulation.actorById("trooper")).not.toHaveProperty("movement");
 
     const outcomes = simulation.tick();
@@ -408,14 +433,25 @@ describe("mission commands", () => {
       },
     ]);
     expect(simulation.completedTicks).toBe(1);
-    expect(simulation.submitCommand(move("trooper", 0, 0))).toBe(1);
+    expect(
+      simulation.submitCommand(move("trooper", 0, 0), {
+        owner: simulation.playerOwner,
+      }),
+    ).toBe(1);
   });
 
   test("applies queued commands in submission order", () => {
     const simulation = mission([actor()]);
-    simulation.submitCommand(move("trooper", 4, 0));
-    simulation.submitCommand({ kind: "stop", actorId: "trooper" });
-    simulation.submitCommand(move("trooper", 0, 4));
+    simulation.submitCommand(move("trooper", 4, 0), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(
+      { kind: "stop", actorId: "trooper" },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(move("trooper", 0, 4), {
+      owner: simulation.playerOwner,
+    });
 
     simulation.tick();
 
@@ -427,9 +463,15 @@ describe("mission commands", () => {
 
   test("reports commands actors reject", () => {
     const simulation = mission([actor("post-1", "post")]);
-    simulation.submitCommand(move("post-1", 1, 0));
-    simulation.submitCommand(move("missing", 1, 0));
-    simulation.submitCommand(move("post-1", Number.NaN, 0));
+    simulation.submitCommand(move("post-1", 1, 0), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(move("missing", 1, 0), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(move("post-1", Number.NaN, 0), {
+      owner: simulation.playerOwner,
+    });
 
     const outcomes = simulation.tick();
 
@@ -443,15 +485,23 @@ describe("mission commands", () => {
 
   test("rejects malformed commands without applying or saving them", () => {
     const simulation = mission([actor()]);
-    simulation.submitCommand(move("trooper", 4, 0));
-    simulation.submitCommand({
-      kind: "dance",
-      actorId: "trooper",
-    } as unknown as MissionCommand);
-    simulation.submitCommand({
-      ...move("trooper", 0, 4),
-      queued: "yes",
-    } as unknown as MissionCommand);
+    simulation.submitCommand(move("trooper", 4, 0), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(
+      {
+        kind: "dance",
+        actorId: "trooper",
+      } as unknown as MissionCommand,
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        ...move("trooper", 0, 4),
+        queued: "yes",
+      } as unknown as MissionCommand,
+      { owner: simulation.playerOwner },
+    );
     const saved = simulation.snapshot();
 
     const outcomes = simulation.tick();
@@ -476,10 +526,14 @@ describe("mission commands", () => {
       const before = simulation.snapshot();
 
       expect(() =>
-        simulation.submitCommand(command as unknown as MissionCommand),
+        simulation.submitCommand(command as unknown as MissionCommand, {
+          owner: simulation.playerOwner,
+        }),
       ).toThrow("command must be an object");
       expect(simulation.snapshot()).toEqual(before);
-      simulation.submitCommand(move("trooper", 4, 0));
+      simulation.submitCommand(move("trooper", 4, 0), {
+        owner: simulation.playerOwner,
+      });
       expect(simulation.tick()[0]!.accepted).toBe(true);
     },
   );
@@ -488,10 +542,13 @@ describe("mission commands", () => {
     "malformed %s requests do not reserve IDs omitted from saves",
     (kind) => {
       const simulation = mission([actor()]);
-      simulation.submitCommand({
-        kind,
-        actorId: "created-1",
-      } as MissionCommand);
+      simulation.submitCommand(
+        {
+          kind,
+          actorId: "created-1",
+        } as MissionCommand,
+        { owner: simulation.playerOwner },
+      );
       const restored = resume(simulation.snapshot());
 
       expect(simulation.unusedActorId("created-")).toBe("created-1");
@@ -507,7 +564,9 @@ describe("mission commands", () => {
 
   test("clamps move targets to the world bounds", () => {
     const simulation = mission([actor()], 10);
-    simulation.submitCommand(move("trooper", 50, -50));
+    simulation.submitCommand(move("trooper", 50, -50), {
+      owner: simulation.playerOwner,
+    });
 
     const [outcome] = simulation.tick();
 
@@ -585,7 +644,9 @@ describe("mission state", () => {
     const simulation = resume(state, 1);
 
     state.actors.push(actor("unknown-1", "unknown"));
-    simulation.submitCommand(move("trooper", 1, 0));
+    simulation.submitCommand(move("trooper", 1, 0), {
+      owner: simulation.playerOwner,
+    });
     simulation.tick();
 
     expect(simulation.actors).toHaveLength(1);
@@ -616,9 +677,13 @@ describe("mission state", () => {
 
   test("snapshots resume identically", () => {
     const original = mission([actor(), actor("scout-1", "scout", 5)]);
-    original.submitCommand(move("trooper", 8, 8));
+    original.submitCommand(move("trooper", 8, 8), {
+      owner: original.playerOwner,
+    });
     original.tick();
-    original.submitCommand(move("scout-1", -8, 0));
+    original.submitCommand(move("scout-1", -8, 0), {
+      owner: original.playerOwner,
+    });
     const saved: MissionState = original.snapshot();
     const resumed = resume(saved);
 

@@ -40,7 +40,8 @@ can be read, edited by hand, and loaded again.
   faction-to-slot assignments, the player's slot, and difficulty into a tick-0
   mission at launch, with one owner per slot sharing the slot's ID. Links use
   `?skirmish=<west>-<east>&player=<slot>&difficulty=<level>`, for example
-  `?skirmish=arc-circle&player=east&difficulty=hard`.
+  `?skirmish=arc-circle&player=east&difficulty=hard`. Development links add
+  `&ai=<slot>:<profile>,...`, such as `&ai=east:arc-skirmish`, to assign AI.
 - `scenario.setup` records launch choices: `difficulty`, the matching
   `enemyScale`, `enemyOwners`, and for skirmishes `factions` by slot. Restart
   reapplies them; a level without it plays at the authored baseline. Enemy
@@ -81,6 +82,9 @@ can be read, edited by hand, and loaded again.
     `altitude` above the highest terrain under the loop, bird `count`, and
     `lapSeconds`. Radius, altitude, and lap time must be positive; count is a
     non-negative integer. They are presentation only.
+  - `ai` lists `{ "owner": id, "profileId": id }` for each AI-controlled owner,
+    naming a [content pack](content-packs.md) profile. The player's owner may
+    appear, as in headless matches.
   - `tileSize`, `terrainTypeIds`, and `objectives` define the map scale, valid
     terrain types, and victory and defeat rules.
   - `savePolicy` defaults to `"skirmish"` when `skirmish` rules are present,
@@ -184,9 +188,10 @@ can be read, edited by hand, and loaded again.
 
 - `state.commands` lists commands waiting for the next tick, each with its
   `tick`, `issuer`, and `command`.
-- An `issuer` is `{ "owner": id }` for an owner's player or AI, or
-  `{ "script": true }` for mission scripts, optionally with the `owner` they
-  act for.
+- An `issuer` is `{ "owner": id }` for an owner's player, the same with
+  `"ai": true` for its AI, or `{ "script": true }` for mission scripts,
+  optionally with the `owner` they act for. AI commands apply in the tick that
+  issues them, so saves do not hold them.
 - Owners command only their own actors: the ordered units, the producer for
   training and its cancellation, and selected workers for placement. A group
   move rejects only the members the issuer may not command. Rejections report
@@ -238,6 +243,23 @@ can be read, edited by hand, and loaded again.
 - Saved sightings must name active or retired actors and valid resources.
   Positions, footprints, health, construction progress, and yields must fit
   the referenced definitions, map, and site limits.
+
+## AI state
+
+- `state.ai` maps each owner in `scenario.ai`, and no others, to its director
+  state. Authoring starts each owner in `establishing`, with first rounds one
+  tick apart.
+- `posture` and optional `requestedPosture`, which applies at the next round,
+  must be ones the profile permits. `nextRoundTick` schedules the next round,
+  and `cursor` is the next concern of a round in progress. `nextActorNumber`
+  starts at one and advances whenever the owner generates an actor ID.
+- `budgets` maps concerns to resource amounts set aside. `claims` maps actor IDs
+  to the concern holding them. Before each planning tick, budgets account for
+  current balances, and claims release lost actors and units beyond the current
+  posture's shares, keeping earlier actor IDs first. Refused purchases restore
+  their original budget reservations. `rejections` holds each refused
+  `concern`, `tick`, `command`, and `reason` until that concern's next turn.
+  `memory` maps concerns to their own JSON state.
 
 ## Economy state
 

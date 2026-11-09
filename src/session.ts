@@ -27,7 +27,7 @@ import type { NetworkControls } from "./ui/network-controls";
 import {
   ACTOR_REMOVAL_KINDS,
   isCommandOf,
-  issuedBy,
+  issuedByPlayer,
 } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
 import type { EconomyElements } from "./ui/economy-controls";
@@ -256,6 +256,7 @@ async function assembleGameSession(
   const { appearances, buildingAppearances, propAssets } = assets;
   const playerOwner = simulation.playerOwner;
   const player = simulation.viewOf(playerOwner);
+  const issuer = { owner: playerOwner };
   // Builds a hidden marker for every authored site; `update` shows known ones.
   const materialsView =
     simulation.economy &&
@@ -491,11 +492,10 @@ async function assembleGameSession(
       const workerId = player.tendWorker(buildingId, input.selectedActorIds);
       return workerId
         ? () =>
-            simulation.submitCommand({
-              kind: "tend",
-              actorId: workerId,
-              buildingId,
-            })
+            simulation.submitCommand(
+              { kind: "tend", actorId: workerId, buildingId },
+              issuer,
+            )
         : undefined;
     },
     canAttack: (actorId) => {
@@ -518,10 +518,10 @@ async function assembleGameSession(
           ),
           siteId,
         ))
-          simulation.submitCommand(order);
+          simulation.submitCommand(order, issuer);
         return;
       }
-      simulation.submitCommand(command);
+      simulation.submitCommand(command, issuer);
     },
     onWorldSelectionChanged: (ids) => {
       if (ids[0]) showActor(ids[0]);
@@ -729,10 +729,13 @@ async function assembleGameSession(
     pendingRemovalId = actor.id;
     // Economy missions refund a sale; the construction sandbox removes freely.
     const sale = player.economy() ? "sell-actor" : "remove-actor";
-    simulation.submitCommand({
-      kind: actor.construction ? "cancel-construction" : sale,
-      actorId: actor.id,
-    });
+    simulation.submitCommand(
+      {
+        kind: actor.construction ? "cancel-construction" : sale,
+        actorId: actor.id,
+      },
+      issuer,
+    );
     controlsDirty = true;
     if (controls.remove) controls.remove.disabled = true;
   };
@@ -756,7 +759,7 @@ async function assembleGameSession(
     paused: () => !playing,
   });
   own(training);
-  const attackMove = createAttackMoveControls(simulation, controls, {
+  const attackMove = createAttackMoveControls(simulation, player, controls, {
     selectedMobileIds: () =>
       input.selectedActorIds.filter((id) => !!player.ownMobileActor(id)),
     enabled: () => canCommand() && !placement.active,
@@ -943,7 +946,7 @@ async function assembleGameSession(
     afterTick: (tickOutcomes) => {
       // Feedback covers only the player's own orders.
       const outcomes = tickOutcomes.filter(({ issuer }) =>
-        issuedBy(issuer, playerOwner),
+        issuedByPlayer(issuer, playerOwner),
       );
       // Capture a destroyed building's height before its view leaves.
       if (simulation.actorVersion !== knownWreckActorVersion) {

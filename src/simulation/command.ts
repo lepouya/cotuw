@@ -163,16 +163,17 @@ export type MissionCommand =
   | CancelConstructionCommand;
 
 /**
- * Who submitted a command: an owner's player or AI, or a mission script.
+ * Who submitted a command: an owner's player or `ai`, or a mission script.
  * Scripts command actors only for owners the scenario's `scriptControl`
  * permits, and alone may edit terrain.
  */
 export type CommandIssuer =
-  { owner: string; script?: never } | { script: true; owner?: string };
+  | { owner: string; ai?: true; script?: never }
+  | { script: true; owner?: string; ai?: never };
 
-/** Whether an owner's player or AI, rather than a script, issued a command. */
-export const issuedBy = (issuer: CommandIssuer, owner: string) =>
-  issuer.script !== true && issuer.owner === owner;
+/** Whether an owner's player, rather than its AI or a script, issued it. */
+export const issuedByPlayer = (issuer: CommandIssuer, owner: string) =>
+  issuer.script !== true && issuer.ai !== true && issuer.owner === owner;
 
 /** A command for one actor or the mission as a whole, rather than a group. */
 export type SingleCommand = Exclude<
@@ -193,10 +194,11 @@ export function isCommandIssuer(
   owners: ReadonlySet<string>,
 ): value is CommandIssuer {
   if (!isRecord(value)) return false;
-  const { owner, script, ...rest } = value;
+  const { owner, script, ai, ...rest } = value;
   return (
     Object.keys(rest).length === 0 &&
     (script === undefined || script === true) &&
+    (ai === undefined || (ai === true && script === undefined)) &&
     (owner === undefined
       ? script === true
       : typeof owner === "string" && owners.has(owner))
@@ -226,6 +228,41 @@ export function moveCommand<K extends "move" | "attack-move">(
           ...queue,
         }
   ) as never;
+}
+
+/**
+ * The existing actors a command names, not the IDs it creates. A paid order's
+ * unit is not an actor yet, so cancelling one names none.
+ */
+export function commandActorIds(command: MissionCommand): readonly string[] {
+  switch (command.kind) {
+    case "move":
+    case "attack-move":
+    case "stop":
+    case "set-rally-point":
+    case "gather":
+    case "return-cargo":
+    case "remove-actor":
+    case "sell-actor":
+    case "cancel-construction":
+      return [command.actorId];
+    case "group-move":
+    case "group-attack-move":
+      return command.actorIds;
+    case "attack":
+      return [command.actorId, command.targetId];
+    case "tend":
+      return [command.actorId, command.buildingId];
+    case "assign-refinery":
+      return [command.actorId, command.refineryId];
+    case "train-unit":
+      return [command.producerId];
+    case "place-actor":
+      return command.workerIds ?? [];
+    case "cancel-production":
+    case "terrain":
+      return [];
+  }
 }
 
 /** Checks saved command structure; gameplay legality is checked at its tick. */

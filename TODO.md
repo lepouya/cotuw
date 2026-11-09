@@ -9,7 +9,8 @@ choices about income, production, expansion, protection, and recovery.
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
 Phases A and B are complete except for deferred cohort task 1.02. Phase C is
-next; the Circle cultivation slice is playable with acceptance work remaining.
+in progress; the Circle cultivation slice is playable with acceptance work
+remaining.
 
 ### Using this checklist
 
@@ -103,14 +104,10 @@ AI. Circle slice work can proceed alongside it. This matchup remains a
 development tool. Build the runner, overlay, and persistence first so later
 AI tasks are developed and verified with them.
 
-- [ ] **1.29** Add a deterministic director with mission profiles, concurrent
-  priorities, shared spending and force allocation, and counted work limits
-  per tick. All actions enter through the normal command boundary.
-  Plan and check rules only through `viewOf(owner)`, which hides foreign intent
-  and names the attacker on its units' latest hits only while detected. Run the
-  director as a mission-owned tick step rather than a `TickObserver`, so every
-  driver and loaded save runs it. Submit with an explicit owner issuer, then
-  remove the player default from `submitCommand`.
+- [x] **1.29** Deterministic director with pack profiles, prioritized concerns,
+  shared budgets and force claims, and counted per-tick limits. It runs as a
+  mission tick step through `viewOf(owner)` and owner-issued commands.
+  `submitCommand` requires an issuer. Profiles have no concerns until 1.33.
 - [ ] **1.30** Add a headless AI-versus-AI runner reporting each match summary
   and result. Accept profiles and start-slot assignments as case inputs rather
   than depending on random seeds in a simulation that has no randomness.
@@ -123,15 +120,16 @@ AI tasks are developed and verified with them.
   and remembered observations without exposing them in normal player UI.
   Read per-tick data through `observeTicks`. Keep it separate from
   `render/debug-overlay.ts`, which draws the terrain grid.
-- [ ] **1.32** Serialize authoritative AI state, including plans, assignments,
-  observations, timers, and budgets, as each part is added. Verify identical
-  continuation after loading and across different clock batching, including
-  bounded catch-up work. Reuse the saved observations from 1.19.
-  AI state belongs in `MissionState`, not `MissionFile.uiState`; adding it
-  requires a mission-file version increment.
+- [ ] **1.32** Serialize authoritative AI state in `state.ai` as each part is
+  added, covering plans and operations beyond the director's budgets, claims,
+  timers, and memory from 1.29. Verify identical continuation across different
+  clock batching, including bounded catch-up work; 1.29 covers save/load. Reuse
+  the saved observations from 1.19. Extending the state requires a mission-file
+  version increment.
 - [ ] **1.33** Implement the initial ARC build plan: gather, place valid
   buildings, train workers and forces, and maintain functioning income and
-  production using actual resources and normal costs and timings.
+  production using actual resources and normal costs and timings. Pass the
+  built-in concerns to `createMissionSimulation` in `createSessionSimulation`.
 - [ ] **1.34** Add recovery plans for ordinary worker, production, and
   support-link losses. Verify recovery without free replacements or resources.
 - [ ] **1.35** Add scouting and observation-driven goals. The AI may know

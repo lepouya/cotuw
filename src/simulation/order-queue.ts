@@ -1,3 +1,4 @@
+import { isWorkerDefinition } from "./actor";
 import { workerHasOrder } from "./economy";
 import { isMobileActor } from "./placement";
 import { clampToBounds } from "./world";
@@ -57,8 +58,7 @@ export function canQueueOrder(
 ): boolean {
   return (
     (order.kind !== "attack" || !!definition.weapon) &&
-    (order.kind !== "gather" ||
-      (hasEconomy && (!!definition.harvesting || !!definition.cultivation)))
+    (order.kind !== "gather" || (hasEconomy && isWorkerDefinition(definition)))
   );
 }
 

@@ -373,13 +373,19 @@ describe("construction support", () => {
       }),
     ).toMatchObject({ accepted: false, reason: "outside-support" });
     expect(balance(simulation)).toBe(before);
-    simulation.submitCommand({ kind: "sell-actor", actorId: "bridge" });
-    simulation.submitCommand({
-      kind: "place-actor",
-      actorId: "new",
-      definitionId: "arc-field-barracks",
-      origin: { x: 34, z: 12 },
-    });
+    simulation.submitCommand(
+      { kind: "sell-actor", actorId: "bridge" },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "place-actor",
+        actorId: "new",
+        definitionId: "arc-field-barracks",
+        origin: { x: 34, z: 12 },
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick().map((outcome) => outcome.accepted)).toEqual([
       true,
       false,

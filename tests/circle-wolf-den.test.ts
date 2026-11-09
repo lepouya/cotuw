@@ -111,20 +111,26 @@ test("a prepared Circle force clears both encounters and continues identically a
     z: number,
     seconds: number,
   ) => {
-    sim.submitCommand({
-      kind,
-      actorIds: sentinelIds,
-      target: map.tileCenter(x, z),
-    });
+    sim.submitCommand(
+      {
+        kind,
+        actorIds: sentinelIds,
+        target: map.tileCenter(x, z),
+      },
+      { owner: sim.playerOwner },
+    );
     advanceSeconds(sim, seconds);
   };
   order(simulation, "group-move", 24, 42, 10);
   order(simulation, "group-move", 34, 36, 10);
-  simulation.submitCommand({
-    kind: "group-attack-move",
-    actorIds: sentinelIds,
-    target: map.tileCenter(52, 32),
-  });
+  simulation.submitCommand(
+    {
+      kind: "group-attack-move",
+      actorIds: sentinelIds,
+      target: map.tileCenter(52, 32),
+    },
+    { owner: simulation.playerOwner },
+  );
   for (let tick = 0; tick < 600; tick++) {
     simulation.tick();
     if (simulation.actors.some(({ combat }) => combat?.attack)) break;
@@ -156,30 +162,39 @@ test("a prepared Circle force clears both encounters and continues identically a
 test("the authored paid opening delivers Lifebloom and reveals the second cultivation site", () => {
   const sim = createSessionSimulation(opening());
   const until = (condition: () => boolean) => untilSeconds(sim, condition, 100);
-  sim.submitCommand({
-    kind: "train-unit",
-    actorId: "worker",
-    producerId: "starting-heartgrove",
-    definitionId: "circle-cultivator",
-  });
+  sim.submitCommand(
+    {
+      kind: "train-unit",
+      actorId: "worker",
+      producerId: "starting-heartgrove",
+      definitionId: "circle-cultivator",
+    },
+    { owner: sim.playerOwner },
+  );
   until(() => !!sim.actorById("worker"));
-  sim.submitCommand({
-    kind: "place-actor",
-    actorId: "conservatory",
-    definitionId: "circle-conservatory",
-    origin: { x: 16, z: 50 },
-    workerIds: ["worker"],
-  });
+  sim.submitCommand(
+    {
+      kind: "place-actor",
+      actorId: "conservatory",
+      definitionId: "circle-conservatory",
+      origin: { x: 16, z: 50 },
+      workerIds: ["worker"],
+    },
+    { owner: sim.playerOwner },
+  );
   until(
     () =>
       !!sim.actorById("conservatory") &&
       !sim.actorById("conservatory")!.construction,
   );
-  sim.submitCommand({
-    kind: "gather",
-    actorId: "worker",
-    siteId: "near-lifebloom",
-  });
+  sim.submitCommand(
+    {
+      kind: "gather",
+      actorId: "worker",
+      siteId: "near-lifebloom",
+    },
+    { owner: sim.playerOwner },
+  );
   until(() => balance(sim, "lifebloom") >= 30);
   const second = sim.economy!.cultivation!.sites[1]!;
   expect(balance(sim, "lifebloom")).toBe(30);

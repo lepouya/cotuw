@@ -29,7 +29,12 @@ import {
 } from "./production";
 import type { BuildingActivity } from "./production";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
-import { clearCombatOrders, cloneData, deepFreeze } from "./actor";
+import {
+  clearCombatOrders,
+  cloneData,
+  deepFreeze,
+  isWorkerDefinition,
+} from "./actor";
 import {
   ACTOR_ORDER_KINDS,
   isCommandIssuer,
@@ -92,6 +97,19 @@ import {
   queuedOrderOf,
 } from "./order-queue";
 import type { ActorOrderCommand } from "./order-queue";
+import {
+  advanceDirector,
+  recordAiRejections,
+  validateAiControllers,
+  validateAiState,
+} from "./director";
+import type {
+  AiCommandSource,
+  AiConcern,
+  AiController,
+  AiRejection,
+  AiState,
+} from "./director";
 import { createOwnerView } from "./owner-view";
 import { workerNavigation } from "./worker-navigation";
 import type { OwnerView } from "./owner-view";
@@ -230,6 +248,8 @@ export type MissionState = {
   fog?: FogState;
   /** Each owner's memory of other owners' actors and of resources. */
   observations: ObservationState;
+  /** Strategic state of the owners an AI controls. */
+  ai: AiState;
   scenarioId?: string;
   /** Participants that control actors, in authored order. */
   owners: Owner[];
@@ -265,6 +285,7 @@ export function createMissionState(
     owners: structuredClone([...owners]),
     playerOwner,
     observations: {},
+    ai: {},
     relationships: [],
     firedEvents: [],
     wrecks: [],
@@ -303,6 +324,10 @@ export type MissionSimulationOptions = {
   emergencyHeadquarters?: boolean;
   /** Matches the scenario's script command permissions. */
   scriptControl?: readonly ScriptControl[];
+  /** The owners an AI controls, with `state.ai` holding each one's progress. */
+  ai?: readonly AiController[];
+  /** Executable concerns that AI profiles name by ID. */
+  aiConcerns?: ReadonlyMap<string, AiConcern>;
 };
 
 /** Owns deterministic fixed-step updates and commands for one mission state. */
@@ -344,10 +369,10 @@ export type MissionSimulation = {
   /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
   unusedActorId: (prefix: string) => string;
   /**
-   * Queues a command for the next tick from `issuer`, the player by default.
-   * Non-object commands and unknown issuers throw.
+   * Queues a command for the next tick from `issuer`. Non-object commands and
+   * unknown issuers throw.
    */
-  submitCommand: (command: MissionCommand, issuer?: CommandIssuer) => number;
+  submitCommand: (command: MissionCommand, issuer: CommandIssuer) => number;
   /** Test setup: adds a validated actor; in a skirmish, only at tick 0. */
   spawnActor: (actor: Actor) => void;
   /** Test setup: removes an actor if it exists; in a skirmish, only at tick 0. */
@@ -396,6 +421,8 @@ export function createMissionSimulation({
   events: authoredEvents = [],
   emergencyHeadquarters = false,
   scriptControl = [],
+  ai: authoredAi = [],
+  aiConcerns = new Map(),
 }: MissionSimulationOptions): MissionSimulation {
   if (!isPositive(tickSeconds)) {
     throw new RangeError(
@@ -517,12 +544,13 @@ export function createMissionSimulation({
   if (state.economy)
     validateEconomy(state.economy, state.actors, state.retiredActorIds);
   if (state.economy) deepFreeze(state.economy);
+  const knownActorIds = new Set([
+    ...state.actors.map(({ id }) => id),
+    ...state.retiredActorIds,
+  ]);
   validateObservations(state.observations, {
     ownerIds,
-    actorIds: new Set([
-      ...state.actors.map(({ id }) => id),
-      ...state.retiredActorIds,
-    ]),
+    actorIds: knownActorIds,
     definitions: definitionsById,
     economy: state.economy,
     tick: state.tick,
@@ -530,6 +558,11 @@ export function createMissionSimulation({
     map,
     tickSeconds,
   });
+  const aiControllers = deepFreeze(structuredClone([...authoredAi]));
+  const concerns = new Map(aiConcerns);
+  validateAiControllers(aiControllers, ownerIds, concerns, tickSeconds);
+  validateAiState(state.ai, aiControllers, knownActorIds);
+  deepFreeze(state.ai);
   const supportResolver = createSupportResolver(definitionsById);
   const supportFor = (actors: readonly Actor[], sharing = relations) =>
     supportResolver(actors, sharing.sharesSupport);
@@ -1466,6 +1499,42 @@ export function createMissionSimulation({
     );
 
   const views = new Map<string, OwnerView>();
+  const enqueueCommand = (command: MissionCommand, issuer: CommandIssuer) => {
+    const submitted = structuredClone(command);
+    const submittedIssuer = structuredClone(issuer);
+    if (!isRecord(submitted))
+      throw new RangeError("Mission command must be an object.");
+    if (!isCommandIssuer(submittedIssuer, ownerIds))
+      throw new RangeError("Mission command has an invalid issuer.");
+    state.commands.push({
+      tick: state.tick,
+      issuer: submittedIssuer,
+      command: submitted,
+    });
+    if (
+      isMissionCommand(submitted) &&
+      (submitted.kind === "place-actor" || submitted.kind === "train-unit")
+    )
+      queuedActorIds.add(submitted.actorId);
+    return submitted;
+  };
+  /** Plans from committed state, so its commands apply in this same tick. */
+  const runDirector = (directed: Map<MissionCommand, AiCommandSource>) => {
+    const ai = advanceDirector(state.ai, aiControllers, state.tick, {
+      tickSeconds,
+      definitions: definitionsById,
+      concerns,
+      viewOf: simulation.viewOf,
+      submit: (command, source) => {
+        const queued = enqueueCommand(command, {
+          owner: source.owner,
+          ai: true,
+        });
+        directed.set(queued, source);
+      },
+    });
+    if (ai !== state.ai) state = { ...state, ai: deepFreeze(ai) };
+  };
   const simulation: MissionSimulation = {
     get metrics() {
       return state.metrics;
@@ -1544,24 +1613,9 @@ export function createMissionSimulation({
         number += 1;
       return `${prefix}${number}`;
     },
-    submitCommand: (command, issuer = { owner: playerOwner }) => {
+    submitCommand: (command, issuer) => {
       ensureMutable();
-      const submitted = structuredClone(command);
-      const submittedIssuer = structuredClone(issuer);
-      if (!isRecord(submitted))
-        throw new RangeError("Mission command must be an object.");
-      if (!isCommandIssuer(submittedIssuer, ownerIds))
-        throw new RangeError("Mission command has an invalid issuer.");
-      state.commands.push({
-        tick: state.tick,
-        issuer: submittedIssuer,
-        command: submitted,
-      });
-      if (
-        isMissionCommand(submitted) &&
-        (submitted.kind === "place-actor" || submitted.kind === "train-unit")
-      )
-        queuedActorIds.add(submitted.actorId);
+      enqueueCommand(command, issuer);
       return state.tick;
     },
     spawnActor: (actor) => {
@@ -1587,7 +1641,7 @@ export function createMissionSimulation({
       }
       const definition = definitionFor(copy);
       let economy = state.economy;
-      if (state.economy && (definition.harvesting || definition.cultivation)) {
+      if (state.economy && isWorkerDefinition(definition)) {
         economy = structuredClone(state.economy);
         enrollWorker(economy, copy.id, definition);
       }
@@ -1650,22 +1704,42 @@ export function createMissionSimulation({
         throw new Error("Mission ticks cannot run recursively.");
       if (ended()) return [];
       notify((observer) => observer.beforeTick?.());
-      const due = state.commands.filter(({ tick }) => tick <= state.tick);
+      const before = state;
       const terrainBefore =
-        map && due.some(({ command }) => command.kind === "terrain")
+        map &&
+        state.commands.some(
+          ({ tick, command }) =>
+            tick <= state.tick && command.kind === "terrain",
+        )
           ? map.terrainState()
           : undefined;
       const versionBefore = map?.navigationChanges.version;
       let outcomes: CommandOutcome[];
       phase = "ticking";
       try {
+        state = { ...state, commands: [...state.commands] };
+        const directed = new Map<MissionCommand, AiCommandSource>();
+        runDirector(directed);
+        const due = state.commands.filter(({ tick }) => tick <= state.tick);
         const working = stageWorking();
-        outcomes = due.flatMap(({ command, issuer }) =>
-          applyCommand(command, issuer, state.tick, working).map((result) => ({
+        const rejected: (AiRejection & AiCommandSource)[] = [];
+        outcomes = due.flatMap(({ command, issuer }) => {
+          const results = applyCommand(command, issuer, state.tick, working);
+          const source = directed.get(command);
+          if (source)
+            for (const { accepted, reason, tick, command: applied } of results)
+              if (!accepted)
+                rejected.push({
+                  ...source,
+                  tick,
+                  command: applied,
+                  ...(reason && { reason }),
+                });
+          return results.map((result) => ({
             ...result,
             issuer: structuredClone(issuer),
-          })),
-        );
+          }));
+        });
         for (const actor of working.actors)
           startQueuedOrders(actor, state.tick, working);
 
@@ -1847,6 +1921,9 @@ export function createMissionSimulation({
           actors: committedActors,
           retiredActorIds: working.retiredIds,
           objectives: deepFreeze(working.objectives),
+          ...(rejected.length && {
+            ai: deepFreeze(recordAiRejections(state.ai, rejected)),
+          }),
           ...(fired && {
             relationships: deepFreeze(fired.relationships),
             firedEvents: deepFreeze(fired.firedEvents),
@@ -1889,6 +1966,7 @@ export function createMissionSimulation({
         if (nextRelations) relations = nextRelations;
       } catch (error) {
         faulted = true;
+        state = before;
         // Return the world to the last committed tick, so no partial terrain or
         // footprint state stays published.
         if (map) {

@@ -28,11 +28,27 @@ These contracts describe where new behaviors, views, and services attach.
   trust that check; its exhaustive policy requires new command kinds to name
   their commanded actors. Only an explicit `script: true` grants script
   authority, and script grants reject unknown fields.
-  Session feedback reads only outcomes the player owner issued.
+  Session feedback reads only outcomes the player itself issued.
 - Tick observers (`observeTicks`) run before and after every tick, whichever
   driver ticks: the real-time loop, a headless runner, or a benchmark. They
   run outside the transaction and may queue commands but not tick or dispose.
   Their errors propagate from `tick` without faulting the mission.
+- `simulation/director.ts` plans for the owners a scenario assigns to AI. The
+  mission runs it after `beforeTick` observers and before selecting due
+  commands, so every driver and loaded save runs it, and its commands apply in
+  the same tick with the owner and `ai` as issuer. Planning and command execution share
+  the tick transaction; either failing restores the committed state and faults
+  the mission. Concerns cannot call mission mutation, tick, or disposal methods.
+- Director concerns are built-in code that profiles name by ID. Each receives
+  `viewOf(owner)` and no route to the simulation. Rounds, concern turns, and
+  commands use counted per-tick limits, never elapsed time. A concern's saved
+  memory must stay JSON, and it learns of refused commands on its next turn.
+  Each owner generates IDs from its saved sequence without reading other
+  owners' actors. A concern can name only actors its view shows, its own paid
+  orders, and IDs it generated, so a refusal cannot reveal a hidden actor.
+  Allied AI owners that pool resources each budget the whole balance, and the
+  first listed spends it first. `state.ai` holds budgets and claims;
+  [faction strategy](../DESIGN.md#faction-strategy) owns their rules.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates
   the current batch even if its hook immediately resumes.

@@ -337,23 +337,31 @@ describe("occupancy navigation", () => {
     const map = new TerrainGrid({ width: 7, height: 3, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
     const simulation = movementMission(map, occupancy, actorAt(map, 0, 1), 0.5);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: map.tileCenter(6, 1),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: map.tileCenter(6, 1),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
-    simulation.submitCommand(place("post-1", "post", 3, 1));
+    simulation.submitCommand(place("post-1", "post", 3, 1), {
+      owner: simulation.playerOwner,
+    });
 
     simulation.tick();
     const detouring = simulation.actorById("trooper")!;
     expect(detouring.worldPosition.z).not.toBe(0);
     const distanceFromCenter = Math.abs(detouring.worldPosition.z);
 
-    simulation.submitCommand({
-      kind: "remove-actor",
-      actorId: "post-1",
-    });
+    simulation.submitCommand(
+      {
+        kind: "remove-actor",
+        actorId: "post-1",
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const shortened = simulation.actorById("trooper")!;
     expect(Math.abs(shortened.worldPosition.z)).toBeLessThan(
@@ -415,12 +423,17 @@ describe("occupancy navigation", () => {
       actorAt(map, 0, 5),
       0.25,
     );
-    simulation.submitCommand(place("gate", "post", 8, 5));
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: map.tileCenter(16, 5),
+    simulation.submitCommand(place("gate", "post", 8, 5), {
+      owner: simulation.playerOwner,
     });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: map.tileCenter(16, 5),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(
       simulation
@@ -428,7 +441,10 @@ describe("occupancy navigation", () => {
         .movement?.waypoints?.some(({ z }) => z !== 0) ?? false,
     ).toBe(true);
 
-    simulation.submitCommand({ kind: "remove-actor", actorId: "gate" });
+    simulation.submitCommand(
+      { kind: "remove-actor", actorId: "gate" },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
 
     expect(
@@ -455,12 +471,17 @@ describe("occupancy navigation", () => {
       actorAt(map, 0, 5),
       0.25,
     );
-    simulation.submitCommand(place("gate", "post", 8, 0));
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: map.tileCenter(16, 5),
+    simulation.submitCommand(place("gate", "post", 8, 0), {
+      owner: simulation.playerOwner,
     });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: map.tileCenter(16, 5),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const lowestWaypoint = () =>
       Math.min(
@@ -470,7 +491,10 @@ describe("occupancy navigation", () => {
       );
     expect(lowestWaypoint()).toBeGreaterThan(map.tileCenter(0, 1).z);
 
-    simulation.submitCommand({ kind: "remove-actor", actorId: "gate" });
+    simulation.submitCommand(
+      { kind: "remove-actor", actorId: "gate" },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
 
     expect(lowestWaypoint()).toBeLessThan(map.tileCenter(0, 1).z);
@@ -512,7 +536,9 @@ describe("occupancy navigation", () => {
     const map = new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
     const original = movementMission(map, occupancy, actorAt(map, 0, 1), 0.25);
-    original.submitCommand(place("barracks-1", "barracks", 2, 0));
+    original.submitCommand(place("barracks-1", "barracks", 2, 0), {
+      owner: original.playerOwner,
+    });
     expect(original.tick()[0]?.accepted).toBe(true);
 
     const saved = JSON.parse(JSON.stringify(original.snapshot()));

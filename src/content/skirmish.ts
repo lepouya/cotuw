@@ -6,9 +6,10 @@ import { createCultivationSite } from "../simulation/cultivation";
 import { isDifficulty, resolveSetup } from "../simulation/mission-setup";
 import { defineScenario } from "../simulation/scenario";
 import { TerrainGrid } from "../simulation/terrain";
-import { hasOwn } from "../simulation/validation";
+import { hasOwn, isIdList } from "../simulation/validation";
 
 import type { CultivationSite } from "../simulation/cultivation";
+import type { AiAssignment } from "../simulation/director";
 import type { MaterialsSite } from "../simulation/harvesting";
 import type { Difficulty } from "../simulation/mission-setup";
 import type { OwnerRelationship } from "../simulation/ownership";
@@ -93,6 +94,8 @@ export type SkirmishChoice = {
   readonly factions: Readonly<Record<string, string>>;
   readonly playerSlot: string;
   readonly difficulty: Difficulty;
+  /** Start slots an AI controls; absent leaves every slot uncontrolled. */
+  readonly ai?: readonly AiAssignment[];
 };
 
 const isFaction = (faction: string): faction is SkirmishFaction =>
@@ -100,7 +103,7 @@ const isFaction = (faction: string): faction is SkirmishFaction =>
 
 /** Why a map cannot assemble these launch choices. */
 export function skirmishChoiceError(
-  { factions, playerSlot, difficulty }: SkirmishChoice,
+  { factions, playerSlot, difficulty, ai }: SkirmishChoice,
   { starts }: SkirmishMap = SKIRMISH_MAP,
 ): string | undefined {
   for (const { id } of starts)
@@ -112,6 +115,16 @@ export function skirmishChoiceError(
     return `The map has no start slot named "${playerSlot}".`;
   if (!isDifficulty(difficulty))
     return "The skirmish has an invalid difficulty.";
+  for (const { owner, profileId } of ai ?? []) {
+    if (!starts.some(({ id }) => id === owner))
+      return `The map has no start slot named "${owner}" for its AI.`;
+    if (
+      !currentContentPack("base").aiProfiles?.some(({ id }) => id === profileId)
+    )
+      return `Start slot ${owner} names an unknown AI profile "${profileId}".`;
+  }
+  if (ai && !isIdList(ai.map(({ owner }) => owner)))
+    return "Each start slot can have only one AI controller.";
 }
 
 /**
@@ -124,7 +137,7 @@ export function createSkirmishScenario(
 ): ScenarioDefinition {
   const error = skirmishChoiceError(choice, skirmishMap);
   if (error) throw new RangeError(error);
-  const { factions, playerSlot, difficulty } = choice;
+  const { factions, playerSlot, difficulty, ai } = choice;
   const slots = skirmishMap.starts.map((start) => {
     const faction = factions[start.id] as SkirmishFaction;
     return { start, faction, opening: SKIRMISH_OPENINGS[faction] };
@@ -149,6 +162,7 @@ export function createSkirmishScenario(
     relationships,
     savePolicy: "skirmish",
     emergencyHeadquarters: true,
+    ...(ai && { ai }),
     skirmish: {
       owners: rivals,
       qualifyingDefinitionIds: content.actors
@@ -199,8 +213,9 @@ export function createSkirmishScenario(
 }
 
 /**
- * Reads `?skirmish=<west>-<east>&player=<slot>&difficulty=<level>` links.
- * Values stay as written so `skirmishChoiceError` reports mistakes.
+ * Reads `?skirmish=<west>-<east>&player=<slot>&difficulty=<level>` links, with
+ * development `&ai=<slot>:<profile>,...` control. Values stay as written so
+ * `skirmishChoiceError` reports mistakes.
  */
 export function skirmishLink(
   link: URLSearchParams,
@@ -208,11 +223,19 @@ export function skirmishLink(
 ): SkirmishChoice | undefined {
   const matchup = link.get("skirmish")?.split("-");
   if (!matchup) return;
+  const ai = link
+    .get("ai")
+    ?.split(",")
+    .map((entry) => {
+      const [owner, ...profile] = entry.split(":");
+      return { owner: owner!, profileId: profile.join(":") };
+    });
   return {
     factions: Object.fromEntries(
       matchup.map((faction, slot) => [starts[slot]?.id ?? slot, faction]),
     ),
     playerSlot: link.get("player") ?? starts[0].id,
     difficulty: (link.get("difficulty") ?? "normal") as Difficulty,
+    ...(ai && { ai }),
   };
 }

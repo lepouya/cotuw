@@ -206,7 +206,10 @@ describe("wolf personal perception", () => {
     ]);
     simulation.tick();
     expect(simulation.actorById("wolf")!.combat?.attack?.targetId).toBe("a");
-    simulation.submitCommand({ kind: "move", actorId: "b", target: at(20) });
+    simulation.submitCommand(
+      { kind: "move", actorId: "b", target: at(20) },
+      { owner: simulation.playerOwner },
+    );
     advanceTicks(simulation, 5);
     expect(simulation.actorById("wolf")!.combat?.attack?.targetId).toBe("a");
   });

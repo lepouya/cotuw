@@ -45,6 +45,7 @@ export function createSessionSimulation(
   map: TerrainGrid = createScenarioMap(missionTerrain(mission)),
 ): MissionSimulation {
   const occupancy = new OccupancyGrid(map);
+  const { content } = mission;
   return createMissionSimulation({
     state: mission.state,
     objectives: mission.scenario.objectives,
@@ -53,14 +54,18 @@ export function createSessionSimulation(
     events: mission.scenario.events,
     emergencyHeadquarters: mission.scenario.emergencyHeadquarters,
     scriptControl: mission.scenario.scriptControl,
+    ai: mission.scenario.ai?.map(({ owner, profileId }) => {
+      const profile = content.aiProfiles?.find(({ id }) => id === profileId);
+      if (!profile)
+        throw new RangeError(
+          `Content pack ${content.id} has no AI profile named "${profileId}".`,
+        );
+      return { owner, profile };
+    }),
     behaviorRegistry: new Map([
       [
         "terrain-move",
-        createTerrainMoveBehavior(
-          map,
-          occupancy,
-          mission.content.movementProfiles,
-        ),
+        createTerrainMoveBehavior(map, occupancy, content.movementProfiles),
       ],
       ["idle", { handleCommand: () => false, update: () => {} }],
     ]),
@@ -137,6 +142,7 @@ export function missionRestart(
       factions: setup.factions,
       playerSlot: state.playerOwner,
       difficulty: setup.difficulty,
+      ai: scenario.ai,
     };
     if (!skirmishChoiceError(choice)) return () => assembleSkirmish(choice);
   }

@@ -1326,6 +1326,12 @@ Posture selection and spending follow these rules:
   permissions and emphasis. Missions may disable offensive pressure; earlier
   missions use gentler behavior. Profiles are independent of Easy, Normal, and
   Hard combat scaling.
+- Content packs hold AI profiles, and a scenario names one for each
+  AI-controlled owner. A profile lists each permitted posture's concerns by
+  priority, with shares of resources and fielded units.
+- A concern keeps its unspent share while its posture lasts, so it can save for
+  a costly purchase. Essential concerns may also spend lower-priority shares
+  and take units from non-essential concerns.
 - Protect essential income and immediate defense, then allocate remaining
   resources and units through the profile. Crises reduce optional commitments,
   use reserves, and prompt reassessment of active attacks.

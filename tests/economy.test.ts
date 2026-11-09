@@ -375,13 +375,16 @@ describe("Materials economy", () => {
     const state = exploredScenarioState(scenario, definitions);
     setBalance(state, 300);
     const { simulation, occupancy } = fixture(state);
-    simulation.submitCommand(build());
-    simulation.submitCommand({
-      kind: "place-actor",
-      actorId: "barracks",
-      definitionId: "arc-field-barracks",
-      origin: { x: 9, z: 10 },
-    });
+    simulation.submitCommand(build(), { owner: simulation.playerOwner });
+    simulation.submitCommand(
+      {
+        kind: "place-actor",
+        actorId: "barracks",
+        definitionId: "arc-field-barracks",
+        origin: { x: 9, z: 10 },
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick().every((outcome) => outcome.accepted)).toBe(true);
     expect(balance(simulation)).toBe(100);
     expect(occupancy.ownerAt(6, 6, "surface")).toBe("refinery");
@@ -513,8 +516,10 @@ describe("Materials economy", () => {
 
   test("same-tick placement spends against staged funds and rejects resources", () => {
     const { simulation, occupancy } = fixture();
-    simulation.submitCommand(build());
-    simulation.submitCommand(build("other", 9, 9));
+    simulation.submitCommand(build(), { owner: simulation.playerOwner });
+    simulation.submitCommand(build("other", 9, 9), {
+      owner: simulation.playerOwner,
+    });
     expect(simulation.tick().map((outcome) => outcome.accepted)).toEqual([
       true,
       false,
@@ -550,12 +555,15 @@ describe("Materials economy", () => {
     setBalance(state, 100);
     const restored = fixture(state).simulation;
     for (const actorId of ["worker", "extra"])
-      restored.submitCommand({
-        kind: "train-unit",
-        producerId: "refinery",
-        actorId,
-        definitionId: "arc-harvester",
-      });
+      restored.submitCommand(
+        {
+          kind: "train-unit",
+          producerId: "refinery",
+          actorId,
+          definitionId: "arc-harvester",
+        },
+        { owner: restored.playerOwner },
+      );
     expect(restored.tick()).toMatchObject([
       { accepted: true },
       { accepted: false, reason: "refinery-occupied" },
@@ -856,12 +864,15 @@ describe("Materials economy", () => {
     });
     finishBuilding(simulation, "barracks");
     for (let i = 1; i <= 6; i++)
-      simulation.submitCommand({
-        kind: "train-unit",
-        actorId: `unit-${i}`,
-        producerId: "barracks",
-        definitionId: "arc-trooper",
-      });
+      simulation.submitCommand(
+        {
+          kind: "train-unit",
+          actorId: `unit-${i}`,
+          producerId: "barracks",
+          definitionId: "arc-trooper",
+        },
+        { owner: simulation.playerOwner },
+      );
     expect(simulation.tick().map((outcome) => outcome.accepted)).toEqual([
       true,
       true,
@@ -1034,7 +1045,7 @@ describe("Materials economy", () => {
     const { simulation: failing, occupancy } = fixture(setup.snapshot(), {
       fault: "move",
     });
-    failing.submitCommand(gather());
+    failing.submitCommand(gather(), { owner: failing.playerOwner });
     const before = failing.snapshot();
     expect(before.economy!.production[0].completedTicks).toBe(3);
     expect(() => failing.tick()).toThrow("test move fault");
@@ -1045,7 +1056,7 @@ describe("Materials economy", () => {
 
   test("a fault rolls back spending, production, resource state, and footprint edits together", () => {
     const { simulation, occupancy } = fixture(undefined, { fault: true });
-    simulation.submitCommand(build());
+    simulation.submitCommand(build(), { owner: simulation.playerOwner });
     const before = simulation.snapshot();
     expect(() => simulation.tick()).toThrow("test fault");
     expect(simulation.snapshot()).toEqual(before);
@@ -1070,11 +1081,14 @@ describe("economy persistence", () => {
         if (phase !== "travelling")
           until(simulation, () => worker(simulation).phase === phase, 1000);
       }
-      simulation.submitCommand({
-        kind: "move",
-        actorId: "cc",
-        target: { x: 0, z: 0 },
-      });
+      simulation.submitCommand(
+        {
+          kind: "move",
+          actorId: "cc",
+          target: { x: 0, z: 0 },
+        },
+        { owner: simulation.playerOwner },
+      );
       const saved = savedState(scenario, simulation);
       const restored = fixture(saved, { tickSeconds: 0.1 }).simulation;
       expect(restored.snapshot()).toEqual(simulation.snapshot());
@@ -1092,10 +1106,13 @@ describe("economy persistence", () => {
     command(simulation, build());
     command(simulation, build("next", 9, 9));
     advanceTicks(simulation, 15);
-    simulation.submitCommand({
-      kind: "cancel-construction",
-      actorId: "refinery",
-    });
+    simulation.submitCommand(
+      {
+        kind: "cancel-construction",
+        actorId: "refinery",
+      },
+      { owner: simulation.playerOwner },
+    );
     const saved = savedState(scenario, simulation);
     const restored = fixture(saved, { tickSeconds: 0.1 }).simulation;
     for (let tick = 0; tick < 100; tick++)

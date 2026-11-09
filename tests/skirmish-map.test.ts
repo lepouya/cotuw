@@ -221,28 +221,37 @@ test.each(SKIRMISH_MAP.starts)(
         costAmount(definitions.get(worker)!),
     ).toBe(stockpile);
     const simulation = opening("arc", start);
-    simulation.submitCommand({
-      kind: "place-actor",
-      actorId: "refinery",
-      definitionId: dropoff,
-      origin: start.dropoffOrigins.arc,
-    });
+    simulation.submitCommand(
+      {
+        kind: "place-actor",
+        actorId: "refinery",
+        definitionId: dropoff,
+        origin: start.dropoffOrigins.arc,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     until(simulation, () => !simulation.actorById("refinery")!.construction);
-    simulation.submitCommand({
-      kind: "train-unit",
-      producerId: "refinery",
-      actorId: "harvester",
-      definitionId: worker,
-    });
+    simulation.submitCommand(
+      {
+        kind: "train-unit",
+        producerId: "refinery",
+        actorId: "harvester",
+        definitionId: worker,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     expect(balance(simulation)).toBe(0);
     until(simulation, () => !!simulation.actorById("harvester"));
-    simulation.submitCommand({
-      kind: "gather",
-      actorId: "harvester",
-      siteId: `${start.startingResourceAreaId}-1`,
-    });
+    simulation.submitCommand(
+      {
+        kind: "gather",
+        actorId: "harvester",
+        siteId: `${start.startingResourceAreaId}-1`,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     until(simulation, () => deposited(simulation) > 0);
     expect(balance(simulation)).toBeGreaterThan(0);
@@ -263,32 +272,41 @@ test.each(SKIRMISH_MAP.starts)(
     expect(simulation.actorById(headquartersId)!.definitionId).toBe(
       headquarters,
     );
-    simulation.submitCommand({
-      kind: "train-unit",
-      producerId: headquartersId,
-      actorId: "cultivator",
-      definitionId: worker,
-    });
+    simulation.submitCommand(
+      {
+        kind: "train-unit",
+        producerId: headquartersId,
+        actorId: "cultivator",
+        definitionId: worker,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     until(simulation, () => !!simulation.actorById("cultivator"));
-    simulation.submitCommand({
-      kind: "place-actor",
-      actorId: "conservatory",
-      definitionId: dropoff,
-      origin: start.dropoffOrigins.circle,
-      workerIds: ["cultivator"],
-    });
+    simulation.submitCommand(
+      {
+        kind: "place-actor",
+        actorId: "conservatory",
+        definitionId: dropoff,
+        origin: start.dropoffOrigins.circle,
+        workerIds: ["cultivator"],
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     expect(balance(simulation, "lifebloom")).toBe(0);
     until(
       simulation,
       () => !simulation.actorById("conservatory")!.construction,
     );
-    simulation.submitCommand({
-      kind: "gather",
-      actorId: "cultivator",
-      siteId: `${start.startingResourceAreaId}-lifebloom-1`,
-    });
+    simulation.submitCommand(
+      {
+        kind: "gather",
+        actorId: "cultivator",
+        siteId: `${start.startingResourceAreaId}-lifebloom-1`,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     until(simulation, () => deposited(simulation, "lifebloom") > 0);
     expect(balance(simulation, "lifebloom")).toBeGreaterThan(0);
@@ -471,4 +489,55 @@ test("skirmish links resolve matchups, sides, and difficulty", () => {
     playerSlot: "east",
     difficulty: "hard",
   });
+  expect(
+    skirmishLink(
+      new URLSearchParams(
+        "skirmish=arc-arc&ai=west:arc-skirmish,east:arc-skirmish",
+      ),
+    )?.ai,
+  ).toEqual([
+    { owner: "west", profileId: "arc-skirmish" },
+    { owner: "east", profileId: "arc-skirmish" },
+  ]);
+});
+
+test("AI assignments survive saving and restarting a skirmish", () => {
+  const choice = {
+    factions: { west: "arc", east: "arc" },
+    playerSlot: "west",
+    difficulty: "normal",
+    ai: [{ owner: "east", profileId: "arc-skirmish" }],
+  } as const;
+  const mission = assembleSkirmish(choice);
+  expect(mission.scenario.ai).toEqual(choice.ai);
+  expect(Object.keys(mission.state.ai)).toEqual(["east"]);
+  const simulation = createSessionSimulation(mission);
+  simulation.tick();
+  const saved = loadMission(
+    serializeMission(
+      mission.scenario,
+      simulation.snapshot(),
+      simulation.tickSeconds,
+    ),
+  );
+  simulation.dispose();
+  expect(saved.scenario.ai).toEqual(choice.ai);
+  expect(saved.state.ai.east!.nextRoundTick).toBeGreaterThan(0);
+  const restarted = missionRestart(saved)!();
+  expect(restarted.scenario.ai).toEqual(choice.ai);
+  expect(restarted.state.tick).toBe(0);
+});
+
+test.each([
+  ["skirmish=arc-arc&ai=north:arc-skirmish", 'no start slot named "north"'],
+  ["skirmish=arc-arc&ai=east:missing", 'unknown AI profile "missing"'],
+  ["skirmish=arc-arc&ai=east", "unknown AI profile"],
+  ["skirmish=arc-arc&ai=east:arc-skirmish:extra", "unknown AI profile"],
+  [
+    "skirmish=arc-arc&ai=east:arc-skirmish,east:arc-skirmish",
+    "only one AI controller",
+  ],
+])("the AI link %s is rejected", (query, message) => {
+  const choice = skirmishLink(new URLSearchParams(query))!;
+  expect(() => assembleSkirmish(choice)).toThrow(message);
 });

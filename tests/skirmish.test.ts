@@ -422,11 +422,14 @@ test.each([false, true])(
       { kind: "attack", actorId: "home-attacker", targetId: "home" },
       { owner: "rival" },
     );
-    sim.submitCommand({
-      kind: "attack",
-      actorId: "enemy-attacker",
-      targetId: "enemy",
-    });
+    sim.submitCommand(
+      {
+        kind: "attack",
+        actorId: "enemy-attacker",
+        targetId: "enemy",
+      },
+      { owner: sim.playerOwner },
+    );
     expect(sim.tick().every(({ accepted }) => accepted)).toBe(true);
     expect(sim.attacks).toHaveLength(2);
     expect(sim.result).toEqual({
@@ -468,7 +471,10 @@ test.each(["tended", "stopped", "untended"] as const)(
     const sim = fixture(state);
     remove(sim, "home");
     if (work === "stopped")
-      sim.submitCommand({ kind: "stop", actorId: "tender" });
+      sim.submitCommand(
+        { kind: "stop", actorId: "tender" },
+        { owner: sim.playerOwner },
+      );
     expect(sim.tick().every(({ accepted }) => accepted)).toBe(true);
     if (work === "tended") {
       expect(sim.actorById("replacement")!.construction).toBeUndefined();

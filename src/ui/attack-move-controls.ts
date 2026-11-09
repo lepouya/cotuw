@@ -2,6 +2,7 @@ import { moveCommand } from "../simulation/command";
 import { setText } from "./dom";
 
 import type { MissionSimulation } from "../simulation/mission";
+import type { OwnerView } from "../simulation/owner-view";
 import type { WorldPosition } from "../simulation/world";
 
 export type AttackMoveControls = {
@@ -12,6 +13,7 @@ export type AttackMoveControls = {
 
 export function createAttackMoveControls(
   simulation: Pick<MissionSimulation, "submitCommand">,
+  player: Pick<OwnerView, "owner">,
   controls: AttackMoveControls,
   options: {
     selectedMobileIds: () => readonly string[];
@@ -58,6 +60,7 @@ export function createAttackMoveControls(
       if (!choosingFor.length || !options.enabled()) return;
       simulation.submitCommand(
         moveCommand("attack-move", choosingFor, target, queued),
+        { owner: player.owner },
       );
       if (queued) message("Attack Move queued. Choose another or Cancel.");
       else {

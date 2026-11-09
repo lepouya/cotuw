@@ -449,12 +449,15 @@ test("five-second histories, exact milestones and final sample survive continuat
 
 test("failed ticks publish no metrics, payments, damage or samples", () => {
   const sim = fixture(initial(), { fault: true });
-  sim.submitCommand({
-    kind: "train-unit",
-    actorId: "worker",
-    producerId: "refinery",
-    definitionId: "arc-harvester",
-  });
+  sim.submitCommand(
+    {
+      kind: "train-unit",
+      actorId: "worker",
+      producerId: "refinery",
+      definitionId: "arc-harvester",
+    },
+    { owner: sim.playerOwner },
+  );
   const before = sim.snapshot();
   expect(() => sim.tick()).toThrow("test fault");
   expect(sim.snapshot()).toEqual(before);
@@ -640,11 +643,14 @@ test("exploration and active vision histories sample the committed owner views",
   unit(state, "scout", "arc-scout", "player", 12, 18);
   state.fog = { explored: {} };
   const sim = fixture(state);
-  sim.submitCommand({
-    kind: "move",
-    actorId: "scout",
-    target: terrain.tileCenter(25, 18),
-  });
+  sim.submitCommand(
+    {
+      kind: "move",
+      actorId: "scout",
+      target: terrain.tileCenter(25, 18),
+    },
+    { owner: sim.playerOwner },
+  );
   advanceSeconds(sim, 5);
   const sample = player(sim).history[1]!;
   const fog = sim.viewOf("player").knowledge.fog!;
@@ -712,12 +718,15 @@ test("same-faction owners attribute production and spending to their own command
       ],
     }),
   );
-  sim.submitCommand({
-    kind: "train-unit",
-    actorId: "player-unit",
-    producerId: "barracks",
-    definitionId: TROOPER,
-  });
+  sim.submitCommand(
+    {
+      kind: "train-unit",
+      actorId: "player-unit",
+      producerId: "barracks",
+      definitionId: TROOPER,
+    },
+    { owner: sim.playerOwner },
+  );
   sim.submitCommand(
     {
       kind: "train-unit",
@@ -840,12 +849,15 @@ test("peak army includes a unit produced and destroyed within one tick", () => {
     startingResourceSites: { player: [], rival: [] },
   };
   const sim = fixture(state, { skirmish, content: [...definitions, gun] });
-  sim.submitCommand({
-    kind: "train-unit",
-    actorId: "ephemeral",
-    producerId: "barracks",
-    definitionId: TROOPER,
-  });
+  sim.submitCommand(
+    {
+      kind: "train-unit",
+      actorId: "ephemeral",
+      producerId: "barracks",
+      definitionId: TROOPER,
+    },
+    { owner: sim.playerOwner },
+  );
   sim.submitCommand(
     { kind: "attack", actorId: "enemy", targetId: "ephemeral" },
     { owner: "rival" },

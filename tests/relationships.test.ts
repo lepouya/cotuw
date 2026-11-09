@@ -41,11 +41,14 @@ describe("owner relationships", () => {
       "neutral",
     );
     advanceSeconds(simulation, 10);
-    simulation.submitCommand({
-      kind: "attack",
-      actorId: "trooper",
-      targetId: "visitor",
-    });
+    simulation.submitCommand(
+      {
+        kind: "attack",
+        actorId: "trooper",
+        targetId: "visitor",
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0]).toMatchObject({
       accepted: false,
       reason: "invalid-target",
@@ -456,12 +459,15 @@ describe("shared resource pools", () => {
       { resource: "materials", owners: ["player", "rival"], amount: 2000 },
       { resource: "lifebloom", owners: ["player", "rival"], amount: 31 },
     ]);
-    simulation.submitCommand({
-      kind: "place-actor",
-      actorId: "barracks",
-      definitionId: "arc-field-barracks",
-      origin: { x: 6, z: 10 },
-    });
+    simulation.submitCommand(
+      {
+        kind: "place-actor",
+        actorId: "barracks",
+        definitionId: "arc-field-barracks",
+        origin: { x: 6, z: 10 },
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(totals(simulation)).toEqual([
       [1900, 31],
@@ -608,12 +614,15 @@ describe("command authority", () => {
         definitionId: "arc-harvester",
       },
     ])
-      simulation.submitCommand(command);
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["trooper", "rival-trooper"],
-      target: contentMap.tileCenter(20, 12),
-    });
+      simulation.submitCommand(command, { owner: simulation.playerOwner });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["trooper", "rival-trooper"],
+        target: contentMap.tileCenter(20, 12),
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(outcomes.map(({ accepted, reason }) => [accepted, reason])).toEqual([
       ...Array(5).fill([false, "unauthorized"]),
@@ -651,7 +660,7 @@ describe("command authority", () => {
     expect(
       simulation.viewOf("rival").evaluatePlacement(placement).accepted,
     ).toBe(true);
-    simulation.submitCommand(placement);
+    simulation.submitCommand(placement, { owner: simulation.playerOwner });
     simulation.submitCommand(barracks("rival-barracks"), rival);
     expect(simulation.tick()).toMatchObject([
       { accepted: false, reason: "unexplored", issuer: { owner: "player" } },
@@ -688,7 +697,7 @@ describe("command authority", () => {
       kind: "cancel-production" as const,
       actorId: "paid-worker",
     };
-    simulation.submitCommand(cancel);
+    simulation.submitCommand(cancel, { owner: simulation.playerOwner });
     simulation.submitCommand(cancel, { script: true, owner: "rival" });
     expect(simulation.tick()).toMatchObject([
       { accepted: true },
@@ -721,18 +730,24 @@ describe("command authority", () => {
       }
       const orders = simulation.actorById("rival-trooper")!.orders;
       const target = contentMap.tileCenter(20, 12);
-      simulation.submitCommand({
-        kind,
-        actorIds: ["trooper", "rival-trooper", "trooper"],
-        target,
-        queued: true,
-      });
-      reference.submitCommand({
-        kind,
-        actorIds: ["trooper"],
-        target,
-        queued: true,
-      });
+      simulation.submitCommand(
+        {
+          kind,
+          actorIds: ["trooper", "rival-trooper", "trooper"],
+          target,
+          queued: true,
+        },
+        { owner: simulation.playerOwner },
+      );
+      reference.submitCommand(
+        {
+          kind,
+          actorIds: ["trooper"],
+          target,
+          queued: true,
+        },
+        { owner: reference.playerOwner },
+      );
       expect(simulation.tick()).toMatchObject([
         { accepted: false, reason: "unauthorized" },
         { accepted: true },

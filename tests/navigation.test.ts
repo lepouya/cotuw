@@ -385,11 +385,14 @@ describe("terrain movement", () => {
       }),
     });
     const simulation = createMovementMission(map, 4, 1);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 2, 0),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 2, 0),
+      },
+      { owner: simulation.playerOwner },
+    );
 
     const [outcome] = simulation.tick();
 
@@ -405,17 +408,23 @@ describe("terrain movement", () => {
       createTerrain: (x) => ({ typeId: x === 2 ? "water" : "plain" }),
     });
     const simulation = createMovementMission(map, 0.5, 0.25, 1);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 0, 0),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 0, 0),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 3, 0),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 3, 0),
+      },
+      { owner: simulation.playerOwner },
+    );
 
     const [outcome] = simulation.tick();
 
@@ -449,11 +458,14 @@ describe("terrain movement", () => {
       }),
     });
     const simulation = createMovementMission(map, 1, 0.1, 0, 1);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 4, 1),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 4, 1),
+      },
+      { owner: simulation.playerOwner },
+    );
 
     const [outcome] = simulation.tick();
     const movement = simulation.actorById("trooper")!.movement;
@@ -472,11 +484,14 @@ describe("terrain movement", () => {
       createTerrain: (x) => ({ typeId: x === 0 ? "rough" : "plain" }),
     });
     const simulation = createMovementMission(map, 3, 0.25);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 2, 0),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 2, 0),
+      },
+      { owner: simulation.playerOwner },
+    );
 
     simulation.tick();
 
@@ -491,11 +506,14 @@ describe("terrain movement", () => {
       createTerrain: (x) => ({ typeId: x === 0 ? "rough" : "plain" }),
     });
     const simulation = createMovementMission(map, 3, 1);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 2, 0),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 2, 0),
+      },
+      { owner: simulation.playerOwner },
+    );
 
     simulation.tick();
 
@@ -507,11 +525,14 @@ describe("terrain movement", () => {
   test("replans an active route after terrain changes", () => {
     const map = new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
     const simulation = createMovementMission(map, 1, 1, 0, 1);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 4, 1),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 4, 1),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     map.setTerrain(2, 1, { typeId: "plain", surfacePassable: false });
 
@@ -532,11 +553,14 @@ describe("terrain movement", () => {
       terrainTypeIds: ["plain", "path"],
     });
     const simulation = createMovementMission(map, 0.25, 1, 0, 2);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 8, 2),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 8, 2),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     for (let x = 0; x < map.width; x += 1) {
       map.setTerrain(x, 0, { typeId: "path" });
@@ -559,11 +583,14 @@ describe("terrain movement", () => {
       createTerrain: (x) => ({ typeId: x === 5 ? "water" : "plain" }),
     });
     const simulation = createMovementMission(map, 0.25, 0.25, 0, 3);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 6, 3),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 6, 3),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     expect(simulation.actorById("trooper")!.movement?.reachedTarget).toBe(
       false,
@@ -585,11 +612,14 @@ describe("terrain movement", () => {
       createTerrain: (x) => ({ typeId: x === 4 ? "water" : "plain" }),
     });
     const simulation = createMovementMission(map, 1, 0.25, 0, 1);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 4, 1),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 4, 1),
+      },
+      { owner: simulation.playerOwner },
+    );
     // Eleven ticks leave the trooper inside its destination tile, short of
     // the center.
     advanceTicks(simulation, 11);
@@ -656,11 +686,14 @@ describe("terrain movement", () => {
   test("keeps a blocked order and resumes it after navigation changes", () => {
     const map = new TerrainGrid({ width: 5, height: 1, tileSize: 1 });
     const simulation = createMovementMission(map, 1, 0.25);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 4, 0),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 4, 0),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     map.setTerrain(1, 0, { typeId: "plain", surfacePassable: false });
 
@@ -798,11 +831,14 @@ describe("saved missions", () => {
       map,
       createMissionState([trooperAt(map, 0, 2)]),
     );
-    original.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: center(map, 8, 2),
-    });
+    original.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: center(map, 8, 2),
+      },
+      { owner: original.playerOwner },
+    );
     original.tick();
     original.submitCommand(wall(4), { script: true });
     original.tick();

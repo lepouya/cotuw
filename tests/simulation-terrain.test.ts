@@ -204,11 +204,14 @@ describe("simulation terrain", () => {
       });
     const occupancy = new OccupancyGrid(map);
     const original = make(map, occupancy);
-    original.submitCommand({
-      kind: "move",
-      actorId: "unit-1",
-      target: map.tileCenter(4, 1),
-    });
+    original.submitCommand(
+      {
+        kind: "move",
+        actorId: "unit-1",
+        target: map.tileCenter(4, 1),
+      },
+      { owner: original.playerOwner },
+    );
     original.tick();
     expect(original.actorById("unit-1")!.worldPosition).toEqual(
       map.tileCenter(2, 1),

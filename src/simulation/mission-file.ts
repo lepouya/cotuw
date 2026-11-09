@@ -3,6 +3,7 @@ import { isCount, isId, isIdList, isPositive, isRecord } from "./validation";
 import { isFinitePosition } from "./world";
 
 import type { ScriptControl } from "./authority";
+import type { AiAssignment } from "./director";
 import type { MissionEventDefinition } from "./events";
 import type { MissionState } from "./mission";
 import type { MissionSetup } from "./mission-setup";
@@ -12,7 +13,7 @@ import type { TerrainState, TerrainTile } from "./terrain";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 18;
+export const MISSION_FILE_VERSION = 20;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 
@@ -75,6 +76,8 @@ export type MissionScenario = {
   readonly emergencyHeadquarters?: boolean;
   /** Owners whose actors mission scripts may command. */
   readonly scriptControl?: readonly ScriptControl[];
+  /** Owners an AI controls, and the content pack profile each one follows. */
+  readonly ai?: readonly AiAssignment[];
   /** Absent selects skirmish with skirmish rules, otherwise objectives. */
   readonly savePolicy?: SavePolicy;
   readonly briefing?: Readonly<ScenarioBriefing>;
@@ -150,6 +153,7 @@ export function serializeMission(
     events,
     emergencyHeadquarters,
     scriptControl,
+    ai,
     savePolicy,
     briefing,
     goals,
@@ -174,6 +178,7 @@ export function serializeMission(
       events,
       emergencyHeadquarters,
       scriptControl,
+      ai,
       savePolicy,
       briefing,
       goals,
@@ -334,6 +339,15 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
     !Array.isArray(scenario.scriptControl)
   )
     throw new RangeError("Scenario scriptControl must be a list.");
+  if (
+    scenario.ai !== undefined &&
+    (!Array.isArray(scenario.ai) ||
+      scenario.ai.some(
+        (entry) =>
+          !isRecord(entry) || !isId(entry.owner) || !isId(entry.profileId),
+      ))
+  )
+    throw new RangeError("Scenario AI entries need an owner and a profile ID.");
   if (
     scenario.savePolicy !== undefined &&
     !(SAVE_POLICIES as readonly unknown[]).includes(scenario.savePolicy)

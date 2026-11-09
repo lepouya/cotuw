@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 18,
+  "version": 20,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "skirmish-map",
@@ -32,6 +32,7 @@
     "owners": [{ "id": "player" }],
     "playerOwner": "player",
     "observations": {},
+    "ai": {},
     "relationships": [],
     "firedEvents": [],
     "wrecks": [],

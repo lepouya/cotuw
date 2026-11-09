@@ -20,7 +20,7 @@ const RALLY_ACTIONS = ["set", "clear", "cancel"] as const;
 
 export function createRallyControls(
   simulation: Pick<MissionSimulation, "submitCommand">,
-  player: Pick<OwnerView, "evaluateRallyPoint">,
+  player: Pick<OwnerView, "owner" | "evaluateRallyPoint">,
   controls: RallyControls,
   options: {
     /** The selected building the player controls. */
@@ -58,7 +58,10 @@ export function createRallyControls(
           options.changed();
         } else if (id && action === "clear") {
           cancel();
-          simulation.submitCommand({ kind: "set-rally-point", actorId: id });
+          simulation.submitCommand(
+            { kind: "set-rally-point", actorId: id },
+            { owner: player.owner },
+          );
         }
       },
       { signal: controller.signal },
@@ -75,11 +78,10 @@ export function createRallyControls(
         options.changed();
         return;
       }
-      simulation.submitCommand({
-        kind: "set-rally-point",
-        actorId: choosingFor,
-        target,
-      });
+      simulation.submitCommand(
+        { kind: "set-rally-point", actorId: choosingFor, target },
+        { owner: player.owner },
+      );
       cancel();
     },
     refresh: () => {

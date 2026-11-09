@@ -149,8 +149,10 @@ const withCatalog =
 describe("unit production", () => {
   test("trains distinct units only on the command tick and accepts movement afterward", () => {
     const { simulation } = fixture();
-    simulation.submitCommand(order());
-    simulation.submitCommand(order("unit-2", "scout"));
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
+    simulation.submitCommand(order("unit-2", "scout"), {
+      owner: simulation.playerOwner,
+    });
     expect(simulation.actors).toHaveLength(1);
     expect(simulation.tick().map(({ accepted }) => accepted)).toEqual([
       true,
@@ -167,11 +169,14 @@ describe("unit production", () => {
       { buildingId: "barracks-1", kind: "exit", actorId: second.id },
     ]);
     expect(Object.isFrozen(simulation.buildingActivity)).toBe(true);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: first.id,
-      target: { x: 3, z: 3 },
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: first.id,
+        target: { x: 3, z: 3 },
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(true);
     expect(simulation.buildingActivity).toEqual([]);
     expect(simulation.actorById(first.id)!.worldPosition).not.toEqual(
@@ -183,7 +188,7 @@ describe("unit production", () => {
     "prefers the entrance side after rotation %i",
     (rotation) => {
       const { simulation, map, producer } = fixture({ rotation });
-      simulation.submitCommand(order());
+      simulation.submitCommand(order(), { owner: simulation.playerOwner });
       simulation.tick();
       const unit = simulation.actorById("unit-1")!;
       const tile = map.tileAtWorldPosition(
@@ -218,7 +223,7 @@ describe("unit production", () => {
       ),
     );
     spawnUnit(simulation, "standing-unit", "trooper", map.tileCenter(7, 4));
-    simulation.submitCommand(order());
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     expect(simulation.tick()[0].accepted).toBe(true);
     const unit = simulation.actorById("unit-1")!;
     expect(
@@ -245,14 +250,17 @@ describe("unit production", () => {
         map.tileCenter(tile.x, tile.z),
       );
     }
-    simulation.submitCommand(order());
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     expect(simulation.tick()[0]).toMatchObject({
       accepted: false,
       reason: "exit-blocked",
     });
     expect(simulation.actorById("unit-1")).toBeUndefined();
-    simulation.submitCommand({ kind: "remove-actor", actorId: "block-5-7" });
-    simulation.submitCommand(order());
+    simulation.submitCommand(
+      { kind: "remove-actor", actorId: "block-5-7" },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     expect(simulation.tick().map(({ accepted }) => accepted)).toEqual([
       true,
       true,
@@ -273,7 +281,7 @@ describe("unit production", () => {
     if (!preview.accepted || !("actor" in preview))
       throw new Error("Expected a valid custom exit.");
     expect(preview.actor.worldPosition).toEqual(map.tileCenter(4, 5));
-    simulation.submitCommand(command);
+    simulation.submitCommand(command, { owner: simulation.playerOwner });
     expect(simulation.tick()[0].accepted).toBe(true);
     expect(simulation.actorById(command.actorId)?.worldPosition).toEqual(
       preview.actor.worldPosition,
@@ -287,7 +295,7 @@ describe("unit production", () => {
       accepted: false,
       reason: "exit-blocked",
     });
-    simulation.submitCommand(blocked);
+    simulation.submitCommand(blocked, { owner: simulation.playerOwner });
     expect(simulation.tick()[0]).toMatchObject({
       accepted: false,
       reason: "exit-blocked",
@@ -299,12 +307,16 @@ describe("unit production", () => {
     const { simulation, map } = fixture();
     expect(simulation.unusedActorId("unit-")).toBe("unit-1");
     expect(simulation.unusedActorId("unit-")).toBe("unit-1");
-    simulation.submitCommand(order("unit-1", "unknown"));
-    simulation.submitCommand(order("unit-2"));
+    simulation.submitCommand(order("unit-1", "unknown"), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(order("unit-2"), {
+      owner: simulation.playerOwner,
+    });
     expect(simulation.unusedActorId("unit-")).toBe("unit-3");
     simulation.tick();
     expect(simulation.unusedActorId("unit-")).toBe("unit-1");
-    simulation.submitCommand(order());
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     simulation.tick();
     expect(simulation.unusedActorId("unit-")).toBe("unit-3");
     simulation.removeActor("unit-1");
@@ -321,7 +333,7 @@ describe("unit production", () => {
     [order("unit", "trooper", "missing"), "missing-producer"],
   ] as const)("rejects invalid requests %#", (command, reason) => {
     const { simulation } = fixture();
-    simulation.submitCommand(command);
+    simulation.submitCommand(command, { owner: simulation.playerOwner });
     expect(simulation.tick()[0]).toMatchObject({
       accepted: false,
       reason,
@@ -342,9 +354,16 @@ describe("unit production", () => {
         "player",
       ),
     );
-    simulation.submitCommand(order("unit-1", "trooper", "cc"));
-    simulation.submitCommand({ kind: "remove-actor", actorId: "barracks-1" });
-    simulation.submitCommand(order("unit-2"));
+    simulation.submitCommand(order("unit-1", "trooper", "cc"), {
+      owner: simulation.playerOwner,
+    });
+    simulation.submitCommand(
+      { kind: "remove-actor", actorId: "barracks-1" },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(order("unit-2"), {
+      owner: simulation.playerOwner,
+    });
     expect(simulation.tick()).toMatchObject([
       { accepted: false, reason: "unsupported-unit" },
       { accepted: true },
@@ -354,7 +373,10 @@ describe("unit production", () => {
 
   test("same-tick requests fill available exits without stacking units", () => {
     const { simulation } = fixture();
-    for (let i = 0; i < 9; i++) simulation.submitCommand(order(`unit-${i}`));
+    for (let i = 0; i < 9; i++)
+      simulation.submitCommand(order(`unit-${i}`), {
+        owner: simulation.playerOwner,
+      });
     const outcomes = simulation.tick();
     expect(outcomes.filter(({ accepted }) => accepted)).toHaveLength(8);
     expect(outcomes[8].reason).toBe("exit-blocked");
@@ -367,7 +389,9 @@ describe("unit production", () => {
   test("training near the map boundary uses only playable tiles", () => {
     const valid = fixture({ origin: { x: 1, z: 1 }, rotation: 2 });
     const { map } = valid;
-    valid.simulation.submitCommand(order());
+    valid.simulation.submitCommand(order(), {
+      owner: valid.simulation.playerOwner,
+    });
     expect(valid.simulation.tick()[0].accepted).toBe(true);
     const tile = map.tileAtWorldPosition(
       valid.simulation.actorById("unit-1")!.worldPosition.x,
@@ -381,7 +405,7 @@ describe("unit production", () => {
     const { simulation } = fixture({
       bounds: { minX: -1.5, maxX: 1.5, minZ: -1.5, maxZ: 0.5 },
     });
-    simulation.submitCommand(order());
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     expect(simulation.tick()[0].accepted).toBe(true);
     expect(simulation.actorById("unit-1")!.worldPosition.z).toBeLessThanOrEqual(
       0.5,
@@ -399,7 +423,7 @@ describe("unit production", () => {
       accepted: false,
       reason: "exit-blocked",
     });
-    simulation.submitCommand(command);
+    simulation.submitCommand(command, { owner: simulation.playerOwner });
     expect(simulation.tick()[0]).toMatchObject({
       accepted: false,
       reason: "exit-blocked",
@@ -418,22 +442,27 @@ describe("unit production", () => {
 
   test("snapshots replay pending training exactly and retain retired IDs", () => {
     const { simulation } = fixture();
-    simulation.submitCommand(order());
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     simulation.tick();
-    simulation.submitCommand({ kind: "remove-actor", actorId: "unit-1" });
+    simulation.submitCommand(
+      { kind: "remove-actor", actorId: "unit-1" },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
-    simulation.submitCommand(order("unit-2", "scout"));
+    simulation.submitCommand(order("unit-2", "scout"), {
+      owner: simulation.playerOwner,
+    });
     const saved = simulation.snapshot();
     const restored = fixture({ state: saved }).simulation;
     expect(restored.tick()).toEqual(simulation.tick());
     expect(restored.snapshot()).toEqual(simulation.snapshot());
-    restored.submitCommand(order());
+    restored.submitCommand(order(), { owner: restored.playerOwner });
     expect(restored.tick()[0].reason).toBe("used-id");
   });
 
   test("a behavior fault rolls back the trained actor and lifecycle version", () => {
     const { simulation } = fixture({ fault: true });
-    simulation.submitCommand(order());
+    simulation.submitCommand(order(), { owner: simulation.playerOwner });
     const before = simulation.snapshot();
     expect(() => simulation.tick()).toThrow("fault");
     expect(simulation.snapshot()).toEqual(before);
@@ -450,24 +479,30 @@ describe("unit production", () => {
 test("rally points are persistent ground orders, clearable, and used after exiting", () => {
   const { simulation, map } = fixture();
   const target = map.tileCenter(9, 9);
-  simulation.submitCommand({
-    kind: "set-rally-point",
-    actorId: "barracks-1",
-    target,
-  });
+  simulation.submitCommand(
+    {
+      kind: "set-rally-point",
+      actorId: "barracks-1",
+      target,
+    },
+    { owner: simulation.playerOwner },
+  );
   expect(simulation.actorById("barracks-1")!.rallyPoint).toBeUndefined();
   expect(simulation.tick()[0].accepted).toBe(true);
   const saved = JSON.parse(JSON.stringify(simulation.snapshot()));
   const restored = fixture({ state: saved }).simulation;
   expect(restored.actorById("barracks-1")!.rallyPoint).toEqual(target);
-  restored.submitCommand(order());
+  restored.submitCommand(order(), { owner: restored.playerOwner });
   expect(restored.tick()[0].accepted).toBe(true);
   expect(restored.actorById("unit-1")!.movement?.target).toEqual(target);
   advanceTicks(restored, 300);
   expect(restored.actorById("unit-1")!.worldPosition).toEqual(target);
-  restored.submitCommand({ kind: "set-rally-point", actorId: "barracks-1" });
+  restored.submitCommand(
+    { kind: "set-rally-point", actorId: "barracks-1" },
+    { owner: restored.playerOwner },
+  );
   restored.tick();
-  restored.submitCommand(order("unit-2"));
+  restored.submitCommand(order("unit-2"), { owner: restored.playerOwner });
   restored.tick();
   expect(restored.actorById("unit-2")!.movement).toBeUndefined();
 });
@@ -493,17 +528,23 @@ test("rally points reject water, occupied footprints, invalid positions, and non
         .viewOf(simulation.playerOwner)
         .evaluateRallyPoint("barracks-1", target),
     ).toBe(false);
-    simulation.submitCommand({
-      kind: "set-rally-point",
-      actorId: "barracks-1",
-      target,
-    });
+    simulation.submitCommand(
+      {
+        kind: "set-rally-point",
+        actorId: "barracks-1",
+        target,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick()[0].accepted).toBe(false);
   }
-  simulation.submitCommand({
-    kind: "set-rally-point",
-    actorId: "missing",
-    target: map.tileCenter(9, 9),
-  });
+  simulation.submitCommand(
+    {
+      kind: "set-rally-point",
+      actorId: "missing",
+      target: map.tileCenter(9, 9),
+    },
+    { owner: simulation.playerOwner },
+  );
   expect(simulation.tick()[0].accepted).toBe(false);
 });

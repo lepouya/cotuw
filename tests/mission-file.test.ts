@@ -374,19 +374,25 @@ test("normalizes Unicode legend characters before round-tripping", () => {
 test("a complete mission file continues identically with queued commands and paid production", () => {
   const mission = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
   const original = createSessionSimulation(mission);
-  original.submitCommand({
-    kind: "place-actor",
-    actorId: "refinery",
-    definitionId: "arc-materials-refinery",
-    origin: { x: 12, z: 49 },
-  });
+  original.submitCommand(
+    {
+      kind: "place-actor",
+      actorId: "refinery",
+      definitionId: "arc-materials-refinery",
+      origin: { x: 12, z: 49 },
+    },
+    { owner: original.playerOwner },
+  );
   advanceTicks(original, 490);
-  original.submitCommand({
-    kind: "train-unit",
-    actorId: "worker",
-    producerId: "refinery",
-    definitionId: "arc-harvester",
-  });
+  original.submitCommand(
+    {
+      kind: "train-unit",
+      actorId: "worker",
+      producerId: "refinery",
+      definitionId: "arc-harvester",
+    },
+    { owner: original.playerOwner },
+  );
   const restored = createSessionSimulation(
     loadMission(
       serializeMission(

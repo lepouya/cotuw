@@ -127,7 +127,7 @@ export const actorIn = (state: Pick<MissionState, "actors">, actorId: string) =>
 export function command(
   sim: MissionSimulation,
   value: MissionCommand,
-  issuer?: CommandIssuer,
+  issuer: CommandIssuer = { owner: sim.playerOwner },
 ) {
   sim.submitCommand(value, issuer);
   return sim.tick()[0]!;

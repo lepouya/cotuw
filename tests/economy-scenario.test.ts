@@ -169,7 +169,7 @@ describe("mission objectives", () => {
       target: mapForOpening().tileCenter(40, 32),
     };
     for (const sim of [simulation, restored]) {
-      sim.submitCommand(command);
+      sim.submitCommand(command, { owner: sim.playerOwner });
       expect(sim.tick()[0].accepted).toBe(true);
       expect(sim.completedTicks).toBe(saved.tick + 1);
       expect(sim.result).toEqual(won);

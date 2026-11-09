@@ -70,7 +70,7 @@ function move(x: number, z: number): ActorCommand {
 describe("terrain-move behavior", () => {
   test("advances continuously along a valid terrain path", () => {
     const simulation = mission();
-    simulation.submitCommand(move(4, 0));
+    simulation.submitCommand(move(4, 0), { owner: simulation.playerOwner });
 
     simulation.tick();
 
@@ -83,7 +83,7 @@ describe("terrain-move behavior", () => {
 
   test("stops exactly at the target without overshooting", () => {
     const simulation = mission(1);
-    simulation.submitCommand(move(1, 0));
+    simulation.submitCommand(move(1, 0), { owner: simulation.playerOwner });
 
     simulation.tick();
 
@@ -94,9 +94,12 @@ describe("terrain-move behavior", () => {
 
   test("a stop command cancels the current order", () => {
     const simulation = mission();
-    simulation.submitCommand(move(4, 0));
+    simulation.submitCommand(move(4, 0), { owner: simulation.playerOwner });
     simulation.tick();
-    simulation.submitCommand({ kind: "stop", actorId: "trooper" });
+    simulation.submitCommand(
+      { kind: "stop", actorId: "trooper" },
+      { owner: simulation.playerOwner },
+    );
 
     simulation.tick();
 

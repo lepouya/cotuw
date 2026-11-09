@@ -1,4 +1,4 @@
-import { deepFreeze } from "./actor";
+import { deepFreeze, isWorkerDefinition } from "./actor";
 import type { Actor, ActorDefinition } from "./actor";
 import type { CargoSource } from "./cargo";
 import { secondsToTicks } from "./clock";
@@ -68,8 +68,7 @@ const isArmyUnit = (definition: ActorDefinition) =>
   !!definition.movement &&
   !!definition.weapon &&
   !definition.footprint &&
-  !definition.harvesting &&
-  !definition.cultivation;
+  !isWorkerDefinition(definition);
 
 const trainsArmy = (
   definition: ActorDefinition,

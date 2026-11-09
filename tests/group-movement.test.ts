@@ -110,11 +110,14 @@ describe("group movement", () => {
     );
     const { simulation } = fixture(actors, undefined, bounds);
     expect(() => simulation.tick()).not.toThrow();
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: actors.map(({ id }) => id),
-      target: { x: -8, z: -4 },
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: actors.map(({ id }) => id),
+        target: { x: -8, z: -4 },
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(outcomes.every(({ accepted }) => accepted)).toBe(true);
     for (const { command } of outcomes) {
@@ -144,11 +147,14 @@ describe("group movement", () => {
         worldPosition: { ...start, x: start.x - 0.01 },
       }),
     );
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["near"],
-      target: map.tileCenter(10, 4),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["near"],
+        target: map.tileCenter(10, 4),
+      },
+      { owner: simulation.playerOwner },
+    );
     const [outcome] = simulation.tick();
     expect(simulation.actorById("near")!.movement).toBeUndefined();
     expect(outcome).toMatchObject({ accepted: true, reachedTarget: false });
@@ -156,16 +162,22 @@ describe("group movement", () => {
 
   test("move receipts preserve reachability when a later order replaces the route", () => {
     const { simulation, map } = fixture();
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "unit-0",
-      target: map.tileCenter(10, 4),
-    });
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "unit-0",
-      target: map.tileCenter(7, 4),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "unit-0",
+        target: map.tileCenter(10, 4),
+      },
+      { owner: simulation.playerOwner },
+    );
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "unit-0",
+        target: map.tileCenter(7, 4),
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(outcomes).toMatchObject([
       { accepted: true, reachedTarget: false },
@@ -182,11 +194,14 @@ describe("group movement", () => {
       ["b", "trooper", { x: 2, z: 7 }],
     ] as const)
       spawnUnit(simulation, id, definitionId, map.tileCenter(tile.x, tile.z));
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["a", "b"],
-      target,
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["a", "b"],
+        target,
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick().every(({ accepted }) => accepted)).toBe(true);
     for (const id of ["a", "b"])
       expect(
@@ -213,11 +228,14 @@ describe("group movement", () => {
         ],
       },
     });
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: simulation.actors.map(({ id }) => id),
-      target: map.tileCenter(17, 6),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: simulation.actors.map(({ id }) => id),
+        target: map.tileCenter(17, 6),
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(outcomes).toHaveLength(8);
     expect(outcomes.every(({ accepted }) => accepted)).toBe(true);
@@ -254,16 +272,22 @@ describe("group movement", () => {
     const initial = first.simulation.snapshot();
     const reversed = fixture([...initial.actors].reverse());
     const ids = initial.actors.map(({ id }) => id);
-    first.simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ids,
-      target: first.map.tileCenter(17, 6),
-    });
-    reversed.simulation.submitCommand({
-      kind: "group-move",
-      actorIds: [...ids].reverse(),
-      target: reversed.map.tileCenter(17, 6),
-    });
+    first.simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ids,
+        target: first.map.tileCenter(17, 6),
+      },
+      { owner: first.simulation.playerOwner },
+    );
+    reversed.simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: [...ids].reverse(),
+        target: reversed.map.tileCenter(17, 6),
+      },
+      { owner: reversed.simulation.playerOwner },
+    );
     const pending = fixture(
       undefined,
       JSON.parse(JSON.stringify(first.simulation.snapshot())),
@@ -289,11 +313,14 @@ describe("group movement", () => {
     const fast = fixture();
     const slow = fixture();
     for (const { simulation, map } of [fast, slow])
-      simulation.submitCommand({
-        kind: "group-move",
-        actorIds: simulation.actors.map(({ id }) => id),
-        target: map.tileCenter(17, 6),
-      });
+      simulation.submitCommand(
+        {
+          kind: "group-move",
+          actorIds: simulation.actors.map(({ id }) => id),
+          target: map.tileCenter(17, 6),
+        },
+        { owner: simulation.playerOwner },
+      );
     const run = (simulation: typeof fast.simulation, step: number) => {
       let now = 0;
       const loop = startSimulationLoop(simulation, {
@@ -314,11 +341,14 @@ describe("group movement", () => {
   test("blocked group clicks keep a distinct requested marker and use separate approach positions", () => {
     const { simulation, map } = fixture();
     const target = map.tileCenter(10, 4);
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["unit-0", "unit-1", "unit-0"],
-      target,
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["unit-0", "unit-1", "unit-0"],
+        target,
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(outcomes).toHaveLength(2);
     expect(outcomes.every(({ accepted }) => accepted)).toBe(true);
@@ -338,19 +368,25 @@ describe("group movement", () => {
     map.setTerrain(1, 1, { typeId: "water" });
     spawnUnit(simulation, "swimmer", "swimmer", map.tileCenter(1, 1));
     spawnUnit(simulation, "trooper", "trooper", map.tileCenter(3, 3));
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "trooper",
-      target: map.tileCenter(4, 3),
-    });
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "trooper",
+        target: map.tileCenter(4, 3),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const previous = simulation.actorById("trooper")!.movement!.target;
     // Stranded swimmer cannot get any closer; a missing actor also rejects.
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["swimmer", "trooper", "missing"],
-      target: map.tileCenter(7, 3),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["swimmer", "trooper", "missing"],
+        target: map.tileCenter(7, 3),
+      },
+      { owner: simulation.playerOwner },
+    );
     const outcomes = simulation.tick();
     expect(outcomes.map(({ accepted }) => accepted)).toEqual([
       false,
@@ -373,11 +409,14 @@ describe("group movement", () => {
       ["c", 5],
     ] as const)
       spawnUnit(simulation, id, "swimmer", map.tileCenter(x, 1));
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["a", "b"],
-      target: map.tileCenter(7, 3),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["a", "b"],
+        target: map.tileCenter(7, 3),
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick().map(({ accepted }) => accepted)).toEqual([
       true,
       false,
@@ -389,12 +428,15 @@ describe("group movement", () => {
 
   test("submitted moves cannot carry a requested group target", () => {
     const { simulation, map } = fixture();
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "unit-0",
-      target: map.tileCenter(6, 3),
-      requestedTarget: map.tileCenter(10, 4),
-    } as MissionCommand);
+    simulation.submitCommand(
+      {
+        kind: "move",
+        actorId: "unit-0",
+        target: map.tileCenter(6, 3),
+        requestedTarget: map.tileCenter(10, 4),
+      } as MissionCommand,
+      { owner: simulation.playerOwner },
+    );
     const [outcome] = simulation.tick();
     expect(outcome!.accepted).toBe(true);
     expect(outcome!.command).not.toHaveProperty("requestedTarget");
@@ -408,11 +450,14 @@ describe("group movement", () => {
     for (let x = 1; x <= 5; x += 1) map.setTerrain(x, 1, { typeId: "water" });
     spawnUnit(simulation, "swimmer", "swimmer", map.tileCenter(1, 1));
     spawnUnit(simulation, "trooper", "trooper", map.tileCenter(3, 3));
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["trooper", "swimmer"],
-      target: map.tileCenter(7, 3),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["trooper", "swimmer"],
+        target: map.tileCenter(7, 3),
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick().every(({ accepted }) => accepted)).toBe(true);
     const waterSlot = simulation.actorById("swimmer")!.movement!.target;
     const landSlot = simulation.actorById("trooper")!.movement!.target;
@@ -445,13 +490,19 @@ describe("group movement", () => {
       ...map.tileCenter(1, 1),
       z: map.tileCenter(1, 1).z + 0.4,
     };
-    simulation.submitCommand({ kind: "move", actorId: "b", target: previous });
+    simulation.submitCommand(
+      { kind: "move", actorId: "b", target: previous },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: ["b", "a"],
-      target: map.tileCenter(1, 1),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: ["b", "a"],
+        target: map.tileCenter(1, 1),
+      },
+      { owner: simulation.playerOwner },
+    );
     expect(simulation.tick().map(({ accepted }) => accepted)).toEqual([
       true,
       false,
@@ -461,14 +512,20 @@ describe("group movement", () => {
 
   test("Stop cancels every group route", () => {
     const { simulation, map } = fixture();
-    simulation.submitCommand({
-      kind: "group-move",
-      actorIds: simulation.actors.map(({ id }) => id),
-      target: map.tileCenter(17, 6),
-    });
+    simulation.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: simulation.actors.map(({ id }) => id),
+        target: map.tileCenter(17, 6),
+      },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     for (const { id } of simulation.actors)
-      simulation.submitCommand({ kind: "stop", actorId: id });
+      simulation.submitCommand(
+        { kind: "stop", actorId: id },
+        { owner: simulation.playerOwner },
+      );
     simulation.tick();
     expect(simulation.actors.every((actor) => !actor.movement)).toBe(true);
   });
@@ -487,7 +544,10 @@ describe("friendly separation", () => {
       }),
     );
     const { simulation } = fixture(actors);
-    simulation.submitCommand({ kind: "move", actorId: "a", target });
+    simulation.submitCommand(
+      { kind: "move", actorId: "a", target },
+      { owner: simulation.playerOwner },
+    );
     simulation.tick();
     const arrived = simulation.actorById("a")!;
     expect(arrived.movement).toBeUndefined();

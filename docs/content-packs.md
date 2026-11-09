@@ -34,6 +34,12 @@ bundled packs through the same parser future mod packs will use.
 - Optional `factionNames` maps simulation faction IDs to nonempty display
   names for the sidebar heading. Unnamed factions use a generic heading.
 - `movementProfiles` prices each terrain type and slope for ground movement.
+- Optional `aiProfiles` lists the behavior scenarios assign to AI owners. Each
+  has a distinct `id`, `roundSeconds` between planning rounds, positive
+  `concernsPerTick` and `commandsPerTick` limits, and `postures`. `postures`
+  must include `establishing`; a posture it omits is forbidden. Each posture
+  lists `{ concern, budget, forces, essential? }` by priority: `concern` names
+  built-in code, and `budget` and `forces` are nonnegative relative shares.
 - Relative asset `url` values resolve against the page. The bundled pack uses
   paths such as `assets/models/wolf.glb` to support hosting under a subpath.
 - `presentation` maps actor IDs to what the player sees:

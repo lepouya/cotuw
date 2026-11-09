@@ -1,4 +1,5 @@
 import { createActor, deepFreeze } from "./actor";
+import { createAiState } from "./director";
 import { createMissionState } from "./mission";
 import { createTilePlacedActor } from "./placement";
 import { TerrainGrid } from "./terrain";
@@ -194,5 +195,6 @@ export function createScenarioState(
     terrain: structuredClone(terrain),
     ...(economy && { economy }),
     fog: createFogState(),
+    ai: createAiState(scenario.ai ?? []),
   };
 }
