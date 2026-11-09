@@ -1,10 +1,13 @@
-import { MeshBuilder, NullEngine, Scene } from "@babylonjs/core";
-import { afterEach, expect, test, vi } from "vitest";
+import { MeshBuilder } from "@babylonjs/core";
+import { expect, test, vi } from "vitest";
+
+import { testScene } from "./helpers/scene";
 import { TerrainMap } from "../src/map";
 import {
   COMBAT_EFFECT_LIMIT,
   createCombatEffectsView,
 } from "../src/render/combat-effects";
+
 import type { AttackEvent } from "../src/simulation/combat";
 
 const hit: AttackEvent = {
@@ -16,15 +19,9 @@ const hit: AttackEvent = {
   damage: 10,
   damageType: "arcane",
 };
-let engine: NullEngine | undefined;
-afterEach(() => {
-  engine?.dispose();
-  engine = undefined;
-});
 
 function fixture() {
-  engine = new NullEngine();
-  const scene = new Scene(engine);
+  const scene = testScene();
   const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
   const instances: {
     root: ReturnType<typeof MeshBuilder.CreateBox>;

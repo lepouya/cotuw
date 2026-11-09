@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+
 import { createNotifications } from "../src/ui/notifications";
 
 class ElementStub extends EventTarget {

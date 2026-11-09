@@ -1,6 +1,10 @@
 import { expect, expectTypeOf, test } from "vitest";
 
-import { isMissionCommand, isOutcomeOf } from "../src/simulation/command";
+import {
+  isMissionCommand,
+  isOutcomeOf,
+  issuedBy,
+} from "../src/simulation/command";
 
 import type {
   CommandOutcome,
@@ -69,4 +73,11 @@ test("outcomes pair each command with its own rejection reasons", () => {
       TrainingReason | "unauthorized" | undefined
     >();
   }
+});
+
+test("only an owner's own player or AI counts as its issuer", () => {
+  expect(issuedBy({ owner: "player" }, "player")).toBe(true);
+  expect(issuedBy({ owner: "rival" }, "player")).toBe(false);
+  expect(issuedBy({ script: true, owner: "player" }, "player")).toBe(false);
+  expect(issuedBy({ script: true }, "player")).toBe(false);
 });

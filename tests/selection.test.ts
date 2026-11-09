@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { createSelection } from "../src/render/selection";
 
 test("selection persists on repeated clicks and Shift toggles mobile units", () => {

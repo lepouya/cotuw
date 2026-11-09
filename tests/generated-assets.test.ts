@@ -1,12 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-
 import { PNG } from "pngjs";
-
 import { expect, test } from "vitest";
 
-import { ASSET_FAMILIES, encodeAsset } from "../scripts/assets";
 import { BASE_CONTENT } from "./helpers/content";
+import { ASSET_FAMILIES, encodeAsset } from "../scripts/assets";
 
 const families = Object.entries(ASSET_FAMILIES);
 const assets = families.flatMap(([family, { assets }]) =>

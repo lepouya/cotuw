@@ -1,10 +1,15 @@
 import { afterEach, expect, test, vi } from "vitest";
+
 import { createCommandInput } from "../src/render/command-input";
 
 import type { Scene } from "@babylonjs/core";
 import type { ContextAction } from "../src/render/command-input";
 
-afterEach(() => vi.unstubAllGlobals());
+const inputs: { dispose: () => void }[] = [];
+afterEach(() => {
+  for (const input of inputs.splice(0)) input.dispose();
+  vi.unstubAllGlobals();
+});
 
 function fixture() {
   const host = new EventTarget();
@@ -50,6 +55,7 @@ function fixture() {
       },
     },
   );
+  inputs.push(input);
   const menu = (actorId?: string, shiftKey = false) => {
     picked = actorId;
     for (const type of ["pointerdown", "pointerup"])
@@ -78,106 +84,82 @@ function fixture() {
 
 test("delayed movement uses only the surviving members of its selection", () => {
   const { input, menu, visible, submitCommand } = fixture();
-  try {
-    input.selectMany(["unit-1", "unit-2"]);
-    const move = menu()("move");
-    visible.delete("unit-1");
-    input.retainSelection((id) => visible.has(id));
-    move.run();
-    expect(submitCommand).toHaveBeenCalledWith({
-      kind: "move",
-      actorId: "unit-2",
-      target: { x: 1, z: 2 },
-    });
-    input.select(undefined);
-    move.run();
-    expect(submitCommand).toHaveBeenCalledTimes(1);
-  } finally {
-    input.dispose();
-  }
+  input.selectMany(["unit-1", "unit-2"]);
+  const move = menu()("move");
+  visible.delete("unit-1");
+  input.retainSelection((id) => visible.has(id));
+  move.run();
+  expect(submitCommand).toHaveBeenCalledWith({
+    kind: "move",
+    actorId: "unit-2",
+    target: { x: 1, z: 2 },
+  });
+  input.select(undefined);
+  move.run();
+  expect(submitCommand).toHaveBeenCalledTimes(1);
 });
 
 test("delayed actions cannot select or attack a target that leaves vision", () => {
   const { input, menu, visible, submitCommand } = fixture();
-  try {
-    input.select("unit-1");
-    const action = menu("wolf");
-    visible.delete("wolf");
-    action("attack").run();
-    action("select").run();
-    expect(submitCommand).not.toHaveBeenCalled();
-    expect(input.selectedActorIds).toEqual(["unit-1"]);
-  } finally {
-    input.dispose();
-  }
+  input.select("unit-1");
+  const action = menu("wolf");
+  visible.delete("wolf");
+  action("attack").run();
+  action("select").run();
+  expect(submitCommand).not.toHaveBeenCalled();
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
 });
 
 test("pausing invalidates a movement action already shown", () => {
   const { input, menu, pause, submitCommand } = fixture();
-  try {
-    input.select("unit-1");
-    const action = menu()("move");
-    pause();
-    action.run();
-    expect(submitCommand).not.toHaveBeenCalled();
-    expect(input.stop()).toBe(0);
-  } finally {
-    input.dispose();
-  }
+  input.select("unit-1");
+  const action = menu()("move");
+  pause();
+  action.run();
+  expect(submitCommand).not.toHaveBeenCalled();
+  expect(input.stop()).toBe(0);
 });
 
 test("an Add action cannot toggle out a unit selected since the menu opened", () => {
   const { input, menu } = fixture();
-  try {
-    input.select("unit-1");
-    const add = menu("unit-2")("add");
-    input.select("unit-2", true);
-    add.run();
-    expect(input.selectedActorIds).toEqual(["unit-1", "unit-2"]);
-  } finally {
-    input.dispose();
-  }
+  input.select("unit-1");
+  const add = menu("unit-2")("add");
+  input.select("unit-2", true);
+  add.run();
+  expect(input.selectedActorIds).toEqual(["unit-1", "unit-2"]);
 });
 
 test("Shift or Queue Orders mode queues moves and attacks", () => {
   const { input, menu, submitCommand } = fixture();
-  try {
-    input.select("unit-1");
-    menu(undefined, true)("move").run();
-    expect(submitCommand).toHaveBeenLastCalledWith({
-      kind: "move",
-      actorId: "unit-1",
-      target: { x: 1, z: 2 },
-      queued: true,
-    });
-    input.setQueueMode(true);
-    menu("wolf")("attack").run();
-    expect(submitCommand).toHaveBeenLastCalledWith({
-      kind: "attack",
-      actorId: "unit-1",
-      targetId: "wolf",
-      queued: true,
-    });
-    input.setQueueMode(false);
-    menu()("move").run();
-    expect(submitCommand).toHaveBeenLastCalledWith({
-      kind: "move",
-      actorId: "unit-1",
-      target: { x: 1, z: 2 },
-    });
-  } finally {
-    input.dispose();
-  }
+  input.select("unit-1");
+  menu(undefined, true)("move").run();
+  expect(submitCommand).toHaveBeenLastCalledWith({
+    kind: "move",
+    actorId: "unit-1",
+    target: { x: 1, z: 2 },
+    queued: true,
+  });
+  input.setQueueMode(true);
+  menu("wolf")("attack").run();
+  expect(submitCommand).toHaveBeenLastCalledWith({
+    kind: "attack",
+    actorId: "unit-1",
+    targetId: "wolf",
+    queued: true,
+  });
+  input.setQueueMode(false);
+  menu()("move").run();
+  expect(submitCommand).toHaveBeenLastCalledWith({
+    kind: "move",
+    actorId: "unit-1",
+    target: { x: 1, z: 2 },
+  });
 });
 
 test("deselect clears selection and reports whether there was any", () => {
   const { input } = fixture();
-  try {
-    expect(input.deselect()).toBe(false);
-    input.select("unit-1");
-    expect(input.deselect()).toBe(true);
-    expect(input.selectedActorIds).toEqual([]);
-  } finally {
-    input.dispose();
-  }
+  expect(input.deselect()).toBe(false);
+  input.select("unit-1");
+  expect(input.deselect()).toBe(true);
+  expect(input.selectedActorIds).toEqual([]);
 });

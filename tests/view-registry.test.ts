@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+
 import { createViewRegistry } from "../src/render/view-registry";
 
 const state = (id: string, revision = 0) => ({ id, revision });

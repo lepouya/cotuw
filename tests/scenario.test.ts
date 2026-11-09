@@ -1,13 +1,15 @@
-import { playerOwners, stockpiles } from "./helpers/scenario";
 import { describe, expect, test } from "vitest";
+
+import { playerOwners, stockpiles } from "./helpers/scenario";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
-import type { Stockpile } from "../src/simulation/stockpiles";
 import { TerrainGrid } from "../src/simulation/terrain";
 import {
   createScenarioMap,
   createScenarioState,
   defineScenario,
 } from "../src/simulation/scenario";
+
+import type { Stockpile } from "../src/simulation/stockpiles";
 
 describe("scenario terrain", () => {
   test("restores a catalog without the default plain terrain", () => {

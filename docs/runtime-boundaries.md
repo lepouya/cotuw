@@ -52,9 +52,9 @@ These contracts describe where new behaviors, views, and services attach.
   Histories share immutable samples without traversing them each tick. The
   verdict and final sample commit together after knowledge and active vision
   update. This omniscient reporting data stays outside owner views.
-- Direct actor spawn and removal hooks accept skirmish setup edits only at
-  tick 0. Live skirmish changes use commands so every snapshot retains the
-  end-of-tick elimination checkpoint.
+- `spawnActor` and `removeActor` are test setup hooks that no runtime code
+  calls. In a skirmish they work only at tick 0. Live skirmish changes use
+  commands so every snapshot retains the end-of-tick elimination checkpoint.
 - `simulation/observations.ts` owns each owner's memory and its
   `OwnerKnowledge`: what an owner may know beyond its own actors and economy,
   meaning authored site locations, its explored terrain and vision, and its

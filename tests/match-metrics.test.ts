@@ -1,30 +1,31 @@
 import { afterEach, expect, test } from "vitest";
+
+import { BASE_CONTENT } from "./helpers/content";
+import {
+  actorIn,
+  advanceSeconds,
+  command,
+  exploredFog,
+  savedState,
+  startMission,
+  stockpiles,
+  untilSeconds,
+} from "./helpers/scenario";
 import { createActor } from "../src/simulation/actor";
-import type { ActorDefinition } from "../src/simulation/actor";
 import { createCultivationSite } from "../src/simulation/cultivation";
-import { createMissionSimulation } from "../src/simulation/mission";
-import type {
-  MissionSimulation,
-  MissionState,
-} from "../src/simulation/mission";
-import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import {
   createScenarioMap,
   createScenarioState,
   defineScenario,
 } from "../src/simulation/scenario";
-import { OccupancyGrid } from "../src/simulation/occupancy";
 import { TerrainGrid } from "../src/simulation/terrain";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
+
+import type { ActorDefinition } from "../src/simulation/actor";
+import type {
+  MissionSimulation,
+  MissionState,
+} from "../src/simulation/mission";
 import type { SkirmishRules } from "../src/simulation/skirmish";
-import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
-import {
-  advanceSeconds,
-  command,
-  exploredFog,
-  stockpiles,
-  untilSeconds,
-} from "./helpers/scenario";
 
 const CC = "arc-command-center-prototype";
 const BARRACKS = "arc-field-barracks";
@@ -152,42 +153,37 @@ const scenario = defineScenario({
 });
 const sims: MissionSimulation[] = [];
 afterEach(() => sims.splice(0).forEach((sim) => sim.dispose()));
-function initial() {
-  const state = createScenarioState(scenario, definitions);
+/** A fully explored start, with the scenario's authored fields replaced. */
+function initial(
+  changes: Partial<Pick<typeof scenario, "buildings" | "units">> = {},
+  content: readonly ActorDefinition[] = definitions,
+) {
+  const state = createScenarioState({ ...scenario, ...changes }, content);
   state.fog = exploredFog(state);
   return state;
 }
+const definition = (id: string) => definitions.find((each) => each.id === id)!;
 function fixture(
   state = initial(),
-  skirmish = rules,
-  fault = false,
-  content = definitions,
+  {
+    skirmish = rules,
+    fault = false,
+    content = definitions,
+  }: {
+    skirmish?: SkirmishRules;
+    fault?: boolean;
+    content?: readonly ActorDefinition[];
+  } = {},
 ) {
   const map = createScenarioMap({ ...scenario, terrain: state.terrain! });
-  const occupancy = new OccupancyGrid(map);
-  const sim = createMissionSimulation({
+  const { simulation: sim } = startMission(map, {
     state,
     skirmish,
     definitions: content,
-    map,
-    occupancy,
-    bounds: map.worldBounds,
     tickSeconds: 0.1,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, MOVEMENT_PROFILES),
-      ],
-      [
-        "idle",
-        {
-          handleCommand: () => false,
-          update: () => {
-            if (fault) throw Error("test fault");
-          },
-        },
-      ],
-    ]),
+    idleUpdate: () => {
+      if (fault) throw Error("test fault");
+    },
   });
   sims.push(sim);
   return sim;
@@ -221,13 +217,15 @@ const train = (
       .accepted,
   ).toBe(true);
 };
+const placeBarracks = (sim: MissionSimulation, actorId: string) =>
+  command(sim, {
+    kind: "place-actor",
+    actorId,
+    definitionId: BARRACKS,
+    origin: { x: 6, z: 2 },
+  });
 const roundtrip = (sim: MissionSimulation) =>
-  fixture(
-    parseMission(
-      serializeMission(scenario, sim.snapshot(), sim.tickSeconds),
-      sim.tickSeconds,
-    ).state,
-  );
+  fixture(savedState(scenario, sim));
 
 // Starting actors affect population and the peak, but never production counters.
 test("opening samples include starting actors, active vision and military readiness", () => {
@@ -270,25 +268,18 @@ test("training, cancellation, completion and sale keep exact counters", () => {
   expect(player(sim).milestones.firstCombatUnit).toBe(producedTick);
   expect(player(sim).unitsProduced).toBe(2);
   expect(player(sim).peakArmy).toBe(1);
-  const place = (id: string, x: number) =>
-    command(sim, {
-      kind: "place-actor",
-      actorId: id,
-      definitionId: BARRACKS,
-      origin: { x, z: 2 },
-    });
-  expect(place("cancel", 6).accepted).toBe(true);
+  expect(placeBarracks(sim, "cancel").accepted).toBe(true);
   expect(
     command(sim, { kind: "cancel-construction", actorId: "cancel" }).accepted,
   ).toBe(true);
-  expect(place("built", 6).accepted).toBe(true);
+  expect(placeBarracks(sim, "built").accepted).toBe(true);
   untilSeconds(sim, () => !sim.actorById("built")!.construction);
   expect(player(sim).buildingsCompleted).toBe(1);
   const spending = player(sim).spent.materials;
   expect(spending).toBe(
     100 +
-      definitions.find((d) => d.id === TROOPER)!.materialsCost! +
-      definitions.find((d) => d.id === "arc-scout")!.materialsCost!,
+      definition(TROOPER).materialsCost! +
+      definition("arc-scout").materialsCost!,
   );
   expect(command(sim, { kind: "sell-actor", actorId: "built" }).accepted).toBe(
     true,
@@ -345,10 +336,7 @@ test("mixed Materials cargo retains sources through interruption and save/load",
 });
 
 test("Circle fractional cargo preserves mixed provenance through site changes and delivery", () => {
-  const state = initial();
-  state.actors = state.actors.filter((actor) => actor.owner !== "player");
   const circleScenario = {
-    ...scenario,
     buildings: [
       {
         actorId: "heart",
@@ -378,9 +366,7 @@ test("Circle fractional cargo preserves mixed provenance through site changes an
       },
     ],
   };
-  const start = createScenarioState(circleScenario, definitions);
-  start.fog = exploredFog(start);
-  const sim = fixture(start);
+  const sim = fixture(initial(circleScenario));
   command(sim, { kind: "gather", actorId: "cultivator", siteId: "bloom-near" });
   advanceSeconds(sim, 0.4);
   const worker = () => sim.economy!.cultivation!.workers[0]!;
@@ -399,7 +385,7 @@ test.each([CC, BARRACKS, REFINERY])(
   "committed damage to %s records opponent milestones and combat building loss",
   (definitionId) => {
     const state = initial();
-    const enemy = state.actors.find((a) => a.id === "enemy")!;
+    const enemy = actorIn(state, "enemy");
     enemy.definitionId = definitionId;
     enemy.health = 1;
     delete enemy.headquartersId;
@@ -422,7 +408,7 @@ test.each([CC, BARRACKS, REFINERY])(
 test("neutral and wildlife damage cannot trigger opponent-specific milestones", () => {
   const state = initial();
   unit(state, "wolf-target", "arc-scout", "wildlife", 12, 18);
-  state.actors.find((a) => a.id === "wolf-target")!.health = 1;
+  actorIn(state, "wolf-target").health = 1;
   unit(state, "attacker", TROOPER, "player", 11, 18);
   const sim = fixture(state);
   command(sim, {
@@ -462,7 +448,7 @@ test("five-second histories, exact milestones and final sample survive continuat
 });
 
 test("failed ticks publish no metrics, payments, damage or samples", () => {
-  const sim = fixture(initial(), rules, true);
+  const sim = fixture(initial(), { fault: true });
   sim.submitCommand({
     kind: "train-unit",
     actorId: "worker",
@@ -493,15 +479,17 @@ test.each([{ player: ["missing"], rival: [] }, { player: [] }, undefined])(
   "rejects invalid starting sites: %j",
   (startingResourceSites) => {
     expect(() =>
-      fixture(initial(), { ...rules, startingResourceSites } as SkirmishRules),
+      fixture(initial(), {
+        skirmish: { ...rules, startingResourceSites } as SkirmishRules,
+      }),
     ).toThrow("invalid skirmish rules");
   },
 );
 
 test("army roles follow content for armed and unarmed units", () => {
-  const { weapon } = definitions.find(({ id }) => id === TROOPER)!;
-  const armedScouts = definitions.map((definition) =>
-    definition.id === "arc-scout" ? { ...definition, weapon } : definition,
+  const { weapon } = definition(TROOPER);
+  const armedScouts = definitions.map((each) =>
+    each.id === "arc-scout" ? { ...each, weapon } : each,
   );
   const opening = () => {
     const state = initial();
@@ -509,22 +497,20 @@ test("army roles follow content for armed and unarmed units", () => {
     return state;
   };
   expect(player(fixture(opening())).peakArmy).toBe(0);
-  expect(player(fixture(opening(), rules, false, armedScouts)).peakArmy).toBe(
-    1,
-  );
+  expect(player(fixture(opening(), { content: armedScouts })).peakArmy).toBe(1);
 });
 
 test.each(["arc-harvester", "circle-cultivator"])(
   "%s cargo capacity must fit safe thousandths",
   (id) => {
-    const content = definitions.map((definition) => {
-      if (definition.id !== id) return definition;
-      const work = definition.harvesting
-        ? { harvesting: { ...definition.harvesting, capacity: 1e13 } }
-        : { cultivation: { ...definition.cultivation!, capacity: 1e13 } };
-      return { ...definition, ...work };
+    const content = definitions.map((each) => {
+      if (each.id !== id) return each;
+      const work = each.harvesting
+        ? { harvesting: { ...each.harvesting, capacity: 1e13 } }
+        : { cultivation: { ...each.cultivation!, capacity: 1e13 } };
+      return { ...each, ...work };
     });
-    expect(() => fixture(initial(), rules, false, content)).toThrow(RangeError);
+    expect(() => fixture(initial(), { content })).toThrow(RangeError);
   },
 );
 
@@ -575,22 +561,19 @@ test("simultaneous lethal unit combat counts both losses without reducing the pe
 test.each(["defense", "relay", "unfinished"])(
   "damage to a %s counts as a base attack and building loss",
   (kind) => {
-    const definition = {
-      ...structuredClone(
-        definitions.find((definition) => definition.id === BARRACKS)!,
-      ),
+    const building = {
+      ...structuredClone(definition(BARRACKS)),
       id: `test-${kind}`,
       production: undefined,
     };
-    const content = [...definitions, definition];
-    const start = createScenarioState(
+    const content = [...definitions, building];
+    const start = initial(
       {
-        ...scenario,
         buildings: [
           ...scenario.buildings,
           {
             actorId: "target",
-            definitionId: definition.id,
+            definitionId: building.id,
             owner: "rival",
             origin: { x: 25, z: 15 },
           },
@@ -598,13 +581,12 @@ test.each(["defense", "relay", "unfinished"])(
       },
       content,
     );
-    start.fog = exploredFog(start);
-    const target = start.actors.find((actor) => actor.id === "target")!;
+    const target = actorIn(start, "target");
     target.health = 1;
     if (kind === "unfinished")
       target.construction = { paidCost: 100, completedTicks: 0, totalTicks: 2 };
     unit(start, "attacker", TROOPER, "player", 23, 16);
-    const sim = fixture(start, rules, false, content);
+    const sim = fixture(start, { content });
     command(sim, { kind: "attack", actorId: "attacker", targetId: "target" });
     expect(sim.result).toBeUndefined();
     expect(player(sim).milestones.firstBaseAttack).toBe(0);
@@ -617,14 +599,7 @@ test.each(["defense", "relay", "unfinished"])(
 
 test("the final tick includes paid production and construction completion", () => {
   const sim = fixture();
-  expect(
-    command(sim, {
-      kind: "place-actor",
-      actorId: "built",
-      definitionId: BARRACKS,
-      origin: { x: 6, z: 2 },
-    }).accepted,
-  ).toBe(true);
+  expect(placeBarracks(sim, "built").accepted).toBe(true);
   train(sim, "trooper");
   expect(player(sim).unitsProduced).toBe(0);
   command(sim, { kind: "sell-actor", actorId: "enemy" }, { owner: "rival" });
@@ -645,15 +620,13 @@ test("the final tick includes paid production and construction completion", () =
 
 test("military readiness waits for support and does not require a queued unit", () => {
   const state = initial();
-  const barracks = state.actors.find((actor) => actor.id === "barracks")!;
+  const barracks = actorIn(state, "barracks");
   barracks.tilePlacement!.origin = { x: 25, z: 18 };
   delete barracks.headquartersId;
   const sim = fixture(state);
   expect(player(sim).milestones.militaryReady).toBeUndefined();
   // A direct setup grant can supply the disconnected producer before play.
-  const root = structuredClone(
-    state.actors.find((actor) => actor.id === "home")!,
-  );
+  const root = structuredClone(actorIn(state, "home"));
   root.id = "replacement";
   root.headquartersId = root.id;
   root.tilePlacement!.origin = { x: 22, z: 18 };
@@ -726,9 +699,8 @@ test.each(["cargo", "gathered", "population", "sample"])(
 );
 
 test("same-faction owners attribute production and spending to their own commands", () => {
-  const start = createScenarioState(
-    {
-      ...scenario,
+  const sim = fixture(
+    initial({
       buildings: [
         ...scenario.buildings,
         {
@@ -738,11 +710,8 @@ test("same-faction owners attribute production and spending to their own command
           origin: { x: 26, z: 6 },
         },
       ],
-    },
-    definitions,
+    }),
   );
-  start.fog = exploredFog(start);
-  const sim = fixture(start);
   sim.submitCommand({
     kind: "train-unit",
     actorId: "player-unit",
@@ -770,9 +739,8 @@ test("same-faction owners attribute production and spending to their own command
 });
 
 test("Circle paid growth and training use Lifebloom and the same milestone definitions", () => {
-  const start = createScenarioState(
-    {
-      ...scenario,
+  const sim = fixture(
+    initial({
       buildings: [
         {
           actorId: "heart",
@@ -787,11 +755,8 @@ test("Circle paid growth and training use Lifebloom and the same milestone defin
           origin: { x: 30, z: 6 },
         },
       ],
-    },
-    definitions,
+    }),
   );
-  start.fog = exploredFog(start);
-  const sim = fixture(start);
   train(sim, "cultivator", "circle-cultivator", "heart");
   untilSeconds(sim, () => !!sim.actorById("cultivator"));
   expect(
@@ -823,7 +788,7 @@ test("Circle paid growth and training use Lifebloom and the same milestone defin
 
 test("losing a producer retains its spending and does not count queued units as losses", () => {
   const state = initial();
-  state.actors.find((actor) => actor.id === "barracks")!.health = 1;
+  actorIn(state, "barracks").health = 1;
   unit(state, "attacker", TROOPER, "rival", 11, 6);
   const sim = fixture(state);
   train(sim, "queued");
@@ -845,20 +810,13 @@ test("construction without an economy counts completion without payment", () => 
     ...rules,
     startingResourceSites: { player: [], rival: [] },
   };
-  const sim = fixture(state, skirmish);
-  expect(
-    command(sim, {
-      kind: "place-actor",
-      actorId: "free",
-      definitionId: BARRACKS,
-      origin: { x: 6, z: 2 },
-    }).accepted,
-  ).toBe(true);
+  const sim = fixture(state, { skirmish });
+  expect(placeBarracks(sim, "free").accepted).toBe(true);
   expect(player(sim)).toMatchObject({
     buildingsCompleted: 1,
     spent: { materials: 0, lifebloom: 0 },
   });
-  const restored = fixture(sim.snapshot(), skirmish);
+  const restored = fixture(sim.snapshot(), { skirmish });
   expect(restored.metrics).toEqual(sim.metrics);
 });
 
@@ -867,21 +825,21 @@ test("peak army includes a unit produced and destroyed within one tick", () => {
   delete state.economy;
   delete state.fog;
   const gun = {
-    ...structuredClone(definitions.find(({ id }) => id === CC)!),
+    ...structuredClone(definition(CC)),
     id: "test-armed-headquarters",
     weapon: {
-      ...definitions.find(({ id }) => id === TROOPER)!.weapon!,
+      ...definition(TROOPER).weapon!,
       damage: 200,
       range: 100,
     },
   };
-  state.actors.find(({ id }) => id === "enemy")!.definitionId = gun.id;
+  actorIn(state, "enemy").definitionId = gun.id;
   const skirmish = {
     ...rules,
     qualifyingDefinitionIds: [...rules.qualifyingDefinitionIds, gun.id],
     startingResourceSites: { player: [], rival: [] },
   };
-  const sim = fixture(state, skirmish, false, [...definitions, gun]);
+  const sim = fixture(state, { skirmish, content: [...definitions, gun] });
   sim.submitCommand({
     kind: "train-unit",
     actorId: "ephemeral",
@@ -900,7 +858,8 @@ test("peak army includes a unit produced and destroyed within one tick", () => {
     peakArmy: 1,
   });
   expect(
-    fixture(sim.snapshot(), skirmish, false, [...definitions, gun]).metrics,
+    fixture(sim.snapshot(), { skirmish, content: [...definitions, gun] })
+      .metrics,
   ).toEqual(sim.metrics);
 });
 
@@ -929,15 +888,7 @@ test.each(["production", "construction"])(
   (kind) => {
     const sim = fixture();
     if (kind === "production") train(sim, "pending");
-    else
-      expect(
-        command(sim, {
-          kind: "place-actor",
-          actorId: "pending",
-          definitionId: BARRACKS,
-          origin: { x: 6, z: 2 },
-        }).accepted,
-      ).toBe(true);
+    else expect(placeBarracks(sim, "pending").accepted).toBe(true);
     const state = sim.snapshot();
     state.metrics!.owners[0]!.spent.materials = 0;
     expect(() => fixture(state)).toThrow("invalid match metrics");
@@ -976,41 +927,32 @@ test("committed metrics share immutable history without exposing mutable counter
 });
 
 test("explicit null cargo provenance is rejected even for an empty worker", () => {
-  const state = createScenarioState(
-    {
-      ...scenario,
-      units: [
-        {
-          actorId: "worker",
-          definitionId: "arc-harvester",
-          owner: "player",
-          tile: { x: 14, z: 12 },
-        },
-      ],
-    },
-    definitions,
-  );
+  const state = initial({
+    units: [
+      {
+        actorId: "worker",
+        definitionId: "arc-harvester",
+        owner: "player",
+        tile: { x: 14, z: 12 },
+      },
+    ],
+  });
   state.economy!.harvesters[0]!.cargoSources = null as never;
   expect(() => fixture(state)).toThrow("invalid economy state");
 });
 
 test("cultivation cargo capacity includes the fractional remainder", () => {
-  const state = createScenarioState(
-    {
-      ...scenario,
-      units: [
-        {
-          actorId: "worker",
-          definitionId: "circle-cultivator",
-          owner: "player",
-          tile: { x: 14, z: 6 },
-        },
-      ],
-    },
-    definitions,
-  );
-  const capacity = definitions.find(({ id }) => id === "circle-cultivator")!
-    .cultivation!.capacity;
+  const state = initial({
+    units: [
+      {
+        actorId: "worker",
+        definitionId: "circle-cultivator",
+        owner: "player",
+        tile: { x: 14, z: 6 },
+      },
+    ],
+  });
+  const capacity = definition("circle-cultivator").cultivation!.capacity;
   Object.assign(state.economy!.cultivation!.workers[0]!, {
     cargo: capacity,
     gatherProgress: 1,

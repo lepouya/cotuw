@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import {
   actorAnimationState,
   extractHealthAndDamageEffects,
@@ -9,6 +10,7 @@ import { createActor } from "../src/simulation/actor";
 
 import type { ActorDefinition } from "../src/simulation/actor";
 import type { ActorPresentation } from "../src/content/presentation";
+import type { ActorAppearance } from "../src/render/actor";
 
 describe("session effects extraction", () => {
   const map = new TerrainMap({
@@ -71,6 +73,20 @@ describe("session effects extraction", () => {
     ],
   ]);
 
+  const context = (selectedActorIds: string[]) => ({
+    definitions,
+    appearances: new Map([
+      ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as ActorAppearance],
+    ]),
+    presentationOf: (id: string) => presentations.get(id),
+    groundPositionOf: () => undefined,
+    buildingTopHeightOf: () => undefined,
+    map,
+    completedTicks: 10,
+    tickSeconds: 0.25,
+    selectedActorIds,
+  });
+
   test("extracts health bars and damage effects for damaged actors", () => {
     const actor = createActor({
       id: "unit-1",
@@ -80,23 +96,9 @@ describe("session effects extraction", () => {
     });
     actor.health = 40;
 
-    const context = {
-      definitions,
-      appearances: new Map([
-        ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as any],
-      ]),
-      presentationOf: (id: string) => presentations.get(id),
-      groundPositionOf: () => undefined,
-      buildingTopHeightOf: () => undefined,
-      map,
-      completedTicks: 10,
-      tickSeconds: 0.25,
-      selectedActorIds: ["unit-1"],
-    };
-
     const { bars, damaged, regenerating } = extractHealthAndDamageEffects(
       [actor],
-      context,
+      context(["unit-1"]),
     );
 
     expect(bars).toHaveLength(1);
@@ -121,21 +123,10 @@ describe("session effects extraction", () => {
     actor.health = 80;
     actor.territory = { mode: "regenerating", home: { x: 4, z: 4 } };
 
-    const context = {
-      definitions,
-      appearances: new Map([
-        ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as any],
-      ]),
-      presentationOf: (id: string) => presentations.get(id),
-      groundPositionOf: () => undefined,
-      buildingTopHeightOf: () => undefined,
-      map,
-      completedTicks: 10,
-      tickSeconds: 0.25,
-      selectedActorIds: [],
-    };
-
-    const { regenerating } = extractHealthAndDamageEffects([actor], context);
+    const { regenerating } = extractHealthAndDamageEffects(
+      [actor],
+      context([]),
+    );
     expect(regenerating).toHaveLength(1);
     expect(regenerating[0].id).toBe("unit-2");
   });

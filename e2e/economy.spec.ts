@@ -152,26 +152,18 @@ async function upload(page: Page, source: string) {
   await expect(page.locator("#game-menu")).toBeVisible();
 }
 
-test("unknown tutorial dismissals cannot corrupt a saved mission", async ({
-  page,
-}) => {
+test("saved missions keep dismissed tutorials", async ({ page }) => {
   await controlledOpening(page);
-  const result = await page.evaluate(async () => {
+  const dismissed = await page.evaluate(async () => {
     const { loadMission } = await import("/src/mission-loading.ts");
     const { view } = window.sessionHarness;
     view.dismissPopup("support-network");
-    let rejected = false;
-    try {
-      view.dismissPopup("missing-guide");
-    } catch (error) {
-      rejected = error instanceof RangeError;
-    }
     const restored = loadMission(
       view.save({ name: "Tutorial review", savedAt: "2026-10-15T12:00:00Z" }),
     );
-    return { rejected, dismissed: restored.uiState?.dismissedPopups };
+    return restored.uiState?.dismissedPopups;
   });
-  expect(result).toEqual({ rejected: true, dismissed: ["support-network"] });
+  expect(dismissed).toEqual(["support-network"]);
 });
 
 test("paused inspection allows selection but blocks orders and placement", async ({
@@ -409,7 +401,7 @@ test("construction order and training cards follow the selected building", async
   await expect(cards).toHaveCount(0);
 });
 
-test("recreating economy controls lists only discovered resources once", async ({
+test("economy controls list only discovered resources once", async ({
   page,
 }) => {
   await controlledOpening(page);

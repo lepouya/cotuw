@@ -59,7 +59,7 @@ const patch = (x: number, z: number): TileCoord[] => [
   { x: x + 1, z: z + 1 },
 ];
 
-export const SKIRMISH_STARTS: SkirmishMap["starts"] = deepFreeze([
+const SKIRMISH_STARTS: SkirmishMap["starts"] = deepFreeze([
   {
     id: "west",
     baseArea: { minX: 8, maxX: 35, minZ: 44, maxZ: 75 },
@@ -117,7 +117,7 @@ const northCrossing = {
 };
 
 /** Stable areas support starting-income attribution for either faction. */
-export const SKIRMISH_RESOURCE_AREAS: readonly ResourceArea[] = deepFreeze([
+const SKIRMISH_RESOURCE_AREAS: readonly ResourceArea[] = deepFreeze([
   ...westAreas.map((area) => ({
     ...area,
     id: `west-${area.id}`,

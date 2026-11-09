@@ -1,21 +1,77 @@
 import { expect } from "vitest";
+
+import { MOVEMENT_PROFILES } from "./content";
+import { createActor } from "../../src/simulation/actor";
+import { createMissionSimulation } from "../../src/simulation/mission";
+import {
+  parseMission,
+  serializeMission,
+} from "../../src/simulation/mission-file";
+import { OccupancyGrid } from "../../src/simulation/occupancy";
 import { createScenarioState } from "../../src/simulation/scenario";
 import {
   balanceOf,
   depositedBy,
   stockpileOf,
 } from "../../src/simulation/stockpiles";
+import { createTerrainMoveBehavior } from "../../src/simulation/terrain-movement";
+
+import type { ActorBehavior } from "../../src/simulation/actor";
 import type {
   CommandIssuer,
   MissionCommand,
 } from "../../src/simulation/command";
 import type { EconomyView } from "../../src/simulation/economy";
+import type { MissionScenario } from "../../src/simulation/mission-file";
 import type { Resource } from "../../src/simulation/resources";
 import type { Stockpile } from "../../src/simulation/stockpiles";
 import type {
   MissionSimulation,
+  MissionSimulationOptions,
   MissionState,
 } from "../../src/simulation/mission";
+import type { TerrainGrid } from "../../src/simulation/terrain";
+import type { WorldPosition } from "../../src/simulation/world";
+
+/**
+ * Wires a simulation as `createSessionSimulation` does, with the state, tick
+ * length, and idle update a rule test chooses. Changing the returned `movement`
+ * changes the behavior the simulation runs.
+ */
+export function startMission(
+  map: TerrainGrid,
+  {
+    idleUpdate = () => {},
+    ...options
+  }: Omit<
+    MissionSimulationOptions,
+    "behaviorRegistry" | "bounds" | "map" | "occupancy"
+  > & { idleUpdate?: ActorBehavior["update"] },
+) {
+  const occupancy = new OccupancyGrid(map);
+  const movement = createTerrainMoveBehavior(map, occupancy, MOVEMENT_PROFILES);
+  const simulation = createMissionSimulation({
+    ...options,
+    map,
+    occupancy,
+    bounds: map.worldBounds,
+    behaviorRegistry: new Map([
+      ["terrain-move", movement],
+      ["idle", { handleCommand: () => false, update: idleUpdate }],
+    ]),
+  });
+  return { simulation, map, occupancy, movement };
+}
+
+/** A running simulation's state after a round trip through its mission file. */
+export const savedState = (
+  scenario: MissionScenario,
+  sim: Pick<MissionSimulation, "snapshot" | "tickSeconds">,
+) =>
+  parseMission(
+    serializeMission(scenario, sim.snapshot(), sim.tickSeconds),
+    sim.tickSeconds,
+  ).state;
 
 /** The player owns one faction's actors; wolves belong to hostile wildlife. */
 export function playerOwners(faction: string) {
@@ -52,6 +108,21 @@ export const exploredFog = ({
   ),
 });
 
+/** Adds a unit to a running mission, the player's by default. */
+export function spawnUnit(
+  sim: MissionSimulation,
+  id: string,
+  definitionId: string,
+  worldPosition: WorldPosition,
+  owner = "player",
+) {
+  sim.spawnActor(createActor({ id, definitionId, owner, worldPosition }));
+}
+
+/** An actor in state that a test is still arranging. */
+export const actorIn = (state: Pick<MissionState, "actors">, actorId: string) =>
+  state.actors.find(({ id }) => id === actorId)!;
+
 /** Submits one command and returns its outcome from the next tick. */
 export function command(
   sim: MissionSimulation,
@@ -60,6 +131,10 @@ export function command(
 ) {
   sim.submitCommand(value, issuer);
   return sim.tick()[0]!;
+}
+
+export function advanceTicks(sim: MissionSimulation, ticks: number) {
+  for (let tick = 0; tick < ticks; tick++) sim.tick();
 }
 
 export function advanceSeconds(sim: MissionSimulation, seconds: number) {

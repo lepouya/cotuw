@@ -91,7 +91,7 @@ import type { BuildingPlacementControls } from "./ui/building-placement";
 import type { ViewStyle } from "./content/content-pack";
 import { createAlertTracker } from "./ui/mission-alerts";
 import type { MissionAlert } from "./ui/mission-alerts";
-import { duePopup } from "./ui/popups";
+import { createPopupTracker } from "./ui/popups";
 import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
@@ -644,13 +644,14 @@ async function assembleGameSession(
     controlsDirty = false;
     raisePopup();
   };
-  const popups = mission.scenario.popups ?? [];
-  const popupIds = new Set(popups.map(({ id }) => id));
-  const dismissedPopups = new Set(mission.uiState?.dismissedPopups);
+  const popups = createPopupTracker(
+    mission.scenario.popups ?? [],
+    mission.uiState,
+  );
   let raisedPopup: string | undefined;
   const raisePopup = () => {
     if (halted()) return;
-    const popup = duePopup(popups, dismissedPopups, {
+    const popup = popups.due({
       placing: placement.definitionId,
       owns: (id) =>
         player
@@ -1138,9 +1139,7 @@ async function assembleGameSession(
       controlsDirty = true;
     },
     dismissPopup: (id) => {
-      if (!popupIds.has(id))
-        throw new RangeError(`Unknown scenario popup: ${id}.`);
-      dismissedPopups.add(id);
+      popups.dismiss(id);
       controlsDirty = true;
     },
     focus: (point) =>
@@ -1150,12 +1149,7 @@ async function assembleGameSession(
         mission.scenario,
         simulation.snapshot(),
         SIMULATION_TICK_SECONDS,
-        {
-          save: info,
-          ...(dismissedPopups.size > 0 && {
-            uiState: { dismissedPopups: [...dismissedPopups] },
-          }),
-        },
+        { save: info, uiState: popups.uiState() },
       ),
     selectActor: (actorId, additive = false) => {
       if (simulationFaulted || placement.active) return;

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
+import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createSessionMap } from "../src/render/terrain-style";
-import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import {
   createMissionSimulation,
@@ -13,10 +13,10 @@ import { OccupancyGrid } from "../src/simulation/occupancy";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { parseMission } from "../src/simulation/mission-file";
+import { traversalCostAt } from "../src/simulation/navigation";
 
 import type { ActorCommand } from "../src/simulation/command";
 import type { MovementProfile } from "../src/simulation/navigation";
-import { traversalCostAt } from "../src/simulation/navigation";
 
 const profile: MovementProfile = {
   id: "ground",
@@ -106,7 +106,7 @@ describe("terrain-move behavior", () => {
   });
 });
 
-describe("prototype movement map", () => {
+describe("session map", () => {
   test("renders authored scenario dimensions, heights, and terrain layers", () => {
     const terrain = new TerrainGrid({
       width: 3,
@@ -158,16 +158,16 @@ describe("prototype movement map", () => {
 
   test("contains passable paths, slow rough ground, water, and cliffs", () => {
     const map = createSessionMap(openingTerrain(), BASE_CONTENT.terrain);
-    const prototypeGround = MOVEMENT_PROFILES[0]!;
+    const ground = MOVEMENT_PROFILES[0]!;
 
     expect(map.terrainAt(50, 32).typeId).toBe("path");
     expect(map.terrainAt(50, 50).typeId).toBe("rough");
     expect(map.terrainAt(42, 58).typeId).toBe("water");
-    expect(traversalCostAt(map, prototypeGround, 50, 32)).toBeLessThan(1);
-    expect(traversalCostAt(map, prototypeGround, 50, 50)).toBeGreaterThan(2);
-    expect(traversalCostAt(map, prototypeGround, 42, 58)).toBeUndefined();
-    expect(traversalCostAt(map, prototypeGround, 60, 20)).toBeUndefined();
-    expect(traversalCostAt(map, prototypeGround, 62, 32)).toBeDefined();
+    expect(traversalCostAt(map, ground, 50, 32)).toBeLessThan(1);
+    expect(traversalCostAt(map, ground, 50, 50)).toBeGreaterThan(2);
+    expect(traversalCostAt(map, ground, 42, 58)).toBeUndefined();
+    expect(traversalCostAt(map, ground, 60, 20)).toBeUndefined();
+    expect(traversalCostAt(map, ground, 62, 32)).toBeDefined();
   });
 });
 

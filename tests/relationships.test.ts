@@ -1,12 +1,15 @@
 import { describe, expect, test } from "vitest";
+
 import {
+  actorIn,
   advanceSeconds,
   balance,
+  savedState,
   stockpiles,
   untilSeconds,
 } from "./helpers/scenario";
 import {
-  at,
+  atSeconds,
   contentMap,
   fixture,
   rivals,
@@ -24,7 +27,13 @@ import type {
   EconomyView,
   MaterialsSite,
 } from "../src/simulation/economy";
-import type { MissionState } from "../src/simulation/mission";
+import type {
+  MissionSimulation,
+  MissionState,
+} from "../src/simulation/mission";
+
+const playerExplored = (simulation: MissionSimulation, x: number, z: number) =>
+  simulation.viewOf(simulation.playerOwner).knowledge.fog!.isExplored(x, z);
 
 describe("owner relationships", () => {
   test("neutral owners neither engage nor accept Attack orders", () => {
@@ -51,7 +60,10 @@ describe("owner relationships", () => {
   test("timed events start a fight, and making peace ends it", () => {
     const { simulation } = fixture({
       units: [unit("trooper", 10), unit("visitor", 14, "rival")],
-      events: [at(1, [rivals("hostile")]), at(3, [rivals("neutral")])],
+      events: [
+        atSeconds(1, [rivals("hostile")]),
+        atSeconds(3, [rivals("neutral")]),
+      ],
     });
     advanceSeconds(simulation, 0.9);
     expect(simulation.relations.relationship("rival", "player")).toBe(
@@ -84,14 +96,10 @@ describe("owner relationships", () => {
       ],
       units: [unit("scout", 50, "rival", "arc-scout")],
       relationships: [{ owners: ["rival", "player"], relationship: "allied" }],
-      events: [at(1, [rivals("neutral")])],
+      events: [atSeconds(1, [rivals("neutral")])],
     });
     const scout = () => simulation.actorById("scout")!;
-    expect(
-      simulation
-        .viewOf(simulation.playerOwner)
-        .knowledge.fog!.isExplored(50, 10),
-    ).toBe(true);
+    expect(playerExplored(simulation, 50, 10)).toBe(true);
     expect(simulation.detects("player", scout())).toBe(true);
     expect(simulation.detects("rival", simulation.actorById("cc")!)).toBe(true);
     advanceSeconds(simulation, 1);
@@ -99,11 +107,7 @@ describe("owner relationships", () => {
     expect(simulation.detects("rival", simulation.actorById("cc")!)).toBe(
       false,
     );
-    expect(
-      simulation
-        .viewOf(simulation.playerOwner)
-        .knowledge.fog!.isExplored(50, 10),
-    ).toBe(true);
+    expect(playerExplored(simulation, 50, 10)).toBe(true);
   });
 
   test("support-sharing allies power and authorize construction until revoked", () => {
@@ -134,7 +138,7 @@ describe("owner relationships", () => {
           sharesSupport: true,
         },
       ],
-      events: [at(1, [rivals("allied")])],
+      events: [atSeconds(1, [rivals("allied")])],
     });
     const view = simulation.viewOf("player");
     expect(disconnectedBuildings(simulation.support).has("barracks")).toBe(
@@ -253,11 +257,7 @@ describe("owner relationships", () => {
       ],
       sites: [site("home", 50), site("hidden", 8)],
     });
-    expect(
-      simulation
-        .viewOf(simulation.playerOwner)
-        .knowledge.fog!.isExplored(50, 12),
-    ).toBe(false);
+    expect(playerExplored(simulation, 50, 12)).toBe(false);
     expect(simulation.sees("rival", contentMap.tileCenter(50, 12))).toBe(true);
     const rival = { owner: "rival" };
     simulation.submitCommand(
@@ -319,7 +319,7 @@ describe("owner relationships", () => {
         },
       ],
       edit: (state) => {
-        state.actors.find(({ id }) => id === "visitor")!.health = 1;
+        actorIn(state, "visitor").health = 1;
       },
     });
     untilSeconds(simulation, () => !simulation.actorById("visitor"), 10);
@@ -330,14 +330,14 @@ describe("owner relationships", () => {
   test("relationships and fired events continue identically after loading", () => {
     const setup: Setup = {
       units: [unit("trooper", 10), unit("visitor", 14, "rival")],
-      events: [at(1, [rivals("allied")]), at(2, [rivals("hostile")])],
+      events: [
+        atSeconds(1, [rivals("allied")]),
+        atSeconds(2, [rivals("hostile")]),
+      ],
     };
     const { simulation, content } = fixture(setup);
     advanceSeconds(simulation, 2.5);
-    const saved = parseMission(
-      serializeMission(content, simulation.snapshot(), TICK_SECONDS),
-      TICK_SECONDS,
-    ).state;
+    const saved = savedState(content, simulation);
     expect(saved.relationships).toEqual([
       { owners: ["player", "rival"], relationship: "hostile" },
     ]);
@@ -411,7 +411,7 @@ describe("owner relationships", () => {
     expect(() =>
       fixture({
         events: [
-          at(1, [{ ...rivals("allied"), owners: ["player", "nobody"] }]),
+          atSeconds(1, [{ ...rivals("allied"), owners: ["player", "nobody"] }]),
         ],
       }),
     ).toThrow("invalid event definition");
@@ -442,7 +442,7 @@ describe("shared resource pools", () => {
           owner: "player",
         },
       ],
-      events: [at(1, [sharing]), at(3, [rivals("allied")])],
+      events: [atSeconds(1, [sharing]), atSeconds(3, [rivals("allied")])],
       edit: lifebloom(31),
     });
     expect(totals(simulation)).toEqual([
@@ -466,7 +466,7 @@ describe("shared resource pools", () => {
       [1900, 31],
     ]);
     const restored = fixture(
-      { events: [at(1, [sharing]), at(3, [rivals("allied")])] },
+      { events: [atSeconds(1, [sharing]), atSeconds(3, [rivals("allied")])] },
       JSON.parse(JSON.stringify(simulation.snapshot())),
     ).simulation;
     for (const current of [simulation, restored]) {
@@ -482,7 +482,7 @@ describe("shared resource pools", () => {
 
   test("ending the alliance separates its pools", () => {
     const { simulation } = fixture({
-      events: [at(1, [sharing]), at(2, [rivals("hostile")])],
+      events: [atSeconds(1, [sharing]), atSeconds(2, [rivals("hostile")])],
     });
     advanceSeconds(simulation, 1.5);
     expect(simulation.economy!.stockpiles).toHaveLength(1);
@@ -639,11 +639,7 @@ describe("command authority", () => {
   test("placement builds for the issuing owner within that owner's knowledge", () => {
     const simulation = authorityFixture();
     const placement = barracks("rival-barracks");
-    expect(
-      simulation
-        .viewOf(simulation.playerOwner)
-        .knowledge.fog!.isExplored(44, 6),
-    ).toBe(false);
+    expect(playerExplored(simulation, 44, 6)).toBe(false);
     expect(simulation.evaluatePlacement(placement)).toMatchObject({
       accepted: false,
       reason: "unexplored",
@@ -747,14 +743,8 @@ describe("command authority", () => {
     const simulation = authorityFixture();
     const target = contentMap.tileCenter(46, 8);
     const hidden = contentMap.tileCenter(8, 8);
-    expect(
-      simulation
-        .viewOf(simulation.playerOwner)
-        .knowledge.fog!.isExplored(46, 8),
-    ).toBe(false);
-    expect(
-      simulation.viewOf(simulation.playerOwner).knowledge.fog!.isExplored(8, 8),
-    ).toBe(true);
+    expect(playerExplored(simulation, 46, 8)).toBe(false);
+    expect(playerExplored(simulation, 8, 8)).toBe(true);
     expect(simulation.evaluateRallyPoint("rival-refinery", target)).toBe(true);
     expect(simulation.evaluateRallyPoint("rival-refinery", hidden)).toBe(false);
     for (const point of [target, hidden])
@@ -815,11 +805,7 @@ describe("command authority", () => {
     const issuer = { owner: "player", script: undefined };
     simulation.submitCommand(move("trooper"), issuer);
     simulation.submitCommand({ kind: "terrain" }, issuer);
-    const file = parseMission(
-      serializeMission(content, simulation.snapshot(), TICK_SECONDS),
-      TICK_SECONDS,
-    );
-    const restored = fixture({}, file.state).simulation;
+    const restored = fixture({}, savedState(content, simulation)).simulation;
     const expected = [
       { accepted: true },
       { accepted: false, reason: "unauthorized" },

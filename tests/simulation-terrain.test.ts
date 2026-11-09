@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+
 import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createActor } from "../src/simulation/actor";
@@ -9,9 +10,11 @@ import {
 import { NavigationGrid } from "../src/simulation/navigation";
 import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { createTilePlacedActor } from "../src/simulation/placement";
+
 import type { ActorDefinition } from "../src/simulation/actor";
 import type { TerrainEdit, TerrainState } from "../src/simulation/terrain";
 import type { MissionCommand } from "../src/simulation/command";
+import type { WorldBounds } from "../src/simulation/world";
 
 const ground = {
   id: "ground",
@@ -20,6 +23,19 @@ const ground = {
   terrainCosts: { plain: 1 },
 };
 const makeMap = () => new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
+
+const emptyMission = (
+  map: TerrainGrid,
+  bounds: WorldBounds = map.worldBounds,
+) =>
+  createMissionSimulation({
+    state: createMissionState([]),
+    definitions: [],
+    behaviorRegistry: new Map(),
+    map,
+    tickSeconds: 1,
+    bounds,
+  });
 
 describe("simulation terrain", () => {
   test.each(["heights", "tiles"])(
@@ -44,14 +60,7 @@ describe("simulation terrain", () => {
     "a sparse %s command is rejected without faulting the mission",
     (field) => {
       const map = makeMap();
-      const simulation = createMissionSimulation({
-        state: createMissionState([]),
-        definitions: [],
-        behaviorRegistry: new Map(),
-        map,
-        tickSeconds: 0.1,
-        bounds: map.worldBounds,
-      });
+      const simulation = emptyMission(map);
       const before = map.terrainState();
       simulation.submitCommand(
         { kind: "terrain", [field]: Array(1) } as MissionCommand,
@@ -79,14 +88,7 @@ describe("simulation terrain", () => {
       const map = makeMap();
       const before = map.terrainState();
       expect(() =>
-        createMissionSimulation({
-          state: createMissionState([]),
-          definitions: [],
-          behaviorRegistry: new Map(),
-          map,
-          tickSeconds: 0.1,
-          bounds: { ...map.worldBounds, ...bounds },
-        }),
+        emptyMission(map, { ...map.worldBounds, ...bounds }),
       ).toThrow("bounds cannot exceed the terrain map");
       expect(map.terrainState()).toEqual(before);
     },
@@ -147,6 +149,7 @@ describe("simulation terrain", () => {
     expect(grid.regionAt(1, 1)).toBe(-1);
     expect(grid.costAt(4, 2)).toBe(1);
   });
+
   test("round-trips a moving actor on a nonblocking footprint without a renderer", () => {
     const map = makeMap();
     const definitions: ActorDefinition[] = [
@@ -254,14 +257,7 @@ describe("simulation terrain", () => {
     },
   ])("rejects malformed terrain commands atomically: %j", (invalid) => {
     const map = makeMap();
-    const mission = createMissionSimulation({
-      map,
-      state: createMissionState([]),
-      definitions: [],
-      behaviorRegistry: new Map(),
-      bounds: map.worldBounds,
-      tickSeconds: 1,
-    });
+    const mission = emptyMission(map);
     const before = map.terrainState();
     mission.submitCommand(
       { kind: "terrain", ...invalid } as TerrainEdit & { kind: "terrain" },

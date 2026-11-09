@@ -1,14 +1,12 @@
 import { describe, expect, test } from "vitest";
 
+import { BASE_CONTENT } from "./helpers/content";
 import { factionName, parseContentPack } from "../src/content/content-pack";
 import { terrainLayers } from "../src/render/terrain-style";
 import { TerrainGrid } from "../src/simulation/terrain";
-import { BASE_CONTENT } from "./helpers/content";
 
 const withEdit = (edit: (pack: any) => void) => {
   const pack = structuredClone(BASE_CONTENT) as any;
-  pack.format = "cotuw-content";
-  pack.formatVersion = 1;
   edit(pack);
   return () => parseContentPack(JSON.stringify(pack));
 };
@@ -24,11 +22,13 @@ describe("content packs", () => {
       ).toThrow("needs faction IDs with nonempty display names");
     },
   );
+
   test("faction names ignore unnamed factions and inherited keys", () => {
     expect(factionName(BASE_CONTENT, "circle")).toBe("Circle of Repose");
     expect(factionName(BASE_CONTENT, "toString")).toBeUndefined();
     expect(factionName(BASE_CONTENT, undefined)).toBeUndefined();
   });
+
   test("production buttons require actors that support their actions", () => {
     expect(
       withEdit((pack) => {
@@ -47,6 +47,7 @@ describe("content packs", () => {
       }),
     ).toThrow("train action without a mobile unit");
   });
+
   test.each([-1, "first", null])(
     "rejects invalid building order %j",
     (order) => {
@@ -72,6 +73,7 @@ describe("content packs", () => {
       ).toThrow(RangeError);
     },
   );
+
   test.each(["constructor", "toString", "__proto__"])(
     "unstyled terrain %s has no inherited layer rules",
     (typeId) => {
@@ -113,6 +115,7 @@ describe("content packs", () => {
       }),
     ).toThrow("unknown building details");
   });
+
   test("the base pack presents every actor it defines", () => {
     for (const { id } of BASE_CONTENT.actors)
       expect(BASE_CONTENT.presentation[id]?.name, id).toBeTruthy();
@@ -184,9 +187,7 @@ describe("content packs", () => {
       height: 1,
       tileSize: 1,
       terrainTypeIds: ["plain", "rough", "water"],
-      createTerrain: (x) => ({
-        typeId: x === 0 ? "rough" : x === 1 ? "plain" : "water",
-      }),
+      createTerrain: (x) => ({ typeId: ["rough", "plain"][x] ?? "water" }),
     });
     const layers = terrainLayers(BASE_CONTENT.terrain);
     const ids = (x: number) =>

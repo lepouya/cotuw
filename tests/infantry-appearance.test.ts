@@ -1,30 +1,24 @@
-import { NullEngine, Scene } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
-import { INFANTRY_IDS } from "../scripts/infantry-model";
+import { testScene } from "./helpers/scene";
 import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
+import { INFANTRY_IDS } from "../scripts/infantry-model";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 
+import type { AbstractMesh, Scene, TransformNode } from "@babylonjs/core";
 import type { ActorGraphics } from "../src/content/presentation";
-import type { AbstractMesh, TransformNode } from "@babylonjs/core";
 import type { SkinnedActorOptions } from "../src/render/skinned-actor-appearance";
 
 /** Loads through the real glTF loader, from the committed file. */
 async function load(graphics: ActorGraphics, options?: SkinnedActorOptions) {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
-  try {
-    const appearance = await loadSkinnedActorAppearance(
-      scene,
-      { ...graphics, url: glbDataUrl(graphics.url) },
-      options,
-    );
-    return { engine, scene, appearance };
-  } catch (error) {
-    engine.dispose();
-    throw error;
-  }
+  const scene = testScene();
+  const appearance = await loadSkinnedActorAppearance(
+    scene,
+    { ...graphics, url: glbDataUrl(graphics.url) },
+    options,
+  );
+  return { scene, appearance };
 }
 
 /** A joint's height above the actor's ground point. */
@@ -47,7 +41,7 @@ const glbModels = Object.entries(BASE_CONTENT.presentation).flatMap(
 
 describe.each(glbModels)("%s model", (id, graphics) => {
   test("gives each instance its own rig and clips", async () => {
-    const { engine, scene, appearance } = await load(graphics);
+    const { scene, appearance } = await load(graphics);
     const first = appearance.instantiate("first", 0);
     const second = appearance.instantiate("second", 0.5);
     const skeleton = skinnedMesh(first.root).skeleton!;
@@ -86,11 +80,10 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       scene.animationGroups.some(({ name }) => name.startsWith("first-")),
     ).toBe(false);
     expect(skinnedMesh(second.root).isDisposed()).toBe(false);
-    engine.dispose();
   });
 
   test("faces +Z and blends walking with a lean either way", async () => {
-    const { engine, scene, appearance } = await load(graphics);
+    const { scene, appearance } = await load(graphics);
     const lean = (turn: number) => {
       const instance = appearance.instantiate(`lean${turn}`, 0);
       const node = (joint: string) =>
@@ -121,13 +114,12 @@ describe.each(glbModels)("%s model", (id, graphics) => {
     expect(right.stride).toBeGreaterThan(0.1);
     expect(Math.abs(right.spine)).toBeGreaterThan(0.01);
     expect(Math.sign(left.spine)).toBe(-Math.sign(right.spine));
-    engine.dispose();
   });
 
   test.runIf(graphics.clips.attack)(
     "layers an attack over idle and returns to its resting pose",
     async () => {
-      const { engine, scene, appearance } = await load(graphics);
+      const { scene, appearance } = await load(graphics);
       const instance = appearance.instantiate("shooter", 0);
       const spine = () =>
         scene.getTransformNodeByName("shooter-spine")!.rotationQuaternion!.x;
@@ -147,12 +139,11 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       expect(step(6)).toBeLessThan(-0.02);
       step(60);
       expect(spine()).toBeCloseTo(0);
-      engine.dispose();
     },
   );
 
   test("runs only the clips that currently shape the pose", async () => {
-    const { engine, scene, appearance } = await load(graphics);
+    const { scene, appearance } = await load(graphics);
     const instance = appearance.instantiate("lazy", 0);
     const running = () =>
       scene.animationGroups
@@ -172,13 +163,12 @@ describe.each(glbModels)("%s model", (id, graphics) => {
     // Settled gait weights release their clips.
     frames(120, 0);
     expect(running()).toEqual([graphics.clips.idle]);
-    engine.dispose();
   });
 
   test.runIf(graphics.clips.death)(
     "falls once and holds the last pose",
     async () => {
-      const { engine, scene, appearance } = await load(graphics);
+      const { scene, appearance } = await load(graphics);
       const instance = appearance.instantiate("fallen", 0);
       const head = () => jointHeight(scene, "fallen-head");
       instance.die!(0);
@@ -199,13 +189,12 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       expect(fallen).toBeGreaterThan(0);
       expect(jointHeight(scene, "fallen-left-shin")).toBeGreaterThan(0);
       expect(head()).toBeCloseTo(fallen);
-      engine.dispose();
     },
   );
 
   test("reduced motion skips recoil and shows remains already fallen", async () => {
     let reduced = true;
-    const { engine, scene, appearance } = await load(graphics, {
+    const { scene, appearance } = await load(graphics, {
       reducedMotion: () => reduced,
     });
     const instance = appearance.instantiate("still", 0);
@@ -225,14 +214,13 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       scene.animate();
       expect(still).toBeCloseTo(jointHeight(scene, "remains-head"));
     }
-    engine.dispose();
   });
 
   test.runIf(graphics.clips.attack)(
     "restarts attacks and cancels them when reduced motion changes",
     async () => {
       let reduced = false;
-      const { engine, scene, appearance } = await load(graphics, {
+      const { scene, appearance } = await load(graphics, {
         reducedMotion: () => reduced,
       });
       const instance = appearance.instantiate("shooter", 0);
@@ -260,7 +248,6 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       instance.play!("attack");
       step(1);
       expect(spine()).toBeCloseTo(0);
-      engine.dispose();
     },
   );
 

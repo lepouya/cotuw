@@ -206,27 +206,6 @@ test(
   },
 );
 
-test("a tick-zero save does not replace the authored restart level", async ({
-  page,
-}) => {
-  await openOpening(page);
-  await expectTerrainReady(page);
-  const source = await page.evaluate(async () => {
-    const { level } = await import("/e2e/missions.ts");
-    const mission = level();
-    mission.state.economy!.stockpiles[0].amount = 77;
-    const { serializeMission } =
-      await import("/src/simulation/mission-file.ts");
-    return serializeMission(mission.scenario, mission.state, 1 / 60, {
-      save: { name: "Immediate save", savedAt: "2026-10-04T10:00:00Z" },
-    });
-  });
-  await importMission(page, source);
-  await expect(materials(page)).toHaveText("77");
-  await page.locator("#restart-mission").click();
-  await expect(materials(page)).toHaveText("150");
-});
-
 test("invalid scenario metadata leaves the current session intact", async ({
   page,
 }) => {

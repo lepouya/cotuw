@@ -1,9 +1,10 @@
 import { expect, test, vi } from "vitest";
+
+import { BASE_CONTENT } from "./helpers/content";
 import { createSandboxLevel } from "../scripts/levels/sandbox-level";
 import { loadMission } from "../src/mission-loading";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { serializeMission } from "../src/simulation/mission-file";
-import { BASE_CONTENT } from "./helpers/content";
 
 vi.mock("../scripts/levels/arc-economy-opening", () => {
   throw new Error("Sandbox authoring loaded the M0 mission.");

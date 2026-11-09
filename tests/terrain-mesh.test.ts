@@ -1,6 +1,7 @@
-import { Color4, NullEngine, Scene } from "@babylonjs/core";
+import { Color4 } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
+import { testScene } from "./helpers/scene";
 import { cornerAlpha, TerrainMap } from "../src/map";
 import {
   chunksForBounds,
@@ -154,8 +155,7 @@ describe("cornerAlpha", () => {
 
 describe("createTerrainMeshes", () => {
   test("groups and feathers layers by type ID, not object identity", () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
+    const scene = testScene();
     // Each tile builds its own type object, as loaded or modded maps may.
     const map = new TerrainMap({
       width: 2,
@@ -188,12 +188,10 @@ describe("createTerrainMeshes", () => {
     ).toBe(1);
     expect(overlay).toHaveLength(3);
     expect(overlay.every(({ isPickable }) => !isPickable)).toBe(true);
-    engine.dispose();
   });
 
   test("height edits refresh slope fading on both sides of a chunk boundary", () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
+    const scene = testScene();
     const map = new TerrainMap({
       width: 33,
       height: 1,
@@ -228,12 +226,10 @@ describe("createTerrainMeshes", () => {
     expect(alphas(0).every((a) => a === 1)).toBe(true);
     expect(alphas(1)).toEqual([1, 1, 1, 1]);
     view.dispose();
-    engine.dispose();
   });
 
   test("clip layers split into phase groups that wrap with the cycle", () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
+    const scene = testScene();
     const map = new TerrainMap({
       width: CLIP_PHASE_GROUPS + 1,
       height: 1,
@@ -274,12 +270,10 @@ describe("createTerrainMeshes", () => {
     ).toBe(8);
     // Frames are not drawn until the sheet loads.
     expect(grass.every(({ material }) => material!.alpha === 0)).toBe(true);
-    engine.dispose();
   });
 
   test("rejects conflicting definitions for one type ID", () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
+    const scene = testScene();
     const map = new TerrainMap({
       width: 2,
       height: 1,
@@ -302,7 +296,6 @@ describe("createTerrainMeshes", () => {
     expect(() => createTerrainMeshes(scene, map)).toThrow(
       "Conflicting terrain tile type ID: ground",
     );
-    engine.dispose();
   });
 });
 

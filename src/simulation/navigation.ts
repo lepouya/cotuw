@@ -561,7 +561,7 @@ export function occupiedTile(
 }
 
 /** The tile a mover occupies when it leaves `position` in this direction. */
-export function tileAlong(
+function tileAlong(
   map: TerrainView,
   position: WorldPosition,
   xDirection: number,

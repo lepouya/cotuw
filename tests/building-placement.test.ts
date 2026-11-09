@@ -1,6 +1,7 @@
-import { Matrix, NullEngine, Scene, Vector3 } from "@babylonjs/core";
+import { Matrix, Vector3 } from "@babylonjs/core";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
+import { testScene } from "./helpers/scene";
 import { TerrainMap } from "../src/map";
 import { createPlacementPreview } from "../src/render/placement-preview";
 import { createBuildingPlacement } from "../src/ui/building-placement";
@@ -58,8 +59,7 @@ function fixture(
   retiredIds: string[] = [],
   saved?: MissionState,
 ) {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
+  const scene = testScene();
   const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
   const state = createMissionState(actors);
   state.retiredActorIds = retiredIds;
@@ -141,7 +141,6 @@ function fixture(
       placement.dispose();
       preview.dispose();
       simulation.dispose();
-      engine.dispose();
     },
   };
 }

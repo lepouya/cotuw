@@ -23,7 +23,7 @@ export type GroupDestination = {
 };
 
 /** World-space radius for friendly separation; zero opts out. */
-export function separationRadius(definition: ActorDefinition): number {
+function separationRadius(definition: ActorDefinition): number {
   return definition.movement?.radius ?? 0;
 }
 

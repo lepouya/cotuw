@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import { TerrainGrid } from "../src/simulation/terrain";
 import { terrainSightlineClear } from "../src/simulation/terrain-sightline";
 

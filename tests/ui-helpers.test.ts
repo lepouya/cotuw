@@ -52,7 +52,7 @@ describe("createKeyedList", () => {
     const container = new ContainerStub();
     const released: string[] = [];
     const signal = new AbortController();
-    const list = createKeyedList(
+    const rows = createKeyedList(
       container as unknown as HTMLElement,
       (key: string) => key,
       (key) => ({
@@ -63,12 +63,12 @@ describe("createKeyedList", () => {
       }),
       signal.signal,
     );
-    list.update(["a", "b"]);
-    list.update(["b"]);
+    rows.update(["a", "b"]);
+    rows.update(["b"]);
     expect(released).toEqual(["a"]);
     signal.abort();
-    list.dispose();
-    list.update(["c"]);
+    rows.dispose();
+    rows.update(["c"]);
     expect(released).toEqual(["a", "b"]);
     expect(container.children).toEqual([]);
   });

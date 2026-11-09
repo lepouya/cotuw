@@ -1,13 +1,10 @@
 import { ARC_ACTOR_DEFINITIONS } from "./content";
-import { exploredFog, stockpiles } from "./scenario";
-import { createMissionSimulation } from "../../src/simulation/mission";
-import { OccupancyGrid } from "../../src/simulation/occupancy";
+import { exploredFog, startMission, stockpiles } from "./scenario";
 import {
   createScenarioState,
   defineScenario,
 } from "../../src/simulation/scenario";
 import { TerrainGrid } from "../../src/simulation/terrain";
-import { createTerrainMoveBehavior } from "../../src/simulation/terrain-movement";
 
 import type { ScriptControl } from "../../src/simulation/authority";
 import type { MissionEventDefinition } from "../../src/simulation/events";
@@ -20,7 +17,7 @@ import type { ScenarioUnit } from "../../src/simulation/scenario";
 
 // Two ARC owners, the player and a rival, on a flat 60 x 20 map.
 export const TICK_SECONDS = 0.1;
-export const mapOptions = {
+const mapOptions = {
   width: 60,
   height: 20,
   tileSize: 1,
@@ -42,7 +39,7 @@ export type Setup = {
   edit?: (state: MissionState) => void;
 };
 
-export function scenario({
+function scenario({
   units = [],
   buildings = [],
   relationships = [],
@@ -82,32 +79,13 @@ export function fixture(setup: Setup = {}, state?: MissionState) {
   const initial = state ?? createScenarioState(content, ARC_ACTOR_DEFINITIONS);
   if (!state && setup.explored) initial.fog = exploredFog(initial);
   setup.edit?.(initial);
-  const map = new TerrainGrid(mapOptions);
-  const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
+  const { simulation } = startMission(new TerrainGrid(mapOptions), {
     state: initial,
     objectives: content.objectives,
     events: content.events,
     scriptControl: content.scriptControl,
     definitions: ARC_ACTOR_DEFINITIONS,
-    map,
-    occupancy,
     tickSeconds: TICK_SECONDS,
-    bounds: map.worldBounds,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, [
-          {
-            id: "surface-ground",
-            maxSlope: 0.75,
-            slopeCostAtLimit: 2,
-            terrainCosts: { plain: 1, path: 1, rough: 2, water: null },
-          },
-        ]),
-      ],
-      ["idle", { handleCommand: () => false, update: () => {} }],
-    ]),
   });
   return { simulation, content };
 }
@@ -119,7 +97,7 @@ export const unit = (
   definitionId = "arc-trooper",
 ): ScenarioUnit => ({ actorId, definitionId, owner, tile: { x, z: 10 } });
 
-export const at = (
+export const atSeconds = (
   seconds: number,
   actions: MissionEventDefinition["actions"],
 ) => ({

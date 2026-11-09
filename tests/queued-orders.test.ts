@@ -1,20 +1,24 @@
 import { describe, expect, test } from "vitest";
-import { ECONOMY_ACTOR_DEFINITIONS } from "./helpers/content";
+
+import { BASE_CONTENT } from "./helpers/content";
 import {
+  actorIn,
+  advanceTicks,
   exploredScenarioState,
   playerOwners,
+  savedState,
+  startMission,
   stockpiles,
 } from "./helpers/scenario";
-import { createMissionSimulation } from "../src/simulation/mission";
 import { isMissionCommand } from "../src/simulation/command";
-import { OccupancyGrid } from "../src/simulation/occupancy";
 import { defineScenario } from "../src/simulation/scenario";
-import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { distance } from "../src/simulation/world";
 
-import type { MissionState } from "../src/simulation/mission";
+import type {
+  MissionSimulation,
+  MissionState,
+} from "../src/simulation/mission";
 import type { ScenarioUnit } from "../src/simulation/scenario";
 import type { WorldPosition } from "../src/simulation/world";
 
@@ -25,8 +29,8 @@ const mapOptions = {
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
 };
-const at = (x: number, z: number) =>
-  new TerrainGrid(mapOptions).tileCenter(x, z);
+const contentMap = new TerrainGrid(mapOptions);
+const at = (x: number, z: number) => contentMap.tileCenter(x, z);
 const unit = (
   actorId: string,
   definitionId: string,
@@ -40,7 +44,7 @@ function scenario(units: ScenarioUnit[]) {
     tileSize: 1,
     ...playerOwners("arc"),
     terrainTypeIds: mapOptions.terrainTypeIds,
-    terrain: new TerrainGrid(mapOptions).terrainState(),
+    terrain: contentMap.terrainState(),
     buildings: [
       {
         actorId: "cc",
@@ -57,39 +61,33 @@ function scenario(units: ScenarioUnit[]) {
 
 function fixture(
   units: ScenarioUnit[],
-  state?: MissionState,
-  edit?: (state: MissionState) => void,
+  {
+    state,
+    edit,
+  }: { state?: MissionState; edit?: (state: MissionState) => void } = {},
 ) {
-  const map = new TerrainGrid(mapOptions);
-  const occupancy = new OccupancyGrid(map);
   const initial =
-    state ?? exploredScenarioState(scenario(units), ECONOMY_ACTOR_DEFINITIONS);
+    state ?? exploredScenarioState(scenario(units), BASE_CONTENT.actors);
   edit?.(initial);
-  return createMissionSimulation({
+  return startMission(new TerrainGrid(mapOptions), {
     state: initial,
-    definitions: ECONOMY_ACTOR_DEFINITIONS,
-    map,
-    occupancy,
+    definitions: BASE_CONTENT.actors,
     tickSeconds: TICK_SECONDS,
-    bounds: map.worldBounds,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, [
-          {
-            id: "surface-ground",
-            maxSlope: 0.75,
-            slopeCostAtLimit: 2,
-            terrainCosts: { plain: 1, path: 0.8, rough: 2.25, water: null },
-          },
-        ]),
-      ],
-      ["idle", { handleCommand: () => false, update: () => {} }],
-    ]),
-  });
+  }).simulation;
 }
 
 const scouts = [unit("a", "arc-scout", 8, 10), unit("b", "arc-scout", 8, 12)];
+
+/** Scout "a" moves and queues a second move behind it. */
+function moveThenQueue(simulation: MissionSimulation) {
+  simulation.submitCommand({ kind: "move", actorId: "a", target: at(14, 10) });
+  simulation.submitCommand({
+    kind: "move",
+    actorId: "a",
+    target: at(14, 15),
+    queued: true,
+  });
+}
 
 describe("queued orders", () => {
   test("queued moves wait behind the current order and run in sequence", () => {
@@ -159,17 +157,7 @@ describe("queued orders", () => {
     "an unqueued %s replaces the current order and clears the queue",
     (kind) => {
       const simulation = fixture(scouts);
-      simulation.submitCommand({
-        kind: "move",
-        actorId: "a",
-        target: at(14, 10),
-      });
-      simulation.submitCommand({
-        kind: "move",
-        actorId: "a",
-        target: at(14, 15),
-        queued: true,
-      });
+      moveThenQueue(simulation);
       simulation.tick();
       simulation.submitCommand(
         kind === "stop"
@@ -183,17 +171,7 @@ describe("queued orders", () => {
 
   test("a rejected unqueued order keeps the current order and queue", () => {
     const simulation = fixture(scouts);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "a",
-      target: at(14, 10),
-    });
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "a",
-      target: at(14, 15),
-      queued: true,
-    });
+    moveThenQueue(simulation);
     simulation.tick();
     simulation.submitCommand({ kind: "gather", actorId: "a", siteId: "none" });
     const [outcome] = simulation.tick();
@@ -298,7 +276,7 @@ describe("queued orders", () => {
       target: at(12, 14),
       queued: true,
     });
-    for (let tick = 0; tick < 200; tick++) simulation.tick();
+    advanceTicks(simulation, 200);
     expect(simulation.actorById("trooper")!.orders).toBeUndefined();
     expect(
       distance(simulation.actorById("trooper")!.worldPosition, at(12, 14)),
@@ -306,11 +284,9 @@ describe("queued orders", () => {
   });
 
   test("a blocked combat return gives way to a queued move", () => {
-    const simulation = fixture(
-      [unit("trooper", "arc-trooper", 8, 10)],
-      undefined,
-      (state) => {
-        const actor = state.actors.find(({ id }) => id === "trooper")!;
+    const simulation = fixture([unit("trooper", "arc-trooper", 8, 10)], {
+      edit: (state) => {
+        const actor = actorIn(state, "trooper");
         actor.combat = {
           returning: {
             point: at(12, 10),
@@ -319,7 +295,7 @@ describe("queued orders", () => {
         };
         actor.orders = [{ kind: "move", target: at(8, 14) }];
       },
-    );
+    });
     simulation.tick();
     expect(simulation.actorById("trooper")!.orders).toBeUndefined();
     expect(simulation.actorById("trooper")!.combat?.returning).toBeUndefined();
@@ -329,13 +305,11 @@ describe("queued orders", () => {
   });
 
   test("Gather cannot queue in a mission without an economy", () => {
-    const simulation = fixture(
-      [unit("worker", "arc-harvester", 8, 10)],
-      undefined,
-      (state) => {
+    const simulation = fixture([unit("worker", "arc-harvester", 8, 10)], {
+      edit: (state) => {
         delete state.economy;
       },
-    );
+    });
     simulation.submitCommand({
       kind: "move",
       actorId: "worker",
@@ -354,23 +328,10 @@ describe("queued orders", () => {
 
   test("queues continue exactly after a save", () => {
     const simulation = fixture(scouts);
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "a",
-      target: at(14, 10),
-    });
-    simulation.submitCommand({
-      kind: "move",
-      actorId: "a",
-      target: at(14, 15),
-      queued: true,
-    });
-    for (let tick = 0; tick < 5; tick++) simulation.tick();
-    const saved = parseMission(
-      serializeMission(scenario(scouts), simulation.snapshot(), TICK_SECONDS),
-      TICK_SECONDS,
-    ).state;
-    const restored = fixture(scouts, saved);
+    moveThenQueue(simulation);
+    advanceTicks(simulation, 5);
+    const saved = savedState(scenario(scouts), simulation);
+    const restored = fixture(scouts, { state: saved });
     expect(restored.actorById("a")!.orders).toHaveLength(1);
     for (let tick = 0; tick < 150; tick++) {
       simulation.tick();
@@ -391,21 +352,20 @@ describe("queued orders", () => {
     ["gather by a Scout", [{ kind: "gather", siteId: "site" }]],
   ])("rejects %s saved queues", (_, orders) => {
     expect(() =>
-      fixture(scouts, undefined, (state) => {
-        Object.assign(
-          state.actors.find(({ id }) => id === "a")!,
-          { orders },
-        );
+      fixture(scouts, {
+        edit: (state) => {
+          Object.assign(actorIn(state, "a"), { orders });
+        },
       }),
     ).toThrow(/queued orders/);
   });
 
   test("rejects queues on buildings and queued flags on other commands", () => {
     expect(() =>
-      fixture(scouts, undefined, (state) => {
-        state.actors.find(({ id }) => id === "cc")!.orders = [
-          { kind: "move", target: at(5, 5) },
-        ];
+      fixture(scouts, {
+        edit: (state) => {
+          actorIn(state, "cc").orders = [{ kind: "move", target: at(5, 5) }];
+        },
       }),
     ).toThrow(/queued orders/);
     expect(

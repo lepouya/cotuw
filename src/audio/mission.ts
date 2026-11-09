@@ -10,7 +10,7 @@ import type { ProductionJob } from "../simulation/production";
  * participants resolve through the view.
  */
 export function createMissionAudio(
-  scene: AudioScene,
+  scene: Pick<AudioScene, "sync" | "emit" | "setMusic">,
   simulation: Pick<
     MissionSimulation,
     | "attacks"

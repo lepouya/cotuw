@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+
 import { createAudioMixer, DEFAULT_AUDIO_SETTINGS } from "../src/audio/mixer";
 
 function device() {
@@ -74,6 +75,21 @@ const options = {
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
+/** An unlocked mixer with "engine" decoded. */
+async function mixerWithEngine(backend: ReturnType<typeof device>) {
+  const mixer = createAudioMixer(backend);
+  mixer.preload(["engine"]);
+  await mixer.unlock();
+  await flush();
+  return mixer;
+}
+/** The first voice's source and nodes have all been released. */
+function expectVoiceDisconnected(backend: ReturnType<typeof device>) {
+  expect(backend.sources[0]!.disconnect).toHaveBeenCalledOnce();
+  expect(backend.gains[3]!.disconnect).toHaveBeenCalledOnce();
+  expect(backend.gains[4]!.disconnect).toHaveBeenCalledOnce();
+  expect(backend.pans[0]!.disconnect).toHaveBeenCalledOnce();
+}
 
 test("master controls both buses, preserves their levels, and initializes saved settings", async () => {
   const backend = device();
@@ -152,10 +168,7 @@ test("audio stays lazy until a gesture, decodes once, and routes independent bus
   expect(voice.ended).toBe(true);
   expect(backend.sources[0]!.stop).toHaveBeenCalledTimes(1);
   backend.sources[0]!.onended!();
-  expect(backend.sources[0]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.gains[3]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.gains[4]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.pans[0]!.disconnect).toHaveBeenCalledOnce();
+  expectVoiceDisconnected(backend);
   mixer.dispose();
   expect(backend.context.close).toHaveBeenCalledOnce();
   expect(mixer.isLoaded("engine")).toBe(false);
@@ -238,10 +251,7 @@ test("late decodes after disposal do not notify or restore playback", async () =
 
 test("failed source startup disconnects allocated nodes and reports unavailable", async () => {
   const backend = device();
-  const mixer = createAudioMixer(backend);
-  mixer.preload(["engine"]);
-  await mixer.unlock();
-  await flush();
+  const mixer = await mixerWithEngine(backend);
   const original = backend.context.createBufferSource.getMockImplementation()!;
   backend.context.createBufferSource.mockImplementation(() => {
     const source = original();
@@ -254,10 +264,7 @@ test("failed source startup disconnects allocated nodes and reports unavailable"
   mixer.onStatus(status);
   expect(mixer.play("engine", options)).toBeUndefined();
   expect(status).toHaveBeenLastCalledWith("unavailable");
-  expect(backend.sources[0]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.gains[3]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.gains[4]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.pans[0]!.disconnect).toHaveBeenCalledOnce();
+  expectVoiceDisconnected(backend);
   mixer.dispose();
 });
 
@@ -293,10 +300,7 @@ test("partial context initialization closes its resources and can retry", async 
 
 test("unchanged mixes preserve the fade and do not accumulate automation", async () => {
   const backend = device();
-  const mixer = createAudioMixer(backend);
-  mixer.preload(["engine"]);
-  await mixer.unlock();
-  await flush();
+  const mixer = await mixerWithEngine(backend);
   const voice = mixer.play("engine", options)!;
   for (let i = 0; i < 100; i++) voice.setMix(options.gain, options.pan);
   expect(backend.gains[3]!.gain.setTargetAtTime).not.toHaveBeenCalled();
@@ -312,28 +316,19 @@ test("unchanged mixes preserve the fade and do not accumulate automation", async
 
 test("device disposal disconnects fading voices without waiting for ended events", async () => {
   const backend = device();
-  const mixer = createAudioMixer(backend);
-  mixer.preload(["engine"]);
-  await mixer.unlock();
-  await flush();
+  const mixer = await mixerWithEngine(backend);
   const voice = mixer.play("engine", options)!;
   backend.context.currentTime = 9.04;
   voice.stop();
   mixer.dispose();
   mixer.dispose();
-  expect(backend.sources[0]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.gains[3]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.gains[4]!.disconnect).toHaveBeenCalledOnce();
-  expect(backend.pans[0]!.disconnect).toHaveBeenCalledOnce();
+  expectVoiceDisconnected(backend);
   expect(backend.context.close).toHaveBeenCalledOnce();
 });
 
 test("gain holds also work on devices without cancelAndHoldAtTime", async () => {
   const backend = device();
-  const mixer = createAudioMixer(backend);
-  mixer.preload(["engine"]);
-  await mixer.unlock();
-  await flush();
+  const mixer = await mixerWithEngine(backend);
   const voice = mixer.play("engine", options)!;
   const param = backend.gains[4]!.gain;
   backend.context.currentTime = 9.04;

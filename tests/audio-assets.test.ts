@@ -78,9 +78,9 @@ test.each(entries)("$id is a usable PCM asset with mix headroom", (asset) => {
 
 test("the audition page offers every asset without autoplay", () => {
   const page = readFileSync("public/assets/audio/index.html", "utf8");
-  for (const id of Object.keys(SOUND_ASSETS) as (keyof typeof SOUND_ASSETS)[])
+  for (const id of Object.keys(SOUND_ASSETS))
     expect(page).toContain(`src="${id}.wav"`);
-  for (const id of Object.keys(MUSIC_ASSETS) as (keyof typeof MUSIC_ASSETS)[])
+  for (const id of Object.keys(MUSIC_ASSETS))
     expect(page).toContain(`src="${id}.wav"`);
   expect(page).not.toContain("autoplay");
 });

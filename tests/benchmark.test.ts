@@ -1,4 +1,6 @@
 import { expect, test } from "vitest";
+
+import { advanceTicks } from "./helpers/scenario";
 import {
   createBenchmarkMission,
   probeOptions,
@@ -12,6 +14,7 @@ import {
 } from "../scripts/benchmark/metrics";
 
 import type { Workload } from "../scripts/benchmark/workload";
+import type { MissionSimulation } from "../src/simulation/mission";
 
 test.each(Object.keys(WORKLOADS) as Workload[])(
   "the %s benchmark starts at a 5:1 ratio",
@@ -35,6 +38,11 @@ test.each(Object.keys(WORKLOADS) as Workload[])(
   },
 );
 
+const westTrooper = (simulation: MissionSimulation) =>
+  simulation.actors.find(
+    (actor) => actor.owner === "west" && actor.definitionId === "arc-trooper",
+  )!.id;
+
 // One run covers the scripted opening and the probe's replacements.
 test(
   "the scene opens cleanly and holds its scale through combat",
@@ -50,9 +58,9 @@ test(
       now: () => 0,
     });
     probe.measure();
-    for (let tick = 0; tick < 1_000; tick++) simulation.tick();
+    advanceTicks(simulation, 1_000);
     expect(probe.record().rejected).toEqual([]);
-    for (let tick = 0; tick < 1_400; tick++) simulation.tick();
+    advanceTicks(simulation, 1_400);
     const { population, attacks, rejected } = probe.record();
     probe.detach();
     simulation.dispose();
@@ -74,10 +82,7 @@ test("probe reinforcement is independent of timing and stops on detach", () => {
   let elapsed = 0;
   const runs = [() => 0, () => (elapsed += 0.25)].map((now) => {
     const simulation = createSessionSimulation(mission);
-    const lost = simulation.actors.find(
-      (actor) => actor.owner === "west" && actor.definitionId === "arc-trooper",
-    )!;
-    simulation.removeActor(lost.id);
+    simulation.removeActor(westTrooper(simulation));
     const probe = attachBenchmarkProbe(simulation, {
       ...probeOptions("normal"),
       now,
@@ -87,7 +92,7 @@ test("probe reinforcement is independent of timing and stops on detach", () => {
   try {
     for (const { simulation, probe } of runs) {
       probe.measure();
-      for (let tick = 0; tick < 20; tick++) simulation.tick();
+      advanceTicks(simulation, 20);
       expect(probe.record().rejected).toEqual([]);
       expect(simulation.economy!.production).toHaveLength(1);
       expect(simulation.snapshot().commands).toEqual([]);
@@ -107,12 +112,7 @@ test("probe reinforcement is independent of timing and stops on detach", () => {
       ...probeOptions("normal"),
       now: () => 0,
     }).detach();
-    detached.removeActor(
-      detached.actors.find(
-        (actor) =>
-          actor.owner === "west" && actor.definitionId === "arc-trooper",
-      )!.id,
-    );
+    detached.removeActor(westTrooper(detached));
     detached.tick();
     expect(detached.economy!.production).toEqual([]);
     detached.dispose();

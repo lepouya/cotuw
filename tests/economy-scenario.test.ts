@@ -1,19 +1,19 @@
-import { lootAmount } from "../src/simulation/economy";
 import { describe, expect, test } from "vitest";
+
 import {
-  ECONOMY_ACTOR_DEFINITIONS,
-  MOVEMENT_PROFILES,
-} from "./helpers/content";
+  actorIn,
+  advanceTicks,
+  savedState,
+  startMission,
+} from "./helpers/scenario";
+import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
+import { lootAmount } from "../src/simulation/economy";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { PROTOTYPE_LANDMARKS } from "../scripts/levels/prototype-terrain";
 import { createActor } from "../src/simulation/actor";
-import type { Actor } from "../src/simulation/actor";
-import type { TileCoord } from "../src/simulation/grid";
 import { personallyDetects } from "../src/simulation/vision";
 import { distance } from "../src/simulation/world";
-import { createMissionSimulation } from "../src/simulation/mission";
-import type { MissionState } from "../src/simulation/mission";
 import {
   findNavigationPath,
   NavigationGrid,
@@ -22,7 +22,10 @@ import {
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createScenarioMap } from "../src/simulation/scenario";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
+
+import type { Actor } from "../src/simulation/actor";
+import type { TileCoord } from "../src/simulation/grid";
+import type { MissionState } from "../src/simulation/mission";
 
 const seconds = 0.1;
 const level = () =>
@@ -31,32 +34,31 @@ const level = () =>
     SIMULATION_TICK_SECONDS,
   );
 const { scenario, state: opening } = level();
-const definitions = ECONOMY_ACTOR_DEFINITIONS;
+const definitions = BASE_CONTENT.actors;
 const initialState = (): MissionState => level().state;
 
 const mapForOpening = () =>
   createScenarioMap({ ...scenario, terrain: opening.terrain });
 
 function fixture(state = initialState(), updateIdle = () => {}) {
-  const map = mapForOpening();
-  const occupancy = new OccupancyGrid(map);
-  return createMissionSimulation({
+  return startMission(mapForOpening(), {
     state,
     definitions,
-    map,
-    occupancy,
     tickSeconds: seconds,
-    bounds: map.worldBounds,
     objectives: scenario.objectives,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, MOVEMENT_PROFILES),
-      ],
-      ["idle", { handleCommand: () => false, update: updateIdle }],
-    ]),
-  });
+    idleUpdate: updateIdle,
+  }).simulation;
 }
+
+const openingGrid = () => {
+  const map = mapForOpening();
+  const grid = new NavigationGrid(
+    map,
+    new OccupancyGrid(map),
+    MOVEMENT_PROFILES[0],
+  );
+  return { map, grid };
+};
 
 type Simulation = ReturnType<typeof fixture>;
 const objective = (simulation: Simulation, id: string) =>
@@ -83,6 +85,12 @@ function finalFightState(): MissionState {
     );
   }
   return state;
+}
+
+function winFinalFight() {
+  const simulation = fixture(finalFightState());
+  for (let tick = 0; tick < 20 && !simulation.result; tick++) simulation.tick();
+  return simulation;
 }
 
 describe("mission objectives", () => {
@@ -116,7 +124,7 @@ describe("mission objectives", () => {
 
   test("the lone-wolf objective completes without granting victory", () => {
     const state = initialState();
-    state.actors.find((actor) => actor.id === "lone-wolf")!.health = 1;
+    actorIn(state, "lone-wolf").health = 1;
     state.actors.push(
       createActor({
         id: "duelist",
@@ -138,14 +146,9 @@ describe("mission objectives", () => {
       { status: "active", progress: { current: 0, total: 5 } },
     ]);
     expect(simulation.result).toBeUndefined();
-    for (let tick = 0; tick < 610; tick++) simulation.tick();
+    advanceTicks(simulation, 610);
     expect(simulation.wrecks).toHaveLength(0);
-    const restored = fixture(
-      parseMission(
-        serializeMission(scenario, simulation.snapshot(), seconds),
-        seconds,
-      ).state,
-    );
+    const restored = fixture(savedState(scenario, simulation));
     expect(restored.objectives).toEqual(simulation.objectives);
     restored.tick();
     simulation.tick();
@@ -153,16 +156,12 @@ describe("mission objectives", () => {
   });
 
   test("all six combat deaths grant persistent victory and allow free play", () => {
-    const simulation = fixture(finalFightState());
-    for (let tick = 0; tick < 20 && !simulation.result; tick++)
-      simulation.tick();
+    const simulation = winFinalFight();
     const won = simulation.result;
     expect(won?.kind).toBe("victory");
     expect(goalsComplete(simulation)).toBe(true);
     const saved = simulation.snapshot();
-    const restored = fixture(
-      parseMission(serializeMission(scenario, saved, seconds), seconds).state,
-    );
+    const restored = fixture(savedState(scenario, simulation));
     expect(restored.result).toEqual(simulation.result);
     const command = {
       kind: "move" as const,
@@ -196,17 +195,15 @@ describe("mission objectives", () => {
 
   test("Command Center destruction takes priority over the final wolf deaths", () => {
     const state = finalFightState();
-    const center = state.actors.find(
-      ({ id }) => id === "starting-command-center",
-    )!;
+    const center = actorIn(state, "starting-command-center");
     center.health = 1;
-    const wolf = state.actors.find(({ id }) => id === "lone-wolf")!;
+    const wolf = actorIn(state, "lone-wolf");
     wolf.worldPosition = { x: -39.5, z: 0.5 };
     wolf.territory = { home: { ...wolf.worldPosition } };
     wolf.combat = {
       attack: { targetId: center.id, lastKnown: { ...center.worldPosition } },
     };
-    state.actors.find(({ id }) => id === "trooper-lone-wolf")!.worldPosition = {
+    actorIn(state, "trooper-lone-wolf").worldPosition = {
       x: -36.5,
       z: 0.5,
     };
@@ -225,12 +222,8 @@ describe("mission objectives", () => {
   });
 
   test("Command Center destruction still ends post-victory free play", () => {
-    const won = fixture(finalFightState());
-    for (let tick = 0; tick < 20 && !won.result; tick++) won.tick();
-    const state = won.snapshot();
-    const center = state.actors.find(
-      ({ id }) => id === "starting-command-center",
-    )!;
+    const state = winFinalFight().snapshot();
+    const center = actorIn(state, "starting-command-center");
     center.health = 1;
     const point = { x: -39.5, z: 0.5 };
     const attacker = createActor({
@@ -261,9 +254,7 @@ describe("mission objectives", () => {
     invalid.objectives[1].resolvedTick = 0;
     invalid.tick = 1;
     expect(() => fixture(invalid)).toThrow("objective progress");
-    const won = fixture(finalFightState());
-    for (let tick = 0; tick < 20 && !won.result; tick++) won.tick();
-    const unresolved = won.snapshot();
+    const unresolved = winFinalFight().snapshot();
     delete unresolved.objectives[1].resolvedTick;
     expect(() => fixture(unresolved)).toThrow("objective progress");
     const premature = initialState();
@@ -341,12 +332,7 @@ describe("authored wolf encounters", () => {
   });
 
   test("recovery salvage rewards the lone-wolf approach and pays for two Troopers", () => {
-    const map = mapForOpening();
-    const grid = new NavigationGrid(
-      map,
-      new OccupancyGrid(map),
-      MOVEMENT_PROFILES[0],
-    );
+    const { map, grid } = openingGrid();
     const simulation = fixture();
     const recovery = opening.economy!.loot.filter(({ id }) =>
       ["salvage-2", "salvage-3"].includes(id),
@@ -381,12 +367,7 @@ describe("authored wolf encounters", () => {
   });
 
   test("rough ground offers a faster detour and ridge routes reconnect", () => {
-    const map = mapForOpening();
-    const grid = new NavigationGrid(
-      map,
-      new OccupancyGrid(map),
-      MOVEMENT_PROFILES[0],
-    );
+    const { map, grid } = openingGrid();
     const from = map.tileCenter(35, 47);
     const to = map.tileCenter(58, 47);
     const path = findNavigationPath(grid, from, to)!;
@@ -417,12 +398,7 @@ describe("authored wolf encounters", () => {
   });
 
   test("distinct mountain peaks leave both ridge crossings and the den entrance usable", () => {
-    const map = mapForOpening();
-    const grid = new NavigationGrid(
-      map,
-      new OccupancyGrid(map),
-      MOVEMENT_PROFILES[0],
-    );
+    const { map, grid } = openingGrid();
     for (const landmark of PROTOTYPE_LANDMARKS)
       for (const peak of landmark.peaks) {
         expect(map.heightAt(peak.x, peak.z), landmark.id).toBeGreaterThan(8);
@@ -450,12 +426,7 @@ describe("authored wolf encounters", () => {
 
   test("six wolves have passable homes and the den shares one territory", () => {
     const simulation = fixture();
-    const map = mapForOpening();
-    const grid = new NavigationGrid(
-      map,
-      new OccupancyGrid(map),
-      MOVEMENT_PROFILES[0],
-    );
+    const { map, grid } = openingGrid();
     const wolves = simulation
       .snapshot()
       .actors.filter((actor) => actor.territory);
@@ -495,12 +466,7 @@ describe("authored wolf encounters", () => {
   });
 
   test("the three-tile entrance is the only ground route into the den", () => {
-    const map = mapForOpening();
-    const grid = new NavigationGrid(
-      map,
-      new OccupancyGrid(map),
-      MOVEMENT_PROFILES[0],
-    );
+    const { map, grid } = openingGrid();
     const from = map.tileCenter(46, 32);
     const to = map.tileCenter(78, 21);
     expect(findNavigationPath(grid, from, to)?.reachedTarget).toBe(true);
@@ -556,7 +522,7 @@ describe("authored wolf encounters", () => {
       }),
     );
     const simulation = fixture(state);
-    for (let tick = 0; tick < 10; tick++) simulation.tick();
+    advanceTicks(simulation, 10);
     const den = simulation
       .snapshot()
       .actors.filter((actor) => actor.territory?.encounterId === "wolf-den");
@@ -568,12 +534,7 @@ describe("authored wolf encounters", () => {
     expect(den.every((actor) => propagators.has(actor.id))).toBe(true);
     expect(propagators.has("lone-wolf")).toBe(false);
     expect(den.some((actor) => actor.combat?.attack)).toBe(true);
-    const restored = fixture(
-      parseMission(
-        serializeMission(scenario, simulation.snapshot(), seconds),
-        seconds,
-      ).state,
-    );
+    const restored = fixture(savedState(scenario, simulation));
     for (let tick = 0; tick < 50; tick++) {
       simulation.tick();
       restored.tick();

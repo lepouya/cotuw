@@ -380,9 +380,9 @@ export type MissionSimulation = {
    * Non-object commands and unknown issuers throw.
    */
   submitCommand: (command: MissionCommand, issuer?: CommandIssuer) => number;
-  /** Adds a validated actor; skirmishes permit this only at tick 0. */
+  /** Test setup: adds a validated actor; in a skirmish, only at tick 0. */
   spawnActor: (actor: Actor) => void;
-  /** Removes an actor and reports its existence; skirmish setup only. */
+  /** Test setup: removes an actor if it exists; in a skirmish, only at tick 0. */
   removeActor: (id: string) => boolean;
   /** A deep copy of the current state and terrain, for saves and replays. */
   snapshot: () => MissionState;

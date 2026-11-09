@@ -1,14 +1,17 @@
 import { describe, expect, test } from "vitest";
-import { advanceSeconds } from "./helpers/scenario";
-import { at, contentMap, fixture, rivals, unit } from "./helpers/rivals";
+
+import { actorIn, advanceSeconds, savedState } from "./helpers/scenario";
+import { atSeconds, contentMap, fixture, rivals, unit } from "./helpers/rivals";
+import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { createCultivationSite } from "../src/simulation/cultivation";
-import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { knownEconomy } from "../src/simulation/observations";
 import { createScenarioState } from "../src/simulation/scenario";
-import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 
-import type { MissionSimulation } from "../src/simulation/mission";
+import type {
+  MissionSimulation,
+  MissionState,
+} from "../src/simulation/mission";
 import type { ResourceLoot } from "../src/simulation/economy";
 
 const rival = { owner: "rival" };
@@ -21,6 +24,25 @@ const moveRival = (simulation: MissionSimulation, actorId: string, x: number) =>
     { kind: "move", actorId, target: contentMap.tileCenter(x, 10) },
     rival,
   );
+const scoutAt = (id: string, x: number, owner: string) =>
+  createActor({
+    id,
+    owner,
+    definitionId: "arc-scout",
+    worldPosition: contentMap.tileCenter(x, 10),
+  });
+/** A player scout that has seen a rival Barracks. */
+const spottedBarracks = {
+  units: [unit("spotter", 40, "player", "arc-scout")],
+  buildings: [
+    {
+      actorId: "barracks",
+      definitionId: "arc-field-barracks",
+      origin: { x: 44, z: 9 },
+      owner: "rival",
+    },
+  ],
+};
 const gift = (x: number): ResourceLoot => ({
   id: "gift",
   name: "Gift",
@@ -102,58 +124,34 @@ describe("owner observations", () => {
     { worldPosition: { x: 0, z: 0 } },
     { construction: { completedTicks: 1, totalTicks: 0 } },
   ])("rejects impossible saved building sightings: %j", (changes) => {
-    const setup = {
-      units: [unit("spotter", 40, "player", "arc-scout")],
-      buildings: [
-        {
-          actorId: "barracks",
-          definitionId: "arc-field-barracks",
-          origin: { x: 44, z: 9 },
-          owner: "rival",
-        },
-      ],
-    };
-    const { simulation } = fixture(setup);
+    const { simulation } = fixture(spottedBarracks);
     simulation.removeActor("spotter");
     const state = simulation.snapshot();
     Object.assign(state.observations.player!.actors[0]!, changes);
-    expect(() => fixture(setup, state)).toThrow("invalid observations");
+    expect(() => fixture(spottedBarracks, state)).toThrow(
+      "invalid observations",
+    );
   });
 
   test("unseen buildings stay remembered through removal and loading", () => {
-    const setup = {
-      units: [unit("spotter", 40, "player", "arc-scout")],
-      buildings: [
-        {
-          actorId: "barracks",
-          definitionId: "arc-field-barracks",
-          origin: { x: 44, z: 9 },
-          owner: "rival",
-        },
-      ],
-    };
-    const { simulation } = fixture(setup);
+    const { simulation } = fixture(spottedBarracks);
     simulation.removeActor("spotter");
     simulation.removeActor("barracks");
-    const { simulation: loaded } = fixture(setup, simulation.snapshot());
+    const { simulation: loaded } = fixture(
+      spottedBarracks,
+      simulation.snapshot(),
+    );
     expect(sighting(loaded, "barracks")).toEqual(
       sighting(simulation, "barracks"),
     );
-    loaded.spawnActor(
-      createActor({
-        id: "returning",
-        owner: "player",
-        definitionId: "arc-scout",
-        worldPosition: contentMap.tileCenter(40, 10),
-      }),
-    );
+    loaded.spawnActor(scoutAt("returning", 40, "player"));
     expect(sighting(loaded, "barracks")).toBeUndefined();
   });
 
   test("renewable yields stay stale and player projections follow refreshed memory", () => {
     const setup = {
       units: [unit("spotter", 4)],
-      edit: (state: ReturnType<typeof createScenarioState>) => {
+      edit: (state: MissionState) => {
         state.economy!.cultivation = {
           sites: [createCultivationSite("grove", "Grove", { x: 8, z: 10 })],
           workers: [],
@@ -177,14 +175,7 @@ describe("owner observations", () => {
       reserve: 100000,
       dormant: false,
     });
-    loaded.spawnActor(
-      createActor({
-        id: "returning",
-        owner: "player",
-        definitionId: "arc-scout",
-        worldPosition: contentMap.tileCenter(4, 10),
-      }),
-    );
+    loaded.spawnActor(scoutAt("returning", 4, "player"));
     expect(known().cultivation!.sites[0]).toMatchObject({
       reserve: 10100,
       dormant: true,
@@ -226,7 +217,7 @@ describe("owner observations", () => {
       ],
       relationships: [{ owners: ["player", "rival"], relationship: "hostile" }],
       edit: (state) => {
-        state.actors.find(({ id }) => id === "doomed")!.health = 1;
+        actorIn(state, "doomed").health = 1;
       },
     });
     expect(sighting(simulation, "doomed")).toBeDefined();
@@ -235,14 +226,7 @@ describe("owner observations", () => {
     advanceSeconds(simulation, 2);
     expect(simulation.actorById("doomed")).toBeUndefined();
     expect(sighting(simulation, "doomed")).toBeUndefined();
-    simulation.spawnActor(
-      createActor({
-        id: "spotter",
-        definitionId: "arc-scout",
-        owner: "player",
-        worldPosition: contentMap.tileCenter(38, 10),
-      }),
-    );
+    simulation.spawnActor(scoutAt("spotter", 38, "player"));
     // Removal leaves no remains, so the report only grows stale.
     expect(sighting(simulation, "visitor")?.tick).toBe(0);
   });
@@ -259,7 +243,7 @@ describe("owner observations", () => {
         },
       ],
       edit: (state) => {
-        state.actors.find(({ id }) => id === "barracks")!.health = 500;
+        actorIn(state, "barracks").health = 500;
       },
     });
     expect(sighting(simulation, "barracks")).toMatchObject({
@@ -274,7 +258,7 @@ describe("owner observations", () => {
   test("allies are not remembered and an alliance clears old sightings", () => {
     const { simulation } = fixture({
       units: [unit("trooper", 4), unit("visitor", 9, "rival")],
-      events: [at(1, [rivals("allied")])],
+      events: [atSeconds(1, [rivals("allied")])],
     });
     simulation.tick();
     expect(sighting(simulation, "visitor")).toBeDefined();
@@ -392,27 +376,13 @@ describe("owner observations", () => {
     });
     expect(memoryOf(simulation).loot).toEqual([{ lootId: "gift", tick: 0 }]);
     simulation.removeActor("spotter");
-    simulation.spawnActor(
-      createActor({
-        id: "collector",
-        definitionId: "arc-scout",
-        owner: "rival",
-        worldPosition: contentMap.tileCenter(36, 10),
-      }),
-    );
+    simulation.spawnActor(scoutAt("collector", 36, "rival"));
     simulation.tick();
     expect(simulation.economy!.loot[0]!.collected).toBe(true);
     const known = knownEconomy(simulation.economy!, memoryOf(simulation));
     expect(known.loot).toMatchObject([{ id: "gift", collected: false }]);
     expect(memoryOf(simulation, "rival").loot).toEqual([]);
-    simulation.spawnActor(
-      createActor({
-        id: "returning",
-        definitionId: "arc-scout",
-        owner: "player",
-        worldPosition: contentMap.tileCenter(30, 10),
-      }),
-    );
+    simulation.spawnActor(scoutAt("returning", 30, "player"));
     expect(memoryOf(simulation).loot).toEqual([]);
   });
 
@@ -423,10 +393,7 @@ describe("owner observations", () => {
     const { simulation, content } = fixture(setup);
     moveRival(simulation, "scout", 50);
     advanceSeconds(simulation, 2);
-    const saved = parseMission(
-      serializeMission(content, simulation.snapshot(), 0.1),
-      0.1,
-    ).state;
+    const saved = savedState(content, simulation);
     const { simulation: loaded } = fixture(setup, saved);
     expect(loaded.snapshot()).toEqual(simulation.snapshot());
     advanceSeconds(simulation, 3);

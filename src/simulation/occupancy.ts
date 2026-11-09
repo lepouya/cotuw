@@ -4,7 +4,7 @@ import { isId, isOneOf } from "./validation";
 import type { TerrainBounds, TileCoord } from "./grid";
 import type { TerrainEdit, TerrainGrid } from "./terrain";
 
-export const OCCUPANCY_LAYERS = ["surface", "air", "subterranean"] as const;
+const OCCUPANCY_LAYERS = ["surface", "air", "subterranean"] as const;
 
 export type OccupancyLayer = (typeof OCCUPANCY_LAYERS)[number];
 

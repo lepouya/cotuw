@@ -1,4 +1,6 @@
 import { describe, expect, test } from "vitest";
+
+import { advanceTicks, spawnUnit } from "./helpers/scenario";
 import { createActor } from "../src/simulation/actor";
 import {
   createMissionSimulation,
@@ -8,6 +10,8 @@ import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { OccupancyGrid } from "../src/simulation/occupancy";
 import { startSimulationLoop } from "../src/simulation/loop";
+import { distance } from "../src/simulation/world";
+
 import type { Actor, ActorDefinition } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
@@ -90,8 +94,6 @@ function fixture(actors?: Actor[], saved?: MissionState, bounds?: WorldBounds) {
   });
   return { simulation, map, occupancy };
 }
-const distance = (a: Actor["worldPosition"], b: Actor["worldPosition"]) =>
-  Math.hypot(a.x - b.x, a.z - b.z);
 const sortedActors = (state: MissionState) =>
   state.actors.sort((a, b) => (a.id < b.id ? -1 : 1));
 
@@ -122,7 +124,7 @@ describe("group movement", () => {
         expect(command.target.z).toBeGreaterThanOrEqual(bounds.minZ);
       }
     }
-    for (let tick = 0; tick < 200; tick++) simulation.tick();
+    advanceTicks(simulation, 200);
     for (const actor of simulation.actors) {
       expect(actor.worldPosition.x).toBeGreaterThanOrEqual(bounds.minX);
       expect(actor.worldPosition.x).toBeLessThanOrEqual(bounds.maxX);
@@ -130,6 +132,7 @@ describe("group movement", () => {
       expect(actor.worldPosition.z).toBeLessThanOrEqual(bounds.maxZ);
     }
   });
+
   test("blocked move receipts survive arrival in the command's tick", () => {
     const { simulation, map } = fixture([]);
     const start = map.tileCenter(9, 4);
@@ -149,7 +152,6 @@ describe("group movement", () => {
     const [outcome] = simulation.tick();
     expect(simulation.actorById("near")!.movement).toBeUndefined();
     expect(outcome).toMatchObject({ accepted: true, reachedTarget: false });
-    simulation.dispose();
   });
 
   test("move receipts preserve reachability when a later order replaces the route", () => {
@@ -169,7 +171,6 @@ describe("group movement", () => {
       { accepted: true, reachedTarget: false },
       { accepted: true, reachedTarget: true },
     ]);
-    simulation.dispose();
   });
 
   test("destinations respect unselected units' authored radii on the same layer", () => {
@@ -180,14 +181,7 @@ describe("group movement", () => {
       ["a", "trooper", { x: 2, z: 6 }],
       ["b", "trooper", { x: 2, z: 7 }],
     ] as const)
-      simulation.spawnActor(
-        createActor({
-          id,
-          definitionId,
-          owner: "player",
-          worldPosition: map.tileCenter(tile.x, tile.z),
-        }),
-      );
+      spawnUnit(simulation, id, definitionId, map.tileCenter(tile.x, tile.z));
     simulation.submitCommand({
       kind: "group-move",
       actorIds: ["a", "b"],
@@ -198,7 +192,6 @@ describe("group movement", () => {
       expect(
         distance(simulation.actorById(id)!.movement!.target, target),
       ).toBeGreaterThanOrEqual(1.7);
-    simulation.dispose();
   });
 
   test("a mixed group crosses a narrow passage and arrives at separate reachable positions", () => {
@@ -254,7 +247,6 @@ describe("group movement", () => {
           expect(distance(a.worldPosition, b.worldPosition)).toBeGreaterThan(
             0.55,
           );
-    simulation.dispose();
   });
 
   test("slot assignment, contact, and saved pending orders do not depend on actor or selection order", () => {
@@ -291,8 +283,6 @@ describe("group movement", () => {
       resumed.simulation.tick();
     }
     expect(resumed.simulation.snapshot()).toEqual(first.simulation.snapshot());
-    for (const item of [first, reversed, pending, resumed])
-      item.simulation.dispose();
   });
 
   test("group ticks are identical at high and low render cadence", () => {
@@ -319,8 +309,6 @@ describe("group movement", () => {
     run(fast.simulation, 5);
     run(slow.simulation, 200);
     expect(slow.simulation.snapshot()).toEqual(fast.simulation.snapshot());
-    fast.simulation.dispose();
-    slow.simulation.dispose();
   });
 
   test("blocked group clicks keep a distinct requested marker and use separate approach positions", () => {
@@ -343,28 +331,13 @@ describe("group movement", () => {
     expect(simulation.actorById("unit-0")!.movement!.destination).not.toEqual(
       simulation.actorById("unit-1")!.movement!.destination,
     );
-    simulation.dispose();
   });
 
   test("each profile resolves its own destination and unavailable actors keep their existing orders", () => {
     const { simulation, map } = fixture([]);
     map.setTerrain(1, 1, { typeId: "water" });
-    simulation.spawnActor(
-      createActor({
-        id: "swimmer",
-        definitionId: "swimmer",
-        owner: "player",
-        worldPosition: map.tileCenter(1, 1),
-      }),
-    );
-    simulation.spawnActor(
-      createActor({
-        id: "trooper",
-        definitionId: "trooper",
-        owner: "player",
-        worldPosition: map.tileCenter(3, 3),
-      }),
-    );
+    spawnUnit(simulation, "swimmer", "swimmer", map.tileCenter(1, 1));
+    spawnUnit(simulation, "trooper", "trooper", map.tileCenter(3, 3));
     simulation.submitCommand({
       kind: "move",
       actorId: "trooper",
@@ -388,7 +361,6 @@ describe("group movement", () => {
     expect(simulation.actorById("trooper")!.movement!.target).not.toEqual(
       previous,
     );
-    simulation.dispose();
   });
 
   test("an approach slot never moves a stranded unit further from the click", () => {
@@ -400,14 +372,7 @@ describe("group movement", () => {
       ["b", 4],
       ["c", 5],
     ] as const)
-      simulation.spawnActor(
-        createActor({
-          id,
-          definitionId: "swimmer",
-          owner: "player",
-          worldPosition: map.tileCenter(x, 1),
-        }),
-      );
+      spawnUnit(simulation, id, "swimmer", map.tileCenter(x, 1));
     simulation.submitCommand({
       kind: "group-move",
       actorIds: ["a", "b"],
@@ -420,7 +385,6 @@ describe("group movement", () => {
     const slot = simulation.actorById("a")!.movement!.target;
     expect(map.tileAtWorldPosition(slot.x, slot.z)).toEqual({ x: 4, z: 1 });
     expect(simulation.actorById("b")!.movement).toBeUndefined();
-    simulation.dispose();
   });
 
   test("submitted moves cannot carry a requested group target", () => {
@@ -437,28 +401,13 @@ describe("group movement", () => {
     expect(
       simulation.actorById("unit-0")!.movement!.requestedTarget,
     ).toBeUndefined();
-    simulation.dispose();
   });
 
   test("mixed profiles find destinations on their own terrain", () => {
     const { simulation, map } = fixture([]);
     for (let x = 1; x <= 5; x += 1) map.setTerrain(x, 1, { typeId: "water" });
-    simulation.spawnActor(
-      createActor({
-        id: "swimmer",
-        definitionId: "swimmer",
-        owner: "player",
-        worldPosition: map.tileCenter(1, 1),
-      }),
-    );
-    simulation.spawnActor(
-      createActor({
-        id: "trooper",
-        definitionId: "trooper",
-        owner: "player",
-        worldPosition: map.tileCenter(3, 3),
-      }),
-    );
+    spawnUnit(simulation, "swimmer", "swimmer", map.tileCenter(1, 1));
+    spawnUnit(simulation, "trooper", "trooper", map.tileCenter(3, 3));
     simulation.submitCommand({
       kind: "group-move",
       actorIds: ["trooper", "swimmer"],
@@ -475,7 +424,6 @@ describe("group movement", () => {
       x: 7,
       z: 3,
     });
-    simulation.dispose();
   });
 
   test("slot exhaustion leaves a rejected unit's prior order running", () => {
@@ -509,7 +457,6 @@ describe("group movement", () => {
       false,
     ]);
     expect(simulation.actorById("b")!.movement!.target).toEqual(previous);
-    simulation.dispose();
   });
 
   test("Stop cancels every group route", () => {
@@ -524,7 +471,6 @@ describe("group movement", () => {
       simulation.submitCommand({ kind: "stop", actorId: id });
     simulation.tick();
     expect(simulation.actors.every((actor) => !actor.movement)).toBe(true);
-    simulation.dispose();
   });
 });
 
@@ -548,7 +494,6 @@ describe("friendly separation", () => {
     expect(distance(arrived.worldPosition, target)).toBeLessThanOrEqual(
       0.005 + 1e-9,
     );
-    simulation.dispose();
   });
 
   test("coincident friendly units separate deterministically without crossing terrain blockers", () => {
@@ -581,8 +526,6 @@ describe("friendly separation", () => {
         false,
       );
     }
-    first.simulation.dispose();
-    second.simulation.dispose();
   });
 
   test("different occupancy layers do not separate", () => {
@@ -600,6 +543,5 @@ describe("friendly separation", () => {
     expect(simulation.actors[0].worldPosition).toEqual(
       simulation.actors[1].worldPosition,
     );
-    simulation.dispose();
   });
 });

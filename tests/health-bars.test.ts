@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { healthBarOpacity } from "../src/render/health-bars";
 
 test("health bars show while selected or fighting, then fade out", () => {

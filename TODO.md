@@ -727,3 +727,6 @@ Keep these outside the checklist unless an explicit scope decision adds them:
   corruption, and world-event escalation.
 - Air, underground and naval layers, transports, oversized deployables,
   stealth, and veterancy.
+- Removing the test-only `MissionSimulation.spawnActor` and `removeActor`
+  hooks. Tests that use them on a running mission would need restarts from
+  edited snapshots or a persisted `spawn-actor` command.

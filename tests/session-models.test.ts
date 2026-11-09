@@ -1,5 +1,7 @@
 import { NullEngine, Scene } from "@babylonjs/core";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+import { BASE_CONTENT } from "./helpers/content";
 import {
   createSessionAssets,
   standInAppearances,
@@ -8,7 +10,6 @@ import { createLifetime } from "../src/lifetime";
 import { createFrameEffectsView } from "../src/render/frame-effects";
 import { loadModelAsset } from "../src/render/glb-model";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
-import { BASE_CONTENT } from "./helpers/content";
 
 import type { ContentPack } from "../src/content/content-pack";
 import type { ActorAppearance } from "../src/render/actor";
@@ -132,8 +133,7 @@ function pendingAssets() {
 
 describe("session assets", () => {
   test("creates stand-in appearances with box meshes and bounds", () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
+    const scene = new Scene(resources.own(new NullEngine()));
 
     const appearances = standInAppearances(scene, [
       [
@@ -154,14 +154,13 @@ describe("session assets", () => {
     expect(appearance.minimapColor).toEqual([0.2, 0.5, 0.8]);
 
     appearance.dispose();
-    scene.dispose();
-    engine.dispose();
   });
 
   test("prepares procedural building details without loading models", async () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
-    const frameEffects = createFrameEffectsView(scene, {}, () => false);
+    const scene = new Scene(resources.own(new NullEngine()));
+    const frameEffects = resources.own(
+      createFrameEffectsView(scene, {}, () => false),
+    );
 
     const content: ContentPack = {
       ...BASE_CONTENT,
@@ -192,31 +191,24 @@ describe("session assets", () => {
       },
     ];
 
-    let readyCalled = false;
-    const assets = createSessionAssets({
-      scene,
-      content,
-      definitions,
-      reducedMotion: () => false,
-      frameEffects,
-    });
+    const assets = resources.own(
+      createSessionAssets({
+        scene,
+        content,
+        definitions,
+        reducedMotion: () => false,
+        frameEffects,
+      }),
+    );
 
     expect(assets.buildingAppearances.has("barracks")).toBe(true);
     const building = assets.buildingAppearances.get("barracks")!;
     expect(building.height).toBe(2);
     expect(building.createDetails).toBeDefined();
 
-    await assets.load({
-      onModelsReady: () => {
-        readyCalled = true;
-      },
-    });
-    expect(readyCalled).toBe(true);
-
-    assets.dispose();
-    frameEffects.dispose();
-    scene.dispose();
-    engine.dispose();
+    const onModelsReady = vi.fn();
+    await assets.load({ onModelsReady });
+    expect(onModelsReady).toHaveBeenCalledOnce();
   });
 
   test("waits for consumers, then loads once and replaces stand-ins", async () => {

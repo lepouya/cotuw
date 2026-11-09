@@ -1,4 +1,7 @@
 import { expect, test } from "vitest";
+
+import { spawnUnit } from "./helpers/scenario";
+import { BASE_CONTENT } from "./helpers/content";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import {
   assembleSkirmish,
@@ -6,7 +9,6 @@ import {
   loadLevel,
   loadMission,
 } from "../src/mission-loading";
-import { createActor } from "../src/simulation/actor";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import {
   DIFFICULTIES,
@@ -15,18 +17,14 @@ import {
 } from "../src/simulation/mission-setup";
 import { serializeMission } from "../src/simulation/mission-file";
 import { createScenarioMap } from "../src/simulation/scenario";
-import { BASE_CONTENT } from "./helpers/content";
 
 import type { LoadedMission } from "../src/mission-loading";
 import type { Difficulty } from "../src/simulation/mission-setup";
 import type { MissionSimulation } from "../src/simulation/mission";
 
-const WEAPON_DAMAGE = BASE_CONTENT.actors.find(
-  ({ id }) => id === "arc-trooper",
-)!.weapon!.damage;
-const MAX_HEALTH = BASE_CONTENT.actors.find(
-  ({ id }) => id === "arc-trooper",
-)!.health!;
+const TROOPER = BASE_CONTENT.actors.find(({ id }) => id === "arc-trooper")!;
+const WEAPON_DAMAGE = TROOPER.weapon!.damage;
+const MAX_HEALTH = TROOPER.health!;
 
 function mission(difficulty: Difficulty) {
   return assembleSkirmish({
@@ -47,14 +45,7 @@ function duel(loaded: LoadedMission) {
     ["ours", "west", 30],
     ["theirs", "east", 32],
   ] as const)
-    simulation.spawnActor(
-      createActor({
-        id,
-        definitionId: "arc-trooper",
-        owner,
-        worldPosition: map.tileCenter(x, 50),
-      }),
-    );
+    spawnUnit(simulation, id, "arc-trooper", map.tileCenter(x, 50), owner);
   return simulation;
 }
 
@@ -168,12 +159,9 @@ test.each([
   ["an unknown enemy", { enemyOwners: ["north"] }],
   ["factions that disagree", { factions: { west: "arc", east: "circle" } }],
 ])("loading rejects %s", (_, change) => {
+  const { scenario, state } = mission("hard");
   const file = JSON.parse(
-    serializeMission(
-      mission("hard").scenario,
-      mission("hard").state,
-      SIMULATION_TICK_SECONDS,
-    ),
+    serializeMission(scenario, state, SIMULATION_TICK_SECONDS),
   );
   file.scenario.setup = { ...file.scenario.setup, ...change };
   expect(() => loadMission(JSON.stringify(file))).toThrow(

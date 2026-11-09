@@ -40,6 +40,12 @@ const blocking2x2: Footprint = {
   blocksMovement: true,
 };
 
+const blockingTile: Footprint = {
+  layer: "surface",
+  occupiedTiles: [{ x: 0, z: 0 }],
+  blocksMovement: true,
+};
+
 const placedDefinitions: readonly ActorDefinition[] = [
   {
     id: "barracks",
@@ -50,11 +56,7 @@ const placedDefinitions: readonly ActorDefinition[] = [
   {
     id: "post",
     behaviorId: "idle",
-    footprint: {
-      layer: "surface",
-      occupiedTiles: [{ x: 0, z: 0 }],
-      blocksMovement: true,
-    },
+    footprint: blockingTile,
     placement: { terrainTypeIds: ["plain"], maxSlope: 1 },
   },
 ];
@@ -257,16 +259,11 @@ describe("occupancy navigation", () => {
       expect(costs).toHaveBeenCalled();
     },
   );
+
   test("avoids occupied tiles and occupied diagonal corners", () => {
     const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
-    occupancy.place(
-      placement("post", 2, 2, {
-        layer: "surface",
-        occupiedTiles: [{ x: 0, z: 0 }],
-        blocksMovement: true,
-      }),
-    );
+    occupancy.place(placement("post", 2, 2, blockingTile));
     const grid = new NavigationGrid(map, occupancy, ground);
     const from = map.tileCenter(0, 2);
     const path = findNavigationPath(grid, from, map.tileCenter(4, 2))!;
@@ -281,13 +278,7 @@ describe("occupancy navigation", () => {
 
     const cornerMap = new TerrainGrid({ width: 3, height: 3, tileSize: 1 });
     const cornerOccupancy = new OccupancyGrid(cornerMap);
-    cornerOccupancy.place(
-      placement("corner", 1, 0, {
-        layer: "surface",
-        occupiedTiles: [{ x: 0, z: 0 }],
-        blocksMovement: true,
-      }),
-    );
+    cornerOccupancy.place(placement("corner", 1, 0, blockingTile));
     const cornerGrid = new NavigationGrid(cornerMap, cornerOccupancy, ground);
     const cornerPath = findNavigationPath(
       cornerGrid,
@@ -301,13 +292,7 @@ describe("occupancy navigation", () => {
   test("resolves an occupied target to the closest reachable tile", () => {
     const map = new TerrainGrid({ width: 5, height: 3, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
-    occupancy.place(
-      placement("target", 2, 1, {
-        layer: "surface",
-        occupiedTiles: [{ x: 0, z: 0 }],
-        blocksMovement: true,
-      }),
-    );
+    occupancy.place(placement("target", 2, 1, blockingTile));
 
     const path = findNavigationPath(
       new NavigationGrid(map, occupancy, ground),
@@ -382,24 +367,9 @@ describe("occupancy navigation", () => {
   test("does not replan a complete route for a distant change", () => {
     const map = new TerrainGrid({ width: 9, height: 5, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
-    const actor = actorAt(map, 0, 2);
-    actor.movement = {
-      target: map.tileCenter(8, 2),
-      destination: map.tileCenter(8, 2),
-      reachedTarget: true,
-      waypoints: [map.tileCenter(0, 3), map.tileCenter(8, 2)],
-      waypointIndex: 0,
-      navigationVersion: map.navigationChanges.version,
-      occupancyLayer: "surface",
-    };
+    const actor = actorOnCompleteRoute(map);
     const simulation = movementMission(map, occupancy, actor, 0.25);
-    occupancy.place(
-      placement("distant", 8, 0, {
-        layer: "surface",
-        occupiedTiles: [{ x: 0, z: 0 }],
-        blocksMovement: true,
-      }),
-    );
+    occupancy.place(placement("distant", 8, 0, blockingTile));
 
     simulation.tick();
 
@@ -413,16 +383,7 @@ describe("occupancy navigation", () => {
   test("does not replan a surface route for an air-layer change", () => {
     const map = new TerrainGrid({ width: 9, height: 5, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
-    const actor = actorAt(map, 0, 2);
-    actor.movement = {
-      target: map.tileCenter(8, 2),
-      destination: map.tileCenter(8, 2),
-      reachedTarget: true,
-      waypoints: [map.tileCenter(0, 3), map.tileCenter(8, 2)],
-      waypointIndex: 0,
-      navigationVersion: map.navigationChanges.version,
-      occupancyLayer: "surface",
-    };
+    const actor = actorOnCompleteRoute(map);
     const simulation = movementMission(map, occupancy, actor, 0.25);
     occupancy.place(
       placement("air-change", 4, 2, {
@@ -577,6 +538,21 @@ function actorAt(map: TerrainGrid, x: number, z: number): Actor {
     owner: "player",
     worldPosition: map.tileCenter(x, z),
   });
+}
+
+/** A trooper on an already planned route across the middle of a 9 x 5 map. */
+function actorOnCompleteRoute(map: TerrainGrid): Actor {
+  const actor = actorAt(map, 0, 2);
+  actor.movement = {
+    target: map.tileCenter(8, 2),
+    destination: map.tileCenter(8, 2),
+    reachedTarget: true,
+    waypoints: [map.tileCenter(0, 3), map.tileCenter(8, 2)],
+    waypointIndex: 0,
+    navigationVersion: map.navigationChanges.version,
+    occupancyLayer: "surface",
+  };
+  return actor;
 }
 
 function movementMission(

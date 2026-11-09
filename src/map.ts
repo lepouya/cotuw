@@ -27,7 +27,7 @@ export function layerSlot(layer: TileLayer, index: number): number {
 }
 
 /** The share of a layer's alpha its slope fade keeps at this grade. */
-export function slopeCoverage(type: TileType | undefined, slope: number) {
+function slopeCoverage(type: TileType | undefined, slope: number) {
   const fade = type?.slopeFade;
   if (!fade) return 1;
   const t = Math.max(

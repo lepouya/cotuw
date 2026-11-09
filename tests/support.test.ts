@@ -1,34 +1,37 @@
 import { describe, expect, test } from "vitest";
+
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
+import {
+  actorIn,
+  advanceTicks,
+  balance,
+  command,
+  exploredScenarioState,
+  playerOwners,
+  savedState,
+  setBalance,
+  startMission,
+  stockpiles,
+} from "./helpers/scenario";
 import {
   createSupportNetwork,
   createSupportResolver,
   supportForOwner,
   supportsPosition,
 } from "../src/simulation/support";
-import { createMissionSimulation } from "../src/simulation/mission";
+import { defineScenario } from "../src/simulation/scenario";
+import { TerrainGrid } from "../src/simulation/terrain";
+import { createTilePlacedActor } from "../src/simulation/placement";
+import { createActor } from "../src/simulation/actor";
+import { createRelations } from "../src/simulation/ownership";
+
+import type { SupportView } from "../src/simulation/support";
 import type {
   MissionState,
   MissionSimulation,
 } from "../src/simulation/mission";
-import { defineScenario } from "../src/simulation/scenario";
-import { parseMission, serializeMission } from "../src/simulation/mission-file";
-import { TerrainGrid } from "../src/simulation/terrain";
-import { OccupancyGrid } from "../src/simulation/occupancy";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
-import { createTilePlacedActor } from "../src/simulation/placement";
-import { createActor } from "../src/simulation/actor";
-import type { Actor, ActorDefinition } from "../src/simulation/actor";
+import type { Actor } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
-import {
-  balance,
-  command,
-  exploredScenarioState,
-  playerOwners,
-  setBalance,
-  stockpiles,
-} from "./helpers/scenario";
-import { createRelations } from "../src/simulation/ownership";
 
 const arcPlayer = { owner: "player", faction: "arc" };
 const sameOwner = (left: string, right: string) => left === right;
@@ -69,41 +72,17 @@ const scenario = defineScenario({
     },
   ],
 });
-function fixture(
-  state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
-  actorDefinitions: readonly ActorDefinition[] = ARC_ACTOR_DEFINITIONS,
-  emergencyHeadquarters = false,
-) {
-  const map = new TerrainGrid(mapOptions);
-  const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
+const initial = () => exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+function fixture(state = initial(), emergencyHeadquarters = false) {
+  return startMission(new TerrainGrid(mapOptions), {
     state,
     emergencyHeadquarters,
-    map,
-    occupancy,
-    definitions: actorDefinitions,
+    definitions: ARC_ACTOR_DEFINITIONS,
     tickSeconds: 1,
-    bounds: map.worldBounds,
-    behaviorRegistry: new Map([
-      ["idle", { handleCommand: () => false, update: () => {} }],
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, [
-          {
-            id: "surface-ground",
-            maxSlope: 0.75,
-            slopeCostAtLimit: 2,
-            terrainCosts: { plain: 1, path: 1, rough: 2, water: null },
-          },
-        ]),
-      ],
-    ]),
   });
-  return { simulation, map };
 }
-function ticks(simulation: MissionSimulation, count: number) {
-  for (let i = 0; i < count; i++) simulation.tick();
-}
+const isConnected = (network: Pick<SupportView, "nodes">, actorId: string) =>
+  network.nodes.find((node) => node.actorId === actorId)!.connected;
 function building(id: string, x: number, z: number): Actor {
   return createTilePlacedActor(
     contentMap,
@@ -138,13 +117,12 @@ describe("construction support", () => {
       catalog,
       sameOwner,
     );
-    expect(
-      network.nodes.find((node) => node.actorId === "barracks")!.connected,
-    ).toBe(false);
+    expect(isConnected(network, "barracks")).toBe(false);
     expect(
       supportsPosition(network, root.worldPosition, arcPlayer, sameOwner),
     ).toBe(false);
   });
+
   test("shared relays cannot lend another owner's root to a third owner", () => {
     const root = createTilePlacedActor(
       contentMap,
@@ -178,9 +156,7 @@ describe("construction support", () => {
       definitions,
       sharesSupport,
     );
-    expect(
-      unfinished.nodes.find((node) => node.actorId === "growth")!.connected,
-    ).toBe(false);
+    expect(isConnected(unfinished, "growth")).toBe(false);
     const sharedRoot = createTilePlacedActor(
       contentMap,
       definitions.get("arc-command-center-prototype")!,
@@ -223,21 +199,15 @@ describe("construction support", () => {
       })),
     );
     const network = createSupportNetwork(actors, definitions, sharesSupport);
-    expect(
-      network.nodes.find((node) => node.actorId === "near")!.connected,
-    ).toBe(true);
-    expect(
-      network.nodes.find((node) => node.actorId === "bridge")!.connected,
-    ).toBe(false);
-    expect(
-      network.nodes.find((node) => node.actorId === "far")!.connected,
-    ).toBe(false);
+    expect(isConnected(network, "near")).toBe(true);
+    expect(isConnected(network, "bridge")).toBe(false);
+    expect(isConnected(network, "far")).toBe(false);
   });
 
   test("another ARC owner's root cannot power buildings or authorize placement", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.owners.push({ id: "rival", faction: "arc" });
-    state.actors.find(({ id }) => id === "cc")!.owner = "rival";
+    actorIn(state, "cc").owner = "rival";
     state.actors.push(blueprint("construction", 7, 10));
     const { simulation } = fixture(state);
     expect(simulation.support!.links).toEqual([
@@ -259,8 +229,9 @@ describe("construction support", () => {
     simulation.tick();
     expect(simulation.actorById("construction")!.construction).toEqual(before);
   });
+
   test("a legally built branch depends on its bridge and can gain a redundant path", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors = state.actors.filter((actor) => actor.id === "cc");
     const { simulation } = fixture(state);
     const place = (id: string, x: number, z: number) => {
@@ -272,16 +243,13 @@ describe("construction support", () => {
           origin: { x, z },
         }).accepted,
       ).toBe(true);
-      ticks(simulation, 8);
+      advanceTicks(simulation, 8);
       expect(simulation.actorById(id)!.construction).toBeUndefined();
     };
     place("built-bridge", 13, 10);
     place("built-remote", 18, 10);
     command(simulation, { kind: "sell-actor", actorId: "built-bridge" });
-    expect(
-      simulation.support!.nodes.find((node) => node.actorId === "built-remote")!
-        .connected,
-    ).toBe(false);
+    expect(isConnected(simulation.support!, "built-remote")).toBe(false);
     place("replacement", 13, 10);
     place("backup", 13, 12);
     command(simulation, { kind: "sell-actor", actorId: "replacement" });
@@ -292,66 +260,54 @@ describe("construction support", () => {
 
   test("support views survive unrelated changes and invalidate staged topology", () => {
     const { simulation } = fixture();
-    const initial = simulation.support;
-    expect(simulation.support).toBe(initial);
+    const first = simulation.support;
+    expect(simulation.support).toBe(first);
     simulation.tick();
-    expect(simulation.support).toBe(initial);
+    expect(simulation.support).toBe(first);
     command(simulation, {
       kind: "set-rally-point",
       actorId: "bridge",
       target: contentMap.tileCenter(15, 14),
     });
-    expect(simulation.support).toBe(initial);
+    expect(simulation.support).toBe(first);
     command(simulation, {
       kind: "place-actor",
       actorId: "site",
       definitionId: "arc-field-barracks",
       origin: { x: 23, z: 10 },
     });
-    const blueprint = simulation.support;
-    ticks(simulation, 2);
-    expect(simulation.support).toBe(blueprint);
-    ticks(simulation, 6);
-    expect(simulation.support).not.toBe(blueprint);
+    const unfinished = simulation.support;
+    advanceTicks(simulation, 2);
+    expect(simulation.support).toBe(unfinished);
+    advanceTicks(simulation, 6);
+    expect(simulation.support).not.toBe(unfinished);
     expect(
       simulation.support!.nodes.find((node) => node.actorId === "site")!
         .complete,
     ).toBe(true);
 
     const resolve = createSupportResolver(definitions);
-    const actors = exploredScenarioState(
-      scenario,
-      ARC_ACTOR_DEFINITIONS,
-    ).actors;
+    const actors = initial().actors;
     const before = resolve(actors, sameOwner);
     actors.splice(
       actors.findIndex((actor) => actor.id === "bridge"),
       1,
     );
     expect(resolve(actors, sameOwner)).not.toBe(before);
-    expect(
-      resolve(actors, sameOwner).nodes.find(
-        (node) => node.actorId === "remote",
-      )!.connected,
-    ).toBe(false);
+    expect(isConnected(resolve(actors, sameOwner), "remote")).toBe(false);
   });
 
   test("overlap alone does not connect completed centers", () => {
-    const actors = exploredScenarioState(
-      scenario,
-      ARC_ACTOR_DEFINITIONS,
-    ).actors;
+    const actors = initial().actors;
     actors[1] = building("bridge", 18, 10);
     actors.pop();
     const network = createSupportNetwork(actors, definitions, sameOwner);
     expect(network.links).toEqual([]);
-    expect(
-      network.nodes.find((node) => node.actorId === "bridge")!.connected,
-    ).toBe(false);
+    expect(isConnected(network, "bridge")).toBe(false);
   });
 
   test("covered completed centers connect to roots with stable redundant edges", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     const network = createSupportNetwork(state.actors, definitions, sameOwner);
     expect(network.nodes.every((node) => node.connected)).toBe(true);
     expect(
@@ -384,12 +340,10 @@ describe("construction support", () => {
   });
 
   test("blueprints never relay and rootless clusters stay disconnected", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors[1] = blueprint("bridge", 13, 10);
     const network = createSupportNetwork(state.actors, definitions, sameOwner);
-    expect(
-      network.nodes.find((node) => node.actorId === "remote")!.connected,
-    ).toBe(false);
+    expect(isConnected(network, "remote")).toBe(false);
     expect(
       supportsPosition(
         network,
@@ -430,10 +384,7 @@ describe("construction support", () => {
       true,
       false,
     ]);
-    expect(
-      simulation.support!.nodes.find((node) => node.actorId === "remote")!
-        .connected,
-    ).toBe(false);
+    expect(isConnected(simulation.support!, "remote")).toBe(false);
   });
 
   test("disconnected production preserves paid queues, cargo, and save continuation", () => {
@@ -451,7 +402,7 @@ describe("construction support", () => {
     });
     command(simulation, { kind: "sell-actor", actorId: "bridge" });
     const job = structuredClone(simulation.economy!.production[0]);
-    ticks(simulation, 20);
+    advanceTicks(simulation, 20);
     expect(simulation.economy!.production[0]).toEqual(job);
     expect(
       simulation.evaluateTraining({
@@ -461,13 +412,10 @@ describe("construction support", () => {
         definitionId: "arc-harvester",
       }),
     ).toMatchObject({ accepted: false, reason: "disconnected" });
-    const restored = fixture(
-      parseMission(serializeMission(scenario, simulation.snapshot(), 1), 1)
-        .state,
-    ).simulation;
+    const restored = fixture(savedState(scenario, simulation)).simulation;
     for (const current of [simulation, restored]) {
       current.spawnActor(building("restored-bridge", 13, 10));
-      ticks(current, 6);
+      advanceTicks(current, 6);
       expect(current.actorById("worker")).toBeDefined();
     }
     expect(restored.snapshot()).toEqual(simulation.snapshot());
@@ -479,7 +427,7 @@ describe("construction support", () => {
   });
 
   test("paused blueprints yield the slot, resume automatically, and refund fully", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors.push(
       blueprint("remote-work", 22, 13),
       blueprint("local-work", 7, 10),
@@ -487,7 +435,7 @@ describe("construction support", () => {
     const { simulation } = fixture(state);
     command(simulation, { kind: "sell-actor", actorId: "bridge" });
     const paused = simulation.actorById("remote-work")!.construction;
-    ticks(simulation, 8);
+    advanceTicks(simulation, 8);
     expect(simulation.actorById("remote-work")!.construction).toEqual(paused);
     expect(simulation.actorById("local-work")!.construction).toBeUndefined();
     simulation.spawnActor(building("replacement", 13, 10));
@@ -506,10 +454,7 @@ describe("construction support", () => {
   });
 
   test("a disconnected Refinery holds delivered cargo until reconnection", () => {
-    const state: MissionState = exploredScenarioState(
-      scenario,
-      ARC_ACTOR_DEFINITIONS,
-    );
+    const state = initial();
     state.actors = state.actors.filter((actor) => actor.id !== "bridge");
     state.actors.push({
       id: "worker",
@@ -536,20 +481,20 @@ describe("construction support", () => {
     });
     const { simulation } = fixture(state);
     const materials = balance(simulation);
-    ticks(simulation, 20);
+    advanceTicks(simulation, 20);
     expect(simulation.economy!.harvesters[0]).toMatchObject({
       cargo: 50,
       phase: "returning",
     });
     expect(balance(simulation)).toBe(materials);
     simulation.spawnActor(building("replacement", 13, 10));
-    ticks(simulation, 2);
+    advanceTicks(simulation, 2);
     expect(balance(simulation)).toBe(materials + 50);
     expect(simulation.economy!.harvesters[0].cargo).toBe(0);
   });
 
   test("a rival owner's network trains units that inherit its ownership", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.owners.push({ id: "rival", faction: "arc" });
     for (const actor of state.actors) actor.owner = "rival";
     setBalance(state, 100, "materials", "rival");
@@ -566,14 +511,14 @@ describe("construction support", () => {
         { owner: "rival" },
       ).accepted,
     ).toBe(true);
-    ticks(simulation, 30);
+    advanceTicks(simulation, 30);
     expect(simulation.actorById("rival-trooper")!.owner).toBe("rival");
   });
 
   test("harvesters work only with their own owner's Refinery", () => {
     const rivalRefinery = (state: MissionState) => {
       state.owners.push({ id: "rival", faction: "arc" });
-      state.actors.find(({ id }) => id === "remote")!.owner = "rival";
+      actorIn(state, "remote").owner = "rival";
       state.actors.push(
         createActor({
           id: "worker",
@@ -590,9 +535,7 @@ describe("construction support", () => {
       });
       return state;
     };
-    const { simulation } = fixture(
-      rivalRefinery(exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS)),
-    );
+    const { simulation } = fixture(rivalRefinery(initial()));
     expect(
       command(simulation, {
         kind: "assign-refinery",
@@ -600,9 +543,7 @@ describe("construction support", () => {
         refineryId: "remote",
       }),
     ).toMatchObject({ accepted: false, reason: "missing-refinery" });
-    const saved = rivalRefinery(
-      exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
-    );
+    const saved = rivalRefinery(initial());
     saved.economy!.harvesters[0]!.refineryId = "remote";
     saved.economy!.harvesters[0]!.phase = "idle";
     expect(() => fixture(saved)).toThrow("invalid economy state");
@@ -640,7 +581,7 @@ describe("Command Center infrastructure queues", () => {
   };
 
   test("each Command Center supplies an independent queue", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors.push(commandCenter("east-cc", 50, 10));
     const { simulation } = fixture(state);
     for (const order of [
@@ -670,7 +611,7 @@ describe("Command Center infrastructure queues", () => {
     expect(command(simulation, place("queued", 10, 8)).accepted).toBe(true);
     expect(work(simulation, "new-cc")!.headquartersId).toBe("cc");
     expect(work(simulation, "queued")!.active).toBeUndefined();
-    ticks(simulation, 12);
+    advanceTicks(simulation, 12);
     expect(simulation.actorById("new-cc")!.construction).toBeUndefined();
     expect(work(simulation, "queued")).toMatchObject({
       headquartersId: "cc",
@@ -687,7 +628,7 @@ describe("Command Center infrastructure queues", () => {
     const { simulation } = fixture();
     expect(simulation.actorById("bridge")!.headquartersId).toBe("cc");
     expect(command(simulation, place("built", 10, 8)).accepted).toBe(true);
-    ticks(simulation, 8);
+    advanceTicks(simulation, 8);
     expect(simulation.actorById("built")!).toMatchObject({
       headquartersId: "cc",
     });
@@ -696,14 +637,11 @@ describe("Command Center infrastructure queues", () => {
       command(simulation, place("closer", 8, 4, "arc-command-center-prototype"))
         .accepted,
     ).toBe(true);
-    ticks(simulation, 12);
+    advanceTicks(simulation, 12);
     expect(simulation.actorById("closer")!.headquartersId).toBe("closer");
     for (const id of ["bridge", "built"])
       expect(simulation.actorById(id)!.headquartersId).toBe("cc");
-    const restored = fixture(
-      parseMission(serializeMission(scenario, simulation.snapshot(), 1), 1)
-        .state,
-    ).simulation;
+    const restored = fixture(savedState(scenario, simulation)).simulation;
     expect(restored.snapshot()).toEqual(simulation.snapshot());
     for (const current of [simulation, restored]) {
       current.removeActor("cc");
@@ -721,17 +659,14 @@ describe("Command Center infrastructure queues", () => {
   test.each(["missing", "bridge", "", null])(
     "invalid saved base affiliations are rejected (%s)",
     (headquartersId) => {
-      const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
-      Object.assign(
-        state.actors.find(({ id }) => id === "remote")!,
-        { headquartersId },
-      );
+      const state = initial();
+      Object.assign(actorIn(state, "remote"), { headquartersId });
       expect(() => fixture(state)).toThrow("invalid infrastructure state");
     },
   );
 
   test("losing a headquarters moves paid work by priority, or pauses it", () => {
-    const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors.push(commandCenter("second-cc", 12, 4));
     const { simulation } = fixture(state);
     for (const order of [
@@ -740,7 +675,7 @@ describe("Command Center infrastructure queues", () => {
       place("b2", 16, 6),
     ])
       expect(command(simulation, order).accepted).toBe(true);
-    ticks(simulation, 2);
+    advanceTicks(simulation, 2);
     expect(work(simulation, "a")).toMatchObject({
       headquartersId: "cc",
       active: true,
@@ -776,7 +711,7 @@ describe("Command Center infrastructure queues", () => {
     simulation.tick();
     const paused = work(simulation, "a")!;
     expect(paused.headquartersId).toBeUndefined();
-    ticks(simulation, 3);
+    advanceTicks(simulation, 3);
     expect(work(simulation, "a")).toEqual(paused);
     expect(balance(simulation)).toBe(before);
   });
@@ -787,7 +722,7 @@ describe("Command Center infrastructure queues", () => {
   ])(
     "an ally's Command Center hosts work only when it shares headquarters (%o)",
     ({ sharesHeadquarters, headquartersId }) => {
-      const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+      const state = initial();
       state.owners.push({ id: "rival", faction: "arc" });
       state.relationships.push({
         owners: ["player", "rival"],
@@ -812,11 +747,7 @@ describe("Command Center infrastructure queues", () => {
     const replacement = (actorId: string, x: number, z: number) =>
       place(actorId, x, z, "arc-command-center-prototype");
     const emergencyFixture = () => {
-      const { simulation } = fixture(
-        exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
-        ARC_ACTOR_DEFINITIONS,
-        true,
-      );
+      const { simulation } = fixture(initial(), true);
       expect(command(simulation, place("pending", 5, 14)).accepted).toBe(true);
       simulation.removeActor("cc");
       simulation.tick();
@@ -824,7 +755,7 @@ describe("Command Center infrastructure queues", () => {
     };
 
     test("an emergency replacement does not wait for an allied queue", () => {
-      const state = exploredScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+      const state = initial();
       state.actors = state.actors.filter(({ id }) => id !== "cc");
       for (const actor of state.actors) delete actor.headquartersId;
       state.owners.push({ id: "ally", faction: "arc" });
@@ -837,7 +768,7 @@ describe("Command Center infrastructure queues", () => {
       const alliedWork = blueprint("allied-work", 6, 7);
       alliedWork.owner = "ally";
       state.actors.push(commandCenter("ally-cc", 2, 10, "ally"), alliedWork);
-      const { simulation } = fixture(state, ARC_ACTOR_DEFINITIONS, true);
+      const { simulation } = fixture(state, true);
       simulation.tick();
       expect(work(simulation, "allied-work")!.active).toBe(true);
       expect(command(simulation, replacement("new-cc", 8, 4)).accepted).toBe(
@@ -854,11 +785,10 @@ describe("Command Center infrastructure queues", () => {
       });
       const restored = fixture(
         JSON.parse(JSON.stringify(simulation.snapshot())),
-        ARC_ACTOR_DEFINITIONS,
         true,
       ).simulation;
-      ticks(simulation, 12);
-      ticks(restored, 12);
+      advanceTicks(simulation, 12);
+      advanceTicks(restored, 12);
       expect(simulation.actorById("new-cc")!.construction).toBeUndefined();
       expect(simulation.actorById("new-cc")!.headquartersId).toBe("new-cc");
       expect(restored.snapshot()).toEqual(simulation.snapshot());

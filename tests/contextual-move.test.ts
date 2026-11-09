@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { contextualMoveCommands } from "../src/ui/contextual-move";
 import {
   createCultivationSite,
@@ -8,8 +9,8 @@ import {
   createHarvesterState,
   workersForSite,
 } from "../src/simulation/economy";
-import type { EconomyState } from "../src/simulation/economy";
 
+import type { EconomyState } from "../src/simulation/economy";
 import type { GroupMoveCommand, MoveCommand } from "../src/simulation/command";
 
 const workers = new Set(["h1", "h2"]);

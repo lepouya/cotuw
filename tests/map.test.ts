@@ -1,5 +1,6 @@
 import { Color4 } from "@babylonjs/core";
 import { describe, expect, test, vi } from "vitest";
+
 import { TerrainMap } from "../src/map";
 
 describe("TerrainMap", () => {

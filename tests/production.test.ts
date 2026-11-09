@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { createActor } from "../src/simulation/actor";
+import { advanceTicks, spawnUnit } from "./helpers/scenario";
 import {
   createMissionSimulation,
   createMissionState,
@@ -129,6 +129,23 @@ function fixture(
   return { map, occupancy, simulation, producer };
 }
 
+/** A mission with this catalog on a blank map. */
+const withCatalog =
+  (state: MissionState, catalog: readonly ActorDefinition[]) => () => {
+    const map = new TerrainGrid({ width: 12, height: 12, tileSize: 1 });
+    return createMissionSimulation({
+      state,
+      map,
+      occupancy: new OccupancyGrid(map),
+      bounds: map.worldBounds,
+      tickSeconds: 1,
+      definitions: catalog,
+      behaviorRegistry: new Map([
+        ["idle", { handleCommand: () => false, update: () => {} }],
+      ]),
+    });
+  };
+
 describe("unit production", () => {
   test("trains distinct units only on the command tick and accepts movement afterward", () => {
     const { simulation } = fixture();
@@ -200,14 +217,7 @@ describe("unit production", () => {
         "player",
       ),
     );
-    simulation.spawnActor(
-      createActor({
-        id: "standing-unit",
-        definitionId: "trooper",
-        owner: "player",
-        worldPosition: map.tileCenter(7, 4),
-      }),
-    );
+    spawnUnit(simulation, "standing-unit", "trooper", map.tileCenter(7, 4));
     simulation.submitCommand(order());
     expect(simulation.tick()[0].accepted).toBe(true);
     const unit = simulation.actorById("unit-1")!;
@@ -228,13 +238,11 @@ describe("unit production", () => {
       { x: 5, z: 7 },
       { x: 6, z: 7 },
     ]) {
-      simulation.spawnActor(
-        createActor({
-          id: `block-${tile.x}-${tile.z}`,
-          definitionId: "trooper",
-          owner: "player",
-          worldPosition: map.tileCenter(tile.x, tile.z),
-        }),
+      spawnUnit(
+        simulation,
+        `block-${tile.x}-${tile.z}`,
+        "trooper",
+        map.tileCenter(tile.x, tile.z),
       );
     }
     simulation.submitCommand(order());
@@ -297,14 +305,7 @@ describe("unit production", () => {
     expect(simulation.unusedActorId("unit-")).toBe("unit-3");
     simulation.removeActor("unit-1");
     expect(simulation.unusedActorId("unit-")).toBe("unit-3");
-    simulation.spawnActor(
-      createActor({
-        id: "unit-3",
-        definitionId: "scout",
-        owner: "player",
-        worldPosition: map.tileCenter(1, 1),
-      }),
-    );
+    spawnUnit(simulation, "unit-3", "scout", map.tileCenter(1, 1));
     expect(simulation.unusedActorId("unit-")).toBe("unit-4");
   });
 
@@ -319,7 +320,7 @@ describe("unit production", () => {
     simulation.submitCommand(command);
     expect(simulation.tick()[0]).toMatchObject({
       accepted: false,
-      reason: reason,
+      reason,
     });
     expect(simulation.actors).toHaveLength(1);
   });
@@ -401,22 +402,11 @@ describe("unit production", () => {
   });
 
   test("production units need a behavior that reports passable tiles", () => {
-    const map = new TerrainGrid({ width: 12, height: 12, tileSize: 1 });
-    expect(() =>
-      createMissionSimulation({
-        state: createMissionState([]),
-        map,
-        occupancy: new OccupancyGrid(map),
-        bounds: map.worldBounds,
-        tickSeconds: 1,
-        definitions: [
-          { ...barracks, production: { unitDefinitionIds: ["trooper"] } },
-          { ...definitions[1], behaviorId: "idle" },
-        ],
-        behaviorRegistry: new Map([
-          ["idle", { handleCommand: () => false, update: () => {} }],
-        ]),
-      }),
+    expect(
+      withCatalog(createMissionState([]), [
+        { ...barracks, production: { unitDefinitionIds: ["trooper"] } },
+        { ...definitions[1], behaviorId: "idle" },
+      ]),
     ).toThrow("Invalid production unit");
   });
 
@@ -447,20 +437,7 @@ describe("unit production", () => {
   test("invalid production catalogs fail at initialization", () => {
     const saved = fixture().simulation.snapshot();
     saved.actors[0].definitionId = "barracks";
-    const map = new TerrainGrid({ width: 12, height: 12, tileSize: 1 });
-    expect(() =>
-      createMissionSimulation({
-        state: saved,
-        map,
-        occupancy: new OccupancyGrid(map),
-        bounds: map.worldBounds,
-        tickSeconds: 1,
-        definitions: [barracks],
-        behaviorRegistry: new Map([
-          ["idle", { handleCommand: () => false, update: () => {} }],
-        ]),
-      }),
-    ).toThrow("Invalid production unit");
+    expect(withCatalog(saved, [barracks])).toThrow("Invalid production unit");
   });
 });
 
@@ -480,7 +457,7 @@ test("rally points are persistent ground orders, clearable, and used after exiti
   restored.submitCommand(order());
   expect(restored.tick()[0].accepted).toBe(true);
   expect(restored.actorById("unit-1")!.movement?.target).toEqual(target);
-  for (let i = 0; i < 300; i++) restored.tick();
+  advanceTicks(restored, 300);
   expect(restored.actorById("unit-1")!.worldPosition).toEqual(target);
   restored.submitCommand({ kind: "set-rally-point", actorId: "barracks-1" });
   restored.tick();

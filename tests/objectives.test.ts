@@ -1,10 +1,12 @@
 import { expect, test } from "vitest";
+
 import {
   createObjectiveStates,
   evaluateObjectives,
   recordObjectiveDestruction,
   validateObjectives,
 } from "../src/simulation/objectives";
+
 import type { ObjectiveDefinition } from "../src/simulation/objectives";
 
 const objectives: readonly ObjectiveDefinition[] = [

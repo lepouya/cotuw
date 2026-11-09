@@ -1,9 +1,15 @@
-import { playerOwners, stockpiles } from "./helpers/scenario";
 import { describe, expect, test, vi } from "vitest";
+
+import {
+  advanceTicks,
+  playerOwners,
+  savedState,
+  spawnUnit,
+  startMission,
+  stockpiles,
+} from "./helpers/scenario";
 import { ARC_ACTOR_DEFINITIONS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
-import { createMissionSimulation } from "../src/simulation/mission";
-import { OccupancyGrid } from "../src/simulation/occupancy";
 import { createTilePlacedActor } from "../src/simulation/placement";
 import {
   createScenarioState,
@@ -11,10 +17,8 @@ import {
 } from "../src/simulation/scenario";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import { TerrainGrid } from "../src/simulation/terrain";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { visibleTiles } from "../src/simulation/vision";
 
-import type { MissionState } from "../src/simulation/mission";
 import type { ActorDefinition } from "../src/simulation/actor";
 import type { TerrainGridOptions } from "../src/simulation/terrain";
 
@@ -73,33 +77,16 @@ const scenario = defineScenario({
   ],
 });
 
+const initial = () => createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+
 function fixture(
-  state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
+  state = initial(),
   actorDefinitions: readonly ActorDefinition[] = ARC_ACTOR_DEFINITIONS,
 ) {
-  const map = new TerrainGrid(mapOptions);
-  const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
+  const { simulation, map } = startMission(new TerrainGrid(mapOptions), {
     state,
-    map,
-    occupancy,
     definitions: actorDefinitions,
     tickSeconds: 1,
-    bounds: map.worldBounds,
-    behaviorRegistry: new Map([
-      ["idle", { handleCommand: () => false, update: () => {} }],
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, [
-          {
-            id: "surface-ground",
-            maxSlope: 0.75,
-            slopeCostAtLimit: 2,
-            terrainCosts: { plain: 1, path: 1, rough: 2, water: null },
-          },
-        ]),
-      ],
-    ]),
   });
   return {
     simulation,
@@ -123,20 +110,13 @@ function placed(id: string, definitionId: string, x: number, z: number) {
 /** A scout at tile (10, 11) sent east until it stands on tile (40, 11). */
 function scouted() {
   const { simulation, map, fog } = fixture();
-  simulation.spawnActor(
-    createActor({
-      id: "scout",
-      definitionId: "arc-scout",
-      owner: "player",
-      worldPosition: map.tileCenter(10, 11),
-    }),
-  );
+  spawnUnit(simulation, "scout", "arc-scout", map.tileCenter(10, 11));
   simulation.submitCommand({
     kind: "move",
     actorId: "scout",
     target: map.tileCenter(40, 11),
   });
-  for (let tick = 0; tick < 8; tick += 1) simulation.tick();
+  advanceTicks(simulation, 8);
   expect(simulation.actorById("scout")!.movement).toBeUndefined();
   return { simulation, map, fog };
 }
@@ -160,7 +140,7 @@ describe("fog of war", () => {
   });
 
   test("blueprints and disconnected buildings provide no vision", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors.push(
       placed("connected", "arc-field-barracks", 12, 10),
       placed("offline", "arc-materials-refinery", 30, 10),
@@ -177,21 +157,15 @@ describe("fog of war", () => {
 
   test("snapshots keep explored terrain and malformed fog is rejected", () => {
     const { simulation } = scouted();
-    const { fog } = fixture(
-      parseMission(serializeMission(scenario, simulation.snapshot(), 1), 1)
-        .state,
-    );
+    const { fog } = fixture(savedState(scenario, simulation));
     expect(fog.isExplored(25, 11)).toBe(true);
     expect(fog.isVisible(25, 11)).toBe(false);
-    const invalid: MissionState = {
-      ...createScenarioState(scenario, ARC_ACTOR_DEFINITIONS),
-      fog: { explored: { player: "01" } },
-    };
+    const invalid = { ...initial(), fog: { explored: { player: "01" } } };
     expect(() => fixture(invalid)).toThrow("Mission state has invalid fog.");
   });
 
   test("saves without explored terrain reveal the whole map", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     const saved = JSON.parse(serializeMission(scenario, state, 1));
     delete saved.state.fog;
     const { simulation } = fixture(
@@ -209,7 +183,7 @@ describe("fog of war", () => {
   });
 
   test("building placement and rally points require explored terrain", () => {
-    const state = createScenarioState(scenario, ARC_ACTOR_DEFINITIONS);
+    const state = initial();
     state.actors.push(placed("barracks", "arc-field-barracks", 6, 10));
     const { simulation, map } = fixture(state);
     const barracks = (x: number, z: number) =>
@@ -234,14 +208,7 @@ describe("fog of war", () => {
 
 test("harvesters cannot be ordered to undiscovered sites", () => {
   const { simulation, map } = fixture();
-  simulation.spawnActor(
-    createActor({
-      id: "harvester",
-      definitionId: "arc-harvester",
-      owner: "player",
-      worldPosition: map.tileCenter(6, 16),
-    }),
-  );
+  spawnUnit(simulation, "harvester", "arc-harvester", map.tileCenter(6, 16));
   const gather = (siteId: string) => {
     simulation.submitCommand({ kind: "gather", actorId: "harvester", siteId });
     return simulation.tick()[0];
@@ -303,14 +270,7 @@ test("automatic harvesting waits for unexplored patch tiles to be discovered", (
   gather();
   expect(simulation.economy!.harvesters[0].phase).toBe("depleted");
   expect(simulation.actorById("worker")!.movement).toBeUndefined();
-  simulation.spawnActor(
-    createActor({
-      id: "scout",
-      definitionId: "arc-scout",
-      owner: "player",
-      worldPosition: map.tileCenter(32, 11),
-    }),
-  );
+  spawnUnit(simulation, "scout", "arc-scout", map.tileCenter(32, 11));
   gather();
   expect(simulation.economy!.harvesters[0].activeSiteId).toBe("hidden");
   expect(simulation.actorById("worker")!.movement!.target).toEqual(

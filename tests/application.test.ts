@@ -5,6 +5,7 @@ import { LEVEL_SOURCES } from "../src/content/levels";
 import {
   assembleSkirmish,
   createSessionSimulation,
+  loadMission,
 } from "../src/mission-loading";
 import { createPlatform } from "../src/platform";
 import { createGameSession } from "../src/session";
@@ -227,6 +228,17 @@ test("a dialog reset failure still releases the departing session", async () => 
 const launched = () =>
   vi.mocked(createGameSession).mock.lastCall![2].mission.scenario;
 
+/** Restarts and resolves with the mission the new session received. */
+async function restarted(app: Awaited<ReturnType<typeof application>>["app"]) {
+  vi.mocked(createGameSession).mockClear();
+  app.restart();
+  await vi.waitFor(() => expect(createGameSession).toHaveBeenCalled());
+  return vi.mocked(createGameSession).mock.lastCall![2].mission;
+}
+
+const savedId = (files: Map<string, string>, name: string) =>
+  [...files].find(([, source]) => source.includes(`"${name}"`))![0];
+
 test("restarting keeps the chosen introduction difficulty", async () => {
   const { app } = await application();
   app.startFaction("circle", "hard");
@@ -235,9 +247,7 @@ test("restarting keeps the chosen introduction difficulty", async () => {
     difficulty: "hard",
     enemyOwners: ["wildlife"],
   });
-  vi.mocked(createGameSession).mockClear();
-  app.restart();
-  await vi.waitFor(() => expect(createGameSession).toHaveBeenCalled());
+  await restarted(app);
   expect(launched().setup?.difficulty).toBe("hard");
 });
 
@@ -259,13 +269,9 @@ test("skirmishes restart from their setup, including after a load", async () => 
       true,
     ),
   );
-  vi.mocked(createGameSession).mockClear();
-  app.restart();
-  await vi.waitFor(() => expect(createGameSession).toHaveBeenCalled());
-  expect(launched().setup).toEqual(setup);
-  expect(
-    vi.mocked(createGameSession).mock.lastCall![2].mission.state.playerOwner,
-  ).toBe("east");
+  const mission = await restarted(app);
+  expect(mission.scenario.setup).toEqual(setup);
+  expect(mission.state.playerOwner).toBe("east");
 });
 
 test("a skirmish link with an unknown faction reports it at the title", async () => {
@@ -280,6 +286,24 @@ test("a skirmish link with an unknown faction reports it at the title", async ()
   expect(ui.report).toHaveBeenLastCalledWith(
     "The level could not start: Start slot east has no playable faction.",
   );
+});
+
+test("a tick-zero save does not replace the authored restart level", async () => {
+  const { app, platform } = await application();
+  const { scenario, state } = loadMission(
+    LEVEL_SOURCES.get("arc-economy-opening")!,
+  );
+  const stockpile = state.economy!.stockpiles[0];
+  const authored = stockpile.amount;
+  stockpile.amount = authored + 1;
+  vi.mocked(platform.importFile).mockResolvedValue(
+    serializeMission(scenario, state, 1 / 60, {
+      save: { name: "Immediate save", savedAt: "2026-10-04T10:00:00Z" },
+    }),
+  );
+  await app.load();
+  const { state: restored } = await restarted(app);
+  expect(restored.economy!.stockpiles[0].amount).toBe(authored);
 });
 
 test("an imported skirmish level remains its restart source after loading a save", async () => {
@@ -297,18 +321,12 @@ test("an imported skirmish level remains its restart source after loading a save
   await app.load();
   app.session()!.simulation.tick();
   expect(await app.save("manual", "Custom opening")).toBe(true);
-  const saved = [...files].find(([, source]) =>
-    source.includes('"Custom opening"'),
-  )![0];
-  await app.load(saved);
-  vi.mocked(createGameSession).mockClear();
-  app.restart();
-  await vi.waitFor(() => expect(createGameSession).toHaveBeenCalled());
-  const restarted = vi.mocked(createGameSession).mock.lastCall![2].mission;
-  expect(restarted.scenario.name).toBe("Custom battlefield");
-  expect(restarted.scenario.setup).toEqual(imported.scenario.setup);
-  expect(restarted.state.tick).toBe(0);
-  expect(restarted.state.economy!.stockpiles[0].amount).toBe(321);
+  await app.load(savedId(files, "Custom opening"));
+  const { scenario, state } = await restarted(app);
+  expect(scenario.name).toBe("Custom battlefield");
+  expect(scenario.setup).toEqual(imported.scenario.setup);
+  expect(state.tick).toBe(0);
+  expect(state.economy!.stockpiles[0].amount).toBe(321);
 
   await app.initialize({
     skirmish: {
@@ -318,9 +336,7 @@ test("an imported skirmish level remains its restart source after loading a save
     },
   });
   await vi.waitFor(() => expect(launched().name).toBe("Skirmish"));
-  vi.mocked(createGameSession).mockClear();
-  app.restart();
-  await vi.waitFor(() => expect(createGameSession).toHaveBeenCalled());
+  await restarted(app);
   expect(launched().name).toBe("Skirmish");
   expect(launched().setup?.difficulty).toBe("easy");
 });
@@ -364,9 +380,7 @@ test("a registered level restarts at a save's difficulty whatever its player", a
   });
   await vi.waitFor(() => expect(launched().name).toBe("Skirmish"));
   expect(await app.save("manual", "From east")).toBe(true);
-  const saved = [...files].find(([, source]) =>
-    source.includes('"From east"'),
-  )![0];
+  const saved = savedId(files, "From east");
   const level = assembleSkirmish({
     factions: { west: "arc", east: "circle" },
     playerSlot: "west",
@@ -377,11 +391,7 @@ test("a registered level restarts at a save's difficulty whatever its player", a
   );
   await app.load();
   await app.load(saved);
-  vi.mocked(createGameSession).mockClear();
-  app.restart();
-  await vi.waitFor(() => expect(createGameSession).toHaveBeenCalled());
-  const { scenario, state } =
-    vi.mocked(createGameSession).mock.lastCall![2].mission;
+  const { scenario, state } = await restarted(app);
   expect(state.playerOwner).toBe("west");
   expect(scenario.setup).toMatchObject({
     difficulty: "easy",
@@ -400,10 +410,7 @@ test("pause, loaded, and result menus name the difficulty", async () => {
   app.openMenu();
   expect(shownDescription(ui)).toContain("Hard difficulty");
   expect(await app.save("manual", "Hard save")).toBe(true);
-  const saved = [...files].find(([, source]) =>
-    source.includes('"Hard save"'),
-  )![0];
-  await app.load(saved);
+  await app.load(savedId(files, "Hard save"));
   await vi.waitFor(() =>
     expect(shownDescription(ui)).toContain("Inspect the saved mission"),
   );

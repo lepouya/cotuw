@@ -67,15 +67,17 @@ test("desktop saves replace an existing file after writing the new content", asy
   expect(disk.files.size).toBe(1);
 });
 
-for (const failure of ["failWrite", "failRename"] as const)
-  test(`desktop ${failure} preserves the previous save and removes partial files`, async () => {
+test.each(["failWrite", "failRename"] as const)(
+  "desktop %s preserves the previous save and removes partial files",
+  async (failure) => {
     const { saves } = createTauriPlatform();
     disk.files.set("saves/quicksave.json", "old");
     disk[failure] = true;
     await expect(saves.write("quicksave", "partial")).rejects.toThrow("failed");
     expect(await saves.read("quicksave")).toBe("old");
     expect(disk.files.size).toBe(1);
-  });
+  },
+);
 
 test("desktop save IDs cannot escape the save directory", async () => {
   const { saves } = createTauriPlatform();

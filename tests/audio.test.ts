@@ -1,14 +1,17 @@
 import { afterEach, expect, test, vi } from "vitest";
+
+import { BASE_CONTENT } from "./helpers/content";
 import { createAudioScene } from "../src/audio/scene";
 import { createMissionAudio } from "../src/audio/mission";
 import { parseContentPack } from "../src/content/content-pack";
 import { readAudioSettings } from "../src/ui/audio-controls";
 import { DEFAULT_AUDIO_SETTINGS } from "../src/audio/mixer";
+import { createObservations } from "../src/simulation/observations";
 import { createOwnerView } from "../src/simulation/owner-view";
-import { BASE_CONTENT } from "./helpers/content";
+
 import type { AudioMixer } from "../src/audio/mixer";
 import type { AudioContent } from "../src/content/audio";
-import type { AudioEmitter } from "../src/audio/scene";
+import type { AudioEmitter, AudioScene } from "../src/audio/scene";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -85,6 +88,16 @@ function setup(playerFaction?: string) {
   );
   return { ...backend, scene, focus };
 }
+/** A scene on `backend` with its listener at the origin. */
+const sceneOn = (
+  backend: ReturnType<typeof device>,
+  content: AudioContent | undefined,
+  presentation: Parameters<typeof createAudioScene>[1] = {},
+) =>
+  createAudioScene(content, presentation, backend.mixer, () => ({
+    x: 0,
+    z: 0,
+  }));
 const economy = (production: object[] = [], harvesters: object[] = []) => ({
   stockpiles: [],
   deposited: [],
@@ -93,6 +106,27 @@ const economy = (production: object[] = [], harvesters: object[] = []) => ({
   harvesters,
   production,
 });
+const placed = {
+  occupancyLayer: "surface",
+  worldPosition: { x: 0, z: 0 },
+  facing: 0,
+};
+const building = {
+  ...placed,
+  id: "b",
+  definitionId: "arc-field-barracks",
+  owner: "player",
+};
+const activeMusic = (calls: ReturnType<typeof device>["calls"]) =>
+  calls
+    .filter((call) => !call.ended && call.options.bus === "music")
+    .map((call) => call.url);
+const sceneSpy = () => ({
+  sync: vi.fn<AudioScene["sync"]>(),
+  emit: vi.fn<AudioScene["emit"]>(),
+  setMusic: vi.fn<AudioScene["setMusic"]>(),
+});
+
 /** A committed mission the player reads through a real owner view. */
 function committed(
   changes: object = {},
@@ -117,8 +151,12 @@ function committed(
     simulation,
     knowledge: {
       owner: "player",
-      observations: { sites: [], loot: [] },
-    } as any,
+      fog: undefined,
+      knowsTile: () => true,
+      seesTile: () => true,
+      sites: [],
+      observations: createObservations(),
+    },
     faction: undefined,
     definitions: new Map(),
   });
@@ -201,6 +239,7 @@ test("Circle casting and living damage use tonal cues without metallic impacts",
   ).toEqual(["assets/audio/circle-cast-1.wav", "assets/audio/living-hit.wav"]);
   scene.dispose();
 });
+
 test("state loops resume when buffers arrive, without replaying past events", () => {
   const { scene, ready, calls } = setup();
   ready(false);
@@ -218,6 +257,7 @@ test("state loops resume when buffers arrive, without replaying past events", ()
   scene.update();
   expect(calls).toHaveLength(2);
 });
+
 test("paused, removed, and distant emitters release their loops", () => {
   const { scene, calls, focus } = setup();
   scene.sync([emitter()]);
@@ -240,6 +280,7 @@ test("paused, removed, and distant emitters release their loops", () => {
   scene.sync([]);
   expect(engine()).toHaveLength(0);
 });
+
 test("selection mixes work loops without restarting or changing other cues", () => {
   const { scene, calls } = setup();
   const worker = emitter({ states: ["working"], position: { x: 9, z: 0 } });
@@ -275,6 +316,7 @@ test("selection mixes work loops without restarting or changing other cues", () 
   scene.setSelection([]);
   expect(calls.filter((call) => !call.ended)).toHaveLength(0);
 });
+
 test("world sequences cancel on fog loss and global player alerts remain audible", () => {
   vi.useFakeTimers();
   const { scene, calls } = setup();
@@ -295,6 +337,7 @@ test("world sequences cancel on fog loss and global player alerts remain audible
   expect(calls.some((call) => call.url.endsWith("/alert.wav"))).toBe(true);
   scene.dispose();
 });
+
 test("combat variants and event bursts obey cooldown and voice limits", () => {
   const { scene, calls, time } = setup();
   const trooper = emitter({ definitionId: "arc-trooper", states: [] });
@@ -314,21 +357,17 @@ test("combat variants and event bursts obey cooldown and voice limits", () => {
     "assets/audio/rifle-1.wav",
   ]);
 });
+
 test("custom action and state names need only data bindings", () => {
   const backend = device();
-  const scene = createAudioScene(
-    BASE_CONTENT.audio,
-    {
-      crane: {
-        audio: {
-          events: { lift: [{ cue: "refinery-door-open" }] },
-          loops: { lifting: "harvester-work" },
-        },
+  const scene = sceneOn(backend, BASE_CONTENT.audio, {
+    crane: {
+      audio: {
+        events: { lift: [{ cue: "refinery-door-open" }] },
+        loops: { lifting: "harvester-work" },
       },
     },
-    backend.mixer,
-    () => ({ x: 0, z: 0 }),
-  );
+  });
   const crane = emitter({ definitionId: "crane", states: ["lifting"] });
   scene.sync([crane]);
   scene.emit("lift", crane);
@@ -344,17 +383,13 @@ test("custom action and state names need only data bindings", () => {
   expect(backend.calls.every((call) => call.ended)).toBe(true);
   expect(backend.listeners.size).toBe(0);
 });
+
 test("object bindings inherit pack defaults and can silence them", () => {
   const backend = device();
-  const scene = createAudioScene(
-    BASE_CONTENT.audio,
-    {
-      crane: {},
-      silent: { audio: { events: { damage: [] } } },
-    },
-    backend.mixer,
-    () => ({ x: 0, z: 0 }),
-  );
+  const scene = sceneOn(backend, BASE_CONTENT.audio, {
+    crane: {},
+    silent: { audio: { events: { damage: [] } } },
+  });
   const crane = emitter({ id: "crane", definitionId: "crane", states: [] });
   const silent = emitter({ id: "silent", definitionId: "silent", states: [] });
   scene.sync([crane, silent]);
@@ -365,6 +400,7 @@ test("object bindings inherit pack defaults and can silence them", () => {
     "assets/audio/damage-1.wav",
   );
 });
+
 test("full voice budgets replace the lowest-priority one-shot", () => {
   const backend = device();
   const cue = { clips: ["a"], gain: 1, cooldown: 0, voices: 24 };
@@ -381,10 +417,7 @@ test("full voice budgets replace the lowest-priority one-shot", () => {
       high: [{ cue: "high" }],
     },
   };
-  const scene = createAudioScene(content, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, content);
   for (let i = 0; i < 24; i++) scene.emit(i === 12 ? "lowest" : "low");
   scene.emit("lowest");
   expect(backend.calls).toHaveLength(24);
@@ -394,6 +427,7 @@ test("full voice budgets replace the lowest-priority one-shot", () => {
     backend.calls[12],
   ]);
 });
+
 test("music switches without leaving the previous track running", () => {
   const { scene, calls } = setup();
   scene.update();
@@ -457,24 +491,18 @@ test.each([
   (edit) => {
     const pack: any = structuredClone(BASE_CONTENT);
     edit(pack);
-    expect(() =>
-      parseContentPack(
-        JSON.stringify({ ...pack, format: "cotuw-content", formatVersion: 1 }),
-      ),
-    ).toThrow(/audio/i);
+    expect(() => parseContentPack(JSON.stringify(pack))).toThrow(/audio/i);
   },
 );
+
 test("old content packs remain silent and valid", () => {
   const pack: any = structuredClone(BASE_CONTENT);
   delete pack.audio;
   for (const presentation of Object.values(pack.presentation) as any[])
     delete presentation.audio;
-  expect(
-    parseContentPack(
-      JSON.stringify({ ...pack, format: "cotuw-content", formatVersion: 1 }),
-    ).audio,
-  ).toBeUndefined();
+  expect(parseContentPack(JSON.stringify(pack)).audio).toBeUndefined();
 });
+
 test("invalid saved volume preferences fall back safely", () => {
   for (const source of [
     null,
@@ -498,23 +526,11 @@ test("invalid saved volume preferences fall back safely", () => {
       DEFAULT_AUDIO_SETTINGS,
     );
 });
+
 test("committed observations group commands, baseline loads, and queue starts", () => {
-  const scene = {
-    sync: vi.fn(),
-    emit: vi.fn(),
-    setMusic: vi.fn(),
-  } as unknown as ReturnType<typeof createAudioScene>;
+  const scene = sceneSpy();
   const { simulation, view } = committed({
-    actors: [
-      {
-        id: "b",
-        definitionId: "barracks",
-        owner: "player",
-        occupancyLayer: "surface",
-        worldPosition: { x: 0, z: 0 },
-        facing: 0,
-      },
-    ],
+    actors: [{ ...building, definitionId: "barracks" }],
     economy: economy([{ producerId: "b", actorId: "one", completedTicks: 3 }]),
     objectives: [{ id: "goal", status: "complete" }],
     result: { kind: "victory" },
@@ -554,14 +570,6 @@ test("committed observations group commands, baseline loads, and queue starts", 
 
 test("production completions use the committed exit participant", () => {
   const { scene, calls } = setup();
-  const building = {
-    id: "b",
-    definitionId: "arc-field-barracks",
-    owner: "player",
-    occupancyLayer: "surface",
-    worldPosition: { x: 0, z: 0 },
-    facing: 0,
-  };
   const { simulation, view } = committed({
     actors: [building],
     economy: economy([{ actorId: "unit", producerId: "b", completedTicks: 1 }]),
@@ -587,14 +595,6 @@ test("production completions use the committed exit participant", () => {
 
 test("instant production still emits training start and completion once", () => {
   const { scene, calls } = setup();
-  const building = {
-    id: "b",
-    definitionId: "arc-field-barracks",
-    owner: "player",
-    occupancyLayer: "surface",
-    worldPosition: { x: 0, z: 0 },
-    facing: 0,
-  };
   const { simulation, view } = committed({ actors: [building] });
   const adapter = createMissionAudio(scene, simulation, view, 8);
   simulation.actors = [
@@ -627,16 +627,16 @@ test("instant production still emits training start and completion once", () => 
 
 test("hidden attacks stay silent while own damage and alerts trigger combat music", () => {
   const { scene, calls, time } = setup();
-  const actor = {
-    occupancyLayer: "surface",
-    worldPosition: { x: 0, z: 0 },
-    facing: 0,
-  };
   const { simulation, view } = committed(
     {
       actors: [
-        { ...actor, id: "hidden", definitionId: "wolf", owner: "wildlife" },
-        { ...actor, id: "own", definitionId: "arc-harvester", owner: "player" },
+        { ...placed, id: "hidden", definitionId: "wolf", owner: "wildlife" },
+        {
+          ...placed,
+          id: "own",
+          definitionId: "arc-harvester",
+          owner: "player",
+        },
       ],
       completedTicks: 0,
     },
@@ -644,35 +644,22 @@ test("hidden attacks stay silent while own damage and alerts trigger combat musi
   );
   const adapter = createMissionAudio(scene, simulation, view, 8);
   simulation.attacks = [{ attackerId: "hidden", targetId: "own" }];
-  adapter.observe([], [{ kind: "attack" } as any]);
+  adapter.observe([], [{ priority: "high" }]);
   expect(calls.some((call) => call.url.includes("wolf-attack"))).toBe(false);
   expect(calls.some((call) => call.url.includes("damage"))).toBe(true);
   expect(calls.some((call) => call.url.endsWith("/alert.wav"))).toBe(true);
-  expect(
-    calls
-      .filter((call) => !call.ended && call.options.bus === "music")
-      .map((call) => call.url),
-  ).toEqual(["assets/audio/beneath-the-ridge.wav"]);
+  expect(activeMusic(calls)).toEqual(["assets/audio/beneath-the-ridge.wav"]);
   simulation.attacks = [];
   simulation.completedTicks = 481;
   time(19);
   adapter.observe();
-  expect(
-    calls
-      .filter((call) => !call.ended && call.options.bus === "music")
-      .map((call) => call.url),
-  ).toEqual(["assets/audio/unquiet-frontier.wav"]);
+  expect(activeMusic(calls)).toEqual(["assets/audio/unquiet-frontier.wav"]);
 });
 
 test("other owners' queues stay silent and their fights set combat music only when seen", () => {
   const { scene, calls } = setup();
-  const actor = {
-    occupancyLayer: "surface",
-    worldPosition: { x: 0, z: 0 },
-    facing: 0,
-  };
   const barracks = (id: string) => ({
-    ...actor,
+    ...placed,
     id,
     definitionId: "arc-field-barracks",
     owner: "rival",
@@ -698,12 +685,12 @@ test("other owners' queues stay silent and their fights set combat music only wh
   simulation.actors = [
     ...simulation.actors,
     {
-      ...actor,
+      ...placed,
       id: "hidden-unit",
       definitionId: "arc-trooper",
       owner: "rival",
     },
-    { ...actor, id: "seen-unit", definitionId: "arc-trooper", owner: "rival" },
+    { ...placed, id: "seen-unit", definitionId: "arc-trooper", owner: "rival" },
   ];
   simulation.buildingActivity = [
     { buildingId: "hidden", kind: "exit", actorId: "hidden-unit" },
@@ -717,33 +704,19 @@ test("other owners' queues stay silent and their fights set combat music only wh
       ),
     ),
   ).toBe(false);
-  expect(
-    calls
-      .filter((call) => !call.ended && call.options.bus === "music")
-      .map((call) => call.url),
-  ).toEqual(["assets/audio/unquiet-frontier.wav"]);
+  expect(activeMusic(calls)).toEqual(["assets/audio/unquiet-frontier.wav"]);
   simulation.attacks = [{ attackerId: "hidden-unit", targetId: "seen" }];
   adapter.observe();
-  expect(
-    calls
-      .filter((call) => !call.ended && call.options.bus === "music")
-      .map((call) => call.url),
-  ).toEqual(["assets/audio/beneath-the-ridge.wav"]);
+  expect(activeMusic(calls)).toEqual(["assets/audio/beneath-the-ridge.wav"]);
 });
 
 test("only shown actors become emitters, with their visible work as states", () => {
-  const scene = {
-    sync: vi.fn(),
-    emit: vi.fn(),
-    setMusic: vi.fn(),
-  } as unknown as ReturnType<typeof createAudioScene>;
+  const scene = sceneSpy();
   const actor = (id: string, owner: string) => ({
+    ...placed,
     id,
     owner,
     definitionId: "arc-harvester",
-    occupancyLayer: "surface",
-    worldPosition: { x: 0, z: 0 },
-    facing: 0,
   });
   const { simulation, view } = committed(
     {
@@ -770,11 +743,7 @@ test("only shown actors become emitters, with their visible work as states", () 
 });
 
 test("lethal hits sound from detected remains, and hidden remains stay silent", () => {
-  const scene = {
-    sync: vi.fn(),
-    emit: vi.fn(),
-    setMusic: vi.fn(),
-  } as unknown as ReturnType<typeof createAudioScene>;
+  const scene = sceneSpy();
   const remains = (actorId: string) => ({
     actorId,
     definitionId: "wolf",
@@ -907,10 +876,7 @@ test("state loops can start with a ready variant while another is unavailable", 
     events: {},
     defaults: { loops: { moving: "hum" } },
   };
-  const scene = createAudioScene(content, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, content);
   scene.sync([emitter()]);
   expect(backend.calls.map((call) => call.url)).toEqual(["ready"]);
   scene.update();
@@ -937,15 +903,10 @@ test("unloaded loop cues do not starve playable loops or restart them on updates
     },
     events: {},
   };
-  const scene = createAudioScene(
-    content,
-    {
-      missing: { audio: { loops: { moving: "missing" } } },
-      ready: { audio: { loops: { moving: "ready" } } },
-    },
-    backend.mixer,
-    () => ({ x: 0, z: 0 }),
-  );
+  const scene = sceneOn(backend, content, {
+    missing: { audio: { loops: { moving: "missing" } } },
+    ready: { audio: { loops: { moving: "ready" } } },
+  });
   const workers = [
     ...Array.from({ length: 12 }, (_, i) =>
       emitter({ id: `missing-${i}`, definitionId: "missing" }),
@@ -982,18 +943,13 @@ test("saturated cues do not consume unused slots for other loop types", () => {
 
 test("state aliases share a loop and changing aliases keeps it running", () => {
   const backend = device();
-  const scene = createAudioScene(
-    BASE_CONTENT.audio,
-    {
-      crane: {
-        audio: {
-          loops: { moving: "harvester-engine", working: "harvester-engine" },
-        },
+  const scene = sceneOn(backend, BASE_CONTENT.audio, {
+    crane: {
+      audio: {
+        loops: { moving: "harvester-engine", working: "harvester-engine" },
       },
     },
-    backend.mixer,
-    () => ({ x: 0, z: 0 }),
-  );
+  });
   const crane = emitter({
     definitionId: "crane",
     states: ["moving", "working", "moving"],
@@ -1013,12 +969,9 @@ test("object definitions can explicitly silence an inherited state loop", () => 
   const backend = device();
   const audio = structuredClone(BASE_CONTENT.audio!);
   audio.defaults = { loops: { moving: "harvester-engine" } };
-  const scene = createAudioScene(
-    audio,
-    { silent: { audio: { loops: { moving: null } } } },
-    backend.mixer,
-    () => ({ x: 0, z: 0 }),
-  );
+  const scene = sceneOn(backend, audio, {
+    silent: { audio: { loops: { moving: null } } },
+  });
   scene.sync([emitter({ definitionId: "silent" })]);
   expect(backend.calls.some((call) => call.url.includes("engine"))).toBe(false);
   const pack: any = structuredClone(BASE_CONTENT);
@@ -1049,10 +1002,7 @@ test("a missing high-priority clip does not evict an audible voice", () => {
     cues: { low: { ...cue, priority: 0 }, high: { ...cue, priority: 1 } },
     events: { low: [{ cue: "low" }], high: [{ cue: "high" }] },
   };
-  const scene = createAudioScene(content, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, content);
   for (let i = 0; i < 24; i++) scene.emit("low");
   backend.ready(false);
   scene.emit("high");
@@ -1076,10 +1026,7 @@ test("repeated sequence cues acquire voices only when each step is due", () => {
       ],
     },
   };
-  const scene = createAudioScene(content, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, content);
   scene.emit("pattern");
   expect(backend.calls).toHaveLength(1);
   for (const at of [10.5, 11]) {
@@ -1125,10 +1072,7 @@ test("deferred bursts are bounded and do not replay missing steps on readiness",
     },
     events: { pattern: [{ cue: "beep", at: 1 }] },
   };
-  const scene = createAudioScene(content, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, content);
   for (let i = 0; i < 1000; i++) scene.emit("pattern");
   expect(vi.getTimerCount()).toBe(96);
   vi.advanceTimersByTime(1000);
@@ -1149,10 +1093,7 @@ test("mission result cues take priority over a full player-feedback mix", () => 
       voices: 24,
     },
   };
-  const scene = createAudioScene(audio, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, audio);
   for (let i = 0; i < 24; i++) scene.emit("command.accepted");
   scene.emit("victory");
   expect(backend.calls.some((call) => call.url.includes("victory"))).toBe(true);
@@ -1182,11 +1123,7 @@ test.each([
 });
 
 test("finished queue heads waiting at an exit do not claim the training state", () => {
-  const scene = {
-    sync: vi.fn(),
-    emit: vi.fn(),
-    setMusic: vi.fn(),
-  } as unknown as ReturnType<typeof createAudioScene>;
+  const scene = sceneSpy();
   const queued = {
     actorId: "queued",
     producerId: "b",
@@ -1195,16 +1132,7 @@ test("finished queue heads waiting at an exit do not claim the training state", 
     exitBlocked: false,
   };
   const { simulation, view } = committed({
-    actors: [
-      {
-        id: "b",
-        definitionId: "arc-field-barracks",
-        owner: "player",
-        occupancyLayer: "surface",
-        worldPosition: { x: 0, z: 0 },
-        facing: 0,
-      },
-    ],
+    actors: [building],
     economy: economy([
       {
         actorId: "ready",
@@ -1238,10 +1166,7 @@ test("deferred steps expire after a long browser stall", () => {
     },
     events: { pattern: [{ cue: "beep", at: 1 }] },
   };
-  const scene = createAudioScene(content, {}, backend.mixer, () => ({
-    x: 0,
-    z: 0,
-  }));
+  const scene = sceneOn(backend, content);
   scene.emit("pattern");
   clock.mockReturnValue(1000);
   vi.advanceTimersByTime(1000);
@@ -1258,14 +1183,6 @@ test("deferred steps expire after a long browser stall", () => {
 
 test("specific player feedback replaces routine alerts in the same tick", () => {
   const { scene, calls, time } = setup();
-  const building = {
-    id: "b",
-    definitionId: "arc-field-barracks",
-    owner: "player",
-    occupancyLayer: "surface",
-    worldPosition: { x: 0, z: 0 },
-    facing: 0,
-  };
   const { simulation, view } = committed({
     actors: [building],
     objectives: [{ id: "goal", status: "active" }],

@@ -45,6 +45,14 @@ const definitions: readonly ActorDefinition[] = [
   },
 ];
 
+const wallDefinition = definitions[1]!;
+const ground = {
+  id: "ground",
+  maxSlope: 1,
+  slopeCostAtLimit: 1,
+  terrainCosts: { plain: 1 },
+};
+
 type World = { map: TerrainGrid; occupancy: OccupancyGrid };
 
 function world(options: Partial<TerrainGridOptions> = {}): World {
@@ -70,7 +78,7 @@ function placeWall(
 function wall({ map }: World, id: string, x: number, z: number, turns = 0) {
   return createTilePlacedActor(
     map,
-    definitions[1]!,
+    wallDefinition,
     placeWall(id, x, z, turns),
     "player",
   );
@@ -120,7 +128,7 @@ describe("tile-placed actors", () => {
     expect(mission.actorById("wall-1")).toEqual(expected);
     // Like facing, a clockwise quarter turn takes +X to -Z.
     expect(expected.facing).toBe(Math.PI / 2);
-    expect(occupiedTilesFor(expected, definitions[1]!)).toEqual([
+    expect(occupiedTilesFor(expected, wallDefinition)).toEqual([
       { x: 3, z: 2 },
       { x: 3, z: 1 },
     ]);
@@ -163,7 +171,7 @@ describe("tile-placed actors", () => {
         state: createMissionState([]),
         behaviorRegistry: new Map([["idle", idle]]),
         bounds: map.worldBounds,
-        definitions: [{ ...definitions[1]!, movement: { speed: 1 } }],
+        definitions: [{ ...wallDefinition, movement: { speed: 1 } }],
         tickSeconds: 1,
         map,
         occupancy,
@@ -252,12 +260,7 @@ describe("tile-placed actors", () => {
     const history = map.navigationChanges.entriesSince(0);
     const changed = vi.fn();
     const unsubscribe = map.onChanged(changed);
-    const grid = new NavigationGrid(map, occupancy, {
-      id: "ground",
-      maxSlope: 1,
-      slopeCostAtLimit: 1,
-      terrainCosts: { plain: 1 },
-    });
+    const grid = new NavigationGrid(map, occupancy, ground);
     expect(grid.costAt(2, 1)).toBeUndefined();
     const invalid = structuredClone(before);
     invalid.terrain!.heights.fill(5);
@@ -324,12 +327,7 @@ describe("tile-placed actors", () => {
     const saved = original.snapshot();
     saved.terrain!.heights.fill(3);
     saved.actors = [wall(placed, "restored", 0, 2)];
-    const grid = new NavigationGrid(map, occupancy, {
-      id: "ground",
-      maxSlope: 1,
-      slopeCostAtLimit: 1,
-      terrainCosts: { plain: 1 },
-    });
+    const grid = new NavigationGrid(map, occupancy, ground);
     expect(grid.costAt(2, 1)).toBeUndefined();
     const changed = vi.fn(() => {
       expect(map.heightAt(0, 2)).toBe(3);
@@ -444,7 +442,7 @@ describe("tile-placed actors", () => {
   test("clears orphan occupancy when a mission starts", () => {
     const placed = world();
     placed.occupancy.place(
-      footprintPlacementFor(wall(placed, "orphan", 2, 1), definitions[1]!),
+      footprintPlacementFor(wall(placed, "orphan", 2, 1), wallDefinition),
     );
 
     simulation(placed);

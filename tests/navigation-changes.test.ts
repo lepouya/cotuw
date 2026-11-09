@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { NavigationChangeLog } from "../src/simulation/navigation-changes";
 
 test("navigation queries cannot mutate retained changes", () => {

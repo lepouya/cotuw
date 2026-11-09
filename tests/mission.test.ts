@@ -11,8 +11,11 @@ import type {
   ActorBehavior,
   ActorDefinition,
 } from "../src/simulation/actor";
-import type { ActorCommand, MissionCommand } from "../src/simulation/command";
-import type { ScheduledCommand } from "../src/simulation/command";
+import type {
+  ActorCommand,
+  MissionCommand,
+  ScheduledCommand,
+} from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
 import type { WorldBounds } from "../src/simulation/world";
 
@@ -70,13 +73,28 @@ function actor(id = "trooper", definitionId = "trooper", x = 0): Actor {
   });
 }
 
-function mission(actors: Actor[], tickSeconds = 0.5) {
+function resume(state: MissionState, tickSeconds = 0.5) {
   return createMissionSimulation({
-    state: createMissionState(actors),
+    state,
     behaviorRegistry,
     bounds,
     definitions,
     tickSeconds,
+  });
+}
+
+function mission(actors: Actor[], tickSeconds = 0.5) {
+  return resume(createMissionState(actors), tickSeconds);
+}
+
+/** One actor whose definition runs `behavior`. */
+function behaving(id: string, behavior: ActorBehavior) {
+  return createMissionSimulation({
+    state: createMissionState([actor(id, id)]),
+    behaviorRegistry: new Map([[id, behavior]]),
+    bounds,
+    definitions: [{ id, behaviorId: id }],
+    tickSeconds: 1,
   });
 }
 
@@ -250,15 +268,7 @@ test.each([
 ])("rejects malformed saved queued command %j before starting", (scheduled) => {
   const state = createMissionState([actor()]);
   state.commands.push(scheduled as unknown as ScheduledCommand);
-  expect(() =>
-    createMissionSimulation({
-      state,
-      behaviorRegistry,
-      bounds,
-      definitions,
-      tickSeconds: 0.5,
-    }),
-  ).toThrow("queued commands");
+  expect(() => resume(state)).toThrow("queued commands");
 });
 
 test("saved commands recheck gameplay legality at their scheduled tick", () => {
@@ -268,13 +278,7 @@ test("saved commands recheck gameplay legality at their scheduled tick", () => {
     issuer: { owner: "player" },
     command: move("missing", 4, 0),
   });
-  const simulation = createMissionSimulation({
-    state,
-    behaviorRegistry,
-    bounds,
-    definitions,
-    tickSeconds: 0.5,
-  });
+  const simulation = resume(state);
   expect(simulation.tick()).toEqual([]);
   expect(simulation.tick()[0]!.accepted).toBe(false);
 });
@@ -291,15 +295,7 @@ test("submission validates the copied issuer before queuing", () => {
 test("sparse saved command lists are rejected before starting", () => {
   const state = createMissionState([actor()]);
   state.commands = Array(1);
-  expect(() =>
-    createMissionSimulation({
-      state,
-      behaviorRegistry,
-      bounds,
-      definitions,
-      tickSeconds: 0.5,
-    }),
-  ).toThrow("queued commands");
+  expect(() => resume(state)).toThrow("queued commands");
 });
 
 describe("mission definitions", () => {
@@ -496,13 +492,7 @@ describe("mission commands", () => {
         kind,
         actorId: "created-1",
       } as MissionCommand);
-      const restored = createMissionSimulation({
-        state: simulation.snapshot(),
-        behaviorRegistry,
-        bounds,
-        definitions,
-        tickSeconds: 0.5,
-      });
+      const restored = resume(simulation.snapshot());
 
       expect(simulation.unusedActorId("created-")).toBe("created-1");
       expect(restored.unusedActorId("created-")).toBe("created-1");
@@ -535,17 +525,11 @@ describe("mission commands", () => {
         target.worldPosition = { x: 20.0000001, z: -3 };
       },
     };
-    const simulation = createMissionSimulation({
-      state: createMissionState([actor("runner-1", "runner")]),
-      behaviorRegistry: new Map([["runaway", runaway]]),
-      bounds,
-      definitions: [{ id: "runner", behaviorId: "runaway" }],
-      tickSeconds: 1,
-    });
+    const simulation = behaving("runner", runaway);
 
     simulation.tick();
 
-    expect(simulation.actorById("runner-1")!.worldPosition).toEqual({
+    expect(simulation.actorById("runner")!.worldPosition).toEqual({
       x: 10,
       z: -3,
     });
@@ -558,13 +542,7 @@ describe("mission commands", () => {
         target.worldPosition = { x: Number.NaN, z: 0 };
       },
     };
-    const simulation = createMissionSimulation({
-      state: createMissionState([actor("invalid-1", "invalid")]),
-      behaviorRegistry: new Map([["invalid", invalid]]),
-      bounds,
-      definitions: [{ id: "invalid", behaviorId: "invalid" }],
-      tickSeconds: 1,
-    });
+    const simulation = behaving("invalid", invalid);
     const before = simulation.snapshot();
 
     expect(() => simulation.tick()).toThrow("invalid world position");
@@ -577,15 +555,9 @@ describe("mission commands", () => {
         target.facing = Number.NaN;
       },
     };
-    const facingSimulation = createMissionSimulation({
-      state: createMissionState([actor("invalid-facing", "invalid-facing")]),
-      behaviorRegistry: new Map([["invalid-facing", invalidFacing]]),
-      bounds,
-      definitions: [{ id: "invalid-facing", behaviorId: "invalid-facing" }],
-      tickSeconds: 1,
-    });
-
-    expect(() => facingSimulation.tick()).toThrow("invalid facing");
+    expect(() => behaving("invalid-facing", invalidFacing).tick()).toThrow(
+      "invalid facing",
+    );
   });
 });
 
@@ -610,13 +582,7 @@ describe("mission state", () => {
   test("never changes the caller's state or actors", () => {
     const trooper = actor();
     const state = createMissionState([trooper]);
-    const simulation = createMissionSimulation({
-      state,
-      behaviorRegistry,
-      bounds,
-      definitions,
-      tickSeconds: 1,
-    });
+    const simulation = resume(state, 1);
 
     state.actors.push(actor("unknown-1", "unknown"));
     simulation.submitCommand(move("trooper", 1, 0));
@@ -654,13 +620,7 @@ describe("mission state", () => {
     original.tick();
     original.submitCommand(move("scout-1", -8, 0));
     const saved: MissionState = original.snapshot();
-    const resumed = createMissionSimulation({
-      state: saved,
-      behaviorRegistry,
-      bounds,
-      definitions,
-      tickSeconds: 0.5,
-    });
+    const resumed = resume(saved);
 
     for (let tick = 0; tick < 5; tick += 1) {
       original.tick();
@@ -689,13 +649,7 @@ describe("mission state", () => {
     expect(simulation.actors.map(({ id }) => id)).toEqual(["scout-1"]);
     expect(() => simulation.spawnActor(actor())).toThrow("retired actor ID");
 
-    const resumed = createMissionSimulation({
-      state: simulation.snapshot(),
-      behaviorRegistry,
-      bounds,
-      definitions,
-      tickSeconds: 0.5,
-    });
+    const resumed = resume(simulation.snapshot());
     expect(() => resumed.spawnActor(actor())).toThrow("retired actor ID");
   });
 

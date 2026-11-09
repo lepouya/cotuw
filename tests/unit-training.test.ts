@@ -16,6 +16,7 @@ import type { MissionState } from "../src/simulation/mission";
 class ElementStub extends EventTarget {
   disabled = false;
   textContent = "";
+  title = "";
   click() {
     this.dispatchEvent(new Event("click"));
   }
@@ -150,7 +151,7 @@ test("availability follows the selected producer's roster instead of the first u
 });
 
 test("a selection without production cannot inherit errors from unrelated unit types", () => {
-  const { simulation, controller, select, status } = fixture();
+  const { simulation, select, status } = fixture();
   const evaluate = simulation.evaluateTraining;
   let evaluations = 0;
   simulation.evaluateTraining = (command) => {
@@ -160,22 +161,16 @@ test("a selection without production cannot inherit errors from unrelated unit t
   select("missing");
   expect(evaluations).toBe(0);
   expect(status.textContent).toContain("Select a production building");
-  controller.dispose();
-  simulation.dispose();
 });
 
 test("plain training buttons expose pending and unavailable explanations", () => {
-  const { simulation, controller, scout, trooper, tick } = fixture();
+  const { controller, scout, trooper, tick } = fixture();
   controller.refresh();
-  expect((trooper as unknown as HTMLButtonElement).title).toContain(
-    "cannot train",
-  );
+  expect(trooper.title).toContain("cannot train");
   scout.click();
-  expect((scout as unknown as HTMLButtonElement).title).toContain("confirmed");
+  expect(scout.title).toContain("confirmed");
   tick();
-  expect((scout as unknown as HTMLButtonElement).title).toBe("");
-  controller.dispose();
-  simulation.dispose();
+  expect(scout.title).toBe("");
 });
 
 test("training skips retired IDs and prevents a second pending request", () => {
@@ -202,40 +197,33 @@ test("training skips retired IDs and prevents a second pending request", () => {
 
 test("blocking training preserves pending orders and reports the current session condition", () => {
   const { simulation, controller, scout, status, tick, setBlocked } = fixture();
-  try {
-    scout.click();
-    setBlocked({ paused: true, placing: true });
-    expect(status.textContent).toBe("Resume the mission to train units.");
-    expect((scout as unknown as HTMLButtonElement).title).toBe(
-      status.textContent,
-    );
-    scout.click();
-    expect(simulation.snapshot().commands).toHaveLength(1);
-    setBlocked({});
-    expect(scout.disabled).toBe(true);
-    expect(status.textContent).toBe("Training Scout…");
-    tick();
-    expect(scout.disabled).toBe(false);
-    setBlocked({ placing: true });
-    expect(status.textContent).toBe(
-      "Finish or cancel the current building placement.",
-    );
-    scout.click();
-    expect(simulation.snapshot().commands).toEqual([]);
-    setBlocked({ paused: true });
-    controller.fault();
-    expect(status.textContent).toContain("Simulation stopped");
-    expect(scout.disabled).toBe(true);
-    setBlocked({});
-    expect(scout.disabled).toBe(true);
-  } finally {
-    controller.dispose();
-    simulation.dispose();
-  }
+  scout.click();
+  setBlocked({ paused: true, placing: true });
+  expect(status.textContent).toBe("Resume the mission to train units.");
+  expect(scout.title).toBe(status.textContent);
+  scout.click();
+  expect(simulation.snapshot().commands).toHaveLength(1);
+  setBlocked({});
+  expect(scout.disabled).toBe(true);
+  expect(status.textContent).toBe("Training Scout…");
+  tick();
+  expect(scout.disabled).toBe(false);
+  setBlocked({ placing: true });
+  expect(status.textContent).toBe(
+    "Finish or cancel the current building placement.",
+  );
+  scout.click();
+  expect(simulation.snapshot().commands).toEqual([]);
+  setBlocked({ paused: true });
+  controller.fault();
+  expect(status.textContent).toContain("Simulation stopped");
+  expect(scout.disabled).toBe(true);
+  setBlocked({});
+  expect(scout.disabled).toBe(true);
 });
 
 test("success feedback belongs to its producer and cannot leak into another selection", () => {
-  const { controller, scout, status, tick, select } = fixture();
+  const { scout, status, tick, select } = fixture();
   scout.click();
   tick();
   expect(status.textContent).toContain("Scout ready");
@@ -243,7 +231,6 @@ test("success feedback belongs to its producer and cannot leak into another sele
   expect(status.textContent).toContain("Train a unit");
   select("one");
   expect(status.textContent).toContain("Scout ready");
-  controller.dispose();
 });
 
 test("restored pending training keeps its ID and cannot complete a new request", () => {
@@ -275,8 +262,6 @@ test("restored pending training keeps its ID and cannot complete a new request",
   controller.refresh();
   expect(status.textContent).toContain("Scout ready");
   expect(simulation.actorById("trained-unit-2")?.definitionId).toBe("scout");
-  controller.dispose();
-  simulation.dispose();
 });
 
 test("tick-time rejection clears pending work and faulting disables every training action", () => {
@@ -294,5 +279,4 @@ test("tick-time rejection clears pending work and faulting disables every traini
   expect(status.textContent).toContain("Simulation stopped");
   scout.click();
   expect(simulation.snapshot().commands).toHaveLength(0);
-  controller.dispose();
 });

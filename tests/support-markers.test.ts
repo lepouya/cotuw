@@ -1,14 +1,16 @@
-import { NullEngine, Scene, VertexBuffer } from "@babylonjs/core";
+import { VertexBuffer } from "@babylonjs/core";
 import { expect, test } from "vitest";
+
+import { testScene } from "./helpers/scene";
 import { TerrainMap } from "../src/map";
 import { createRallyPointView } from "../src/render/rally-point";
 import { createSupportNetworkView } from "../src/render/support-network";
 import { supportsPosition } from "../src/simulation/support";
+
 import type { SupportNetwork } from "../src/simulation/support";
 
 test("rally rings follow sloping terrain and reuse unchanged geometry", () => {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
+  const scene = testScene();
   const map = new TerrainMap({
     width: 20,
     height: 20,
@@ -29,13 +31,12 @@ test("rally rings follow sloping terrain and reuse unchanged geometry", () => {
   expect(scene.getMeshByName("rally-point")).toBe(mesh);
   view.dispose();
   expect(scene.getMeshByName("rally-point")).toBeNull();
-  engine.dispose();
 });
 
-for (const distance of [20, 15]) {
-  test(`gap markers stay outside live coverage with unequal radii at distance ${distance}`, () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
+test.each([20, 15])(
+  "gap markers stay outside live coverage with unequal radii at distance %i",
+  (distance) => {
+    const scene = testScene();
     const map = new TerrainMap({ width: 100, height: 40, tileSize: 1 });
     const network: SupportNetwork = {
       nodes: [
@@ -91,6 +92,5 @@ for (const distance of [20, 15]) {
       meshes,
     );
     view.dispose();
-    engine.dispose();
-  });
-}
+  },
+);

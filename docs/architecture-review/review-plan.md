@@ -1057,8 +1057,115 @@ product work in `TODO.md`, and remove temporary files in
     - Deferred to Slice 13: whether browser checks of session rules can move to
       units.
 
-- [ ] **Slice 13: unit and asset test suite**
+- [x] **Slice 13: unit and asset test suite**
   (97 `tests/` files + `vitest.config.ts`, ~30,175 LOC)
   - Shared helpers (`tests/helpers/*`, 5 files) and all 92 `tests/*.test.ts`
     files, batched by subsystem to remove private-implementation coupling
     and duplicated setup while retaining distinct behavioral coverage.
+  - [x] **Pass A** (modular assessment and refactor, base `7831509`):
+    - `startMission(map, options)` in `tests/helpers/scenario.ts` owns the
+      occupancy, bounds, and `terrain-move` plus `idle` wiring that 11 fixtures
+      repeated, with content movement profiles and an `idleUpdate` hook. Each
+      file keeps its own fixture, scenario, and map. `combat`, `economy`,
+      `queued-orders`, and `wildlife` copied the content profile; `support`,
+      `vision`, and `rivals` used other path and rough costs, which their tests
+      prove inert. Kernel tests with synthetic definitions stay on
+      `createMissionSimulation`.
+    - `savedState(scenario, sim)` replaces 15 save round trips and the
+      `cultivation` wrapper. Sites that read `file.scenario` stay explicit.
+    - `createPopupTracker` in `src/ui/popups.ts` owns due popups, dismissal,
+      and saved `uiState`, replacing `duePopup` and state split across the
+      `session.ts` closure.
+    - Slice 12 deferral resolved: unknown popup rejection and the tick-zero
+      restart rule moved to units, and `issuedBy` gained a truth table. The
+      restart test fails with its rule removed. `economy.spec.ts` keeps the
+      session save path and the issuer filter wiring.
+    - `createMissionAudio` takes `Pick<AudioScene, ...>`, removing four scene
+      casts; `committed` uses typed knowledge. Its partial `simulation: any`
+      stays, since typing it requires complete actors in every test.
+    - Helpers: `ECONOMY_ACTOR_DEFINITIONS` (it held every faction) and
+      single-use `WILDLIFE_ACTOR_DEFINITIONS` removed; `rivals.at` ->
+      `atSeconds`; `scenario` and `mapOptions` module-private.
+    - No persisted format change. Edits span 24 files (net `-197` lines), so
+      Pass B runs in its own session.
+    - Checks: `npm run check` passes (`1375` units, `6` conditional skips, and
+      five smoke cases). `economy`, `saves`, `audio`, and `dialogs` browser
+      specs pass (`77` cases across Chromium and WebKit). Asset tests were not
+      run, since no asset or generator changed.
+    - Kept: all `vi.mock` uses (import-boundary guards, external packages, the
+      application's composition root, and asset timing); spy assertions on work
+      bounds; `any` in malformed-input tables; scene-graph name lookups, the
+      observable output under `NullEngine`; most test-only exports, which are
+      pure calculations units own; the flat `tests/` layout.
+    - Rejected: a shared production `missionSimulationOptions` export (one
+      production caller; registry unchanged across recent history); a shared
+      `tests/helpers/dom.ts` (stub surfaces and `pointer` fields differ); a
+      teardown sweep (`130` `try`/`finally` blocks, no demonstrated failure);
+      moving `TerrainGrid.setHeight`/`setTerrain` to helpers (low value).
+    - Deferred in `TODO.md`: removing `MissionSimulation.spawnActor` and
+      `removeActor`, which never had a `src/` or `scripts/` caller (`101` unit
+      and `17` browser calls, about 60 lines of `mission.ts`). The hooks and
+      `runtime-boundaries.md` now label them test setup.
+    - Pass B leads: positional `undefined` arguments to fixtures, mainly in
+      `combat` (about 39 sites); local tick loops and the ticks-based `until` in
+      `economy` beside `untilSeconds`; `skirmish` states the emergency rule in
+      its scenario and fixture; `shadeFog` tests in `fog.test.ts`;
+      `readAudioSettings` in `audio.test.ts`; `TILES_PER_REPEAT` with no
+      generator reader; removable exports (`SKIRMISH_STARTS`,
+      `SKIRMISH_RESOURCE_AREAS`, and exports with no importer, such as
+      `tileAlong`, `separationRadius`, and `OCCUPANCY_LAYERS`); the
+      `economy.spec.ts:412` title; the always-true `clips.death` `runIf`.
+  - [x] **Pass B** (exhaustive review and `$code-simplifier` cleanup):
+    - Manifest after Pass B: added `tests/helpers/scene.ts` (98 files).
+    - `tests/helpers/scenario.ts` gains `advanceTicks`, `actorIn`, and
+      `spawnUnit`, replacing local loops, `state.actors.find` lookups, and
+      `spawnActor(createActor(...))` blocks. `spawnUnit` also narrows the
+      deferred hook removal to one call site for those uses.
+    - `testScene()` releases its engine through `onTestFinished`. Teardown
+      `try`/`finally` blocks: `140 -> 14`; the rest guard mocks, timers, or a
+      camera fixture. Files that assert disposal keep those assertions.
+    - Fixture arguments are named options in `combat`, `economy`, `wildlife`,
+      `queued-orders`, `match-metrics`, and `skirmish`, ending positional
+      `undefined` placeholders. Nested ternaries removed from `combat`,
+      `actor-presentation`, and `content-pack`.
+    - Local builders replace repeated setup: `loop` (`manualLoop`), `mission`
+      (`resume`, `behaving`), `application` (`restarted`, `savedId`), `audio`
+      (`sceneOn`, `building`, `activeMusic`), `audio-mixer` (`mixerWithEngine`),
+      `navigation` (`gridOf`, `missionWith`), `occupancy`, `simulation-terrain`,
+      `support`, `vision`, `wrecks`, `economy-presentation`, and
+      `tile-placed-actor-view`. The `audio` alert fake now uses the real
+      `{ priority }` shape instead of a stale cast.
+    - Imports grouped and tests separated across the suite. Casts: `54 -> 42`,
+      nearly all malformed-input tables and DOM stubs.
+    - Unused exports made private: `SKIRMISH_STARTS`,
+      `SKIRMISH_RESOURCE_AREAS`, `tileAlong`, `separationRadius`,
+      `OCCUPANCY_LAYERS`, `slopeCoverage`. Stale `economy.spec.ts` title fixed.
+    - Reviewed without change: `clock`, `command`, `objectives`, `lifetime`,
+      `mission-loading`, `sandbox-level`, `top-bar`, `popups`, `saves`,
+      `save-policy`, `playtest-build`, `check-runner`, `selection`,
+      `input-focus`, `context-actions`, `contextual-move`, `world-shortcuts`,
+      `pointer-gesture`, `primary-click`, `unit-controls`, `owner-view`,
+      `minimap`, `map`, `terrain-mesh`, `terrain-sightline`,
+      `navigation-changes`, `texture-clip`, `view-registry`, `actor-gait`,
+      `health-bars`, `footprint-overlay`, `queued-order-view`, `screen-bar`,
+      `effect-assets`, `generated-assets`, `terrain-assets`, `model-assets`
+      beyond teardown, and `vitest.config.ts`.
+    - Kept: `shadeFog` tests in `fog.test.ts` beside their fog fixture;
+      `readAudioSettings` tests in `audio.test.ts` (no controls test file to
+      join); `TILES_PER_REPEAT`, which ties content to the generator's stated
+      repeat; the `clips.death` guard, since the clip is optional; trailing
+      view disposal, which still exercises cleanup; explicit disposal in
+      `camera`, `session-models`, and `actor-view-registry`, whose engines
+      serve other fixture or lifetime duties; the two `deferred` copies (lib
+      target lacks `Promise.withResolvers`).
+    - Checks: `npm run check` passes (`1375` units, `6` conditional skips, and
+      five smoke cases); asset tests (`127` passed). Comparing `vitest list`
+      with `HEAD` shows only the intended changes: four added units, and three
+      renames (`session map`, two `test.each` conversions). The renamed spec
+      and its neighbor pass in Chromium.
+  - [x] **Change review**:
+    - The frontier-glide camera test uses `testScene()` so its engine is
+      released after the test. A temporary teardown assertion verifies that
+      no engine remains in Babylon's global registry.
+    - Checks: `npm run check`, all `127` asset tests, and the `77` affected
+      economy, saves, audio, and dialogs browser cases pass.

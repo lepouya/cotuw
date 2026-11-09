@@ -1,12 +1,14 @@
-import { Color4, NullEngine, Scene, VertexBuffer } from "@babylonjs/core";
+import { Color4, VertexBuffer } from "@babylonjs/core";
 import { expect, test, vi } from "vitest";
+
+import { testScene } from "./helpers/scene";
 import { TerrainMap } from "../src/map";
 import { createQueuedOrderView } from "../src/render/queued-orders";
+
 import type { ActorRenderState } from "../src/simulation/actor";
 
 test("queue previews reuse geometry, follow terrain edits, and release observers", () => {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
+  const scene = testScene();
   const map = new TerrainMap({
     width: 10,
     height: 10,
@@ -39,42 +41,35 @@ test("queue previews reuse geometry, follow terrain edits, and release observers
       ],
     },
   ];
-  try {
-    view.update(actors);
-    const first = scene.getMeshByName("queued-orders")!;
-    expect(first.isPickable).toBe(false);
-    view.update(actors);
-    expect(scene.getMeshByName("queued-orders")).toBe(first);
-    layerCount.mockClear();
-    for (let z = 0; z <= map.height; z++)
-      for (let x = 0; x <= map.width; x++) map.setHeight(x, z, 2);
-    expect(layerCount).not.toHaveBeenCalled();
-    view.update(actors);
-    expect(layerCount).toHaveBeenCalledTimes(1);
-    const next = scene.getMeshByName("queued-orders")!;
-    expect(next).not.toBe(first);
-    expect(first.isDisposed()).toBe(true);
-    const positions = next.getVerticesData(VertexBuffer.PositionKind)!;
-    expect(
-      positions.filter((_, index) => index % 3 === 1).every((y) => y > 2),
-    ).toBe(true);
-    map.setTerrain(0, 0, { typeId: "plain", surfaceBuildable: false });
-    view.update(actors);
-    const raised = scene.getMeshByName("queued-orders")!;
-    const raisedPositions = raised.getVerticesData(VertexBuffer.PositionKind)!;
-    expect(
-      raisedPositions
-        .filter((_, index) => index % 3 === 1)
-        .every((y) => y > 2.1),
-    ).toBe(true);
-    expect(next.isDisposed()).toBe(true);
-    view.dispose();
-    view.dispose();
-    expect(map.onChangedObservable.hasObservers()).toBe(false);
-    view.update(actors);
-    expect(scene.getMeshByName("queued-orders")).toBeNull();
-  } finally {
-    scene.dispose();
-    engine.dispose();
-  }
+  view.update(actors);
+  const first = scene.getMeshByName("queued-orders")!;
+  expect(first.isPickable).toBe(false);
+  view.update(actors);
+  expect(scene.getMeshByName("queued-orders")).toBe(first);
+  layerCount.mockClear();
+  for (let z = 0; z <= map.height; z++)
+    for (let x = 0; x <= map.width; x++) map.setHeight(x, z, 2);
+  expect(layerCount).not.toHaveBeenCalled();
+  view.update(actors);
+  expect(layerCount).toHaveBeenCalledTimes(1);
+  const next = scene.getMeshByName("queued-orders")!;
+  expect(next).not.toBe(first);
+  expect(first.isDisposed()).toBe(true);
+  const positions = next.getVerticesData(VertexBuffer.PositionKind)!;
+  expect(
+    positions.filter((_, index) => index % 3 === 1).every((y) => y > 2),
+  ).toBe(true);
+  map.setTerrain(0, 0, { typeId: "plain", surfaceBuildable: false });
+  view.update(actors);
+  const raised = scene.getMeshByName("queued-orders")!;
+  const raisedPositions = raised.getVerticesData(VertexBuffer.PositionKind)!;
+  expect(
+    raisedPositions.filter((_, index) => index % 3 === 1).every((y) => y > 2.1),
+  ).toBe(true);
+  expect(next.isDisposed()).toBe(true);
+  view.dispose();
+  view.dispose();
+  expect(map.onChangedObservable.hasObservers()).toBe(false);
+  view.update(actors);
+  expect(scene.getMeshByName("queued-orders")).toBeNull();
 });

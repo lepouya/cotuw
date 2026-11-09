@@ -1,6 +1,7 @@
-import { BASE_CONTENT } from "./helpers/content";
 import { describe, expect, test } from "vitest";
 
+import { advanceTicks } from "./helpers/scenario";
+import { BASE_CONTENT } from "./helpers/content";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { createSessionSimulation, loadMission } from "../src/mission-loading";
@@ -41,6 +42,13 @@ function testMission() {
     fog: { explored: { player: "100011" } },
   };
 }
+
+const popup = (kind: string, definitionId: string) => ({
+  id: "intro",
+  title: "Intro",
+  text: "Text",
+  trigger: { kind, definitionId },
+});
 
 describe("mission files", () => {
   test("round-trip state and draw terrain from north to south", () => {
@@ -254,55 +262,29 @@ test.each([
   [
     "duplicate popups",
     (file: any) => {
-      const popup = {
-        id: "intro",
-        title: "Intro",
-        text: "Text",
-        trigger: { kind: "actor", definitionId: "arc-trooper" },
-      };
-      file.scenario.popups = [popup, popup];
+      file.scenario.popups = [popup("actor", "arc-trooper")];
+      file.scenario.popups.push(file.scenario.popups[0]);
     },
     "popups need distinct IDs",
   ],
   [
     "invalid popup trigger",
     (file: any) => {
-      file.scenario.popups = [
-        {
-          id: "intro",
-          title: "Intro",
-          text: "Text",
-          trigger: { kind: "tick", definitionId: "arc-trooper" },
-        },
-      ];
+      file.scenario.popups = [popup("tick", "arc-trooper")];
     },
     "placement or actor trigger",
   ],
   [
     "unknown popup actor",
     (file: any) => {
-      file.scenario.popups = [
-        {
-          id: "intro",
-          title: "Intro",
-          text: "Text",
-          trigger: { kind: "actor", definitionId: "dragon" },
-        },
-      ];
+      file.scenario.popups = [popup("actor", "dragon")];
     },
     'popup uses unknown actor "dragon"',
   ],
   [
     "a placement popup naming a mobile actor",
     (file: any) => {
-      file.scenario.popups = [
-        {
-          id: "intro",
-          title: "Intro",
-          text: "Text",
-          trigger: { kind: "placement", definitionId: "arc-trooper" },
-        },
-      ];
+      file.scenario.popups = [popup("placement", "arc-trooper")];
     },
     "require a building definition",
   ],
@@ -398,7 +380,7 @@ test("a complete mission file continues identically with queued commands and pai
     definitionId: "arc-materials-refinery",
     origin: { x: 12, z: 49 },
   });
-  for (let tick = 0; tick < 490; tick++) original.tick();
+  advanceTicks(original, 490);
   original.submitCommand({
     kind: "train-unit",
     actorId: "worker",

@@ -1,8 +1,10 @@
 import { expect, test } from "vitest";
+
 import { missionEnded } from "../src/simulation/mission-result";
-import type { MissionResult } from "../src/simulation/mission-result";
 import { presentResult } from "../src/ui/mission-result";
 import { productionBlocker } from "../src/ui/production-action";
+
+import type { MissionResult } from "../src/simulation/mission-result";
 
 const campaignVictory: MissionResult = { kind: "victory", tick: 1 };
 const campaignDefeat: MissionResult = {

@@ -1,26 +1,27 @@
 import { afterEach, expect, test } from "vitest";
-import { createActor } from "../src/simulation/actor";
-import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
+
+import { BASE_CONTENT } from "./helpers/content";
 import {
+  actorIn,
   advanceSeconds,
   balance,
   command,
   exploredFog,
+  startMission,
   stockpiles,
 } from "./helpers/scenario";
-import { createMissionSimulation } from "../src/simulation/mission";
+import { createActor } from "../src/simulation/actor";
 import { createObjectiveStates } from "../src/simulation/objectives";
-import type { ObjectiveDefinition } from "../src/simulation/objectives";
 import { parseMission, serializeMission } from "../src/simulation/mission-file";
 import {
   createScenarioMap,
   createScenarioState,
   defineScenario,
 } from "../src/simulation/scenario";
-import { OccupancyGrid } from "../src/simulation/occupancy";
 import { TerrainGrid } from "../src/simulation/terrain";
-import { createTerrainMoveBehavior } from "../src/simulation/terrain-movement";
 import { evaluateSkirmish } from "../src/simulation/skirmish";
+
+import type { ObjectiveDefinition } from "../src/simulation/objectives";
 import type { SkirmishRules } from "../src/simulation/skirmish";
 import type {
   MissionSimulation,
@@ -101,37 +102,27 @@ const initial = (
 };
 function fixture(
   state = initial(),
-  skirmish: SkirmishRules | null = rules,
-  fault = false,
-  objectives: readonly ObjectiveDefinition[] = [],
+  {
+    skirmish = rules,
+    fault = false,
+    objectives = [],
+  }: {
+    skirmish?: SkirmishRules | null;
+    fault?: boolean;
+    objectives?: readonly ObjectiveDefinition[];
+  } = {},
 ) {
   const map = createScenarioMap({ ...scenario, terrain: state.terrain! });
-  const occupancy = new OccupancyGrid(map);
-  const simulation = createMissionSimulation({
+  const { simulation } = startMission(map, {
     state,
     skirmish: skirmish ?? undefined,
     objectives,
-    emergencyHeadquarters: true,
+    emergencyHeadquarters: scenario.emergencyHeadquarters,
     definitions: BASE_CONTENT.actors,
-    map,
-    occupancy,
     tickSeconds: 0.1,
-    bounds: map.worldBounds,
-    behaviorRegistry: new Map([
-      [
-        "terrain-move",
-        createTerrainMoveBehavior(map, occupancy, MOVEMENT_PROFILES),
-      ],
-      [
-        "idle",
-        {
-          handleCommand: () => false,
-          update: () => {
-            if (fault) throw new Error("test fault");
-          },
-        },
-      ],
-    ]),
+    idleUpdate: () => {
+      if (fault) throw new Error("test fault");
+    },
   });
   simulations.push(simulation);
   return simulation;
@@ -139,7 +130,7 @@ function fixture(
 const remove = (sim: MissionSimulation, actorId: string, owner = "player") =>
   sim.submitCommand({ kind: "sell-actor", actorId }, { owner });
 const pending = (state: MissionState, id: string, remainingTicks = 100) => {
-  const actor = state.actors.find((actor) => actor.id === id)!;
+  const actor = actorIn(state, id);
   const definition = BASE_CONTENT.actors.find(
     ({ id }) => id === actor.definitionId,
   )!;
@@ -300,7 +291,7 @@ test.each(["victory", "defeat", "draw"] as const)(
       0.1,
     );
     expect(file.scenario.skirmish).toEqual(rules);
-    const restored = fixture(file.state, file.scenario.skirmish);
+    const restored = fixture(file.state, { skirmish: file.scenario.skirmish });
     expect(restored.result?.kind).toBe(kind);
     restored.tick();
     expect(restored.snapshot()).toEqual(sim.snapshot());
@@ -315,7 +306,7 @@ test("an in-progress save continues identically through elimination", () => {
     serializeMission(scenario, sim.snapshot(), 0.1),
     0.1,
   );
-  const restored = fixture(file.state, file.scenario.skirmish);
+  const restored = fixture(file.state, { skirmish: file.scenario.skirmish });
   sim.tick();
   restored.tick();
   expect(restored.snapshot()).toEqual(sim.snapshot());
@@ -323,7 +314,7 @@ test("an in-progress save continues identically through elimination", () => {
 });
 
 test("a failed tick publishes neither the sales nor a result", () => {
-  const sim = fixture(initial(), rules, true);
+  const sim = fixture(initial(), { fault: true });
   remove(sim, "home");
   const before = sim.snapshot();
   expect(() => sim.tick()).toThrow("test fault");
@@ -341,7 +332,7 @@ test.each([
   { qualifyingDefinitionIds: [CC, CC] },
 ])("rejects malformed skirmish rules: %j", (change) => {
   expect(() =>
-    fixture(initial(), { ...rules, ...change } as SkirmishRules),
+    fixture(initial(), { skirmish: { ...rules, ...change } as SkirmishRules }),
   ).toThrow("invalid skirmish rules");
 });
 
@@ -357,7 +348,7 @@ test("skirmish rules cannot accompany campaign objectives", () => {
   ];
   const state = initial();
   state.objectives = createObjectiveStates(objectives);
-  expect(() => fixture(state, rules, false, objectives)).toThrow(
+  expect(() => fixture(state, { objectives })).toThrow(
     "invalid skirmish rules",
   );
 });
@@ -366,7 +357,7 @@ test("a saved result requires skirmish rules", () => {
   const sim = fixture();
   remove(sim, "home");
   sim.tick();
-  expect(() => fixture(sim.snapshot(), null)).toThrow(
+  expect(() => fixture(sim.snapshot(), { skirmish: null })).toThrow(
     "skirmish result without rules",
   );
 });

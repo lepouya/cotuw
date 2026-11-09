@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+
 import { createPointerGesture } from "../src/render/pointer-gesture";
 
 function pointer(target: EventTarget, type: string, pointerId: number, x = 10) {

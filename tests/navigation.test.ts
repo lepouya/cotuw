@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { advanceTicks } from "./helpers/scenario";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { createActor } from "../src/simulation/actor";
 import { OccupancyGrid } from "../src/simulation/occupancy";
@@ -21,10 +22,11 @@ import {
 } from "../src/simulation/terrain-movement";
 
 import type { TerrainTile } from "../src/simulation/terrain";
-import type { ActorBehavior } from "../src/simulation/actor";
+import type { Actor, ActorBehavior } from "../src/simulation/actor";
 import type { TerrainCommand } from "../src/simulation/command";
 import type { MissionState } from "../src/simulation/mission";
 import type { MovementProfile } from "../src/simulation/navigation";
+import type { WorldPosition } from "../src/simulation/world";
 
 const ground: MovementProfile = {
   id: "ground",
@@ -35,6 +37,22 @@ const ground: MovementProfile = {
 
 function center(map: TerrainGrid, x: number, z: number) {
   return map.tileCenter(x, z);
+}
+
+const gridOf = (map: TerrainGrid) =>
+  new NavigationGrid(map, new OccupancyGrid(map), ground);
+
+/** Every segment of a route must stay traversable. */
+function expectTraversable(
+  grid: NavigationGrid,
+  from: WorldPosition,
+  waypoints: readonly WorldPosition[],
+) {
+  let previous = from;
+  for (const point of waypoints) {
+    expect(segmentCost(grid, previous, point)).toBeDefined();
+    previous = point;
+  }
 }
 
 describe("terrain traversal", () => {
@@ -66,6 +84,7 @@ describe("terrain traversal", () => {
     }
     expect(cost).toBeLessThan(segmentCost(grid.unbounded(), from, target)!);
   });
+
   test("detours to a boundary point without crossing blocked terrain or the leash", () => {
     const map = new TerrainGrid({
       width: 7,
@@ -98,6 +117,7 @@ describe("terrain traversal", () => {
     map.setTerrain(6, 3, { typeId: "water" });
     expect(findNavigationPath(grid, from, target)?.reachedTarget).toBe(false);
   });
+
   test("routes inside a small leash without any tile centers inside it", () => {
     const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
     const from = { ...center(map, 2, 2), x: 0.3 };
@@ -115,6 +135,7 @@ describe("terrain traversal", () => {
       waypoints: [target],
     });
   });
+
   test("bounded grids own immutable bounds so cached regions cannot change", () => {
     const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
     const bounds = { center: center(map, 1, 1), radius: 1 };
@@ -133,6 +154,7 @@ describe("terrain traversal", () => {
     expect(grid.bounds!.center).toEqual(center(map, 1, 1));
     expect(Object.isFrozen(grid.bounds!.center)).toBe(true);
   });
+
   test("bounded views share their physical grid and its cost updates", () => {
     const map = new TerrainGrid({ width: 5, height: 5, tileSize: 1 });
     const occupancy = new OccupancyGrid(map);
@@ -158,6 +180,7 @@ describe("terrain traversal", () => {
     expect(bounded.regionAt(1, 2)).toBe(-1);
     expect(physical.costAt(1, 2)).toBeUndefined();
   });
+
   test("combines terrain type, authored overrides, and slope", () => {
     const tiles: TerrainTile[] = [
       { typeId: "plain" },
@@ -194,7 +217,7 @@ describe("terrain traversal", () => {
     });
 
     const path = findNavigationPath(
-      new NavigationGrid(map, new OccupancyGrid(map), ground),
+      gridOf(map),
       center(map, 0, 1),
       center(map, 4, 1),
     );
@@ -219,7 +242,7 @@ describe("terrain traversal", () => {
     });
 
     const path = findNavigationPath(
-      new NavigationGrid(map, new OccupancyGrid(map), ground),
+      gridOf(map),
       center(map, 0, 1),
       center(map, 4, 1),
     );
@@ -234,7 +257,7 @@ describe("terrain traversal", () => {
     const map = new TerrainGrid({ width: 9, height: 9, tileSize: 1 });
 
     const path = findNavigationPath(
-      new NavigationGrid(map, new OccupancyGrid(map), ground),
+      gridOf(map),
       center(map, 0, 0),
       center(map, 6, 3),
     );
@@ -252,18 +275,13 @@ describe("terrain traversal", () => {
         surfacePassable: x === 3 && z < 5 ? false : undefined,
       }),
     });
-    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
+    const grid = gridOf(map);
     const from = center(map, 1, 1);
 
     const path = findNavigationPath(grid, from, center(map, 5, 1))!;
 
     expect(path.reachedTarget).toBe(true);
-    const points = [from, ...path.waypoints];
-    for (let index = 1; index < points.length; index += 1) {
-      expect(
-        segmentCost(grid, points[index - 1]!, points[index]!),
-      ).toBeDefined();
-    }
+    expectTraversable(grid, from, path.waypoints);
     expect(path.waypoints.length).toBeLessThan(8);
   });
 
@@ -276,19 +294,14 @@ describe("terrain traversal", () => {
         typeId: x === 2 && z === 1 ? "water" : "plain",
       }),
     });
-    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
+    const grid = gridOf(map);
     // On the shared edge between plain tile (1, 1) and water tile (2, 1).
     const from = { x: -0.5, z: 0 };
 
     const path = findNavigationPath(grid, from, center(map, 4, 1))!;
 
     expect(occupiedTile(grid, from)).toEqual({ x: 1, z: 1 });
-    const points = [from, ...path.waypoints];
-    for (let index = 1; index < points.length; index += 1) {
-      expect(
-        segmentCost(grid, points[index - 1]!, points[index]!),
-      ).toBeDefined();
-    }
+    expectTraversable(grid, from, path.waypoints);
   });
 
   test("visits both side tiles where a segment crosses a tile corner", () => {
@@ -309,7 +322,7 @@ describe("terrain traversal", () => {
       tileSize: 1,
       createTerrain: (x) => ({ typeId: x === 2 ? "water" : "plain" }),
     });
-    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
+    const grid = gridOf(map);
 
     expect(grid.regionAt(0, 0)).toBe(grid.regionAt(1, 2));
     expect(grid.regionAt(0, 0)).not.toBe(grid.regionAt(4, 0));
@@ -323,7 +336,7 @@ describe("terrain traversal", () => {
       tileSize: 1,
       terrainTypeIds: ["plain", "rough"],
     });
-    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
+    const grid = gridOf(map);
     expect(grid.costAt(1, 0)).toBe(1);
 
     map.editTerrain({
@@ -346,9 +359,7 @@ describe("terrain traversal", () => {
       terrainTypeIds: ["plain", "lava"],
     });
 
-    expect(
-      () => new NavigationGrid(map, new OccupancyGrid(map), ground),
-    ).toThrow("has no cost for terrain lava");
+    expect(() => gridOf(map)).toThrow("has no cost for terrain lava");
   });
 
   test("rejects maps with terrain a profile does not price", () => {
@@ -359,9 +370,7 @@ describe("terrain traversal", () => {
       createTerrain: () => ({ typeId: "plains" }),
     });
 
-    expect(
-      () => new NavigationGrid(map, new OccupancyGrid(map), ground),
-    ).toThrow("has no cost for terrain plains");
+    expect(() => gridOf(map)).toThrow("has no cost for terrain plains");
   });
 });
 
@@ -418,34 +427,12 @@ describe("terrain movement", () => {
 
   test("rebuilds an incomplete saved route at the current map version", () => {
     const map = new TerrainGrid({ width: 3, height: 1, tileSize: 1 });
-    const saved = createActor({
-      id: "trooper",
-      definitionId: "trooper",
-      owner: "player",
-      worldPosition: center(map, 0, 0),
-    });
+    const saved = trooperAt(map, 0, 0);
     saved.movement = {
       target: center(map, 2, 0),
       navigationVersion: map.navigationChanges.version,
     };
-    const simulation = createMissionSimulation({
-      state: createMissionState([saved]),
-      behaviorRegistry: new Map([
-        [
-          "terrain-move",
-          createTerrainMoveBehavior(map, new OccupancyGrid(map), [ground]),
-        ],
-      ]),
-      bounds: map.worldBounds,
-      definitions: [
-        {
-          id: "trooper",
-          behaviorId: "terrain-move",
-          movement: { speed: 1, profileId: ground.id },
-        },
-      ],
-      tickSeconds: 0.25,
-    });
+    const simulation = missionWith(map, saved, 1, 0.25);
 
     expect(() => simulation.tick()).not.toThrow();
     expect(simulation.actorById("trooper")!.movement?.waypoints).toBeDefined();
@@ -605,7 +592,7 @@ describe("terrain movement", () => {
     });
     // Eleven ticks leave the trooper inside its destination tile, short of
     // the center.
-    for (let tick = 0; tick < 11; tick += 1) simulation.tick();
+    advanceTicks(simulation, 11);
     map.notifyChange({ minX: 0, minZ: 2, maxX: 0, maxZ: 2 });
 
     simulation.tick();
@@ -626,12 +613,7 @@ describe("terrain movement", () => {
         typeId: x === 2 && z === 1 ? "water" : "plain",
       }),
     });
-    const saved = createActor({
-      id: "trooper",
-      definitionId: "trooper",
-      owner: "player",
-      worldPosition: center(map, 0, 1),
-    });
+    const saved = trooperAt(map, 0, 1);
     // A stale route straight through the water at the current map version.
     saved.movement = {
       target: center(map, 4, 1),
@@ -641,24 +623,7 @@ describe("terrain movement", () => {
       waypointIndex: 0,
       navigationVersion: map.navigationChanges.version,
     };
-    const simulation = createMissionSimulation({
-      state: createMissionState([saved]),
-      behaviorRegistry: new Map([
-        [
-          "terrain-move",
-          createTerrainMoveBehavior(map, new OccupancyGrid(map), [ground]),
-        ],
-      ]),
-      bounds: map.worldBounds,
-      definitions: [
-        {
-          id: "trooper",
-          behaviorId: "terrain-move",
-          movement: { speed: 2, profileId: ground.id },
-        },
-      ],
-      tickSeconds: 1,
-    });
+    const simulation = missionWith(map, saved, 2, 1);
 
     simulation.tick();
 
@@ -676,7 +641,7 @@ describe("terrain movement", () => {
     });
 
     const step = advanceAlongSegment(
-      new NavigationGrid(map, new OccupancyGrid(map), ground),
+      gridOf(map),
       center(map, 0, 0),
       center(map, 2, 0),
       1,
@@ -747,6 +712,14 @@ describe("terrain movement", () => {
   });
 });
 
+const trooperAt = (map: TerrainGrid, tileX: number, tileZ: number) =>
+  createActor({
+    id: "trooper",
+    definitionId: "trooper",
+    owner: "player",
+    worldPosition: center(map, tileX, tileZ),
+  });
+
 function createMovementMission(
   map: TerrainGrid,
   speed: number,
@@ -754,15 +727,17 @@ function createMovementMission(
   tileX = 0,
   tileZ = 0,
 ) {
+  return missionWith(map, trooperAt(map, tileX, tileZ), speed, tickSeconds);
+}
+
+function missionWith(
+  map: TerrainGrid,
+  trooper: Actor,
+  speed: number,
+  tickSeconds: number,
+) {
   return createMissionSimulation({
-    state: createMissionState([
-      createActor({
-        id: "trooper",
-        definitionId: "trooper",
-        owner: "player",
-        worldPosition: center(map, tileX, tileZ),
-      }),
-    ]),
+    state: createMissionState([trooper]),
     behaviorRegistry: new Map([
       [
         "terrain-move",
@@ -821,14 +796,7 @@ describe("saved missions", () => {
     const map = createMap();
     const original = createSimulation(
       map,
-      createMissionState([
-        createActor({
-          id: "trooper",
-          definitionId: "trooper",
-          owner: "player",
-          worldPosition: center(map, 0, 2),
-        }),
-      ]),
+      createMissionState([trooperAt(map, 0, 2)]),
     );
     original.submitCommand({
       kind: "move",
@@ -883,7 +851,7 @@ describe("saved missions", () => {
 
   test("restores terrain into grids that cached the same version", () => {
     const map = createMap();
-    const grid = new NavigationGrid(map, new OccupancyGrid(map), ground);
+    const grid = gridOf(map);
     expect(grid.costAt(4, 2)).toBe(1);
     const walled = createMap();
     walled.editTerrain(wall(4));

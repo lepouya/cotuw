@@ -44,6 +44,18 @@ const objective = (status: ObjectiveView["status"]): ObjectiveView => ({
   status,
 });
 
+const node = (actorId: string, owner: string, connected: boolean) => ({
+  actorId,
+  owner,
+  center: { x: 0, z: 0 },
+  radius: 6,
+  complete: true,
+  root: false,
+  connected,
+  rootOwners: connected ? [owner] : [],
+  rootIds: connected ? ["root"] : [],
+});
+
 function tracker() {
   const alerts = createAlertTracker({
     nameOf: (id) => id[0]!.toUpperCase() + id.slice(1),
@@ -176,17 +188,7 @@ describe("mission alerts", () => {
     const observe = tracker();
     const actors = ["a", "b", "c"].map((id) => actor(id, "refinery"));
     const network = (connected: Record<string, boolean>): SupportView => ({
-      nodes: actors.map(({ id }) => ({
-        actorId: id,
-        owner: "player",
-        center: { x: 0, z: 0 },
-        radius: 6,
-        complete: true,
-        root: false,
-        connected: connected[id]!,
-        rootOwners: connected[id] ? ["player"] : [],
-        rootIds: connected[id] ? ["root"] : [],
-      })),
+      nodes: actors.map(({ id }) => node(id, "player", connected[id]!)),
       links: [],
     });
     observe({
@@ -210,17 +212,6 @@ describe("mission alerts", () => {
   test("other owners' attacks, losses, production, routes, and outages stay silent", () => {
     const observe = tracker();
     const tilePlacement = { origin: { x: 0, z: 0 }, quarterTurns: 0 };
-    const node = (actorId: string, owner: string, connected: boolean) => ({
-      actorId,
-      owner,
-      center: { x: 0, z: 0 },
-      radius: 6,
-      complete: true,
-      root: false,
-      connected,
-      rootOwners: connected ? [owner] : [],
-      rootIds: connected ? ["root"] : [],
-    });
     const before = ["rival", "ally"].flatMap((owner) => [
       actor(`${owner}-worker`, "harvester", { owner }),
       actor(`${owner}-unit`, "trooper", { owner }),

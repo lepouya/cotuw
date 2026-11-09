@@ -1,5 +1,7 @@
 import { expect, test, vi } from "vitest";
-import { balance, deposited } from "./helpers/scenario";
+
+import { balance, deposited, untilSeconds } from "./helpers/scenario";
+import { BASE_CONTENT } from "./helpers/content";
 import {
   SKIRMISH_OPENINGS,
   createSkirmishScenario,
@@ -10,11 +12,8 @@ import {
 import {
   SKIRMISH_CROSSINGS,
   SKIRMISH_MAP,
-  SKIRMISH_RESOURCE_AREAS,
-  SKIRMISH_STARTS,
   SKIRMISH_TERRAIN,
 } from "../src/content/skirmish-map";
-import { BASE_CONTENT } from "./helpers/content";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import {
   assembleSkirmish,
@@ -110,27 +109,19 @@ test("terrain and resource access are symmetric under swapping starts", () => {
   expect(new Set(all.map(({ id }) => id)).size).toBe(all.length);
   const tiles = new Set(all.map(({ tile }) => tileKey(tile)));
   expect(tiles.size).toBe(all.length);
-  for (const { tile, capacity } of lifebloom) {
-    const opposite = mirrored(map, tile);
-    expect(
-      lifebloom.find(
-        ({ tile: other }) => other.x === opposite.x && other.z === opposite.z,
-      )!.capacity,
-    ).toBe(capacity);
-  }
-  for (const { tile, initialMaterials } of sites) {
-    const opposite = mirrored(map, tile);
-    expect(
-      sites.find(
-        ({ tile: other }) => other.x === opposite.x && other.z === opposite.z,
-      )!.initialMaterials,
-    ).toBe(initialMaterials);
-  }
+  const opposite = <T extends { tile: TileCoord }>(list: T[], site: T) => {
+    const { x, z } = mirrored(map, site.tile);
+    return list.find(({ tile }) => tile.x === x && tile.z === z)!;
+  };
+  for (const site of lifebloom)
+    expect(opposite(lifebloom, site).capacity).toBe(site.capacity);
+  for (const site of sites)
+    expect(opposite(sites, site).initialMaterials).toBe(site.initialMaterials);
 });
 
 test("start slots mirror each other's base and opening footprints", () => {
   const map = new TerrainGrid(SKIRMISH_TERRAIN);
-  const [west, east] = SKIRMISH_STARTS;
+  const [west, east] = SKIRMISH_MAP.starts;
   const footprint = (
     definitionId: string,
     origin: TileCoord,
@@ -172,14 +163,14 @@ test.each(SKIRMISH_CROSSINGS)(
       SKIRMISH_CROSSINGS.filter(({ id }) => id !== crossing.id),
     );
     const grid = navigation(map);
-    const [from, to] = SKIRMISH_STARTS.map((start) => approach(map, start));
+    const [from, to] = SKIRMISH_MAP.starts.map((start) => approach(map, start));
     expect(findNavigationPath(grid, from, to)?.reachedTarget).toBe(true);
     closeCrossings(map, [crossing]);
     expect(findNavigationPath(grid, from, to)?.reachedTarget).not.toBe(true);
   },
 );
 
-test.each(SKIRMISH_STARTS)(
+test.each(SKIRMISH_MAP.starts)(
   "$id has flat base space and reachable income and expansions",
   (start) => {
     const grid = navigation();
@@ -191,11 +182,11 @@ test.each(SKIRMISH_STARTS)(
         expect(grid.costAt(x, z)).toBeDefined();
         expect(map.terrainAt(x, z).surfaceBuildable).not.toBe(false);
       }
-    expect(SKIRMISH_RESOURCE_AREAS.map(({ id }) => id)).toContain(
+    expect(SKIRMISH_MAP.resourceAreas.map(({ id }) => id)).toContain(
       start.startingResourceAreaId,
     );
     const from = approach(map, start);
-    for (const area of SKIRMISH_RESOURCE_AREAS) {
+    for (const area of SKIRMISH_MAP.resourceAreas) {
       for (const tile of [...area.materialsTiles, ...area.lifebloomTiles]) {
         expect(grid.costAt(tile.x, tile.z)).toBeDefined();
         expect(
@@ -208,11 +199,8 @@ test.each(SKIRMISH_STARTS)(
   },
 );
 
-function until(simulation: MissionSimulation, ready: () => boolean) {
-  const limit = 150 / SIMULATION_TICK_SECONDS;
-  for (let tick = 0; tick < limit && !ready(); tick++) simulation.tick();
-  expect(ready()).toBe(true);
-}
+const until = (simulation: MissionSimulation, ready: () => boolean) =>
+  untilSeconds(simulation, ready, 150);
 
 function opening(faction: "arc" | "circle", start: SkirmishStart) {
   return createSessionSimulation(
@@ -224,7 +212,7 @@ function opening(faction: "arc" | "circle", start: SkirmishStart) {
   );
 }
 
-test.each(SKIRMISH_STARTS)(
+test.each(SKIRMISH_MAP.starts)(
   "ARC can fund and deliver its first income from $id",
   (start) => {
     const { dropoff, worker, stockpile } = SKIRMISH_OPENINGS.arc;
@@ -233,39 +221,35 @@ test.each(SKIRMISH_STARTS)(
         costAmount(definitions.get(worker)!),
     ).toBe(stockpile);
     const simulation = opening("arc", start);
-    try {
-      simulation.submitCommand({
-        kind: "place-actor",
-        actorId: "refinery",
-        definitionId: dropoff,
-        origin: start.dropoffOrigins.arc,
-      });
-      expect(simulation.tick()[0].accepted).toBe(true);
-      until(simulation, () => !simulation.actorById("refinery")!.construction);
-      simulation.submitCommand({
-        kind: "train-unit",
-        producerId: "refinery",
-        actorId: "harvester",
-        definitionId: worker,
-      });
-      expect(simulation.tick()[0].accepted).toBe(true);
-      expect(balance(simulation)).toBe(0);
-      until(simulation, () => !!simulation.actorById("harvester"));
-      simulation.submitCommand({
-        kind: "gather",
-        actorId: "harvester",
-        siteId: `${start.startingResourceAreaId}-1`,
-      });
-      expect(simulation.tick()[0].accepted).toBe(true);
-      until(simulation, () => deposited(simulation) > 0);
-      expect(balance(simulation)).toBeGreaterThan(0);
-    } finally {
-      simulation.dispose();
-    }
+    simulation.submitCommand({
+      kind: "place-actor",
+      actorId: "refinery",
+      definitionId: dropoff,
+      origin: start.dropoffOrigins.arc,
+    });
+    expect(simulation.tick()[0].accepted).toBe(true);
+    until(simulation, () => !simulation.actorById("refinery")!.construction);
+    simulation.submitCommand({
+      kind: "train-unit",
+      producerId: "refinery",
+      actorId: "harvester",
+      definitionId: worker,
+    });
+    expect(simulation.tick()[0].accepted).toBe(true);
+    expect(balance(simulation)).toBe(0);
+    until(simulation, () => !!simulation.actorById("harvester"));
+    simulation.submitCommand({
+      kind: "gather",
+      actorId: "harvester",
+      siteId: `${start.startingResourceAreaId}-1`,
+    });
+    expect(simulation.tick()[0].accepted).toBe(true);
+    until(simulation, () => deposited(simulation) > 0);
+    expect(balance(simulation)).toBeGreaterThan(0);
   },
 );
 
-test.each(SKIRMISH_STARTS)(
+test.each(SKIRMISH_MAP.starts)(
   "Circle can fund and deliver its first income from $id",
   (start) => {
     const { dropoff, headquarters, worker, stockpile } =
@@ -276,42 +260,38 @@ test.each(SKIRMISH_STARTS)(
     ).toBe(stockpile);
     const simulation = opening("circle", start);
     const headquartersId = `${start.id}-headquarters`;
-    try {
-      expect(simulation.actorById(headquartersId)!.definitionId).toBe(
-        headquarters,
-      );
-      simulation.submitCommand({
-        kind: "train-unit",
-        producerId: headquartersId,
-        actorId: "cultivator",
-        definitionId: worker,
-      });
-      expect(simulation.tick()[0].accepted).toBe(true);
-      until(simulation, () => !!simulation.actorById("cultivator"));
-      simulation.submitCommand({
-        kind: "place-actor",
-        actorId: "conservatory",
-        definitionId: dropoff,
-        origin: start.dropoffOrigins.circle,
-        workerIds: ["cultivator"],
-      });
-      expect(simulation.tick()[0].accepted).toBe(true);
-      expect(balance(simulation, "lifebloom")).toBe(0);
-      until(
-        simulation,
-        () => !simulation.actorById("conservatory")!.construction,
-      );
-      simulation.submitCommand({
-        kind: "gather",
-        actorId: "cultivator",
-        siteId: `${start.startingResourceAreaId}-lifebloom-1`,
-      });
-      expect(simulation.tick()[0].accepted).toBe(true);
-      until(simulation, () => deposited(simulation, "lifebloom") > 0);
-      expect(balance(simulation, "lifebloom")).toBeGreaterThan(0);
-    } finally {
-      simulation.dispose();
-    }
+    expect(simulation.actorById(headquartersId)!.definitionId).toBe(
+      headquarters,
+    );
+    simulation.submitCommand({
+      kind: "train-unit",
+      producerId: headquartersId,
+      actorId: "cultivator",
+      definitionId: worker,
+    });
+    expect(simulation.tick()[0].accepted).toBe(true);
+    until(simulation, () => !!simulation.actorById("cultivator"));
+    simulation.submitCommand({
+      kind: "place-actor",
+      actorId: "conservatory",
+      definitionId: dropoff,
+      origin: start.dropoffOrigins.circle,
+      workerIds: ["cultivator"],
+    });
+    expect(simulation.tick()[0].accepted).toBe(true);
+    expect(balance(simulation, "lifebloom")).toBe(0);
+    until(
+      simulation,
+      () => !simulation.actorById("conservatory")!.construction,
+    );
+    simulation.submitCommand({
+      kind: "gather",
+      actorId: "cultivator",
+      siteId: `${start.startingResourceAreaId}-lifebloom-1`,
+    });
+    expect(simulation.tick()[0].accepted).toBe(true);
+    until(simulation, () => deposited(simulation, "lifebloom") > 0);
+    expect(balance(simulation, "lifebloom")).toBeGreaterThan(0);
   },
 );
 
@@ -405,27 +385,18 @@ test("custom maps keep their identity and restart from their registered level", 
   );
   const opening = loadMission(source);
   const simulation = createSessionSimulation(opening);
-  try {
-    simulation.tick();
-    const saved = loadMission(
-      serializeMission(
-        scenario,
-        simulation.snapshot(),
-        SIMULATION_TICK_SECONDS,
-        {
-          save: { name: "Alternate map", savedAt: "2026-11-06T00:00:00.000Z" },
-        },
-      ),
-    );
-    expect(saved.scenario.id).toBe(alternate.id);
-    expect(missionRestart(saved)).toBeUndefined();
-    const restarted = missionRestart(saved, source)!();
-    expect(restarted.state.tick).toBe(0);
-    expect(restarted.state.terrain).toEqual(opening.state.terrain);
-    expect(restarted.scenario.setup).toEqual(opening.scenario.setup);
-  } finally {
-    simulation.dispose();
-  }
+  simulation.tick();
+  const saved = loadMission(
+    serializeMission(scenario, simulation.snapshot(), SIMULATION_TICK_SECONDS, {
+      save: { name: "Alternate map", savedAt: "2026-11-06T00:00:00.000Z" },
+    }),
+  );
+  expect(saved.scenario.id).toBe(alternate.id);
+  expect(missionRestart(saved)).toBeUndefined();
+  const restarted = missionRestart(saved, source)!();
+  expect(restarted.state.tick).toBe(0);
+  expect(restarted.state.terrain).toEqual(opening.state.terrain);
+  expect(restarted.scenario.setup).toEqual(opening.scenario.setup);
 });
 
 test("assembly requires an authored home resource area", () => {

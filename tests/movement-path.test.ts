@@ -1,6 +1,7 @@
-import { NullEngine, Scene, VertexBuffer } from "@babylonjs/core";
+import { VertexBuffer } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
+import { testScene } from "./helpers/scene";
 import { TerrainMap } from "../src/map";
 import { createMovementPathView } from "../src/render/movement-path";
 
@@ -39,8 +40,7 @@ function movingActor({
 }
 
 function setup() {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
+  const scene = testScene();
   const map = new TerrainMap({
     width: 10,
     height: 10,
@@ -49,12 +49,12 @@ function setup() {
   });
   const view = createMovementPathView(scene, map);
   view.setSelectedActors(["trooper"]);
-  return { engine, map, scene, view };
+  return { map, scene, view };
 }
 
 describe("movement path view", () => {
   test("draws a dotted route and reachable destination on the ground", () => {
-    const { engine, map, scene, view } = setup();
+    const { map, scene, view } = setup();
 
     view.update([movingActor()]);
 
@@ -79,11 +79,10 @@ describe("movement path view", () => {
     ).toBeGreaterThan(0);
 
     view.dispose();
-    engine.dispose();
   });
 
   test("marks the requested target when the route ends somewhere else", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
 
     view.update([
       movingActor({
@@ -100,11 +99,10 @@ describe("movement path view", () => {
     ).not.toBeNull();
 
     view.dispose();
-    engine.dispose();
   });
 
   test("hides passed dashes without rebuilding or moving the rest", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     view.update([movingActor()]);
     const route = scene.getMeshByName("movement-path-route")!;
     const before = route.getVerticesData(VertexBuffer.PositionKind)!.slice();
@@ -121,11 +119,10 @@ describe("movement path view", () => {
     );
 
     view.dispose();
-    engine.dispose();
   });
 
   test("rebuilds route geometry after terrain elevation changes", () => {
-    const { engine, map, scene, view } = setup();
+    const { map, scene, view } = setup();
     const actor = movingActor();
     view.update([actor]);
     const original = scene.getMeshByName("movement-path-route")!;
@@ -148,11 +145,10 @@ describe("movement path view", () => {
     );
 
     view.dispose();
-    engine.dispose();
   });
 
   test("keeps rejected-command feedback visible without an active order", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
 
     view.showRejectedTarget("trooper", { x: 3, z: 0 });
     view.update([{ ...movingActor(), movement: undefined }]);
@@ -163,11 +159,10 @@ describe("movement path view", () => {
     ).not.toBeNull();
 
     view.dispose();
-    engine.dispose();
   });
 
   test("keeps rejected-command feedback beside an active order", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     view.update([movingActor()]);
 
     view.showRejectedTarget("trooper", { x: 3, z: 3 });
@@ -177,11 +172,10 @@ describe("movement path view", () => {
     expect(scene.getMeshByName("movement-path-unreachable")).not.toBeNull();
 
     view.dispose();
-    engine.dispose();
   });
 
   test("shows a persistent blocked marker when an active route is lost", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
 
     view.update([movingActor({ blocked: true })]);
     view.update([movingActor({ blocked: true })]);
@@ -190,11 +184,10 @@ describe("movement path view", () => {
     expect(scene.getMeshByName("movement-path-unreachable")).not.toBeNull();
 
     view.dispose();
-    engine.dispose();
   });
 
   test("tracks multiple selected routes and preserves survivors when selection shrinks", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     const actors = [
       movingActor(),
       { ...movingActor({ destination: { x: 3, z: 1 } }), id: "scout" },
@@ -213,11 +206,10 @@ describe("movement path view", () => {
     ).toEqual([survivor]);
     expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
     view.dispose();
-    engine.dispose();
   });
 
   test("a resolved group slot still marks its unreachable group click", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     const actor = movingActor();
     view.update([
       {
@@ -230,11 +222,10 @@ describe("movement path view", () => {
       scene.getMeshByName("movement-path-unreachable-cross"),
     ).not.toBeNull();
     view.dispose();
-    engine.dispose();
   });
 
   test("selected actors sharing a blocked group click share one marker", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     const actor = movingActor();
     const requested = {
       ...actor,
@@ -253,11 +244,10 @@ describe("movement path view", () => {
     expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
     expect(scene.getMeshByName("movement-path-unreachable-cross")).toBeNull();
     view.dispose();
-    engine.dispose();
   });
 
   test("changing a blocked group click preserves the resolved route geometry", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     const actor = movingActor();
     view.update([
       {
@@ -277,11 +267,10 @@ describe("movement path view", () => {
     expect(marker.isDisposed()).toBe(true);
     expect(scene.getMeshByName("movement-path-unreachable")).not.toBeNull();
     view.dispose();
-    engine.dispose();
   });
 
   test("clears the tracker when selection or movement ends", () => {
-    const { engine, scene, view } = setup();
+    const { scene, view } = setup();
     view.update([movingActor()]);
 
     view.setSelectedActors([]);
@@ -294,12 +283,11 @@ describe("movement path view", () => {
     expect(scene.getMeshByName("movement-path-route")).toBeNull();
 
     view.dispose();
-    engine.dispose();
   });
 });
 
 test("an aggressive order keeps its diamond destination during an engagement", () => {
-  const { engine, scene, view } = setup();
+  const { scene, view } = setup();
   const actor = { ...movingActor(), attackMove: { target: { x: 2, z: 0 } } };
   view.update([actor]);
   expect(scene.getMeshByName("attack-move-destination")).not.toBeNull();
@@ -316,11 +304,10 @@ test("an aggressive order keeps its diamond destination during an engagement", (
   view.update([{ ...movingActor(), movement: undefined }]);
   expect(scene.getMeshByName("attack-move-destination")).toBeNull();
   view.dispose();
-  engine.dispose();
 });
 
 test("a blocked Attack Move marker clears as soon as the order resumes or stops", () => {
-  const { engine, scene, view } = setup();
+  const { scene, view } = setup();
   const actor: ActorRenderState = {
     ...movingActor(),
     movement: undefined,
@@ -338,5 +325,4 @@ test("a blocked Attack Move marker clears as soon as the order resumes or stops"
   view.update([{ ...actor, attackMove: undefined }]);
   expect(scene.getMeshByName("movement-path-unreachable")).toBeNull();
   view.dispose();
-  engine.dispose();
 });
