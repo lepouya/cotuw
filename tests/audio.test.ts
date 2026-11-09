@@ -160,7 +160,7 @@ function committed(
     },
     faction: undefined,
     definitions: new Map(),
-    rules: {} as OwnerRuleChecks,
+    rules: () => ({}) as OwnerRuleChecks,
   });
   return { simulation, view };
 }

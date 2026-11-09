@@ -2,6 +2,7 @@ import { containsGridPoint, isTileCoord, tileBounds, tileKey } from "./grid";
 import { isId, isOneOf } from "./validation";
 
 import type { TerrainBounds, TileCoord } from "./grid";
+import type { NavigationChangeLog } from "./navigation-changes";
 import type { TerrainEdit, TerrainGrid } from "./terrain";
 
 const OCCUPANCY_LAYERS = ["surface", "air", "subterranean"] as const;
@@ -65,7 +66,14 @@ export class OccupancyGrid {
   private readonly cells = new Map<OccupancyLayer, (string | undefined)[]>();
   private readonly placements = new Map<string, PreparedPlacement>();
 
-  constructor(private readonly terrain: TerrainGrid) {
+  /** `changes` hears each footprint change; derived indexes can discard them. */
+  constructor(
+    private readonly terrain: TerrainGrid,
+    private readonly changes: Pick<
+      NavigationChangeLog,
+      "record"
+    > = terrain.navigationChanges,
+  ) {
     for (const layer of OCCUPANCY_LAYERS) {
       this.cells.set(
         layer,
@@ -130,7 +138,7 @@ export class OccupancyGrid {
       cells[this.index(x, z)] = ownerId;
     }
     this.placements.set(ownerId, prepared);
-    this.terrain.navigationChanges.record(prepared.bounds, {
+    this.changes.record(prepared.bounds, {
       layers: [footprint.layer],
       effect: footprint.blocksMovement ? "increase" : "none",
     });
@@ -148,7 +156,7 @@ export class OccupancyGrid {
       cells[this.index(x, z)] = undefined;
     }
     this.placements.delete(ownerId);
-    this.terrain.navigationChanges.record(prepared.bounds, {
+    this.changes.record(prepared.bounds, {
       layers: [footprint.layer],
       effect: footprint.blocksMovement ? "decrease" : "none",
     });

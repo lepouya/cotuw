@@ -1,4 +1,4 @@
-import { NavigationGrid, resolveNavigationDestination } from "./navigation";
+import { resolveNavigationDestination } from "./navigation";
 import {
   adjacentTiles,
   occupiedTilesFor,
@@ -9,6 +9,7 @@ import { tileKey } from "./grid";
 import type { Actor } from "./actor";
 import type { EconomyWorld } from "./economy";
 import type { TileCoord } from "./grid";
+import type { NavigationGrid } from "./navigation";
 import type { WorldPosition } from "./world";
 
 /** The target of an unblocked route the actor is following. */
@@ -67,21 +68,15 @@ export function workerNavigation(
     if (preview) return preview;
     const occupancy = grid.occupancy;
     const blocked = new Set(footprint.map(tileKey));
-    preview = new NavigationGrid(
-      grid.map,
-      {
-        ownerAt: (...args) => occupancy.ownerAt(...args),
-        occupiedWithin: (...args) => occupancy.occupiedWithin(...args),
-        placementByOwnerId: (...args) => occupancy.placementByOwnerId(...args),
-        canPlace: (...args) => occupancy.canPlace(...args),
-        blocksMovementAt: (x, z, layer) =>
-          (layer === building.occupancyLayer &&
-            blocked.has(tileKey({ x, z }))) ||
-          occupancy.blocksMovementAt(x, z, layer),
-      },
-      grid.profile,
-      grid.occupancyLayer,
-    );
+    preview = grid.withOccupancy({
+      ownerAt: (...args) => occupancy.ownerAt(...args),
+      occupiedWithin: (...args) => occupancy.occupiedWithin(...args),
+      placementByOwnerId: (...args) => occupancy.placementByOwnerId(...args),
+      canPlace: (...args) => occupancy.canPlace(...args),
+      blocksMovementAt: (x, z, layer) =>
+        (layer === building.occupancyLayer && blocked.has(tileKey({ x, z }))) ||
+        occupancy.blocksMovementAt(x, z, layer),
+    });
     previews.set(key, preview);
     return preview;
   };

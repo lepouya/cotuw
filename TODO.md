@@ -384,7 +384,7 @@ ownership and information boundaries hold, and M0 still works.
 
 Before starting the director:
 
-- [ ] Scope owner-view rule previews to owned, detected, and remembered state.
+- [x] Scope owner-view rule previews to owned, detected, and remembered state.
   Share rule calculations with authoritative command validation. Cover hidden
   occupancy, resources, debris, actor IDs, and worker routes without leaking
   changes under fog. Verify placement, training, rally, and tending previews

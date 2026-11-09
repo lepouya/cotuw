@@ -532,7 +532,8 @@ describe("Materials economy", () => {
       }),
     ).toMatchObject({ accepted: false, reason: "resource-site" });
     expect(
-      restored.viewOf(restored.playerOwner).evaluatePlacement({
+      command(restored, {
+        kind: "place-actor",
         actorId: "on-loot",
         definitionId: "arc-materials-refinery",
         origin: { x: 22, z: 10 },

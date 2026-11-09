@@ -40,6 +40,7 @@ const commandReasons = ({
   "invalid-cultivator": "Select a cultivating worker first.",
   "invalid-growth": "Choose an unfinished growing building.",
   "tender-occupied": "This building already has a tending worker.",
+  "unreachable-growth": "No selected worker can reach this building.",
   "invalid-harvester": `Select a ${harvester} first.`,
   "missing-site": "Choose a resource site.",
   "missing-refinery": `Assign this ${harvester} to an empty ${refinery} first.`,

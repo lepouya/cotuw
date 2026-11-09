@@ -125,7 +125,7 @@ export function createBuildingPlacement(
         }
       : undefined;
   const placementKey = () => JSON.stringify([origin, quarterTurns]);
-  /** The candidate at the current state, evaluated as its command would be. */
+  /** The candidate at the current state, as the owner's knowledge judges it. */
   const evaluate = (): PlacementCandidate | undefined => {
     const candidate = active ? placement() : undefined;
     if (!candidate) return undefined;

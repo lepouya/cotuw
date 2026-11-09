@@ -233,6 +233,11 @@ story.
 - Vision, exploration, observations, and private economic and queue state are
   scoped by owner. Other owners' actors are inspected through detection rules;
   sharing a service does not grant command authority over their actors or jobs.
+- Owner rule previews use owned and detected actors, remembered building
+  footprints, known resources, and debris the owner currently sees. Unseen
+  changes cannot affect a preview. Previews are advisory: commands still
+  validate against the actual world and may fail on an unseen obstruction,
+  without spending resources or interrupting a worker.
 - Loot pays its whole reward once to the owner of the nearest mobile unit
   reaching it, with stable actor IDs breaking ties. Owners holding no
   stockpile of its resource, such as wildlife, cannot collect it.

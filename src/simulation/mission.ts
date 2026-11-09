@@ -1,3 +1,6 @@
+import { createRuleChecks } from "./rule-checks";
+import type { RuleWorld } from "./rule-checks";
+import { createOwnerRuleChecks } from "./owner-rule-world";
 import {
   createMatchMetrics,
   recordMatch,
@@ -9,7 +12,6 @@ import type {
   MatchRecorder,
   MatchView,
 } from "./match-metrics";
-import { growthCandidates, growthWorkerFor } from "./growth";
 import { missionEnded } from "./mission-result";
 import type { MissionResult } from "./mission-result";
 import { evaluateSkirmish, validateSkirmish } from "./skirmish";
@@ -17,23 +19,15 @@ import type { SkirmishResult, SkirmishRules } from "./skirmish";
 import { combatScaling, validateSetup } from "./mission-setup";
 import type { MissionSetup } from "./mission-setup";
 import {
-  headquarteredOwners,
-  infrastructureHeadquarters,
-  replacesHeadquarters,
-} from "./infrastructure";
-import {
   assignGroupDestinations,
   separateMobileActors,
 } from "./group-movement";
 import {
   createProductionJob,
-  evaluateTraining as evaluateUnitTraining,
-  productionRejection,
   trainableUnitIds,
   validateProductionDefinitions,
 } from "./production";
-import type { BuildingActivity, TrainingEvaluation } from "./production";
-import type { TrainUnitCommand } from "./command";
+import type { BuildingActivity } from "./production";
 import { clampToBounds, isFinitePosition, withinBounds } from "./world";
 import { clearCombatOrders, cloneData, deepFreeze } from "./actor";
 import {
@@ -46,19 +40,13 @@ import {
 import { createCommandAuthority } from "./authority";
 import { tileKey } from "./grid";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
-import {
-  createSupportResolver,
-  disconnectedBuildings,
-  ownedCoverage,
-  supportsPosition,
-  validateSupportDefinition,
-} from "./support";
+import { createSupportResolver, validateSupportDefinition } from "./support";
 import { TerrainGrid } from "./terrain";
 import {
   attackRejection,
   guardController,
   startAttack,
-  wreckTiles,
+  wreckDebris,
   noteAttackMoveRoute,
   updateCombat,
   validateCombatActor,
@@ -105,11 +93,12 @@ import {
 } from "./order-queue";
 import type { ActorOrderCommand } from "./order-queue";
 import { createOwnerView } from "./owner-view";
-import type { OwnerRuleChecks, OwnerView } from "./owner-view";
+import { workerNavigation } from "./worker-navigation";
+import type { OwnerView } from "./owner-view";
 import {
   applyEconomyCommand as applyEconomy,
-  enrollWorker,
   activeSites,
+  enrollWorker,
   economySites,
   interruptWorker,
   removeEconomyActor,
@@ -119,15 +108,9 @@ import {
   validateEconomyState,
 } from "./economy";
 import { costAmount } from "./resources";
-import {
-  canAfford,
-  chargeCost,
-  refundCost,
-  regroupStockpiles,
-} from "./stockpiles";
+import { chargeCost, refundCost, regroupStockpiles } from "./stockpiles";
 import type { EconomyCommandHooks, EconomyState, EconomyView } from "./economy";
 import {
-  createTilePlacedActor,
   evaluateFootprint,
   footprintPlacementFor,
   isMobileActor,
@@ -164,11 +147,6 @@ import type {
 import type { AuthorityView, ScriptControl } from "./authority";
 import type { NavigatingActor } from "./group-movement";
 import type { FootprintPlacement } from "./occupancy";
-import type {
-  ActorPlacement,
-  PlacementEvaluation,
-  PlacementReason,
-} from "./placement";
 import type { SupportView } from "./support";
 import type { TerrainState } from "./terrain";
 import {
@@ -785,191 +763,6 @@ export function createMissionSimulation({
   );
   deepFreeze(state.wildlife);
 
-  const evaluatePlacement = (
-    placement: ActorPlacement,
-    owner: string,
-    actors: readonly Actor[],
-    usedIds: ReadonlySet<string>,
-    economy?: EconomyState,
-    debris?: ReadonlySet<string>,
-  ): PlacementEvaluation => {
-    const reject = (reason: PlacementReason): PlacementEvaluation => ({
-      accepted: false,
-      reason,
-      tiles: [],
-    });
-    const { actorId, definitionId, origin, quarterTurns = 0 } = placement;
-    if (
-      !map ||
-      !occupancy ||
-      !isId(actorId) ||
-      !isValidTilePlacement({ origin, quarterTurns })
-    ) {
-      return reject("invalid-actor");
-    }
-    if (usedIds.has(actorId)) {
-      return reject("used-id");
-    }
-    const definition = definitionsById.get(definitionId);
-    if (!definition) {
-      return reject("unknown-definition");
-    }
-    if (!definition.footprint) {
-      return reject("not-placeable");
-    }
-    const actor = createTilePlacedActor(map, definition, placement, owner);
-    let workerId: string | undefined;
-    const evaluation = evaluateFootprint(
-      map,
-      occupancy,
-      actor,
-      definition,
-      actors,
-    );
-    if (
-      evaluation.accepted &&
-      evaluation.tiles.some((tile) => !ownerVision.knowsTile(owner, tile))
-    )
-      return { ...reject("unexplored"), tiles: evaluation.tiles };
-    if (
-      evaluation.accepted &&
-      debris &&
-      evaluation.tiles.some((tile) => debris.has(tileKey(tile)))
-    )
-      return { ...reject("debris"), tiles: evaluation.tiles };
-    if (evaluation.accepted && economy) {
-      if (!canAfford(economy, owner, definition))
-        return { ...reject("insufficient-resources"), tiles: evaluation.tiles };
-      const resources = new Set(
-        [
-          ...activeSites(economy),
-          ...economy.loot.filter((loot) => !loot.collected),
-        ].map((resource) => tileKey(resource.tile)),
-      );
-      if (evaluation.tiles.some((tile) => resources.has(tileKey(tile))))
-        return { ...reject("resource-site"), tiles: evaluation.tiles };
-      // An owner without a headquarters may place a replacement.
-      const emergency = replacesHeadquarters(
-        actor,
-        headquarteredOwners(actors, definitionsById),
-        { definitions: definitionsById, emergencyHeadquarters },
-      );
-      if (definition.growth) {
-        if (
-          !emergency &&
-          !infrastructureHeadquarters(actor, actors, {
-            definitions: definitionsById,
-            sharesHeadquarters: relations.sharesHeadquarters,
-          }).length
-        )
-          return { ...reject("missing-headquarters"), tiles: evaluation.tiles };
-        const workerIds = placement.workerIds ?? [];
-        if (!growthCandidates(actor, workerIds, actors, definitionsById).length)
-          return { ...reject("missing-worker"), tiles: evaluation.tiles };
-        const tender = growthWorkerFor(actor, workerIds, actors, {
-          definitions: definitionsById,
-          behaviors: behaviorsById,
-          map,
-        });
-        if (!tender)
-          return { ...reject("unreachable-growth"), tiles: evaluation.tiles };
-        workerId = tender.id;
-      }
-      const network = supportFor(actors);
-      const recipient = { owner, faction: definition.faction };
-      if (
-        definition.support &&
-        !supportsPosition(
-          network,
-          actor.worldPosition,
-          recipient,
-          relations.sharesSupport,
-        ) &&
-        // A replacement may use a disconnected owned building's radius.
-        !(emergency && ownedCoverage(network, actor.worldPosition, recipient))
-      )
-        return { ...reject("outside-support"), tiles: evaluation.tiles };
-    }
-    if (evaluation.accepted) {
-      try {
-        ensureValidActor(actor);
-      } catch {
-        return { ...reject("invalid-actor"), tiles: evaluation.tiles };
-      }
-    }
-    return evaluation.accepted && workerId
-      ? { ...evaluation, workerId }
-      : evaluation;
-  };
-
-  const evaluateTraining = (
-    command: TrainUnitCommand,
-    actors: readonly Actor[],
-    usedIds: Pick<ReadonlySet<string>, "has">,
-    economy?: EconomyState,
-  ): TrainingEvaluation => {
-    if (
-      economy &&
-      disconnectedBuildings(supportFor(actors)).has(command.producerId)
-    )
-      return { accepted: false, reason: "disconnected" };
-    const evaluation = evaluateUnitTraining(command, {
-      actors,
-      usedIds,
-      definitions: definitionsById,
-      canStandAt: (unit, tile) =>
-        behaviorsById.get(unit.behaviorId)!.canStandAt!(unit, tile),
-      map,
-      occupancy,
-      bounds: worldBounds,
-    });
-    if (
-      economy &&
-      (evaluation.accepted || evaluation.reason === "exit-blocked")
-    ) {
-      const reason = productionRejection(
-        economy,
-        actors.find(({ id }) => id === command.producerId)!,
-        definitionsById.get(command.definitionId)!,
-      );
-      return reason
-        ? { accepted: false, reason }
-        : { accepted: true, queued: true };
-    }
-    if (evaluation.accepted && "actor" in evaluation) {
-      try {
-        ensureValidActor(evaluation.actor);
-      } catch {
-        return { accepted: false, reason: "invalid-actor" };
-      }
-    }
-    return evaluation;
-  };
-  const evaluateRallyPoint = (
-    producer: Actor | undefined,
-    target: WorldPosition,
-  ) => {
-    const unitIds = trainableUnitIds(producer, definitionsById);
-    if (
-      !map ||
-      !occupancy ||
-      !producer ||
-      !unitIds.length ||
-      !target ||
-      !isFinitePosition(target) ||
-      !withinBounds(target, worldBounds)
-    )
-      return false;
-    const tile = map.tileAtWorldPosition(target.x, target.z);
-    return (
-      ownerVision.knowsTile(producer.owner, tile) &&
-      occupancy.ownerAt(tile.x, tile.z, "surface") === undefined &&
-      unitIds.every((id) => {
-        const unit = definitionsById.get(id)!;
-        return behaviorsById.get(unit.behaviorId)!.canStandAt!(unit, tile);
-      })
-    );
-  };
   const authorityView = (working: WorkingActors): AuthorityView => ({
     ownerOf: (id) => working.actorsById.get(id)?.owner,
     producerOf: (id) =>
@@ -1141,6 +934,38 @@ export function createMissionSimulation({
     definitions: definitionsById,
   });
   const { sees, seesTile, detects } = ownerVision;
+  const checks = createRuleChecks({
+    definitions: definitionsById,
+    map,
+    bounds: worldBounds,
+    knowsTile: ownerVision.knowsTile,
+    relations: () => relations,
+    emergencyHeadquarters,
+    validateActor: ensureValidActor,
+  });
+  /** The actual world a command validates against, staged or committed. */
+  const commandWorld = (
+    actors: readonly Actor[],
+    usedIds: RuleWorld["usedIds"],
+    economy?: EconomyState,
+    debris?: RuleWorld["debris"],
+  ): RuleWorld => ({
+    actors,
+    usedIds,
+    occupancy,
+    behaviors: behaviorsById,
+    debris,
+    economy: economy && {
+      view: economy,
+      support: supportFor(actors),
+      resourceTiles: new Set(
+        [
+          ...activeSites(economy),
+          ...economy.loot.filter((loot) => !loot.collected),
+        ].map(({ tile }) => tileKey(tile)),
+      ),
+    },
+  });
   /** Derives vision, then records what each owner now sees. */
   const withKnowledge = (
     candidate: MissionState,
@@ -1219,15 +1044,7 @@ export function createMissionSimulation({
   );
   const wreckTicks = secondsToTicks(WRECK_SECONDS, tickSeconds);
   /** Footprint tiles under building debris, rebuilt when wrecks change. */
-  const debrisFor = (wrecks: readonly Wreck[]) =>
-    new Set(
-      wrecks.flatMap((wreck) =>
-        wreckTiles(wreck, definitionsById.get(wreck.definitionId)!).map(
-          tileKey,
-        ),
-      ),
-    );
-  let debrisTiles = debrisFor(state.wrecks);
+  let debrisTiles = wreckDebris(state.wrecks, definitionsById);
   let attacks: readonly AttackEvent[] = [];
   let buildingActivity: readonly BuildingActivity[] = [];
 
@@ -1407,6 +1224,12 @@ export function createMissionSimulation({
     retire: (id) => working.retiredIds.push(id),
     refund: (owner, definition, amount) =>
       refundPayment(working, owner, definition, amount),
+    reaches: (worker, building) =>
+      !!workerNavigation({
+        definitions: definitionsById,
+        behaviors: behaviorsById,
+        map: map!,
+      }).entrance(worker, building),
   });
   const applyEconomyCommand = (
     command: EconomyCommand,
@@ -1500,7 +1323,10 @@ export function createMissionSimulation({
       const accepted =
         applied.target === undefined
           ? trainableUnitIds(actor, definitionsById).length > 0
-          : evaluateRallyPoint(actor, applied.target);
+          : checks.rallyPoint(actor, applied.target, {
+              occupancy,
+              behaviors: behaviorsById,
+            });
       if (accepted) {
         if (applied.target) actor!.rallyPoint = { ...applied.target };
         else delete actor!.rallyPoint;
@@ -1516,13 +1342,15 @@ export function createMissionSimulation({
     "place-actor": (command, tick, working, issuer) => {
       const applied = structuredClone(command);
       // Authorization requires placements to name an owner.
-      const evaluation = evaluatePlacement(
+      const evaluation = checks.placement(
         applied,
         issuer.owner!,
-        working.actors,
-        working.usedIds,
-        working.economy,
-        debrisTiles,
+        commandWorld(
+          working.actors,
+          working.usedIds,
+          working.economy,
+          debrisTiles,
+        ),
       );
       if (!evaluation.accepted)
         return {
@@ -1561,11 +1389,9 @@ export function createMissionSimulation({
     },
     "train-unit": (command, tick, working) => {
       const applied = structuredClone(command);
-      const evaluation = evaluateTraining(
+      const evaluation = checks.training(
         applied,
-        working.actors,
-        working.usedIds,
-        working.economy,
+        commandWorld(working.actors, working.usedIds, working.economy),
       );
       if (!evaluation.accepted)
         return {
@@ -1640,42 +1466,6 @@ export function createMissionSimulation({
     );
 
   const views = new Map<string, OwnerView>();
-  const ownerRuleChecks: OwnerRuleChecks = {
-    placement: (placement, owner) =>
-      evaluatePlacement(
-        structuredClone(placement),
-        owner,
-        state.actors,
-        usedActorIds,
-        state.economy,
-        debrisTiles,
-      ),
-    training: (command) =>
-      evaluateTraining(
-        structuredClone(command),
-        state.actors,
-        usedActorIds,
-        state.economy,
-      ),
-    rallyPoint: (id, target) => evaluateRallyPoint(actorsById.get(id), target),
-    tendWorker: (buildingId, workerIds) => {
-      const building = actorsById.get(buildingId);
-      if (
-        !map ||
-        !building?.construction ||
-        !definitionFor(building).growth ||
-        state.economy?.cultivation?.workers.some(
-          (worker) => worker.tendingId === buildingId,
-        )
-      )
-        return undefined;
-      return growthWorkerFor(building, workerIds, state.actors, {
-        definitions: definitionsById,
-        behaviors: behaviorsById,
-        map,
-      })?.id;
-    },
-  };
   const simulation: MissionSimulation = {
     get metrics() {
       return state.metrics;
@@ -1728,7 +1518,12 @@ export function createMissionSimulation({
         knowledge: known,
         faction: factionOf(state.owners, owner),
         definitions: definitionsById,
-        rules: ownerRuleChecks,
+        rules: (source) =>
+          createOwnerRuleChecks(source, checks, {
+            map,
+            definitions: definitionsById,
+            behaviors: behaviorsById,
+          }),
       });
       views.set(owner, view);
       return view;
@@ -1774,15 +1569,14 @@ export function createMissionSimulation({
       const copy = structuredClone(actor);
       let footprint: FootprintPlacement | undefined;
       if (copy.tilePlacement !== undefined) {
-        const evaluation = evaluatePlacement(
+        const evaluation = checks.placement(
           {
             actorId: copy.id,
             definitionId: copy.definitionId,
             ...copy.tilePlacement,
           },
           copy.owner,
-          state.actors,
-          usedActorIds,
+          commandWorld(state.actors, usedActorIds),
         );
         if (!evaluation.accepted) {
           throw new RangeError(
@@ -1970,11 +1764,12 @@ export function createMissionSimulation({
               tickSeconds,
               move: moveActor,
               evaluateSpawn: ({ actorId, producerId, definitionId }) =>
-                evaluateTraining(
+                checks.training(
                   { kind: "train-unit", actorId, producerId, definitionId },
-                  working.actors,
-                  // The job's own reserved ID is free for its unit.
-                  { has: (id) => id !== actorId && working.usedIds.has(id) },
+                  commandWorld(working.actors, {
+                    // The job's own reserved ID is free for its unit.
+                    has: (id) => id !== actorId && working.usedIds.has(id),
+                  }),
                 ),
               support: () => supportFor(working.actors),
               income: working.match?.income,
@@ -2084,7 +1879,7 @@ export function createMissionSimulation({
             (wreck, index) => wreck.actorId !== previousWrecks[index]!.actorId,
           )
         )
-          debrisTiles = debrisFor(state.wrecks);
+          debrisTiles = wreckDebris(state.wrecks, definitionsById);
         attacks = deepFreeze(tickAttacks);
         buildingActivity = deepFreeze(working.activity);
         actorsById = new Map(committedActors.map((actor) => [actor.id, actor]));

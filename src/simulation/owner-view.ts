@@ -13,6 +13,9 @@ import type {
   DeepReadonly,
   TerritoryState,
 } from "./actor";
+import type { EconomyView } from "./economy";
+import type { Wreck } from "./combat";
+import type { SupportView } from "./support";
 import type { TrainUnitCommand } from "./command";
 import type { MissionSimulation } from "./mission";
 import type { OwnerKnowledge } from "./observations";
@@ -21,15 +24,27 @@ import type { TrainingEvaluation } from "./production";
 import type { Detectable } from "./vision";
 import type { WorldPosition } from "./world";
 
-/** The mission's rule checks that an owner view scopes to its owner. */
+/** Advisory rule checks answered from one owner's knowledge. */
 export type OwnerRuleChecks = {
-  placement: (placement: ActorPlacement, owner: string) => PlacementEvaluation;
+  placement: (placement: ActorPlacement) => PlacementEvaluation;
   training: (command: TrainUnitCommand) => TrainingEvaluation;
   rallyPoint: (actorId: string, target: WorldPosition) => boolean;
   tendWorker: (
     buildingId: string,
     workerIds: readonly string[],
   ) => string | undefined;
+};
+
+/** The owner-visible inputs used to build advisory rule checks. */
+export type OwnerRuleSource = {
+  actors: () => {
+    shown: readonly ObservedActor[];
+    shownById: ReadonlyMap<string, ObservedActor>;
+  };
+  economy: () => EconomyView | undefined;
+  knowledge: OwnerKnowledge;
+  wrecks: () => readonly DeepReadonly<Wreck>[];
+  support: () => SupportView | undefined;
 };
 
 /**
@@ -61,7 +76,7 @@ export type ObservedActor = DeepReadonly<
  * Recomputes only when an input changes identity. Committed simulation state
  * is replaced rather than mutated, so identity marks every change.
  */
-function cached<Inputs extends readonly unknown[], T>(
+export function cached<Inputs extends readonly unknown[], T>(
   inputs: () => Inputs,
   compute: (inputs: NoInfer<Inputs>) => T,
 ): () => T {
@@ -133,7 +148,7 @@ export function createOwnerView({
   /** The owner's faction, for its labels, prices, and music. */
   faction: string | undefined;
   definitions: ReadonlyMap<string, ActorDefinition>;
-  rules: OwnerRuleChecks;
+  rules: (source: OwnerRuleSource) => OwnerRuleChecks;
 }) {
   const { owner } = knowledge;
   const owns = (actor: Pick<ActorRenderState, "owner">) =>
@@ -242,6 +257,7 @@ export function createOwnerView({
   );
   const ownActor = (id: string | undefined) =>
     id === undefined ? undefined : actors().ownById.get(id);
+  const checks = rules({ actors, economy, knowledge, wrecks, support });
   return {
     owner,
     faction,
@@ -264,20 +280,20 @@ export function createOwnerView({
       const found = ownActor(id);
       return found && isMobile(found) ? found : undefined;
     },
-    /** Checks a placement as a command from this owner would be checked. */
+    /** Advisory placement check; execution can still find an unseen blocker. */
     evaluatePlacement: (placement: ActorPlacement) =>
-      rules.placement(placement, owner),
+      checks.placement(placement),
     /** Other owners' producers read as missing, hiding their queues. */
     evaluateTraining: (command: TrainUnitCommand): TrainingEvaluation =>
       ownActor(command.producerId)
-        ? rules.training(command)
+        ? checks.training(command)
         : { accepted: false, reason: "missing-producer" },
     evaluateRallyPoint: (actorId: string, target: WorldPosition) =>
-      !!ownActor(actorId) && rules.rallyPoint(actorId, target),
+      !!ownActor(actorId) && checks.rallyPoint(actorId, target),
     /** The nearest own candidate that can reach and tend own, unfinished growth. */
     tendWorker: (buildingId: string, workerIds: readonly string[]) =>
       ownActor(buildingId)
-        ? rules.tendWorker(
+        ? checks.tendWorker(
             buildingId,
             workerIds.filter((id) => ownActor(id)),
           )

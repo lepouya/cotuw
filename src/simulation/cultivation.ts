@@ -11,7 +11,12 @@ import {
 } from "./worker-navigation";
 import type { Actor, ActorDefinition, DeepReadonly } from "./actor";
 import type { EconomyCommand } from "./command";
-import type { EconomyReason, EconomyState, EconomyWorld } from "./economy";
+import type {
+  EconomyCommandHooks,
+  EconomyReason,
+  EconomyState,
+  EconomyWorld,
+} from "./economy";
 import type { TileCoord } from "./grid";
 import type { WorldPosition } from "./world";
 
@@ -115,6 +120,7 @@ export function applyCultivationCommand(
   economy: EconomyState,
   actors: Actor[],
   definitions: ReadonlyMap<string, ActorDefinition>,
+  reaches: EconomyCommandHooks["reaches"],
 ): EconomyReason | undefined {
   const actor = actors.find((actor) => actor.id === command.actorId);
   const worker = economy.cultivation?.workers.find(
@@ -136,6 +142,7 @@ export function applyCultivationCommand(
         other.actorId !== worker.actorId && other.tendingId === building.id,
     );
     if (prior) return "tender-occupied";
+    if (!reaches(actor, building)) return "unreachable-growth";
     interruptCultivation(actor, economy);
     worker.tendingId = building.id;
     worker.phase = "tending";

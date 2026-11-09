@@ -15,6 +15,7 @@ import { isTick, secondsToTicks } from "./clock";
 import { followRoute } from "./automatic-movement";
 import { terrainSightlineClear } from "./terrain-sightline";
 import { tileAreaBounds } from "./terrain";
+import { tileKey } from "./grid";
 import { clearCombatOrders, compareIds, healthOf } from "./actor";
 import { isId, isPositive } from "./validation";
 import {
@@ -310,6 +311,17 @@ export function validateWrecks(
   )
     throw new RangeError("Mission state has invalid wrecks.");
 }
+
+/** Keys of the tiles under building debris among `wrecks`. */
+export const wreckDebris = (
+  wrecks: readonly Wreck[],
+  definitions: ReadonlyMap<string, ActorDefinition>,
+) =>
+  new Set(
+    wrecks.flatMap((wreck) =>
+      wreckTiles(wreck, definitions.get(wreck.definitionId)!).map(tileKey),
+    ),
+  );
 
 /** The footprint tiles building debris covers; none for fallen units. */
 export function wreckTiles(

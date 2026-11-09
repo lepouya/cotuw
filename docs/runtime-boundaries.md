@@ -182,6 +182,19 @@ These contracts describe where new behaviors, views, and services attach.
   cut off from support, whoever owns them. The view also holds the placement,
   training, rally, and tending checks, which answer only for the owner's own
   actors and use its knowledge. These checks exist only on the view.
+  `simulation/owner-rule-world.ts` builds their occupancy and navigation from
+  shown actors and remembered building footprints without changing live
+  occupancy or navigation versions. Mobile sightings do not block routes.
+  Shown footprints take precedence over memories, and newer memories over older
+  overlapping footprints. Authored site locations stay reserved until Materials
+  are known depleted. Salvage uses last-seen pickups, and debris uses shown
+  remains. Hidden actors, retired IDs,
+  and foreign paid orders do not reserve preview IDs.
+  `simulation/rule-checks.ts` shares rule calculations between these advisory
+  previews and authoritative staged command validation. A preview can pass
+  while execution rejects an unseen obstruction, including a tending worker's
+  route; rejection spends nothing, keeps the worker's job, and does not name the
+  hidden actor. These derived queries add no save state.
   Session actor views, controls, alerts, audio, health bars, and damage and
   regeneration effects use these projections. Hit and building activity events
   name hidden actors too, so consumers resolve participants through the view.

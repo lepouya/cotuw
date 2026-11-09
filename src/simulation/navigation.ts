@@ -172,6 +172,17 @@ export class NavigationGrid {
     this.generation = map.navigationChanges.generation;
   }
 
+  /** The same movement rules over other occupancy, with separate caches. */
+  withOccupancy(occupancy: OccupancyView): NavigationGrid {
+    return new NavigationGrid(
+      this.map,
+      occupancy,
+      this.profile,
+      this.occupancyLayer,
+      this.bounds,
+    );
+  }
+
   /** Terrain costs without the route's circular waypoint restriction. */
   unbounded(): NavigationGrid {
     if (!this.bounds) return this;

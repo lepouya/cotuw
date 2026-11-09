@@ -84,7 +84,7 @@ function fixture() {
       knowledge,
       faction: "arc",
       definitions,
-      rules,
+      rules: () => rules,
     });
   return { simulation, view, player: view(), rules };
 }
@@ -366,5 +366,5 @@ test("rule checks answer only for the owner's own actors", () => {
     definitionId: "barracks",
     origin: target,
   });
-  expect(rules.placement).toHaveBeenCalledWith(expect.anything(), "player");
+  expect(rules.placement).toHaveBeenCalledOnce();
 });

@@ -202,7 +202,8 @@ export type EconomyReason =
   | "missing-order"
   | "invalid-cultivator"
   | "invalid-growth"
-  | "tender-occupied";
+  | "tender-occupied"
+  | "unreachable-growth";
 
 export const lootResource = (loot: Readonly<ResourceLoot>): Resource =>
   RESOURCE_IDS.find((id) => loot[id] !== undefined)!;
@@ -376,6 +377,8 @@ export type EconomyCommandHooks = {
   retire: (actorId: string) => void;
   /** Returns a cancelled job's payment to its owner. */
   refund: (owner: string, definition: ActorDefinition, amount: number) => void;
+  /** Whether a worker has a route to a building's entrance. */
+  reaches: (worker: Actor, building: Actor) => boolean;
 };
 
 export function applyEconomyCommand(
@@ -383,7 +386,7 @@ export function applyEconomyCommand(
   economy: EconomyState,
   actors: Actor[],
   definitions: ReadonlyMap<string, ActorDefinition>,
-  { retire, refund }: EconomyCommandHooks,
+  { retire, refund, reaches }: EconomyCommandHooks,
 ): EconomyReason | undefined {
   if (command.kind === "cancel-production") {
     const job = cancelProduction(economy.production, command.actorId);
@@ -398,7 +401,13 @@ export function applyEconomyCommand(
     command.kind === "tend" ||
     (actor && definitions.get(actor.definitionId)?.cultivation)
   )
-    return applyCultivationCommand(command, economy, actors, definitions);
+    return applyCultivationCommand(
+      command,
+      economy,
+      actors,
+      definitions,
+      reaches,
+    );
   return applyHarvestingCommand(command, economy, actor, actors, definitions);
 }
 
