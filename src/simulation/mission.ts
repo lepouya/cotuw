@@ -97,15 +97,21 @@ import {
   validateObservations,
 } from "./observations";
 import type { ObservationState, OwnerKnowledge } from "./observations";
+import {
+  canQueueOrder,
+  enqueueOrder,
+  isBusy,
+  queuedOrderOf,
+} from "./order-queue";
+import type { ActorOrderCommand } from "./order-queue";
 import { createOwnerView } from "./owner-view";
-import type { OwnerView } from "./owner-view";
+import type { OwnerRuleChecks, OwnerView } from "./owner-view";
 import {
   applyEconomyCommand as applyEconomy,
   enrollWorker,
   activeSites,
   economySites,
   interruptWorker,
-  workerHasOrder,
   removeEconomyActor,
   saleRefund,
   updateEconomy,
@@ -357,22 +363,6 @@ export type MissionSimulation = {
   viewOf: (owner: string) => OwnerView;
   /** A copy of an actor's state, or `undefined` when it does not exist. */
   actorById: (id: string) => Actor | undefined;
-  /**
-   * Checks the constraints placement commands from `owner`, the player by
-   * default, meet when applied.
-   */
-  evaluatePlacement: (
-    placement: ActorPlacement,
-    owner?: string,
-  ) => PlacementEvaluation;
-  /** Checks paid queue capacity, or free exits in the construction sandbox. */
-  evaluateTraining: (command: TrainUnitCommand) => TrainingEvaluation;
-  evaluateRallyPoint: (actorId: string, target: WorldPosition) => boolean;
-  /** The nearest candidate that can reach and tend unfinished growth. */
-  tendWorker: (
-    buildingId: string,
-    workerIds: readonly string[],
-  ) => string | undefined;
   /** Lowest `${prefix}${n}` not used or queued; previews do not reserve it. */
   unusedActorId: (prefix: string) => string;
   /**
@@ -1264,58 +1254,20 @@ export function createMissionSimulation({
     validateUpdate(actor, before);
     return accepted;
   };
-  /** Whether an actor is still carrying out an order or a harvest trip. */
-  const busy = (actor: Actor, economy: EconomyState | undefined) =>
-    (!!actor.movement && !actor.movement.blocked) ||
-    (!!actor.attackMove && !actor.attackMove.blocked) ||
-    !!actor.combat?.attack ||
-    (!!actor.combat?.returning && !actor.combat.returning.blocked) ||
-    workerHasOrder(economy, actor.id);
-  const queuedOrderOf = (
-    command: ActorOrderCommand,
-    requestedTarget?: WorldPosition,
-  ): QueuedOrder | undefined => {
-    switch (command.kind) {
-      case "move":
-      case "attack-move":
-        return {
-          kind: command.kind,
-          target: clampToBounds(command.target, worldBounds),
-          ...(requestedTarget && { requestedTarget: { ...requestedTarget } }),
-        };
-      case "attack":
-        return { kind: "attack", targetId: command.targetId };
-      case "gather":
-        return { kind: "gather", siteId: command.siteId };
-      default:
-        return undefined;
-    }
-  };
-  /** Queues a queued order behind a busy actor's current one. */
   const sequence = (
     command: ActorOrderCommand,
     order: QueuedOrder | undefined,
     tick: number,
     working: WorkingActors,
-  ): CommandResult | undefined => {
+  ) => {
     const actor = working.actorsById.get(command.actorId);
-    if (!actor || !("queued" in command && command.queued)) return undefined;
-    if (!actor.orders && !busy(actor, working.economy)) return undefined;
-    const definition = definitionFor(actor);
-    // Only checks it can ever carry the order out; the rest waits until then.
-    const accepted =
-      !!order &&
-      isMobileActor(actor, definition) &&
-      canQueueOrder(order, definition, !!working.economy);
-    if (accepted) (actor.orders ??= []).push(order);
-    const reason = accepted ? undefined : queueRejection(order, definition);
-    return {
-      tick,
-      command: structuredClone(command),
-      accepted,
-      ...(accepted && { queued: true }),
-      ...(reason && { reason }),
-    } as CommandResult;
+    return actor
+      ? enqueueOrder(actor, command, order, {
+          definition: definitionFor(actor),
+          economy: working.economy,
+          tick,
+        })
+      : undefined;
   };
   // A rejected order leaves the current one and its queue running.
   const replaceQueue = (outcome: CommandResult, working: WorkingActors) => {
@@ -1329,7 +1281,7 @@ export function createMissionSimulation({
     tick: number,
     working: WorkingActors,
   ) => {
-    while (actor.orders && !busy(actor, working.economy)) {
+    while (actor.orders && !isBusy(actor, working.economy)) {
       const order = actor.orders.shift()!;
       if (!actor.orders.length) delete actor.orders;
       const command = { ...structuredClone(order), actorId: actor.id };
@@ -1405,7 +1357,8 @@ export function createMissionSimulation({
       if (!commanded(actorId)) return unauthorized(tick, move);
       const waiting = sequence(
         move,
-        destination && queuedOrderOf(move, destination.requestedTarget),
+        destination &&
+          queuedOrderOf(move, worldBounds, destination.requestedTarget),
         tick,
         working,
       );
@@ -1446,7 +1399,7 @@ export function createMissionSimulation({
     if (!isCommandOf(command, ACTOR_ORDER_KINDS))
       return [executeCommand(command, tick, working, issuer)];
     return [
-      sequence(command, queuedOrderOf(command), tick, working) ??
+      sequence(command, queuedOrderOf(command, worldBounds), tick, working) ??
         replaceQueue(executeCommand(command, tick, working, issuer), working),
     ];
   };
@@ -1687,6 +1640,42 @@ export function createMissionSimulation({
     );
 
   const views = new Map<string, OwnerView>();
+  const ownerRuleChecks: OwnerRuleChecks = {
+    placement: (placement, owner) =>
+      evaluatePlacement(
+        structuredClone(placement),
+        owner,
+        state.actors,
+        usedActorIds,
+        state.economy,
+        debrisTiles,
+      ),
+    training: (command) =>
+      evaluateTraining(
+        structuredClone(command),
+        state.actors,
+        usedActorIds,
+        state.economy,
+      ),
+    rallyPoint: (id, target) => evaluateRallyPoint(actorsById.get(id), target),
+    tendWorker: (buildingId, workerIds) => {
+      const building = actorsById.get(buildingId);
+      if (
+        !map ||
+        !building?.construction ||
+        !definitionFor(building).growth ||
+        state.economy?.cultivation?.workers.some(
+          (worker) => worker.tendingId === buildingId,
+        )
+      )
+        return undefined;
+      return growthWorkerFor(building, workerIds, state.actors, {
+        definitions: definitionsById,
+        behaviors: behaviorsById,
+        map,
+      })?.id;
+    },
+  };
   const simulation: MissionSimulation = {
     get metrics() {
       return state.metrics;
@@ -1739,6 +1728,7 @@ export function createMissionSimulation({
         knowledge: known,
         faction: factionOf(state.owners, owner),
         definitions: definitionsById,
+        rules: ownerRuleChecks,
       });
       views.set(owner, view);
       return view;
@@ -1746,41 +1736,6 @@ export function createMissionSimulation({
     actorById: (id) => {
       const actor = actorsById.get(id);
       return actor && structuredClone(actor);
-    },
-    evaluatePlacement: (placement, owner = playerOwner) =>
-      evaluatePlacement(
-        structuredClone(placement),
-        owner,
-        state.actors,
-        usedActorIds,
-        state.economy,
-        debrisTiles,
-      ),
-    evaluateTraining: (command) =>
-      evaluateTraining(
-        structuredClone(command),
-        state.actors,
-        usedActorIds,
-        state.economy,
-      ),
-    evaluateRallyPoint: (id, target) =>
-      evaluateRallyPoint(actorsById.get(id), target),
-    tendWorker: (buildingId, workerIds) => {
-      const building = actorsById.get(buildingId);
-      if (
-        !map ||
-        !building?.construction ||
-        !definitionFor(building).growth ||
-        state.economy?.cultivation?.workers.some(
-          (worker) => worker.tendingId === buildingId,
-        )
-      )
-        return undefined;
-      return growthWorkerFor(building, workerIds, state.actors, {
-        definitions: definitionsById,
-        behaviors: behaviorsById,
-        map,
-      })?.id;
     },
     unusedActorId: (prefix) => {
       let number = nextActorNumbers.get(prefix) ?? 1;
@@ -2162,38 +2117,6 @@ export function createMissionSimulation({
   };
   return simulation;
 }
-
-function canQueueOrder(
-  order: QueuedOrder,
-  definition: ActorDefinition,
-  hasEconomy: boolean,
-): boolean {
-  return (
-    (order.kind !== "attack" || !!definition.weapon) &&
-    (order.kind !== "gather" ||
-      (hasEconomy && (!!definition.harvesting || !!definition.cultivation)))
-  );
-}
-
-/** Why an actor can never carry out an order, if its definition decides. */
-function queueRejection(
-  order: QueuedOrder | undefined,
-  definition: ActorDefinition,
-): "unarmed" | "invalid-harvester" | undefined {
-  if (order?.kind === "attack" && !definition.weapon) return "unarmed";
-  if (
-    order?.kind === "gather" &&
-    !definition.harvesting &&
-    !definition.cultivation
-  )
-    return "invalid-harvester";
-  return undefined;
-}
-
-type ActorOrderCommand = Extract<
-  MissionCommand,
-  { kind: (typeof ACTOR_ORDER_KINDS)[number] }
->;
 
 type CommandHandler<C extends SingleCommand> = (
   command: C,

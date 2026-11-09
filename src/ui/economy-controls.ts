@@ -3,12 +3,12 @@ import {
   cultivationStatus,
 } from "../simulation/cultivation";
 import {
-  harvestingStalled,
   collectsLoot,
   lootAmount,
   lootResource,
   saleRefund,
 } from "../simulation/economy";
+import { harvestingStalled } from "../simulation/harvesting";
 import { refineryOccupied } from "../simulation/production";
 import { costCurrency, costLabel, resourceName } from "../simulation/resources";
 import type {
@@ -18,11 +18,8 @@ import type {
 import { ECONOMY_COMMAND_KINDS, isOutcomeOf } from "../simulation/command";
 import { contentRoles } from "./content-roles";
 import { createButton, createKeyedList, setText } from "./dom";
-import type {
-  EconomyReason,
-  EconomyView,
-  HarvesterState,
-} from "../simulation/economy";
+import type { EconomyReason, EconomyView } from "../simulation/economy";
+import type { HarvesterState } from "../simulation/harvesting";
 import type { MissionSimulation } from "../simulation/mission";
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type {

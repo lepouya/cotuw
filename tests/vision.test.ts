@@ -187,7 +187,7 @@ describe("fog of war", () => {
     state.actors.push(placed("barracks", "arc-field-barracks", 6, 10));
     const { simulation, map } = fixture(state);
     const barracks = (x: number, z: number) =>
-      simulation.evaluatePlacement({
+      simulation.viewOf(simulation.playerOwner).evaluatePlacement({
         actorId: "next",
         definitionId: "arc-field-barracks",
         origin: { x, z },
@@ -198,10 +198,14 @@ describe("fog of war", () => {
       reason: "unexplored",
     });
     expect(
-      simulation.evaluateRallyPoint("barracks", map.tileCenter(10, 14)),
+      simulation
+        .viewOf(simulation.playerOwner)
+        .evaluateRallyPoint("barracks", map.tileCenter(10, 14)),
     ).toBe(true);
     expect(
-      simulation.evaluateRallyPoint("barracks", map.tileCenter(30, 11)),
+      simulation
+        .viewOf(simulation.playerOwner)
+        .evaluateRallyPoint("barracks", map.tileCenter(30, 11)),
     ).toBe(false);
   });
 });

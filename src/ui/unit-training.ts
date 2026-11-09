@@ -4,6 +4,7 @@ import { productionBlocker, setActionAvailability } from "./production-action";
 import { setText } from "./dom";
 
 import type { MissionSimulation } from "../simulation/mission";
+import type { OwnerView } from "../simulation/owner-view";
 import type {
   AuthorityReason,
   CommandOutcome,
@@ -44,12 +45,9 @@ const trainingReasons = ({
 export function createUnitTraining(
   simulation: Pick<
     MissionSimulation,
-    | "result"
-    | "economy"
-    | "unusedActorId"
-    | "evaluateTraining"
-    | "submitCommand"
+    "result" | "unusedActorId" | "submitCommand"
   >,
+  player: Pick<OwnerView, "economy" | "evaluateTraining">,
   controls: UnitTrainingControls,
   options: {
     names: ReadonlyMap<string, string>;
@@ -74,7 +72,7 @@ export function createUnitTraining(
     definitionId,
   });
   const evaluate = (definitionId: string) =>
-    simulation.evaluateTraining(commandFor(definitionId));
+    player.evaluateTraining(commandFor(definitionId));
   const refresh = () => {
     const reasons = reasonsFor();
     if (faulted || !options.enabled()) {
@@ -128,7 +126,7 @@ export function createUnitTraining(
         : !availability.accepted
           ? reasons[availability.reason]
           : (currentResult ??
-            (simulation.economy
+            (player.economy()
               ? "Queue a unit. Resources are paid now; cancel for a full refund."
               : "Train a unit. It will appear beside this building.")),
     );
@@ -137,7 +135,7 @@ export function createUnitTraining(
     const train = () => {
       if (faulted || !options.enabled() || pending) return;
       const command = commandFor(definitionId);
-      const evaluation = simulation.evaluateTraining(command);
+      const evaluation = player.evaluateTraining(command);
       if (!evaluation.accepted) {
         result = {
           producerId: command.producerId,
@@ -165,7 +163,7 @@ export function createUnitTraining(
       result = {
         producerId: command.producerId,
         text: accepted
-          ? simulation.economy
+          ? player.economy()
             ? `${options.names.get(command.definitionId) ?? command.definitionId} queued. Select this building to view or cancel production.`
             : `${options.names.get(command.definitionId) ?? command.definitionId} ready beside the building.`
           : reasonsFor(command.producerId)[reason ?? "invalid-actor"],

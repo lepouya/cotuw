@@ -219,7 +219,7 @@ describe("construction support", () => {
         .map(({ actorId }) => actorId),
     ).toEqual(["cc"]);
     expect(
-      simulation.evaluatePlacement({
+      simulation.viewOf(simulation.playerOwner).evaluatePlacement({
         actorId: "new",
         definitionId: "arc-field-barracks",
         origin: { x: 8, z: 14 },
@@ -405,7 +405,7 @@ describe("construction support", () => {
     advanceTicks(simulation, 20);
     expect(simulation.economy!.production[0]).toEqual(job);
     expect(
-      simulation.evaluateTraining({
+      simulation.viewOf(simulation.playerOwner).evaluateTraining({
         kind: "train-unit",
         actorId: "other",
         producerId: "remote",

@@ -2,10 +2,8 @@
 import { costOf } from "./base-content.ts";
 import { createWolfDenScenario } from "./wolf-den.ts";
 
-import type {
-  ResourceLoot,
-  MaterialsSite,
-} from "../../src/simulation/economy.ts";
+import type { ResourceLoot } from "../../src/simulation/economy.ts";
+import type { MaterialsSite } from "../../src/simulation/harvesting.ts";
 import type { TileCoord } from "../../src/simulation/grid.ts";
 
 /** One named patch of 200-Materials tiles, numbered in authored order. */

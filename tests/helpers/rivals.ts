@@ -8,7 +8,8 @@ import { TerrainGrid } from "../../src/simulation/terrain";
 
 import type { ScriptControl } from "../../src/simulation/authority";
 import type { MissionEventDefinition } from "../../src/simulation/events";
-import type { MaterialsSite, ResourceLoot } from "../../src/simulation/economy";
+import type { ResourceLoot } from "../../src/simulation/economy";
+import type { MaterialsSite } from "../../src/simulation/harvesting";
 import type { MissionState } from "../../src/simulation/mission";
 import type { ObjectiveDefinition } from "../../src/simulation/objectives";
 import type { OwnerRelationship } from "../../src/simulation/ownership";

@@ -13,9 +13,24 @@ import type {
   DeepReadonly,
   TerritoryState,
 } from "./actor";
+import type { TrainUnitCommand } from "./command";
 import type { MissionSimulation } from "./mission";
 import type { OwnerKnowledge } from "./observations";
+import type { ActorPlacement, PlacementEvaluation } from "./placement";
+import type { TrainingEvaluation } from "./production";
 import type { Detectable } from "./vision";
+import type { WorldPosition } from "./world";
+
+/** The mission's rule checks that an owner view scopes to its owner. */
+export type OwnerRuleChecks = {
+  placement: (placement: ActorPlacement, owner: string) => PlacementEvaluation;
+  training: (command: TrainUnitCommand) => TrainingEvaluation;
+  rallyPoint: (actorId: string, target: WorldPosition) => boolean;
+  tendWorker: (
+    buildingId: string,
+    workerIds: readonly string[],
+  ) => string | undefined;
+};
 
 /**
  * What an owner sees of another owner's detected actor: its pose, condition,
@@ -99,15 +114,16 @@ function observedActor(
 
 /**
  * One owner's legal view of the committed mission: its own actors and private
- * economy, what it currently detects of others, and its knowledge. Player
- * presentation and AI planning read the same view. Lookups follow the
- * simulation's latest committed state.
+ * economy, what it currently detects of others, its knowledge, and rule checks
+ * limited to its own actors. Player presentation and AI planning share this
+ * view. Lookups follow the simulation's latest committed state.
  */
 export function createOwnerView({
   simulation,
   knowledge,
   faction,
   definitions,
+  rules,
 }: {
   simulation: Pick<
     MissionSimulation,
@@ -117,6 +133,7 @@ export function createOwnerView({
   /** The owner's faction, for its labels, prices, and music. */
   faction: string | undefined;
   definitions: ReadonlyMap<string, ActorDefinition>;
+  rules: OwnerRuleChecks;
 }) {
   const { owner } = knowledge;
   const owns = (actor: Pick<ActorRenderState, "owner">) =>
@@ -247,6 +264,24 @@ export function createOwnerView({
       const found = ownActor(id);
       return found && isMobile(found) ? found : undefined;
     },
+    /** Checks a placement as a command from this owner would be checked. */
+    evaluatePlacement: (placement: ActorPlacement) =>
+      rules.placement(placement, owner),
+    /** Other owners' producers read as missing, hiding their queues. */
+    evaluateTraining: (command: TrainUnitCommand): TrainingEvaluation =>
+      ownActor(command.producerId)
+        ? rules.training(command)
+        : { accepted: false, reason: "missing-producer" },
+    evaluateRallyPoint: (actorId: string, target: WorldPosition) =>
+      !!ownActor(actorId) && rules.rallyPoint(actorId, target),
+    /** The nearest own candidate that can reach and tend own, unfinished growth. */
+    tendWorker: (buildingId: string, workerIds: readonly string[]) =>
+      ownActor(buildingId)
+        ? rules.tendWorker(
+            buildingId,
+            workerIds.filter((id) => ownActor(id)),
+          )
+        : undefined,
   };
 }
 

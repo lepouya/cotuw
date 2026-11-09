@@ -10,6 +10,7 @@ import { createObservations } from "../src/simulation/observations";
 import { createOwnerView } from "../src/simulation/owner-view";
 
 import type { AudioMixer } from "../src/audio/mixer";
+import type { OwnerRuleChecks } from "../src/simulation/owner-view";
 import type { AudioContent } from "../src/content/audio";
 import type { AudioEmitter, AudioScene } from "../src/audio/scene";
 
@@ -159,6 +160,7 @@ function committed(
     },
     faction: undefined,
     definitions: new Map(),
+    rules: {} as OwnerRuleChecks,
   });
   return { simulation, view };
 }

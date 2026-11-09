@@ -372,7 +372,9 @@ describe("tile-placed actors", () => {
       createMissionState([trooper(placed, "trooper-1", 1, 1)]),
     );
     const evaluate = (id: string, x: number, z: number) =>
-      mission.evaluatePlacement(placeWall(id, x, z));
+      mission
+        .viewOf(mission.playerOwner)
+        .evaluatePlacement(placeWall(id, x, z));
 
     expect(evaluate("water", 0, 2)).toMatchObject({
       accepted: false,
@@ -595,9 +597,11 @@ describe("tile-placed actors", () => {
 
   test("returns the placement rejection reason from the command's tick", () => {
     const mission = simulation(world());
-    expect(mission.evaluatePlacement(placeWall("second", 2, 1)).accepted).toBe(
-      true,
-    );
+    expect(
+      mission
+        .viewOf(mission.playerOwner)
+        .evaluatePlacement(placeWall("second", 2, 1)).accepted,
+    ).toBe(true);
     mission.submitCommand(placeWall("first", 2, 1));
     mission.submitCommand(placeWall("second", 2, 1));
     expect(mission.tick()[1]).toMatchObject({

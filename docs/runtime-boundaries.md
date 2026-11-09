@@ -98,12 +98,17 @@ These contracts describe where new behaviors, views, and services attach.
   cancellation, producer loss, and saved-queue validation. A Refinery holds
   one Harvester, fielded or paid. `simulation/economy.ts` runs the queues
   during its update and enrolls produced workers.
-- `simulation/economy.ts` owns workers, sites, and gifts. `enrollWorker`
-  creates worker state from an actor's definition. Shared queries expose
-  sites, compatible workers, and outstanding automatic orders;
+- `simulation/economy.ts` owns the shared worker rules, sites, and gifts.
+  `enrollWorker` creates worker state from an actor's definition. Shared
+  queries expose sites, compatible workers, and outstanding automatic orders;
   explicit actor commands interrupt either worker type without losing cargo.
+  `simulation/harvesting.ts` and `simulation/cultivation.ts` own each worker
+  type's state, commands, updates, and validation.
   Building loss cancels affected automatic routes. Cultivators retain delivery
   work and queued orders while selecting a replacement drop-off.
+- `simulation/order-queue.ts` owns which orders can wait, when an actor counts
+  as busy, and queuing behind its current order. `simulation/mission.ts` starts
+  queued orders through the normal command handlers.
 - `simulation/cargo.ts` preserves ordered resource-source amounts, including
   fractional cultivation, independently of workers' current orders and sites.
   Both economies consume provenance on delivery before recording income.
@@ -174,7 +179,9 @@ These contracts describe where new behaviors, views, and services attach.
   Support overlays include only usable, owned or detected buildings and links
   between them. Remains follow the same rule: own, or currently detected.
   `workingIds` and `offlineIds` name shown actors that are visibly working or
-  cut off from support, whoever owns them.
+  cut off from support, whoever owns them. The view also holds the placement,
+  training, rally, and tending checks, which answer only for the owner's own
+  actors and use its knowledge. These checks exist only on the view.
   Session actor views, controls, alerts, audio, health bars, and damage and
   regeneration effects use these projections. Hit and building activity events
   name hidden actors too, so consumers resolve participants through the view.

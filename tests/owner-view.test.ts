@@ -1,9 +1,9 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import { createActor } from "../src/simulation/actor";
 import { createOwnerView } from "../src/simulation/owner-view";
 import { createRelations } from "../src/simulation/ownership";
-import { createHarvesterState } from "../src/simulation/economy";
+import { createHarvesterState } from "../src/simulation/harvesting";
 import { createCultivatorState } from "../src/simulation/cultivation";
 import { createObservations } from "../src/simulation/observations";
 
@@ -14,6 +14,8 @@ import type {
 import type { Wreck } from "../src/simulation/combat";
 import type { EconomyState } from "../src/simulation/economy";
 import type { OwnerKnowledge } from "../src/simulation/observations";
+import type { PlacementEvaluation } from "../src/simulation/placement";
+import type { TrainingEvaluation } from "../src/simulation/production";
 import type { SupportView } from "../src/simulation/support";
 import type { Detectable } from "../src/simulation/vision";
 
@@ -45,6 +47,21 @@ const knowledge: OwnerKnowledge = {
 };
 
 function fixture() {
+  const rules = {
+    placement: vi.fn((): PlacementEvaluation => ({
+      accepted: false,
+      reason: "used-id",
+      tiles: [],
+    })),
+    training: vi.fn((): TrainingEvaluation => ({
+      accepted: true,
+      queued: true,
+    })),
+    rallyPoint: vi.fn(() => true),
+    tendWorker: vi.fn(
+      (_id: string, workerIds: readonly string[]) => workerIds[0],
+    ),
+  };
   const simulation = {
     actors: [
       actor("trooper", "trooper", "player"),
@@ -62,8 +79,14 @@ function fixture() {
     wrecks: [] as Wreck[],
   };
   const view = () =>
-    createOwnerView({ simulation, knowledge, faction: "arc", definitions });
-  return { simulation, view, player: view() };
+    createOwnerView({
+      simulation,
+      knowledge,
+      faction: "arc",
+      definitions,
+      rules,
+    });
+  return { simulation, view, player: view(), rules };
 }
 
 test("hidden hostiles stay out of the owner's lookups and groups", () => {
@@ -315,4 +338,33 @@ test("support shows usable detected nodes and keeps links within that view", () 
   expect(player.support()?.nodes.map(({ actorId }) => actorId)).toEqual([
     "barracks",
   ]);
+});
+
+test("rule checks answer only for the owner's own actors", () => {
+  const { player, rules } = fixture();
+  const target = { x: 0, z: 0 };
+  const train = (producerId: string) =>
+    player.evaluateTraining({
+      kind: "train-unit",
+      actorId: "new",
+      producerId,
+      definitionId: "trooper",
+    });
+  expect(train("barracks").accepted).toBe(true);
+  expect(train("wolf")).toEqual({
+    accepted: false,
+    reason: "missing-producer",
+  });
+  expect(rules.training).toHaveBeenCalledOnce();
+  expect(player.evaluateRallyPoint("barracks", target)).toBe(true);
+  expect(player.evaluateRallyPoint("wolf", target)).toBe(false);
+  expect(rules.rallyPoint).toHaveBeenCalledOnce();
+  expect(player.tendWorker("barracks", ["wolf", "trooper"])).toBe("trooper");
+  expect(player.tendWorker("wolf", ["trooper"])).toBeUndefined();
+  player.evaluatePlacement({
+    actorId: "new",
+    definitionId: "barracks",
+    origin: target,
+  });
+  expect(rules.placement).toHaveBeenCalledWith(expect.anything(), "player");
 });

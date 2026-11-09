@@ -684,8 +684,9 @@ test("worker controls share delivery actions and tolerate missions without culti
     const { createEconomyControls } =
       await import("/src/ui/economy-controls.ts");
     const { currentContentPack } = await import("/src/content/packs.ts");
-    const { createHarvesterState, economyForOwner } =
-      await import("/src/simulation/economy.ts");
+    const { economyForOwner } = await import("/src/simulation/economy.ts");
+    const { createHarvesterState } =
+      await import("/src/simulation/harvesting.ts");
     const { createCultivatorState } =
       await import("/src/simulation/cultivation.ts");
     const { createActor } = await import("/src/simulation/actor.ts");

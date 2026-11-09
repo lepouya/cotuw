@@ -1,4 +1,4 @@
-import type { MissionSimulation } from "../simulation/mission";
+import type { OwnerView } from "../simulation/owner-view";
 import { setText } from "./dom";
 
 export type NetworkControls = {
@@ -6,7 +6,7 @@ export type NetworkControls = {
 };
 
 export function createNetworkControls(
-  simulation: Pick<MissionSimulation, "support">,
+  player: Pick<OwnerView, "support">,
   controls: NetworkControls,
   options: {
     /** The selected actor the player controls. */
@@ -25,9 +25,7 @@ export function createNetworkControls(
     },
     refresh: () => {
       const id = options.selectedActorId();
-      const node = simulation.support?.nodes.find(
-        (node) => node.actorId === id,
-      );
+      const node = player.support()?.nodes.find((node) => node.actorId === id);
       const tiles = (radius: number) =>
         Math.round((radius / options.tileSize) * 10) / 10;
       const status = elements?.status;

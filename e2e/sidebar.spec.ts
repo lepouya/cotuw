@@ -502,7 +502,6 @@ test(
         selectedActorIds: ["building"],
         placementActive: false,
         faulted: false,
-        canRemove: true,
         balances: { lifebloom: 10 },
         relationTo: relationTo(createRelations([])),
       } satisfies SidebarState;
@@ -565,7 +564,6 @@ test(
         sidebar.update({
           ...state,
           selectedActorIds: ["unit"],
-          canRemove: false,
         });
         const retainedFocus = document.activeElement === listedUnit;
         const retainedNode =
@@ -707,8 +705,9 @@ test("session controls skip unchanged frames and removal works without a sidebar
     });
     try {
       let evaluations = 0;
-      const evaluateTraining = view.simulation.evaluateTraining;
-      view.simulation.evaluateTraining = (command) => {
+      const player = view.simulation.viewOf(view.simulation.playerOwner);
+      const evaluateTraining = player.evaluateTraining;
+      player.evaluateTraining = (command) => {
         evaluations += 1;
         return evaluateTraining(command);
       };

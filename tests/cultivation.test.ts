@@ -167,7 +167,7 @@ test("paid opening trains its worker, tends a drop-off, cultivates, and funds pr
 test("growth requires a selected worker, pauses without losing progress, and resumes manually", () => {
   const { simulation: sim } = fixture();
   expect(
-    sim.evaluatePlacement({
+    sim.viewOf(sim.playerOwner).evaluatePlacement({
       actorId: "new",
       definitionId: "circle-conservatory",
       origin: { x: 10, z: 6 },
@@ -621,7 +621,7 @@ test("placement selects the nearest reachable selected Cultivator without mutati
   });
   advanceSeconds(sim, 8);
   const version = map.navigationChanges.version;
-  const evaluation = sim.evaluatePlacement({
+  const evaluation = sim.viewOf(sim.playerOwner).evaluatePlacement({
     actorId: "growth",
     definitionId: "circle-conservatory",
     origin: { x: 10, z: 6 },

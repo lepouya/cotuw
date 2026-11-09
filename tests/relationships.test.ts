@@ -22,11 +22,8 @@ import { disconnectedBuildings } from "../src/simulation/support";
 import { regroupStockpiles } from "../src/simulation/stockpiles";
 
 import type { Setup } from "./helpers/rivals";
-import type {
-  EconomyState,
-  EconomyView,
-  MaterialsSite,
-} from "../src/simulation/economy";
+import type { EconomyState, EconomyView } from "../src/simulation/economy";
+import type { MaterialsSite } from "../src/simulation/harvesting";
 import type {
   MissionSimulation,
   MissionState,
@@ -145,14 +142,19 @@ describe("owner relationships", () => {
       false,
     );
     expect(view.offlineIds().has("barracks")).toBe(false);
-    expect(simulation.evaluatePlacement(placement).accepted).toBe(true);
+    expect(
+      simulation.viewOf(simulation.playerOwner).evaluatePlacement(placement)
+        .accepted,
+    ).toBe(true);
     advanceSeconds(simulation, 1);
     expect(simulation.relations.relationship("player", "rival")).toBe("allied");
     expect(disconnectedBuildings(simulation.support).has("barracks")).toBe(
       true,
     );
     expect(view.offlineIds().has("barracks")).toBe(true);
-    expect(simulation.evaluatePlacement(placement)).toMatchObject({
+    expect(
+      simulation.viewOf(simulation.playerOwner).evaluatePlacement(placement),
+    ).toMatchObject({
       accepted: false,
       reason: "outside-support",
     });
@@ -640,13 +642,15 @@ describe("command authority", () => {
     const simulation = authorityFixture();
     const placement = barracks("rival-barracks");
     expect(playerExplored(simulation, 44, 6)).toBe(false);
-    expect(simulation.evaluatePlacement(placement)).toMatchObject({
+    expect(
+      simulation.viewOf(simulation.playerOwner).evaluatePlacement(placement),
+    ).toMatchObject({
       accepted: false,
       reason: "unexplored",
     });
-    expect(simulation.evaluatePlacement(placement, "rival").accepted).toBe(
-      true,
-    );
+    expect(
+      simulation.viewOf("rival").evaluatePlacement(placement).accepted,
+    ).toBe(true);
     simulation.submitCommand(placement);
     simulation.submitCommand(barracks("rival-barracks"), rival);
     expect(simulation.tick()).toMatchObject([
@@ -745,8 +749,12 @@ describe("command authority", () => {
     const hidden = contentMap.tileCenter(8, 8);
     expect(playerExplored(simulation, 46, 8)).toBe(false);
     expect(playerExplored(simulation, 8, 8)).toBe(true);
-    expect(simulation.evaluateRallyPoint("rival-refinery", target)).toBe(true);
-    expect(simulation.evaluateRallyPoint("rival-refinery", hidden)).toBe(false);
+    expect(
+      simulation.viewOf("rival").evaluateRallyPoint("rival-refinery", target),
+    ).toBe(true);
+    expect(
+      simulation.viewOf("rival").evaluateRallyPoint("rival-refinery", hidden),
+    ).toBe(false);
     for (const point of [target, hidden])
       simulation.submitCommand(
         {

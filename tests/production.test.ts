@@ -266,7 +266,9 @@ describe("unit production", () => {
         allowed && definition.id === "scout" && tile.x === 4 && tile.z === 5,
     });
     const command = order("custom-unit", "scout");
-    const preview = simulation.evaluateTraining(command);
+    const preview = simulation
+      .viewOf(simulation.playerOwner)
+      .evaluateTraining(command);
     expect(preview.accepted).toBe(true);
     if (!preview.accepted || !("actor" in preview))
       throw new Error("Expected a valid custom exit.");
@@ -279,7 +281,9 @@ describe("unit production", () => {
     simulation.removeActor(command.actorId);
     allowed = false;
     const blocked = order("blocked-unit", "scout");
-    expect(simulation.evaluateTraining(blocked)).toEqual({
+    expect(
+      simulation.viewOf(simulation.playerOwner).evaluateTraining(blocked),
+    ).toEqual({
       accepted: false,
       reason: "exit-blocked",
     });
@@ -389,7 +393,9 @@ describe("unit production", () => {
       bounds: { minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5 },
     });
     const command = order();
-    expect(simulation.evaluateTraining(command)).toEqual({
+    expect(
+      simulation.viewOf(simulation.playerOwner).evaluateTraining(command),
+    ).toEqual({
       accepted: false,
       reason: "exit-blocked",
     });
@@ -482,7 +488,11 @@ test("rally points reject water, occupied footprints, invalid positions, and non
     { x: NaN, z: 0 },
     { x: 999, z: 0 },
   ]) {
-    expect(simulation.evaluateRallyPoint("barracks-1", target)).toBe(false);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .evaluateRallyPoint("barracks-1", target),
+    ).toBe(false);
     simulation.submitCommand({
       kind: "set-rally-point",
       actorId: "barracks-1",

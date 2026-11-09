@@ -5,10 +5,8 @@ import {
   createCultivationSite,
   createCultivatorState,
 } from "../src/simulation/cultivation";
-import {
-  createHarvesterState,
-  workersForSite,
-} from "../src/simulation/economy";
+import { workersForSite } from "../src/simulation/economy";
+import { createHarvesterState } from "../src/simulation/harvesting";
 
 import type { EconomyState } from "../src/simulation/economy";
 import type { GroupMoveCommand, MoveCommand } from "../src/simulation/command";

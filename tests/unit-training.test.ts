@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import {
   createMissionSimulation,
@@ -86,6 +86,7 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
   let placing = false;
   const controller = createUnitTraining(
     simulation,
+    simulation.viewOf(simulation.playerOwner),
     {
       train: [
         {
@@ -152,14 +153,12 @@ test("availability follows the selected producer's roster instead of the first u
 
 test("a selection without production cannot inherit errors from unrelated unit types", () => {
   const { simulation, select, status } = fixture();
-  const evaluate = simulation.evaluateTraining;
-  let evaluations = 0;
-  simulation.evaluateTraining = (command) => {
-    evaluations++;
-    return evaluate(command);
-  };
+  const evaluate = vi.spyOn(
+    simulation.viewOf(simulation.playerOwner),
+    "evaluateTraining",
+  );
   select("missing");
-  expect(evaluations).toBe(0);
+  expect(evaluate).not.toHaveBeenCalled();
   expect(status.textContent).toContain("Select a production building");
 });
 

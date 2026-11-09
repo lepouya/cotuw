@@ -203,7 +203,6 @@ export function createSidebarSelection(
     update: (state: SidebarState) => {
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
-      removeBuilding.disabled = !state.canRemove;
       removeBuilding.hidden = !state.actors.some(
         (shown) =>
           selected.has(shown.id) && owns(shown) && isTilePlacedActor(shown),

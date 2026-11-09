@@ -256,6 +256,7 @@ async function assembleGameSession(
   const { appearances, buildingAppearances, propAssets } = assets;
   const playerOwner = simulation.playerOwner;
   const player = simulation.viewOf(playerOwner);
+  // Builds a hidden marker for every authored site; `update` shows known ones.
   const materialsView =
     simulation.economy &&
     createMaterialsSitesView(
@@ -486,11 +487,8 @@ async function assembleGameSession(
     canFollow: (actorId) => followableIds([actorId]).length > 0,
     followActor: (actorId) => followActors([actorId]),
     tend: (buildingId) => {
-      if (!canCommand() || !player.ownActor(buildingId)) return undefined;
-      const workerId = simulation.tendWorker(
-        buildingId,
-        input.selectedActorIds.filter((id) => player.ownActor(id)),
-      );
+      if (!canCommand()) return undefined;
+      const workerId = player.tendWorker(buildingId, input.selectedActorIds);
       return workerId
         ? () =>
             simulation.submitCommand({
@@ -608,9 +606,8 @@ async function assembleGameSession(
     return actor;
   };
   const refreshControls = () => {
-    const canRemove = !!removableActor();
     const economy = player.economy();
-    if (controls.remove) controls.remove.disabled = !canRemove;
+    if (controls.remove) controls.remove.disabled = !removableActor();
     placement.update();
     network.refresh();
     rally.refresh();
@@ -630,7 +627,6 @@ async function assembleGameSession(
       speed: loop.speed,
       elapsedSeconds: simulation.completedTicks * simulation.tickSeconds,
       following: view.camera.following,
-      canRemove,
       ...(economy && {
         balances: resourceBalances(economy, playerOwner),
         resource: playerResource,
@@ -698,7 +694,7 @@ async function assembleGameSession(
       buildingAppearances,
     ),
   );
-  const placement = createBuildingPlacement(canvas, map, simulation, {
+  const placement = createBuildingPlacement(canvas, map, simulation, player, {
     preview: placementPreview,
     buildings: buildings.map((definition) => ({
       definition,
@@ -732,7 +728,7 @@ async function assembleGameSession(
     if (!actor) return;
     pendingRemovalId = actor.id;
     // Economy missions refund a sale; the construction sandbox removes freely.
-    const sale = simulation.economy ? "sell-actor" : "remove-actor";
+    const sale = player.economy() ? "sell-actor" : "remove-actor";
     simulation.submitCommand({
       kind: actor.construction ? "cancel-construction" : sale,
       actorId: actor.id,
@@ -750,7 +746,7 @@ async function assembleGameSession(
       definitionId: player.ownActor(actorId)?.definitionId,
       faction: player.faction,
     });
-  const training = createUnitTraining(simulation, controls, {
+  const training = createUnitTraining(simulation, player, controls, {
     names,
     roles,
     selectedActorId: selectedOwnActorId,
@@ -775,7 +771,7 @@ async function assembleGameSession(
     },
   });
   own(attackMove);
-  const rally = createRallyControls(simulation, controls, {
+  const rally = createRallyControls(simulation, player, controls, {
     changed: () => {
       controlsDirty = true;
     },
@@ -795,14 +791,14 @@ async function assembleGameSession(
   /** Returns whether any mode was active. */
   const cancelGroundTargets = () =>
     groundTargets.map((mode) => mode.cancel()).some(Boolean);
-  const network = createNetworkControls(simulation, controls, {
+  const network = createNetworkControls(player, controls, {
     selectedActorId: selectedOwnActorId,
     tileSize: map.tileSize,
     supportHub: (actorId) => roles(actorId).supportHub,
   });
   const economyElements = controls.economy;
   const economyControls =
-    simulation.economy && economyElements
+    player.economy() && economyElements
       ? createEconomyControls(economyElements, simulation, {
           definitions,
           names,

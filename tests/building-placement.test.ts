@@ -103,6 +103,7 @@ function fixture(
     canvas as unknown as HTMLCanvasElement,
     map,
     simulation,
+    simulation.viewOf(simulation.playerOwner),
     {
       preview,
       buildings: [
@@ -114,7 +115,7 @@ function fixture(
       ],
       controls: controls as unknown as Parameters<
         typeof createBuildingPlacement
-      >[3]["controls"],
+      >[4]["controls"],
       onPlaced,
       onStart: () => {},
     },

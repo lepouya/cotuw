@@ -18,7 +18,7 @@ import {
 import {
   harvestingRecoveryCost,
   harvestingStalled,
-} from "../src/simulation/economy";
+} from "../src/simulation/harvesting";
 import { createActor } from "../src/simulation/actor";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
@@ -406,7 +406,11 @@ describe("Materials economy", () => {
     expect(simulation.actorById("barracks")!.construction!.completedTicks).toBe(
       0,
     );
-    expect(simulation.evaluateTraining(trainHarvester()).accepted).toBe(true);
+    expect(
+      simulation
+        .viewOf(simulation.playerOwner)
+        .evaluateTraining(trainHarvester()).accepted,
+    ).toBe(true);
     advanceTicks(simulation, 8);
     expect(simulation.actorById("barracks")!.construction).toBeUndefined();
     expect(
@@ -521,14 +525,14 @@ describe("Materials economy", () => {
     setBalance(state, 300);
     const restored = fixture(state).simulation;
     expect(
-      restored.evaluatePlacement({
+      restored.viewOf(restored.playerOwner).evaluatePlacement({
         actorId: "on-site",
         definitionId: "arc-materials-refinery",
         origin: { x: 14, z: 6 },
       }),
     ).toMatchObject({ accepted: false, reason: "resource-site" });
     expect(
-      restored.evaluatePlacement({
+      restored.viewOf(restored.playerOwner).evaluatePlacement({
         actorId: "on-loot",
         definitionId: "arc-materials-refinery",
         origin: { x: 22, z: 10 },
@@ -561,7 +565,7 @@ describe("Materials economy", () => {
     advanceTicks(restored, 5);
     expect(restored.actorById("worker")).toBeDefined();
     expect(
-      restored.evaluateTraining({
+      restored.viewOf(restored.playerOwner).evaluateTraining({
         kind: "train-unit",
         producerId: "refinery",
         actorId: "extra",

@@ -15,6 +15,7 @@ import type {
 import type { ActorDefinition } from "../simulation/actor";
 import type { AuthorityReason, CommandOutcome } from "../simulation/command";
 import type { MissionSimulation } from "../simulation/mission";
+import type { OwnerView } from "../simulation/owner-view";
 import type { ActorPlacement, PlacementReason } from "../simulation/placement";
 
 export type BuildingPlacementControls = {
@@ -72,7 +73,15 @@ export type BuildingPlacementOptions = {
 export function createBuildingPlacement(
   canvas: HTMLCanvasElement,
   map: TerrainMap,
-  simulation: MissionSimulation,
+  simulation: Pick<
+    MissionSimulation,
+    | "unusedActorId"
+    | "completedTicks"
+    | "actorVersion"
+    | "result"
+    | "submitCommand"
+  >,
+  player: Pick<OwnerView, "owner" | "evaluatePlacement" | "ownActor">,
   {
     buildings,
     preview,
@@ -120,15 +129,14 @@ export function createBuildingPlacement(
   const evaluate = (): PlacementCandidate | undefined => {
     const candidate = active ? placement() : undefined;
     if (!candidate) return undefined;
-    const evaluation = simulation.evaluatePlacement(candidate);
-    const tender =
-      evaluation.accepted && evaluation.workerId
-        ? simulation.actorById(evaluation.workerId)?.worldPosition
-        : undefined;
+    const evaluation = player.evaluatePlacement(candidate);
+    const tender = evaluation.accepted
+      ? player.ownActor(evaluation.workerId)?.worldPosition
+      : undefined;
     return {
       definition: definition!,
       placement: candidate,
-      owner: simulation.playerOwner,
+      owner: player.owner,
       evaluation,
       ...(tender && { tender }),
     };
@@ -241,7 +249,7 @@ export function createBuildingPlacement(
   const confirm = () => {
     if (!active || pendingId || faulted || !enabled()) return;
     const candidate = placement();
-    if (!candidate || !simulation.evaluatePlacement(candidate).accepted) {
+    if (!candidate || !player.evaluatePlacement(candidate).accepted) {
       onInvalid?.();
       update();
       return;

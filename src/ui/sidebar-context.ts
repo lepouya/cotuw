@@ -24,7 +24,6 @@ export type SidebarState = {
   paused?: boolean;
   /** Whether the camera follows actors. */
   following?: boolean;
-  canRemove: boolean;
   /** Present when the mission has an economy. */
   balances?: Partial<Record<Resource, number>>;
   objectives?: readonly ObjectiveView[];

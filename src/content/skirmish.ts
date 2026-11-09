@@ -9,7 +9,7 @@ import { TerrainGrid } from "../simulation/terrain";
 import { hasOwn } from "../simulation/validation";
 
 import type { CultivationSite } from "../simulation/cultivation";
-import type { MaterialsSite } from "../simulation/economy";
+import type { MaterialsSite } from "../simulation/harvesting";
 import type { Difficulty } from "../simulation/mission-setup";
 import type { OwnerRelationship } from "../simulation/ownership";
 import type { Resource } from "../simulation/resources";

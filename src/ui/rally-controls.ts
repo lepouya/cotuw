@@ -3,6 +3,7 @@ import { setText } from "./dom";
 import type { ActorRenderState } from "../simulation/actor";
 import type { CommandOutcome } from "../simulation/command";
 import type { MissionSimulation } from "../simulation/mission";
+import type { OwnerView } from "../simulation/owner-view";
 import type { WorldPosition } from "../simulation/world";
 
 export type RallyControls = {
@@ -18,7 +19,8 @@ export type RallyControls = {
 const RALLY_ACTIONS = ["set", "clear", "cancel"] as const;
 
 export function createRallyControls(
-  simulation: Pick<MissionSimulation, "submitCommand" | "evaluateRallyPoint">,
+  simulation: Pick<MissionSimulation, "submitCommand">,
+  player: Pick<OwnerView, "evaluateRallyPoint">,
   controls: RallyControls,
   options: {
     /** The selected building the player controls. */
@@ -68,7 +70,7 @@ export function createRallyControls(
     cancel,
     choose: (target: WorldPosition) => {
       if (!choosingFor || !options.enabled()) return;
-      if (!simulation.evaluateRallyPoint(choosingFor, target)) {
+      if (!player.evaluateRallyPoint(choosingFor, target)) {
         result = "Choose passable ground clear of buildings.";
         options.changed();
         return;

@@ -135,6 +135,69 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
 });
 
 test(
+  "Circle growth explains its worker and resumes through both Tend actions",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page, { console: true });
+    const mission = new MissionDriver(page, { realTime: true });
+    await mission.opening({ dismissGuide: false, faction: "circle" });
+    await dismissExplanation(page, "Welcome, Guide");
+    await pressPoint(page, await terrainPoint(page, 9, 51));
+    await page.locator("#train-circle-cultivator").click();
+    await page.locator('[data-speed="4"]').click();
+    const worker = page
+      .locator("#unit-roster button")
+      .filter({ hasText: "Cultivator" });
+    await expect(worker).toHaveCount(1);
+    await page.locator("#tab-buildings").click();
+    await expect(
+      page
+        .locator(".production-card")
+        .filter({ has: page.locator("#build-circle-conservatory") }),
+    ).toHaveAccessibleDescription(/Select a Cultivator to tend construction/);
+    await page.locator("#tab-units").click();
+    await worker.click();
+
+    await page.locator("#tab-buildings").click();
+    await page.locator("#build-circle-conservatory").click();
+    await dismissExplanation(page, "Tending growth");
+    const site = await terrainPoint(page, 16, 50);
+    await page.mouse.move(site.x, site.y);
+    const canvas = page.locator("#game-canvas");
+    await expect(canvas).toHaveAttribute("data-placement-status", "valid");
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const { gameScene } = await import("/e2e/harness.ts");
+          return !!gameScene().getMeshByName("growth-worker-preview");
+        }),
+      )
+      .toBe(true);
+    await page.mouse.click(site.x, site.y);
+    await expect(canvas).toHaveAttribute("data-placement-active", "false");
+    await page.locator('[data-speed="1"]').click();
+    await page.locator("#tab-units").click();
+    await worker.click();
+    const tend = page.locator('[data-economy-action^="tend:"]');
+    const stop = page.locator("#stop-units");
+
+    await stop.click();
+    await expect(tend).toBeEnabled();
+    await tend.click();
+    await expect(tend).toBeDisabled();
+
+    await stop.click();
+    await expect(tend).toBeEnabled();
+    await page.mouse.click(site.x, site.y, { button: "right" });
+    const menu = page.locator(".radial-menu");
+    await expect(menu.locator(".radial-default")).toContainText("Tend");
+    await menu.locator(".radial-default").click();
+    await expect(tend).toBeDisabled();
+    expect(errors).toEqual([]);
+  },
+);
+
+test(
   "Circle silhouettes and living focus bolts render together",
   { tag: WEBKIT },
   async ({ page }, testInfo) => {

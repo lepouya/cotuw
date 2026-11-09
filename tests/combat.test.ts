@@ -287,7 +287,9 @@ describe("combat", () => {
       definitionId: "arc-command-center-prototype",
       origin: { x: 2, z: 2 },
     };
-    expect(simulation.evaluatePlacement(placement)).toMatchObject({
+    expect(
+      simulation.viewOf(simulation.playerOwner).evaluatePlacement(placement),
+    ).toMatchObject({
       accepted: false,
       reason: "debris",
     });
@@ -295,7 +297,9 @@ describe("combat", () => {
     runUntil(simulation, () => simulation.wrecks.length === 0, 61);
     // Clears exactly on time, so previews agree with the next tick.
     expect(simulation.completedTicks - destroyedTick).toBe(60 / TICK_SECONDS);
-    const cleared = simulation.evaluatePlacement(placement);
+    const cleared = simulation
+      .viewOf(simulation.playerOwner)
+      .evaluatePlacement(placement);
     expect(cleared.accepted || cleared.reason).not.toBe("debris");
   });
 

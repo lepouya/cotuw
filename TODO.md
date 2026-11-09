@@ -382,6 +382,14 @@ ownership and information boundaries hold, and M0 still works.
 
 ### C. AI development harness
 
+Before starting the director:
+
+- [ ] Scope owner-view rule previews to owned, detected, and remembered state.
+  Share rule calculations with authoritative command validation. Cover hidden
+  occupancy, resources, debris, actor IDs, and worker routes without leaking
+  changes under fog. Verify placement, training, rally, and tending previews
+  agree across missions with identical owner knowledge.
+
 Use ARC against ARC on the rough map and existing roster to prove the shared
 AI. Circle slice work can proceed alongside it. This matchup remains a
 development tool. Build the runner, overlay, and persistence first so later
@@ -390,8 +398,11 @@ AI tasks are developed and verified with them.
 - [ ] **1.29** Add a deterministic director with mission profiles, concurrent
   priorities, shared spending and force allocation, and counted work limits
   per tick. All actions enter through the normal command boundary.
-  Plan only from `viewOf(owner)`, which hides foreign intent and names the
-  attacker on its units' latest hits only while detected.
+  Plan and check rules only through `viewOf(owner)`, which hides foreign intent
+  and names the attacker on its units' latest hits only while detected. Run the
+  director as a mission-owned tick step rather than a `TickObserver`, so every
+  driver and loaded save runs it. Submit with an explicit owner issuer, then
+  remove the player default from `submitCommand`.
 - [ ] **1.30** Add a headless AI-versus-AI runner reporting each match summary
   and result. Accept profiles and start-slot assignments as case inputs rather
   than depending on random seeds in a simulation that has no randomness.
@@ -402,11 +413,14 @@ AI tasks are developed and verified with them.
   stalled as a failed completion check, and preserve state and AI diagnostics.
 - [ ] **1.31** Add a development overlay showing posture, operations, budgets,
   and remembered observations without exposing them in normal player UI.
+  Read per-tick data through `observeTicks`. Keep it separate from
+  `render/debug-overlay.ts`, which draws the terrain grid.
 - [ ] **1.32** Serialize authoritative AI state, including plans, assignments,
   observations, timers, and budgets, as each part is added. Verify identical
   continuation after loading and across different clock batching, including
   bounded catch-up work. Observations from 1.19 are saved and verified for
-  continuation after loading.
+  continuation after loading. AI state belongs in `MissionState`, not
+  `MissionFile.uiState`, and adding it bumps the mission file version.
 - [ ] **1.33** Implement the initial ARC build plan: gather, place valid
   buildings, train workers and forces, and maintain functioning income and
   production using actual resources and normal costs and timings.
@@ -448,20 +462,29 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
 - [ ] **1.40** Implement building repair through each headquarters'
   infrastructure pool, following [recovery rules](DESIGN.md#repair-and-healing).
   Cover payment, cancellation, paused work, disconnection, and competition with
-  construction.
+  construction. Add repair jobs to `updateInfrastructure`'s work list and
+  `claimSlot`; they read the ledger for oldest-first per-second payment.
 - [ ] **1.41** Add Medic and Mechanic support from the Field Barracks, including
   eligible targets, automatic service, manual priority, pursuit limits,
   single-provider rules, and save/load continuation. Verify personnel healing
-  and recovery of Harvesters that survive raid damage.
+  and recovery of Harvesters that survive raid damage. Add order kinds through
+  `simulation/order-queue.ts`. Support units run outside `updateCombat`, so they
+  pursue through `followRoute` with their own `RouteRetryState` and the
+  mission's bounded `move` and `destination`.
 - [ ] **1.42** Add the Demolition Trooper to Field Barracks production.
-  Implement its single-target building damage bonus and verify the counter
-  relationship and reason to field a mixed force.
+  Implement its single-target building damage bonus at `updateCombat`'s damage
+  site and verify the counter relationship and reason to field a mixed force.
 - [ ] **1.43** Generate and register the added ARC models, animation, command
   feedback, effects, and essential audio. Verify readability and generated
   asset contracts for each included actor. Reserve owner-color areas on ARC
   models, as the [Circle direction](DESIGN.md#m1-circle-presentation) does,
   and render owner colors there and on minimap markers so owners of the same
-  faction are distinguishable. 1.53 uses the same owner-color path.
+  faction are distinguishable. 1.53 uses the same owner-color path. Add a color
+  to owners; the session picks each `MinimapActor.color`. Buildings' GLB
+  instances share materials, so key per-owner copies of named marking materials
+  by appearance and owner color in the view registries. Infantry `accent` parts
+  bake into the vertex-colored body, so owner colors need a separate marking
+  mesh and regenerated GLBs.
 - [ ] **1.44** Add control groups, double-click selection, select-all-of-type,
   and idle-worker controls with the chosen keyboard and touch alternatives.
   Verify ten manual mobile-unit groups, overlapping membership, selection-only
@@ -474,9 +497,9 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   Verify exact-type owned mobile-unit selection in view by double-click,
   additive Shift-double-click, and panel actions for view or map scope with
   Add units support. Buildings retain individual selection.
-  Extend the save format for player interface state and restore group
-  membership, retaining only surviving owned mobile units. Verify restart and
-  new-mission clearing, and loading with current keyboard preferences without
+  Extend `MissionFile.uiState` and restore group membership, retaining only
+  surviving owned mobile units. Verify restart and new-mission clearing, and
+  loading with current keyboard preferences without
   affecting simulation outcomes. Verify type entries and selected counts in
   mixed selections, named in-view and map-wide actions, replacement selection,
   and Add units preserving the other selected types.
@@ -492,7 +515,11 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   independently of saves. Verify physical-position defaults and layout-aware
   labels on QWERTY, AZERTY, and QWERTZ, including number-row group shortcuts
   with modifiers and production-card positions. Cover hosts without automatic
-  layout labels and unavailable system/browser key combinations.
+  layout labels and unavailable system/browser key combinations. Replace the
+  static `(R)`, `(S)`, and `(Esc)` hints in `ui/sidebar-orders.ts` with binding
+  labels. Replace the tools' `onStart` cancellation with one active-tool state
+  so card shortcuts can wait for placement. Add a device preferences module for
+  bindings and `audio-controls.ts`, the two `localStorage` callers.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
   expansion, defense, recovery, and combat content.
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
@@ -542,8 +569,8 @@ verified; preview work is partial progress.
 - [ ] Base-loop integration: 1.15-1.18 provide owners, economies, command
   authority, and owner-neutral rules; 1.20, 1.24, and 1.27 provide information
   boundaries and persistence. The slice runs with single-player control.
-  Headless checks cover emergency Heartgrove recovery; its acceptance remains
-  in 1.49. Normal-menu skirmish launch remains in 1.60.
+  1.49 covers emergency Heartgrove recovery. Normal-menu skirmish launch
+  remains in 1.60.
 - [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
   and mechanic. Check interrupted work and deterministic saves under 1.56 as
   each system lands. Run the cohort introduction and cultivation acceptance
@@ -562,7 +589,7 @@ Next integration target: normal-menu skirmish launch.
   Sentinels and fast, fragile, unarmed Wayfinders with extended ordinary vision.
   Heartgroves train Cultivators; verify startup funds cover the first worker
   and Conservatory through normal play without a preplaced worker.
-- [ ] **1.49** Implement the selected Circle construction, placement,
+- [x] **1.49** Implement the selected Circle construction, placement,
   infrastructure, and worker-capacity rules. Verify interrupted work and
   rebuilding, single-worker tending and replacement, slot yielding, independent
   completed buildings, and Conservatories without worker-slot caps.
@@ -572,6 +599,10 @@ Next integration target: normal-menu skirmish launch.
   Verify manual Tend replacement preserves payment and progress and normal
   interruption rules apply to the assigned worker. Provide Tend through
   on-screen and radial-menu actions.
+  Headless checks cover these rules, emergency recovery with and without the
+  scenario rule, and saved continuation. Browser checks cover the card's
+  explanation, the worker preview, and on-screen and radial Tend in Chromium
+  and WebKit.
 - [ ] **1.50** Implement renewable cultivation, reserve-limited output,
   dormancy, and recovery. Verify the selected rates, output curve, thresholds,
   active regeneration, uncapped staffing, retained site assignments, manual site
@@ -653,7 +684,8 @@ and producer-based progression scope from 1.06.
   and result. Include unit, building, exploration, and active-vision histories.
   Show both owners' comparison graphs after the match, keeping opponent
   histories hidden during play. Show the defined resource, production, loss,
-  and peak-army totals. Use the same definitions in playtest reports.
+  and peak-army totals. Use the same definitions in playtest reports. Add the
+  panel through a `MenuView` field and a panel entry in `ui/dialogs.ts`.
 - [ ] **1.63** Run the agreed headless profile/start-slot set for ARC versus
   Circle and Circle versus ARC: both player factions, both start positions,
   and Easy, Normal, and Hard, totaling 12 baseline cases. Use standard faction
@@ -671,6 +703,21 @@ and producer-based progression scope from 1.06.
   deferred; compact layout and touch checks remain. WebKit missed the frame
   budget in 1.28 from per-frame rendering work; merging each unit's meshes in
   1.43 and skipping off-screen animation are the next candidates.
+  Change these known allocation sites only where profiling shows a cost:
+  - Simulation: `Uint8Array`s in `createVision`, `occupiedTilesFor` in owner
+    `detects`, the support resolver's `JSON.stringify` key, navigation closures
+    in `advanceWorkerRoute`, spreads in `economySites` and `activeSites`,
+    `separateMobileActors` buckets, full-map slot scans per group move,
+    `entriesSince` copies, and `placementByOwnerId` cloning.
+  - Rendering: `JSON.stringify` in `support-network.ts`, `queued-orders.ts`,
+    `rally-point.ts`, `tile-placed-actor-view.ts`, and terrain chunk rebuilds;
+    maps in `materials-sites.ts` `update`, whose identity guard needs tests
+    that stop mutating the economy in place; emission arrays and `stableUnit`
+    in `damage-effects.ts`; `Vector3`s in `selectionPoint` and
+    `extractHealthAndDamageEffects`.
+  - Interface and audio: `JSON.stringify` keys in the sidebar roster and
+    selection, `createAlertTracker.observe`, the session's alert `workerIds` and
+    `sites` projections, and `observe` and `desiredLoops` in `audio/mission.ts`.
 
 Phase gate: either faction can enter a complete skirmish through the normal
 menu, and both matchups meet the agreed automated behavior and scale targets.
@@ -708,7 +755,7 @@ challenge, pacing, and useful choices.
   assets match their sources, and confirm that human and headless acceptance
   targets are met. Update DESIGN.md, README.md, docs/verification.md, and
   affected format/content contracts to describe the delivered game before
-  closing M1.
+  closing M1. Prune delivery detail from this checklist's task prose.
 
 Phase gate: both factions pass the agreed match, performance, persistence,
 platform, and human acceptance targets, with feedback incorporated and known
@@ -727,6 +774,10 @@ Keep these outside the checklist unless an explicit scope decision adds them:
   corruption, and world-event escalation.
 - Air, underground and naval layers, transports, oversized deployables,
   stealth, and veterancy.
+- Catalysts, Resonance, mixed-yield collection, building upgrades, permanent
+  research, voice acting, and physical mobile performance targets.
+- Scenario-specified resource pool divisions other than equal shares, and
+  restricting script authority to a scripted sequence.
 - Removing the test-only `MissionSimulation.spawnActor` and `removeActor`
   hooks. Tests that use them on a running mission would need restarts from
   edited snapshots or a persisted `spawn-actor` command.
