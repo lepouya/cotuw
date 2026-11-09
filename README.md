@@ -69,13 +69,12 @@ focused and watch runs.
 
 - [Design](DESIGN.md): vision, locked rules, milestone scope, and open
   decisions.
-- [Design questionnaire](docs/design-questionnaire.md): supporting rationale,
-  future systems, and unresolved design questions.
-- [TODO](TODO.md): ordered milestone tasks, design decisions,
-  dependencies, and acceptance gates for the two-faction skirmish.
+- [Design questionnaire](docs/design-questionnaire.md): supporting design
+  discussions retained for review.
+- [TODO](TODO.md): remaining milestone work, dependencies, progress, and
+  acceptance gates for the two-faction skirmish.
 - [Verification](docs/verification.md): automated checks and demo acceptance.
-- [Architecture review](docs/architecture-review.md): installed skills and the
-  milestone review workflow.
+- [Architecture review](docs/architecture-review.md): review tools and workflow.
 - [Runtime boundaries](docs/runtime-boundaries.md): simulation and resource
   ownership contracts.
 - [UI ownership](docs/ui-ownership.md): feature boundaries, lifetimes, and

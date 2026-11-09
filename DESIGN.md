@@ -7,7 +7,7 @@ The playable build contains the ARC M0 mission, construction sandbox, and
 Circle wolf-den cultivation slice. M1's two-faction skirmish is the active
 development target; [TODO.md](TODO.md) owns task order and progress. Game-wide
 rules below include accepted systems that are not yet implemented. The
-prototype sections describe the playable build.
+mission sections describe the playable build.
 
 ## Vision
 
@@ -27,6 +27,10 @@ Neither expedition initially understands the world's citadels, lost caches, or
 ancient inhabitants. ARC seeks to secure and exploit them; the Circle believes
 they are essential to its pilgrimage. Each side first treats the other as the
 central antagonist.
+
+The expeditions' meeting is humanity's first known contact with another
+intelligent people. The player is an abstract battlefield leader rather than
+a named protagonist.
 
 The mid-to-late campaign reveals the Everwake: ancient inhabitants who changed
 themselves into deathless demonic forms, devastated their world, and were
@@ -269,8 +273,10 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   Circle's is **Lifebloom** or **Bloom**.
 - ARC's rare resource is **Strategic Catalysts** or **Catalysts**; the Circle's
   is **Ley Resonance** or **Resonance**.
-- The exotic Everwake resource remains hidden until the story reveal and has no
-  selected name yet.
+- The exotic Everwake resource has no selected name. It is absent from the UI,
+  tracking, and spending until the story reveal, then funds rare adaptations of
+  Everwake capabilities from relics, lost caches, and citadels. Earlier ancient
+  discoveries are story events rather than currency sources.
 - One worker gathers both common and rare yields from data-driven sites: ARC's
   **Harvester** returns to a **Materials Refinery**, while the Circle's
   **Cultivator** returns to a **Lifebloom Conservatory**.
@@ -323,9 +329,10 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   interruption ends the prior cultivation order; resuming requires a new
   Gather order. Dormancy keeps Gather active, so orders queued behind it wait
   through dormancy and recovery.
-- Sites have an internal common-to-rare yield ratio. Starting sites favor common
-  resources; richer rare yields encourage expansion. Exact ratios stay hidden;
-  players learn a site's value from collected output.
+- Sites have an internal common-to-rare yield ratio. Starting sites favor
+  common resources; richer rare yields encourage expansion. Scouting provides
+  no quality grade or exact ratio; players learn from collected output. A
+  contextual tip may explain mixed yields when first encountered.
 - Resources use unlimited global stockpiles per owner by default. Materials
   and Lifebloom remain distinct balances even when one owner controls both
   faction types; Catalysts and Resonance follow the same rule when available.
@@ -381,11 +388,15 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   Command Center. Other faction types do not supply ARC construction support.
   An alliance alone does not enable support sharing, and support sharing does
   not grant control over allied actors or pool resources.
+- Some remote outposts and unknown ancient structures require an ARC network
+  connection to become usable. They remain unidentified as Everwake technology
+  before the reveal. Claimable structures are outside M1.
 - Buildings and fully deployed mobile structures may be sold. Mobile units and
   vehicles may not. The refund is half the resources invested in construction
   and completed installed upgrades, multiplied by the current-health fraction
   and independently rounded down for each resource. Campaign unlocks do not
-  count as investment.
+  count as investment. Temporary shields and bonus health do not increase the
+  ordinary health fraction, which is clamped to zero through one.
 
 ## Repair and healing
 
@@ -395,20 +406,29 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - Support units are unarmed. They automatically service a nearby eligible unit
   while idle, or prioritize a manually selected target, and consume no faction
   resources.
-- One support unit services one target at a time, and only one provider may
-  service a target. It must stop within range; a moving target may be followed
-  within a limited pursuit distance.
+- Idle support selects the nearest damaged eligible unit within its
+  acquisition radius. Automatic service never replaces a manual order.
+  One support unit services one target at a time, and only one provider may
+  service a target. It stops within range and follows a moving target only
+  within a bounded pursuit distance. Move or Stop replaces service; damage
+  alone does not cancel it. Ranges and rates are data-driven.
 - A building uses contextual **Repair** without a builder. Each simulated
   second, a paid repair step restores up to 1% of maximum health, with a
   smaller final step. Charge for that step before applying its health.
 - Repairing 100% health costs 50% of the building's original common-resource
-  cost. Each job costs that amount multiplied by its starting missing-health
-  fraction and never uses rare or exotic resources.
+  cost. Each job records its starting missing-health amount; later damage does
+  not enlarge it. Only one repair job may be outstanding per building. Damage
+  does not cancel repair or stop an otherwise operational building.
+- Repair costs that amount multiplied by the starting missing-health fraction,
+  using only common resources. Nothing is paid or reserved up front. Cumulative
+  step charges must equal the calculated job cost.
 - Unaffordable or disconnected repair pauses and later resumes. Cancellation
-  keeps restored health because unpaid future ticks require no refund.
+  keeps restored health because unpaid future ticks require no refund. One
+  grouped alert explains an unaffordable pause without repeating each second.
 - Repair jobs drawing from the same balance pay oldest first each second.
   An unaffordable job and later repair jobs pause for that second, preserving
-  their priority and progress.
+  their priority and progress. The UI shows priority and resource drain;
+  cancelling and restarting moves a repair to the back of the payment queue.
 - Each Command Center or Heartgrove owns its base's infrastructure queue and
   capacity, shared by construction, building repair, and building upgrades.
   Each headquarters has one baseline slot; ARC Command Center upgrades may
@@ -478,7 +498,7 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   progress, payment, and original priority preserved. A stable job ID resolves
   equal-time ties, and one grouped warning reports the capacity loss.
 - Individual building tiers, effects, costs, timing, and presentation remain
-  content and balance decisions. M1 upgrade scope is tracked in TODO.md.
+  content and balance decisions. Building upgrades are outside M1.
 
 ## Mod support
 
@@ -753,6 +773,28 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - Bindings are player preferences shared across missions, independent of
   mission saves.
 
+### Game-wide interface requirements
+
+These accepted targets include features not yet available in the playable
+build. TODO.md owns milestone delivery; current controls are described above.
+
+- Provide an option for primary clicks on non-friendly targets to open the
+  radial menu with the default action highlighted, enabled by default on mobile.
+- Hovered actors show contextual health; an Always Show Health Bars setting
+  shows friendly and detected actors while respecting fog. Selected friendlies
+  use rings or building brackets; hostile/neutral inspection uses distinct
+  segmented shapes. Feedback must remain readable without color alone.
+- Remembered buildings use visibly muted last-known silhouettes without live
+  health updates. Minimap icons distinguish units, buildings, memories, and
+  coarse sensor contacts; a rotated camera footprint shows heading. Keep
+  network detail and exact health off the default minimap.
+- Tactical pause permits inspection and queued commands, with execution on
+  resume. Multiplayer menus do not pause and must say Game continues online;
+  multiplayer disables single-player pause/speed controls.
+- Wheel zoom anchors under the pointer, pinch at its midpoint, and on-screen
+  or keyboard plus/minus at the view center. Portrait layouts request rotation;
+  compact landscape play must not require hover, a keyboard, or secondary input.
+
 ## Maps and world systems
 
 - Mobile units use continuous world positions; the tile grid defines terrain,
@@ -858,39 +900,82 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   grid. Babylon map helpers add visual layers, vectors, and render
   notifications. Edits and restoration reject noninteger coordinates, nonfinite
   heights, and invalid terrain flags before changing state.
-- One air layer and one subterranean layer are sufficient initially; rendered
-  altitude and depth are not tactical bands.
-- Air movement ignores ordinary surface terrain and footprints but respects map
-  bounds and authored air blockers. Takeoff and landing are explicit layer
-  transitions, and landing requires a valid surface footprint.
-- Burrowed actors ignore ordinary surface obstacles but respect subterranean
-  blockers. Burrowing and emerging are explicit transitions; cross-layer attacks
-  require an explicit compatible weapon or ability.
-- Watercraft traverse water; amphibious profiles traverse land and water and
-  cross valid shorelines without changing occupancy layers.
-- Mixed-layer groups are permitted. Each actor resolves movement with its own
-  profile, while every weapon declares which layers it can target.
-- Passenger transport is a reusable capability; an APC is one planned use.
-  Boarding is explicit, and passengers cannot attack, provide vision, or receive
-  world commands while loaded.
-- Transports retain passenger identities, health, veterancy, and persistent
-  state. Unloading places the same actors in nearby positions they can traverse.
-- Destroying a transport attempts an emergency unload. Survivors take 50% of
-  maximum health as damage and are briefly stunned; passengers without a valid
-  position die. Any otherwise sellable transport must be empty.
-- Oversized units have selection areas spanning more than one square tile and
-  use authored movement clearance distinct from selection bounds.
-- Deployability is separate from size. Deployable actors retain one identity
-  across mobile and grid-aligned deployed modes, and each actor declares whether
-  completed deployment can be reversed.
-- Deployment uses a nearby grid-snapped preview, a valid reserved footprint, and
-  a timed transition. Capabilities declare whether they operate while mobile,
-  deployed, or both.
-- A deployed actor may be a network consumer, relay, root, or nonparticipant.
-  Network participation begins when deployment completes and ends when
-  undeployment begins.
 - The playable map uses an irregular mask within a rectangular data grid. Camera
   bounds follow explored terrain and do not expose the full map early.
+
+### Special movement and transport
+
+These accepted systems are outside M1. They constrain future actor and save
+models without requiring implementation in the ground-only skirmish.
+
+- Use one air and one subterranean occupancy layer, with normal same-layer
+  separation and opposing blockers. Rendered altitude and depth are not
+  tactical bands. Out-of-bounds terrain blocks every layer; the surface
+  passability override affects only surface actors.
+- Air profiles ignore ordinary surface terrain, slopes, and footprints but
+  respect authored air blockers. Takeoff and landing are explicit transitions;
+  landing requires a valid surface footprint.
+- Burrowed actors ignore surface obstacles but respect subterranean blockers.
+  Emerging requires free surface space. A surface destination resolves to a
+  valid nearby emergence point, then ordinary surface movement.
+- Watercraft traverse water; amphibious profiles traverse land and water,
+  crossing valid shorelines without changing layers. Shore cliffs may block
+  transitions. Watercraft production requires a valid water location.
+- Mixed-layer groups use each actor's profile and stable layer-specific
+  selection anchor. Friendly burrowed units have selectable markers; a radial
+  list disambiguates overlapping actors. Loaded passengers use the manifest
+  instead of world selection.
+- Weapons declare targetable layers and default to surface-only. Ranges use
+  horizontal distance. Layer changes that invalidate a target end firing and
+  use normal last-known-target behavior. Incapable selected units retain their
+  orders when other members attack.
+- Transport is a reusable, data-driven capability; an APC is one planned use.
+  Capacity, passenger eligibility, and boarding time are authored. Board sends
+  passengers to a stopped transport's boarding radius.
+- Loaded passengers leave world occupancy and pathfinding. They cannot attack,
+  provide vision, or receive world commands. A sidebar manifest shows their
+  identities, health, and veterancy. Transport weapons remain actor-specific.
+- Boarding and unloading preserve identity, owner, health, veterancy, and other
+  persistent state without healing or resetting passengers. Unload targets a
+  location and uses nearby individually traversable positions; insufficient
+  space pauses or rejects unloading with feedback.
+- Destruction attempts a deterministic emergency unload. Each emerging
+  passenger takes 50% of maximum health as damage; survivors are briefly
+  stunned for an authored duration. Passengers without valid nearby space die.
+  An otherwise sellable transport must be empty.
+
+### Oversized and deployable actors
+
+These systems are outside M1.
+
+- Oversized actors have selection areas larger than one tile and separate
+  authored movement clearance. Paths require clearance along their full length,
+  using a conservative circle or capsule while mobile and an exact footprint
+  while deployed. Small friendlies may yield without crossing obstacles.
+- Deployability is independent of size. One identity, owner, health, veterancy,
+  and persistent state survive mobile, transitioning, and deployed modes.
+- Deploy opens a nearby grid-snapped position/rotation preview. The actor moves
+  there, aligns, stops, and starts a timed transition, reserving the full
+  footprint. Normal terrain, slope, bounds, occupancy, and authored support
+  requirements apply.
+- Move cancels unfinished deployment without a resource penalty. Definitions
+  declare whether completed deployment is reversible, and confirmation explains
+  permanent deployment. Undeployment takes time and retains the footprint
+  until completion. Saves preserve transition progress and reservations.
+- Capabilities declare mobile, deployed, or both modes. Deploying retains
+  stationary mobile capabilities; undeploying retains deployed functions until
+  completion, except network participation. Production and other persistent
+  work pause while their required capability is unavailable.
+- Deployed network roles are none, consumer, relay, or root. Participation
+  begins at deployment completion and ends when undeployment begins. Preview
+  downstream outages before undeploying. Reversible actors may undeploy while
+  disconnected; queued work survives.
+- Damage does not automatically cancel transitions or heal on mode changes.
+  Destruction cancels transitions/production, removes network participation,
+  and releases reservations, leaving ordinary nonblocking remains.
+- Mission-critical identity persists across modes. Sale requires full
+  deployment, no transition or passengers, and permission from the mission.
+  Ordinary health-scaled refunds apply; combat destruction gives no refund.
 
 ## Actor animation
 
@@ -1053,6 +1138,33 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - A friendly concealed actor shows when at least one opponent fully detects it,
   but never identifies the detector, its channel, or its coverage.
 
+The following concealment and sensor rules are outside M1:
+
+- Camouflaged actors are visible to ordinary observers only within an authored
+  proximity radius. Cloaked actors require a compatible detector or reveal.
+  Invisible is presentation terminology for Cloaked.
+- Subterranean concealment applies to observers outside that layer; the actor's
+  authored ordinary category still governs observers capable of seeing it.
+- Detectors match any supported signature, category, layer, and range; one
+  compatible channel suffices. Upgrades add range, precision, or compatibility,
+  never detection levels. Detection loss has an authored grace period.
+- Sensor contacts are coarse, deterministic markers without type, exact
+  position, health, or rank. They cannot be selected as actors, followed, or
+  used as movement blockers. Operating a detector does not inherently reveal it.
+- Committed attacks still resolve after detection loss. Projectiles use their
+  authored guidance without hidden position updates. Blind fire never snaps to
+  an undetected actor and requires compatible impact geometry and target layer.
+- Attack Ground may target a sensor contact over unexplored terrain without
+  revealing it or enabling arbitrary commands elsewhere in unexplored space.
+- Movement, boarding, and unloading do not inherently reveal concealment.
+  Repeated revealing actions refresh the duration; authored capabilities may
+  override defaults. Ordinary reveal suppresses concealment but still requires
+  vision. Damage outside vision gives only a coarse impact ping; explicit
+  advanced effects may grant detection through fog.
+- A friendly Detected status reveals no detector or channel. Show forced-reveal
+  duration, and use persistent status rather than repeated notifications.
+  Becoming a sensor contact alone does not notify the owner unless observable.
+
 ## Campaign
 
 - The player chooses ARC or the Circle and remains with that side throughout its
@@ -1067,8 +1179,14 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - Easy, Normal, and Hard are independent of campaign choice. Easy multiplies
   enemy health and damage by `sqrt(0.5)`; Hard uses `sqrt(2)`; Normal is the
   baseline. Other behavior is unchanged unless explicitly revised.
-- Difficulty may be overridden per mission. Changing it during play restarts
-  the mission; existing mission saves retain their original difficulty.
+- Campaign saves store a default difficulty; each mission offers a one-mission
+  override without changing that default. Normal is the initial default.
+  Change Difficulty and Restart reconstructs a mission rather than rescaling
+  an ongoing battle. Existing saves retain their effective difficulty.
+- Every difficulty grants the same progression, story, resources, and unlocks.
+  Campaign records retain each mission's highest completed difficulty; higher
+  settings satisfy lower completion records. Difficulty achievements may use
+  those records without gating gameplay content.
 - Single-player campaign missions offer optional free play after victory or
   defeat, using surviving forces and the battlefield as they stand. After a
   defeat, label the action Continue free play - mission failed. The recorded
@@ -1093,8 +1211,17 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - Veterancy is mission-local: 10 kills grants +25% base damage; 25 adds +25%
   base attack speed; 50 raises damage to +50%; 100 raises speed to +50%; 200
   raises both to +75%.
-- Five purpose-made SVG badges appear on promoted actors. New actors begin at
-  zero unless a mission script explicitly specifies otherwise.
+- Count actual health removed, excluding overkill. Damage from persistent
+  hazards and temporary summons credits their persistent creator. No qualifying
+  contributor means no kill credit; unarmed actors cannot earn it.
+- Rank bonuses add percentage points of unmodified base stats. Attack speed
+  increases attacks per time, rather than reducing intervals by that percentage.
+  Veterancy multiplies other modifiers and never changes range, movement, or
+  health. Save kill counts and ranks; replacements start at zero unless
+  scripted.
+- Five purpose-made SVG badges use one stripe, two stripes, one chevron, two
+  chevrons, and a star. Show them beside friendly and detected opposing veterans
+  without obscuring other status markers or revealing hidden actors.
 
 ## Mission setup
 
@@ -1303,172 +1430,79 @@ Posture selection and spending follow these rules:
   continuation and cannot duplicate an alert or restart a handled response.
   Personal vision and derived encounter-rest status are reconstructed.
 
-Deterministic acceptance checks cover:
-
-- Personal detection, terrain occlusion, alpha range, and lone-wolf isolation
-  from den alerts in the authored M0 map.
-- Relay chains, fixed origins, one response per alert, stable simultaneous
-  choices, expiry, and investigation completion.
-- Detection loss, fresh threats and alerts, unseen incoming hits, and target
-  retention during combat or temporary blockage.
-- Hard leashes, failed-route suppression, blocked homes, retries, and delayed
-  regeneration only at home.
-- Save continuation in every wolf state, including blocked routes and active
-  relay chains, matching uninterrupted state tick for tick.
-- Identical results across actor iteration order and render or fixed-tick
-  scheduling batches, without render or platform state entering wolf logic.
-
 ## Construction and training sandbox
 
-- The browser sandbox starts with no actors. Players place **Command Centers**
-  and **Field Barracks** from the Buildings tab, then train **Troopers** and
-  **Scouts** through a selected barracks in the Units tab.
-- Construction and training are instant, with no resource cost, build time,
-  production queue, or construction-support requirement in this sandbox.
-- The Command Center has a 2 × 2 footprint; the Field Barracks has a 3 × 2
-  footprint. Both support quarter-turn rotation and terrain placement previews.
-- Training is a serializable command applied at the start of a simulation tick.
-  Building definitions list their trainable unit definitions. A unit spawns on
-  a free orthogonally adjacent surface tile within mission bounds that its
-  movement behavior permits.
-  Spawn selection prefers the entrance side, then distance to the building
-  center, then tile order. Rotation turns the entrance side.
-- Training rejects missing producers, unsupported units, reused actor IDs, and
-  blocked exits. Requests in the same tick use separate available tiles.
-  Clearing an exit lets the player retry; there is no waiting production job.
-- Construction and training choose actor IDs that exclude active actors,
-  retired actors, and queued creations, including restored pending commands.
-  Previewing does not reserve IDs; rejected requests leave theirs available.
-- Selection shows the actor's type, building footprint and orientation, or unit
-  movement speed. Sidebar options and details derive from content definitions
-  and presentation data. The Units tab trains from the selected production
-  building and lists field units for selection. Selecting or placing a friendly
-  production building opens Units; selection details remain visible below.
-- Goals show current building and unit counts for construction and training
-  practice. The sandbox has no victory or defeat condition.
-- The sidebar reserves screen width beside the world canvas. Its content
-  scrolls independently in compact landscape layouts. Placement controls stay
-  available across tabs, and touch placement uses explicit confirmation.
+- `/?level=sandbox` starts without actors or fog. Place Command Centers and
+  Field Barracks, then train Troopers and Scouts from the selected barracks.
+- Construction and training are instant and free, without queues or support
+  requirements. Invalid placement and blocked exits reject normally.
+- Goals count buildings and units; there is no victory or defeat condition.
+  Sidebar, placement, rotation, and touch controls use the ordinary interface.
 
-## Materials economy prototype
+## ARC economy and production
 
-- ARC's setup choice loads the Materials opening, with a fixed Command Center
-  in the map-edge pocket. `/?level=sandbox` selects the free construction and
-  training sandbox.
-- The opening starts with 150 Materials. Prototype costs are 300 for a Command
-  Center, 100 for a Materials Refinery, 50 for a Harvester, 100 for a Field
-  Barracks, 25 for a Trooper, and 20 for a Scout. Unit training takes six, four,
-  and three seconds for Harvesters, Troopers, and Scouts respectively.
-- Building blueprints reserve their footprint and pay their full cost at
-  placement. One baseline construction slot processes them in placement order:
-  twelve seconds for a Command Center, eight for a Refinery or Barracks.
-  Unfinished buildings cannot produce units or receive Harvester assignments.
-  Cancelling a blueprint refunds its full cost and releases the footprint;
-  losing it gives no refund. Placement requires the blueprint center inside a
-  completed connected building's support radius. Prototype radii are twelve
-  world units for Command Centers and six for Refineries and Barracks; one
-  world unit is one tile. These are data-driven tuning values.
-- Completed buildings link when either center lies within the other's support
-  radius: their center distance is at most the larger radius. Completed Command
-  Centers are network roots. Blueprints never relay support and operate only
-  while their center lies in connected coverage. Rootless clusters stay
-  disconnected. Redundant paths remain live when another path is lost.
-  Connectivity is derived from authoritative actors and definitions, and is
-  rebuilt after loading. Losing every completed Command Center removes support
-  coverage and prevents placement recovery. Combat destruction of the starting
-  Command Center ends the opening in defeat.
-- Disconnection pauses construction and production without losing payment,
-  progress, or queue order. Paused blueprints yield the shared construction
-  slot; the oldest connected blueprint advances. Restoring coverage resumes
-  work automatically. Disconnected Refineries retain Harvester assignments but
-  cannot accept cargo; mobile Harvesters keep their cargo and remain
-  controllable. Offline cancellation and sale use the normal refunds.
-- Support coverage appears during placement, building selection, and persistent
-  Network View. Active areas and links are solid; inactive radii and broken
-  connections are dashed with gap crosses. Offline buildings dim, stop animated
-  machinery, turn off emissive lights, and show a crossed power badge.
-  Sidebar states explain paused work. Grouped disconnection and restoration
-  alerts focus the camera on affected buildings.
-- Prototype vision radii are 14 world units for Command Centers and Scouts,
-  8 for Refineries and Barracks, 7 for Troopers, and 5 for Harvesters. A
-  building's vision covers its own support radius, so connected coverage is
-  explored once the building completes. The Command Center reveals the near
-  patch; the south patch and every salvage box start unexplored. Undiscovered
-  resources stay hidden from the world, minimap, and sidebar, and harvesters
-  cannot be sent to them. The construction sandbox has no fog.
-- A Refinery has one paid production or assigned Harvester slot. Barracks
-  queues hold up to five paid orders and train one unit at a time. Cancelling
-  an unfinished order refunds its full cost. Completed production waits for
-  a free, passable adjacent exit; the paid order remains cancellable. A yellow
-  placement-preview arrow marks the preferred exit side and follows rotation;
-  blocked exits may send units to another adjacent side.
-- Each production building retains one optional ground rally point in its
-  mission state. Set Rally Point in Selection or Units enters click-or-tap
-  targeting; Cancel or Esc exits. The location must be explored, passable for
-  every unit the producer trains, and clear of building footprints. Clear Rally
-  Point restores exit-and-idle behavior.
-  A flag appears only while the producer is selected. Newly completed units
-  exit first, then use ordinary movement toward the current rally point.
-  Later blockers use the normal pathfinding and unreachable-target rules.
-- A Harvester carries 100 Materials and takes 60 seconds to gather a full
-  load, plus travel. It gathers the assigned tile, then resource tiles within
-  two tiles on each axis. Only explored tiles are candidates. Candidates use
-  distance from the assigned tile, then row and column order; Harvesters resolve
-  shared yields in actor-ID order. Resources enter the global stockpile only on
-  delivery.
-- Move and Stop interrupt collection while preserving cargo. A new patch
-  order with cargo returns it first. Return cargo also works after Stop.
-  Exhaustion delivers any partial final load, then waits for a new patch.
-  Blocked routes wait for navigation changes or a new order.
-- A lost Refinery interrupts automation and frees its surviving Harvester for
-  assignment to an empty slot. The unit remains movable and keeps its cargo.
-  Producer loss discards paid production; cancelled identities remain retired.
-  Completed buildings sell for half their prototype cost multiplied by their
-  health fraction, rounded down; mobile units cannot be sold.
-- The near patch contains four 200-Materials tiles; the south patch contains
-  two. Three ordinary salvage tiles each grant 25 Materials to the owner of
-  the first mobile unit reaching them, without a delivery. One lies near
-  the base at (25, 52). Two lie beyond the lone wolf at (54, 32) and (56, 34),
-  providing 50 Materials for two replacement Troopers before the den.
-  Resource tiles and uncollected salvage prevent placement. Depleted tiles
-  become buildable.
-- The sidebar provides cargo, phase, Gather, Return cargo, Refinery assignment,
-  paid-order cancellation, patch totals, and salvage commands. The top bar
-  shows available Materials. Blue resource markers shrink in four nonempty
-  stages and disappear at depletion. The content pack sets descending fullness
-  cutoffs and model scales; a fraction equal to a cutoff enters the smaller
-  stage. Salvage uses hovering, rotating gold gift boxes
-  with red ribbons and disappears on collection. Clicking a gift box sends
-  selected mobile units to its tile. Both marker types follow terrain edits
-  and appear on the minimap. Exhaustion, missing assignments,
-  blocked routes, and unaffordable harvesting recovery have explanatory
-  feedback. Building timers show in Buildings and Selection, with a progress bar
-  over translucent, staged blueprints.
-  Gathering Harvesters lower and spin a drill with a green light; idle workers
-  raise the drill and show amber. Completed Refineries turn a rooftop fan and
-  work a pump, and animate each Harvester exit and delivery. Reduced motion
-  retains static activity cues.
-- Mission snapshots include stockpiles, tile yields, collected salvage,
-  Harvester assignments, cargo, gathering progress, phases, routes, paid
-  production, rally points, blueprint progress and queue order, explored
-  terrain, pending commands, and reserved or retired actor identities.
+- Each Materials Refinery has one paid or fielded Harvester slot. An empty slot
+  accepts a paid new Harvester or an unassigned survivor. More simultaneous
+  Harvesters require more Refineries. No replacements are free.
+- Harvesters carry 100 Materials and take 60 seconds to fill a load, plus
+  travel.
+  They gather the assigned tile, then explored resource tiles within two tiles
+  on each axis. Choose tiles by distance from the assignment, then row and
+  column; stable worker IDs allocate shared yields. Income arrives on delivery.
+- Move and Stop preserve cargo while interrupting collection. A new patch order
+  delivers existing cargo first; Return cargo works after Stop. Exhaustion
+  delivers the final partial load and waits for a new assignment. Blocked routes
+  wait for navigation changes or a new order.
+- Refinery loss stops Harvester automation and frees the survivor for another
+  empty slot, preserving cargo. Disconnection retains the assignment but blocks
+  delivery. Economic stalls explain replacement, loot, or sale options without
+  declaring defeat. Harvester attacks receive high-priority alerts and pulses.
+- Completed ARC nodes link when either center is within the other's support
+  radius. Command Centers root the network; blueprints do not relay support.
+  Placement tests the blueprint center against connected coverage. Redundant
+  paths preserve support; rootless clusters are disconnected.
+- Support overlays appear during placement, building selection, and Network
+  View. Active areas/links are solid; broken connections are dashed with
+  crosses.
+  Offline buildings dim, stop machinery, lose active vision, and show a crossed
+  power badge. Grouped outage/restoration alerts focus affected buildings.
+- Production pays the full cost on admission and permits five outstanding orders
+  per producer, including its active order, subject to worker-slot constraints.
+  Cancellation refunds fully until the unit enters play, including completed
+  work waiting for an exit. Producer loss discards paid work without a refund.
+- Training exits on a free, passable orthogonally adjacent tile, preferring the
+  rotated entrance side, distance to the producer center, then tile order.
+  A placement arrow shows that entrance. Blocked paid production waits;
+  instant sandbox training rejects. Same-tick spawns use separate tiles.
+- Creation IDs exclude live, retired, and queued creations, including restored
+  commands. Previews reserve nothing; rejected requests leave IDs available.
+- Each producer saves one optional ground rally point. Set Rally Point enters
+  targeting; Cancel or Escape exits. Points require explored ground passable
+  for every trainable unit and clear of footprints. Clear restores
+  exit-and-idle.
+  New units exit first, then move normally toward the current rally point.
+  Show its flag only while the producer is selected.
+- Resource sites and uncollected loot reserve placement; depletion releases
+  resource tiles. Markers use four descending nonempty scales, choosing the
+  smaller stage at an exact cutoff and disappearing at depletion. Loot uses
+  animated gift boxes, pays on contact without delivery, and disappears once.
+- Costs, timings, footprints, support/vision radii, and actor statistics live
+  in the [base content pack](src/content/packs/base.json). The authored
+  [wolf-den level](scripts/levels/wolf-den.ts) owns terrain and encounter
+  positions. Initial skirmish stocks follow
+  [M1 resources](#m1-resources-and-progression).
 
-## Combat prototype
+## Combat rules
 
 - Every unit and building definition authors maximum health. Current health is
   saved actor state and is absent while undamaged. Only actors with health can
   be targeted, damaged, or destroyed.
-- Actors save their controlling owner, and definitions name a faction type.
-  Only hostile owners attack each other; allies share vision and detection.
-  The mission names the player's owner. An owner detects an actor when it
-  currently sees the unit's tile or any of a building's footprint tiles.
-  Without fog, every owner detects everything.
 - A weapon authors fixed damage, a damage type, a range, and a cooldown. Range
   runs from the attacker's center to the target's footprint or body edge.
   Weapons hit hostile actors on their own occupancy layer. Damage types are
   reserved for armor matchups such as kinetic versus energy; every type
-  currently deals full damage. Scouts, Harvesters, and current buildings are
-  unarmed; a future armed building such as a turret uses the same weapon data.
+  currently deals full damage. Armed buildings use the same weapon data as
+  mobile attackers; defenses are part of the M1 roster.
 - A tick applies commands, then resolves combat in actor-ID order, then moves
   actors, updates the economy, and separates units. Every hit in a tick applies
   together, so simultaneous attackers both land; actors left at zero health are
@@ -1531,39 +1565,13 @@ Deterministic acceptance checks cover:
   sidebar shows exact health for one selected actor. Rifle hits draw a brief
   tracer, wolf bites draw claw marks on the target, and accepted attack orders
   flash a red target marker.
-- Prototype values: Troopers have 100 health and a 10-damage kinetic rifle with
-  range 6 and a one-second cooldown, acquiring within 7 and chasing up to 10
-  from post. Scouts have 40 health, Harvesters 150, Barracks and Refineries 800,
-  and Command Centers 2000. Wolves have 100 health, speed 5, vision 8, and an
-  8-damage kinetic bite with range 0.6 and a 1.2-second cooldown. Their
-  default leash is 14. Alpha wolves have 150 health, vision 10, and 125% normal
-  size. Wolves regenerate 5 health per second after 5 seconds out of combat at
-  home. Alerts last 8 seconds, investigation waits 1.5 seconds, blocked retries
-  wait 0.5 seconds, and 3 seconds without progress abandons an approach. Arrival
-  tolerance is 0.15 world units. Content can tune these values per encounter.
-  One Trooper can defeat one normal wolf.
-- The Materials opening places one lone wolf on the southern path at tile
-  (46, 32), out of sight of the base, with a 14-tile territory. The den lies
-  east of the ridge, enclosed by six-unit mountain walls, with a three-tile
-  northern entrance at x 77–79. Four normal wolves start at (74, 21), (82, 21),
-  (75, 24), and (81, 24); the alpha starts at (78, 19). Their shared territory
-  centers on (78, 21) with radius 12. Rough ground surrounds the entrance path
-  inside the den. The nearby ridge crossing uses flat corner rows 32–36;
-  the ridge south of it blocks sight between the encounters even at their
-  leash boundaries. The northern crossing uses rows 66–72. A split summit at
-  (63, 43) marks the ridge, and twin mountain teeth flank the den entrance.
-  These terrain peaks remain inaccessible from the ground routes and persist
-  on explored terrain and the minimap.
-- Combat destruction of the opening's authored starting Command Center records
-  a defeat at that tick. All simultaneous hits resolve, then movement and
-  economy stop. Further ticks leave the state unchanged. The result survives
-  saving, and the results panel offers Restart, Load, and Main menu. Restart
-  reloads the level; Main menu releases the session. Load lists
-  saves and imports files, validates the mission before releasing the current
-  session, and begins paused, with Inspect and Resume actions. Inspection allows
-  selection and camera movement; commands require resuming. A loaded defeat
-  stays ended.
-  Economic stalls and ordinary unit or building losses do not declare defeat.
+- Combat values and wolf timers are data-driven in the base content pack.
+  On Normal, one Trooper must defeat one normal wolf, a Scout must not, and
+  the five-wolf den requires multiple Troopers. Alpha wolves use 125% scale.
+- The ARC introduction protects its authored starting Command Center.
+  Destruction records defeat, applies all simultaneous hits, then stops
+  movement and economy. Economic stalls and other losses do not declare defeat.
+  Loaded defeats remain ended; inspection permits selection and camera movement.
 - Mission objectives are data. A `destroy` objective completes when combat
   destroys all its targets; a `protect` objective fails when combat destroys
   any of them. Removals and sales never count. The result derives from
@@ -1574,13 +1582,11 @@ Deterministic acceptance checks cover:
   Progress and resolution ticks survive corpse cleanup and saving. Command
   Center destruction takes priority over victory when they occur in the same
   tick.
-- Goals shows objective counters and route and combat directives, plus the
-  Command Center protection rule. Recommended preparation explains the economy
-  and army buildup with current actor counts; it is not a victory requirement.
-  Victory pauses at the interface and offers Continue free play, Restart, Load,
-  and Main menu. Continuing restores all ordinary actions. A loaded victory
-  opens the same paused results panel. Command Center destruction still causes
-  defeat in free play.
+- Goals show objective progress and preparation using current actor counts;
+  recommended preparation is not a victory requirement. Victory pauses and
+  offers Continue free play, Restart, Load, and Main menu. A loaded victory
+  opens the same panel. The protected headquarters remains critical in free
+  play.
 - Saves preserve health, weapon cooldowns, building aim, attack destinations,
   returns and their retry state, route bounds, remains, and the complete
   [wolf and alert state](#m0-wolf-implementation-contract).
@@ -1649,50 +1655,32 @@ roster and a distinct construction or cultivation mechanic.
 - UI work covers modular ownership of dialogs, sidebars, markup, and styles.
 - External playtesting and incorporating feedback are part of the milestone.
 
-The [M1 checklist](TODO.md#milestone-1) tracks design decisions, implementation,
-and acceptance. Ownership, construction, cultivation, the roster, resource
-scope, results, summary metrics, pacing, acceptance targets, controls, and
-Circle presentation are defined here. Implementation and playable-slice tuning
-are tracked in the checklist.
+The [M1 checklist](TODO.md#milestone-1) owns implementation order and
+acceptance progress. The following sections define the selected scope.
 
 ### Circle wolf-den development slice
 
-- The target opening starts with a Heartgrove and enough Lifebloom to train a
-  Cultivator and grow a Conservatory. Tend construction, cultivate renewable
-  sites, grow a Musterhall, then scout and clear the wolves with Sentinels and
-  Wayfinders. Use normal costs, timings, infrastructure, and dormancy rules.
-- Include a second cultivation site to test concentrated staffing, site
-  rotation, travel, and recovery. Adapt preparation goals and contextual
-  guidance to the Circle. Keep the ARC introduction available separately.
-- The playable cultivation slice starts with a Heartgrove and 150 Lifebloom,
-  without preplaced workers or troops. It includes paid Cultivator production,
-  worker-tended Conservatory and Musterhall growth, renewable Lifebloom,
-  dormancy, army production, normal fog, and the six-wolf objectives. Losing
-  the starting Heartgrove ends this introductory mission in defeat. Victory
-  allows continued free play; restart restores the authored opening.
-- Two gift boxes beyond the lone wolf grant 25 Lifebloom each. Any friendly
-  mobile unit collects one by walking over it; each pays once and remains
-  collected in saves. They do not replace cultivation in the paid opening.
-- New mission opens a setup screen for the wolf-den demo. Difficulty buttons
-  span the same width as the faction choices, default to Normal, and apply to
-  whichever faction is chosen. ARC launches its
-  base-building introduction; Circle launches its cultivation slice. Both
-  choices describe their playable opening. Direct development links remain
-  available, including skirmish links for any faction assignment.
-- Actors have owners with their own Lifebloom and Materials stockpiles, and
-  commands are authorized against their issuing owner. Infrastructure has
-  queues and slots per headquarters, and emergency headquarters recovery is
-  available to scenarios that enable it. Support units, defenses, constructs,
-  and faction AI remain pending. The complete base-loop acceptance still
-  requires the shared milestone foundations. Presentation validation for the
-  full roster remains open.
-- Wolves exercise movement, scouting, combat readability, durability, and
-  basic recovery. They do not validate ARC matchups, defense-breaking counters,
-  faction AI, skirmish pacing, or full-match balance. Add focused structure,
-  defense, and support encounters as the extended roster becomes available.
-- The slice does not waive shared ownership, command authority, economy,
-  infrastructure, visibility, or persistence requirements. A working preview
-  does not complete the full Circle or skirmish acceptance gates.
+- The playable slice uses the shared wolf-den map and six-wolf objectives.
+  It starts with a Heartgrove and 150 Lifebloom, without workers or troops.
+  Train a Cultivator, tend a Conservatory, cultivate, grow a Musterhall, and
+  scout/fight with Sentinels and Wayfinders. Normal costs, timings, tending,
+  infrastructure, fog, and dormancy rules apply.
+- Two cultivation sites support staffing, rotation, travel, and recovery
+  decisions. Circle preparation goals and contextual guides explain the loop.
+  Two gifts beyond the lone wolf grant 25 Lifebloom each, collected once by
+  mobile units and persisted in saves; they do not fund the opening.
+- Losing the starting Heartgrove ends this mission in defeat. Victory permits
+  free play; restart restores the authored opening.
+- New mission offers ARC's introduction or this Circle slice, with independent
+  Easy/Normal/Hard choice defaulting to Normal. Development links also support
+  assembled skirmishes; normal-menu skirmish launch is pending.
+- Owners, economies, headquarters queues, command authority, visibility, and
+  persistence use the shared foundations. Extended support/defense/construct
+  content, faction AI, full-roster presentation, and introduction acceptance
+  remain in [TODO.md](TODO.md#e-circle-playable-loop-and-introduction).
+- Wolves validate movement, scouting, combat readability, and basic durability.
+  Structure counters, defense breaking, support, AI, and match pacing require
+  focused encounters and full skirmishes rather than wolf-only acceptance.
 
 ### M1 roster
 
@@ -2096,9 +2084,9 @@ are tracked in the checklist.
 - A mission snapshot includes simulation terrain and its navigation version.
   An actor's active route is simulation state, so a loaded mission continues
   every move exactly as an uninterrupted one would, without recalculating.
-- Implemented systems preserve passenger identities, occupancy transitions,
-  deployment state and reservations, veterancy, temporary reveals, and
-  authoritative sensor contacts or detection effects.
+- As deferred systems are implemented, saves must preserve passenger
+  identities, occupancy transitions, deployment state and reservations,
+  veterancy, temporary reveals, and authoritative detection effects.
 - Incompatible saves fail with a clear explanation. M0 guarantees same-build
   round-tripping without requiring cross-build migration. M1 is not required
   to load M0 saves, including distributed playtest saves. The ARC introduction
@@ -2123,26 +2111,37 @@ are tracked in the checklist.
 
 ## Open decisions
 
-- **Factions and campaigns**
-  - Full rosters, counters, faction motifs, technologies, and campaign missions.
-  - Exact Everwake resource, citadel, cache, and reveal details.
-  - Alliance-only units or abilities and skirmish modes beyond the M1 matchup.
-- **Maps and world systems**
-  - Campaign map sizes, terrain palettes, resource placement, and neutral
-    systems beyond the current playable slice.
-  - World-event cadence and escalation.
-  - Whether corruption spreads, and how players counter or exploit it.
-- **Interface and presentation**
-  - Accessibility tuning and final art and audio direction.
-- **Future systems**
-  - Multi-owner shared-pool membership and partial alliance-breakup policies
-    beyond the accepted balance-division rule.
-  - Technology-tree and permanent-research design.
-  - Script conflict precedence and missing-target policies.
-  - Historical strategic intelligence sharing and uncertainty tuning beyond
-    the locked allied vision and detection rules.
-  - Faction build plans, force composition, budgets, and behavior-profile
-    schemas and tuning for concrete missions.
-  - Deterministic mod dependency and load-order resolution, overrides, save
-    compatibility across mod changes, trust and signing, and exact console APIs.
-  - Multiplayer session rules, lobby flow, networking, and replay requirements.
+Resolve these when their scope becomes active; they do not reopen accepted
+rules. M1 implementation choices and tuning belong to its tasks in TODO.md.
+
+- **Factions and campaigns:** full rosters/counters, technology, missions, and
+  faction motifs beyond M1; alliance-only units and later skirmish modes.
+- **Story:** signal origin, the meaning of the Unquiet in the prophecy, citadel
+  and cache functions, Everwake reveal details, and exotic resource name/uses.
+  Player-title usage, Circle leadership, and early Everwake address remain open.
+- **Economy:** resource transfer/trading, collection-site ownership, population
+  or command caps, worker scouting value, combat-wreck salvage, and mixed-yield
+  balance. M1 cultivation tuning remains in 1.57.
+- **World:** campaign map scale/palettes, neutral systems, world-event cadence,
+  escalation, and corruption's spread and counterplay.
+- **Presentation:** accessibility tuning, final art/audio, and concealment,
+  sensor-contact, and other future status readability.
+- **Progression:** permanent research/technology trees, campaign save fields,
+  and committing mission results to campaign progression.
+- **Sharing:** multi-owner pool membership and partial alliance breakup beyond
+  equal balance division; historical strategic-report sharing and uncertainty
+  beyond live allied vision/detection.
+- **Mission behavior:** conflicting simultaneous actions and missing targets;
+  faction profiles, build plans, layouts, composition, budgets, thresholds,
+  and planning cadence. Profile candidates include offensive permission and
+  grace, operation limits, home reserves, response/pursuit range, scouting and
+  development priorities, posture stability, and retaliation permissions.
+- **Mods:** installation/discovery/storage, enablement profiles, browser limits,
+  deterministic dependency/load-order/override rules, save mod manifests,
+  compatibility and missing mods, schema tooling, trust/signing/permissions,
+  distribution, and exact console APIs.
+- **Multiplayer:** session/lobby/network/replay rules and cooperative
+  difficulty.
+  Begin after the single-player campaign and AI are proven. Native mobile
+  delivery and a player-facing map editor remain later work; authoring needs
+  should shape the editor when full scenarios are being produced.

@@ -18,6 +18,9 @@
 - Describe the current state, never the history of how it got there. Edit the
   affected text in place rather than recording what it replaced, what was
   removed, or what something used to be. Version control holds the history.
+- Keep completed tasks to short outcomes. Pending tasks retain dependencies,
+  remaining work, and acceptance criteria; link their rules instead of
+  repeating them. Preserve rationale only when it informs future work.
 - Use Markdown lists instead of tables.
 - Wrap Markdown lines at 80 characters or fewer.
 - Comment intent, constraints, trade-offs, and non-obvious behavior. Drop the

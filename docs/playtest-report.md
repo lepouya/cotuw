@@ -1,4 +1,4 @@
-# M0 playtest report
+# Playtest report
 
 Use a participant code instead of personal contact details. Keep one report
 per attempt. Times below are real elapsed time from starting the mission;
@@ -11,6 +11,8 @@ record simulation time separately where available.
 - Build revision from `build.json`:
 - Bundle `distributionReady` value:
 - Play URL:
+- Mission and faction:
+- Start slot, for skirmishes:
 - Difficulty:
 - Operating system and version:
 - Browser and version:
@@ -22,7 +24,7 @@ record simulation time separately where available.
 
 ## Attempt
 
-- Result: victory / defeat / stopped / technical blocker:
+- Result: victory / defeat / draw / stopped / technical blocker:
 - Real elapsed time:
 - Simulation time at finish, if available:
 - Pauses and speed changes:
@@ -32,6 +34,8 @@ record simulation time separately where available.
 - When did the game feel too slow, too fast, or difficult?
 - What did you expect to happen that did not happen?
 - If you stopped, when and why?
+- What drove your income, production, expansion, and combat choices?
+- For Circle, what did you change to sustain cultivation?
 - Would you try another mission? Why?
 
 ## Observations and assistance

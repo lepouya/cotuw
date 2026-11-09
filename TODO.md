@@ -6,10 +6,10 @@ Build a small ARC-versus-Circle skirmish, playable as either faction against
 an AI that establishes and sustains its own base. Players should make useful
 choices about income, production, expansion, protection, and recovery.
 
-[DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed game
-requirements. This checklist tracks delivery; unresolved choices are tasks,
-not settled rules. Record accepted rules in DESIGN.md and supporting rationale
-in the [design questionnaire](docs/design-questionnaire.md).
+[DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
+and open design decisions. This checklist owns delivery and acceptance.
+Phases A and B are complete except for deferred cohort task 1.02. Phase C is
+next; the Circle cultivation slice is playable with acceptance work remaining.
 
 ### Using this checklist
 
@@ -25,370 +25,78 @@ in the [design questionnaire](docs/design-questionnaire.md).
   affected focused checks. Reserve `npm run check:full` for acceptance and
   releases. Use [verification](docs/verification.md) for check selection,
   platform coverage, and human acceptance.
-- Keep task-specific findings and reproduction details in issues. Link issues
-  from their tasks when useful; do not accumulate dated playtest logs here.
+- Keep completed tasks to a short outcome. Pending tasks retain dependencies,
+  remaining work, and acceptance criteria; link rules instead of repeating them.
+- Keep findings and reproduction details in linked issues. Version control
+  owns delivery history; do not accumulate playtest or implementation logs.
 - Tasks that depend on an optional scope choice implement only the agreed
   content. Record a deliberate deferral beside the affected task.
 
 ### A. Baseline and design decisions
 
-These decisions define implementation scope. Resolve each before starting
-work that depends on it; Circle art direction can begin once construction and
-roster choices are ready.
+Design decisions are complete. The external cohort is deferred until the AI
+is playable.
 
-- [x] **1.01** Prepare a reproducible M0 playtest build and report template.
-  The browser bundle command and
-  [tester instructions](docs/playtest-instructions.md) include a
-  [report template](docs/playtest-report.md) and revision/file hashes. The
-  bundle uses relative URLs for
-  [GitHub Pages hosting](docs/verification.md#m0-baseline-playtest-preparation).
-  Playtesting verified the build.
-- [ ] **1.02** Recruit a five-to-eight-person cohort spanning RTS-familiar and
-  less experienced players, then run baseline M0 playtests using in-game
-  guidance. Record controls, clarity, pacing, reliability, assistance, and
-  abandonment; turn actionable findings into prioritized issues for the UI and
-  onboarding work. Deferred until the enemy AI is playable: without it,
-  sessions would yield only surface feedback. Revise this task's scope then and
-  run it with 1.47 and 1.57, using one cohort for all three.
-  ARC guides use short action prompts. Both slices offer 4× speed and Escape
-  opens the pause menu after canceling active tools and clearing selection.
-  Browser checks cover these controls, including compact touch layouts.
-  Both introductions share guide, time-control, save/load, and restart checks.
-- [x] **1.03** Settle Circle construction, placement, infrastructure,
-  interruptions, and worker capacity.
-  [Construction](DESIGN.md#economy-and-construction) defines single-Cultivator
-  tending, preserved progress, valid explored placement, independent buildings,
-  Heartgrove infrastructure and worker production, and Conservatories without
-  worker-slot caps. The skirmish
-  trains its first Cultivator instead of requiring a preplaced worker.
-  Implementation is tracked in 1.48 and 1.49.
-- [x] **1.04** Specify cultivation throughput, dormancy triggers, recovery, and
-  worker behavior. [Cultivation](DESIGN.md#economy-and-construction) defines
-  renewable shared reserves, uncapped staffing, declining output, automatic
-  dormancy and recovery, retained site assignments, delivery, interruptions,
-  cargo handling, and visible feedback. Initial rates and capacities are
-  data-driven. Implementation is tracked in 1.50 and 1.51, save verification
-  in 1.56, and playable-slice tuning in 1.57.
-- [x] **1.05** Select the minimum roster, roles, counters, and producers.
-  [M1 roster](DESIGN.md#m1-roster) defines Demolition Troopers, Briar Rams,
-  Construct Nurseries, support units, scouting, Sentinels, Sentry Turrets,
-  Thornspires, and Relay Stations. Connected ARC expansion and worker-led
-  Circle expansion use distinct infrastructure rules. Implementation is
-  tracked in 1.39, 1.41, 1.42, 1.48, and 1.52. Resource and upgrade scope
-  follows 1.06; balance is refined through playable matches.
-- [x] **1.06** Settle resource and progression scope.
-  [M1 resources](DESIGN.md#m1-resources-and-progression) defines common-only
-  costs, producer-based availability, baseline headquarters capacity, and
-  initial skirmish stocks of 150 Materials or Lifebloom. Each faction can
-  afford its first worker and drop-off building. Costs and starts are tuned
-  together. Implementation is tracked in 1.14, 1.16, and faction tasks;
-  1.58 records the deferral of rare resources, upgrades, and research.
-- [x] **1.07** Define skirmish setup. [Mission setup](DESIGN.md#mission-setup)
-  defines two fixed start areas on one authored map, faction-specific assembly
-  at launch, simultaneous operational-headquarters starts with income bootstrap
-  packages, reproducible load and restart, and scenario-declared script
-  authority. Starting amounts are defined in 1.06; the Circle worker bootstrap
-  is defined in 1.03. Implementation is tracked in 1.14, 1.17, and 1.27.
-- [x] **1.08** Decide actor ownership and distinguish owner rules from faction
-  type rules. [Ownership rules](DESIGN.md#ownership-and-relationships) define
-  control, vision, economy, support, headquarters-owned infrastructure,
-  objectives, mutual relationships, and scenario-defined sharing, including
-  relationship changes and recovery. Implementation is tracked in phase B.
-- [x] **1.09** Lock victory, defeat, post-result behavior, and summary metrics.
-  [Skirmish results](DESIGN.md#m1-skirmish-results) defines qualifying completed
-  buildings, defense inclusion, relay exclusion, emergency headquarters
-  recovery, soft defeats, end-of-tick elimination and draws, frozen results,
-  and post-result named saves and Quicksave. Skirmish autosaves occur at start
-  and every five simulation minutes, excluding result ticks. Campaigns offer
-  optional free play after victory or defeat with the outcome preserved.
-  [Match summary](DESIGN.md#m1-match-summary) defines milestones, exact totals
-  and peaks, and five-second population and map-coverage histories.
-  Implementation is tracked in 1.16, 1.25-1.27, 1.49, 1.61, and 1.62.
-  Revisit defense inclusion through playtesting in 1.66.
-- [x] **1.10** Set pacing, difficulty, test coverage, scale, and performance
-  targets. [M1 acceptance](DESIGN.md#m1-pacing-and-acceptance) defines Normal's
-  15-to-25-minute match target, whole-minute AI windows, four-minute offensive
-  grace, all three difficulties, 12 baseline cases, and a 30-minute headless
-  cutoff. Benchmark 200 units/40 buildings normally and 400 units/80 buildings
-  for stress testing on the M3 Pro/18 GB development Mac. Budgets cover 1080p
-  rendering, tick-time percentiles, and 2x simulation pace. Physical mobile
-  performance is deferred; compact layout and touch checks remain.
-  Implementation and verification are tracked in 1.14, 1.27-1.30, 1.37, 1.60,
-  1.63, and 1.64.
-- [x] **1.11** Set the M1 persistence policy.
-  [Persistence](DESIGN.md#persistence) defines development compatibility breaks
-  without migrations or legacy rulesets, deterministic same-build continuation,
-  version-change rules, and visible, manually deletable incompatible saves with
-  safe load rejection.
-  Implementation is tracked in 1.23 and 1.27.
-- [x] **1.12** Choose default keys and touch/on-screen alternatives for control
-  groups, idle workers, selection, Attack Move, production, and construction.
-  [Controls and interface](DESIGN.md#controls-and-interface) defines the
-  accepted group, idle-worker, matching-unit, command, and menu-position
-  shortcuts and their on-screen alternatives. M1 includes keyboard rebinding
-  and support for European layouts. Defaults use physical key positions with
-  layout-aware labels. Group membership persists with saves and clears on
-  restart or a new mission; keyboard preferences remain independent.
-  Circle construction uses selected Cultivators and manual Tend replacement.
-  Matching-unit actions belong to explicit type entries in mixed selections,
-  replacing selection by default and adding matches in Add units mode.
-  Implementation is tracked in 1.27, 1.44, 1.45, and 1.49.
-- [x] **1.13** Establish Circle art and audio direction for living structures,
-  constructs, infantry, growth, damage, and faction identity.
-  [Circle presentation](DESIGN.md#m1-circle-presentation) defines architecture,
-  palette, silhouettes, weapons, growth, damage, sound effects, and faction
-  music arrangements. The direction fits the existing offline geometry,
-  rigging, animation, and audio synthesis pipeline without hand-authored
-  binary art. New asset recipes, presentation integration, and gameplay-scale
-  validation remain in 1.53.
+- [x] **1.01** Reproducible browser playtest bundle, tester instructions, and
+  report template. See
+  [playtest preparation](docs/verification.md#playtest-preparation).
+- [ ] **1.02** Recruit five to eight RTS-familiar and less experienced players
+  once the enemy AI is playable. Run one cohort through 1.47 and 1.57,
+  covering controls, clarity, pacing, reliability, assistance, and abandonment.
+  Revise the session scope for that build and turn findings into prioritized
+  issues for controls and onboarding.
+- [x] **1.03** Circle construction and infrastructure rules.
+- [x] **1.04** Cultivation, dormancy, delivery, and recovery rules.
+- [x] **1.05** Minimum roster, roles, counters, and producers.
+- [x] **1.06** Common-resource progression and affordable starting packages.
+- [x] **1.07** Scenario setup, start slots, restart, and script authority.
+- [x] **1.08** Ownership independent of faction type and explicit sharing.
+- [x] **1.09** Results, emergency recovery, saves, and summary definitions.
+- [x] **1.10** Pacing, difficulty, coverage, scale, and performance targets.
+- [x] **1.11** Development save-compatibility policy.
+- [x] **1.12** Keyboard defaults, rebinding, and on-screen alternatives.
+- [x] **1.13** Circle art and audio direction.
 
-Phase gate: dependent rules and acceptance values are recorded, and the
-selected roster is bounded.
+[DESIGN.md](DESIGN.md) owns these rules; dependent tasks implement them.
 
 ### B. Multi-faction and UI foundations
 
-Use the decisions from phase A. Keep the ARC introduction playable throughout
-and bring up the rough skirmish map early for simulation and AI development.
+Complete. The shared simulation supports independent owners, private
+information, faction-specific economies, and reproducible skirmish setup.
+The ARC introduction remains the regression baseline.
 
-- [x] **1.14** Author the rough skirmish map with both start slots, expansion
-  sites, scouting opportunities, and attack routes. Implement the selected
-  setup mechanism using the ARC mirror harness for starts and restarts.
-  Supply both factions' starting packages and identify starting resource sites
-  per start position for expansion metrics. Resolve chosen faction and
-  difficulty into setup, applying enemy health/damage scaling while keeping
-  starting stocks and AI profiles intact.
-  The generated `skirmish-map` preview and `src/content/skirmish-map.ts`
-  provide both slots, three independent crossings, home income, and expansion
-  areas.
-  The rough-map preview is playtested and accepted.
-  `assembleSkirmish` resolves any faction assignment and difficulty at launch
-  through the shared loading path, with `emergencyHeadquarters`, owner-based
-  rules, and both resource kinds on every area. `scenario.setup` keeps the
-  choices for restart. Headless checks cover slot symmetry, flat base space,
-  resource access, both factions' paid first income from either slot, matchup
-  independence, scaling, saved continuation, and restart after load. Browser
-  specs verify the setup screen and skirmish links in Chromium and WebKit.
-- [x] **1.15** Implement the actor ownership model from 1.08 across hostility,
-  support networks, vision and fog, economy, objectives, presentation, and
-  saves. Verify that opposing owners of the same faction type fight and keep
-  separate support networks.
-  Cover mutual relationship changes, neutral attack restrictions, allied
-  vision ending with exploration retained, and revocation of scenario-enabled
-  support and headquarters access. Preserve effective relationships in saves.
-  [Owners and events](docs/mission-files.md#owners) define the saved format.
-  Every actor, wreck, and save carries an owner; hostility, per-owner vision
-  under fog, support networks, growth, cultivation and Refinery delivery,
-  training, and player presentation use them. Opposing ARC owners fight and
-  keep separate support networks and construction slots. Relationships
-  default to neutral and change through one-time scenario events; allies
-  share vision and optionally support and Heartgrove queues, and ending
-  sharing revokes it with payment and progress kept. Per-Command Center
-  queues in 1.16 use the same headquarters sharing rule.
-  Regression checks cover root-to-relay sharing, faction-compatible support,
-  owner-specific resource knowledge, saved worker assignments, and training
-  rosters for owned actors of another faction type.
-- [x] **1.16** Give each owner its own stockpiles, workers, production, and
-  stall state, with infrastructure queues and slots per headquarters and
-  training queues per production building. Verify that spending and refunds
-  cannot affect another owner's economy without explicit resource sharing.
-  Verify that completing another headquarters adds an independent queue and
-  baseline capacity without moving existing buildings' affiliations.
-  Cover separate resource types, same-type sharing, and separating pools
-  without losing or duplicating balances. Verify reassignment preserves paid
-  work and priority within receiving capacity; training stays on its producer.
-  Implement the M1 skirmish's single emergency headquarters job at normal cost
-  and build time when no operational headquarters remains.
-  Owners hold separate stockpiles per resource, and payments, refunds,
-  deliveries, and stall checks use the actor's owner. Command Centers and
-  Heartgroves each supply a queue; work keeps its headquarters while eligible
-  and otherwise moves with payment, progress, and priority, or pauses. Base
-  affiliations persist after construction completes and through saves.
-  Allies granted `sharesResources` pool each resource and divide it equally
-  when sharing ends. The scenario flag `emergencyHeadquarters` enables the
-  replacement job independently of allied queues. Headless checks cover these
-  rules and save continuation;
-  browser specs cover owner-specific hints, construction, training, and
-  save/load/restart wiring. Playtesting accepted the result. Scenario-specified
-  pool divisions other than equal shares are deferred; no M1 content shares
-  resources.
-- [x] **1.17** Add issuing-owner authority to commands and validate actor
-  ownership, including between same-faction-type owners in the development
-  harness. Implement the agreed mission-script authority and reject
-  unauthorized work. Create placed buildings for the issuing owner and check
-  placement against that owner's exploration rather than the player's fog.
-  [Commands](docs/mission-files.md#commands) carry a saved owner or script
-  issuer and are rejected as unauthorized outside its actors. Placement builds
-  for the issuer and uses its knowledge. Scenario `scriptControl` grants
-  scripts owners, optionally limited to actor IDs, and only scripts edit
-  terrain. Player feedback ignores other issuers' outcomes. Headless checks
-  cover rival ARC owners, shared services without command authority, placement
-  workers, script permissions, and deterministic saves. Browser checks cover
-  issuer-scoped feedback. Restricting scripts to a scripted sequence is deferred
-  until sequences exist; mirror-harness use follows 1.14 launch assembly.
-- [x] **1.18** Replace player-only simulation assumptions, including loot
-  collection, with owner-neutral rules or explicit documented exceptions.
-  [Loot](DESIGN.md#ownership-and-relationships) pays the nearest collecting
-  unit's owner if it holds that resource, so wildlife cannot collect it.
-  [Runtime boundaries](docs/runtime-boundaries.md#simulation-and-timing)
-  document the remaining player-perspective exception, authored objectives,
-  which 1.25 makes owner-based. Headless checks cover rival collection,
-  wildlife exclusion, and simultaneous-arrival tie-breaking.
-- [x] **1.19** Add authoritative AI observation memory for observed enemies,
-  economic sites, and threats, with last-seen positions and ticks. Expose
-  only the observations and authored map knowledge permitted by the plan.
-  Keep explored terrain per owner.
-  Every owner saves its explored terrain and
-  [observations](docs/mission-files.md#observations) of non-allied actors,
-  site yields, and loot under the
-  [memory rules](DESIGN.md#fog-stealth-and-detection); threats are hostile
-  sightings. `viewOf(owner).knowledge` exposes authored site locations,
-  exploration, vision, and memory. Headless checks cover last-seen units and
-  buildings, observed and unobserved destruction, alliances, per-owner
-  exploration, site yields, unseen pickups and depletion, saved
-  continuation, malformed memory, and owner IDs that match inherited object
-  properties.
-- [x] **1.20** Keep player alerts, audio, minimap pulses, and sidebar data
-  limited to the player's own actors and detections. Verify that hidden AI
-  activity does not leak through these presentation paths. Browser checks
-  cover allied and neutral labels changing with relationships. Sites and loot
-  on the map, minimap, and sidebar show the player's last-seen state from
-  1.19, hiding others' unseen gathering and pickups. Headless checks cover
-  other owners' attacks, losses, completions, training, blocked routes, and
-  outages raising no alerts or pulses, and unseen production staying silent.
-  A browser check covers an event turning an ally hostile: segmented hostile
-  markers, revoked shared coverage, one outage alert, and silent rival
-  activity beyond the player's vision. Player-view projections exclude other
-  owners' private economy and undetected support nodes. Sidebar inspection
-  follows detection changes independently of actor creation and removal;
-  visible damage triggers combat music even when its source is hidden, and
-  only the player's production queues sound.
-- [x] **1.21** Review UI ownership and choose the smallest coherent structure
-  for feature-owned markup, behavior, styles, and shared layout primitives.
-  Record the boundaries before refactoring; retain the locked technical stack.
-  [UI ownership](docs/ui-ownership.md) records inspected coupling, the selected
-  root-based DOM/CSS structure, application and dialog responsibilities,
-  lifetime rules, and verification. Runtime extraction follows in 1.22-1.24.
-- [x] **1.22** Modularize dialogs with consistent focus, dismissal, pause and
-  resume, asynchronous-work handling, and disposal. Verify interactions among
-  menus, contextual guides, and mission-result screens.
-  `ui/dialogs.ts` owns menu/guide markup, styles, transitions, save-panel
-  handlers, and child audio bindings. Application operations remain behind
-  callbacks. Browser checks cover canceled loads, stale panel work, result
-  precedence, focus, busy restrictions, list feedback, and setup/disposal
-  failures preserving usable title navigation and original diagnostics.
-- [x] **1.23** Separate navigation and save/load presentation from session
-  startup and teardown. Verify repeated loads, restarts, and returns to title
-  without stale handlers, pending work, or retained session resources. Keep
-  incompatible saves listed with their reason and deletion action, following
-  the persistence policy from 1.11.
-  Allow named saves and Quicksave after all skirmish results. Autosave at match
-  start and each five-minute simulation boundary while in progress, skipping
-  result ticks and preserving separate save entries.
-  `src/application.ts` owns the session, levels, restart source, replacement,
-  load validity, saves, and exit; `src/ui/save-panel.ts` owns save naming and
-  listing. Incompatible saves show their mismatch reason with Delete only.
-  Scenario `savePolicy: "skirmish"` applies the skirmish save rules, used by
-  the skirmish map preview until launch assembly in 1.14. Unit checks cover
-  compatibility reasons, listing, the policy schedule, startup rollback, and
-  stale save feedback during teardown. Browser checks cover incompatible
-  listing, skirmish autosaves and result saves, and repeated load, restart,
-  and title cycles.
-- [x] **1.24** Make sidebar features composable and supply faction names,
-  resource labels, costs, and actions through content and player-visible state.
-  Modularize their markup and styles without duplicating the ARC sidebar.
-  One sidebar composes TypeScript-created production, goals, selection, and
-  order sections with adjacent CSS. Session binders receive typed controls;
-  cards and keyed rows retain their nodes across updates. Browser checks cover
-  both factions, custom content and costs, information isolation, focus,
-  compact layouts, and disposal. Human playtest accepted the result.
-- [x] **1.25** Add the agreed objective rules for actors constructed during
-  play. Eliminate owners on loss of qualifying completed buildings, including
-  inactive buildings and replacement headquarters, without relying only on
-  fixed authored actor IDs. Mobile units and unfinished construction do not
-  prevent elimination. Selling the last qualifying building also eliminates
-  its owner. Include defensive buildings and exclude Relay Stations. Verify
-  emergency recovery while a qualifying building remains and same-tick draws
-  independent of actor-processing order. Economic stalls alone never resolve
-  the match.
-  Evaluate both owners once at tick end after commands, combat, and
-  construction. Cover same-tick completion and loss, sales, and construction
-  paused by lost support or tending. Latch result and final metrics together.
-  Scenario `skirmish` rules identify competing owners and qualifying building
-  types. End-of-tick elimination records a frozen victory, defeat, or draw;
-  saves preserve the verdict and reject inconsistent results and conflicting
-  save policies. Direct actor hooks are limited to skirmish setup; live changes
-  use commands. Headless checks cover same-tick sales and lethal combat,
-  replacement completion, paused support and tending, both factions, and
-  emergency recovery. Browser checks cover all verdicts, inspection, save/load,
-  and result-boundary autosaves in Chromium and WebKit. The verdict, exact
-  counters, and final history sample commit together.
-- [x] **1.26** Record match milestone ticks, losses, and result in mission state
-  using the definitions from 1.09. Make the data available to summaries and
-  headless reports. Freeze the recorded summary at the result tick.
-  Include per-owner population, exploration, and active-vision histories;
-  sample every five simulation seconds, with initial and final samples, and
-  preserve histories and exact milestone ticks through save/load.
-  Preserve cargo source attribution to record the first delivered income from
-  outside each owner's starting resource area, including mixed-source cargo.
-  Record opponent-specific engagement and building-attack milestones from
-  committed damage, including defenses, relays, and unfinished structures.
-  Verify exact resource, production, completion, loss, and peak-army counters,
-  including cancellation refunds, sale proceeds, and authored starting actors.
-  Skirmish metrics persist exact per-owner counters and milestone ticks, with
-  immutable five-second histories and a final checkpoint. Actor definitions
-  supply military roles; scenario data names each owner's starting resource
-  sites. Ordered cargo provenance includes fractional cultivation and survives
-  interrupted routes.
-  Headless checks cover both factions, same-faction owners, mixed deliveries,
-  final-tick production and completion, combat losses, refunds, and save/load.
-  Browser playtests cover an economy opening, production, Quicksave, reload,
-  all frozen verdicts, and the autosave boundary in Chromium and WebKit.
-  Human playtest completed. Review checks cover same-tick production losses,
-  immutable histories, refundable spending, exploration consistency, and
-  fractional cargo capacity.
-- [x] **1.27** Update mission and content formats, validation, and documentation
-  for ownership, multi-faction state, observations, objectives, and metrics.
-  Include effective difficulty and scaling, plus the skirmish draw result and
-  its resolution tick. Control-group interface-state persistence is added
-  with the feature in 1.44.
-  Apply version changes with their implementations and regenerate bundled
-  levels. Verify save/load continuation and safe rejection under the
-  compatibility policy from 1.11.
-  1.15 added owners, relationships with sharing, scenario events, and fired
-  events to the format with their validation and documentation; 1.19 added
-  per-owner exploration and observations; 1.23 added the scenario save policy.
-  The mission format persists owner-based skirmish rules, verdicts, match
-  metrics, and cargo provenance, with validated deterministic continuation,
-  plus `scenario.setup` with difficulty, effective scaling, enemy owners, and
-  skirmish factions, validated against the mission's owners.
-- [x] **1.28** Profile the rough map at 200 mobile units and 40 buildings
-  across both owners, with a 400-unit/80-building stress scene. Measure
-  pathfinding, group movement, vision, and tick/frame costs; address blockers
-  before roster and AI work depend on the target scale.
-  `npm run benchmark` and `e2e/benchmark.spec.ts` measure a scripted ARC mirror
-  without AI on the reference Mac on mains power. Both report actual population,
-  combat, gathering, and deliveries. A shared probe replaces combat losses, so
-  normal scenes hold 180-196 units and stress scenes 360-391, with buildings at
-  40 or 80.
-  Normal ticks meet the 3 ms pre-AI p95 goal in Chromium and WebKit, and both
-  sustain 120 ticks per second at 2x. At 1x, Chromium meets the frame budget at
-  about 60 FPS with 99.9% of frames within 20 ms. WebKit misses it at 53-55 FPS
-  with 76-83%; 1.64 owns that budget. The stress scene falls behind at 2x. A
-  group move costs about 1 ms per unit on its command tick. Performance is
-  accepted for phase C.
+- [x] **1.14** Rough skirmish map and launch assembly for either faction in
+  either slot, with difficulty scaling and reproducible load/restart.
+- [x] **1.15** Actor ownership, relationships, vision, and shared services.
+- [x] **1.16** Owner stockpiles, headquarters queues, producer queues, and
+  emergency headquarters recovery.
+- [x] **1.17** Issuing-owner and scenario-script command authority.
+- [x] **1.18** Owner-neutral simulation rules, including loot collection.
+- [x] **1.19** Persisted owner exploration and observation memory.
+- [x] **1.20** Player alerts, audio, minimap, and sidebar information isolation.
+- [x] **1.21** UI ownership boundaries.
+- [x] **1.22** Dialog focus, navigation, pause, asynchronous work, and disposal.
+- [x] **1.23** Application/session lifecycle, save presentation, compatibility
+  feedback, and skirmish save policy.
+- [x] **1.24** Shared content-driven sidebar with feature-owned DOM and CSS.
+- [x] **1.25** End-of-tick owner elimination, frozen verdicts, and draws.
+- [x] **1.26** Exact match metrics, cargo provenance, and sampled histories.
+- [x] **1.27** Mission/content formats, validation, and deterministic saves.
+  Control-group persistence belongs to 1.44.
+- [x] **1.28** Pre-AI scale profiling. Normal ticks meet the pre-AI budget and
+  sustain 2× pace in Chromium and WebKit. WebKit rendering misses the frame
+  budget, and stress scenes fall behind at 2×; 1.38 and 1.64 own AI-enabled
+  verification and remaining performance work.
 
-Phase gate: independent owners can operate through the same simulation rules,
-ownership and information boundaries hold, and M0 still works.
+Use [runtime contracts](docs/runtime-boundaries.md),
+[UI ownership](docs/ui-ownership.md), and
+[mission files](docs/mission-files.md) when extending these foundations.
 
 ### C. AI development harness
 
-Before starting the director:
-
-- [x] Scope owner-view rule previews to owned, detected, and remembered state.
-  Share rule calculations with authoritative command validation. Cover hidden
-  occupancy, resources, debris, actor IDs, and worker routes without leaking
-  changes under fog. Verify placement, training, rally, and tending previews
-  agree across missions with identical owner knowledge.
+Prerequisite complete: owner-view placement, training, rally, and tending
+previews use only owned, detected, and remembered state. The director must use
+this [view boundary](docs/runtime-boundaries.md#headless-preparation).
 
 Use ARC against ARC on the rough map and existing roster to prove the shared
 AI. Circle slice work can proceed alongside it. This matchup remains a
@@ -418,9 +126,9 @@ AI tasks are developed and verified with them.
 - [ ] **1.32** Serialize authoritative AI state, including plans, assignments,
   observations, timers, and budgets, as each part is added. Verify identical
   continuation after loading and across different clock batching, including
-  bounded catch-up work. Observations from 1.19 are saved and verified for
-  continuation after loading. AI state belongs in `MissionState`, not
-  `MissionFile.uiState`, and adding it bumps the mission file version.
+  bounded catch-up work. Reuse the saved observations from 1.19.
+  AI state belongs in `MissionState`, not `MissionFile.uiState`; adding it
+  requires a mission-file version increment.
 - [ ] **1.33** Implement the initial ARC build plan: gather, place valid
   buildings, train workers and forces, and maintain functioning income and
   production using actual resources and normal costs and timings.
@@ -450,11 +158,8 @@ Use the roster from 1.05 and extend the functioning ARC AI as content lands.
 M1 uses common resources and producer-based availability, with rare resources,
 upgrades, and research deferred. Task IDs remain stable across phase changes.
 
-- [x] **1.58** Record the optional-system scope from 1.06. Rare resources,
-  mixed-yield collection, building upgrades, and permanent research are
-  deferred beyond M1. Common owner balances, Circle Lifebloom, and ordinary
-  producer availability remain part of 1.16 and the faction implementation
-  tasks. No selected roster or AI task requires these deferred systems.
+- [x] **1.58** Optional-system scope: rare resources, mixed yields, upgrades,
+  and research are deferred beyond M1.
 - [ ] **1.39** Add the ARC Relay Station and Sentry Turret as data-driven
   content. Verify support loss, reconnection, placement, targeting, and the
   expansion or protection choices they are intended to provide. Exclude Relay
@@ -485,41 +190,22 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   by appearance and owner color in the view registries. Infantry `accent` parts
   bake into the vertex-colored body, so owner colors need a separate marking
   mesh and regenerated GLBs.
-- [ ] **1.44** Add control groups, double-click selection, select-all-of-type,
-  and idle-worker controls with the chosen keyboard and touch alternatives.
-  Verify ten manual mobile-unit groups, overlapping membership, selection-only
-  recall, quick-repeat focus, destroyed-member removal, and Groups panel
-  actions. Verify number-key recall, Ctrl+Shift+number assignment, and
-  Shift+number addition in browser and desktop builds, including Mac Control.
-  Verify Period cycling and focus, Shift+Period selection without camera
-  movement, and the Idle workers count and actions. Cover stopped and depleted
-  workers, carried resources, pending orders, and retained waiting assignments.
-  Verify exact-type owned mobile-unit selection in view by double-click,
-  additive Shift-double-click, and panel actions for view or map scope with
-  Add units support. Buildings retain individual selection.
-  Extend `MissionFile.uiState` and restore group membership, retaining only
-  surviving owned mobile units. Verify restart and new-mission clearing, and
-  loading with current keyboard preferences without
-  affecting simulation outcomes. Verify type entries and selected counts in
-  mixed selections, named in-view and map-wide actions, replacement selection,
-  and Add units preserving the other selected types.
-- [ ] **1.45** Add Attack Move, production, and construction bindings. Verify
-  A targeting, Shift-click queuing, Escape and Cancel, and S stopping active
-  and queued orders without clearing selection. Verify B opening construction,
-  Q/W/E/R/T activating stable card positions in the active production panel,
-  one unit per training activation, displayed keys, and R rotating during
-  placement while card shortcuts wait. Verify focus rules, dialog/form-field
-  precedence, disabled-action explanations, and compact landscape usability.
-  Add keyboard rebinding in Options, current-binding labels, context-aware
-  conflict feedback, Reset to defaults, and preferences shared across missions
-  independently of saves. Verify physical-position defaults and layout-aware
-  labels on QWERTY, AZERTY, and QWERTZ, including number-row group shortcuts
-  with modifiers and production-card positions. Cover hosts without automatic
-  layout labels and unavailable system/browser key combinations. Replace the
-  static `(R)`, `(S)`, and `(Esc)` hints in `ui/sidebar-orders.ts` with binding
-  labels. Replace the tools' `onStart` cancellation with one active-tool state
-  so card shortcuts can wait for placement. Add a device preferences module for
-  bindings and `audio-controls.ts`, the two preferences in `localStorage`.
+- [ ] **1.44** Implement [control groups](DESIGN.md#m1-control-groups),
+  [idle-worker controls](DESIGN.md#m1-idle-worker-controls), and
+  [matching-unit selection](DESIGN.md#m1-matching-unit-selection).
+  Verify keyboard and on-screen actions in browser and desktop builds,
+  including Mac Control, mixed selections, and Add units mode. Cover destroyed
+  group members and workers with cargo, pending orders, or waiting assignments.
+  Extend `MissionFile.uiState` for groups; verify load filters invalid members,
+  new missions and restart clear groups, and bindings remain device preferences.
+- [ ] **1.45** Implement [command shortcuts](DESIGN.md#m1-command-shortcuts)
+  and [keyboard preferences](DESIGN.md#m1-keyboard-preferences). Verify queued
+  targeting, Stop, placement/card precedence, dialog/form focus, disabled
+  explanations, and compact landscape controls. Test QWERTY, AZERTY, QWERTZ,
+  number-row modifiers, missing automatic layout labels, and host-reserved keys.
+  Replace static hints in `ui/sidebar-orders.ts` with current bindings. Use
+  one active-tool state so card shortcuts wait during placement. Share device
+  preference storage with audio; keep it independent of mission saves.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
   expansion, defense, recovery, and combat content.
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
@@ -540,103 +226,45 @@ phase A and the required shared foundations from phase B. Develop the
 wolf-den slice alongside the ARC AI and roster; faction AI integration still
 requires phase C. Use Lifebloom-only costs and producer-based availability.
 
-#### Wolf-den slice delivery
+The [playable slice](DESIGN.md#circle-wolf-den-development-slice) includes
+core infantry, paid worker production, tended growth, renewable cultivation,
+feedback, guides, generated art/audio, and focused save checks. Full task
+acceptance remains open below; normal-menu skirmish launch belongs to 1.60.
 
-[Scope and limitations](DESIGN.md#circle-wolf-den-development-slice) define
-the staged target. Keep the task IDs below open until their full outcomes are
-verified; preview work is partial progress.
-
-- [x] Core infantry: 1.48 provides Sentinels and Wayfinders; 1.53 provides
-  their generated elven models, channeling, living bolts, sounds, and faction
-  music. Combat checks verify both encounters and saved continuation.
-- [x] Single-player cultivation slice: 1.48 provides Heartgrove, Cultivator,
-  Conservatory, and Musterhall content and the paid opening. 1.49 adds
-  selected-worker placement, single-worker tending, interruption, replacement,
-  slot yielding, and queues per Heartgrove. 1.50 adds renewable reserves,
-  declining output, dormancy, recovery, cargo, and reachable delivery.
-  1.51 supplies feedback and guidance. Partial 1.53 work includes living
-  structures, three growth layers, work animation and sound, and falling
-  leaves. 1.56 has deterministic growth, dormancy, and cargo-save checks.
-  Mouse and touch checks cover launch, worker production, growth, first
-  delivery, and restart. The chooser is partial progress on 1.60.
-  Circle guidance uses short action prompts. Its six production portraits
-  show elven roles and living structures; cultivation and growth have distinct
-  organic work loops. Two Lifebloom gifts reward scouting beyond the lone wolf
-  without funding the opening. Collection and saved continuation are checked.
-  ARC and Circle use shared wolf-den authoring, worker route handling,
-  interruption, and compatible-site queries. Regression checks cover tending
-  cancellation, drop-off loss, queued delivery, and the 60% slowdown threshold.
-- [ ] Base-loop integration: 1.15-1.18 provide owners, economies, command
-  authority, and owner-neutral rules; 1.20, 1.24, and 1.27 provide information
-  boundaries and persistence. The slice runs with single-player control.
-  1.49 covers emergency Heartgrove recovery. Normal-menu skirmish launch
-  remains in 1.60.
-- [ ] Presentation and introduction: develop 1.53 and 1.54 alongside each actor
-  and mechanic. Check interrupted work and deterministic saves under 1.56 as
-  each system lands. Run the cohort introduction and cultivation acceptance
-  in 1.57 once the real base loop is playable.
-- [ ] Extended roster: 1.52 adds support, defenses, and constructs with focused
-  encounters. Wolves alone cannot validate structure counters. Circle AI
-  remains 1.55; full skirmish integration and balance remain phases F and G.
-
-Next integration target: normal-menu skirmish launch.
-
-#### Circle tasks
-
-- [ ] **1.48** Add Heartgrove, Lifebloom Conservatory, Cultivator, Musterhall,
-  Sentinel, and Wayfinder as data-driven content with Circle-facing labels,
-  costs, production, and starting resources. Verify tougher, shorter-ranged
+- [ ] **1.48** Complete core-roster acceptance for Heartgrove, Conservatory,
+  Cultivator, Musterhall, Sentinel, and Wayfinder content, labels, costs,
+  production, and starting resources. Verify tougher, shorter-ranged
   Sentinels and fast, fragile, unarmed Wayfinders with extended ordinary vision.
   Heartgroves train Cultivators; verify startup funds cover the first worker
   and Conservatory through normal play without a preplaced worker.
-- [x] **1.49** Implement the selected Circle construction, placement,
-  infrastructure, and worker-capacity rules. Verify interrupted work and
-  rebuilding, single-worker tending and replacement, slot yielding, independent
-  completed buildings, and Conservatories without worker-slot caps.
-  Verify emergency Heartgrove recovery still requires Cultivator tending.
-  Require a selected Cultivator, explain unavailable construction cards, and
-  choose the nearest selected reachable worker with a highlighted preview.
-  Verify manual Tend replacement preserves payment and progress and normal
-  interruption rules apply to the assigned worker. Provide Tend through
-  on-screen and radial-menu actions.
-  Headless checks cover these rules, emergency recovery with and without the
-  scenario rule, and saved continuation. Browser checks cover the card's
-  explanation, the worker preview, and on-screen and radial Tend in Chromium
-  and WebKit.
-- [ ] **1.50** Implement renewable cultivation, reserve-limited output,
-  dormancy, and recovery. Verify the selected rates, output curve, thresholds,
-  active regeneration, uncapped staffing, retained site assignments, manual site
-  changes, automatic recovery resumption, nearest reachable owned Conservatory
-  delivery, and cargo retention when delivery is blocked. Verify immediate
-  interruptions preserve cargo, a new site order delivers cargo first, and
-  dormancy keeps Gather active without advancing queued orders.
-  Verify that simultaneous workers cannot overdraw reserves and that reserve
-  allocation and dormancy transitions remain deterministic.
-- [ ] **1.51** Add site and worker feedback that distinguishes dormancy, blocked
-  routes, idle workers, missing delivery destinations, untended construction,
-  and unavailable Heartgrove capacity. Show selected-site reserve, efficiency,
-  state, and recovery threshold, recovery-waiting worker status, and one
-  notification when a worked site enters dormancy. Provide the guides and
-  briefing needed to explain the Circle's economy and construction.
+- [x] **1.49** Circle placement, single-worker tending and replacement,
+  infrastructure, and emergency Heartgrove recovery, with saved continuation
+  and keyboard-free construction controls.
+- [ ] **1.50** Complete cultivation acceptance against
+  [economy rules](DESIGN.md#economy-and-construction). Verify reserve-adjusted
+  output, regeneration, dormancy/recovery, retained assignments, manual site
+  changes, nearest reachable owned delivery, cargo-preserving interruptions,
+  and queued orders waiting through dormancy. Cover simultaneous workers,
+  reserve overdraw, and deterministic transition ordering.
+- [ ] **1.51** Complete feedback and guidance acceptance for cultivation and
+  construction. Verify site reserve/efficiency/recovery displays, one dormancy
+  notification per transition, and distinct states for idle, waiting, blocked
+  delivery/routes, untended growth, and unavailable infrastructure capacity.
 - [ ] **1.52** Add Healer and Artificer support, the Thornspire, Briar Ram,
   and Construct Nursery. Circle expansion uses existing structures. Verify
   target eligibility, counter relationships, recovery, production requirements,
   the Briar Ram's single-target building damage bonus, and the Nursery's shared
   Briar Ram/Artificer queue. Musterhalls train Healers.
-- [ ] **1.53** Generate Circle models, textures, growth and combat animations,
-  effects, and essential audio under the
-  [Circle presentation direction](DESIGN.md#m1-circle-presentation).
-  Verify the complete roster's silhouettes, palette, owner markings,
-  entrances, weapons, and animation contracts at gameplay scale. Integrate
-  three growth stages, active and paused tending feedback, and restoration
-  from saved progress. Verify damage thresholds, repair recovery, destruction,
-  and reduced-motion readability. Generate distinct work, weapon, support, and
-  destruction cues with brief tails and work-loop limits. Add Circle
-  exploration and combat arrangements selected by player faction, with music
-  below gameplay cues. Rebuild assets reproducibly and verify pack bindings.
-- [ ] **1.54** Author the short Circle introductory scenario teaching
-  cultivation, dormancy, construction, and production before skirmish play.
-  Keep M0 available as ARC's introduction.
+- [ ] **1.53** Complete full-roster assets and presentation acceptance under
+  [Circle direction](DESIGN.md#m1-circle-presentation). Extend the slice's
+  generated models, growth layers, effects, work/weapon audio, and faction
+  music for the remaining roster. Verify silhouettes, owner markings,
+  entrances, weapons, interrupted growth, saved progress, damage/repair,
+  destruction, reduced motion, and mix readability at gameplay scale.
+  Rebuild assets reproducibly and verify pack bindings.
+- [ ] **1.54** Finish the Circle introduction using the wolf-den slice.
+  Verify it teaches cultivation, dormancy, construction, and production before
+  skirmish play. Keep M0 available as ARC's introduction.
 - [ ] **1.55** Add the Circle AI build plan and operations for its economy,
   infrastructure, roster, and recovery. Exercise it through the shared harness.
 - [ ] **1.56** Verify Circle saves and deterministic continuation through
@@ -645,10 +273,10 @@ Next integration target: normal-menu skirmish launch.
   state, worker cargo, cultivation progress, assignments, and queued orders.
 - [ ] **1.57** Playtest the Circle introduction and base loop with the 1.02
   cohort, in the same sessions as 1.02 and 1.47, launched through the demo
-  setup screen or a development link. Verify
-  that RTS-familiar newcomers understand its differences,
-  can establish and sustain a base, and can explain a useful cultivation
-  decision. Refine cultivation rates, reserve capacity, cargo capacity, and
+  setup screen or a development link. Verify RTS-familiar newcomers understand
+  its differences, establish and sustain a base, and explain a useful
+  cultivation decision. Refine cultivation rates, reserve capacity, cargo
+  capacity, and
   dormancy thresholds using the playable slice. Fix and retest recurring
   confusion before full-match balancing.
 
@@ -662,30 +290,20 @@ and producer-based progression scope from 1.06.
 
 - [ ] **1.59** Finish the map with viable routes, expansion opportunities,
   scouting landmarks, and defensible starts for both player assignments.
-  Both factions' first income and restart from either slot are verified in
-  1.14; re-verify them against the finished map.
-- [ ] **1.60** Add the normal-menu flow for faction choice, introductions, and
-  skirmish launch. The mission-start dialog offers ARC or Circle and Easy,
-  Normal, or Hard difficulty.
-  The demo setup screen offers difficulty and launches ARC's introduction or
-  the Circle cultivation slice. The complete Circle introduction and skirmish
-  launch remain pending.
-- [ ] **1.61** Wire the agreed objectives, victory, defeat, and post-result
-  behavior into complete matches, including same-tick elimination draws.
-  Freeze skirmishes for inspection after every result and offer Save, Restart,
-  Load, and Main menu. Keep Quicksave available; loading finished saves
-  restores frozen inspection. Campaign free play is separate from this flow.
-  Verify load preserves the result and restart begins a fresh match with the
-  same chosen faction assignment, difficulty, scaling, rules, and scenario.
-  Verify a terminal tick coinciding with an autosave boundary preserves the
-  pre-result Autosave. Apply the end-of-tick result timing from 1.09.
-- [ ] **1.62** Present the persisted match summary on the results panel and in
-  headless reports, including income, production, expansion, attack, losses,
-  and result. Include unit, building, exploration, and active-vision histories.
-  Show both owners' comparison graphs after the match, keeping opponent
-  histories hidden during play. Show the defined resource, production, loss,
-  and peak-army totals. Use the same definitions in playtest reports. Add the
-  panel through a `MenuView` field and a panel entry in `ui/dialogs.ts`.
+  Verify both factions' paid first income and restart from either slot.
+- [ ] **1.60** Extend the demo setup screen to offer the complete Circle
+  introduction and skirmish launch. Preserve independent ARC/Circle and
+  Easy/Normal/Hard choices and access to ARC's introduction.
+- [ ] **1.61** Verify [result rules](DESIGN.md#m1-skirmish-results) in
+  complete matches. Cover same-tick draws, frozen inspection, named/quick
+  saves, loaded results, and restart preserving launch choices. Verify a result
+  on an autosave boundary preserves the pre-result Autosave. Reuse the phase B
+  result and persistence implementation.
+- [ ] **1.62** Present the [match summary](DESIGN.md#m1-match-summary) in the
+  results panel and headless reports. Include exact milestones, totals, peaks,
+  and comparison histories for both owners. Keep opponent histories hidden
+  during play and use the same definitions in playtest reports. Add a
+  `MenuView` field and a panel in `ui/dialogs.ts`.
 - [ ] **1.63** Run the agreed headless profile/start-slot set for ARC versus
   Circle and Circle versus ARC: both player factions, both start positions,
   and Easy, Normal, and Hard, totaling 12 baseline cases. Use standard faction
@@ -700,25 +318,10 @@ and producer-based progression scope from 1.06.
   Verify 2x keeps simulation pace and report rendering performance. Report
   degradation at 400 units and 80 buildings, exercising movement, gathering,
   combat, vision, and AI together. Physical mobile performance targets are
-  deferred; compact layout and touch checks remain. WebKit missed the frame
-  budget in 1.28 from per-frame rendering work; merging each unit's meshes in
-  1.43 and skipping off-screen animation are the next candidates.
-  Change these known allocation sites only where profiling shows a cost:
-  - Simulation: `Uint8Array`s in `createVision`, `occupiedTilesFor` in owner
-    `detects`, the support resolver's `JSON.stringify` key, navigation closures
-    in `advanceWorkerRoute`, spreads in `economySites` and `activeSites`,
-    `separateMobileActors` buckets, full-map slot scans per group move,
-    `entriesSince` copies, and `placementByOwnerId` cloning.
-  - Rendering: `JSON.stringify` in `support-network.ts`, `queued-orders.ts`,
-    `rally-point.ts`, `tile-placed-actor-view.ts`, and terrain chunk rebuilds;
-    maps in `materials-sites.ts` `update`, whose identity guard needs tests
-    that stop mutating the economy in place; emission arrays and `stableUnit`
-    in `damage-effects.ts`; `Vector3`s in `selectionPoint` and
-    `extractHealthAndDamageEffects`.
-  - Interface and audio: `JSON.stringify` keys in the sidebar roster and
-    selection, `createAlertTracker.observe`, the session's alert `workerIds` and
-    `sites` projections, `observe` in `audio/mission.ts`, and `desiredLoops` in
-    `audio/scene.ts`.
+  deferred; compact layout and touch checks remain. Profile WebKit rendering
+  and stress-case backlog with AI enabled before choosing optimizations.
+  Candidate rendering work includes merging unit meshes and skipping off-screen
+  animation; change allocation sites only when measured costs justify it.
 
 Phase gate: either faction can enter a complete skirmish through the normal
 menu, and both matchups meet the agreed automated behavior and scale targets.
@@ -756,7 +359,7 @@ challenge, pacing, and useful choices.
   assets match their sources, and confirm that human and headless acceptance
   targets are met. Update DESIGN.md, README.md, docs/verification.md, and
   affected format/content contracts to describe the delivered game before
-  closing M1. Prune delivery detail from this checklist's task prose.
+  closing M1. Keep completed tasks concise.
 
 Phase gate: both factions pass the agreed match, performance, persistence,
 platform, and human acceptance targets, with feedback incorporated and known

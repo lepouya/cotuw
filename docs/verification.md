@@ -1,11 +1,9 @@
 # Verification
 
 [DESIGN.md](../DESIGN.md) owns game rules and milestone scope.
-[TODO.md](../TODO.md) tracks M1 implementation and acceptance work. Existing
-mission flows exercise the playable ARC M0 slice; they do not establish M1
-skirmish acceptance. These checks cover the application, authored mission,
-and desktop host. Automated runs establish correctness; human runs establish
-clarity, pacing, and usability.
+[TODO.md](../TODO.md) tracks delivery and acceptance. Automated checks cover
+correctness; human play covers clarity, pacing, and usability. Introductory
+mission checks do not establish complete skirmish acceptance.
 
 ## Automated checks
 
@@ -19,8 +17,8 @@ Use two check tiers:
 - `npm run check:full` for acceptance, releases, or an explicit request. It adds
   generated-asset checks, the Rust test harness, every browser flow in Chromium,
   and the `@webkit` browser flows in macOS WebKit, including phone/tablet
-  layouts and complete M0 playthroughs. The Rust harness currently has no tests;
-  platform adapters have TypeScript tests.
+  layouts and complete M0 playthroughs. Platform adapters have TypeScript
+  tests; the Rust harness currently has no tests.
 
 Reuse a passing check when the checked files have not changed. A full pass
 also satisfies the quick check; do not run both tiers on the same files.
@@ -200,10 +198,9 @@ hand. Without the probe, that scene does not replace its losses.
 
 ## Mission flow
 
-The full ARC M0 browser mission starts at the title screen and uses the authored
-economy, actors, combat, and objectives through victory and free play. It runs
-with mouse and phone touch input in Chromium and WebKit. Its controlled clock
-accelerates waiting without granting resources or changing balance.
+The ARC M0 browser flow covers title to victory/free play with mouse and
+phone touch in Chromium and WebKit. A controlled clock accelerates waiting
+without changing resources or balance.
 
 ```sh
 npx playwright test e2e/mission.spec.ts
@@ -216,13 +213,14 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
   --project=chromium --grep mouse
 ```
 
-## M0 baseline playtest preparation
+## Playtest preparation
 
-Task 1.01 uses a fixed revision so reports and saved reproductions identify
-one build. Builds are hosted on GitHub Pages. Recruit five to eight players
-spanning RTS-familiar and less experienced players, and agree on a
-report-return channel before sending the bundle. Recruitment and distribution
-are organizer actions.
+Use a fixed revision and the checked bundle for reproducible reports and
+saved bug cases. GitHub Pages hosts browser playtests. The cohort in task 1.02
+is deferred until AI is playable and combines ARC and Circle sessions under
+1.47 and 1.57. Agree on session scope and a report-return channel before
+recruitment and distribution. The bundled tester instructions cover ARC's
+introduction; adapt them to the selected session scope before distribution.
 
 From a clean checkout of the selected revision, using Node.js 26:
 
@@ -237,20 +235,16 @@ The command builds the production site and writes ignored `playtest/` with
 records the full revision, Node/npm versions, lockfile hash, and each bundled
 file's SHA-256 and byte count. Archive the entire directory and the acceptance
 results before distribution. Serve the exact `site/` files that were checked.
-Keep the hosting URL stable for the cohort; do not replace it with later M1
-builds during the baseline. Do not regenerate assets or levels for a playtest
-unless updating the selected source revision.
+Keep the hosting URL and revision stable throughout a cohort's sessions.
+Regenerate assets or levels only when updating the selected source revision.
 
 For local review of uncommitted work, use
 `npm run playtest:build -- --allow-dirty`. Such bundles are marked
 `distributionReady: false`; they are not the fixed-revision cohort build.
-The clean-source marker does not run or record acceptance checks.
-The builder checks Git cleanliness before and after compilation, including
-untracked files even when Git's display settings hide them. Keep the checkout
-unchanged while building. Preparation uses a private output directory and
-leaves `dist/` intact. A failed build or packaging step preserves the previous
-`playtest/` bundle; publication failure attempts to restore it. If restoration
-also fails, the error identifies the retained backup's recovery path.
+The marker records source provenance, not acceptance results. Keep the
+checkout unchanged during the builder's before/after cleanliness checks,
+including untracked files. Preparation preserves `dist/` and the previous
+bundle on failure; a failed publication reports any backup recovery path.
 
 Publish the checked files by replacing the `gh-pages` branch, with the
 repository's Pages source set to that branch. Pages then serves the bundle at
@@ -278,9 +272,9 @@ the [report template](playtest-report.md). Observe without teaching controls
 or strategy unless requested or blocked; record every intervention. Cover
 controls, clarity, pacing, reliability, assistance, and abandonment. Use
 participant codes and keep recruitment/contact details outside the repository.
-Turn actionable findings into prioritized issues linked to affected M1 tasks;
-record a disposition for observations that do not become issues. The actual
-sessions and triage satisfy task 1.02, not build preparation alone.
+Turn actionable findings into prioritized issues linked to affected tasks;
+record a disposition for other observations. Build preparation alone does not
+satisfy playtest acceptance.
 
 ## Human acceptance
 
