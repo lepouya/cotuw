@@ -21,10 +21,11 @@ import {
   isRecord,
 } from "./validation";
 
-import type { ActorDefinition } from "./actor";
+import type { ActorDefinition, DeepReadonly } from "./actor";
 import type { CommandResult, MissionCommand } from "./command";
 import type { OwnerView } from "./owner-view";
 import type { Resource } from "./resources";
+import type { TerrainView } from "./terrain";
 
 export const AI_POSTURES = [
   "establishing",
@@ -106,6 +107,8 @@ export type AiState = Record<string, OwnerAiState>;
 export type AiConcernContext = {
   readonly tick: number;
   readonly view: OwnerView;
+  /** The authored map; absent from missions without terrain. */
+  readonly terrain: TerrainView | undefined;
   readonly definitions: ReadonlyMap<string, ActorDefinition>;
   readonly posture: AiPosture;
   /** The concern's saved state; it must stay JSON. */
@@ -114,6 +117,11 @@ export type AiConcernContext = {
   readonly rejections: readonly AiRejection[];
   /** What this concern may spend of a resource. */
   funds: (resource: Resource) => number;
+  /**
+   * Returns this concern's unspent budget, so the next reconciliation shares
+   * it by weight. For a concern with nothing left to save for.
+   */
+  releaseFunds: () => void;
   /**
    * Queues a command for this tick. Creation commands spend their price from
    * the concern's funds. False when funds or the tick's command limit run out,
@@ -139,9 +147,51 @@ export type AiCommandSource = {
   debits: { concern: string; resource: Resource; amount: number }[];
 };
 
+/** An owner's AI state summarized for reports and development tools. */
+export type AiDiagnostics = DeepReadonly<
+  Pick<OwnerAiState, "posture" | "requestedPosture" | "budgets" | "memory">
+> & {
+  /** Claimed actors by concern. */
+  claims: Record<string, number>;
+  /** Refused commands still waiting for their concerns' next turns. */
+  rejections: {
+    concern: string;
+    tick: number;
+    kind: string;
+    reason?: string;
+  }[];
+};
+
+export function aiDiagnostics({
+  posture,
+  requestedPosture,
+  budgets,
+  claims,
+  rejections,
+  memory,
+}: DeepReadonly<OwnerAiState>): AiDiagnostics {
+  const claimed = new Map<string, number>();
+  for (const concern of Object.values(claims))
+    claimed.set(concern, (claimed.get(concern) ?? 0) + 1);
+  return {
+    posture,
+    ...(requestedPosture && { requestedPosture }),
+    budgets,
+    claims: Object.fromEntries(claimed),
+    rejections: rejections.map(({ concern, tick, command, reason }) => ({
+      concern,
+      tick,
+      kind: command.kind,
+      ...(reason && { reason }),
+    })),
+    memory,
+  };
+}
+
 /** The mission services the director uses. */
 export type DirectorHost = {
   tickSeconds: number;
+  terrain?: TerrainView;
   definitions: ReadonlyMap<string, ActorDefinition>;
   concerns: ReadonlyMap<string, AiConcern>;
   viewOf: (owner: string) => OwnerView;
@@ -455,11 +505,15 @@ function concernContext(
   return {
     tick,
     view,
+    terrain: host.terrain,
     definitions: host.definitions,
     posture: ai.posture,
     memory: ai.memory[concern]!,
     rejections,
     funds,
+    releaseFunds: () => {
+      ai.budgets[concern] = {};
+    },
     issue: (command) => {
       if (
         spent.commands >= profile.commandsPerTick ||

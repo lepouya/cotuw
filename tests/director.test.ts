@@ -11,6 +11,7 @@ import {
 } from "./helpers/scenario";
 import { issuedByPlayer } from "../src/simulation/command";
 import { createAiState } from "../src/simulation/director";
+import { startSimulationLoop } from "../src/simulation/loop";
 import { createActor } from "../src/simulation/actor";
 import {
   createScenarioMap,
@@ -274,6 +275,28 @@ test("budgets split resources by weight and keep each concern's savings", () => 
   expect(sim.snapshot().ai.west!.budgets).toEqual({
     saver: { materials: 75 },
     spender: { materials: 0 },
+  });
+});
+
+test("released funds are shared again by weight", () => {
+  const funds: number[] = [];
+  const sim = fixture(
+    profile([allocation("releaser"), allocation("saver", 3)]),
+    {
+      releaser: (context) => {
+        funds.push(context.funds("materials"));
+        context.releaseFunds();
+        expect(context.funds("materials")).toBe(0);
+      },
+      saver: () => {},
+    },
+  );
+  advanceTicks(sim, 2 * ROUND + 1);
+  // 100 splits 25/75; each release regains a quarter of what it returned.
+  expect(funds).toEqual([25, 6.25, 1.563]);
+  expect(sim.snapshot().ai.west!.budgets).toEqual({
+    releaser: {},
+    saver: { materials: 98.4375 },
   });
 });
 
@@ -829,28 +852,32 @@ test("hidden enemy state cannot change an owner's commands", () => {
   ).toEqual(plain);
 });
 
+/** Training, claims, borrowing, and a partial round to carry across splits. */
+const continuationProfile = profile(
+  [allocation("planner", 2, 2), allocation("raider", 1, 1, true)],
+  { concernsPerTick: 1 },
+);
+const continuationConcerns: Record<string, AiConcern> = {
+  planner: (context) => {
+    const trained = (context.memory.trained as number | undefined) ?? 0;
+    if (trained < 3 && train(context)) context.memory.trained = trained + 1;
+    for (const { id } of context.view.actors().ownMobile) context.claim(id);
+  },
+  raider: (context) => {
+    for (const actorId of context.claimed().slice(0, 1))
+      context.issue({
+        kind: "move",
+        actorId,
+        target: { x: 20, z: 12 },
+      } satisfies MissionCommand);
+    context.claim("west-unit-4");
+    if (context.tick < ROUND) train(context, "west-hq");
+  },
+};
+
 test("a saved mission continues exactly as an uninterrupted one", () => {
-  const aiProfile = profile(
-    [allocation("planner", 2, 2), allocation("raider", 1, 1, true)],
-    { concernsPerTick: 1 },
-  );
-  const concerns: Record<string, AiConcern> = {
-    planner: (context) => {
-      const trained = (context.memory.trained as number | undefined) ?? 0;
-      if (trained < 3 && train(context)) context.memory.trained = trained + 1;
-      for (const { id } of context.view.actors().ownMobile) context.claim(id);
-    },
-    raider: (context) => {
-      for (const actorId of context.claimed().slice(0, 1))
-        context.issue({
-          kind: "move",
-          actorId,
-          target: { x: 20, z: 12 },
-        } satisfies MissionCommand);
-      context.claim("west-unit-4");
-      if (context.tick < ROUND) train(context, "west-hq");
-    },
-  };
+  const aiProfile = continuationProfile;
+  const concerns = continuationConcerns;
   const whole = fixture(aiProfile, concerns);
   advanceTicks(whole, 100);
   // Tick 21 falls inside a round, with its cursor partway through.
@@ -865,6 +892,45 @@ test("a saved mission continues exactly as an uninterrupted one", () => {
     expect(after.snapshot()).toEqual(whole.snapshot());
   }
 });
+
+test.each<[string, number[]]>([
+  ["one tick per frame", Array.from({ length: 100 }, () => 100)],
+  ["uneven frames", [30, 470, 1750, 20, 3730, 4000]],
+  ["a stall caught up in bounded batches", [10_000]],
+])(
+  "AI matches continue identically across clock batching: %s",
+  (_name, frames) => {
+    const whole = fixture(continuationProfile, continuationConcerns);
+    advanceTicks(whole, 100);
+    const sim = fixture(continuationProfile, continuationConcerns);
+    const clock = { now: 0 };
+    const loop = startSimulationLoop(sim, {
+      pumpMilliseconds: 60_000,
+      maxCatchUpSeconds: 0.5,
+      now: () => clock.now,
+    });
+    // Half a tick of slack keeps float rounding from owing too few ticks.
+    clock.now = 50;
+    try {
+      let batches = 0;
+      for (const frame of frames) {
+        clock.now += frame;
+        loop.advance();
+        batches += 1;
+      }
+      // Each call runs at most five ticks; the remainder stays owed.
+      while (sim.completedTicks < 100 && batches < 1000) {
+        loop.advance();
+        batches += 1;
+      }
+      expect(batches).toBeGreaterThanOrEqual(20);
+      expect(loop.faulted).toBe(false);
+    } finally {
+      loop.stop();
+    }
+    expect(sim.snapshot()).toEqual(whole.snapshot());
+  },
+);
 
 test("a concern's failure faults the mission", () => {
   const sim = fixture(profile([allocation("broken")]), {

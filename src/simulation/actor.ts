@@ -290,6 +290,23 @@ export const isWorkerDefinition = (
   definition: Pick<ActorDefinition, "harvesting" | "cultivation">,
 ) => !!definition.harvesting || !!definition.cultivation;
 
+/** Workers, scouts, and support are unarmed or carry out economy work. */
+export const isArmyUnit = (definition: ActorDefinition) =>
+  !!definition.movement &&
+  !!definition.weapon &&
+  !definition.footprint &&
+  !isWorkerDefinition(definition);
+
+/** Scenario rosters may omit some of a producer's units. */
+export const trainsArmy = (
+  definition: ActorDefinition,
+  definitions: ReadonlyMap<string, ActorDefinition>,
+) =>
+  !!definition.production?.unitDefinitionIds.some((id) => {
+    const unit = definitions.get(id);
+    return !!unit && isArmyUnit(unit);
+  });
+
 /** Orders actor IDs for deterministic iteration and tie-breaking. */
 export function compareIds(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;

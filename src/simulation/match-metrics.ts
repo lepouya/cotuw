@@ -1,4 +1,4 @@
-import { deepFreeze, isWorkerDefinition } from "./actor";
+import { deepFreeze, isArmyUnit, trainsArmy } from "./actor";
 import type { Actor, ActorDefinition } from "./actor";
 import type { CargoSource } from "./cargo";
 import { secondsToTicks } from "./clock";
@@ -62,21 +62,6 @@ export type MatchView = {
   coverage: (owner: string) => { explored: number; visible: number };
 };
 export type MatchRecorder = ReturnType<typeof recordMatch>;
-
-/** Workers, scouts, and support are unarmed or carry out economy work. */
-const isArmyUnit = (definition: ActorDefinition) =>
-  !!definition.movement &&
-  !!definition.weapon &&
-  !definition.footprint &&
-  !isWorkerDefinition(definition);
-
-const trainsArmy = (
-  definition: ActorDefinition,
-  definitions: MatchContext["definitions"],
-) =>
-  !!definition.production?.unitDefinitionIds.some((id) =>
-    isArmyUnit(definitions.get(id)!),
-  );
 
 function population(
   actors: readonly Actor[],

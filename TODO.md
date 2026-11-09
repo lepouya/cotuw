@@ -107,7 +107,7 @@ AI tasks are developed and verified with them.
 - [x] **1.29** Deterministic director with pack profiles, prioritized concerns,
   shared budgets and force claims, and counted per-tick limits. It runs as a
   mission tick step through `viewOf(owner)` and owner-issued commands.
-  `submitCommand` requires an issuer. Profiles have no concerns until 1.33.
+  `submitCommand` requires an issuer.
 - [x] **1.30** Headless AI-versus-AI runner (`npm run ai:match`) with ARC
   mirror cases by player slot and difficulty. It reports results, milestones,
   totals, scaling, and AI diagnostics, and preserves Incomplete / stalled
@@ -119,19 +119,23 @@ AI tasks are developed and verified with them.
   `render/debug-overlay.ts`, which draws the terrain grid.
 - [ ] **1.32** Serialize authoritative AI state in `state.ai` as each part is
   added, covering plans and operations beyond the director's budgets, claims,
-  timers, and memory from 1.29. Verify identical continuation across different
-  clock batching, including bounded catch-up work; 1.29 covers save/load. Reuse
-  the saved observations from 1.19. Extending the state requires a mission-file
-  version increment.
-- [ ] **1.33** Implement the initial ARC build plan: gather, place valid
-  buildings, train workers and forces, and maintain functioning income and
-  production using actual resources and normal costs and timings. Pass the
-  built-in concerns to `createMissionSimulation` in `createSessionSimulation`.
+  timers, and memory from 1.29. Reuse the saved observations from 1.19.
+  Extending the state requires a mission-file version increment. The director
+  tests verify identical continuation across clock batching and bounded
+  catch-up; extend them, and the save checks, with each new part through 1.36.
+- [x] **1.33** ARC build plan in `simulation/arc-concerns.ts` with the shared
+  `forces` concern, which sessions use by default. It opens with a Refinery and
+  Harvester, then a Field Barracks, and grows to three Refineries and two
+  Barracks while training Troopers to a rally point. The undisturbed mirror
+  reaches first income near 1:15, military production near 2:25, and a first
+  Trooper near 2:30 through ordinary placement and costs.
 - [ ] **1.34** Add recovery plans for ordinary worker, production, and
   support-link losses. Verify recovery without free replacements or resources.
 - [ ] **1.35** Add scouting and observation-driven goals. The AI may know
   authored terrain, routes, and resource locations; enemy state and current
-  yields require observation. Test stale reports and lost contact.
+  yields require observation. Test stale reports and lost contact. Home
+  Materials run out near minute 24 in the undisturbed mirror, and Gather
+  needs explored sites, so scouting must find other deposits before then.
 - [ ] **1.36** Add group operations for local defense, raids on exposed income,
   and attacks. Implement assignment, retreat, regrouping, bounded replanning,
   and release of forces under the existing [AI rules](DESIGN.md#npc-ai).

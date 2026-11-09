@@ -5,6 +5,7 @@ import {
   skirmishChoiceError,
 } from "./content/skirmish";
 import { errorMessage } from "./errors";
+import { BUILT_IN_AI_CONCERNS } from "./simulation/ai-concerns";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { resolveSetup } from "./simulation/mission-setup";
 import { createMissionSimulation } from "./simulation/mission";
@@ -42,12 +43,12 @@ export const missionTerrain = (mission: MissionFile): ScenarioTerrain => ({
 
 /**
  * A headless simulation unless `map` supplies rendered terrain. `aiConcerns`
- * supplies the concerns the mission's AI profiles name.
+ * replaces the built-in concerns the mission's AI profiles name.
  */
 export function createSessionSimulation(
   mission: LoadedMission,
   map: TerrainGrid = createScenarioMap(missionTerrain(mission)),
-  aiConcerns?: ReadonlyMap<string, AiConcern>,
+  aiConcerns: ReadonlyMap<string, AiConcern> = BUILT_IN_AI_CONCERNS,
 ): MissionSimulation {
   const occupancy = new OccupancyGrid(map);
   const { content } = mission;

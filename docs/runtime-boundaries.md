@@ -39,16 +39,23 @@ These contracts describe where new behaviors, views, and services attach.
   the same tick with the owner and `ai` as issuer. Planning and command execution share
   the tick transaction; either failing restores the committed state and faults
   the mission. Concerns cannot call mission mutation, tick, or disposal methods.
-- Director concerns are built-in code that profiles name by ID. Each receives
-  `viewOf(owner)` and no route to the simulation. Rounds, concern turns, and
+- Director concerns are built-in code that profiles name by ID, registered in
+  `simulation/ai-concerns.ts` with the shared ones; sessions use that registry
+  unless a caller supplies concerns. Faction plans such as
+  `simulation/arc-concerns.ts` build on `simulation/ai-planning.ts`. Each
+  concern receives `viewOf(owner)`, the authored terrain, and no route to the
+  simulation. Rounds, concern turns, and
   commands use counted per-tick limits, never elapsed time. A concern's saved
   memory must stay JSON, and it learns of refused commands on its next turn.
   Each owner generates IDs from its saved sequence without reading other
   owners' actors. A concern can name only actors its view shows, its own paid
   orders, and IDs it generated, so a refusal cannot reveal a hidden actor.
   Allied AI owners that pool resources each budget the whole balance, and the
-  first listed spends it first. `state.ai` holds budgets and claims;
-  [faction strategy](../DESIGN.md#faction-strategy) owns their rules.
+  first listed spends it first. A concern with nothing left to buy releases
+  its savings for the next reconciliation to share by weight. `state.ai` holds
+  budgets and claims; [faction strategy](../DESIGN.md#faction-strategy) owns
+  their rules. `simulation.ai` exposes it read-only for reports and
+  development tools.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates
   the current batch even if its hook immediately resumes.

@@ -1330,8 +1330,9 @@ Posture selection and spending follow these rules:
   AI-controlled owner. A profile lists each permitted posture's concerns by
   priority, with shares of resources and fielded units.
 - A concern keeps its unspent share while its posture lasts, so it can save for
-  a costly purchase. Essential concerns may also spend lower-priority shares
-  and take units from non-essential concerns.
+  a costly purchase. A concern with nothing left to buy releases its share for
+  redistribution by weight. Essential concerns may also spend lower-priority
+  shares and take units from non-essential concerns.
 - Protect essential income and immediate defense, then allocate remaining
   resources and units through the profile. Crises reduce optional commitments,
   use reserves, and prompt reassessment of active attacks.

@@ -4,7 +4,7 @@
   "ticksPerSecond": 60,
   "scenario": {
     "id": "skirmish-map",
-    "content": { "id": "base", "version": 3 },
+    "content": { "id": "base", "version": 4 },
     "actors": [
       "arc-trooper",
       "arc-scout",

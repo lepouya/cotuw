@@ -352,6 +352,8 @@ export type MissionSimulation = {
   readonly result: MissionResult | undefined;
   /** For headless reports and post-match summaries, outside player knowledge. */
   readonly metrics: DeepReadonly<MatchMetrics> | undefined;
+  /** Each AI owner's strategic state, for diagnostics outside player knowledge. */
+  readonly ai: DeepReadonly<AiState>;
   readonly objectives: readonly ObjectiveView[];
   /** Current relationship rules; events replace the view when they change. */
   readonly relations: Relations;
@@ -1522,6 +1524,7 @@ export function createMissionSimulation({
   const runDirector = (directed: Map<MissionCommand, AiCommandSource>) => {
     const ai = advanceDirector(state.ai, aiControllers, state.tick, {
       tickSeconds,
+      terrain: map,
       definitions: definitionsById,
       concerns,
       viewOf: simulation.viewOf,
@@ -1538,6 +1541,9 @@ export function createMissionSimulation({
   const simulation: MissionSimulation = {
     get metrics() {
       return state.metrics;
+    },
+    get ai() {
+      return state.ai;
     },
     get actors() {
       return state.actors;
