@@ -649,10 +649,11 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   wolves.
 - The game menu pauses a single-player mission and offers Save, Quicksave,
   Load, Options, Restart, and Main menu; its Load panel lists saves and imports
-  files. F5 quicksaves, F9 loads the quicksave, and F10 opens the menu. Escape
-  opens the menu after closing contextual UI, canceling active world tools,
-  ending camera modes, and clearing selection. In the menu, Escape backs out of
-  a panel, then closes the menu, preserving whether the mission was paused.
+  files. F5 quicksaves, F9 loads the quicksave, and F10 opens the menu; with a
+  modifier held, these keys stay with the host, as in Ctrl+F5's hard reload.
+  Escape opens the menu after closing contextual UI, canceling active world
+  tools, ending camera modes, and clearing selection. In the menu, Escape backs
+  out of a panel, then closes the menu, preserving whether the mission was paused.
   An available continue action, such as Resume, leads the menu. Audio
   settings open from Options, on the title screen and in missions. Mission
   menus name the difficulty, including right after loading a save.

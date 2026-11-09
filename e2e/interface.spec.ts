@@ -7,6 +7,7 @@ import {
   importMission,
   quickSave,
   terrainPoint,
+  openOpening,
 } from "./page-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
@@ -117,6 +118,18 @@ async function rightClick(page: Page, x: number, z: number) {
   const point = await terrainPoint(page, x, z);
   await page.mouse.click(point.x, point.y, { button: "right" });
 }
+
+test("application keys leave modified presses to the host", async ({
+  page,
+}) => {
+  await openOpening(page);
+  const menu = page.locator("#game-menu");
+  await page.keyboard.press("Shift+F10");
+  await page.keyboard.press("Control+F10");
+  await expect(menu).toBeHidden();
+  await page.keyboard.press("F10");
+  await expect(menu).toBeVisible();
+});
 
 test(
   "Escape handles skirmish controls when document focus is misreported",

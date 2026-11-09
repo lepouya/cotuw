@@ -61,9 +61,17 @@ const APPLICATION_KEYS = new Map<string, () => unknown>([
   ["F10", app.openMenu],
 ]);
 // F5 and F10 would otherwise reload the page or focus the browser menu.
+// Modified presses stay with the host, such as Ctrl+F5's hard reload.
 window.addEventListener("keydown", (event) => {
   const action = APPLICATION_KEYS.get(event.code);
-  if (!action) return;
+  if (
+    !action ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    event.shiftKey
+  )
+    return;
   event.preventDefault();
   if (!event.repeat && app.ready() && worldKeyboardAvailable(document))
     void Promise.resolve(action()).catch((error) =>

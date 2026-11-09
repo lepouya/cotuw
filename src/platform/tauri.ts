@@ -16,8 +16,18 @@ const DIRECTORY = "saves";
 const IN_APP_DATA = { baseDir: BaseDirectory.AppData };
 const FILTERS = [{ name: "Mission", extensions: ["json"] }];
 
+/** Removes partial saves a crash left behind, ahead of any new write. */
+async function removeInterruptedSaves() {
+  await mkdir(DIRECTORY, { ...IN_APP_DATA, recursive: true });
+  for (const { isFile, name } of await readDir(DIRECTORY, IN_APP_DATA))
+    if (isFile && name.endsWith(".tmp"))
+      await remove(`${DIRECTORY}/${name}`, IN_APP_DATA);
+}
+
 /** Keeps saves as JSON files in the app data folder. */
-export function createTauriPlatform(): Platform {
+export async function createTauriPlatform(): Promise<Platform> {
+  // Leftovers waste space but cannot affect saves, so a failure is ignored.
+  await removeInterruptedSaves().catch(() => {});
   const path = (id: string) => {
     if (!/^[a-zA-Z0-9_.-]+$/.test(id)) throw new RangeError("Invalid save ID.");
     return `${DIRECTORY}/${id}.json`;

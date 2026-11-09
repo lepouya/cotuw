@@ -1,5 +1,3 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 /** Host services the game uses without depending on Tauri directly. */
 export type Platform = {
   /** Mission files in the player's save library, by ID. */
@@ -21,7 +19,8 @@ export type SaveStorage = {
 };
 
 export async function createPlatform(): Promise<Platform> {
-  return isTauri()
+  // Tauri sets this global; importing its helper would add Tauri to browsers.
+  return "isTauri" in globalThis
     ? (await import("./tauri")).createTauriPlatform()
     : (await import("./browser")).createBrowserPlatform();
 }

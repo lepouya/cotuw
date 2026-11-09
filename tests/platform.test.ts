@@ -1,5 +1,8 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
+import { readDir } from "@tauri-apps/plugin-fs";
+
+import { createPlatform } from "../src/platform";
 import { createTauriPlatform } from "../src/platform/tauri";
 import { createBrowserPlatform } from "../src/platform/browser";
 
@@ -54,12 +57,12 @@ beforeEach(() => {
 test("only the desktop host closes its window on exit", async () => {
   expect(await createBrowserPlatform().exit()).toBe(false);
   expect(closeWindow).not.toHaveBeenCalled();
-  expect(await createTauriPlatform().exit()).toBe(true);
+  expect(await (await createTauriPlatform()).exit()).toBe(true);
   expect(closeWindow).toHaveBeenCalledOnce();
 });
 
 test("desktop saves replace an existing file after writing the new content", async () => {
-  const { saves } = createTauriPlatform();
+  const { saves } = await createTauriPlatform();
   disk.files.set("saves/quicksave.json", "old");
   await saves.write("quicksave", "new");
   expect(await saves.read("quicksave")).toBe("new");
@@ -70,7 +73,7 @@ test("desktop saves replace an existing file after writing the new content", asy
 test.each(["failWrite", "failRename"] as const)(
   "desktop %s preserves the previous save and removes partial files",
   async (failure) => {
-    const { saves } = createTauriPlatform();
+    const { saves } = await createTauriPlatform();
     disk.files.set("saves/quicksave.json", "old");
     disk[failure] = true;
     await expect(saves.write("quicksave", "partial")).rejects.toThrow("failed");
@@ -79,8 +82,27 @@ test.each(["failWrite", "failRename"] as const)(
   },
 );
 
+test("desktop startup removes interrupted writes and keeps saves", async () => {
+  disk.files.set("saves/quicksave.json", "kept");
+  disk.files.set("saves/quicksave.json.interrupted.tmp", "partial");
+  const { saves } = await createTauriPlatform();
+  expect(await saves.list()).toEqual(["quicksave"]);
+  expect([...disk.files.keys()]).toEqual(["saves/quicksave.json"]);
+});
+
+test("desktop startup survives an unreadable save folder", async () => {
+  vi.mocked(readDir).mockRejectedValueOnce(new Error("Denied"));
+  await expect(createTauriPlatform()).resolves.toBeDefined();
+});
+
+test("the platform follows the host's Tauri global", async () => {
+  expect(await (await createPlatform()).exit()).toBe(false);
+  vi.stubGlobal("isTauri", true);
+  expect(await (await createPlatform()).exit()).toBe(true);
+});
+
 test("desktop save IDs cannot escape the save directory", async () => {
-  const { saves } = createTauriPlatform();
+  const { saves } = await createTauriPlatform();
   for (const id of ["../outside", "folder/save", "folder\\save", "save:stream"])
     for (const action of [
       () => saves.read(id),
