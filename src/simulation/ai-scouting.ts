@@ -6,12 +6,11 @@ import {
   isAvoided,
   isAvoidedList,
   isStaleReport,
-  isUsable,
-  ownBuildings,
   recentAvoided,
   rosterBuildings,
   staleReportTicks,
   train,
+  usableBuildings,
 } from "./ai-planning";
 import { secondsToTicks } from "./clock";
 import { tileKey } from "./grid";
@@ -215,11 +214,11 @@ function fieldScout(
   }
   // Saves for the scout before its producer exists and through any delay.
   if (tick < (memory.replaceTick ?? 0)) return;
-  const producer = ownBuildings(
+  const [producer] = usableBuildings(
     context,
     (definition) =>
       !!definition.production?.unitDefinitionIds.includes(unit.id),
-  ).find((building) => isUsable(context, building));
+  );
   if (!producer) return;
   const actorId = train(context, producer, unit);
   if (actorId) {

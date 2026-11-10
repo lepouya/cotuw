@@ -119,10 +119,11 @@ export type AiConcernContext = {
   /** What this concern may spend of a resource. */
   funds: (resource: Resource) => number;
   /**
-   * Returns this concern's unspent budget, so the next reconciliation shares
-   * it by weight. For a concern with nothing left to save for.
+   * Returns this concern's unspent budget beyond `keep`, so the next
+   * reconciliation shares it by weight. For a concern with nothing left, or
+   * only a reserve, to save for.
    */
-  releaseFunds: () => void;
+  releaseFunds: (keep?: Partial<Record<Resource, number>>) => void;
   /**
    * Queues a command for this tick. Creation commands spend their price from
    * the concern's funds. False when funds or the tick's command limit run out,
@@ -521,8 +522,14 @@ function concernContext(
     memory: ai.memory[concern]!,
     rejections,
     funds,
-    releaseFunds: () => {
-      ai.budgets[concern] = {};
+    releaseFunds: (keep = {}) => {
+      const account = ai.budgets[concern]!;
+      ai.budgets[concern] = Object.fromEntries(
+        RESOURCE_IDS.flatMap((resource) => {
+          const kept = Math.min(account[resource] ?? 0, keep[resource] ?? 0);
+          return kept > 0 ? [[resource, kept]] : [];
+        }),
+      );
     },
     issue: (command) => {
       if (

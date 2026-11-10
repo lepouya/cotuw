@@ -127,11 +127,12 @@ AI tasks are developed and verified with them.
   Barracks while training Troopers to a rally point. The undisturbed mirror
   reaches first income near 1:15, military production near 2:30, and a first
   Trooper near 2:40 through ordinary placement and costs.
-- [ ] **1.34** Add recovery plans for ordinary worker, production, and
-  support-link losses. Verify recovery without free replacements or resources.
-  Raids can already destroy every Harvester while all funds go to Troopers,
-  which ends Easy and Hard mirror cases near 9:40; keep enough in reserve to
-  restore income.
+- [x] **1.34** Recovery reserves income replacement costs and restores lost
+  headquarters. Income and production plans replace workers and offline
+  buildings, reusing stranded Harvesters, and restore one Refinery and
+  producer before growing again. Tests cover paid recovery from
+  worker, income, production, headquarters, and support-link losses, defense
+  timing, and deterministic save/load continuation.
 - [x] **1.35** Faction-neutral `scouting` concern in
   `simulation/ai-scouting.ts` explores authored sites, refreshes stale reports,
   retreats after damage, skips failed approaches, and replaces lost scouts at
@@ -143,12 +144,14 @@ AI tasks are developed and verified with them.
   home. Defense protects buildings and workers; offense raids observed income
   and attacks known buildings after the four-minute grace. Idle scouts sweep
   for unseen buildings, including while stale reports are avoided. Every ARC
-  mirror case completes, with raids from 4:15.
+  mirror case completes, with raids from about 4:25.
 - [ ] **1.37** Tune opening grace, commitment, pursuit, retreat, and recovery
   through profiles, replacing the initial tuning constants in the `ai-*.ts`
   concern modules. Keep these separate from difficulty health/damage scaling.
-  The Normal ARC mirror currently ends by elimination near 12:40, below the
-  15 to 25 minute target.
+  The Normal ARC mirror currently ends by elimination near 13:10, below the
+  15 to 25 minute target. In Easy and Hard cases, early raids overrun the
+  scaled-down side's single-Harvester economy near 8:40 to 9:50. Losing
+  every headquarters needs 300 Materials banked to recover.
   Enforce M1's four-minute offensive grace period while allowing local defense.
   Tune normally funded, observation-driven raids and substantial assaults to
   the agreed windows without forcing attacks during crises.

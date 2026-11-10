@@ -300,6 +300,22 @@ test("released funds are shared again by weight", () => {
   });
 });
 
+test("a release can keep a reserve and return only the surplus", () => {
+  const funds: number[] = [];
+  const sim = fixture(profile([allocation("keeper"), allocation("saver", 3)]), {
+    keeper: (context) => {
+      funds.push(context.funds("materials"));
+      context.releaseFunds({ materials: 10 });
+      expect(context.funds("materials")).toBe(10);
+    },
+    saver: () => {},
+  });
+  advanceTicks(sim, 2 * ROUND + 1);
+  // 25 of 100 keeps 10; each returned surplus splits again by weight.
+  expect(funds).toEqual([25, 13.75, 10.938]);
+  expect(sim.snapshot().ai.west!.budgets.keeper).toEqual({ materials: 10 });
+});
+
 test("float error in a budget share cannot block an exact price", () => {
   let trained = false;
   const sim = fixture(

@@ -1,10 +1,10 @@
 // Group controller for faction operations: assembly, advance, and return.
-import { compareIds, healthOf, isArmyUnit, trainsArmy } from "./actor";
+import { compareIds, healthOf, isArmyUnit } from "./actor";
 import {
+  armyProducer,
   definitionOf,
   headquarters,
-  isUsable,
-  ownBuildings,
+  usableBuildings,
 } from "./ai-planning";
 import { secondsToTicks } from "./clock";
 import {
@@ -147,10 +147,8 @@ export const armyUnits = (context: AiConcernContext) =>
 
 /** Where new units gather: the first army rally point, else headquarters. */
 export function stagingPoint(context: AiConcernContext) {
-  const rally = ownBuildings(context, (definition) =>
-    trainsArmy(definition, context.definitions),
-  ).find(
-    (building) => isUsable(context, building) && building.rallyPoint,
+  const rally = usableBuildings(context, armyProducer(context)).find(
+    ({ rallyPoint }) => rallyPoint,
   )?.rallyPoint;
   return rally ?? headquarters(context)?.worldPosition;
 }

@@ -1,9 +1,11 @@
 // ARC build plan: Materials income and army producers.
-import { compareIds, trainsArmy } from "./actor";
+import { compareIds } from "./actor";
 import {
   affords,
+  armyProducer,
   definitionOf,
   headquarters,
+  isOnline,
   isUsable,
   ownBuildings,
   place,
@@ -46,13 +48,18 @@ function sitesNear(
     );
 }
 
+/** Postures that build only the essential base, before growing it. */
+const restoring = ({ posture }: AiConcernContext) =>
+  posture === "establishing" || posture === "recovering";
+
 const harvesterOf = (context: AiConcernContext, refinery: ActorDefinition) =>
   context.definitions.get(refinery.refinery!.harvesterDefinitionId)!;
 
 /**
  * Builds Refineries beside known Materials, staffs each with a Harvester, and
- * keeps Harvesters gathering. Establishing keeps one Refinery; later postures
- * grow to several. Savings return to the pool once every Refinery is staffed.
+ * keeps Harvesters gathering. Establishing and recovering keep one Refinery;
+ * other postures grow to several. Savings return to the pool once every Refinery is staffed.
+ * Harvesters of offline Refineries move to open ones.
  */
 export const arcIncome: AiConcern = (context) => {
   const { terrain } = context;
@@ -61,17 +68,18 @@ export const arcIncome: AiConcern = (context) => {
   const refineries = ownBuildings(
     context,
     (definition) => !!definition.refinery,
-  );
+  ).filter((refinery) => isOnline(context, refinery));
   // Planning reads committed state, so reserve assignments within this turn.
   const occupied = new Set(
     refineries
       .filter(({ id }) => refineryOccupied(economy, id))
       .map(({ id }) => id),
   );
+  let unstaffed = false;
   for (const worker of [...economy.harvesters].sort((a, b) =>
     compareIds(a.actorId, b.actorId),
   )) {
-    if (worker.phase === "unassigned") {
+    if (!refineries.some(({ id }) => id === worker.refineryId)) {
       const open = refineries.find(
         (refinery) => isUsable(context, refinery) && !occupied.has(refinery.id),
       );
@@ -84,6 +92,7 @@ export const arcIncome: AiConcern = (context) => {
         })
       )
         occupied.add(open.id);
+      else unstaffed = true;
     } else if (worker.phase === "idle" || worker.phase === "depleted") {
       const refinery = refineries.find(({ id }) => id === worker.refineryId);
       const [nearest] = refinery
@@ -108,7 +117,7 @@ export const arcIncome: AiConcern = (context) => {
       )
     )
       occupied.add(refinery.id);
-  const wanted = context.posture === "establishing" ? 1 : DEVELOPING_REFINERIES;
+  const wanted = restoring(context) ? 1 : DEVELOPING_REFINERIES;
   if (
     refineries.length >= wanted &&
     refineries.every((refinery) => occupied.has(refinery.id))
@@ -123,8 +132,12 @@ export const arcIncome: AiConcern = (context) => {
     !definition ||
     refineries.length >= wanted ||
     refineries.some((refinery) => refinery.construction) ||
-    // Wait until the Refinery can also be staffed.
-    !affords(context, definition, harvesterOf(context, definition))
+    // Wait until the Refinery can also be staffed, unless a Harvester waits.
+    !affords(
+      context,
+      definition,
+      ...(unstaffed ? [] : [harvesterOf(context, definition)]),
+    )
   )
     return;
   const [target] = sitesNear(context, terrain, home.worldPosition);
@@ -138,26 +151,19 @@ export const arcIncome: AiConcern = (context) => {
 };
 
 /**
- * Builds army producers once income exists, away from the Materials, and
- * moves the posture between establishing and developing as they appear.
- * Savings return to the pool once the posture's producers exist.
+ * Builds army producers once income exists, away from the Materials. Savings
+ * return to the pool once the posture's producers exist.
  */
 export const arcProduction: AiConcern = (context) => {
   const { terrain } = context;
   const economy = context.view.economy();
   const home = headquarters(context);
   if (!economy || !home || !terrain) return;
-  const army = (definition: ActorDefinition) =>
-    trainsArmy(definition, context.definitions);
-  const producers = ownBuildings(context, army);
-  const established =
-    economy.harvesters.length > 0 &&
-    producers.some((producer) => !producer.construction);
-  if (context.posture === "establishing" && established)
-    context.requestPosture("developing");
-  else if (context.posture === "developing" && !established)
-    context.requestPosture("establishing");
-  const planned = context.posture === "establishing" ? 1 : 2;
+  const army = armyProducer(context);
+  const producers = ownBuildings(context, army).filter((producer) =>
+    isOnline(context, producer),
+  );
+  const planned = restoring(context) ? 1 : 2;
   if (producers.length >= planned) {
     context.releaseFunds();
     return;

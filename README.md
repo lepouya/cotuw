@@ -54,7 +54,8 @@ Open `/?level=sandbox` for free construction and training. Explicit
 Use `/?level=skirmish-map` to inspect the rough M1 battlefield the same way.
 Use `/?skirmish=arc-circle&player=east&difficulty=hard` to start an assembled
 skirmish. Add `&ai=west:arc-skirmish` to let the ARC AI build its base,
-train forces, scout, defend, raid observed income, and attack known bases.
+train forces, scout, defend, raid observed income, attack known bases, and
+rebuild after losses.
 Development AI links offer a diagnostics overlay; Backquote cycles AI owners,
 then hides it.
 Choose Circle in New mission or use `/?level=circle-wolf-den` for the

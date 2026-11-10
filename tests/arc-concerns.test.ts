@@ -212,7 +212,7 @@ test.each(["missing", "blocked"])(
       };
     const sim = resumeMirror(dueRound(state));
     try {
-      runTicks(sim, 2);
+      runTicks(sim, ROUND_TICKS);
       const target = sim.actorById(producer.id)!.rallyPoint;
       expect(target).toBeDefined();
       expect(sim.viewOf("west").evaluateRallyPoint(producer.id, target!)).toBe(

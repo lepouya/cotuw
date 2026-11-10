@@ -1,5 +1,5 @@
 // Faction-neutral reading and ordering helpers for director concerns.
-import { compareIds } from "./actor";
+import { compareIds, trainsArmy } from "./actor";
 import { secondsToTicks } from "./clock";
 import { tileKey } from "./grid";
 import { rosterIncludes } from "./ownership";
@@ -71,24 +71,46 @@ export const headquarters = (context: AiConcernContext) =>
     (building) => !building.construction,
   );
 
+/** Not cut off from support. Plans count offline buildings as lost. */
+export const isOnline = (context: AiConcernContext, building: Building) =>
+  !context.view.offlineIds().has(building.id);
+
 /** Completed and supported, so it can produce or receive deliveries. */
 export const isUsable = (context: AiConcernContext, building: Building) =>
-  !building.construction && !context.view.offlineIds().has(building.id);
+  !building.construction && isOnline(context, building);
 
-/** Whether the concern's funds cover every listed price together. */
-export function affords(
+/** Own usable buildings, in ID order. */
+export const usableBuildings = (
   context: AiConcernContext,
-  ...definitions: ActorDefinition[]
-) {
-  const owed = new Map<Resource, number>();
+  matches: (definition: ActorDefinition) => boolean,
+) =>
+  ownBuildings(context, matches).filter((building) =>
+    isUsable(context, building),
+  );
+
+/** Matches definitions that train army units. */
+export const armyProducer =
+  (context: AiConcernContext) => (definition: ActorDefinition) =>
+    trainsArmy(definition, context.definitions);
+
+/** The listed prices added together, by resource. */
+export function totalPrice(definitions: readonly ActorDefinition[]) {
+  const owed: Partial<Record<Resource, number>> = {};
   for (const definition of definitions) {
     const resource = costResource(definition);
-    owed.set(resource, (owed.get(resource) ?? 0) + costAmount(definition));
+    owed[resource] = (owed[resource] ?? 0) + costAmount(definition);
   }
-  return [...owed].every(
-    ([resource, amount]) => context.funds(resource) >= amount,
-  );
+  return owed;
 }
+
+/** Whether the concern's funds cover every listed price together. */
+export const affords = (
+  context: AiConcernContext,
+  ...definitions: ActorDefinition[]
+) =>
+  Object.entries(totalPrice(definitions)).every(
+    ([resource, amount]) => context.funds(resource as Resource) >= amount,
+  );
 
 /** Tiles under shown buildings and sites, with a one-tile margin for routes. */
 function reservedTiles(context: AiConcernContext) {

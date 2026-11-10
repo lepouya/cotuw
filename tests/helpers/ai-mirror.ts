@@ -17,7 +17,7 @@ export const MIRROR = assembleSkirmish(
 );
 
 /** Enough ticks for one full planning round of the ARC profile. */
-export const ROUND_TICKS = 3;
+export const ROUND_TICKS = 4;
 
 /** Ticks `sim`, returning every command outcome in order. */
 export function runTicks(sim: MissionSimulation, ticks: number) {

@@ -45,19 +45,24 @@ These contracts describe where new behaviors, views, and services attach.
   `simulation/arc-concerns.ts` build on `simulation/ai-planning.ts`. Group
   operations run through `simulation/ai-operations.ts`; a concern saves each
   in its memory's `operations` list, which diagnostics read. Operations keep
-  their home rally separate from temporary regrouping points. Each
-  concern receives `viewOf(owner)`, the authored terrain, and no route to the
-  simulation. Rounds, concern turns, and
-  commands use counted per-tick limits, never elapsed time. A concern's saved
+  their home rally separate from temporary regrouping points.
+  `simulation/ai-recovery.ts` keeps a reserve for restoring income and
+  switches between recovering and developing as the base loses and regains
+  its headquarters, income, or army production. Income plans own all worker
+  training; defense controls when its posture ends. Each concern receives
+  `viewOf(owner)`, the authored terrain, and no route to the simulation.
+  Rounds, concern turns, and commands use counted per-tick limits, never
+  elapsed time. A concern's saved
   memory must stay JSON, and it learns of refused commands on its next turn.
   Each owner generates IDs from its saved sequence without reading other
   owners' actors. A concern can name only actors its view shows, its own paid
   orders, and IDs it generated, so a refusal cannot reveal a hidden actor.
   Allied AI owners that pool resources each budget the whole balance, and the
   first listed spends it first. A concern with nothing left to buy releases
-  its savings for the next reconciliation to share by weight. `state.ai` holds
-  budgets and claims; [faction strategy](../DESIGN.md#faction-strategy) owns
-  their rules. `simulation.ai` exposes it read-only for reports and
+  its savings, or those beyond a reserve, for the next reconciliation to
+  share by weight. `state.ai` holds budgets and claims;
+  [faction strategy](../DESIGN.md#faction-strategy) owns their rules.
+  `simulation.ai` exposes it read-only for reports and
   development tools.
 - Loop hooks run outside the simulation transaction. They may queue commands
   or pause the loop. Recursive `advance` calls do no work; a pause invalidates

@@ -30,6 +30,10 @@ const OWNERS = ["west", "east"] as const;
 const seconds = (count: number) =>
   secondsToTicks(count, SIMULATION_TICK_SECONDS);
 const definitions = new Map(MIRROR.content.actors.map((d) => [d.id, d]));
+/** Both owners' first raids are advancing by then. */
+const RAIDS_SECONDS = 35;
+/** West's first raid has launched by then. */
+const WEST_RAID_SECONDS = 25;
 const operations = (sim: MissionSimulation | MissionState, owner = "west") =>
   operationsOf(sim.ai[owner]!.memory);
 
@@ -65,7 +69,7 @@ test("offense waits out the opening grace period", () => {
 test("a raid sets out against observed enemy income after the grace", () => {
   const sim = resumeMirror(structuredClone(graced));
   try {
-    const results = runTicks(sim, seconds(15));
+    const results = runTicks(sim, seconds(RAIDS_SECONDS));
     for (const owner of OWNERS) {
       expect(sim.ai[owner]!.posture).toBe("pressuring");
       const [raid] = operations(sim, owner);
@@ -105,7 +109,7 @@ test("a raid sets out against observed enemy income after the grace", () => {
 test("an operation continues identically after save and load", () => {
   const sim = resumeMirror(structuredClone(graced));
   try {
-    runTicks(sim, seconds(10));
+    runTicks(sim, seconds(WEST_RAID_SECONDS));
     expect(operations(sim)).toHaveLength(1);
     const saved = savedState(MIRROR.scenario, sim);
     const resumed = createSessionSimulation({
@@ -136,9 +140,9 @@ test("active operations continue identically through bounded clock catch-up", ()
     now: () => now,
   });
   try {
-    runTicks(whole, seconds(15));
+    runTicks(whole, seconds(WEST_RAID_SECONDS));
     expect(operations(whole)).toHaveLength(1);
-    now = 15_000 + SIMULATION_TICK_SECONDS * 500;
+    now = WEST_RAID_SECONDS * 1000 + SIMULATION_TICK_SECONDS * 500;
     for (
       let batch = 0;
       batched.completedTicks < whole.completedTicks && batch < 100;

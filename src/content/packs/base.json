@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 1,
   "id": "base",
-  "version": 6,
+  "version": 7,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -523,6 +523,7 @@
       "postures": {
         "establishing": [
           { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
+          { "concern": "recovery", "budget": 0, "forces": 0 },
           {
             "concern": "arc-income",
             "budget": 1,
@@ -542,6 +543,7 @@
             "forces": 0,
             "essential": true
           },
+          { "concern": "recovery", "budget": 2, "forces": 0 },
           { "concern": "forces", "budget": 2, "forces": 0 },
           { "concern": "arc-production", "budget": 1, "forces": 0 },
           { "concern": "offense", "budget": 0, "forces": 8 }
@@ -556,6 +558,7 @@
             "forces": 0,
             "essential": true
           },
+          { "concern": "recovery", "budget": 2, "forces": 0 },
           { "concern": "forces", "budget": 2, "forces": 0 },
           { "concern": "arc-production", "budget": 1, "forces": 0 }
         ],
@@ -567,10 +570,35 @@
             "forces": 0,
             "essential": true
           },
+          { "concern": "recovery", "budget": 2, "forces": 0 },
           { "concern": "forces", "budget": 3, "forces": 0 },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "offense", "budget": 0, "forces": 8 },
           { "concern": "arc-production", "budget": 1, "forces": 0 }
+        ],
+        "recovering": [
+          { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
+          {
+            "concern": "recovery",
+            "budget": 1,
+            "forces": 0,
+            "essential": true
+          },
+          {
+            "concern": "arc-income",
+            "budget": 2,
+            "forces": 0,
+            "essential": true
+          },
+          {
+            "concern": "arc-production",
+            "budget": 1,
+            "forces": 0,
+            "essential": true
+          },
+          { "concern": "scouting", "budget": 1, "forces": 1 },
+          { "concern": "offense", "budget": 0, "forces": 8 },
+          { "concern": "forces", "budget": 0, "forces": 0 }
         ]
       }
     }

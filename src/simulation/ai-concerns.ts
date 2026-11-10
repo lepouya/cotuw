@@ -1,14 +1,15 @@
-import { isArmyUnit, trainsArmy } from "./actor";
+import { isArmyUnit } from "./actor";
 import {
+  armyProducer,
   definitionOf,
   headquarters,
-  isUsable,
-  ownBuildings,
   stepToward,
   train,
+  usableBuildings,
 } from "./ai-planning";
 import { defense } from "./ai-defense";
 import { offense } from "./ai-offense";
+import { recovery } from "./ai-recovery";
 import { scouting } from "./ai-scouting";
 import { ARC_CONCERNS } from "./arc-concerns";
 
@@ -28,9 +29,7 @@ export const trainForces: AiConcern = (context) => {
   const economy = context.view.economy();
   if (!economy || !terrain) return;
   const home = headquarters(context);
-  const producers = ownBuildings(context, (definition) =>
-    trainsArmy(definition, context.definitions),
-  ).filter((producer) => isUsable(context, producer));
+  const producers = usableBuildings(context, armyProducer(context));
   for (const producer of producers) {
     if (
       !producer.rallyPoint ||
@@ -68,5 +67,6 @@ export const BUILT_IN_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map([
   ["defense", defense],
   ["forces", trainForces],
   ["offense", offense],
+  ["recovery", recovery],
   ["scouting", scouting],
 ]);
