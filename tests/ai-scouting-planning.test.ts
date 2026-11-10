@@ -2,7 +2,8 @@ import { expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
-import { scouting, STALE_REPORT_SECONDS } from "../src/simulation/ai-scouting";
+import { STALE_REPORT_SECONDS } from "../src/simulation/ai-planning";
+import { scouting } from "../src/simulation/ai-scouting";
 import { createObservations } from "../src/simulation/observations";
 import { TerrainGrid } from "../src/simulation/terrain";
 
@@ -77,6 +78,7 @@ function fixture(faction = "arc", tickSeconds = 0.1) {
       knowledge: {
         sites: [{ id: "site", tile: { x: 80, z: 80 }, resource: "materials" }],
         observations,
+        seesTile: () => true,
       },
     },
   } as unknown as AiConcernContext;
@@ -261,4 +263,21 @@ test("a site and a building with the same ID remain distinct goals", () => {
   expect(issued).toEqual([
     { kind: "move", actorId: scout.id, target: buildingAt },
   ]);
+});
+
+test("avoided stale reports leave the scout free to sweep unseen areas", () => {
+  const { context, memory, issued } = fixture();
+  context.view.knowledge.seesTile = () => false;
+  memory.avoid = [{ ...far, tick: context.tick }];
+  scouting(context);
+  expect(memory.goal).toMatchObject({ kind: "area" });
+  expect(issued[0]).toMatchObject({ kind: "move", actorId: "scout" });
+});
+
+test("stale reports take priority over never-seen sweep points", () => {
+  const { context, memory, observations } = fixture();
+  context.view.knowledge.seesTile = () => false;
+  observations.sites.push({ siteId: "site", amount: 0, tick: 1 });
+  scouting(context);
+  expect(memory.goal).toMatchObject({ kind: "site", id: "site" });
 });

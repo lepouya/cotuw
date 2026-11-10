@@ -16,6 +16,9 @@ export const MIRROR = assembleSkirmish(
   ARC_MIRROR_CASES.find(({ id }) => id === "arc-mirror-west-normal")!.choice,
 );
 
+/** Enough ticks for one full planning round of the ARC profile. */
+export const ROUND_TICKS = 3;
+
 /** Ticks `sim`, returning every command outcome in order. */
 export function runTicks(sim: MissionSimulation, ticks: number) {
   const outcomes: CommandOutcome[] = [];

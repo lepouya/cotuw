@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
 
-import { dueRound, MIRROR, resumeMirror, runTicks } from "./helpers/ai-mirror";
+import {
+  dueRound,
+  MIRROR,
+  resumeMirror,
+  ROUND_TICKS,
+  runTicks,
+} from "./helpers/ai-mirror";
 import { createSessionSimulation, loadMission } from "../src/mission-loading";
 import {
   secondsToTicks,
@@ -63,7 +69,11 @@ test("the ARC AI grows income and forces with ordinary placement and costs", () 
     const refineries = ownedBy(owner, "arc-materials-refinery");
     expect(refineries.length).toBeGreaterThanOrEqual(2);
     expect(ownedBy(owner, "arc-field-barracks")).toHaveLength(1);
-    expect(ownedBy(owner, "arc-trooper").length).toBeGreaterThanOrEqual(4);
+    // Raids after the grace period can already have cost Troopers.
+    const { peakArmy } = simulation.metrics!.owners.find(
+      (metrics) => metrics.owner === owner,
+    )!;
+    expect(peakArmy).toBeGreaterThanOrEqual(4);
     for (const building of [
       ...refineries,
       ...ownedBy(owner, "arc-field-barracks"),
@@ -95,7 +105,9 @@ test("the ARC AI's commands stay valid", () => {
 });
 
 test("the developing base reaches its income and production targets", () => {
-  const sim = resumeMirror(simulation.snapshot());
+  // Undisturbed by raids and attacks.
+  const concerns = new Map(BUILT_IN_AI_CONCERNS).set("offense", () => {});
+  const sim = resumeMirror(simulation.snapshot(), concerns);
   try {
     const results = runTicks(sim, minutes(5));
     expect(results.filter(({ accepted }) => !accepted)).toEqual([]);
@@ -166,9 +178,9 @@ test.each([1, 2])(
     concerns.set("forces", () => {});
     const sim = resumeMirror(state, concerns);
     try {
-      const results = sim
-        .tick()
-        .filter(({ issuer }) => issuer.owner === "west");
+      const results = runTicks(sim, ROUND_TICKS).filter(
+        ({ issuer }) => issuer.owner === "west",
+      );
       expect(results.filter(({ accepted }) => !accepted)).toEqual([]);
       expect(
         results.filter(({ command }) => command.kind === "assign-refinery"),

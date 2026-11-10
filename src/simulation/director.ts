@@ -139,7 +139,10 @@ export type AiConcernContext = {
   /** False when the profile forbids it. The highest-priority request wins. */
   requestPosture: (posture: AiPosture) => boolean;
 };
-export type AiConcern = (context: AiConcernContext) => void;
+export type AiConcern = ((context: AiConcernContext) => void) & {
+  /** Validates this concern's saved state before a mission starts. */
+  validateMemory?: (memory: Record<string, unknown>) => boolean;
+};
 
 /** Budget reservations to return if a command is refused. */
 export type AiCommandSource = {
@@ -283,6 +286,7 @@ export function validateAiState(
   ai: AiState,
   controllers: readonly AiController[],
   actorIds: ReadonlySet<string>,
+  concerns: ReadonlyMap<string, AiConcern>,
 ) {
   const valid =
     isRecord(ai) &&
@@ -328,7 +332,11 @@ export function validateAiState(
         ) &&
         isRecord(state.memory) &&
         Object.entries(state.memory).every(
-          ([concern, memory]) => known.has(concern) && isRecord(memory),
+          ([concern, memory]) =>
+            known.has(concern) &&
+            isRecord(memory) &&
+            isJson(memory) &&
+            (concerns.get(concern)?.validateMemory?.(memory) ?? true),
         )
       );
     });

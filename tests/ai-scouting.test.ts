@@ -1,8 +1,15 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
 
-import { dueRound, MIRROR, resumeMirror, runTicks } from "./helpers/ai-mirror";
+import {
+  dueRound,
+  MIRROR,
+  resumeMirror,
+  ROUND_TICKS,
+  runTicks,
+} from "./helpers/ai-mirror";
 import { savedState } from "./helpers/scenario";
 import { createSessionSimulation } from "../src/mission-loading";
+import { BUILT_IN_AI_CONCERNS } from "../src/simulation/ai-concerns";
 import { SCOUT_REPLACEMENT_SECONDS } from "../src/simulation/ai-scouting";
 import {
   secondsToTicks,
@@ -20,8 +27,6 @@ import type {
 const OWNERS = ["west", "east"] as const;
 const seconds = (count: number) =>
   secondsToTicks(count, SIMULATION_TICK_SECONDS);
-/** Enough ticks for one full planning round of the ARC profile. */
-const ROUND_TICKS = 3;
 
 let simulation: MissionSimulation;
 const outcomes: CommandOutcome[] = [];
@@ -172,7 +177,9 @@ test("a lost scout is replaced at normal cost after a delay", () => {
     ({ owner }) => owner === "west",
   )!.history;
   history[history.length - 1]!.units -= 1;
-  const sim = resumeForRound(state);
+  // Raids would disrupt the income the replacement waits for.
+  const concerns = new Map(BUILT_IN_AI_CONCERNS).set("offense", () => {});
+  const sim = resumeMirror(dueRound(state), concerns);
   try {
     runTicks(sim, ROUND_TICKS);
     const lost = memoryOf(sim);

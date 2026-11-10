@@ -259,7 +259,13 @@ can be read, edited by hand, and loaded again.
   posture's shares, keeping earlier actor IDs first. Refused purchases restore
   their original budget reservations. `rejections` holds each refused
   `concern`, `tick`, `command`, and `reason` until that concern's next turn.
-  `memory` maps concerns to their own JSON state.
+  `memory` maps concerns to their own JSON state. Concerns can supply a
+  `validateMemory` predicate; loading checks built-in scouting, defense, and
+  offense memory before starting the mission.
+- An operation stores its objective, units, phase, progress, and retry counts
+  in its concern's `operations` list. `rally` is its home destination;
+  optional `regroup` is a temporary assembly point. Scouting saves its goal,
+  replacement timer, avoided positions, and last-seen sweep ticks.
 
 ## Economy state
 

@@ -42,7 +42,10 @@ These contracts describe where new behaviors, views, and services attach.
 - Director concerns are built-in code that profiles name by ID, registered in
   `simulation/ai-concerns.ts` with the shared ones; sessions use that registry
   unless a caller supplies concerns. Faction plans such as
-  `simulation/arc-concerns.ts` build on `simulation/ai-planning.ts`. Each
+  `simulation/arc-concerns.ts` build on `simulation/ai-planning.ts`. Group
+  operations run through `simulation/ai-operations.ts`; a concern saves each
+  in its memory's `operations` list, which diagnostics read. Operations keep
+  their home rally separate from temporary regrouping points. Each
   concern receives `viewOf(owner)`, the authored terrain, and no route to the
   simulation. Rounds, concern turns, and
   commands use counted per-tick limits, never elapsed time. A concern's saved

@@ -297,6 +297,11 @@ export const isArmyUnit = (definition: ActorDefinition) =>
   !definition.footprint &&
   !isWorkerDefinition(definition);
 
+/** Buildings that turn gathered resources into income. */
+export const isIncomeBuilding = (
+  definition: Pick<ActorDefinition, "refinery" | "cultivationDropoff">,
+) => !!definition.refinery || !!definition.cultivationDropoff;
+
 /** Unarmed mobile units that neither gather nor build, such as scouts. */
 export const isScoutUnit = (definition: ActorDefinition) =>
   !!definition.movement &&

@@ -1,5 +1,6 @@
 import { createElement as el } from "./dom";
 import { formatElapsed } from "../format-time";
+import { operationsOf } from "../simulation/ai-operations";
 import { aiDiagnostics } from "../simulation/director";
 import "./ai-overlay.css";
 
@@ -20,6 +21,8 @@ export type AiOverlaySource = Pick<
 export type AiOverlaySection = { title: string; lines: string[] };
 
 const amount = (value: number) => value.toFixed(1).replace(/\.0$/, "");
+const place = ({ x, z }: { x: number; z: number }) =>
+  `${Math.round(x)},${Math.round(z)}`;
 
 /**
  * Describes one AI owner's strategy, commands, and memory as text lines.
@@ -75,6 +78,15 @@ export function describeAi(
       ),
     },
     {
+      title: "Operations",
+      lines: listed(
+        operationsOf(memory).map(
+          ({ concern, operation: { id, phase, outcome, units, target } }) =>
+            `${concern} ${id}: ${phase}${outcome ? ` (${outcome})` : ""}, ${units.length} units → ${place(target)}`,
+        ),
+      ),
+    },
+    {
       title: "Commands",
       lines: listed(
         recent.map(
@@ -107,7 +119,7 @@ export function describeAi(
         `${observations.actors.length} actors, ${observations.sites.length} sites, ${observations.loot.length} loot`,
         ...sightings.map(
           ({ definitionId, owner: seenOwner, worldPosition, tick: seen }) =>
-            `${definitionId} (${seenOwner}) at ${Math.round(worldPosition.x)},${Math.round(worldPosition.z)}, ${age(seen)} ago`,
+            `${definitionId} (${seenOwner}) at ${place(worldPosition)}, ${age(seen)} ago`,
         ),
       ],
     },

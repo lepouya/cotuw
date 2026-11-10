@@ -115,14 +115,12 @@ AI tasks are developed and verified with them.
   The 12-case ARC-versus-Circle matrix belongs to 1.63.
 - [x] **1.31** Development AI overlay (`ui/ai-overlay.ts`), offered by `ai=`
   development links in dev and playtest builds. Backquote cycles AI owners'
-  posture, budgets, claims, recent and refused commands, concern memory, and
-  sightings. Add an operations view with 1.36.
-- [ ] **1.32** Serialize authoritative AI state in `state.ai` as each part is
-  added, covering plans and operations beyond the director's budgets, claims,
-  timers, and memory from 1.29. Reuse the saved observations from 1.19.
-  Extending the state requires a mission-file version increment. The director
-  tests verify identical continuation across clock batching and bounded
-  catch-up; extend them, and the save checks, with each new part through 1.36.
+  posture, budgets, claims, operations, recent and refused commands, concern
+  memory, and sightings.
+- [x] **1.32** `state.ai` saves budgets, claims, timers, plans, scouting goals,
+  and operations, with observations from 1.19. Concern-owned validators reject
+  malformed memory before startup. Tests verify deterministic save/load and
+  continuation through clock batching and bounded catch-up.
 - [x] **1.33** ARC build plan in `simulation/arc-concerns.ts` with the shared
   `forces` concern, which sessions use by default. It opens with a Refinery and
   Harvester, then a Field Barracks, and grows to three Refineries and two
@@ -131,16 +129,26 @@ AI tasks are developed and verified with them.
   Trooper near 2:40 through ordinary placement and costs.
 - [ ] **1.34** Add recovery plans for ordinary worker, production, and
   support-link losses. Verify recovery without free replacements or resources.
+  Raids can already destroy every Harvester while all funds go to Troopers,
+  which ends Easy and Hard mirror cases near 9:40; keep enough in reserve to
+  restore income.
 - [x] **1.35** Faction-neutral `scouting` concern in
   `simulation/ai-scouting.ts` explores authored sites, refreshes stale reports,
   retreats after damage, skips failed approaches, and replaces lost scouts at
   normal cost. The undisturbed mirror sights every site and enemy income;
   Harvesters can use scouted deposits after home Materials run out.
-- [ ] **1.36** Add group operations for local defense, raids on exposed income,
-  and attacks. Implement assignment, retreat, regrouping, bounded replanning,
-  and release of forces under the existing [AI rules](DESIGN.md#npc-ai).
+- [x] **1.36** Faction-neutral group operations in
+  `simulation/ai-operations.ts` assemble, advance, regroup, retreat when
+  outmatched or depleted, retry stalls within limits, and return survivors
+  home. Defense protects buildings and workers; offense raids observed income
+  and attacks known buildings after the four-minute grace. Idle scouts sweep
+  for unseen buildings, including while stale reports are avoided. Every ARC
+  mirror case completes, with raids from 4:15.
 - [ ] **1.37** Tune opening grace, commitment, pursuit, retreat, and recovery
-  through profiles. Keep these separate from difficulty health/damage scaling.
+  through profiles, replacing the initial tuning constants in the `ai-*.ts`
+  concern modules. Keep these separate from difficulty health/damage scaling.
+  The Normal ARC mirror currently ends by elimination near 12:40, below the
+  15 to 25 minute target.
   Enforce M1's four-minute offensive grace period while allowing local defense.
   Tune normally funded, observation-driven raids and substantial assaults to
   the agreed windows without forcing attacks during crises.

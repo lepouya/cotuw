@@ -3,31 +3,47 @@ import { compareIds, healthOf, isScoutUnit } from "./actor";
 import {
   definitionOf,
   headquarters,
+  isAvoided,
+  isAvoidedList,
+  isStaleReport,
   isUsable,
   ownBuildings,
+  recentAvoided,
   rosterBuildings,
+  staleReportTicks,
   train,
 } from "./ai-planning";
 import { secondsToTicks } from "./clock";
-import { distance } from "./world";
+import { tileKey } from "./grid";
+import {
+  hasOwn,
+  isCount,
+  isId,
+  isNonnegative,
+  isOneOf,
+  isRecord,
+} from "./validation";
+import { distance, isFinitePosition } from "./world";
 
+import type { Avoided } from "./ai-planning";
 import type { AiConcern, AiConcernContext } from "./director";
 import type { ActorRenderState } from "./actor";
+import type { TileCoord } from "./grid";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 
-/** Initial tuning: reports this old prompt fresh scouting. */
-export const STALE_REPORT_SECONDS = 180;
 /** Initial tuning: the wait before replacing a lost scout. */
 export const SCOUT_REPLACEMENT_SECONDS = 60;
 /** Tiles around danger or an unreachable target that scouting skips a while. */
 const AVOID_TILES = 10;
 /** A failed retreat waits before trying the home route again. */
 const RETREAT_RETRY_SECONDS = 5;
+/** Initial tuning: spacing of the map points an otherwise idle scout sweeps. */
+const SWEEP_TILES = 20;
 
 /** A place worth seeing: never sighted, or last seen at `tick`. */
 type Report = {
-  kind: "site" | "building";
+  kind: "site" | "building" | "area";
   id: string;
   position: WorldPosition;
   tick?: number;
@@ -47,7 +63,9 @@ export type ScoutMemory = {
   /** No replacement trains before this tick. */
   replaceTick?: number;
   /** Where the scout met damage or could not reach, and when. */
-  avoid?: (WorldPosition & { tick: number })[];
+  avoid?: Avoided[];
+  /** When each sweep point, by tile key, was last in view. */
+  swept?: Record<string, number>;
 };
 
 /** The scout unit with the widest vision that a roster producer trains. */
@@ -64,21 +82,34 @@ function scoutDefinition(context: AiConcernContext) {
     )[0];
 }
 
+/** Evenly spaced tiles across the map. */
+const sweepTiles = (terrain: TerrainView): TileCoord[] =>
+  Array.from({ length: Math.ceil(terrain.width / SWEEP_TILES) }, (_, column) =>
+    Array.from(
+      { length: Math.ceil(terrain.height / SWEEP_TILES) },
+      (_, row) => ({
+        x: Math.min(column * SWEEP_TILES + SWEEP_TILES / 2, terrain.width - 1),
+        z: Math.min(row * SWEEP_TILES + SWEEP_TILES / 2, terrain.height - 1),
+      }),
+    ),
+  ).flat();
+
 /**
  * Authored sites never sighted, then sites and enemy buildings not seen for
  * the stale interval, oldest first. Units move, so their reports are for
- * operations rather than scouting.
+ * operations rather than scouting. Stale sweep points are a fallback, so
+ * buildings raised out of sight are found even while reports are avoided.
  */
 function scoutingReports(
   context: AiConcernContext,
   terrain: TerrainView,
+  swept: Readonly<Record<string, number>>,
+  tiles: readonly TileCoord[],
 ): Report[] {
   const { sites, observations } = context.view.knowledge;
-  const stale = secondsToTicks(STALE_REPORT_SECONDS, context.tickSeconds);
-  const isStale = (tick: number | undefined) =>
-    tick === undefined || context.tick - tick >= stale;
+  const isStale = (tick: number | undefined) => isStaleReport(context, tick);
   const seen = new Map(observations.sites.map((site) => [site.siteId, site]));
-  return [
+  const reports = [
     ...sites.map((site) => ({
       kind: "site" as const,
       id: site.id,
@@ -94,34 +125,64 @@ function scoutingReports(
         tick: actor.tick,
       })),
   ].filter((report) => isStale(report.tick));
+  return [
+    ...reports,
+    ...tiles
+      .map((tile) => ({
+        kind: "area" as const,
+        id: tileKey(tile),
+        position: terrain.tileCenter(tile.x, tile.z),
+        tick: hasOwn(swept, tileKey(tile)) ? swept[tileKey(tile)] : undefined,
+      }))
+      .filter((report) => isStale(report.tick)),
+  ];
 }
 
 /**
  * Keeps one scout exploring: unsighted authored sites nearest first, then
- * stale reports. A damaged scout retreats home and avoids that area for the
- * stale interval; a lost one is replaced at normal cost after a delay.
+ * stale reports, then sweeps of the map. A damaged scout retreats home and
+ * avoids that area for the stale interval; a lost one is replaced at normal
+ * cost after a delay.
  */
 export const scouting: AiConcern = (context) => {
   const { terrain, tick } = context;
   if (!terrain) return;
   const memory = context.memory as ScoutMemory;
-  const stale = secondsToTicks(STALE_REPORT_SECONDS, context.tickSeconds);
-  const avoid = (memory.avoid ?? []).filter(
-    (entry) => tick - entry.tick < stale,
-  );
+  const avoid = recentAvoided(memory.avoid, tick, staleReportTicks(context));
   memory.avoid = avoid;
+  const tiles = sweepTiles(terrain);
+  for (const tile of tiles)
+    if (context.view.knowledge.seesTile(tile))
+      (memory.swept ??= {})[tileKey(tile)] = tick;
   const scout = fieldScout(context, memory, avoid);
-  if (scout) explore(context, terrain, scout, memory, avoid);
+  if (scout) explore(context, terrain, scout, memory, avoid, tiles);
   if (!avoid.length) delete memory.avoid;
 };
 
-type Avoided = NonNullable<ScoutMemory["avoid"]>;
+scouting.validateMemory = (memory) => {
+  const { goal } = memory;
+  return (
+    (memory.scoutId === undefined || isId(memory.scoutId)) &&
+    (memory.health === undefined || isNonnegative(memory.health)) &&
+    (memory.replaceTick === undefined || isCount(memory.replaceTick)) &&
+    isAvoidedList(memory.avoid) &&
+    (memory.swept === undefined ||
+      (isRecord(memory.swept) && Object.values(memory.swept).every(isCount))) &&
+    (goal === undefined ||
+      (isRecord(goal) &&
+        isOneOf(["site", "building", "area", "retreat"], goal.kind) &&
+        (goal.kind === "retreat" || isId(goal.id)) &&
+        isFinitePosition(goal.position) &&
+        (goal.issued === undefined || goal.issued === true) &&
+        (goal.retryTick === undefined || isCount(goal.retryTick))))
+  );
+};
 
 /** Trains or replaces the scout, returning it only while claimed. */
 function fieldScout(
   context: AiConcernContext,
   memory: ScoutMemory,
-  avoid: Avoided,
+  avoid: Avoided[],
 ) {
   const { tick } = context;
   const economy = context.view.economy();
@@ -173,7 +234,8 @@ function explore(
   terrain: TerrainView,
   scout: ActorRenderState,
   memory: ScoutMemory,
-  avoid: Avoided,
+  avoid: Avoided[],
+  tiles: readonly TileCoord[],
 ) {
   const { tick } = context;
   const fullHealth = definitionOf(context, scout).health ?? 0;
@@ -191,7 +253,7 @@ function explore(
     }
   }
   const range = AVOID_TILES * terrain.tileSize;
-  const reports = scoutingReports(context, terrain);
+  const reports = scoutingReports(context, terrain, memory.swept ?? {}, tiles);
   const goal = memory.goal;
   const refused = context.rejections.some(
     ({ command }) => command.kind === "move" && command.actorId === scout.id,
@@ -216,11 +278,10 @@ function explore(
   }
   if (!memory.goal) {
     const [next] = reports
-      .filter(({ position }) =>
-        avoid.every((entry) => distance(entry, position) > range),
-      )
+      .filter(({ position }) => !isAvoided(avoid, position, range))
       .sort(
         (a, b) =>
+          Number(a.kind === "area") - Number(b.kind === "area") ||
           (a.tick ?? -1) - (b.tick ?? -1) ||
           distance(scout.worldPosition, a.position) -
             distance(scout.worldPosition, b.position) ||

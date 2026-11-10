@@ -1,10 +1,12 @@
 // Faction-neutral reading and ordering helpers for director concerns.
 import { compareIds } from "./actor";
+import { secondsToTicks } from "./clock";
 import { tileKey } from "./grid";
 import { rosterIncludes } from "./ownership";
 import { occupiedTilesFor } from "./placement";
 import { costAmount, costResource } from "./resources";
-import { clampToBounds } from "./world";
+import { isCount, isRecord } from "./validation";
+import { clampToBounds, distance, isFinitePosition } from "./world";
 
 import type { ActorDefinition, ActorRenderState } from "./actor";
 import type { AiConcernContext } from "./director";
@@ -12,6 +14,9 @@ import type { TileCoord } from "./grid";
 import type { Resource } from "./resources";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
+
+/** Initial tuning: reports this old are uncertain and prompt fresh scouting. */
+export const STALE_REPORT_SECONDS = 180;
 
 /** Tiles searched around a placement anchor. */
 const PLACEMENT_RADIUS = 7;
@@ -199,3 +204,37 @@ export function stepToward(
     z: from.z + (dz / length) * reach,
   };
 }
+
+/** A place a concern skips for a while, and when it began. */
+export type Avoided = WorldPosition & { tick: number };
+
+export const isAvoidedList = (value: unknown) =>
+  value === undefined ||
+  (Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isRecord(entry) && isCount(entry.tick) && isFinitePosition(entry),
+    ));
+
+/** The entries younger than `lifetime` ticks. */
+export const recentAvoided = (
+  entries: readonly Avoided[] | undefined,
+  tick: number,
+  lifetime: number,
+) => (entries ?? []).filter((entry) => tick - entry.tick < lifetime);
+
+export const isAvoided = (
+  entries: readonly Avoided[],
+  position: WorldPosition,
+  range: number,
+) => entries.some((entry) => distance(entry, position) <= range);
+
+/** The ticks after which a report is stale. */
+export const staleReportTicks = (context: AiConcernContext) =>
+  secondsToTicks(STALE_REPORT_SECONDS, context.tickSeconds);
+
+/** Whether a report from `tick` is stale; a missing report always is. */
+export const isStaleReport = (
+  context: AiConcernContext,
+  tick: number | undefined,
+) => tick === undefined || context.tick - tick >= staleReportTicks(context);

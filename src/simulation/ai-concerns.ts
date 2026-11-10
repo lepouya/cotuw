@@ -7,6 +7,8 @@ import {
   stepToward,
   train,
 } from "./ai-planning";
+import { defense } from "./ai-defense";
+import { offense } from "./ai-offense";
 import { scouting } from "./ai-scouting";
 import { ARC_CONCERNS } from "./arc-concerns";
 
@@ -63,6 +65,8 @@ export const trainForces: AiConcern = (context) => {
 /** The concerns content-pack AI profiles may name. */
 export const BUILT_IN_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map([
   ...ARC_CONCERNS,
+  ["defense", defense],
   ["forces", trainForces],
+  ["offense", offense],
   ["scouting", scouting],
 ]);

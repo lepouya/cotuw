@@ -29,7 +29,25 @@ function source(): Omit<AiOverlaySource, "observeTicks"> {
         reason: "unreachable",
       },
     ],
-    memory: { economy: { note: "x".repeat(500) } },
+    memory: {
+      economy: { note: "x".repeat(500) },
+      army: {
+        operations: [
+          {
+            id: "raid:1",
+            kind: "raid",
+            phase: "return",
+            outcome: "failed",
+            target: { x: 20.6, z: 4.2 },
+            rally: { x: 0, z: 0 },
+            units: ["a", "b"],
+            progressTick: 900,
+            retries: 0,
+            regroups: 0,
+          },
+        ],
+      },
+    },
   });
   const observations = {
     actors: [sighting("old", 100), sighting("new", 550)],
@@ -65,6 +83,9 @@ test("the AI overlay describes strategy, commands, and memory", () => {
   ]);
   expect(sections.Budgets).toEqual(["economy: materials 12.3", "army: empty"]);
   expect(sections.Forces).toEqual(["army: 2 claimed", "economy: 1 claimed"]);
+  expect(sections.Operations).toEqual([
+    "army raid:1: return (failed), 2 units → 21,4",
+  ]);
   expect(sections.Commands).toEqual([
     "990 train-unit refused (insufficient-resources)",
   ]);

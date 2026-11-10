@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 1,
   "id": "base",
-  "version": 5,
+  "version": 6,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -522,6 +522,7 @@
       "commandsPerTick": 8,
       "postures": {
         "establishing": [
+          { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
           {
             "concern": "arc-income",
             "budget": 1,
@@ -533,6 +534,7 @@
           { "concern": "forces", "budget": 1, "forces": 1 }
         ],
         "developing": [
+          { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           {
             "concern": "arc-income",
@@ -540,7 +542,34 @@
             "forces": 0,
             "essential": true
           },
-          { "concern": "forces", "budget": 2, "forces": 1 },
+          { "concern": "forces", "budget": 2, "forces": 0 },
+          { "concern": "arc-production", "budget": 1, "forces": 0 },
+          { "concern": "offense", "budget": 0, "forces": 8 }
+        ],
+        "pressuring": [
+          { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
+          { "concern": "scouting", "budget": 1, "forces": 1 },
+          { "concern": "offense", "budget": 0, "forces": 8 },
+          {
+            "concern": "arc-income",
+            "budget": 2,
+            "forces": 0,
+            "essential": true
+          },
+          { "concern": "forces", "budget": 2, "forces": 0 },
+          { "concern": "arc-production", "budget": 1, "forces": 0 }
+        ],
+        "defending": [
+          { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
+          {
+            "concern": "arc-income",
+            "budget": 2,
+            "forces": 0,
+            "essential": true
+          },
+          { "concern": "forces", "budget": 3, "forces": 0 },
+          { "concern": "scouting", "budget": 1, "forces": 1 },
+          { "concern": "offense", "budget": 0, "forces": 8 },
           { "concern": "arc-production", "budget": 1, "forces": 0 }
         ]
       }

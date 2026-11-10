@@ -1,10 +1,10 @@
 {
   "format": "cotuw-mission",
-  "version": 20,
+  "version": 21,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "arc-economy-opening",
-    "content": { "id": "base", "version": 5 },
+    "content": { "id": "base", "version": 6 },
     "name": "Clear the wolf threat",
     "tileSize": 1,
     "terrainTypeIds": ["plain", "path", "rough", "water"],

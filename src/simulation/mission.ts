@@ -563,7 +563,7 @@ export function createMissionSimulation({
   const aiControllers = deepFreeze(structuredClone([...authoredAi]));
   const concerns = new Map(aiConcerns);
   validateAiControllers(aiControllers, ownerIds, concerns, tickSeconds);
-  validateAiState(state.ai, aiControllers, knownActorIds);
+  validateAiState(state.ai, aiControllers, knownActorIds, concerns);
   deepFreeze(state.ai);
   const supportResolver = createSupportResolver(definitionsById);
   const supportFor = (actors: readonly Actor[], sharing = relations) =>
