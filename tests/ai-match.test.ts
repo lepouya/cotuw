@@ -1,12 +1,14 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import {
   ARC_MIRROR_CASES,
   CASE_SETS,
+  passed,
   playMatch,
   runMatch,
   skirmishCases,
 } from "../scripts/ai-match/runner";
+import * as observers from "../scripts/ai-match/observers";
 import { skirmishChoiceError } from "../src/content/skirmish";
 import {
   assembleSkirmish,
@@ -15,12 +17,33 @@ import {
 } from "../src/mission-loading";
 import { createActor } from "../src/simulation/actor";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
+import { BUILT_IN_AI_CONCERNS } from "../src/simulation/ai-concerns";
+import * as missionFiles from "../src/simulation/mission-file";
 import { parseMission } from "../src/simulation/mission-file";
 import { DIFFICULTIES } from "../src/simulation/mission-setup";
 import { createScenarioMap } from "../src/simulation/scenario";
 
-import type { MatchCase } from "../scripts/ai-match/runner";
+import type { MatchCase, MatchRun } from "../scripts/ai-match/runner";
 import type { AiConcern } from "../src/simulation/director";
+
+/** Drops counters observed only during this segment of the match. */
+const withoutActivity = ({
+  owners,
+  audit: _,
+  disruptions: __,
+  ...report
+}: MatchRun["report"]) => ({
+  ...report,
+  owners: owners.map(
+    ({ postureTicks: _, operations: __, refused: ___, ...owner }) => owner,
+  ),
+});
+
+/** Compares runs apart from what a resumed run counts from its start. */
+const resumable = ({ report, preservedState }: MatchRun) => ({
+  report: withoutActivity(report),
+  preservedState,
+});
 
 // Three simulation seconds keeps each case short.
 const SHORT = 0.05;
@@ -91,6 +114,125 @@ test("a case reports the same outcome on every run", () => {
   expect(runMatch(matchCase)).toEqual(runMatch(matchCase));
 });
 
+test("a continuation compares complete mission state", () => {
+  const matchCase = {
+    ...shortCase("arc-mirror-west-normal"),
+    resumeAtMinutes: SHORT / 2,
+  };
+  expect(runMatch(matchCase).report.continuation).toBe("matched");
+  const parse = missionFiles.parseMission;
+  const spy = vi
+    .spyOn(missionFiles, "parseMission")
+    .mockImplementation((...args) => {
+      const saved = parse(...args);
+      // Health is absent from the short run's metrics and AI diagnostics.
+      if (saved.state.tick === 90) saved.state.actors[0]!.health = 1;
+      return saved;
+    });
+  try {
+    const run = runMatch(matchCase);
+    expect(run.report.continuation).toBe("diverged");
+    expect(parse(run.preservedState!, SIMULATION_TICK_SECONDS).state.tick).toBe(
+      90,
+    );
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+test("continuation keeps audit failures from the resumed run", () => {
+  const audit = observers.matchAudit;
+  let runs = 0;
+  const spy = vi
+    .spyOn(observers, "matchAudit")
+    .mockImplementation((simulation) => {
+      const observer = audit(simulation);
+      const resumed = ++runs === 3;
+      return {
+        ...observer,
+        problems: () => [
+          ...observer.problems(),
+          ...(resumed ? ["bad claim"] : []),
+        ],
+      };
+    });
+  try {
+    const { report } = runMatch({
+      ...shortCase("arc-mirror-west-normal"),
+      resumeAtMinutes: SHORT / 2,
+    });
+    expect(report.continuation).toBe("matched");
+    expect(report.audit).toEqual(["after load: bad claim"]);
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+test("a result before the checkpoint fails an unexercised continuation", () => {
+  const concerns = new Map(BUILT_IN_AI_CONCERNS).set("recovery", (context) => {
+    for (const actor of context.view.actors().own)
+      context.issue({ kind: "sell-actor", actorId: actor.id });
+  });
+  const { report, preservedState } = runMatch(
+    {
+      ...shortCase("arc-mirror-west-normal"),
+      resumeAtMinutes: SHORT / 2,
+    },
+    concerns,
+  );
+  expect(report.status).toBe("completed");
+  expect(report.continuation).toBe("not reached");
+  expect(passed(report)).toBe(false);
+  expect(preservedState).toBeDefined();
+});
+
+test("a failed reload is reported without throwing away the checkpoint", () => {
+  const parse = missionFiles.parseMission;
+  const spy = vi
+    .spyOn(missionFiles, "parseMission")
+    .mockImplementation((...args) => {
+      const saved = parse(...args);
+      if (saved.state.tick === 90) throw new Error("bad checkpoint");
+      return saved;
+    });
+  try {
+    const { report, preservedState } = runMatch({
+      ...shortCase("arc-mirror-west-normal"),
+      resumeAtMinutes: SHORT / 2,
+    });
+    expect(report.continuation).toBe("diverged");
+    expect(report.audit).toContain("save/load failed: bad checkpoint");
+    expect(preservedState).toBeDefined();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+test.each([0, -1, NaN, Infinity])(
+  "rejects an invalid continuation checkpoint: %s",
+  (resumeAtMinutes) => {
+    expect(() =>
+      runMatch({
+        ...shortCase("arc-mirror-west-normal"),
+        resumeAtMinutes,
+      }),
+    ).toThrow("Resume time must be positive");
+  },
+);
+
+test.each([SHORT, SHORT * 2])(
+  "a checkpoint at or past the cutoff is reported unreached: %s",
+  (resumeAtMinutes) => {
+    const { report, preservedState } = runMatch({
+      ...shortCase("arc-mirror-west-normal"),
+      resumeAtMinutes,
+    });
+    expect(report.continuation).toBe("not reached");
+    expect(passed(report)).toBe(false);
+    expect(preservedState).toBeDefined();
+  },
+);
+
 test("authored skirmishes report owner factions without launch setup", () => {
   const matchCase = shortCase("arc-mirror-west-normal");
   const mission = assembleSkirmish(matchCase.choice);
@@ -137,6 +279,34 @@ test("a result on the final allowed tick takes precedence over the cutoff", () =
     result: { kind: "draw", tick: 179, eliminatedOwners: ["west", "east"] },
   });
   expect(preservedState).toBeUndefined();
+});
+
+test("a completed match does not pass recovery without replacing its losses", () => {
+  const matchCase = shortCase("arc-mirror-west-normal");
+  const mission = assembleSkirmish(matchCase.choice);
+  for (const actor of mission.state.actors)
+    if (actor.owner === "east")
+      mission.state.commands.push({
+        tick: 120,
+        issuer: { owner: "east" },
+        command: { kind: "sell-actor", actorId: actor.id },
+      });
+  const run = playMatch(matchCase.id, mission, {
+    cutoffMinutes: SHORT,
+    disruptions: [
+      {
+        minutes: 0.01,
+        owner: "west",
+        definitionIds: ["arc-command-center-prototype"],
+      },
+    ],
+  });
+  expect(run.report.status).toBe("completed");
+  expect(run.report.disruptions).toMatchObject([
+    { removed: 1, restoredTicks: {} },
+  ]);
+  expect(passed(run.report)).toBe(false);
+  expect(run.preservedState).toBeDefined();
 });
 
 test("diagnostics and saved continuation preserve active concerns", () => {
@@ -194,12 +364,75 @@ test("diagnostics and saved continuation preserve active concerns", () => {
     ...parseMission(first.preservedState!, SIMULATION_TICK_SECONDS),
   };
   const options = { cutoffMinutes: SHORT * 2, aiConcerns };
-  expect(playMatch(matchCase.id, saved, options)).toEqual(
-    playMatch(matchCase.id, mission, options),
+  expect(resumable(playMatch(matchCase.id, saved, options))).toEqual(
+    resumable(playMatch(matchCase.id, mission, options)),
   );
   expect(
-    playMatch(matchCase.id, saved, { cutoffMinutes: SHORT, aiConcerns }),
-  ).toEqual(first);
+    resumable(
+      playMatch(matchCase.id, saved, { cutoffMinutes: SHORT, aiConcerns }),
+    ),
+  ).toEqual(resumable(first));
+});
+
+test("reports count posture time and operations seen during the run", () => {
+  const matchCase = shortCase("arc-mirror-west-normal");
+  const mission = assembleSkirmish(matchCase.choice);
+  const operation = (kind: string, phase: string, outcome?: string) => ({
+    id: `${kind}:1`,
+    kind,
+    phase,
+    target: { x: 0, z: 0 },
+    rally: { x: 0, z: 0 },
+    units: [],
+    ...(outcome && { outcome }),
+    progressTick: 0,
+    retries: 0,
+    regroups: 0,
+  });
+  // One operation per planning round: launch, advance, fail, then end.
+  const steps = [
+    [operation("raid", "assemble"), operation("defend", "advance")],
+    [operation("raid", "advance")],
+    [operation("raid", "return", "failed")],
+    [],
+  ];
+  const script: AiConcern = (context) => {
+    const turn = (context.memory.turn as number | undefined) ?? 0;
+    context.memory.turn = turn + 1;
+    context.memory.operations = steps[Math.min(turn, steps.length - 1)];
+  };
+  mission.content = {
+    ...mission.content,
+    aiProfiles: mission.content.aiProfiles!.map((profile) => ({
+      ...profile,
+      postures: {
+        establishing: [{ concern: "script", budget: 1, forces: 1 }],
+      },
+    })),
+  };
+  const { report } = playMatch(matchCase.id, mission, {
+    cutoffMinutes: SHORT * 2,
+    aiConcerns: new Map([["script", script]]),
+  });
+  const [west, east] = report.owners;
+  expect(west!.postureTicks).toEqual({ establishing: report.ticks });
+  // Each owner's rounds start on its own tick: west at 0, east at 1.
+  const round = 60;
+  expect(west!.operations).toEqual({
+    raid: {
+      launched: 1,
+      firstLaunchTick: 0,
+      firstAdvanceTick: round,
+      ended: { failed: 1 },
+    },
+    defend: {
+      launched: 1,
+      firstLaunchTick: 0,
+      firstAdvanceTick: 0,
+      ended: { disbanded: 1 },
+    },
+  });
+  expect(east!.operations?.raid?.firstLaunchTick).toBe(1);
 });
 
 test("a case ends at its result, with the concerns supplied", () => {

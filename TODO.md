@@ -146,18 +146,21 @@ AI tasks are developed and verified with them.
   for unseen buildings, including while stale reports are avoided. Every ARC
   mirror case completes, with raids from about 4:25.
 - [ ] **1.37** Tune opening grace, commitment, pursuit, retreat, and recovery
-  through profiles, replacing the initial tuning constants in the `ai-*.ts`
-  concern modules. Keep these separate from difficulty health/damage scaling.
-  The Normal ARC mirror currently ends by elimination near 13:10, below the
-  15 to 25 minute target. In Easy and Hard cases, early raids overrun the
-  scaled-down side's single-Harvester economy near 8:40 to 9:50. Losing
-  every headquarters needs 300 Materials banked to recover.
-  Enforce M1's four-minute offensive grace period while allowing local defense.
-  Tune normally funded, observation-driven raids and substantial assaults to
-  the agreed windows without forcing attacks during crises.
+  through profile `tuning`, kept separate from difficulty health/damage
+  scaling. Tactical thresholds come from the profile. Normal ARC mirrors
+  end near 16:20, with first raids near 4:20 and first attacks near 9:20;
+  Easy and Hard cases end decisively near 9:30 to 9:50, which is accepted.
+  Recovery saves to restart income and sells production when it cannot.
+  Losing the Command Center before 300 Materials are banked is an accepted
+  loss. Remaining: human playtest against the harness AI.
 - [ ] **1.38** Exercise the ARC mirror harness through completed matches,
   recovery cases, and the agreed scale with AI enabled. Resolve deadlocks,
-  resource leaks, ownership faults, and performance blockers.
+  resource leaks, ownership faults, and performance blockers. The runner's
+  audit, baseline, recovery, and full-state save/load continuation cases
+  pass. Worker, income, and production losses recover; headquarters loss is
+  an accepted loss that must still finish cleanly. Remaining: measure
+  the 200-unit, 40-building benchmark with AI enabled, which needs a way to
+  hold the scene's scale while the AI trains from its stockpile.
 
 Phase gate: ARC AI establishes and rebuilds its base, scouts, defends, and
 attacks through shared rules, with reproducible results and useful diagnostics.

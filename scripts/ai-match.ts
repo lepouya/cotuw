@@ -23,7 +23,8 @@ if (cutoffMinutes !== undefined && !isPositive(cutoffMinutes))
 const { module } = await runnerImport<typeof import("./ai-match/runner.ts")>(
   fileURLToPath(new URL("ai-match/runner.ts", import.meta.url)),
 );
-const { CASE_SETS, runMatch } = module;
+const { CASE_SETS, disruptionSummary, launchSummary, passed, runMatch } =
+  module;
 const allCases = [...CASE_SETS.values()].flat();
 const selected = (name: string) =>
   CASE_SETS.get(name) ?? allCases.filter(({ id }) => id === name);
@@ -50,7 +51,7 @@ const describe = (report: MatchReport, statePath: string) => {
 };
 
 await mkdir(OUTPUT, { recursive: true });
-let unfinished = 0;
+let failed = 0;
 for (const matchCase of cases) {
   const started = performance.now();
   const { report, preservedState } = runMatch({
@@ -69,10 +70,15 @@ for (const matchCase of cases) {
   console.log(
     `${report.case}: ${describe(report, statePath)} at ${formatElapsed(report.seconds)} (${wallSeconds.toFixed(1)} s)`,
   );
-  unfinished += Number(report.status !== "completed");
+  console.log(`  ${launchSummary(report)}`);
+  for (const line of disruptionSummary(report)) console.log(`  ${line}`);
+  if (report.continuation)
+    console.log(`  save/load continuation ${report.continuation}`);
+  for (const problem of report.audit) console.log(`  audit: ${problem}`);
+  failed += Number(!passed(report));
 }
 console.log(`Reports in ${OUTPUT}.`);
-if (unfinished) {
-  console.error(`${unfinished} of ${cases.length} cases did not finish.`);
+if (failed) {
+  console.error(`${failed} of ${cases.length} cases did not pass.`);
   process.exitCode = 1;
 }

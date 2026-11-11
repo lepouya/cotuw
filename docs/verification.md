@@ -160,14 +160,39 @@ skirmish cases headlessly, every case set by default. `skirmishCases` in
 uses its faction's standard profile and stands in for the player at each
 difficulty. The simulation has no randomness, so a case and revision
 reproduce one outcome. The cutoff counts match time, so a saved mission
-resumes toward the same limit.
+resumes toward the same limit. The sets are:
+
+- `arc-mirror`: the baseline ARC mirror by start slot and difficulty.
+- `arc-recovery`: Normal mirrors in which west loses its Harvesters, its
+  income, its Field Barracks, or its Command Center at 6:00. Reports give
+  when each lost definition was completed again. A case passes only when
+  the disruption occurs and every listed definition is restored before the
+  match ends. Headquarters loss is an accepted loss, so that case needs only
+  a clean, completed match.
+- `arc-continuation`: saves a Normal mirror at 9:30 during its first attacks,
+  resumes it, and requires identical complete mission state, including AI,
+  observations, and metric histories, to an uninterrupted run. Ending before
+  the checkpoint, or a `--cutoff` at or before it, fails this check.
 
 Reports in `.checks/ai-matches/<case>.json` give the revision, wall-clock and
 simulation time, status, result, effective scaling, and each owner's
-milestones, totals, latest sample, and AI diagnostics. An Incomplete / stalled
-case, or one whose tick throws, also saves its mission as
-`<case>.mission.json` and fails the run; other cases still run. Tests can
-drive `playMatch` with their own concerns and profiles.
+milestones, totals, latest sample, and AI diagnostics. Each AI owner also
+reports ticks per posture, refused commands by kind and reason, and its
+operations by kind: launches, first launch and advance ticks, and ends by
+outcome. Groups that disappear without an outcome count as disbanded; claims
+can be reassigned without units dying. These count only the ticks a run plays,
+so a resumed run omits earlier activity. The console prints each owner's first
+raid and attack.
+
+A once-a-second audit checks that claims and operation units belong to their AI,
+claims of lost units clear by the owner's next planning round, and saved AI
+state stays bounded. Budgets may briefly exceed balances after payments outside
+AI commands, so the audit does not compare them. Every failed case saves a
+diagnostic mission as `<case>.mission.json`: its final state, or its checkpoint
+when continuation diverges or loading fails. Incomplete cases, throwing ticks,
+audit problems, unrestored losses, and failed continuations fail the run; other
+cases still run. Continuation audits include both segments. Tests can drive
+`playMatch` with their own concerns and profiles.
 
 Development links that assign AI, such as
 `?skirmish=arc-arc&ai=east:arc-skirmish`, also enable the AI overlay in dev
