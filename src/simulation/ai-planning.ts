@@ -15,9 +15,6 @@ import type { Resource } from "./resources";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 
-/** Initial tuning: reports this old are uncertain and prompt fresh scouting. */
-export const STALE_REPORT_SECONDS = 180;
-
 /** Tiles searched around a placement anchor. */
 const PLACEMENT_RADIUS = 7;
 /** Candidate offsets nearest first; ties keep row-major order. */
@@ -253,7 +250,7 @@ export const isAvoided = (
 
 /** The ticks after which a report is stale. */
 export const staleReportTicks = (context: AiConcernContext) =>
-  secondsToTicks(STALE_REPORT_SECONDS, context.tickSeconds);
+  secondsToTicks(context.tuning.staleReportSeconds, context.tickSeconds);
 
 /** Whether a report from `tick` is stale; a missing report always is. */
 export const isStaleReport = (

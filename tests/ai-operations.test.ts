@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { BASE_CONTENT } from "./helpers/content";
+import { ARC_AI_TUNING, BASE_CONTENT } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import {
   endOperation,
@@ -47,6 +47,7 @@ function fixture(units: Actor[]) {
     ({
       tick,
       tickSeconds: TICK_SECONDS,
+      tuning: ARC_AI_TUNING,
       definitions,
       rejections,
       claim: (id: string) => !lost.has(id),

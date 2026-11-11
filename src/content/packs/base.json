@@ -1,8 +1,8 @@
 {
   "format": "cotuw-content",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "id": "base",
-  "version": 7,
+  "version": 8,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -520,6 +520,40 @@
       "roundSeconds": 1,
       "concernsPerTick": 2,
       "commandsPerTick": 8,
+      "tuning": {
+        "staleReportSeconds": 180,
+        "scouting": {
+          "replacementSeconds": 60,
+          "sweepTiles": 20,
+          "avoidTiles": 10,
+          "retreatRetrySeconds": 5
+        },
+        "defense": {
+          "threatTiles": 12,
+          "odds": 1.5,
+          "calmSeconds": 10,
+          "retargetTiles": 3
+        },
+        "offense": {
+          "graceSeconds": 240,
+          "raid": { "minUnits": 4, "maxUnits": 6, "odds": 2 },
+          "attack": { "units": 12, "odds": 1.25 },
+          "defendedTiles": 14,
+          "raidRedirectTiles": 16,
+          "avoidSeconds": 120,
+          "avoidTiles": 12
+        },
+        "operations": {
+          "gatherTiles": 6,
+          "regroupTiles": 14,
+          "maxRegroups": 2,
+          "stallSeconds": 20,
+          "maxRetries": 3,
+          "engagementTiles": 12,
+          "retreatOdds": 1.5,
+          "depletedShare": 0.3
+        }
+      },
       "postures": {
         "establishing": [
           { "concern": "defense", "budget": 0, "forces": 0, "essential": true },

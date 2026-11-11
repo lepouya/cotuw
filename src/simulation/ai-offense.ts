@@ -28,22 +28,6 @@ import type { ActorSighting } from "./observations";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 
-/** M1 forbids offensive operations before this match time. */
-export const OFFENSIVE_GRACE_SECONDS = 240;
-/** Initial tuning: raid size, and the odds it needs against known defenders. */
-const RAID_UNITS = { min: 4, max: 6 };
-const RAID_ODDS = 2;
-/** Initial tuning: an attack's size, and its odds against known defenders. */
-const ATTACK_UNITS = 12;
-const ATTACK_ODDS = 1.25;
-/** Initial tuning: known hostiles this near a target defend it. */
-const DEFENDED_TILES = 14;
-/** Initial tuning: a raid moves on to income this near its finished target. */
-const RAID_REDIRECT_TILES = 16;
-/** Initial tuning: targets near a failed advance wait this long. */
-const AVOID_SECONDS = 120;
-const AVOID_TILES = 12;
-
 type OffenseMemory = OperationsMemory & {
   nextId?: number;
   /** Where advances failed, and when. */
@@ -63,10 +47,11 @@ export const offense: AiConcern = (context) => {
   const { terrain, tick } = context;
   if (!terrain) return;
   const memory = context.memory as OffenseMemory;
+  const tuning = context.tuning.offense;
   const avoid = recentAvoided(
     memory.avoid,
     tick,
-    secondsToTicks(AVOID_SECONDS, context.tickSeconds),
+    secondsToTicks(tuning.avoidSeconds, context.tickSeconds),
   );
   const buildings = hostileBuildings(context);
   const operations: Operation[] = [];
@@ -81,7 +66,7 @@ export const offense: AiConcern = (context) => {
   }
   const home = stagingPoint(context);
   const graced =
-    tick >= secondsToTicks(OFFENSIVE_GRACE_SECONDS, context.tickSeconds);
+    tick >= secondsToTicks(tuning.graceSeconds, context.tickSeconds);
   // Claims test which units the posture's share allows; unused ones go back.
   const busy = new Set(operations.flatMap(({ units }) => units));
   const free =
@@ -94,7 +79,7 @@ export const offense: AiConcern = (context) => {
           )
           .filter(({ id }) => !busy.has(id) && context.claim(id))
       : [];
-  const range = AVOID_TILES * terrain.tileSize;
+  const range = tuning.avoidTiles * terrain.tileSize;
   const launch =
     graced && home
       ? nextLaunch(
@@ -196,7 +181,7 @@ function resolve(
           (building) =>
             isIncomeBuilding(context.definitions.get(building.definitionId)!) &&
             distance(building.worldPosition, operation.target) <=
-              RAID_REDIRECT_TILES * terrain.tileSize,
+              context.tuning.offense.raidRedirectTiles * terrain.tileSize,
         )
       : buildings;
   const [next] = nearestTo(operation.target, candidates);
@@ -220,10 +205,11 @@ function nextLaunch(
   free: readonly ActorRenderState[],
 ): Launch | undefined {
   if (!targets.length) return;
+  const { attack, defendedTiles, raid } = context.tuning.offense;
   const active = (kind: Operation["kind"]) =>
     operations.some((operation) => operation.kind === kind);
   const army = knownDefenders(context);
-  const range = DEFENDED_TILES * terrain.tileSize;
+  const range = defendedTiles * terrain.tileSize;
   const defenseOf = (target: Target) =>
     strengthOf(
       context,
@@ -235,8 +221,8 @@ function nextLaunch(
   const [base] = nearestTo(home, targets);
   if (
     !active("attack") &&
-    free.length >= ATTACK_UNITS &&
-    strengthOf(context, free) >= defenseOf(base!) * ATTACK_ODDS
+    free.length >= attack.units &&
+    strengthOf(context, free) >= defenseOf(base!) * attack.odds
   )
     return { kind: "attack", target: base!, units: free.map(({ id }) => id) };
   if (active("raid") || active("attack")) return;
@@ -253,7 +239,7 @@ function nextLaunch(
         compareIds(a.target.actorId, b.target.actorId),
     );
   for (const { target, defense } of raids) {
-    const units = raidGroup(context, free, defense * RAID_ODDS);
+    const units = raidGroup(context, free, defense * raid.odds);
     if (units) return { kind: "raid", target, units };
   }
 }
@@ -264,7 +250,8 @@ function raidGroup(
   free: readonly ActorRenderState[],
   needed: number,
 ) {
-  for (let size = RAID_UNITS.min; size <= RAID_UNITS.max; size++) {
+  const { minUnits, maxUnits } = context.tuning.offense.raid;
+  for (let size = minUnits; size <= maxUnits; size++) {
     const group = free.slice(0, size);
     if (group.length < size) return;
     if (strengthOf(context, group) >= needed) return group.map(({ id }) => id);

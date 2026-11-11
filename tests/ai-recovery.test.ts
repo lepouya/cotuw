@@ -69,9 +69,87 @@ function afterLoss(state: MissionState, ...definitionIds: string[]) {
 const rejected = (results: readonly CommandOutcome[]) =>
   results.filter(({ issuer, accepted }) => issuer.ai && !accepted);
 
-test("an established base keeps a reserve for a replacement Harvester", () => {
+test("an established base saves toward a replacement Refinery and Harvester", () => {
   expect(developed.ai.west!.posture).not.toBe("establishing");
-  expect(developed.ai.west!.budgets.recovery!.materials).toBeCloseTo(50);
+  const reserve = developed.ai.west!.budgets.recovery!.materials!;
+  expect(reserve).toBeGreaterThan(50);
+  expect(reserve).toBeLessThanOrEqual(150);
+});
+
+test("losing all income without the funds to restart it sells production", () => {
+  const state = structuredClone(developed);
+  // The Field Barracks' half refund covers the rest.
+  setBalance(state, 100, "materials", "west");
+  const { sim, results, run } = afterLoss(
+    state,
+    "arc-harvester",
+    "arc-materials-refinery",
+  );
+  try {
+    run(seconds(5), () => sim.ai.west!.posture === "recovering");
+    run(
+      seconds(60),
+      () =>
+        westOf(sim, "arc-harvester").length > 0 &&
+        westOf(sim, "arc-materials-refinery").some(
+          ({ construction }) => !construction,
+        ),
+    );
+    const sold = results.filter(
+      ({ command, issuer, accepted }) =>
+        accepted && issuer.ai && command.kind === "sell-actor",
+    );
+    expect(sold).toHaveLength(1);
+    expect(westOf(sim, "arc-command-center-prototype")).toHaveLength(1);
+    expect(rejected(results)).toEqual([]);
+  } finally {
+    sim.dispose();
+  }
+}, 30_000);
+
+test("recovery sells nothing while it can pay to restart income", () => {
+  const state = structuredClone(developed);
+  setBalance(state, 150, "materials", "west");
+  const { sim, results, run } = afterLoss(
+    state,
+    "arc-harvester",
+    "arc-materials-refinery",
+  );
+  try {
+    run(seconds(5), () => sim.ai.west!.posture === "recovering");
+    runTicks(sim, seconds(20));
+    expect(results.some(({ command }) => command.kind === "sell-actor")).toBe(
+      false,
+    );
+    expect(westOf(sim, "arc-field-barracks")).toHaveLength(1);
+  } finally {
+    sim.dispose();
+  }
+}, 30_000);
+
+test("recovery keeps damaged production whose sale would pay nothing", () => {
+  const state = structuredClone(developed);
+  setBalance(state, 0, "materials", "west");
+  state.actors = state.actors.map((actor) =>
+    actor.owner === "west" && actor.definitionId === "arc-field-barracks"
+      ? { ...actor, health: 1 }
+      : actor,
+  );
+  const { sim, results, run } = afterLoss(
+    state,
+    "arc-harvester",
+    "arc-materials-refinery",
+  );
+  try {
+    run(seconds(5), () => sim.ai.west!.posture === "recovering");
+    results.push(...runTicks(sim, seconds(5)));
+    expect(results.some(({ command }) => command.kind === "sell-actor")).toBe(
+      false,
+    );
+    expect(westOf(sim, "arc-field-barracks")).not.toHaveLength(0);
+  } finally {
+    sim.dispose();
+  }
 });
 
 test("losing every Harvester recovers income from the reserve", () => {
@@ -170,7 +248,7 @@ test("losing all Refineries reuses surviving Harvesters at paid replacements", (
   }
 });
 
-test("a lost support link replaces offline production and reassigns its worker", () => {
+function supportLossMission() {
   const terrain = new TerrainGrid({
     width: 64,
     height: 24,
@@ -229,8 +307,12 @@ test("a lost support link replaces offline production and reassigns its worker",
   const state = createScenarioState(scenario, MIRROR.definitions);
   state.ai.west!.posture = "developing";
   state.economy!.harvesters = [createHarvesterState("worker", "remote")];
+  return { ...MIRROR, scenario, state: { ...state, terrain: state.terrain! } };
+}
+
+test("a lost support link replaces offline production and reassigns its worker", () => {
   const sim = createSessionSimulation(
-    { ...MIRROR, scenario, state: { ...state, terrain: state.terrain! } },
+    supportLossMission(),
     undefined,
     CONCERNS,
   );
@@ -257,6 +339,47 @@ test("a lost support link replaces offline production and reassigns its worker",
           !sim.viewOf("west").offlineIds().has(building.id),
       ),
     ).toBe(true);
+    expect(rejected(results)).toEqual([]);
+  } finally {
+    sim.dispose();
+  }
+});
+
+test("a worker queued at an offline Refinery does not block funding a restart", () => {
+  const mission = supportLossMission();
+  mission.state.actors = mission.state.actors.filter(
+    ({ id }) => id !== "worker",
+  );
+  mission.state.economy!.harvesters = [];
+  setBalance(mission.state, 150, "materials", "west");
+  const sim = createSessionSimulation(mission, undefined, CONCERNS);
+  try {
+    sim.submitCommand(
+      {
+        kind: "train-unit",
+        producerId: "remote",
+        actorId: "pending-worker",
+        definitionId: "arc-harvester",
+      },
+      { owner: "west" },
+    );
+    sim.submitCommand(
+      { kind: "remove-actor", actorId: "bridge" },
+      { owner: "west" },
+    );
+    const first = sim.tick();
+    expect(first.filter(({ accepted }) => !accepted)).toEqual([]);
+    expect(sim.economy!.production).toMatchObject([
+      { actorId: "pending-worker" },
+    ]);
+    expect(sim.viewOf("west").offlineIds().has("remote")).toBe(true);
+    const results = runTicks(sim, seconds(60));
+    expect(
+      results.some(
+        ({ command, accepted }) => command.kind === "sell-actor" && accepted,
+      ),
+    ).toBe(true);
+    expect(sim.economy!.harvesters.length).toBeGreaterThan(0);
     expect(rejected(results)).toEqual([]);
   } finally {
     sim.dispose();

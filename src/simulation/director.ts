@@ -1,5 +1,6 @@
 // Strategic control for AI owners, run by the mission before each tick's commands.
 import { compareIds, isWorkerDefinition } from "./actor";
+import { isAiTuning } from "./ai-tuning";
 import { secondsToTicks } from "./clock";
 import { commandActorIds, isMissionCommand } from "./command";
 import {
@@ -22,6 +23,7 @@ import {
 } from "./validation";
 
 import type { ActorDefinition, DeepReadonly } from "./actor";
+import type { AiTuning } from "./ai-tuning";
 import type { CommandResult, MissionCommand } from "./command";
 import type { OwnerView } from "./owner-view";
 import type { Resource } from "./resources";
@@ -59,6 +61,7 @@ export type AiProfile = {
   readonly postures: Readonly<
     Partial<Record<AiPosture, readonly AiAllocation[]>>
   >;
+  readonly tuning: AiTuning;
 };
 
 /** Names the pack profile that controls a scenario's owner. */
@@ -112,6 +115,7 @@ export type AiConcernContext = {
   readonly terrain: TerrainView | undefined;
   readonly definitions: ReadonlyMap<string, ActorDefinition>;
   readonly posture: AiPosture;
+  readonly tuning: AiTuning;
   /** The concern's saved state; it must stay JSON. */
   readonly memory: Record<string, unknown>;
   /** This concern's refused commands since its previous turn. */
@@ -216,6 +220,7 @@ export function validateAiProfile(profile: AiProfile) {
     isPositive(profile.concernsPerTick) &&
     isCount(profile.commandsPerTick) &&
     isPositive(profile.commandsPerTick) &&
+    isAiTuning(profile.tuning) &&
     isRecord(profile.postures) &&
     hasOwn(profile.postures, "establishing") &&
     Object.entries(profile.postures).every(
@@ -232,7 +237,7 @@ export function validateAiProfile(profile: AiProfile) {
     );
   if (!valid)
     throw new RangeError(
-      `AI profile ${isRecord(profile) ? profile.id : ""} needs an id, round time, work limits, and allocations for establishing and its other postures.`,
+      `AI profile ${isRecord(profile) ? profile.id : ""} needs an id, round time, work limits, tuning, and allocations for establishing and its other postures.`,
     );
 }
 
@@ -257,6 +262,10 @@ export function validateAiControllers(
     if (!isCount(secondsToTicks(profile.roundSeconds, tickSeconds)))
       throw new RangeError(
         `AI profile ${profile.id} has an unsafe round interval.`,
+      );
+    if (!isAiTuning(profile.tuning, tickSeconds))
+      throw new RangeError(
+        `AI profile ${profile.id} has an unsafe tuning duration.`,
       );
     for (const concern of profileConcerns(profile))
       if (!concerns.has(concern))
@@ -519,6 +528,7 @@ function concernContext(
     terrain: host.terrain,
     definitions: host.definitions,
     posture: ai.posture,
+    tuning: profile.tuning,
     memory: ai.memory[concern]!,
     rejections,
     funds,

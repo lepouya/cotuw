@@ -13,7 +13,7 @@ import type { TerrainState, TerrainTile } from "./terrain";
 import type { WorldPosition } from "./world";
 
 const FORMAT = "cotuw-mission";
-export const MISSION_FILE_VERSION = 21;
+export const MISSION_FILE_VERSION = 22;
 /** Lines that fit within this width stay on one line. */
 const LINE_WIDTH = 80;
 

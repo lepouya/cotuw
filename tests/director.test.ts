@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "vitest";
 
-import { BASE_CONTENT } from "./helpers/content";
+import { ARC_AI_TUNING, BASE_CONTENT } from "./helpers/content";
 import {
   actorIn,
   advanceTicks,
@@ -127,6 +127,7 @@ const profile = (
   concernsPerTick: 8,
   commandsPerTick: 8,
   postures: { establishing: allocations },
+  tuning: ARC_AI_TUNING,
   ...overrides,
 });
 const allocation = (
@@ -1138,6 +1139,20 @@ test.each<[string, () => void, string]>([
     "an unsafe round interval",
     () => fixture(profile([], { roundSeconds: 1e308 }), {}),
     "unsafe round interval",
+  ],
+  [
+    "an unsafe tuning duration",
+    () =>
+      fixture(
+        profile([], {
+          tuning: {
+            ...ARC_AI_TUNING,
+            scouting: { ...ARC_AI_TUNING.scouting, replacementSeconds: 1e308 },
+          },
+        }),
+        {},
+      ),
+    "unsafe tuning duration",
   ],
 ])("rejects %s", (_, start, message) => {
   expect(start).toThrow(message);

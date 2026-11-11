@@ -20,15 +20,6 @@ import { distance } from "./world";
 import type { Operation, OperationsMemory } from "./ai-operations";
 import type { AiConcern, AiConcernContext } from "./director";
 
-/** Initial tuning: hostiles this near own buildings or workers threaten them. */
-const THREAT_TILES = 12;
-/** Initial tuning: defense commits this multiple of the threat's strength. */
-const DEFENSE_ODDS = 1.5;
-/** Initial tuning: threats must stay away this long before defense ends. */
-const CALM_SECONDS = 10;
-/** The objective follows threats that move at least this far. */
-const RETARGET_TILES = 3;
-
 type DefenseMemory = OperationsMemory & {
   /** Since when no threat has been seen; absent while threatened. */
   calmTick?: number;
@@ -50,7 +41,8 @@ export const defense: AiConcern = (context) => {
         !!actor.tilePlacement ||
         isWorkerDefinition(definitionOf(context, actor)),
     );
-  const range = THREAT_TILES * terrain.tileSize;
+  const tuning = context.tuning.defense;
+  const range = tuning.threatTiles * terrain.tileSize;
   const threats = visibleHostiles(context).filter((hostile) =>
     assets.some(
       (asset) => distance(asset.worldPosition, hostile.worldPosition) <= range,
@@ -80,7 +72,8 @@ export const defense: AiConcern = (context) => {
       });
     else if (
       operation.phase !== "advance" ||
-      distance(operation.target, target) > RETARGET_TILES * terrain.tileSize
+      distance(operation.target, target) >
+        tuning.retargetTiles * terrain.tileSize
     )
       redirectOperation(context, operation, target);
     commitDefenders(context, operation, strengthOf(context, threats));
@@ -88,7 +81,7 @@ export const defense: AiConcern = (context) => {
     memory.calmTick ??= tick;
     if (
       tick - memory.calmTick >=
-      secondsToTicks(CALM_SECONDS, context.tickSeconds)
+      secondsToTicks(tuning.calmSeconds, context.tickSeconds)
     ) {
       if (operation && operation.phase !== "return")
         endOperation(context, operation, "completed");
@@ -132,7 +125,8 @@ function commitDefenders(
           distance(b.worldPosition, operation.target) || compareIds(a.id, b.id),
     );
   for (const unit of candidates) {
-    if (strengthOf(context, committed) >= threat * DEFENSE_ODDS) break;
+    if (strengthOf(context, committed) >= threat * context.tuning.defense.odds)
+      break;
     if (!context.claim(unit.id)) continue;
     committed.push(unit);
     added.push(unit.id);

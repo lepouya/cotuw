@@ -1,8 +1,7 @@
 import { expect, test } from "vitest";
 
-import { BASE_CONTENT } from "./helpers/content";
+import { ARC_AI_TUNING, BASE_CONTENT } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
-import { STALE_REPORT_SECONDS } from "../src/simulation/ai-planning";
 import { scouting } from "../src/simulation/ai-scouting";
 import { createObservations } from "../src/simulation/observations";
 import { TerrainGrid } from "../src/simulation/terrain";
@@ -51,8 +50,9 @@ function fixture(faction = "arc", tickSeconds = 0.1) {
   let fielded: Actor | undefined = scout;
   let accepts = true;
   const context = {
-    tick: Math.ceil((STALE_REPORT_SECONDS + 10) / tickSeconds),
+    tick: Math.ceil((ARC_AI_TUNING.staleReportSeconds + 10) / tickSeconds),
     tickSeconds,
+    tuning: ARC_AI_TUNING,
     terrain,
     definitions,
     memory,
@@ -205,7 +205,7 @@ test.each([0.1, 0.5])(
       tick: context.tick,
     });
     const staleTick =
-      context.tick + Math.ceil(STALE_REPORT_SECONDS / tickSeconds);
+      context.tick + Math.ceil(ARC_AI_TUNING.staleReportSeconds / tickSeconds);
     scouting({ ...context, tick: staleTick - 1 });
     expect(memory.goal).toBeUndefined();
     scouting({ ...context, tick: staleTick });
@@ -280,4 +280,20 @@ test("stale reports take priority over never-seen sweep points", () => {
   observations.sites.push({ siteId: "site", amount: 0, tick: 1 });
   scouting(context);
   expect(memory.goal).toMatchObject({ kind: "site", id: "site" });
+});
+
+test("odd sweep spacing visits whole tiles and remembers their visibility", () => {
+  const { context, memory } = fixture();
+  context.view.knowledge.seesTile = ({ x, z }) => {
+    expect(Number.isInteger(x) && Number.isInteger(z)).toBe(true);
+    return true;
+  };
+  scouting({
+    ...context,
+    tuning: {
+      ...context.tuning,
+      scouting: { ...context.tuning.scouting, sweepTiles: 7 },
+    },
+  });
+  expect(memory.swept).toHaveProperty("3,3", context.tick);
 });

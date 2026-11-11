@@ -7,11 +7,11 @@ import {
   ROUND_TICKS,
   runTicks,
 } from "./helpers/ai-mirror";
+import { ARC_AI_TUNING } from "./helpers/content";
 import { savedState } from "./helpers/scenario";
 import { createSessionSimulation } from "../src/mission-loading";
 import { isIncomeBuilding } from "../src/simulation/actor";
 import { BUILT_IN_AI_CONCERNS } from "../src/simulation/ai-concerns";
-import { OFFENSIVE_GRACE_SECONDS } from "../src/simulation/ai-offense";
 import { operationsOf } from "../src/simulation/ai-operations";
 import {
   secondsToTicks,
@@ -44,7 +44,7 @@ const opening: { posture: string; operations: number; claims: string[] }[] = [];
 // The undisturbed opening up to the end of the offensive grace period.
 beforeAll(() => {
   simulation = createSessionSimulation(MIRROR);
-  const rounds = seconds(OFFENSIVE_GRACE_SECONDS) / 60;
+  const rounds = seconds(ARC_AI_TUNING.offense.graceSeconds) / 60;
   for (let round = 0; round < rounds; round++) {
     runTicks(simulation, 60);
     for (const owner of OWNERS) {

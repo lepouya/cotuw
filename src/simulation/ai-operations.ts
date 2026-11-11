@@ -22,21 +22,6 @@ import type { AiConcernContext } from "./director";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 
-/** Initial tuning: a group within this many tiles of its rally has gathered. */
-const GATHER_TILES = 6;
-/** Initial tuning: an advancing group this spread out regroups first. */
-const REGROUP_TILES = 14;
-const MAX_REGROUPS = 2;
-/** Initial tuning: a phase without progress this long is replanned. */
-const STALL_SECONDS = 20;
-const MAX_RETRIES = 3;
-/** Initial tuning: hostiles this near an advancing group count against it. */
-const ENGAGEMENT_TILES = 12;
-/** Initial tuning: retreat when visible hostiles outmatch the group this much. */
-const RETREAT_ODDS = 1.5;
-/** Initial tuning: depleted below this share, a group must clearly win. */
-const DEPLETED_SHARE = 0.3;
-
 const OPERATION_KINDS = ["defend", "raid", "attack"] as const;
 const OPERATION_PHASES = ["assemble", "advance", "return"] as const;
 const OPERATION_OUTCOMES = ["completed", "failed", "cancelled"] as const;
@@ -264,8 +249,9 @@ function outmatched(
       (actor) => distance(actor.worldPosition, center) <= range,
     ),
   );
-  const depleted = own < (operation.strength ?? 0) * DEPLETED_SHARE;
-  return threat > own * (depleted ? 1 / RETREAT_ODDS : RETREAT_ODDS);
+  const { depletedShare, retreatOdds } = context.tuning.operations;
+  const depleted = own < (operation.strength ?? 0) * depletedShare;
+  return threat > own * (depleted ? 1 / retreatOdds : retreatOdds);
 }
 
 /** Begins the advance, recording the strength that sets out. */
@@ -293,6 +279,7 @@ export function stepOperation(
   { retreats }: { retreats: boolean },
 ): OperationEvent {
   const { tick } = context;
+  const tuning = context.tuning.operations;
   operation.units = operation.units.filter((id) => context.claim(id));
   const units = operation.units.map((id) => context.view.ownMobileActor(id)!);
   if (!units.length) return "ended";
@@ -320,16 +307,21 @@ export function stepOperation(
   if (operation.phase === "advance") {
     if (
       retreats &&
-      outmatched(context, operation, units, ENGAGEMENT_TILES * terrain.tileSize)
+      outmatched(
+        context,
+        operation,
+        units,
+        tuning.engagementTiles * terrain.tileSize,
+      )
     )
       fail();
     else if (
       !engaged &&
-      operation.regroups < MAX_REGROUPS &&
+      operation.regroups < tuning.maxRegroups &&
       units.some(
         (unit) =>
           distance(unit.worldPosition, center) >
-          REGROUP_TILES * terrain.tileSize,
+          tuning.regroupTiles * terrain.tileSize,
       )
     ) {
       // The unit nearest the center stands where the others can meet it.
@@ -347,7 +339,8 @@ export function stepOperation(
   const gathered = () =>
     units.every(
       (unit) =>
-        distance(unit.worldPosition, rally) <= GATHER_TILES * terrain.tileSize,
+        distance(unit.worldPosition, rally) <=
+        tuning.gatherTiles * terrain.tileSize,
     );
   // A failure is reported before the group can disband.
   if (operation.phase === "return" && !event && gathered()) return disband();
@@ -371,13 +364,13 @@ export function stepOperation(
     operation.progressTick = tick;
   } else if (
     tick - operation.progressTick >=
-    secondsToTicks(STALL_SECONDS, context.tickSeconds)
+    secondsToTicks(tuning.stallSeconds, context.tickSeconds)
   ) {
     operation.retries += 1;
     operation.progressTick = tick;
     delete operation.issued;
   }
-  if (operation.retries > MAX_RETRIES) {
+  if (operation.retries > tuning.maxRetries) {
     if (operation.phase === "return") return disband();
     if (operation.phase === "assemble") beginAdvance(context, operation, units);
     else fail();

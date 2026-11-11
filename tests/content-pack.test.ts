@@ -48,6 +48,36 @@ describe("content packs", () => {
         ]),
       "AI profile arc-skirmish needs",
     ],
+    [
+      "no tuning",
+      (pack) => delete pack.aiProfiles[0].tuning,
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "an unknown tuning value",
+      (pack) => (pack.aiProfiles[0].tuning.offense.raidOdds = 2),
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "a missing tuning group",
+      (pack) => delete pack.aiProfiles[0].tuning.operations,
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "a fractional retry limit",
+      (pack) => (pack.aiProfiles[0].tuning.operations.maxRetries = 1.5),
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "a depleted share above one",
+      (pack) => (pack.aiProfiles[0].tuning.operations.depletedShare = 1.1),
+      "AI profile arc-skirmish needs",
+    ],
+    [
+      "a raid minimum above its maximum",
+      (pack) => (pack.aiProfiles[0].tuning.offense.raid.minUnits = 7),
+      "AI profile arc-skirmish needs",
+    ],
   ])("rejects AI profiles with %s", (_, edit, message) => {
     expect(withEdit(edit)).toThrow(message);
   });
@@ -151,8 +181,8 @@ describe("content packs", () => {
   });
 
   test("reject unknown formats, built-ins, and tile types", () => {
-    expect(withEdit((pack) => (pack.formatVersion = 2))).toThrow(
-      'format "cotuw-content" version 1',
+    expect(withEdit((pack) => (pack.formatVersion = 1))).toThrow(
+      'format "cotuw-content" version 2',
     );
     expect(
       withEdit(

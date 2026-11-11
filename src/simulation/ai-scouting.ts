@@ -31,15 +31,6 @@ import type { TileCoord } from "./grid";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 
-/** Initial tuning: the wait before replacing a lost scout. */
-export const SCOUT_REPLACEMENT_SECONDS = 60;
-/** Tiles around danger or an unreachable target that scouting skips a while. */
-const AVOID_TILES = 10;
-/** A failed retreat waits before trying the home route again. */
-const RETREAT_RETRY_SECONDS = 5;
-/** Initial tuning: spacing of the map points an otherwise idle scout sweeps. */
-const SWEEP_TILES = 20;
-
 /** A place worth seeing: never sighted, or last seen at `tick`. */
 type Report = {
   kind: "site" | "building" | "area";
@@ -82,15 +73,15 @@ function scoutDefinition(context: AiConcernContext) {
 }
 
 /** Evenly spaced tiles across the map. */
-const sweepTiles = (terrain: TerrainView): TileCoord[] =>
-  Array.from({ length: Math.ceil(terrain.width / SWEEP_TILES) }, (_, column) =>
-    Array.from(
-      { length: Math.ceil(terrain.height / SWEEP_TILES) },
-      (_, row) => ({
-        x: Math.min(column * SWEEP_TILES + SWEEP_TILES / 2, terrain.width - 1),
-        z: Math.min(row * SWEEP_TILES + SWEEP_TILES / 2, terrain.height - 1),
-      }),
-    ),
+const sweepTiles = (terrain: TerrainView, spacing: number): TileCoord[] =>
+  Array.from({ length: Math.ceil(terrain.width / spacing) }, (_, column) =>
+    Array.from({ length: Math.ceil(terrain.height / spacing) }, (_, row) => ({
+      x: Math.min(
+        column * spacing + Math.floor(spacing / 2),
+        terrain.width - 1,
+      ),
+      z: Math.min(row * spacing + Math.floor(spacing / 2), terrain.height - 1),
+    })),
   ).flat();
 
 /**
@@ -149,7 +140,7 @@ export const scouting: AiConcern = (context) => {
   const memory = context.memory as ScoutMemory;
   const avoid = recentAvoided(memory.avoid, tick, staleReportTicks(context));
   memory.avoid = avoid;
-  const tiles = sweepTiles(terrain);
+  const tiles = sweepTiles(terrain, context.tuning.scouting.sweepTiles);
   for (const tile of tiles)
     if (context.view.knowledge.seesTile(tile))
       (memory.swept ??= {})[tileKey(tile)] = tick;
@@ -202,7 +193,11 @@ function fieldScout(
       if (memory.goal && memory.goal.kind !== "retreat")
         avoid.push({ ...memory.goal.position, tick });
       memory.replaceTick =
-        tick + secondsToTicks(SCOUT_REPLACEMENT_SECONDS, context.tickSeconds);
+        tick +
+        secondsToTicks(
+          context.tuning.scouting.replacementSeconds,
+          context.tickSeconds,
+        );
     }
     for (const key of ["scoutId", "goal", "health"] as const)
       delete memory[key];
@@ -251,7 +246,8 @@ function explore(
       return;
     }
   }
-  const range = AVOID_TILES * terrain.tileSize;
+  const tuning = context.tuning.scouting;
+  const range = tuning.avoidTiles * terrain.tileSize;
   const reports = scoutingReports(context, terrain, memory.swept ?? {}, tiles);
   const goal = memory.goal;
   const refused = context.rejections.some(
@@ -268,7 +264,7 @@ function explore(
     if (goal.kind === "retreat" && (refused || scout.movement?.blocked)) {
       delete goal.issued;
       goal.retryTick =
-        tick + secondsToTicks(RETREAT_RETRY_SECONDS, context.tickSeconds);
+        tick + secondsToTicks(tuning.retreatRetrySeconds, context.tickSeconds);
     } else {
       // Arriving without refreshing a report also confirms a failed approach.
       if (goal.kind !== "retreat") avoid.push({ ...goal.position, tick });

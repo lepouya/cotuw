@@ -1337,6 +1337,13 @@ Posture selection and spending follow these rules:
 - Protect essential income and immediate defense, then allocate remaining
   resources and units through the profile. Crises reduce optional commitments,
   use reserves, and prompt reassessment of active attacks.
+- Recovery saves enough to restart income from nothing. If income stops and
+  the owner cannot pay to restart it, recovery sells buildings that neither
+  root a base nor earn income, largest refund first. A sale must return a
+  positive amount of a resource needed for the restart. Offline construction
+  and paused worker training do not count as restarting income.
+- Losing every headquarters before the owner can pay for a replacement is a
+  genuine losing position; the AI does not bank for it.
 - A faction with offensive pressure disabled defends locally when attacked.
   Wider retaliation requires an explicit mission rule or event.
 - Resource-denial operations target known economic opportunities when the

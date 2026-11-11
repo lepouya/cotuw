@@ -1,16 +1,19 @@
 // Faction-neutral reserve and restoration after base losses.
-import { isIncomeBuilding, isWorkerDefinition } from "./actor";
+import { compareIds, isIncomeBuilding, isWorkerDefinition } from "./actor";
 import {
+  affords,
   armyProducer,
   definitionOf,
   headquarters,
+  isOnline,
   ownBuildings,
   place,
   rosterBuildings,
   totalPrice,
   usableBuildings,
 } from "./ai-planning";
-import { economyWorkers } from "./economy";
+import { economyWorkers, saleRefund } from "./economy";
+import { costResource } from "./resources";
 
 import type { ActorDefinition } from "./actor";
 import type { AiConcern, AiConcernContext } from "./director";
@@ -38,8 +41,9 @@ const workerOf = (context: AiConcernContext, building: ActorDefinition) =>
 /**
  * Reserves income replacement costs and restores a lost headquarters. Income
  * plans own worker training, including replacements. Recovering releases
- * savings to the build plans; elsewhere only higher-priority concerns may
- * draw the reserve. Defense owns its exit timing.
+ * savings to the build plans, and sells buildings when nothing else can pay
+ * to restart income. Elsewhere only higher-priority concerns may draw the
+ * reserve. Defense owns its exit timing.
  */
 export const recovery: AiConcern = (context) => {
   const intact = isIntact(context);
@@ -54,6 +58,7 @@ export const recovery: AiConcern = (context) => {
   const restores = context.posture !== "defending";
   const reserve =
     replaceHeadquarters(context, restores) ?? incomeReserve(context);
+  if (context.posture === "recovering") sellForIncome(context);
   context.releaseFunds(
     context.posture !== "recovering" || reserve.urgent
       ? reserve.price
@@ -89,16 +94,81 @@ function replaceHeadquarters(
   return { price: totalPrice([definition]), urgent: true };
 }
 
-/** Covers one worker, and a building to train it when none is usable. */
-function incomeReserve(context: AiConcernContext): Reserve {
-  const trainsWorkers = (definition: ActorDefinition) =>
+const trainsWorkers =
+  (context: AiConcernContext) => (definition: ActorDefinition) =>
     !!workerOf(context, definition);
-  const [trainer] = usableBuildings(context, trainsWorkers);
+
+/** Income buildings that train their own workers. */
+const restartBuildings = (context: AiConcernContext) =>
+  rosterBuildings(
+    context,
+    (definition) =>
+      isIncomeBuilding(definition) && trainsWorkers(context)(definition),
+  );
+
+/**
+ * While income has stopped and the funds cannot restart it, sells the
+ * completed building with the largest refund that neither roots the base nor
+ * earns. Pending buildings and workers count as restarted.
+ */
+function sellForIncome(context: AiConcernContext) {
+  const [restart] = restartBuildings(context);
+  const economy = context.view.economy();
+  if (!restart || !economy || !headquarters(context)) return;
+  const trainers = new Set(
+    usableBuildings(context, trainsWorkers(context)).map(({ id }) => id),
+  );
+  const staffed =
+    economyWorkers(economy).length > 0 ||
+    economy.production.some(
+      ({ producerId, definitionId }) =>
+        trainers.has(producerId) &&
+        isWorkerDefinition(context.definitions.get(definitionId)!),
+    );
+  const earning =
+    usableBuildings(context, isIncomeBuilding).length > 0 ||
+    ownBuildings(context, isIncomeBuilding).some(
+      (building) => !!building.construction && isOnline(context, building),
+    );
+  const missing = [
+    ...(earning ? [] : [restart]),
+    ...(staffed ? [] : [workerOf(context, restart)!]),
+  ];
+  if (affords(context, ...missing)) return;
+  const needed = totalPrice(missing);
+  const [sale] = ownBuildings(
+    context,
+    (definition) => !definition.infrastructure && !isIncomeBuilding(definition),
+  )
+    .flatMap((building) => {
+      const definition = definitionOf(context, building);
+      const resource = costResource(definition);
+      const refund = saleRefund(building, definition);
+      return !building.construction &&
+        refund > 0 &&
+        (needed[resource] ?? 0) > context.funds(resource)
+        ? [{ id: building.id, refund }]
+        : [];
+    })
+    .sort((a, b) => b.refund - a.refund || compareIds(a.id, b.id));
+  if (sale) context.issue({ kind: "sell-actor", actorId: sale.id });
+}
+
+/**
+ * Covers one worker, and a building to train it when none is usable. Where
+ * income buildings train the workers, it always covers one of each, since
+ * losing them all otherwise leaves no income to rebuild with.
+ */
+function incomeReserve(context: AiConcernContext): Reserve {
+  const [restart] = restartBuildings(context);
+  if (restart)
+    return { price: totalPrice([restart, workerOf(context, restart)!]) };
+  const [trainer] = usableBuildings(context, trainsWorkers(context));
   if (trainer)
     return {
       price: totalPrice([workerOf(context, definitionOf(context, trainer))!]),
     };
-  const [building] = rosterBuildings(context, trainsWorkers);
+  const [building] = rosterBuildings(context, trainsWorkers(context));
   if (!building) return { price: {} };
   const staffed = economyWorkers(context.view.economy()).length > 0;
   return {

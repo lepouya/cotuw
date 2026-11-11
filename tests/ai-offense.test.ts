@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { BASE_CONTENT } from "./helpers/content";
+import { ARC_AI_TUNING, BASE_CONTENT } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { offense } from "../src/simulation/ai-offense";
 import { TerrainGrid } from "../src/simulation/terrain";
@@ -52,6 +52,7 @@ function fixture(count = 6) {
     tick: 3000,
     tickSeconds: 0.1,
     posture: "pressuring",
+    tuning: ARC_AI_TUNING,
     terrain: new TerrainGrid({
       width: 100,
       height: 100,
@@ -130,6 +131,24 @@ test("force quotas select the units closest to home before claiming them", () =>
     { units: ["unit-2", "unit-3", "unit-4", "unit-5"] },
   ]);
   expect([...claims]).toEqual(["unit-2", "unit-3", "unit-4", "unit-5"]);
+});
+
+test("the profile controls opening grace and raid commitment", () => {
+  const { context, memory } = fixture();
+  const tuning = {
+    ...context.tuning,
+    offense: {
+      ...context.tuning.offense,
+      graceSeconds: 310,
+      raid: { ...context.tuning.offense.raid, minUnits: 5 },
+    },
+  };
+  offense({ ...context, tuning, tick: 3099 });
+  expect(memory.operations).toBeUndefined();
+  offense({ ...context, tuning, tick: 3100 });
+  expect(memory.operations).toMatchObject([
+    { kind: "raid", units: ["unit-0", "unit-1", "unit-2", "unit-3", "unit-4"] },
+  ]);
 });
 
 test("a target whose owner stops being hostile cancels its operation", () => {

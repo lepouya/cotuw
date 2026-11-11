@@ -7,10 +7,10 @@ import {
   ROUND_TICKS,
   runTicks,
 } from "./helpers/ai-mirror";
+import { ARC_AI_TUNING } from "./helpers/content";
 import { savedState } from "./helpers/scenario";
 import { createSessionSimulation } from "../src/mission-loading";
 import { BUILT_IN_AI_CONCERNS } from "../src/simulation/ai-concerns";
-import { SCOUT_REPLACEMENT_SECONDS } from "../src/simulation/ai-scouting";
 import {
   secondsToTicks,
   SIMULATION_TICK_SECONDS,
@@ -185,7 +185,9 @@ test("a lost scout is replaced at normal cost after a delay", () => {
     const lost = memoryOf(sim);
     expect(lost.scoutId).toBeUndefined();
     expect(lost.replaceTick).toBeGreaterThanOrEqual(
-      sim.completedTicks + seconds(SCOUT_REPLACEMENT_SECONDS) - ROUND_TICKS,
+      sim.completedTicks +
+        seconds(ARC_AI_TUNING.scouting.replacementSeconds) -
+        ROUND_TICKS,
     );
     runTicks(sim, lost.replaceTick! - sim.completedTicks - 1);
     expect(memoryOf(sim).scoutId).toBeUndefined();

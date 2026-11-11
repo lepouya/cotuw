@@ -40,6 +40,10 @@ bundled packs through the same parser future mod packs will use.
   must include `establishing`; a posture it omits is forbidden. Each posture
   lists `{ concern, budget, forces, essential? }` by priority: `concern` names
   built-in code, and `budget` and `forces` are nonnegative relative shares.
+  `tuning` holds the concerns' thresholds and timing, with distances in tiles,
+  durations in seconds, and odds as strength ratios. Every value is required
+  and unknown keys are rejected; `AiTuning` in `simulation/ai-tuning.ts`
+  documents each one.
 - Relative asset `url` values resolve against the page. The bundled pack uses
   paths such as `assets/models/wolf.glb` to support hosting under a subpath.
 - `presentation` maps actor IDs to what the player sees:
