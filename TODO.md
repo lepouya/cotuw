@@ -8,9 +8,8 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phases A and B are complete except for deferred cohort task 1.02. Phase C is
-in progress; the Circle cultivation slice is playable with acceptance work
-remaining.
+Phases A through C are complete except for deferred cohort task 1.02. The
+Circle cultivation slice is playable with acceptance work remaining.
 
 ### Using this checklist
 
@@ -95,74 +94,38 @@ Use [runtime contracts](docs/runtime-boundaries.md),
 
 ### C. AI development harness
 
-Prerequisite complete: owner-view placement, training, rally, and tending
-previews use only owned, detected, and remembered state. The director must use
-this [view boundary](docs/runtime-boundaries.md#headless-preparation).
+Complete. A deterministic director plays AI owners through `viewOf(owner)`
+and owner-issued commands. The ARC mirror on the rough map establishes and
+rebuilds its base, scouts, defends, raids, and attacks through shared rules.
+It remains a development matchup, launched by `ai=` links.
 
-Use ARC against ARC on the rough map and existing roster to prove the shared
-AI. Circle slice work can proceed alongside it. This matchup remains a
-development tool. Build the runner, overlay, and persistence first so later
-AI tasks are developed and verified with them.
+- [x] **1.29** Director with pack profiles, prioritized concerns, shared
+  budgets and force claims, urgency-ranked postures, and counted per-tick
+  limits.
+- [x] **1.30** Headless runner (`npm run ai:match`) with ARC mirror,
+  recovery, and continuation case sets and a 30-minute cutoff.
+- [x] **1.31** Development AI overlay for `ai=` links.
+- [x] **1.32** Saved AI state with validated concern memory and deterministic
+  continuation across clock batching and pending withdrawal orders.
+- [x] **1.33** ARC build plan for income, producers, and forces using normal
+  placement and costs.
+- [x] **1.34** Paid recovery after worker, income, production, support-link,
+  and headquarters losses.
+- [x] **1.35** Faction-neutral scouting of authored sites, stale reports, and
+  unseen buildings.
+- [x] **1.36** Faction-neutral defense, raid, and attack operations, withdrawn
+  within tick limits when a posture omits them, preserving reassigned units.
+- [x] **1.37** Profile tuning separate from difficulty. Normal mirrors end
+  near 13:40, below the 15-minute target, with raids near 4:20 and attacks
+  near 9:20. Losing the headquarters before a replacement is affordable is an
+  accepted loss.
+- [x] **1.38** Mirror audit, recovery, and continuation cases pass. The AI
+  benchmark holds 200 units and 40 buildings at about 4.0 ms p95 and 4.9 ms
+  p99, at the tick budget.
 
-- [x] **1.29** Deterministic director with pack profiles, prioritized concerns,
-  shared budgets and force claims, and counted per-tick limits. It runs as a
-  mission tick step through `viewOf(owner)` and owner-issued commands.
-  `submitCommand` requires an issuer.
-- [x] **1.30** Headless AI-versus-AI runner (`npm run ai:match`) with ARC
-  mirror cases by player slot and difficulty. It reports results, milestones,
-  totals, scaling, and AI diagnostics, and preserves Incomplete / stalled
-  cases at the 30-minute cutoff. `createSessionSimulation` accepts concerns.
-  The 12-case ARC-versus-Circle matrix belongs to 1.63.
-- [x] **1.31** Development AI overlay (`ui/ai-overlay.ts`), offered by `ai=`
-  development links in dev and playtest builds. Backquote cycles AI owners'
-  posture, budgets, claims, operations, recent and refused commands, concern
-  memory, and sightings.
-- [x] **1.32** `state.ai` saves budgets, claims, timers, plans, scouting goals,
-  and operations, with observations from 1.19. Concern-owned validators reject
-  malformed memory before startup. Tests verify deterministic save/load and
-  continuation through clock batching and bounded catch-up.
-- [x] **1.33** ARC build plan in `simulation/arc-concerns.ts` with the shared
-  `forces` concern, which sessions use by default. It opens with a Refinery and
-  Harvester, then a Field Barracks, and grows to three Refineries and two
-  Barracks while training Troopers to a rally point. The undisturbed mirror
-  reaches first income near 1:15, military production near 2:30, and a first
-  Trooper near 2:40 through ordinary placement and costs.
-- [x] **1.34** Recovery reserves income replacement costs and restores lost
-  headquarters. Income and production plans replace workers and offline
-  buildings, reusing stranded Harvesters, and restore one Refinery and
-  producer before growing again. Tests cover paid recovery from
-  worker, income, production, headquarters, and support-link losses, defense
-  timing, and deterministic save/load continuation.
-- [x] **1.35** Faction-neutral `scouting` concern in
-  `simulation/ai-scouting.ts` explores authored sites, refreshes stale reports,
-  retreats after damage, skips failed approaches, and replaces lost scouts at
-  normal cost. The undisturbed mirror sights every site and enemy income;
-  Harvesters can use scouted deposits after home Materials run out.
-- [x] **1.36** Faction-neutral group operations in
-  `simulation/ai-operations.ts` assemble, advance, regroup, retreat when
-  outmatched or depleted, retry stalls within limits, and return survivors
-  home. Defense protects buildings and workers; offense raids observed income
-  and attacks known buildings after the four-minute grace. Idle scouts sweep
-  for unseen buildings, including while stale reports are avoided. Every ARC
-  mirror case completes, with raids from about 4:25.
-- [x] **1.37** Profile `tuning` sets opening grace, commitment, pursuit,
-  retreat, and recovery, separate from difficulty scaling. Normal ARC
-  mirrors end near 13:40, with first raids near 4:20 and attacks near 9:20;
-  Easy and Hard end decisively near 9:30 to 9:50. Recovery saves to restart
-  income and sells production when it cannot; losing the Command Center
-  before 300 Materials are banked is an accepted loss. A human playtest won
-  in about nine minutes after the AI attacked first.
-- [x] **1.38** The ARC mirror harness passes its audit, baseline, recovery,
-  and full-state save/load continuation cases. Worker, income, and
-  production losses recover; headquarters loss is an accepted loss that
-  finishes cleanly. The AI benchmark uses only probe training, records
-  actual population, and requires measured combat. Its normal headless run
-  holds 199 to 200 units and 40 buildings, at about 4.0 ms p95 and 4.9 ms
-  p99. Crowded operations no longer count members already at their point
-  as stalls, and new routes share a per-tick search budget.
-
-Phase gate: ARC AI establishes and rebuilds its base, scouts, defends, and
-attacks through shared rules, with reproducible results and useful diagnostics.
+Use [runtime contracts](docs/runtime-boundaries.md) and
+[headless acceptance](docs/verification.md#m1-headless-acceptance) when
+extending the AI.
 
 ### D. Expanded ARC base and controls
 
@@ -192,7 +155,8 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   and recovery of Harvesters that survive raid damage. Add order kinds through
   `simulation/order-queue.ts`. Support units run outside `updateCombat`, so they
   pursue through `followRoute` with their own `RouteRetryState` and the
-  mission's bounded `move` and `destination`.
+  mission's bounded `move` and `destination`. Keep support units out of AI
+  scout selection (`isScoutUnit`) and director force shares.
 - [ ] **1.42** Add the Demolition Trooper to Field Barracks production.
   Implement its single-target building damage bonus at `updateCombat`'s damage
   site and verify the counter relationship and reason to field a mixed force.
@@ -220,7 +184,9 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
   expansion, defense, recovery, and combat content. Include Refineries at
   scouted remote deposits, which need support reach; Harvesters otherwise
-  haul to home Refineries.
+  haul to home Refineries. Move build-plan constants into profile `tuning`.
+  Reassess active attacks when a crisis needs their units, following
+  [faction strategy](DESIGN.md#faction-strategy).
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
   units, and controls with the 1.02 cohort, in the same sessions as 1.02 and
   1.57. Play against the harness AI on the rough
@@ -280,6 +246,8 @@ acceptance remains open below; normal-menu skirmish launch belongs to 1.60.
   skirmish play. Keep M0 available as ARC's introduction.
 - [ ] **1.55** Add the Circle AI build plan and operations for its economy,
   infrastructure, roster, and recovery. Exercise it through the shared harness.
+  Recovery assumes income buildings train their own workers; have each
+  faction plan report its income-restart price and progress first.
 - [ ] **1.56** Verify Circle saves and deterministic continuation through
   construction, tending assignments and worker replacement, cultivation,
   dormancy, recovery, and support work. Preserve site reserves and dormancy
@@ -303,7 +271,9 @@ and producer-based progression scope from 1.06.
 
 - [ ] **1.59** Finish the map with viable routes, expansion opportunities,
   scouting landmarks, and defensible starts for both player assignments.
-  Verify both factions' paid first income and restart from either slot.
+  Verify both factions' paid first income and restart from either slot. The
+  Normal ARC mirror's winner depends on start slot; find whether the map or
+  tie-breaking causes it.
 - [ ] **1.60** Extend the demo setup screen to offer the complete Circle
   introduction and skirmish launch. Preserve independent ARC/Circle and
   Easy/Normal/Hard choices and access to ARC's introduction.
