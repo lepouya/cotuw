@@ -18,7 +18,7 @@ import {
 import { distance, isFinitePosition } from "./world";
 
 import type { ActorRenderState } from "./actor";
-import type { AiConcernContext } from "./director";
+import type { AiConcernContext, AiWithdrawalContext } from "./director";
 import type { TerrainView } from "./terrain";
 import type { WorldPosition } from "./world";
 
@@ -384,6 +384,27 @@ export function stepOperation(
   )
     operation.issued = true;
   return event;
+}
+
+/** Sends unclaimed survivors home, retaining orders that hit the tick limit. */
+export function withdrawOperations(context: AiWithdrawalContext) {
+  const memory = context.memory as OperationsMemory;
+  const pending = (memory.operations ?? []).filter((operation) => {
+    operation.units = operation.units.filter(
+      (id) => context.view.ownMobileActor(id) && context.canOrder(id),
+    );
+    return (
+      operation.units.length > 0 &&
+      !context.issue({
+        kind: "group-move",
+        actorIds: operation.units,
+        target: operation.rally,
+      })
+    );
+  });
+  if (pending.length) memory.operations = pending;
+  else delete memory.operations;
+  return !pending.length;
 }
 
 /** Every operation saved in an owner's concern memory, for diagnostics. */

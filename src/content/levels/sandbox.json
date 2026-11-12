@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 23,
+  "version": 24,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "sandbox",

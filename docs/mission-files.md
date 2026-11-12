@@ -253,6 +253,9 @@ can be read, edited by hand, and loaded again.
   must be ones the profile permits. `nextRoundTick` schedules the next round,
   and `cursor` is the next concern of a round in progress. `nextActorNumber`
   starts at one and advances whenever the owner generates an actor ID.
+- Optional `withdrawing` lists inactive concerns whose follow-up orders still
+  need a turn. Their memory retains unsent work; withdrawal shares the owner's
+  per-tick limits and ends if the concern becomes active again.
 - `budgets` maps concerns to resource amounts set aside. `claims` maps actor IDs
   to the concern holding them. Before each planning tick, budgets account for
   current balances, and claims release lost actors and units beyond the current

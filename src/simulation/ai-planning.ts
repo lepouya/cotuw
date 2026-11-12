@@ -25,8 +25,6 @@ const PLACEMENT_OFFSETS: readonly TileCoord[] = Array.from(
     z: Math.floor(index / (2 * PLACEMENT_RADIUS + 1)) - PLACEMENT_RADIUS,
   }),
 ).sort((a, b) => a.x * a.x + a.z * a.z - (b.x * b.x + b.z * b.z));
-/** Checks need an ID; real IDs are spent only on issued orders. */
-const PROBE_ID = "ai-probe";
 
 export type Building = ActorRenderState & {
   tilePlacement: NonNullable<ActorRenderState["tilePlacement"]>;
@@ -137,6 +135,7 @@ export function findPlacement(
   terrain: TerrainView,
   definition: ActorDefinition,
   anchor: WorldPosition,
+  actorId: string,
 ): TileCoord | undefined {
   const point = clampToBounds(anchor, terrain.worldBounds);
   const center = terrain.tileAtWorldPosition(point.x, point.z);
@@ -155,7 +154,7 @@ export function findPlacement(
     )
       continue;
     const evaluation = context.view.evaluatePlacement({
-      actorId: PROBE_ID,
+      actorId,
       definitionId: definition.id,
       origin,
     });
@@ -171,12 +170,13 @@ export function place(
   anchor: WorldPosition,
 ) {
   if (!affords(context, definition)) return false;
-  const origin = findPlacement(context, terrain, definition, anchor);
+  const actorId = context.newActorId(definition.id);
+  const origin = findPlacement(context, terrain, definition, anchor, actorId);
   return (
     !!origin &&
     context.issue({
       kind: "place-actor",
-      actorId: context.newActorId(definition.id),
+      actorId,
       definitionId: definition.id,
       origin,
     })
@@ -193,15 +193,15 @@ export function train(
   definition: ActorDefinition,
 ): string | undefined {
   if (!affords(context, definition)) return;
+  const actorId = context.newActorId(definition.id);
   const command = {
     kind: "train-unit" as const,
     producerId: producer.id,
-    actorId: PROBE_ID,
+    actorId,
     definitionId: definition.id,
   };
   if (!context.view.evaluateTraining(command).accepted) return;
-  const actorId = context.newActorId(definition.id);
-  return context.issue({ ...command, actorId }) ? actorId : undefined;
+  return context.issue(command) ? actorId : undefined;
 }
 
 /**

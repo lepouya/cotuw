@@ -92,6 +92,8 @@ export type OwnerAiState = {
   nextActorNumber: number;
   /** The next concern of the round in progress; absent between rounds. */
   cursor?: number;
+  /** Inactive concerns still issuing follow-up orders within tick limits. */
+  withdrawing?: string[];
   /** Resource reservations, reconciled with the balance before planning. */
   budgets: Record<string, Partial<Record<Resource, number>>>;
   /** The concern holding each claimed actor. */
@@ -141,12 +143,30 @@ export type AiConcernContext = {
   /** Whether this concern now holds a fielded non-worker unit of the owner. */
   claim: (actorId: string) => boolean;
   release: (actorId: string) => void;
-  /** False when the profile forbids it. The highest-priority request wins. */
+  /**
+   * False when the profile forbids it. Defending outranks recovering, which
+   * outranks the rest; among equals, the higher-priority concern's wins.
+   */
   requestPosture: (posture: AiPosture) => boolean;
+};
+/**
+ * What a concern may do when a round begins in a posture without it. Its
+ * funds and units are already released; it can only order existing actors.
+ */
+export type AiWithdrawalContext = Pick<
+  AiConcernContext,
+  "tick" | "tickSeconds" | "view" | "terrain" | "definitions" | "tuning"
+> & {
+  readonly memory: Record<string, unknown>;
+  /** Own actors that no active concern has claimed. */
+  canOrder: (actorId: string) => boolean;
+  issue: (command: MissionCommand) => boolean;
 };
 export type AiConcern = ((context: AiConcernContext) => void) & {
   /** Validates this concern's saved state before a mission starts. */
   validateMemory?: (memory: Record<string, unknown>) => boolean;
+  /** Ends work after leaving a posture; false requests another tick's turn. */
+  withdraw?: (context: AiWithdrawalContext) => boolean | void;
 };
 
 /** Budget reservations to return if a command is refused. */
@@ -206,6 +226,22 @@ export type DirectorHost = {
   viewOf: (owner: string) => OwnerView;
   submit: (command: MissionCommand, source: AiCommandSource) => void;
 };
+
+/** Requests that outrank concern priority, least urgent first. */
+const URGENT_POSTURES: readonly AiPosture[] = ["recovering", "defending"];
+const urgency = (posture: AiPosture) => URGENT_POSTURES.indexOf(posture);
+
+const actorIdPrefix = (owner: string) => `ai:${owner.length}:${owner}:`;
+
+/** Refusals could reveal hidden actors, so commands stay within the view. */
+const staysInView = (view: OwnerView, command: MissionCommand) =>
+  commandActorIds(command).every((id) => view.shownActor(id)) &&
+  ((command.kind !== "place-actor" && command.kind !== "train-unit") ||
+    command.actorId.startsWith(actorIdPrefix(view.owner))) &&
+  (command.kind !== "cancel-production" ||
+    !!view
+      .economy()
+      ?.production.some(({ actorId }) => actorId === command.actorId));
 
 /** Drops float error from a share, so it can match a whole price or count. */
 const settled = (share: number) =>
@@ -318,6 +354,15 @@ export function validateAiState(
         (state.cursor === undefined ||
           (isCount(state.cursor) &&
             state.cursor <= profile.postures[state.posture]!.length)) &&
+        (state.withdrawing === undefined ||
+          (isIdList(state.withdrawing) &&
+            state.withdrawing.every(
+              (concern) =>
+                known.has(concern) &&
+                !profile.postures[state.posture]!.some(
+                  (active) => active.concern === concern,
+                ),
+            ))) &&
         isRecord(state.budgets) &&
         Object.entries(state.budgets).every(
           ([concern, funds]) =>
@@ -473,16 +518,7 @@ function concernContext(
   const allocation = allocations[index]!;
   const { concern } = allocation;
   const owner = view.owner;
-  const idPrefix = `ai:${owner.length}:${owner}:`;
-  /** Refusals could reveal hidden actors, so commands stay within the view. */
-  const staysInView = (command: MissionCommand) =>
-    commandActorIds(command).every((id) => view.shownActor(id)) &&
-    ((command.kind !== "place-actor" && command.kind !== "train-unit") ||
-      command.actorId.startsWith(idPrefix)) &&
-    (command.kind !== "cancel-production" ||
-      !!view
-        .economy()
-        ?.production.some(({ actorId }) => actorId === command.actorId));
+  const idPrefix = actorIdPrefix(owner);
   /** Budgets this concern may use, its own first and then lowest priority. */
   const accounts = () => [
     concern,
@@ -545,7 +581,7 @@ function concernContext(
       if (
         spent.commands >= profile.commandsPerTick ||
         !isMissionCommand(command) ||
-        !staysInView(command)
+        !staysInView(view, command)
       )
         return false;
       const definition =
@@ -587,10 +623,67 @@ function concernContext(
     requestPosture: (posture) => {
       if (!isOneOf(AI_POSTURES, posture) || !hasOwn(profile.postures, posture))
         return false;
-      ai.requestedPosture ??= posture;
+      if (
+        !ai.requestedPosture ||
+        urgency(posture) > urgency(ai.requestedPosture)
+      )
+        ai.requestedPosture = posture;
       return true;
     },
   };
+}
+
+/** Lets a concern the new posture leaves out end its work. */
+function withdrawConcern(
+  ai: OwnerAiState,
+  profile: AiProfile,
+  concern: string,
+  {
+    view,
+    tick,
+    host,
+    spent,
+  }: {
+    view: OwnerView;
+    tick: number;
+    host: DirectorHost;
+    spent: { commands: number };
+  },
+) {
+  const withdraw = host.concerns.get(concern)!.withdraw;
+  if (!withdraw || !hasOwn(ai.memory, concern)) return true;
+  const memory = ai.memory[concern]!;
+  const canOrder = (actorId: string) =>
+    !!view.ownActor(actorId) && !hasOwn(ai.claims, actorId);
+  const completed = withdraw({
+    tick,
+    tickSeconds: host.tickSeconds,
+    view,
+    terrain: host.terrain,
+    definitions: host.definitions,
+    tuning: profile.tuning,
+    memory,
+    canOrder,
+    issue: (command) => {
+      if (
+        spent.commands >= profile.commandsPerTick ||
+        !isMissionCommand(command) ||
+        command.kind === "place-actor" ||
+        command.kind === "train-unit" ||
+        commandActorIds(command).some(
+          (id) => view.ownActor(id) && !canOrder(id),
+        ) ||
+        !staysInView(view, command)
+      )
+        return false;
+      host.submit(command, { owner: view.owner, concern, debits: [] });
+      spent.commands += 1;
+      return true;
+    },
+  });
+  if (!isJson(memory))
+    throw new RangeError(`AI concern ${concern} memory must stay JSON.`);
+  return completed !== false;
 }
 
 /**
@@ -606,11 +699,24 @@ export function advanceDirector(
   let next = ai;
   for (const { owner, profile } of controllers) {
     const saved = ai[owner]!;
-    if (saved.cursor === undefined && tick < saved.nextRoundTick) continue;
+    if (
+      saved.cursor === undefined &&
+      tick < saved.nextRoundTick &&
+      !saved.withdrawing?.length
+    )
+      continue;
     const working = structuredClone(saved);
     const view = host.viewOf(owner);
-    if (working.cursor === undefined)
+    const concernsOf = () =>
+      profile.postures[working.posture]!.map(({ concern }) => concern);
+    if (working.cursor === undefined && tick >= working.nextRoundTick) {
+      const before = concernsOf();
       beginRound(working, profile, tick, host.tickSeconds);
+      const after = new Set(concernsOf());
+      working.withdrawing = [
+        ...new Set([...(working.withdrawing ?? []), ...before]),
+      ].filter((concern) => !after.has(concern));
+    }
     const allocations = profile.postures[working.posture]!;
     reconcileBudgets(working, allocations, view);
     const forces = reconcileClaims(
@@ -620,11 +726,24 @@ export function advanceDirector(
       host.definitions,
     );
     const spent = { commands: 0 };
-    for (
-      let turns = 0;
-      turns < profile.concernsPerTick && working.cursor! < allocations.length;
-      turns += 1
+    let turns = 0;
+    working.withdrawing = (working.withdrawing ?? []).filter((concern) => {
+      if (turns >= profile.concernsPerTick) return true;
+      turns += 1;
+      return !withdrawConcern(working, profile, concern, {
+        view,
+        tick,
+        host,
+        spent,
+      });
+    });
+    if (!working.withdrawing.length) delete working.withdrawing;
+    while (
+      turns < profile.concernsPerTick &&
+      working.cursor !== undefined &&
+      working.cursor < allocations.length
     ) {
+      turns += 1;
       const index = working.cursor!;
       const context = concernContext(working, profile, index, {
         view,

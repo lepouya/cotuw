@@ -9,13 +9,18 @@ import {
   reinforceOperation,
   stagingPoint,
   stepOperation,
+  withdrawOperations,
   strengthOf,
 } from "../src/simulation/ai-operations";
 import { TerrainGrid } from "../src/simulation/terrain";
 
 import type { Actor } from "../src/simulation/actor";
 import type { MissionCommand } from "../src/simulation/command";
-import type { AiConcernContext, AiRejection } from "../src/simulation/director";
+import type {
+  AiConcernContext,
+  AiRejection,
+  AiWithdrawalContext,
+} from "../src/simulation/director";
 
 const terrain = new TerrainGrid({
   width: 100,
@@ -348,4 +353,45 @@ test("diagnostics list operations saved in any concern's memory", () => {
       custom: { operations: [null, { id: "incomplete" }] },
     }),
   ).toEqual([{ concern: "defense", operation }]);
+});
+
+test("withdrawn operations send their survivors home and are forgotten", () => {
+  const { operation, issued, context } = fixture(group(3, 40, 40));
+  const living = new Set(["unit-0", "unit-2"]);
+  const memory = { operations: [operation], kept: true };
+  const base = context();
+  withdrawOperations({
+    ...base,
+    memory,
+    canOrder: () => true,
+    view: {
+      ...base.view,
+      ownMobileActor: (id: string) =>
+        living.has(id) ? base.view.ownMobileActor(id) : undefined,
+    },
+  } as unknown as AiWithdrawalContext);
+  expect(issued).toEqual([
+    { kind: "group-move", actorIds: ["unit-0", "unit-2"], target: home },
+  ]);
+  expect(memory).toEqual({ kept: true });
+});
+
+test("withdrawal leaves reassigned units alone and retries unsent orders", () => {
+  const { operation, issued, context } = fixture(group(3, 40, 40));
+  const memory = { operations: [operation] };
+  const base = context();
+  const withdrawal = {
+    ...base,
+    memory,
+    canOrder: (id: string) => id !== "unit-1",
+    issue: () => false,
+  } as unknown as AiWithdrawalContext;
+  expect(withdrawOperations(withdrawal)).toBe(false);
+  expect(operation.units).toEqual(["unit-0", "unit-2"]);
+  expect(memory.operations).toEqual([operation]);
+  expect(withdrawOperations({ ...withdrawal, issue: base.issue })).toBe(true);
+  expect(issued).toEqual([
+    { kind: "group-move", actorIds: ["unit-0", "unit-2"], target: home },
+  ]);
+  expect(memory).toEqual({});
 });

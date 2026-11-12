@@ -55,7 +55,7 @@ test.each([
   ["past the edge", { x: -500, z: 500 }],
 ])("placement searches from an anchor %s the map", (_where, anchor) => {
   const { stub, checked } = context(1000);
-  const origin = findPlacement(stub, terrain, BARRACKS, anchor);
+  const origin = findPlacement(stub, terrain, BARRACKS, anchor, "placement");
   expect(origin).toBeDefined();
   for (const { origin: tried } of checked)
     for (const { x, z } of BARRACKS.footprint!.occupiedTiles)
@@ -64,7 +64,7 @@ test.each([
 
 test("placement gives up when no candidate is accepted", () => {
   const { stub } = context(1000, () => false);
-  expect(findPlacement(stub, terrain, BARRACKS, { x: 0, z: 0 })).toBe(
-    undefined,
-  );
+  expect(
+    findPlacement(stub, terrain, BARRACKS, { x: 0, z: 0 }, "placement"),
+  ).toBeUndefined();
 });

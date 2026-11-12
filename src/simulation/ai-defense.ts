@@ -10,6 +10,7 @@ import {
   reinforceOperation,
   stagingPoint,
   stepOperation,
+  withdrawOperations,
   strengthOf,
   visibleHostiles,
 } from "./ai-operations";
@@ -28,7 +29,7 @@ type DefenseMemory = OperationsMemory & {
 /**
  * Meets detected armed hostiles near own buildings and workers with enough
  * nearby army units, in every posture that lists it. It requests the
- * defending posture while threatened and leaves it once threats stay away.
+ * defending posture while threatened and holds it until threats stay away.
  */
 export const defense: AiConcern = (context) => {
   const { terrain, tick } = context;
@@ -79,10 +80,13 @@ export const defense: AiConcern = (context) => {
     commitDefenders(context, operation, strengthOf(context, threats));
   } else {
     memory.calmTick ??= tick;
-    if (
+    const calm =
       tick - memory.calmTick >=
-      secondsToTicks(tuning.calmSeconds, context.tickSeconds)
-    ) {
+      secondsToTicks(tuning.calmSeconds, context.tickSeconds);
+    if (!calm) {
+      // Holding the posture keeps lower-urgency requests waiting.
+      if (context.posture === "defending") context.requestPosture("defending");
+    } else {
       if (operation && operation.phase !== "return")
         endOperation(context, operation, "completed");
       if (
@@ -100,6 +104,8 @@ export const defense: AiConcern = (context) => {
   if (operation) memory.operations = [operation];
   else delete memory.operations;
 };
+
+defense.withdraw = withdrawOperations;
 
 defense.validateMemory = (memory) =>
   hasValidOperations(memory) &&

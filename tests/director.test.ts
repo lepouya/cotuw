@@ -6,11 +6,21 @@ import {
   advanceTicks,
   balance,
   savedState,
+  setBalance,
   startMission,
   stockpiles,
 } from "./helpers/scenario";
 import { issuedByPlayer } from "../src/simulation/command";
 import { createAiState } from "../src/simulation/director";
+import {
+  launchOperation,
+  withdrawOperations,
+} from "../src/simulation/ai-operations";
+import {
+  ownBuildings,
+  place,
+  train as planTraining,
+} from "../src/simulation/ai-planning";
 import { startSimulationLoop } from "../src/simulation/loop";
 import { createActor } from "../src/simulation/actor";
 import {
@@ -22,6 +32,7 @@ import { TerrainGrid } from "../src/simulation/terrain";
 
 import type {
   AiAllocation,
+  AiWithdrawalContext,
   AiConcern,
   AiConcernContext,
   AiController,
@@ -235,6 +246,43 @@ test("loaded missions run their director without a driver's help", () => {
   resumed.tick();
   expect(turns).toBe(3);
 });
+
+test.each(["place-actor", "train-unit"] as const)(
+  "%s planning works when an existing actor is named ai-probe",
+  (kind) => {
+    const sim = fixture(
+      profile([allocation("builder")]),
+      {
+        builder: once((context) => {
+          const queued =
+            kind === "place-actor"
+              ? place(
+                  context,
+                  context.terrain!,
+                  context.definitions.get("arc-materials-refinery")!,
+                  context.view.ownActor("west-hq")!.worldPosition,
+                )
+              : planTraining(
+                  context,
+                  ownBuildings(
+                    context,
+                    (definition) => definition.id === BARRACKS,
+                  )[0]!,
+                  context.definitions.get(TROOPER)!,
+                );
+          expect(queued).toBeTruthy();
+        }),
+      },
+      {
+        change: (state) => {
+          state.actors.find(({ id }) => id === "west-unit-4")!.id = "ai-probe";
+          setBalance(state, 1000, "materials", "west");
+        },
+      },
+    );
+    expect(sim.tick()).toMatchObject([{ accepted: true, command: { kind } }]);
+  },
+);
 
 test("rounds wait their interval and owners plan on separate ticks", () => {
   const ticks: Record<string, number[]> = { west: [], east: [] };
@@ -675,7 +723,7 @@ test("postures reorder concerns and release those they do not use", () => {
       },
       kept: (context) => {
         log.push(`kept:${context.posture}`);
-        // A higher-priority request wins, so this one does not apply.
+        // An equally urgent request from a higher-priority concern wins.
         if (context.posture === "establishing")
           context.requestPosture("establishing");
       },
@@ -695,6 +743,197 @@ test("postures reorder concerns and release those they do not use", () => {
   expect(budgets).toEqual({ kept: { materials: 100 } });
   // Memory outlives the posture, so a concern can resume its plan.
   expect(memory).toHaveProperty("old");
+});
+
+test.each([
+  [["developing", "recovering"], "recovering"],
+  [["recovering", "pressuring"], "recovering"],
+  [["recovering", "defending"], "defending"],
+  [["defending", "recovering"], "defending"],
+  [["pressuring", "developing"], "pressuring"],
+] as const)(
+  "posture requests %j resolve to %s regardless of concern order",
+  (requests, expected) => {
+    const sim = fixture(
+      profile([], {
+        postures: {
+          establishing: [allocation("first"), allocation("second")],
+          developing: [],
+          pressuring: [],
+          defending: [],
+          recovering: [],
+        },
+      }),
+      {
+        first: once((context) => void context.requestPosture(requests[0])),
+        second: once((context) => void context.requestPosture(requests[1])),
+      },
+    );
+    sim.tick();
+    expect(sim.snapshot().ai.west!.requestedPosture).toBe(expected);
+    advanceTicks(sim, ROUND);
+    expect(sim.snapshot().ai.west!.posture).toBe(expected);
+  },
+);
+
+test("a concern the new posture leaves out withdraws once, without spending", () => {
+  const withdrawals: { tick: number; memory: unknown }[] = [];
+  const old: AiConcern = Object.assign(
+    (context: AiConcernContext) => {
+      context.memory.marker = context.tick;
+      context.requestPosture("developing");
+    },
+    {
+      withdraw: (context: AiWithdrawalContext) => {
+        withdrawals.push({ tick: context.tick, memory: { ...context.memory } });
+        expect(
+          context.issue({
+            kind: "train-unit",
+            producerId: "west-barracks",
+            actorId: "ai:4:west:trooper:9",
+            definitionId: TROOPER,
+          }),
+        ).toBe(false);
+        expect(context.issue({ kind: "stop", actorId: "east-unit" })).toBe(
+          false,
+        );
+        expect(context.issue({ kind: "stop", actorId: "west-unit-1" })).toBe(
+          true,
+        );
+      },
+    },
+  );
+  const sim = fixture(
+    profile([], {
+      postures: {
+        establishing: [allocation("old"), allocation("kept")],
+        developing: [allocation("kept")],
+      },
+    }),
+    { old, kept: () => {} },
+  );
+  const outcomes = Array.from({ length: 3 * ROUND }, () => sim.tick()).flat();
+  expect(withdrawals).toEqual([{ tick: ROUND, memory: { marker: 0 } }]);
+  expect(
+    outcomes.filter(({ issuer }) => issuer.ai).map(({ command }) => command),
+  ).toEqual([{ kind: "stop", actorId: "west-unit-1" }]);
+  expect(sim.snapshot().ai.west!.budgets).not.toHaveProperty("old");
+});
+
+test("withdrawal obeys tick limits and resumes pending orders after loading", () => {
+  const old: AiConcern = Object.assign(
+    (context: AiConcernContext) => {
+      context.memory.operations = [1, 2].map((number) =>
+        launchOperation(context, {
+          id: `raid:${number}`,
+          kind: "raid",
+          phase: "advance",
+          target: { x: 30, z: 0 },
+          rally: { x: -20, z: 0 },
+          units: [`west-unit-${number}`],
+        }),
+      );
+      context.requestPosture("developing");
+    },
+    { withdraw: withdrawOperations },
+  );
+  const aiProfile = profile([], {
+    commandsPerTick: 1,
+    concernsPerTick: 1,
+    postures: {
+      establishing: [allocation("old")],
+      developing: [allocation("kept")],
+    },
+  });
+  const keptTicks: number[] = [];
+  const concerns = {
+    old,
+    kept: (context: AiConcernContext) => void keptTicks.push(context.tick),
+  };
+  const sim = fixture(aiProfile, concerns);
+  advanceTicks(sim, ROUND);
+  const first = sim.tick();
+  expect(first.map(({ command }) => command)).toMatchObject([
+    { kind: "move", actorId: "west-unit-1" },
+  ]);
+  expect(sim.ai.west!.withdrawing).toEqual(["old"]);
+  expect(keptTicks).toEqual([]);
+  const resumed = fixture(aiProfile, concerns, {
+    state: savedState(scenario, sim),
+  });
+  expect(resumed.tick()).toEqual(sim.tick());
+  expect(sim.ai.west!.withdrawing).toBeUndefined();
+  expect(keptTicks).toEqual([]);
+  expect(resumed.tick()).toEqual(sim.tick());
+  expect(keptTicks).toEqual([ROUND + 2, ROUND + 2]);
+  expect(resumed.snapshot()).toEqual(sim.snapshot());
+});
+
+test("withdrawal cannot override a surviving concern's claims", () => {
+  const old: AiConcern = Object.assign(
+    (context: AiConcernContext) => {
+      context.claim("west-unit-1");
+      context.memory.ready = true;
+      context.requestPosture("developing");
+    },
+    {
+      withdraw: (context: AiWithdrawalContext) => {
+        expect(context.canOrder("west-unit-1")).toBe(false);
+        expect(context.issue({ kind: "stop", actorId: "west-unit-1" })).toBe(
+          false,
+        );
+      },
+    },
+  );
+  const sim = fixture(
+    profile([], {
+      postures: {
+        establishing: [allocation("old"), allocation("kept", 0, 1, true)],
+        developing: [allocation("kept", 0, 1, true)],
+      },
+    }),
+    {
+      old,
+      kept: (context) => void context.claim("west-unit-1"),
+    },
+  );
+  const outcomes = Array.from({ length: ROUND + 1 }, () => sim.tick()).flat();
+  expect(sim.ai.west!.claims["west-unit-1"]).toBe("kept");
+  expect(outcomes).toEqual([]);
+});
+
+test("reactivating a concern cancels its pending withdrawal", () => {
+  const withdrawals: number[] = [];
+  const turns: number[] = [];
+  const old: AiConcern = Object.assign(
+    (context: AiConcernContext) => {
+      turns.push(context.tick);
+      if (context.memory.started) return;
+      context.memory.started = true;
+      context.requestPosture("developing");
+    },
+    {
+      withdraw: (context: AiWithdrawalContext) => {
+        withdrawals.push(context.tick);
+        return false;
+      },
+    },
+  );
+  const sim = fixture(
+    profile([], {
+      postures: {
+        establishing: [allocation("old")],
+        developing: [allocation("kept")],
+      },
+    }),
+    { old, kept: (context) => void context.requestPosture("establishing") },
+  );
+  advanceTicks(sim, 2 * ROUND + 1);
+  expect(turns).toEqual([0, 2 * ROUND]);
+  expect(withdrawals).toEqual(
+    Array.from({ length: ROUND }, (_, index) => ROUND + index),
+  );
+  expect(sim.ai.west!.withdrawing).toBeUndefined();
 });
 
 test("inactive concerns keep refusals until their next turn", () => {
@@ -1171,6 +1410,8 @@ test.each<[string, (ai: any) => void]>([
   ["a claim on no actor", (ai) => (ai.west.claims.ghost = "a")],
   ["a claim for no concern", (ai) => (ai.west.claims["west-unit-1"] = "b")],
   ["a cursor past the round", (ai) => (ai.west.cursor = 2)],
+  ["withdrawal of no concern", (ai) => (ai.west.withdrawing = ["missing"])],
+  ["withdrawal of an active concern", (ai) => (ai.west.withdrawing = ["a"])],
   ["a malformed rejection", (ai) => ai.west.rejections.push({ concern: "a" })],
   ["non-record memory", (ai) => (ai.west.memory.a = [])],
 ])("rejects saved AI state with %s", (_, corrupt) => {

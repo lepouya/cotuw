@@ -43,14 +43,13 @@ const workerOf = (context: AiConcernContext, building: ActorDefinition) =>
  * plans own worker training, including replacements. Recovering releases
  * savings to the build plans, and sells buildings when nothing else can pay
  * to restart income. Elsewhere only higher-priority concerns may draw the
- * reserve. Defense owns its exit timing.
+ * reserve. Defense outranks recovery until its calm interval ends.
  */
 export const recovery: AiConcern = (context) => {
   const intact = isIntact(context);
   if (context.posture === "establishing" || context.posture === "recovering") {
     if (intact) context.requestPosture("developing");
-  } else if (!intact && context.posture !== "defending")
-    context.requestPosture("recovering");
+  } else if (!intact) context.requestPosture("recovering");
   if (context.posture === "establishing") {
     context.releaseFunds();
     return;

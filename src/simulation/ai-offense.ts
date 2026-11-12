@@ -14,6 +14,7 @@ import {
   redirectOperation,
   stagingPoint,
   stepOperation,
+  withdrawOperations,
   strengthOf,
 } from "./ai-operations";
 import { secondsToTicks } from "./clock";
@@ -121,6 +122,8 @@ export const offense: AiConcern = (context) => {
   if (avoid.length) memory.avoid = avoid;
   else delete memory.avoid;
 };
+
+offense.withdraw = withdrawOperations;
 
 offense.validateMemory = (memory) =>
   hasValidOperations(memory) &&

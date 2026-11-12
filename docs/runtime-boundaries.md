@@ -38,24 +38,33 @@ These contracts describe where new behaviors, views, and services attach.
 - `simulation/director.ts` plans for the owners a scenario assigns to AI. The
   mission runs it after `beforeTick` observers and before selecting due
   commands, so every driver and loaded save runs it, and its commands apply in
-  the same tick with the owner and `ai` as issuer. Planning and command execution share
-  the tick transaction; either failing restores the committed state and faults
-  the mission. Concerns cannot call mission mutation, tick, or disposal methods.
+  the same tick with the owner and `ai` as issuer. Planning and command
+  execution share the tick transaction; either failing restores the committed
+  state and faults the mission. Concerns cannot call mission mutation, tick,
+  or disposal methods.
 - Director concerns are built-in code that profiles name by ID, registered in
   `simulation/ai-concerns.ts` with the shared ones; sessions use that registry
   unless a caller supplies concerns. Faction plans such as
   `simulation/arc-concerns.ts` build on `simulation/ai-planning.ts`. Group
   operations run through `simulation/ai-operations.ts`; a concern saves each
   in its memory's `operations` list, which diagnostics read. Operations keep
-  their home rally separate from temporary regrouping points.
+  their home rally separate from temporary regrouping points. When a round
+  begins in a posture that omits a concern, its optional `withdraw` may order
+  existing actors that active concerns have not claimed. Returning false
+  keeps withdrawal pending for another tick, including after loading.
+  Withdrawal shares the owner's concern and command limits. Defense and
+  offense send unclaimed survivors home, retaining unsent orders until a
+  later tick.
   `simulation/ai-recovery.ts` keeps a reserve for restoring income and
   switches between recovering and developing as the base loses and regains
   its headquarters, income, or army production. Income plans own all worker
-  training; defense controls when its posture ends. Each concern receives
+  training; defense holds its posture until its calm interval ends. Posture
+  requests rank defending, then recovering, then the rest; among equals the
+  higher-priority concern's request wins. Each concern receives
   `viewOf(owner)`, the authored terrain, and no route to the simulation.
   Rounds, concern turns, and commands use counted per-tick limits, never
-  elapsed time. A concern's saved
-  memory must stay JSON, and it learns of refused commands on its next turn.
+  elapsed time. A concern's saved memory must stay JSON, and it learns of
+  refused commands on its next turn.
   Each owner generates IDs from its saved sequence without reading other
   owners' actors. A concern can name only actors its view shows, its own paid
   orders, and IDs it generated, so a refusal cannot reveal a hidden actor.

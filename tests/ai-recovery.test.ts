@@ -181,7 +181,7 @@ test("income and recovery do not queue the same replacement worker", () => {
   }
 });
 
-test("recovery lets defense finish its calm interval before changing posture", () => {
+test("recovery follows defense's calm interval without developing between", () => {
   const state = structuredClone(developed);
   state.ai.west!.posture = "defending";
   delete state.ai.west!.requestedPosture;
@@ -192,6 +192,12 @@ test("recovery lets defense finish its calm interval before changing posture", (
   try {
     runTicks(sim, seconds(5));
     expect(sim.ai.west!.posture).toBe("defending");
+    const postures = new Set<string>();
+    for (let tick = 0; tick < seconds(10); tick++) {
+      sim.tick();
+      postures.add(sim.ai.west!.posture);
+    }
+    expect([...postures]).toEqual(["defending", "recovering"]);
   } finally {
     sim.dispose();
   }
