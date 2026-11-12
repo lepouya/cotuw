@@ -73,7 +73,7 @@ export function activityTracker() {
         }
       const seen = new Set<string>();
       for (const { concern, operation } of operationsOf(state.memory)) {
-        const key = `${concern}:${operation.id}`;
+        const key = JSON.stringify([concern, operation.id]);
         seen.add(key);
         const summary = (operations[operation.kind] ??= {
           launched: 0,
@@ -141,7 +141,7 @@ export function matchAudit(simulation: MissionSimulation) {
       for (const [actorId, concern] of Object.entries(state.claims)) {
         const actor = actors.get(actorId);
         if (!actor) {
-          const key = `${owner}:${actorId}`;
+          const key = JSON.stringify([owner, actorId]);
           const round = missingClaims.get(key) ?? state.nextRoundTick;
           missing.set(key, round);
           // A round that began since then reconciled claims.

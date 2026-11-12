@@ -9,10 +9,12 @@ import {
   createMissionState,
 } from "../src/simulation/mission";
 import {
+  destinationRegion,
   findNavigationPath,
   forEachTileOnSegment,
   NavigationGrid,
   occupiedTile,
+  routeEnd,
   segmentCost,
   traversalCostAt,
 } from "../src/simulation/navigation";
@@ -250,6 +252,43 @@ describe("terrain traversal", () => {
     expect(path).toMatchObject({
       destination: center(map, 1, 1),
       reachedTarget: false,
+    });
+  });
+
+  test("route ends and regions match the searched route without searching", () => {
+    const map = new TerrainGrid({
+      width: 5,
+      height: 3,
+      tileSize: 1,
+      createTerrain: (x) => ({
+        typeId: "plain",
+        surfacePassable: x === 2 ? false : undefined,
+      }),
+    });
+    const grid = gridOf(map);
+    const from = center(map, 0, 1);
+    const work = { tiles: 0 };
+    for (const target of [center(map, 4, 1), center(map, 1, 0)]) {
+      const path = findNavigationPath(grid, from, target, work)!;
+      expect(routeEnd(grid, from, target)).toEqual({
+        destination: path.destination,
+        reachedTarget: path.reachedTarget,
+        leavesStart: true,
+      });
+      const end = map.tileAtWorldPosition(
+        path.destination.x,
+        path.destination.z,
+      );
+      expect(destinationRegion(grid, from, target)).toEqual({
+        region: grid.regionAt(end.x, end.z),
+        reachedTarget: path.reachedTarget,
+      });
+    }
+    expect(work.tiles).toBeGreaterThan(0);
+    // The closest reachable tile to a target beyond the wall is the start's.
+    expect(routeEnd(grid, center(map, 1, 1), center(map, 4, 1))).toMatchObject({
+      reachedTarget: false,
+      leavesStart: false,
     });
   });
 

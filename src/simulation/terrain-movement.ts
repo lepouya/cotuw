@@ -3,6 +3,7 @@ import {
   forEachTileOnSegment,
   NavigationGrid,
   occupiedTile,
+  routeEnd,
   segmentCost,
   traversalCostAt,
 } from "./navigation";
@@ -14,7 +15,7 @@ import {
   withinBounds,
 } from "./world";
 import { tileAreaBounds } from "./terrain";
-import { withinRouteBounds } from "./actor";
+import { compareIds, withinRouteBounds } from "./actor";
 import { isCount, isPositive } from "./validation";
 
 import type { TerrainBounds } from "./grid";
@@ -27,10 +28,31 @@ import type {
   MovementOrder,
   RouteBounds,
 } from "./actor";
-import type { MovementProfile, NavigationPath } from "./navigation";
+import type { MovementProfile, NavigationPath, RouteWork } from "./navigation";
 import type { WorldPosition } from "./world";
 
-/** Creates deterministic continuous movement over weighted terrain routes. */
+/**
+ * Tiles that new routes may search per tick before the rest wait. Leave time
+ * for combat, vision, and economy too. The search that crosses the limit
+ * completes, so one always runs.
+ */
+const ROUTE_TILES_PER_TICK = 2000;
+/** Each search also pays this, for its setup and route straightening. */
+const SEARCH_OVERHEAD_TILES = 100;
+
+/** An order still waiting for its route, or for a route on its new layer. */
+const routeMissing = (actor: Readonly<Actor>, order: MovementOrder) =>
+  !order.waypoints ||
+  order.waypointIndex === undefined ||
+  order.destination === undefined ||
+  order.reachedTarget === undefined ||
+  order.occupancyLayer !== actor.occupancyLayer;
+
+/**
+ * Creates deterministic continuous movement over weighted terrain routes.
+ * Unbounded moves are accepted from region reachability and searched before
+ * the tick's updates, within the shared route budget.
+ */
 export function createTerrainMoveBehavior(
   map: TerrainView,
   occupancy: OccupancyView,
@@ -70,13 +92,22 @@ export function createTerrainMoveBehavior(
   const routeGrid = (grid: NavigationGrid, bounds?: RouteBounds) =>
     bounds ? grid.within(bounds) : grid;
   const changes = map.navigationChanges;
+  /** Actors whose routes wait for a later tick's budget. */
+  let waiting: ReadonlySet<string> = new Set();
 
-  const replan = (actor: Actor, order: MovementOrder, grid: NavigationGrid) => {
+  const replan = (
+    actor: Actor,
+    order: MovementOrder,
+    grid: NavigationGrid,
+    work?: RouteWork,
+  ) => {
     order.occupancyLayer = grid.occupancyLayer;
+    delete order.queuedTick;
     const path = findNavigationPath(
       routeGrid(grid, order.bounds),
       actor.worldPosition,
       order.target,
+      work,
     );
     // An order may end on the actor's own tile only if that was already its
     // destination.
@@ -151,7 +182,8 @@ export function createTerrainMoveBehavior(
       }
       if (
         !isOptionalCount(order.waypointIndex, waypoints.length) ||
-        !isOptionalCount(order.navigationVersion, Number.POSITIVE_INFINITY)
+        !isOptionalCount(order.navigationVersion, Number.POSITIVE_INFINITY) ||
+        !isOptionalCount(order.queuedTick, Number.POSITIVE_INFINITY)
       ) {
         throw new RangeError(
           `Actor ${actor.id} has an invalid route position.`,
@@ -182,6 +214,22 @@ export function createTerrainMoveBehavior(
           return true;
         case "move": {
           const grid = gridFor(actor, definition);
+          if (!command.bounds) {
+            // The route waits for the tick's search; this decides acceptance.
+            const end = routeEnd(grid, actor.worldPosition, command.target);
+            if (!end?.leavesStart) return false;
+            actor.movement = {
+              target: { ...command.target },
+              ...(command.requestedTarget && {
+                requestedTarget: { ...command.requestedTarget },
+              }),
+              destination: end.destination,
+              reachedTarget: end.reachedTarget,
+              occupancyLayer: grid.occupancyLayer,
+            };
+            return true;
+          }
+          // Leashed routes are short and must be checked against their bounds.
           const path = findNavigationPath(
             routeGrid(grid, command.bounds),
             actor.worldPosition,
@@ -222,21 +270,56 @@ export function createTerrainMoveBehavior(
         }
       }
     },
+    prepareUpdates: (actors, tick) => {
+      const pending = actors.filter(
+        ({ actor }) => actor.movement && routeMissing(actor, actor.movement),
+      );
+      // Earlier requests go first, so no route waits indefinitely.
+      for (const { actor } of pending) actor.movement!.queuedTick ??= tick;
+      // Owners take turns, starting with a different one each tick.
+      const owners = [...new Set(pending.map(({ actor }) => actor.owner))].sort(
+        compareIds,
+      );
+      const queues = owners.map((owner) =>
+        pending
+          .filter(({ actor }) => actor.owner === owner)
+          .sort(
+            (a, b) =>
+              a.actor.movement!.queuedTick! - b.actor.movement!.queuedTick! ||
+              compareIds(a.actor.id, b.actor.id),
+          ),
+      );
+      const work: RouteWork = { tiles: 0 };
+      const deferred = new Set<string>();
+      for (let turn = 0; queues.some((queue) => queue.length); turn += 1) {
+        const queue = queues[(turn + tick) % queues.length]!;
+        const next = queue.shift();
+        if (!next) continue;
+        if (work.tiles >= ROUTE_TILES_PER_TICK) deferred.add(next.actor.id);
+        else {
+          replan(
+            next.actor,
+            next.actor.movement!,
+            gridFor(next.actor, next.definition),
+            work,
+          );
+          work.tiles += SEARCH_OVERHEAD_TILES;
+        }
+      }
+      waiting = deferred;
+    },
     update: (actor, definition, seconds) => {
       const order = actor.movement;
       if (!order) {
         return;
       }
       const grid = gridFor(actor, definition);
-      const routeMissing =
-        !order.waypoints ||
-        order.waypointIndex === undefined ||
-        order.destination === undefined ||
-        order.reachedTarget === undefined ||
-        order.occupancyLayer !== actor.occupancyLayer;
+      const missing = routeMissing(actor, order);
+      // Waiting actors hold still until a later tick plans their routes.
+      if (missing && waiting.has(actor.id)) return;
       let replanned = false;
-      if (routeMissing || order.navigationVersion !== changes.version) {
-        if (routeMissing || needsReplan(grid, actor, order)) {
+      if (missing || order.navigationVersion !== changes.version) {
+        if (missing || needsReplan(grid, actor, order)) {
           replan(actor, order, grid);
           replanned = true;
         } else {

@@ -13,6 +13,7 @@ import {
 } from "./world";
 import { isTick, secondsToTicks } from "./clock";
 import { followRoute } from "./automatic-movement";
+import { createSpatialIndex } from "./spatial-index";
 import { terrainSightlineClear } from "./terrain-sightline";
 import { tileAreaBounds } from "./terrain";
 import { tileKey } from "./grid";
@@ -69,6 +70,8 @@ const MUZZLE_HEIGHT = 1.2;
 const TARGET_HEIGHT = 0.5;
 /** An actor has reached a point within this distance of it. */
 const ARRIVAL_RADIUS = 1;
+/** World-space bucket size for local target acquisition. */
+const TARGET_CELL_SIZE = 8;
 
 /**
  * Automatic targeting for armed actors whose definitions opt in, such as
@@ -405,6 +408,11 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   );
   const sorted = [...world.actors].sort((a, b) => compareIds(a.id, b.id));
   const definitionOf = (actor: Actor) => definitions.get(actor.definitionId)!;
+  const targets = createSpatialIndex<Actor>(
+    TARGET_CELL_SIZE,
+    (actor) => actor.worldPosition,
+  );
+  for (const actor of sorted) targets.add(actor);
   const targetable = (actor: Actor, target: Actor | undefined) =>
     !!target && canTarget(actor, target, world);
   const controllers = new Map(
@@ -538,25 +546,26 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       let nearest: Actor | undefined;
       let nearestDistance = radius;
       const { x, z } = actor.worldPosition;
-      // Ascending IDs keep the first of equally near targets.
-      for (const target of sorted) {
-        // Most actors are far away, and this scan runs for every idle guard.
+      targets.visitNear(actor.worldPosition, radius, (target) => {
         if (
           Math.abs(target.worldPosition.x - x) > nearestDistance ||
           Math.abs(target.worldPosition.z - z) > nearestDistance
         )
-          continue;
+          return;
         const gap = distance(actor.worldPosition, target.worldPosition);
         if (
           gap > nearestDistance ||
-          (nearest && gap === nearestDistance) ||
+          // Equally near targets keep the lowest ID, as an ID-order scan did.
+          (nearest &&
+            gap === nearestDistance &&
+            compareIds(target.id, nearest.id) >= 0) ||
           !engageable(actor, target) ||
           !accept(target)
         )
-          continue;
+          return;
         nearest = target;
         nearestDistance = gap;
-      }
+      });
       return nearest;
     },
     recentAttacker: (actor) => {

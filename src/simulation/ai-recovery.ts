@@ -1,7 +1,6 @@
 // Faction-neutral reserve and restoration after base losses.
 import { compareIds, isIncomeBuilding, isWorkerDefinition } from "./actor";
 import {
-  affords,
   armyProducer,
   definitionOf,
   headquarters,
@@ -14,6 +13,7 @@ import {
 } from "./ai-planning";
 import { economyWorkers, saleRefund } from "./economy";
 import { costResource } from "./resources";
+import { balanceOf } from "./stockpiles";
 
 import type { ActorDefinition } from "./actor";
 import type { AiConcern, AiConcernContext } from "./director";
@@ -58,7 +58,7 @@ export const recovery: AiConcern = (context) => {
   const restores = context.posture !== "defending";
   const reserve =
     replaceHeadquarters(context, restores) ?? incomeReserve(context);
-  if (context.posture === "recovering") sellForIncome(context);
+  sellForIncome(context);
   context.releaseFunds(
     context.posture !== "recovering" || reserve.urgent
       ? reserve.price
@@ -134,8 +134,16 @@ function sellForIncome(context: AiConcernContext) {
     ...(earning ? [] : [restart]),
     ...(staffed ? [] : [workerOf(context, restart)!]),
   ];
-  if (affords(context, ...missing)) return;
   const needed = totalPrice(missing);
+  // A sale depends on the owner's shortfall, not this concern's allocation.
+  const funds = (resource: Resource) =>
+    balanceOf(economy, context.view.owner, resource) ?? 0;
+  if (
+    Object.entries(needed).every(
+      ([resource, amount]) => funds(resource as Resource) >= amount,
+    )
+  )
+    return;
   const [sale] = ownBuildings(
     context,
     (definition) => !definition.infrastructure && !isIncomeBuilding(definition),
@@ -146,7 +154,7 @@ function sellForIncome(context: AiConcernContext) {
       const refund = saleRefund(building, definition);
       return !building.construction &&
         refund > 0 &&
-        (needed[resource] ?? 0) > context.funds(resource)
+        (needed[resource] ?? 0) > funds(resource)
         ? [{ id: building.id, refund }]
         : [];
     })

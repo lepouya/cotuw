@@ -341,12 +341,13 @@ export function findNavigationPath(
   grid: NavigationGrid,
   from: WorldPosition,
   target: WorldPosition,
+  work?: RouteWork,
 ): NavigationPath | undefined {
   const resolved = resolveNavigationDestination(grid, from, target);
   if (!resolved) return undefined;
   const { start, end, reachedTarget } = resolved;
   const { map } = grid;
-  const route = (resolved.direct ? [] : searchTiles(grid, start, end))
+  const route = (resolved.direct ? [] : searchTiles(grid, start, end, work))
     .slice(1)
     .map(({ x, z }) => map.tileCenter(x, z));
   const destination = destinationPoint(grid, resolved, target);
@@ -366,6 +367,9 @@ export function findNavigationPath(
   };
 }
 
+/** Tiles route searches expanded, which measures their cost. */
+export type RouteWork = { tiles: number };
+
 /**
  * Where a route towards `target` would end, without constructing it, or
  * `undefined` when the source cannot move.
@@ -375,8 +379,28 @@ export function navigationDestination(
   from: WorldPosition,
   target: WorldPosition,
 ): WorldPosition | undefined {
+  return routeEnd(grid, from, target)?.destination;
+}
+
+/**
+ * How a route towards `target` would end, without searching for it:
+ * `leavesStart` is false when the closest reachable tile is the source's own.
+ */
+export function routeEnd(
+  grid: NavigationGrid,
+  from: WorldPosition,
+  target: WorldPosition,
+):
+  | { destination: WorldPosition; reachedTarget: boolean; leavesStart: boolean }
+  | undefined {
   const resolved = resolveNavigationDestination(grid, from, target);
-  return resolved && destinationPoint(grid, resolved, target);
+  if (!resolved) return undefined;
+  const { start, end, reachedTarget } = resolved;
+  return {
+    destination: destinationPoint(grid, resolved, target),
+    reachedTarget,
+    leavesStart: reachedTarget || start.x !== end.x || start.z !== end.z,
+  };
 }
 
 function destinationPoint(
@@ -385,6 +409,30 @@ function destinationPoint(
   target: WorldPosition,
 ): WorldPosition {
   return reachedTarget ? { ...target } : grid.map.tileCenter(end.x, end.z);
+}
+
+/**
+ * The region a route towards `target` ends in, and whether it reaches the
+ * target. A source on passable ground needs no search for its closest tile.
+ */
+export function destinationRegion(
+  grid: NavigationGrid,
+  from: WorldPosition,
+  target: WorldPosition,
+): { region: number; reachedTarget: boolean } | undefined {
+  const start = occupiedTile(grid, from);
+  if (!grid.bounds && grid.costAt(start.x, start.z) !== undefined) {
+    const region = grid.regionAt(start.x, start.z);
+    const goal = grid.map.tileAtWorldPosition(target.x, target.z);
+    return { region, reachedTarget: grid.regionAt(goal.x, goal.z) === region };
+  }
+  const resolved = resolveNavigationDestination(grid, from, target);
+  return (
+    resolved && {
+      region: grid.regionAt(resolved.end.x, resolved.end.z),
+      reachedTarget: resolved.reachedTarget,
+    }
+  );
 }
 
 /** Resolves reachable tiles without constructing a route to them. */
@@ -624,6 +672,7 @@ function searchTiles(
   grid: NavigationGrid,
   start: TileCoord,
   end: TileCoord,
+  work?: RouteWork,
 ): TileCoord[] {
   const { map } = grid;
   const startIndex = map.tileIndex(start.x, start.z);
@@ -649,6 +698,7 @@ function searchTiles(
       break;
     }
     closed[currentIndex] = 1;
+    if (work) work.tiles += 1;
     const current = tileForIndex(map, currentIndex);
     const currentCost = grid.costAt(current.x, current.z);
 

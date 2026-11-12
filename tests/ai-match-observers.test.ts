@@ -34,6 +34,49 @@ test("the audit allows a lost unit's claim until a later round begins", () => {
   ]);
 });
 
+test("the audit keeps owner and actor IDs with separators distinct", () => {
+  const ai = createAiState([{ owner: "a" }, { owner: "a:b" }]);
+  ai.a!.claims["b:c"] = "offense";
+  ai.a!.nextRoundTick = 100;
+  ai["a:b"]!.claims.c = "offense";
+  ai["a:b"]!.nextRoundTick = 10;
+  const simulation = {
+    tickSeconds: 0.1,
+    actors: [],
+    ai,
+  } as unknown as MissionSimulation;
+  const audit = matchAudit(simulation);
+  audit.observe(0);
+  audit.observe(10);
+  expect(audit.problems()).toEqual([]);
+});
+
+test("activity keeps concern and operation IDs with separators distinct", () => {
+  const ai = createAiState([{ owner: "west" }]);
+  const operation = (id: string) => ({
+    id,
+    kind: "raid",
+    phase: "advance",
+    target: { x: 0, z: 0 },
+    rally: { x: 0, z: 0 },
+    units: [],
+    progressTick: 0,
+    retries: 0,
+    regroups: 0,
+  });
+  ai.west!.memory = {
+    "a:b": { operations: [operation("c")] },
+    a: { operations: [operation("b:c")] },
+  };
+  const tracker = activityTracker();
+  tracker.observe(ai, 0);
+  tracker.observe({ west: { ...ai.west!, memory: {} } }, 1);
+  expect(tracker.report("west")!.operations.raid).toMatchObject({
+    launched: 2,
+    ended: { disbanded: 2 },
+  });
+});
+
 test("disruptions track prototype-named definitions and resume boundaries", () => {
   const actor = createActor({
     id: "building",

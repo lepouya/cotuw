@@ -220,6 +220,21 @@ test.each(["move", "attack-move", "group-move", "group-attack-move"] as const)(
   },
 );
 
+test("batch preparation cannot rename actors before update validation", () => {
+  const simulation = behaving("unit", {
+    handleCommand: () => false,
+    prepareUpdates: ([entry]) => {
+      entry!.actor.id = "renamed";
+    },
+    update: () => {},
+  });
+  const before = simulation.snapshot();
+  expect(() => simulation.tick()).toThrow("identity");
+  expect(simulation.snapshot()).toEqual(before);
+  expect(() => simulation.tick()).toThrow("faulted");
+  simulation.dispose();
+});
+
 test.each(["handleCommand", "update"] as const)(
   "a behavior cannot change occupancy layer during %s",
   (hook) => {

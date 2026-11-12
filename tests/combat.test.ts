@@ -437,6 +437,27 @@ describe("combat", () => {
 });
 
 describe("combat edge cases", () => {
+  test("equally near targets use stable IDs across spatial cells", () => {
+    const { simulation } = fixture(
+      [
+        unit("trooper", "arc-trooper", 19, 10),
+        unit("z-left", "wolf", 17, 10),
+        unit("a-right", "wolf", 21, 10),
+      ],
+      {
+        content: withChanges("wolf", {
+          weapon: undefined,
+          territory: undefined,
+        }),
+      },
+    );
+    simulation.tick();
+    expect(simulation.actorById("trooper")!.combat?.attack?.targetId).toBe(
+      "a-right",
+    );
+    simulation.dispose();
+  });
+
   test("guards stop an engagement at the target's current chase boundary", () => {
     const content = withChanges(
       "wolf",

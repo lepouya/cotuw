@@ -117,7 +117,7 @@ test("recovery sells nothing while it can pay to restart income", () => {
   );
   try {
     run(seconds(5), () => sim.ai.west!.posture === "recovering");
-    runTicks(sim, seconds(20));
+    results.push(...runTicks(sim, seconds(20)));
     expect(results.some(({ command }) => command.kind === "sell-actor")).toBe(
       false,
     );
@@ -196,6 +196,50 @@ test("recovery lets defense finish its calm interval before changing posture", (
     sim.dispose();
   }
 });
+
+test.each([100, 150])(
+  "ongoing defense restarts income from %s Materials, selling only for a shortfall",
+  (materials) => {
+    const state = structuredClone(developed);
+    state.ai.west!.posture = "defending";
+    delete state.ai.west!.requestedPosture;
+    delete state.ai.west!.cursor;
+    setBalance(state, materials, "materials", "west");
+    const concerns = new Map(CONCERNS).set("defense", (context) => {
+      context.requestPosture("defending");
+    });
+    const sim = resumeMirror(state, concerns);
+    try {
+      for (const actor of sim.actors)
+        if (
+          actor.owner === "west" &&
+          ["arc-harvester", "arc-materials-refinery"].includes(
+            actor.definitionId,
+          )
+        )
+          sim.submitCommand(
+            { kind: "remove-actor", actorId: actor.id },
+            { owner: "west" },
+          );
+      const results = runTicks(sim, seconds(60));
+      expect(sim.ai.west!.posture).toBe("defending");
+      expect(westOf(sim, "arc-harvester").length).toBeGreaterThan(0);
+      expect(
+        westOf(sim, "arc-materials-refinery").some(
+          ({ construction }) => !construction,
+        ),
+      ).toBe(true);
+      expect(
+        results.some(
+          ({ command, accepted }) => command.kind === "sell-actor" && accepted,
+        ),
+      ).toBe(materials < 150);
+      expect(rejected(results)).toEqual([]);
+    } finally {
+      sim.dispose();
+    }
+  },
+);
 
 test("losing the Field Barracks rebuilds it at its normal cost", () => {
   const state = structuredClone(developed);

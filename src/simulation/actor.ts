@@ -272,6 +272,8 @@ export type MovementOrder = {
   blocked?: boolean;
   /** Route points; absent until the behavior plans a route. */
   waypoints?: WorldPosition[];
+  /** The first tick its route waited for a search, which orders the queue. */
+  queuedTick?: number;
   waypointIndex?: number;
   navigationVersion?: number;
   /** The occupancy layer the route was planned on. */
@@ -406,7 +408,7 @@ export function createActor({
 
 /**
  * Trusted code for one serializable behavior ID. Behaviors change only their
- * staged actor; mission mutation methods cannot run within a tick.
+ * staged actors; mission mutation methods cannot run within a tick.
  */
 export type ActorBehavior = {
   /** Read-only navigation queries for group orders and local separation. */
@@ -425,6 +427,14 @@ export type ActorBehavior = {
     command: AppliedActorCommand,
   ) => boolean;
   update: (actor: Actor, definition: ActorDefinition, seconds: number) => void;
+  /**
+   * Runs before the tick's updates with every actor using this behavior, so
+   * it can share per-tick work, such as route searches, among them.
+   */
+  prepareUpdates?: (
+    actors: readonly { actor: Actor; definition: ActorDefinition }[],
+    tick: number,
+  ) => void;
   /** Throws when a definition cannot run this behavior. */
   validateDefinition?: (definition: ActorDefinition) => void;
   /** Throws when behavior-owned actor state is invalid. */

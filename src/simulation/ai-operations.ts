@@ -292,11 +292,18 @@ export function stepOperation(
     endOperation(context, operation, "failed");
     event = "failed";
   };
+  // A crowded group leaves out members already beside the order's point;
+  // they cannot get closer, which is not a stall.
+  const gatherRange = tuning.gatherTiles * terrain.tileSize;
   if (
     context.rejections.some(
       ({ command }) =>
         (command.kind === "move" || command.kind === "attack-move") &&
-        operation.units.includes(command.actorId),
+        operation.units.includes(command.actorId) &&
+        distance(
+          context.view.ownMobileActor(command.actorId)!.worldPosition,
+          command.target,
+        ) > gatherRange,
     )
   ) {
     operation.retries += 1;
@@ -337,11 +344,7 @@ export function stepOperation(
   }
   const rally = operation.regroup ?? operation.rally;
   const gathered = () =>
-    units.every(
-      (unit) =>
-        distance(unit.worldPosition, rally) <=
-        tuning.gatherTiles * terrain.tileSize,
-    );
+    units.every((unit) => distance(unit.worldPosition, rally) <= gatherRange);
   // A failure is reported before the group can disband.
   if (operation.phase === "return" && !event && gathered()) return disband();
   if (operation.phase === "assemble" && gathered())

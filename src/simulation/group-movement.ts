@@ -1,7 +1,8 @@
-import { resolveNavigationDestination, segmentCost } from "./navigation";
+import { destinationRegion, segmentCost } from "./navigation";
 import { isTilePlacedActor } from "./placement";
 import { compareIds } from "./actor";
 import { distance, withinBounds } from "./world";
+import { createSpatialIndex } from "./spatial-index";
 
 import type { Actor, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
@@ -40,14 +41,16 @@ export function assignGroupDestinations(
   target: WorldPosition,
   bounds?: WorldBounds,
 ): GroupDestination[] {
+  if (!movers.length) return [];
   const selected = new Set(movers.map(({ actor }) => actor.id));
-  const reserved = actors
-    .filter(({ actor }) => !isTilePlacedActor(actor) && !selected.has(actor.id))
-    .map(({ actor, definition }) => ({
-      point: actor.worldPosition,
-      layer: actor.occupancyLayer,
-      radius: separationRadius(definition),
-    }));
+  const reserved = createReservations(movers[0]!.grid.map.tileSize);
+  for (const { actor, definition } of actors)
+    if (!isTilePlacedActor(actor) && !selected.has(actor.id))
+      reserved.add({
+        point: actor.worldPosition,
+        layer: actor.occupancyLayer,
+        radius: separationRadius(definition),
+      });
   // Each region's tiles, nearest the click first, shared by movers on a grid.
   const slotsByGrid = new Map<NavigationGrid, Map<number, Slot[]>>();
   const slotsIn = (grid: NavigationGrid, region: number) => {
@@ -73,11 +76,7 @@ export function assignGroupDestinations(
   };
   const destinations: GroupDestination[] = [];
   for (const { actor, definition, grid } of movers) {
-    const base = resolveNavigationDestination(
-      grid,
-      actor.worldPosition,
-      target,
-    );
+    const base = destinationRegion(grid, actor.worldPosition, target);
     if (!base) continue;
     const radius = separationRadius(definition);
     const minimumSpacing = grid.map.tileSize * 0.8;
@@ -87,10 +86,7 @@ export function assignGroupDestinations(
       : squaredDistance(actor.worldPosition, target);
     let slot: Slot | undefined;
     let slotNearActor = Number.POSITIVE_INFINITY;
-    for (const candidate of slotsIn(
-      grid,
-      grid.regionAt(base.end.x, base.end.z),
-    )) {
+    for (const candidate of slotsIn(grid, base.region)) {
       if (
         candidate.nearTarget >= limit ||
         (slot && candidate.nearTarget > slot.nearTarget)
@@ -100,11 +96,11 @@ export function assignGroupDestinations(
       const nearActor = squaredDistance(candidate.point, actor.worldPosition);
       if (nearActor >= slotNearActor) continue;
       if (
-        reserved.some(
-          (other) =>
-            other.layer === actor.occupancyLayer &&
-            distance(other.point, candidate.point) <
-              Math.max(minimumSpacing, radius + other.radius),
+        reserved.blocks(
+          candidate.point,
+          actor.occupancyLayer,
+          radius,
+          minimumSpacing,
         )
       )
         continue;
@@ -112,7 +108,7 @@ export function assignGroupDestinations(
       slotNearActor = nearActor;
     }
     if (!slot) continue;
-    reserved.push({ point: slot.point, layer: actor.occupancyLayer, radius });
+    reserved.add({ point: slot.point, layer: actor.occupancyLayer, radius });
     destinations.push({
       actorId: actor.id,
       target: { ...slot.point },
@@ -120,6 +116,42 @@ export function assignGroupDestinations(
     });
   }
   return destinations;
+}
+
+type Reservation = {
+  point: WorldPosition;
+  layer: Actor["occupancyLayer"];
+  radius: number;
+};
+
+/** Reserved spots bucketed by cell, so a spacing check reads nearby ones. */
+function createReservations(cellSize: number) {
+  const index = createSpatialIndex<Reservation>(cellSize, (spot) => spot.point);
+  let largestRadius = 0;
+  return {
+    add: (reservation: Reservation) => {
+      index.add(reservation);
+      largestRadius = Math.max(largestRadius, reservation.radius);
+    },
+    /** Whether a reserved spot is closer to `point` than spacing allows. */
+    blocks: (
+      point: WorldPosition,
+      layer: Actor["occupancyLayer"],
+      radius: number,
+      minimumSpacing: number,
+    ) => {
+      return !index.visitNear(
+        point,
+        Math.max(minimumSpacing, radius + largestRadius),
+        (other) =>
+          !(
+            other.layer === layer &&
+            distance(other.point, point) <
+              Math.max(minimumSpacing, radius + other.radius)
+          ),
+      );
+    },
+  };
 }
 
 function squaredDistance(a: WorldPosition, b: WorldPosition): number {

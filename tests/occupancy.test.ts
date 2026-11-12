@@ -523,6 +523,8 @@ describe("occupancy navigation", () => {
       actorId: actor.id,
       target: map.tileCenter(4, 1),
     });
+    // Routes are searched on update.
+    behavior.update(actor, definition, 0);
     expect(actor.movement?.waypoints?.every(({ z }) => z === row)).toBe(true);
 
     actor.occupancyLayer = "air";

@@ -849,6 +849,13 @@ build. TODO.md owns milestone delivery; current controls are described above.
     navigation change. A route that meets a blocker its checks missed
     recalculates once that tick, then waits as blocked. Presentation-only
     terrain edits are not navigation changes.
+  - Region reachability decides whether a new unleashed order is accepted;
+    its route is searched just before the tick's movement. New routes share
+    a fixed per-tick search budget, and owners take turns for it, so a large
+    group order departs over a few ticks instead of stalling one. Each
+    owner's longest-waiting routes go first. An actor whose route waits holds
+    still. Leashed orders and recalculations of existing routes search at
+    once.
 - A group move is one serializable command resolved at the start of a tick.
   Units receive distinct reachable tile-center destinations near the requested
   point, using their own profiles and occupancy layers. Stable actor IDs order
@@ -1338,10 +1345,11 @@ Posture selection and spending follow these rules:
   resources and units through the profile. Crises reduce optional commitments,
   use reserves, and prompt reassessment of active attacks.
 - Recovery saves enough to restart income from nothing. If income stops and
-  the owner cannot pay to restart it, recovery sells buildings that neither
-  root a base nor earn income, largest refund first. A sale must return a
-  positive amount of a resource needed for the restart. Offline construction
-  and paused worker training do not count as restarting income.
+  the owner cannot pay to restart it, recovery sells buildings even while
+  defending. It sells only buildings that neither root a base nor earn income,
+  largest refund first. A sale must return a positive amount of a resource
+  needed for the restart. Offline construction and paused worker training do
+  not count as restarting income.
 - Losing every headquarters before the owner can pay for a replacement is a
   genuine losing position; the AI does not bank for it.
 - A faction with offensive pressure disabled defends locally when attacked.

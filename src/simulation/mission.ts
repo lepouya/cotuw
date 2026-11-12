@@ -1811,10 +1811,25 @@ export function createMissionSimulation({
               { ...actor.worldPosition },
             ]),
           );
-          for (const actor of working.actors) {
-            const before = actorIdentity(actor);
+          const updates = working.actors.map((actor) => ({
+            actor,
+            definition: definitionFor(actor),
+            behavior: behaviorFor(actor),
+            before: actorIdentity(actor),
+          }));
+          const byBehavior = new Map<ActorBehavior, typeof updates>();
+          for (const entry of updates) {
+            const { behavior } = entry;
+            if (!behavior.prepareUpdates) continue;
+            let group = byBehavior.get(behavior);
+            if (!group) byBehavior.set(behavior, (group = []));
+            group.push(entry);
+          }
+          for (const [behavior, actors] of byBehavior)
+            behavior.prepareUpdates?.(actors, state.tick);
+          for (const { actor, definition, behavior, before } of updates) {
             const route = actor.movement;
-            behaviorFor(actor).update(actor, definitionFor(actor), tickSeconds);
+            behavior.update(actor, definition, tickSeconds);
             noteAttackMoveRoute(actor, route, navigationVersion);
             // Rounding in a behavior's motion must not carry an actor off the map.
             if (isFinitePosition(actor.worldPosition)) {

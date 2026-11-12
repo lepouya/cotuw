@@ -242,6 +242,22 @@ test("a refused group order is reissued and counted", () => {
   expect(issued.map(({ kind }) => kind)).toEqual(["group-attack-move"]);
 });
 
+test("members refused beside their order's point are not a stall", () => {
+  const units = [...group(2, home.x, home.z), trooper("late", 40, 40)];
+  const { operation, issued, rejections, step } = fixture(units);
+  step();
+  expect(operation.phase).toBe("assemble");
+  rejections.push({
+    concern: "offense",
+    tick: 0,
+    command: { kind: "move", actorId: "unit-1", target: home },
+  });
+  issued.length = 0;
+  step();
+  expect(operation.retries).toBe(0);
+  expect(issued).toEqual([]);
+});
+
 test("a strung-out advance regroups at its middle unit", () => {
   const units = [
     trooper("a", 20, 20),
