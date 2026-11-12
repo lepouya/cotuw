@@ -145,22 +145,21 @@ AI tasks are developed and verified with them.
   and attacks known buildings after the four-minute grace. Idle scouts sweep
   for unseen buildings, including while stale reports are avoided. Every ARC
   mirror case completes, with raids from about 4:25.
-- [ ] **1.37** Tune opening grace, commitment, pursuit, retreat, and recovery
-  through profile `tuning`, kept separate from difficulty health/damage
-  scaling. Tactical thresholds come from the profile. Normal ARC mirrors
-  end near 16:20, with first raids near 4:20 and first attacks near 9:20;
-  Easy and Hard cases end decisively near 9:30 to 9:50, which is accepted.
-  Recovery saves to restart income and sells production when it cannot.
-  Losing the Command Center before 300 Materials are banked is an accepted
-  loss. Remaining: human playtest against the harness AI.
-- [ ] **1.38** Exercise the ARC mirror harness through completed matches,
-  recovery cases, and the agreed scale with AI enabled. Resolve deadlocks,
-  resource leaks, ownership faults, and performance blockers. The runner's
-  audit, baseline, recovery, and full-state save/load continuation cases
-  pass. Worker, income, and production losses recover; headquarters loss is
-  an accepted loss that must still finish cleanly. Remaining: measure
-  the 200-unit, 40-building benchmark with AI enabled, which needs a way to
-  hold the scene's scale while the AI trains from its stockpile.
+- [x] **1.37** Profile `tuning` sets opening grace, commitment, pursuit,
+  retreat, and recovery, separate from difficulty scaling. Normal ARC
+  mirrors end near 13:40, with first raids near 4:20 and attacks near 9:20;
+  Easy and Hard end decisively near 9:30 to 9:50. Recovery saves to restart
+  income and sells production when it cannot; losing the Command Center
+  before 300 Materials are banked is an accepted loss. A human playtest won
+  in about nine minutes after the AI attacked first.
+- [x] **1.38** The ARC mirror harness passes its audit, baseline, recovery,
+  and full-state save/load continuation cases. Worker, income, and
+  production losses recover; headquarters loss is an accepted loss that
+  finishes cleanly. The AI benchmark uses only probe training, records
+  actual population, and requires measured combat. Its normal headless run
+  holds 199 to 200 units and 40 buildings, at about 4.0 ms p95 and 4.9 ms
+  p99. Crowded operations no longer count members already at their point
+  as stalls, and new routes share a per-tick search budget.
 
 Phase gate: ARC AI establishes and rebuilds its base, scouts, defends, and
 attacks through shared rules, with reproducible results and useful diagnostics.
@@ -173,6 +172,11 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
 
 - [x] **1.58** Optional-system scope: rare resources, mixed yields, upgrades,
   and research are deferred beyond M1.
+- [x] **1.71** Each owner takes a content-pack palette color in mission
+  order, shown on minimap markers, remains, and models'
+  [owner materials](docs/actor-assets.md): ARC building trim, Harvester
+  cabs, infantry markings, and Circle building markings. ARC mirror
+  playtests read friend and foe at a glance on the field and minimap.
 - [ ] **1.39** Add the ARC Relay Station and Sentry Turret as data-driven
   content. Verify support loss, reconnection, placement, targeting, and the
   expansion or protection choices they are intended to provide. Exclude Relay
@@ -194,15 +198,9 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   site and verify the counter relationship and reason to field a mixed force.
 - [ ] **1.43** Generate and register the added ARC models, animation, command
   feedback, effects, and essential audio. Verify readability and generated
-  asset contracts for each included actor. Reserve owner-color areas on ARC
-  models, as the [Circle direction](DESIGN.md#m1-circle-presentation) does,
-  and render owner colors there and on minimap markers so owners of the same
-  faction are distinguishable. 1.53 uses the same owner-color path. Add a color
-  to owners; the session picks each `MinimapActor.color`. Buildings' GLB
-  instances share materials, so key per-owner copies of named marking materials
-  by appearance and owner color in the view registries. Infantry `accent` parts
-  bake into the vertex-colored body, so owner colors need a separate marking
-  mesh and regenerated GLBs.
+  asset contracts for each included actor. Give each owned model
+  [owner materials](docs/actor-assets.md), as 1.71 does; 1.53 follows the
+  same path.
 - [ ] **1.44** Implement [control groups](DESIGN.md#m1-control-groups),
   [idle-worker controls](DESIGN.md#m1-idle-worker-controls), and
   [matching-unit selection](DESIGN.md#m1-matching-unit-selection).
@@ -337,6 +335,8 @@ and producer-based progression scope from 1.06.
   and stress-case backlog with AI enabled before choosing optimizations.
   Candidate rendering work includes merging unit meshes and skipping off-screen
   animation; change allocation sites only when measured costs justify it.
+  The browser spec still measures the scripted scene: give benchmark builds
+  the AI scene and its training swap first.
 
 Phase gate: either faction can enter a complete skirmish through the normal
 menu, and both matchups meet the agreed automated behavior and scale targets.

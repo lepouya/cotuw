@@ -218,13 +218,24 @@ planned M1 acceptance checks; current M0 browser checks do not establish them.
   percentiles, and simulation backlog. Repeat at 2x to verify simulation pace
   and report rendering performance. Measure stress-case degradation separately.
 
-`npm run benchmark -- [normal|stress]` runs a scripted ARC mirror headlessly and
-reports tick-time percentiles, rejected orders, and population samples. Scenes
-start at the named scale, and a probe orders replacements for combat losses.
-Replacements count toward the target while they train, so the reported units
-run slightly below it.
-Orders to scouts lost in combat account for any `move` rejections. Add Node's
-`--cpu-prof` to attribute the cost. The scene has no AI until phase C.
+`npm run benchmark -- [normal|stress] [--no-ai]` runs an ARC mirror headlessly
+and reports tick-time percentiles, rejected orders, and population samples.
+Scenes start at the named scale, and a probe orders replacements for combat
+losses. Replacements count toward the target while they train; reports give
+the actual fielded population throughout measurement.
+
+- By default both owners play the `arc-skirmish` profile with AI training
+  commands declined, so only the probe trains. The load script keeps
+  movement and combat active alongside AI orders. The scene is played a
+  minute past the profile's opening grace, saved, and loaded before measuring.
+  A run without measured combat, a full measurement window, the target
+  building count, or at least 85% of its target units fails. The report adds
+  each AI's posture time, operations, refusals, and the
+  [match audit](#m1-headless-acceptance).
+- `--no-ai` measures the scripted scene instead, where orders to scouts lost
+  in combat account for any `move` rejections. Compare its tick costs with
+  the AI scene; use the CPU profile to attribute time to the director.
+- Add Node's `--cpu-prof` to attribute the cost.
 
 Measure the production build in Chromium and WebKit at 1x and 2x, watching the
 center crossing with a 1920 x 1080 canvas:
@@ -240,8 +251,10 @@ sustained `ticksPerSecond` below 60 times the speed means the simulation is
 falling behind. Only builds made with `COTUW_BENCHMARK` set expose the session
 the collector needs, so run this spec alone. Playwright's WebKit stands in for
 the packaged app until 1.64 measures it directly.
-`npm run benchmark -- normal --write <file>` writes the scene for loading by
-hand. Without the probe, that scene does not replace its losses.
+`npm run benchmark -- normal --write <file>` writes the AI scene's saved
+mission for loading by hand, or with `--no-ai` the scripted tick-0 scene.
+Without the probe, neither replaces losses, and the hand-loaded AI trains with
+its full profile. The browser spec measures the scripted scene until 1.64.
 
 ## Mission flow
 
