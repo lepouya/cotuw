@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
-import { factionName, parseContentPack } from "../src/content/content-pack";
+import {
+  factionName,
+  ownerColors,
+  parseContentPack,
+} from "../src/content/content-pack";
 import { terrainLayers } from "../src/render/terrain-style";
 import { TerrainGrid } from "../src/simulation/terrain";
 
@@ -86,6 +90,35 @@ describe("content packs", () => {
     expect(factionName(BASE_CONTENT, "circle")).toBe("Circle of Repose");
     expect(factionName(BASE_CONTENT, "toString")).toBeUndefined();
     expect(factionName(BASE_CONTENT, undefined)).toBeUndefined();
+  });
+
+  test("owners take distinct palette colors in mission order", () => {
+    const colors = ownerColors(
+      [{ id: "west" }, { id: "east" }, { id: "wildlife" }],
+      {
+        ownerColors: [
+          [0, 0, 1],
+          [1, 0, 0],
+          [1, 1, 0],
+        ],
+      },
+    );
+    expect([...colors]).toEqual([
+      ["west", [0, 0, 1]],
+      ["east", [1, 0, 0]],
+      ["wildlife", [1, 1, 0]],
+    ]);
+  });
+
+  test("an exhausted owner palette cannot assign duplicate colors", () => {
+    expect(() =>
+      ownerColors([{ id: "west" }, { id: "east" }, { id: "wildlife" }], {
+        ownerColors: [
+          [0, 0, 1],
+          [1, 0, 0],
+        ],
+      }),
+    ).toThrow("a color for every owner");
   });
 
   test("production buttons require actors that support their actions", () => {
@@ -182,7 +215,7 @@ describe("content packs", () => {
 
   test("reject unknown formats, built-ins, and tile types", () => {
     expect(withEdit((pack) => (pack.formatVersion = 1))).toThrow(
-      'format "cotuw-content" version 2',
+      'format "cotuw-content" version 3',
     );
     expect(
       withEdit(
@@ -274,6 +307,23 @@ test.each([
       delete pack.view.lighting;
     },
     "lighting",
+  ],
+  [
+    "one owner color",
+    (pack: any) => {
+      pack.view.ownerColors = [[0, 0, 1]];
+    },
+    "two distinct owner colors",
+  ],
+  [
+    "repeated owner colors",
+    (pack: any) => {
+      pack.view.ownerColors = [
+        [0, 0, 1],
+        [0, 0, 1],
+      ];
+    },
+    "two distinct owner colors",
   ],
   [
     "invalid sun direction",

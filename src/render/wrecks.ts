@@ -6,7 +6,7 @@ import {
 } from "@babylonjs/core";
 
 import { stableUnit } from "./actor";
-import { unitCubeInstance } from "./glb-model";
+import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
@@ -14,6 +14,7 @@ import type { Wreck } from "../simulation/combat";
 import type { TileCoord } from "../simulation/grid";
 import type { ActorAppearance } from "./actor";
 import type { ModelAsset } from "./glb-model";
+import type { OwnerMaterials } from "./owner-materials";
 
 /** Remains fade out over this many seconds before they clear. */
 const FADE_SECONDS = 5;
@@ -31,6 +32,8 @@ export type WreckViewOptions = {
   topHeightFor?: (wreck: Wreck) => number | undefined;
   /** Shows collapsed debris at once. */
   reducedMotion?: () => boolean;
+  /** Keeps fallen units in their owner's colors. */
+  ownerMaterials?: OwnerMaterials;
 };
 
 /** Fallen units and building rubble; never pickable. */
@@ -43,6 +46,7 @@ export function createWreckView(
     rubble: rubbleAsset,
     topHeightFor,
     reducedMotion = () => false,
+    ownerMaterials,
   }: WreckViewOptions,
 ) {
   const rubble = new StandardMaterial("wreck-rubble", scene);
@@ -145,6 +149,7 @@ export function createWreckView(
           `wreck-${wreck.actorId}`,
           stableUnit(wreck.actorId),
         );
+        ownerMaterials?.apply(hierarchyMeshes(instance.root), wreck.owner);
         const { x, z } = wreck.worldPosition;
         root.position.set(x, map.heightAtWorldPosition(x, z), z);
         groundUpdates.push(() => {

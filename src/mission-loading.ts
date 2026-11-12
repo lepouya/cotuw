@@ -19,6 +19,7 @@ import { createScenarioMap, createScenarioState } from "./simulation/scenario";
 import { createTerrainMoveBehavior } from "./simulation/terrain-movement";
 import { isCount, isId, isRecord } from "./simulation/validation";
 
+import { ownerColors } from "./content/content-pack";
 import type { ContentPack } from "./content/content-pack";
 import type { SkirmishChoice } from "./content/skirmish";
 import type { ActorDefinition } from "./simulation/actor";
@@ -187,5 +188,7 @@ function prepareMission(file: MissionFile): LoadedMission {
       throw new RangeError("Placement popups require a building definition.");
   }
   createSessionSimulation(mission).dispose();
+  // Rejected here rather than when a session starts drawing the owners.
+  ownerColors(file.state.owners, content.view);
   return mission;
 }

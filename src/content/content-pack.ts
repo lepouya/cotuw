@@ -34,13 +34,15 @@ import type { TerrainStyle } from "./terrain-style";
 import type { TextureClip } from "./texture-clip";
 
 const FORMAT = "cotuw-content";
-const CONTENT_FORMAT_VERSION = 2;
+const CONTENT_FORMAT_VERSION = 3;
 
 /** Names a content pack and the version whose rules a mission uses. */
 export type ContentReference = { id: string; version: number };
 
 export type ViewStyle = {
   clearColor: Rgb;
+  /** Distinct colors that mark each owner's actors, in mission owner order. */
+  ownerColors: readonly Rgb[];
   lighting: {
     skyColor: Rgb;
     groundColor: Rgb;
@@ -94,6 +96,16 @@ export type ContentPack = ContentReference & {
   terrain: TerrainStyle;
   view: ViewStyle;
 };
+
+/** Each owner's distinct color, in mission owner order. */
+export function ownerColors(
+  owners: readonly { id: string }[],
+  { ownerColors: colors }: Pick<ViewStyle, "ownerColors">,
+): ReadonlyMap<string, Rgb> {
+  if (owners.length > colors.length)
+    throw new RangeError("The owner palette needs a color for every owner.");
+  return new Map(owners.map(({ id }, index) => [id, colors[index]!]));
+}
 
 /** A faction's display name, if the pack provides one. */
 export function factionName(
@@ -175,6 +187,14 @@ export function parseContentPack(source: string): ContentPack {
     throw invalid(
       "needs valid lighting colors, intensities, and sun direction",
     );
+  const colors = pack.view.ownerColors;
+  if (
+    !Array.isArray(colors) ||
+    colors.length < 2 ||
+    !colors.every(isRgb) ||
+    new Set(colors.map(String)).size !== colors.length
+  )
+    throw invalid("needs at least two distinct owner colors");
 
   if (pack.clips !== undefined && !isRecord(pack.clips))
     throw invalid("needs clips keyed by ID");

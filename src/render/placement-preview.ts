@@ -12,6 +12,7 @@ import { createTilePlacedActor } from "../simulation/placement";
 import type { LinesMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { ActorDefinition } from "../simulation/actor";
+import type { OwnerMaterials } from "./owner-materials";
 import type {
   ActorPlacement,
   PlacementEvaluation,
@@ -44,13 +45,14 @@ export function createPlacementPreview(
   map: TerrainMap,
   definitions: readonly ActorDefinition[],
   appearances: TilePlacedActorAppearanceCatalog,
+  ownerMaterials?: OwnerMaterials,
 ) {
   const models = createTilePlacedActorViewRegistry(
     scene,
     map,
     definitions,
     appearances,
-    { preview: true },
+    { preview: true, ownerMaterials },
   );
   let overlay: ReturnType<typeof createFootprintOverlay> | undefined;
   /** Layers rarely change, and counting them scans every tile. */

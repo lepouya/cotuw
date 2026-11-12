@@ -49,6 +49,8 @@ import { TerrainMap } from "./map";
 import { createCommandInput } from "./render/command-input";
 import { createGameView } from "./render/game-view";
 import { createMinimap } from "./render/minimap";
+import { ownerColors } from "./content/content-pack";
+import { createOwnerMaterials } from "./render/owner-materials";
 import { createMovementPathView } from "./render/movement-path";
 import { createActorViewRegistry } from "./render/actor-view-registry";
 import { createTilePlacedActorViewRegistry } from "./render/tile-placed-actor-view";
@@ -257,6 +259,9 @@ async function assembleGameSession(
     }),
   );
   const { appearances, buildingAppearances, propAssets } = assets;
+  const colorsByOwner = ownerColors(simulation.owners, content.view);
+  // Created before the views, so it outlives every mesh that uses it.
+  const ownerMaterials = own(createOwnerMaterials(colorsByOwner));
   const playerOwner = simulation.playerOwner;
   const player = simulation.viewOf(playerOwner);
   const issuer = { owner: playerOwner };
@@ -300,19 +305,17 @@ async function assembleGameSession(
     const { x, z } = startingActor.worldPosition;
     view.camera.focusOnPoint(new Vector3(x, 0, z));
   }
-  const actorViews = createActorViewRegistry(
-    view.scene,
-    map,
-    appearances,
-    (actor) => player.relationTo(actor) === "hostile",
-  );
+  const actorViews = createActorViewRegistry(view.scene, map, appearances, {
+    isHostile: (actor) => player.relationTo(actor) === "hostile",
+    ownerMaterials,
+  });
   own(actorViews);
   const tilePlacedViews = createTilePlacedActorViewRegistry(
     view.scene,
     map,
     definitions,
     buildingAppearances,
-    { reducedMotion },
+    { reducedMotion, ownerMaterials },
   );
   own(tilePlacedViews);
   const networkView = createSupportNetworkView(view.scene, map);
@@ -368,6 +371,7 @@ async function assembleGameSession(
     appearanceFor: (id) => appearances.get(id),
     rubble: () => propAssets.get("rubble"),
     reducedMotion,
+    ownerMaterials,
     topHeightFor: ({ actorId, definitionId, tilePlacement }) =>
       tilePlacement &&
       tilePlacedViews.topHeight({ id: actorId, definitionId, tilePlacement }),
@@ -581,13 +585,13 @@ async function assembleGameSession(
           actor,
           definitionsById.get(actor.definitionId)!,
         ),
-        color: buildingAppearances.get(actor.definitionId)?.minimapColor,
+        color: colorsByOwner.get(actor.owner),
         selected: input.selectedActorIds.includes(actor.id),
       })),
       ...player.actors().shownMobile.map((actor) => ({
         id: actor.id,
         worldPosition: actor.worldPosition,
-        color: appearances.get(actor.definitionId)?.minimapColor,
+        color: colorsByOwner.get(actor.owner),
         selected: input.selectedActorIds.includes(actor.id),
       })),
     ],
@@ -695,6 +699,7 @@ async function assembleGameSession(
       map,
       buildings,
       buildingAppearances,
+      ownerMaterials,
     ),
   );
   const placement = createBuildingPlacement(canvas, map, simulation, player, {

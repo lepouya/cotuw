@@ -13,7 +13,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   idle, walk, turn, hit, and death clips. Troopers use aim and fire;
   Sentinels use aim and channeling clips. Circle personnel have slender
   proportions, pointed ears, exposed faces, circlets, tunics, and mantles,
-  with blue owner markings.
+  with owner markings; ARC owner markings cover the shoulders, chest, and
+  helmet ridge.
   Sentinels wear layered leaf armor and channel violet focus artifacts;
   Wayfinders wear light hoods and carry wayfinding staves.
   Each asset ID has one recipe owning its scale, palette, geometry, gait, arm
@@ -49,6 +50,12 @@ clips match their generators, and reject unregistered files in `public/assets`.
   such as `MATERIALS_COLOR`, so generated models match the stand-ins.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
+- A material named `owner` or ending in `-owner` marks the owner-color area.
+  Sessions give each owner a shared copy in its
+  [owner color](content-packs.md), so keep those parts in their own mesh
+  rather than baking them into vertex colors. Infantry export owner markings
+  as a third mesh, ARC buildings use owner trim, and the Harvester an owner
+  cab. Neutral models, such as resource sites and wolves, have none.
 - `npm run assets:terrain`: `scripts/terrain-textures.ts` generates seamless
   dirt, water, clutter, and rock PNGs from periodic gradient and cellular
   noise. Dirt spans eight tiles per repeat with warped soil, damp patches, and

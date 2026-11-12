@@ -57,6 +57,17 @@ test("rejects scenario AI the content pack or file format cannot supply", () => 
   ).toThrow("invalid AI state");
 });
 
+test("rejects owners beyond the content pack's color palette", () => {
+  const file = JSON.parse(LEVEL_SOURCES.get("sandbox")!);
+  const extra = Array.from({ length: 9 }, (_, index) => ({
+    id: `extra-${index}`,
+  }));
+  file.state.owners.push(...extra);
+  expect(() => loadMission(JSON.stringify(file))).toThrow(
+    "a color for every owner",
+  );
+});
+
 test("explains why this build cannot load a stored mission", () => {
   const level = () => JSON.parse(LEVEL_SOURCES.get("arc-economy-opening")!);
   expect(missionIncompatibility(level())).toBeUndefined();

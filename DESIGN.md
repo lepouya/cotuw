@@ -685,6 +685,9 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - The minimap is north-up, distinguishes explored terrain from current vision,
   respects detection, supports camera navigation, and accepts commands only in
   an explicit command mode.
+- Every owner has a distinct color from the content pack's palette, in
+  mission owner order. Minimap markers and reserved model areas use it, so
+  owners of the same faction stay distinguishable.
 
 ### M1 control groups
 

@@ -78,11 +78,10 @@ export function createWolfAppearance(
 ): ActorAppearance {
   const { root, legs } = createWolfParts(scene, "wolf-template");
   root.scaling.setAll(scale);
-  const body = createMeshAppearance(
-    root,
-    { radius: 0.5 * scale, height: 0.95 * scale },
-    [0.86, 0.22, 0.2],
-  );
+  const body = createMeshAppearance(root, {
+    radius: 0.5 * scale,
+    height: 0.95 * scale,
+  });
   return {
     ...body,
     instantiate: (name, seed) => {

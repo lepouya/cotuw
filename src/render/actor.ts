@@ -13,6 +13,8 @@ import type { TerrainMap } from "../map";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { ActorMotion } from "./actor-gait";
 import type { Rgb, ActorTrigger } from "../content/presentation";
+import type { OwnerMaterials } from "./owner-materials";
+import { hierarchyMeshes } from "./glb-model";
 
 // Keep the actor visibly above the terrain's thin visual-layer offsets.
 const GROUND_CLEARANCE = 0.04;
@@ -49,8 +51,6 @@ export type ActorAppearance = {
   instantiate: (name: string, seed: number) => ActorInstance;
   /** A cylinder on the ground point that picking and selection use. */
   bounds: { radius: number; height: number };
-  /** Minimap marker color, in 0-1 channels. */
-  minimapColor?: Rgb;
   /** Releases what instances share, such as templates and materials. */
   dispose: () => void;
 };
@@ -106,6 +106,7 @@ export function createActorRenderer(
   initialState: ObservedActor,
   appearance: ActorAppearance,
   initialSelection: SelectionStyle,
+  ownerMaterials?: OwnerMaterials,
 ): ActorRenderer {
   const { id } = initialState;
   const { radius, height } = appearance.bounds;
@@ -116,6 +117,7 @@ export function createActorRenderer(
       appearance.instantiate(`actor-${id}`, stableUnit(id)),
     );
     instance.root.parent = root;
+    ownerMaterials?.apply(hierarchyMeshes(instance.root), initialState.owner);
     for (const node of [instance.root, ...instance.root.getChildMeshes()]) {
       if (node instanceof AbstractMesh && node.isVisible) {
         node.isPickable = true;
@@ -261,12 +263,10 @@ export function createActorRenderer(
 export function createMeshAppearance(
   template: TransformNode,
   bounds: ActorAppearance["bounds"],
-  minimapColor?: Rgb,
 ): ActorAppearance {
   template.setEnabled(false);
   return {
     bounds,
-    minimapColor,
     instantiate: (name) => {
       const root = template.instantiateHierarchy(
         null,

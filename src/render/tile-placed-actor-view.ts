@@ -24,10 +24,11 @@ import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
-import type { ActorDefinition } from "../simulation/actor";
+import type { Actor, ActorDefinition } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
 import type { BuildingActivityKind } from "../simulation/production";
 import type { Rgb } from "../content/presentation";
+import type { OwnerMaterials } from "./owner-materials";
 import type { ModelAsset, ModelInstance } from "./glb-model";
 
 /** Gap left on footprint sides that face unoccupied tiles. */
@@ -79,7 +80,6 @@ export type TilePlacedActorDetailsFactory = (
 export type TilePlacedActorAppearance = {
   height: number;
   color: Rgb;
-  minimapColor?: Rgb;
   createDetails?: TilePlacedActorDetailsFactory;
   /** The loaded model's highest point above its seat, in tiles. */
   modelTopHeight?: number;
@@ -93,9 +93,13 @@ export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
   TilePlacedActorAppearance
 >;
 
+/** A drawn building, whose owner colors its reserved model areas. */
+export type OwnedTilePlacedActor = TilePlacedActorState &
+  Readonly<Pick<Actor, "owner">>;
+
 export type TilePlacedActorViewRegistry = {
   update: (
-    actors: readonly TilePlacedActorState[],
+    actors: readonly OwnedTilePlacedActor[],
     disconnected?: ReadonlySet<string>,
   ) => void;
   /**
@@ -127,14 +131,19 @@ export function createTilePlacedActorViewRegistry(
   {
     preview = false,
     reducedMotion = () => false,
-  }: { preview?: boolean; reducedMotion?: () => boolean } = {},
+    ownerMaterials,
+  }: {
+    preview?: boolean;
+    reducedMotion?: () => boolean;
+    /** Recolors owner materials; the caller owns the copies. */
+    ownerMaterials?: OwnerMaterials;
+  } = {},
 ): TilePlacedActorViewRegistry {
   for (const [definitionId, appearance] of appearances) {
     if (
       !(appearance.height > 0) ||
       !Number.isFinite(appearance.height) ||
-      !isRgb(appearance.color) ||
-      (appearance.minimapColor !== undefined && !isRgb(appearance.minimapColor))
+      !isRgb(appearance.color)
     ) {
       throw new RangeError(
         `Invalid tile-placed actor appearance: ${definitionId}.`,
@@ -149,7 +158,7 @@ export function createTilePlacedActorViewRegistry(
   const materials = new Map<string, StandardMaterial>();
   lifetime.defer(() => materials.clear());
   const actorIds = new WeakMap<TransformNode, string>();
-  let actors: readonly TilePlacedActorState[] = [];
+  let actors: readonly OwnedTilePlacedActor[] = [];
   let disconnectedIds: ReadonlySet<string> = new Set();
   let selectedActorId: string | undefined;
   let selection: ReturnType<typeof createFootprintOverlay> | undefined;
@@ -250,7 +259,7 @@ export function createTilePlacedActorViewRegistry(
 
   // One column per occupied tile, from its lowest corner to a shared roof, so
   // the body matches the footprint's shape and never floats on a slope.
-  const create = (actor: TilePlacedActorState) => {
+  const create = (actor: OwnedTilePlacedActor) => {
     const definition = definitionsById.get(actor.definitionId);
     if (!definition) {
       throw new Error(
@@ -323,6 +332,7 @@ export function createTilePlacedActorViewRegistry(
         shared,
       );
       if (details) lifetime.own(details);
+      ownerMaterials?.apply(root.getChildMeshes(), actor.owner);
       if (preview) {
         for (const mesh of root.getChildMeshes()) {
           mesh.isPickable = false;
@@ -483,13 +493,15 @@ export function createTilePlacedActorViewRegistry(
     keyFor: ({
       id,
       definitionId,
+      owner,
       tilePlacement,
       construction,
-    }: TilePlacedActorState) => ({
+    }: OwnedTilePlacedActor) => ({
       appearance: appearances.get(definitionId),
       placement: JSON.stringify([definitionId, tilePlacement]),
       key: JSON.stringify([
         definitionId,
+        owner,
         tilePlacement,
         construction && constructionStage(construction),
         disconnectedIds.has(id),
@@ -515,7 +527,7 @@ export function createTilePlacedActorViewRegistry(
   });
 
   const update = (
-    nextActors: readonly TilePlacedActorState[],
+    nextActors: readonly OwnedTilePlacedActor[],
     disconnected: ReadonlySet<string> = disconnectedIds,
   ) => {
     disconnectedIds = disconnected;

@@ -1,3 +1,4 @@
+import { Color3, VertexBuffer } from "@babylonjs/core";
 import { expect, test } from "vitest";
 
 import { testScene } from "./helpers/scene";
@@ -5,8 +6,85 @@ import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
 import { loadModelAsset } from "../src/render/glb-model";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
+import {
+  createOwnerMaterials,
+  isOwnerMaterial,
+} from "../src/render/owner-materials";
 
 import type { PBRMaterial } from "@babylonjs/core";
+import type { Rgb } from "../src/content/presentation";
+
+test.each(
+  BASE_CONTENT.actors.filter(
+    ({ faction }) => faction === "arc" || faction === "circle",
+  ),
+)(
+  "$id exports separate owner markings that instances can recolor and share",
+  async ({ id }) => {
+    const scene = testScene();
+    const presentation = BASE_CONTENT.presentation[id]!;
+    const model = presentation.model;
+    const asset =
+      model && "glb" in model
+        ? await loadSkinnedActorAppearance(scene, {
+            ...model.glb,
+            url: glbDataUrl(model.glb.url),
+          })
+        : await loadModelAsset(scene, {
+            ...presentation.building!.glb!,
+            url: glbDataUrl(presentation.building!.glb!.url),
+          });
+    const instances = ["first", "second", "third"].map((name) =>
+      asset.instantiate(name, 0),
+    );
+    const markings = instances.map(({ root }) =>
+      root
+        .getChildMeshes()
+        .filter((mesh) => isOwnerMaterial(mesh.material?.name ?? "")),
+    );
+    expect(markings[0]!.length).toBeGreaterThan(0);
+    const colors = new Map<string, Rgb>([
+      ["west", [0.2, 0.45, 1]],
+      ["east", [0.92, 0.18, 0.15]],
+    ]);
+    const materials = createOwnerMaterials(colors);
+    const source = markings[0]![0]!.material as PBRMaterial;
+    const sourceColor = source.albedoColor.clone();
+    const body = instances[0]!.root
+      .getChildMeshes()
+      .filter((mesh) => !markings[0]!.includes(mesh))
+      .map((mesh) => [mesh, mesh.material] as const);
+    try {
+      for (const [index, instance] of instances.entries())
+        materials.apply(
+          instance.root.getChildMeshes(),
+          index === 2 ? "east" : "west",
+        );
+      for (const [index, meshes] of markings.entries())
+        for (const mesh of meshes) {
+          const color = colors.get(index === 2 ? "east" : "west")!;
+          expect((mesh.material as PBRMaterial).albedoColor).toEqual(
+            new Color3(...color).toLinearSpace(),
+          );
+          // Baked colors must not multiply the new material's owner color.
+          const vertices = mesh.getVerticesData(VertexBuffer.ColorKind);
+          if (vertices)
+            expect(Array.from(vertices).every((value) => value === 1)).toBe(
+              true,
+            );
+        }
+      expect(markings[0]![0]!.material).toBe(markings[1]![0]!.material);
+      expect(markings[0]![0]!.material).not.toBe(markings[2]![0]!.material);
+      expect(source.albedoColor).toEqual(sourceColor);
+      for (const [mesh, material] of body) expect(mesh.material).toBe(material);
+    } finally {
+      for (const instance of instances) instance.dispose();
+      materials.dispose();
+      asset.dispose();
+    }
+    expect(scene.materials).toHaveLength(0);
+  },
+);
 
 test.each(["wolf", "alpha-wolf", "arc-harvester"])(
   "%s loads its generated clips and holds its death pose",

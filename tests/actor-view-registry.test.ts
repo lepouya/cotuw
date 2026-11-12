@@ -1,4 +1,5 @@
 import {
+  Color3,
   MeshBuilder,
   NullEngine,
   Ray,
@@ -16,11 +17,91 @@ import {
   interpolatePose,
 } from "../src/render/actor-view-registry";
 import { withFrameEffects } from "../src/render/frame-effects";
+import { standInAppearances } from "../src/render/session-assets";
+import { createOwnerMaterials } from "../src/render/owner-materials";
 
 import type { ActorAppearance, ActorPose } from "../src/render/actor";
 import type { ActorMotion } from "../src/render/actor-gait";
 import type { ActorRenderState } from "../src/simulation/actor";
-import type { FrameEffect } from "../src/content/presentation";
+import type { FrameEffect, Rgb } from "../src/content/presentation";
+
+test.each(["mesh", "stand-in", "fallback"])(
+  "%s appearances retain owner colors through replacement and transfer",
+  (kind) => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
+    const appearances = new Map<string, ActorAppearance>();
+    if (kind === "mesh") {
+      const mesh = MeshBuilder.CreateBox("template", {}, scene);
+      mesh.material = new StandardMaterial("owner", scene);
+      appearances.set(
+        "trooper",
+        createMeshAppearance(mesh, {
+          radius: 0.5,
+          height: 1,
+        }),
+      );
+    } else if (kind === "stand-in") {
+      const standIns = standInAppearances(scene, [
+        [
+          "trooper",
+          {
+            url: "trooper.glb",
+            clips: { idle: "idle", locomotion: "walk" },
+            cycleDistance: 1,
+            bounds: { radius: 0.5, height: 1 },
+          },
+        ],
+      ]);
+      appearances.set("trooper", standIns.get("trooper")!);
+    }
+    const colors = new Map<string, Rgb>([
+      ["player", [0.2, 0.45, 1]],
+      ["enemy", [0.92, 0.18, 0.15]],
+    ]);
+    const ownerMaterials = createOwnerMaterials(colors);
+    const views = createActorViewRegistry(scene, map, appearances, {
+      ownerMaterials,
+    });
+    const materialOf = (id: string) =>
+      scene
+        .getTransformNodeByName(`actor-${id}-root`)!
+        .getChildMeshes()
+        .find((mesh) => mesh.material?.name.includes("owner"))!
+        .material as StandardMaterial;
+    try {
+      let first = actor("a");
+      const second = actor("b");
+      views.update([first, second], 1);
+      const original = materialOf("a");
+      expect(original.diffuseColor).toEqual(
+        new Color3(...colors.get("player")!),
+      );
+      expect(materialOf("b")).toBe(original);
+
+      first = { ...first, owner: "enemy" };
+      views.update([first, second], 1);
+      expect(materialOf("a").diffuseColor).toEqual(
+        new Color3(...colors.get("enemy")!),
+      );
+      expect(materialOf("b")).toBe(original);
+      views.update([second], 1);
+      views.update([first, second], 1);
+      expect(materialOf("a").diffuseColor).toEqual(
+        new Color3(...colors.get("enemy")!),
+      );
+      views.dispose();
+      ownerMaterials.dispose();
+      expect(scene.materials).not.toContain(original);
+    } finally {
+      views.dispose();
+      ownerMaterials.dispose();
+      for (const appearance of appearances.values()) appearance.dispose();
+      engine.dispose();
+    }
+  },
+);
 
 function pose(x: number, z: number, facing: number): ActorPose {
   return { worldPosition: { x, z }, facing };
@@ -138,7 +219,7 @@ describe("actor view registry", () => {
         [
           "actor-selection-material",
           "actor-hostile-selection-material",
-          "actor-fallback-material",
+          "actor-fallback-owner",
         ].includes(material.name),
       );
       expect(ownedMaterials).toHaveLength(3);

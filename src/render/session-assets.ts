@@ -47,7 +47,7 @@ export type SessionAssets = {
   dispose: () => void;
 };
 
-/** Boxes in each model's color stand in while its GLB loads. */
+/** Owner-colored boxes stand in while their GLBs load. */
 export function standInAppearances(
   scene: Scene,
   models: readonly (readonly [string, ActorGraphics])[],
@@ -64,18 +64,13 @@ export function standInAppearances(
       mesh.parent = root;
       mesh.position.y = height / 2;
       const material = new StandardMaterial(
-        `actor-template-${id}-material`,
+        `actor-template-${id}-owner`,
         scene,
       );
-      material.diffuseColor = new Color3(
-        ...(graphics.minimapColor ?? DEFAULT_ACTOR_COLOR),
-      );
+      material.diffuseColor = new Color3(...DEFAULT_ACTOR_COLOR);
       material.specularColor = new Color3(0.12, 0.12, 0.12);
       mesh.material = material;
-      return [
-        id,
-        createMeshAppearance(root, graphics.bounds, graphics.minimapColor),
-      ];
+      return [id, createMeshAppearance(root, graphics.bounds)];
     }),
   );
 }

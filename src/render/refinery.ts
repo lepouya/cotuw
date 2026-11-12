@@ -28,14 +28,14 @@ export const createRefineryDetails: TilePlacedActorDetailsFactory = (
   const steel = material("steel", [0.3, 0.4, 0.42]);
   const hull = material("hull", [0.52, 0.45, 0.3]);
   const dark = material("bay", [0.09, 0.1, 0.1]);
-  const marking = material("markings", [0.94, 0.46, 0.12]);
+  const owner = material("owner", [0.94, 0.46, 0.12]);
   const fanSurface = material("fan", [0.85, 0.68, 0.25]);
   const beacon = material("beacon", [1, 0.65, 0.15], true);
   const processing = material("processing-light", [0.2, 1, 0.65], true);
   box("hall", [1.7, 0.75, 1.5], [-0.55, 0.375, -0.1], hull);
   box("hall-roof", [1.82, 0.1, 1.62], [-0.55, 0.8, -0.1], steel);
   box("bay", [0.95, DOOR_HEIGHT, 0.03], [-0.55, DOOR_HEIGHT / 2, 0.66], dark);
-  box("bay-header", [1.1, 0.08, 0.06], [-0.55, 0.62, 0.67], marking);
+  box("bay-header", [1.1, 0.08, 0.06], [-0.55, 0.62, 0.67], owner);
   const door = box(
     "garage-door",
     [0.95, DOOR_HEIGHT, 0.04],
@@ -43,7 +43,7 @@ export const createRefineryDetails: TilePlacedActorDetailsFactory = (
     steel,
   );
   cylinder("tank", [0.95, 1.2], [0.8, 0.6, -0.3], steel);
-  cylinder("tank-band", [1, 0.08], [0.8, 0.85, -0.3], marking);
+  cylinder("tank-band", [1, 0.08], [0.8, 0.85, -0.3], owner);
   box("beacon", [0.18, 0.18, 0.18], [0.8, 1.29, -0.3], beacon);
   const pump = cylinder("pump", [0.22, 0.5], [1.15, 0.35, 0.55], steel);
   const piston = cylinder("press", [0.18, 0.4], [-0.05, 0.95, 0.3], steel);

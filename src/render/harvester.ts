@@ -26,6 +26,9 @@ export function createHarvesterBody(
   const root = new TransformNode(rootName, scene);
   const steel = new StandardMaterial("harvester-steel", scene);
   steel.diffuseColor = new Color3(0.78, 0.58, 0.2);
+  // Sessions recolor the cab for its owner.
+  const owner = new StandardMaterial("harvester-owner", scene);
+  owner.diffuseColor = steel.diffuseColor.clone();
   const rubber = new StandardMaterial("harvester-tracks", scene);
   rubber.diffuseColor = new Color3(0.12, 0.16, 0.17);
   const box = (
@@ -44,7 +47,7 @@ export function createHarvesterBody(
     mesh.material = material;
   };
   box("harvester-chassis", 0.7, 0.35, 1.1, 0, 0.45, 0, steel);
-  box("harvester-cab", 0.55, 0.4, 0.45, 0, 0.82, 0.25, steel);
+  box("harvester-cab", 0.55, 0.4, 0.45, 0, 0.82, 0.25, owner);
   box("harvester-left-track", 0.2, 0.28, 1.25, -0.43, 0.25, 0, rubber);
   box("harvester-right-track", 0.2, 0.28, 1.25, 0.43, 0.25, 0, rubber);
   return { root, steel, rubber };
@@ -105,11 +108,10 @@ export function createHarvesterAppearance(
 ): ActorAppearance {
   const parts = createHarvesterBody(scene, "harvester-template");
   parts.root.scaling.setAll(scale);
-  const body = createMeshAppearance(
-    parts.root,
-    { radius: 0.72 * scale, height: 1.2 * scale },
-    [0.94, 0.7, 0.22],
-  );
+  const body = createMeshAppearance(parts.root, {
+    radius: 0.72 * scale,
+    height: 1.2 * scale,
+  });
   return {
     ...body,
     instantiate: (name, seed) => {

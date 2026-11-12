@@ -1,8 +1,8 @@
 {
   "format": "cotuw-content",
-  "formatVersion": 2,
+  "formatVersion": 3,
   "id": "base",
-  "version": 8,
+  "version": 9,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -673,7 +673,6 @@
       "model": {
         "glb": {
           "url": "assets/actors/circle-sentinel.glb",
-          "minimapColor": [0.47, 0.68, 0.85],
           "bounds": {
             "radius": 0.58,
             "height": 2.25
@@ -715,7 +714,6 @@
       "model": {
         "glb": {
           "url": "assets/actors/circle-wayfinder.glb",
-          "minimapColor": [0.47, 0.68, 0.85],
           "bounds": {
             "radius": 0.5,
             "height": 1.9
@@ -751,7 +749,6 @@
       "model": {
         "glb": {
           "url": "assets/actors/arc-trooper.glb",
-          "minimapColor": [0.82, 0.28, 0.1],
           "bounds": {
             "radius": 0.45,
             "height": 1.95
@@ -800,7 +797,6 @@
       "model": {
         "glb": {
           "url": "assets/actors/arc-scout.glb",
-          "minimapColor": [0.12, 0.62, 0.82],
           "bounds": {
             "radius": 0.4,
             "height": 1.65
@@ -830,7 +826,6 @@
       "building": {
         "height": 0.3,
         "color": [0.28, 0.38, 0.42],
-        "minimapColor": [0.36, 0.7, 0.76],
         "glb": {
           "url": "assets/models/command-center.glb",
           "idle": "idle"
@@ -849,7 +844,6 @@
       "building": {
         "height": 0.25,
         "color": [0.28, 0.34, 0.26],
-        "minimapColor": [0.65, 0.72, 0.32],
         "glb": {
           "url": "assets/models/barracks.glb",
           "idle": "idle",
@@ -880,7 +874,6 @@
       "building": {
         "height": 0.45,
         "color": [0.45, 0.38, 0.22],
-        "minimapColor": [0.85, 0.65, 0.2],
         "glb": {
           "url": "assets/models/refinery.glb",
           "idle": "idle",
@@ -930,7 +923,6 @@
         "glb": {
           "url": "assets/models/harvester.glb",
           "rig": "rigid",
-          "minimapColor": [0.94, 0.7, 0.22],
           "bounds": {
             "radius": 0.72,
             "height": 1.2
@@ -963,7 +955,6 @@
       "model": {
         "glb": {
           "url": "assets/models/wolf.glb",
-          "minimapColor": [0.86, 0.22, 0.2],
           "bounds": {
             "radius": 0.5,
             "height": 0.95
@@ -1008,7 +999,6 @@
       "model": {
         "glb": {
           "url": "assets/models/wolf.glb",
-          "minimapColor": [0.86, 0.22, 0.2],
           "bounds": {
             "radius": 0.625,
             "height": 1.1875
@@ -1056,7 +1046,6 @@
       "model": {
         "glb": {
           "url": "assets/actors/circle-cultivator.glb",
-          "minimapColor": [0.47, 0.68, 0.85],
           "bounds": {
             "radius": 0.5,
             "height": 1.9
@@ -1100,7 +1089,6 @@
       "building": {
         "height": 0.12,
         "color": [0.38, 0.29, 0.18],
-        "minimapColor": [0.58, 0.79, 0.51],
         "glb": {
           "url": "assets/models/circle-heartgrove.glb",
           "idle": "idle"
@@ -1132,7 +1120,6 @@
       "building": {
         "height": 0.12,
         "color": [0.38, 0.29, 0.18],
-        "minimapColor": [0.58, 0.79, 0.51],
         "glb": {
           "url": "assets/models/circle-conservatory.glb",
           "idle": "idle"
@@ -1164,7 +1151,6 @@
       "building": {
         "height": 0.12,
         "color": [0.38, 0.29, 0.18],
-        "minimapColor": [0.58, 0.79, 0.51],
         "glb": {
           "url": "assets/models/circle-musterhall.glb",
           "idle": "idle"
@@ -1455,6 +1441,16 @@
   },
   "view": {
     "clearColor": [0.035, 0.07, 0.09],
+    "ownerColors": [
+      [0.2, 0.45, 1],
+      [0.92, 0.18, 0.15],
+      [0.96, 0.86, 0.2],
+      [0.3, 0.82, 0.25],
+      [0.92, 0.36, 0.78],
+      [1, 0.55, 0.1],
+      [0.92, 0.92, 0.92],
+      [0.55, 0.36, 0.2]
+    ],
     "lighting": {
       "skyColor": [0.6, 0.78, 0.77],
       "groundColor": [0.08, 0.12, 0.1],

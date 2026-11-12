@@ -89,7 +89,6 @@ export type ClipRoles<T> = {
 /** Authored GLB and animation configuration for one actor definition. */
 export type ActorGraphics = {
   url: string;
-  minimapColor?: Rgb;
   bounds: { radius: number; height: number };
   /** Clip names in the GLB. */
   clips: ClipRoles<string>;
@@ -131,7 +130,7 @@ export function validateActorGraphics(
   value: unknown,
 ): asserts value is ActorGraphics {
   const graphics: Partial<ActorGraphics> = isRecord(value) ? value : {};
-  const { url, bounds, cycleDistance, minimapColor, clips } = graphics;
+  const { url, bounds, cycleDistance, clips } = graphics;
   if (
     !isId(url) ||
     !isRecord(clips) ||
@@ -162,8 +161,6 @@ export function validateActorGraphics(
     throw new RangeError(`Actor model ${url} needs a positive cycle distance`);
   if (!bounds || !isPositive(bounds.radius) || !isPositive(bounds.height))
     throw new RangeError(`Actor model ${url} needs positive finite bounds`);
-  if (minimapColor !== undefined && !isRgb(minimapColor))
-    throw new RangeError(`Actor model ${url} needs a valid minimap color`);
 }
 
 export type ModelGraphics = {
@@ -301,7 +298,6 @@ export type ActorPresentation = {
   building?: {
     height: number;
     color: Rgb;
-    minimapColor?: Rgb;
     /** A built-in set of articulated parts. */
     details?: BuiltinBuildingDetailId;
     glb?: ModelGraphics;
@@ -386,12 +382,7 @@ export function validateActorPresentation(
   }
   const building = presentation.building;
   if (building !== undefined) {
-    if (
-      !building ||
-      !isPositive(building.height) ||
-      !isRgb(building.color) ||
-      (building.minimapColor !== undefined && !isRgb(building.minimapColor))
-    )
+    if (!building || !isPositive(building.height) || !isRgb(building.color))
       throw invalid(`gives ${actor.id} invalid building colors or height`);
     if (
       building.details !== undefined &&

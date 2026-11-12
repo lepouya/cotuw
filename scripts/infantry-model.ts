@@ -21,7 +21,7 @@ import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
 import type { Scene } from "@babylonjs/core";
 
 type Vec3 = [number, number, number];
-type Finish = "armor" | "cloth" | "accent" | "visor" | "dark" | "skin";
+type Finish = "armor" | "cloth" | "owner" | "visor" | "dark" | "skin";
 type Joint = { name: string; parent?: string; offset: Vec3 };
 type Part = {
   name: string;
@@ -92,7 +92,7 @@ const ARC_PARTS: Part[] = [
     "box",
     [0.12, 0.13, 0.025],
     [0, 1.39, 0.292],
-    "accent",
+    "owner",
   ),
   part(
     "backpack",
@@ -111,7 +111,7 @@ const ARC_PARTS: Part[] = [
     "box",
     [0.12, 0.06, 0.43],
     [0, 1.86, 0],
-    "accent",
+    "owner",
   ),
   ...mirrored((side, sign) => [
     part(
@@ -120,7 +120,7 @@ const ARC_PARTS: Part[] = [
       "sphere",
       [0.3, 0.24, 0.34],
       [sign * 0.37, 1.37, 0],
-      "armor",
+      "owner",
     ),
     part(
       `${side}-upper-arm`,
@@ -202,7 +202,7 @@ const ARC_PARTS: Part[] = [
     "box",
     [0.08, 0.07, 0.16],
     [0.12, 1.24, 0.36],
-    "accent",
+    "owner",
   ),
 ];
 
@@ -210,7 +210,7 @@ const ARC_PARTS: Part[] = [
 function elvenParts(mantle: Vec3): Part[] {
   return [
     part("tunic", "spine", "sphere", [0.43, 0.58, 0.28], [0, 1.25, 0], "cloth"),
-    part("sash", "pelvis", "torus", [0.43, 0.12, 0.32], [0, 0.98, 0], "accent"),
+    part("sash", "pelvis", "torus", [0.43, 0.12, 0.32], [0, 0.98, 0], "owner"),
     part("face", "head", "sphere", [0.26, 0.39, 0.28], [0, 1.73, 0.05], "skin"),
     part(
       "hair-crown",
@@ -304,7 +304,7 @@ function elvenParts(mantle: Vec3): Part[] {
         "leaf",
         [0.055, 0.59, 0.04],
         [sign * 0.14, 0.67, 0.23],
-        "accent",
+        "owner",
       ),
     ]),
   ];
@@ -421,7 +421,7 @@ const FOCUS_HELD: Stance = {
 // ARC parts show no skin, but every palette defines each finish.
 const ARC_SKIN: Vec3 = [0.83, 0.68, 0.53];
 const CIRCLE_TRIM = {
-  accent: [0.47, 0.68, 0.85],
+  owner: [0.47, 0.68, 0.85],
   visor: [0.68, 0.35, 0.95],
   skin: [0.86, 0.73, 0.6],
 } satisfies Record<string, Vec3>;
@@ -472,7 +472,7 @@ const INFANTRY_RECIPES = {
         "sphere",
         [0.32, 0.4, 0.3],
         [-0.3, 0.83, 0],
-        "accent",
+        "owner",
       ),
       part(
         "growth-tool-handle",
@@ -499,7 +499,7 @@ const INFANTRY_RECIPES = {
     palette: {
       armor: [0.68, 0.34, 0.17],
       cloth: [0.16, 0.21, 0.23],
-      accent: [0.97, 0.71, 0.26],
+      owner: [0.97, 0.71, 0.26],
       visor: [0.19, 0.72, 0.79],
       skin: ARC_SKIN,
     },
@@ -513,7 +513,7 @@ const INFANTRY_RECIPES = {
     palette: {
       armor: [0.2, 0.55, 0.62],
       cloth: [0.14, 0.24, 0.27],
-      accent: [0.64, 0.9, 0.82],
+      owner: [0.64, 0.9, 0.82],
       visor: [0.91, 0.76, 0.34],
       skin: ARC_SKIN,
     },
@@ -584,8 +584,8 @@ function buildInfantry(
     bones.set(label, bone);
   }
 
-  // glTF colors are linear. One vertex-colored body mesh plus the glowing
-  // visor keeps each soldier to two draw calls.
+  // glTF colors are linear. A vertex-colored body, the glowing visor, and
+  // owner markings that sessions recolor keep each soldier to three draws.
   const palette = { ...recipe.palette, dark: DARK };
   const linear = (color: Vec3) => new Color3(...color).toLinearSpace();
   const body = new PBRMaterial(`${name}-body`, scene);
@@ -597,12 +597,19 @@ function buildInfantry(
   visor.emissiveColor = linear(palette.visor).scale(0.35);
   visor.metallic = 0;
   visor.roughness = 0.3;
+  const owner = new PBRMaterial(`${name}-owner`, scene);
+  owner.albedoColor = linear(palette.owner);
+  owner.metallic = 0;
+  owner.roughness = 0.6;
 
+  // Owner parts take their color from the material, which sessions replace.
+  const colorOf = ({ finish }: Part) =>
+    finish === "owner" ? Color3.White() : linear(palette[finish]);
   const skinned = (label: string, pieces: Part[], material: PBRMaterial) =>
     rigidSkin(
       `${name}-${label}`,
       pieces.map((each) => ({
-        vertices: partVertices(scene, each, linear(palette[each.finish])),
+        vertices: partVertices(scene, each, colorOf(each)),
         bone: skeleton.bones.indexOf(bones.get(each.joint)!),
       })),
       skeleton,
@@ -611,13 +618,18 @@ function buildInfantry(
     );
   skinned(
     "body",
-    parts.filter(({ finish }) => finish !== "visor"),
+    parts.filter(({ finish }) => finish !== "visor" && finish !== "owner"),
     body,
   );
   skinned(
     "visor",
     parts.filter(({ finish }) => finish === "visor"),
     visor,
+  );
+  skinned(
+    "owner",
+    parts.filter(({ finish }) => finish === "owner"),
+    owner,
   );
 
   const clip = (

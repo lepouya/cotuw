@@ -143,7 +143,6 @@ describe("session assets", () => {
           clips: { idle: "idle", locomotion: "walk" },
           cycleDistance: 1,
           bounds: { radius: 0.5, height: 1.2 },
-          minimapColor: [0.2, 0.5, 0.8],
         },
       ],
     ]);
@@ -151,7 +150,6 @@ describe("session assets", () => {
     expect(appearances.has("arc-trooper")).toBe(true);
     const appearance = appearances.get("arc-trooper")!;
     expect(appearance.bounds).toEqual({ radius: 0.5, height: 1.2 });
-    expect(appearance.minimapColor).toEqual([0.2, 0.5, 0.8]);
 
     appearance.dispose();
   });
@@ -172,7 +170,6 @@ describe("session assets", () => {
           building: {
             height: 2,
             color: [0.3, 0.4, 0.3],
-            minimapColor: [0.5, 0.5, 0.5],
             details: "barracks",
           },
         },

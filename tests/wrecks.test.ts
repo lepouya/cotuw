@@ -1,10 +1,17 @@
-import { MeshBuilder, TransformNode } from "@babylonjs/core";
+import {
+  Color3,
+  MeshBuilder,
+  StandardMaterial,
+  TransformNode,
+} from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { testScene } from "./helpers/scene";
 import { glbDataUrl } from "./helpers/assets";
 import { TerrainMap } from "../src/map";
 import { createWreckView } from "../src/render/wrecks";
+import { createMeshAppearance } from "../src/render/actor";
+import { createOwnerMaterials } from "../src/render/owner-materials";
 import { loadModelAsset, staticInstance } from "../src/render/glb-model";
 
 import type { ActorAppearance } from "../src/render/actor";
@@ -253,4 +260,45 @@ test("flat replacement rubble cannot produce non-finite collapse transforms", ()
   expect(chunk.scaling.asArray().every(Number.isFinite)).toBe(true);
   expect(chunk.position.asArray().every(Number.isFinite)).toBe(true);
   views.dispose();
+});
+
+test("fallen units keep their owner's colors", () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
+  const template = MeshBuilder.CreateBox("template", {}, scene);
+  template.material = new StandardMaterial("trooper-owner", scene);
+  const appearance = createMeshAppearance(template, {
+    radius: 0.5,
+    height: 1,
+  });
+  const ownerMaterials = createOwnerMaterials(new Map([["east", [1, 0, 0]]]));
+  const views = createWreckView(scene, map, {
+    appearanceFor: () => appearance,
+    tilesFor: () => [],
+    ownerMaterials,
+  });
+  updateWrecks(
+    views,
+    [
+      {
+        actorId: "fallen",
+        definitionId: "trooper",
+        owner: "east",
+        tick: 0,
+        worldPosition: { x: 0, z: 0 },
+        facing: 0,
+      },
+    ],
+    0,
+    0,
+  );
+  const [marking] = scene
+    .getTransformNodeByName("wreck-fallen")!
+    .getChildMeshes();
+  expect((marking!.material as StandardMaterial).diffuseColor).toEqual(
+    new Color3(1, 0, 0),
+  );
+  views.dispose();
+  ownerMaterials.dispose();
+  appearance.dispose();
 });

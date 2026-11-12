@@ -17,6 +17,7 @@ import {
 } from "./actor";
 
 import type { ActorTrigger } from "../content/presentation";
+import type { OwnerMaterials } from "./owner-materials";
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { ObservedActor } from "../simulation/owner-view";
@@ -72,7 +73,14 @@ export function createActorViewRegistry(
   scene: Scene,
   map: TerrainMap,
   appearances: ActorAppearanceCatalog,
-  isHostile: (actor: ObservedActor) => boolean = () => false,
+  {
+    isHostile = () => false,
+    ownerMaterials,
+  }: {
+    isHostile?: (actor: ObservedActor) => boolean;
+    /** Recolors owner materials; the caller owns the copies. */
+    ownerMaterials?: OwnerMaterials;
+  } = {},
 ): ActorViewRegistry {
   const lifetime = createLifetime();
   const selectionMaterial = lifetime.own(
@@ -111,10 +119,12 @@ export function createActorViewRegistry(
     createViewRegistry({
       keyFor: (actor: ObservedActor) => ({
         definitionId: actor.definitionId,
+        owner: actor.owner,
         appearance: appearanceFor(actor.definitionId),
       }),
       sameKey: (left, right) =>
         left.definitionId === right.definitionId &&
+        left.owner === right.owner &&
         left.appearance === right.appearance,
       onRemove: (id) => {
         previousPoses.delete(id);
@@ -130,6 +140,7 @@ export function createActorViewRegistry(
           actor,
           appearance,
           styleFor(actor),
+          ownerMaterials,
         );
         renderer.setSelected(selectedActorIds.has(actor.id));
         return renderer;
@@ -238,7 +249,7 @@ function createFallbackAppearance(scene: Scene): ActorAppearance {
     scene,
   );
   mesh.position.y = FALLBACK_ACTOR_SIZE / 2;
-  const material = new StandardMaterial("actor-fallback-material", scene);
+  const material = new StandardMaterial("actor-fallback-owner", scene);
   material.diffuseColor = new Color3(...DEFAULT_ACTOR_COLOR);
   mesh.material = material;
   return createMeshAppearance(mesh, {

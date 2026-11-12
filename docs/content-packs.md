@@ -120,7 +120,9 @@ bundled packs through the same parser future mod packs will use.
 - The terrain style schema and its validation live in
   `src/content/terrain-style.ts`; `src/render/terrain-style.ts` builds each
   tile's layers from it.
-- `view` sets the background color and lighting.
+- `view` sets the background color, lighting, and `ownerColors`: at least
+  two distinct colors, with one for every mission owner. Colors are assigned
+  in `state.owners` order and mark owners on models and minimap markers.
 
 Built-in models and building details live in
 [`builtin-models.ts`](../src/render/builtin-models.ts). Loading rejects a pack

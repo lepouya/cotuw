@@ -51,7 +51,6 @@ export async function loadSkinnedActorAppearance(
   );
   return {
     bounds: graphics.bounds,
-    minimapColor: graphics.minimapColor,
     instantiate: (name, seed) => {
       const instance = instantiate(
         assets,
