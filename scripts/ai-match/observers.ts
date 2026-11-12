@@ -175,8 +175,9 @@ export type Disruption = {
 };
 
 export type DisruptionReport = Disruption & {
+  /** The owner's matching actors that the removal took away. */
   removed: number;
-  /** When the owner again had each one completed; absent if it never did. */
+  /** When a new one was completed again; absent if it never was. */
   restoredTicks: Record<string, number>;
 };
 
@@ -199,51 +200,68 @@ export function disruptionTracker(
       );
   // A resumed match already holds the losses scheduled before it.
   const reports = disruptions
-    .map((disruption): DisruptionReport & { tick: number; applied?: true } => ({
-      ...disruption,
-      tick: secondsToTicks(disruption.minutes * 60, tickSeconds),
-      removed: 0,
-      restoredTicks: {},
-    }))
+    .map(
+      (
+        disruption,
+      ): DisruptionReport & {
+        tick: number;
+        /** The actors whose removal was submitted, once it was. */
+        targets?: ReadonlySet<string>;
+      } => ({
+        ...disruption,
+        tick: secondsToTicks(disruption.minutes * 60, tickSeconds),
+        removed: 0,
+        restoredTicks: {},
+      }),
+    )
     .filter(({ tick }) => tick >= simulation.completedTicks);
   /** Queues removals for the coming tick. */
   const apply = () => {
     for (const report of reports) {
-      if (report.applied || simulation.completedTicks < report.tick) continue;
-      report.applied = true;
-      for (const actor of simulation.actors)
-        if (
-          actor.owner === report.owner &&
-          report.definitionIds.includes(actor.definitionId)
-        ) {
-          simulation.submitCommand(
-            { kind: "remove-actor", actorId: actor.id },
-            { owner: report.owner },
-          );
-          report.removed += 1;
-        }
-    }
-  };
-  const observe = (tick: number) => {
-    for (const report of reports) {
-      if (!report.applied || tick <= report.tick) continue;
-      for (const definitionId of report.definitionIds)
-        if (
-          !hasOwn(report.restoredTicks, definitionId) &&
-          simulation.actors.some(
+      if (report.targets || simulation.completedTicks < report.tick) continue;
+      report.targets = new Set(
+        simulation.actors
+          .filter(
             (actor) =>
               actor.owner === report.owner &&
-              actor.definitionId === definitionId &&
-              !actor.construction,
+              report.definitionIds.includes(actor.definitionId),
           )
-        )
-          report.restoredTicks = {
-            ...report.restoredTicks,
-            [definitionId]: tick,
-          };
+          .map(({ id }) => id),
+      );
+      for (const actorId of report.targets)
+        simulation.submitCommand(
+          { kind: "remove-actor", actorId },
+          { owner: report.owner },
+        );
+    }
+  };
+  /** Counts removals that took effect; only other actors restore a loss. */
+  const observe = (tick: number) => {
+    const present = new Set(simulation.actors.map(({ id }) => id));
+    for (const report of reports) {
+      const { targets } = report;
+      if (!targets || tick < report.tick) continue;
+      if (tick === report.tick)
+        report.removed = [...targets].filter((id) => !present.has(id)).length;
+      else
+        for (const definitionId of report.definitionIds)
+          if (
+            !hasOwn(report.restoredTicks, definitionId) &&
+            simulation.actors.some(
+              (actor) =>
+                actor.owner === report.owner &&
+                actor.definitionId === definitionId &&
+                !actor.construction &&
+                !targets.has(actor.id),
+            )
+          )
+            report.restoredTicks = {
+              ...report.restoredTicks,
+              [definitionId]: tick,
+            };
     }
   };
   const results = (): DisruptionReport[] =>
-    reports.map(({ tick: _, applied: __, ...report }) => report);
+    reports.map(({ tick: _, targets: __, ...report }) => report);
   return { apply, observe, results };
 }

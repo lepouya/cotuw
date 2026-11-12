@@ -100,9 +100,9 @@ test("disruptions track prototype-named definitions and resume boundaries", () =
   const tracker = disruptionTracker(simulation, [disruption]);
   tracker.apply();
   actors.length = 0;
-  tracker.observe(11);
+  tracker.observe(10);
   expect(tracker.results()).toMatchObject([{ removed: 1, restoredTicks: {} }]);
-  actors.push(actor);
+  actors.push({ ...actor, id: "replacement" });
   tracker.observe(12);
   expect(tracker.results()).toMatchObject([
     { removed: 1, restoredTicks: { ["__proto__"]: 12 } },
@@ -110,6 +110,31 @@ test("disruptions track prototype-named definitions and resume boundaries", () =
   expect(
     disruptionTracker(simulation, [{ ...disruption, minutes: 0 }]).results(),
   ).toEqual([]);
+});
+
+test("a refused removal neither counts as a loss nor as its restoration", () => {
+  const actors = [
+    createActor({
+      id: "kept",
+      owner: "west",
+      definitionId: "arc-harvester",
+      worldPosition: { x: 0, z: 0 },
+    }),
+  ];
+  const simulation = {
+    completedTicks: 10,
+    tickSeconds: 0.1,
+    owners: [{ id: "west" }],
+    actors,
+    submitCommand: () => {},
+  } as unknown as MissionSimulation;
+  const tracker = disruptionTracker(simulation, [
+    { minutes: 1 / 60, owner: "west", definitionIds: ["arc-harvester"] },
+  ]);
+  tracker.apply();
+  tracker.observe(10);
+  tracker.observe(11);
+  expect(tracker.results()).toMatchObject([{ removed: 0, restoredTicks: {} }]);
 });
 
 test("a defense redirected after it ended counts as another launch", () => {

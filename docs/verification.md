@@ -165,10 +165,10 @@ resumes toward the same limit. The sets are:
 - `arc-mirror`: the baseline ARC mirror by start slot and difficulty.
 - `arc-recovery`: Normal mirrors in which west loses its Harvesters, its
   income, its Field Barracks, or its Command Center at 6:00. Reports give
-  when each lost definition was completed again. A case passes only when
-  the disruption occurs and every listed definition is restored before the
-  match ends. Headquarters loss is an accepted loss, so that case needs only
-  a clean, completed match.
+  when a new actor of each lost definition was completed. A case passes only
+  when the removal takes effect and every listed definition is restored
+  before the match ends. Headquarters loss is an accepted loss, so that case
+  needs only a clean, completed match.
 - `arc-continuation`: saves a Normal mirror at 9:30 during its first attacks,
   resumes it, and requires identical complete mission state, including AI,
   observations, and metric histories, to an uninterrupted run. Ending before
