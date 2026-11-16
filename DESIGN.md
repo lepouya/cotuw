@@ -1579,10 +1579,11 @@ Posture selection and spending follow these rules:
   or corpse, or building debris that blocks placement on its footprint until it
   clears. Remains never block movement or shots and cannot be selected.
   Hostile and neutral remains are shown only within current vision.
-- Clicking or tapping a visible hostile with friendly units selected orders
-  each to attack it; unarmed units keep their orders and the receipt reports
-  them. Otherwise the click selects the hostile for inspection with a red
-  segmented ring. Undetected hostiles are not drawn, listed, or selectable.
+- Clicking or tapping a visible hostile with friendly units or an owned armed
+  building selected orders the selection to attack it; unarmed units keep
+  their orders and the receipt reports them. Otherwise the click selects the
+  hostile for inspection with a red segmented ring. Undetected hostiles are
+  not drawn, listed, or selectable.
   Visible hostile buildings allow inspection; building actions, queues, and
   support overlays belong to the player's faction.
 - Five-segment health bars show above selected actors and above actors that

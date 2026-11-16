@@ -31,7 +31,7 @@ function fixture() {
     focus: () => {},
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
   });
-  const visible = new Set(["unit-1", "unit-2", "wolf"]);
+  const visible = new Set(["unit-1", "unit-2", "wolf", "sentry", "relay"]);
   let playing = true;
   let picked: string | undefined;
   let actions: readonly ContextAction[] = [];
@@ -46,6 +46,8 @@ function fixture() {
       movementTargetForMesh: () => ({ x: 1, z: 2 }),
       actorIdsInRect: () => [],
       canMove: (id) => visible.has(id) && id.startsWith("unit"),
+      canIssueAttack: (id) =>
+        visible.has(id) && (id.startsWith("unit") || id === "sentry"),
       canSelect: (id) => visible.has(id),
       canAttack: (id) => id === "wolf" && visible.has(id),
       canCommand: () => playing,
@@ -97,6 +99,21 @@ test("delayed movement uses only the surviving members of its selection", () => 
   input.select(undefined);
   move.run();
   expect(submitCommand).toHaveBeenCalledTimes(1);
+});
+
+test("a selected sentry attacks without movement or queued mobile orders", () => {
+  const { input, menu, submitCommand } = fixture();
+  input.select("sentry");
+  input.setQueueMode(true);
+  menu("wolf")("attack").run();
+  expect(submitCommand).toHaveBeenCalledExactlyOnceWith({
+    kind: "attack",
+    actorId: "sentry",
+    targetId: "wolf",
+  });
+  expect(menu()("move")).toBeUndefined();
+  input.select("relay");
+  expect(menu("wolf")("attack")).toBeUndefined();
 });
 
 test("delayed actions cannot select or attack a target that leaves vision", () => {

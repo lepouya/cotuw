@@ -103,7 +103,7 @@ test("queued receipts are reported apart from orders that start now", () => {
   } as const;
   controls.onOutcomes([attack, { ...attack, queued: true }]);
   expect(movementStatus.textContent).toBe(
-    "1 unit attacking · 1 attack order queued.",
+    "1 attack order accepted · 1 attack order queued.",
   );
   controls.dispose();
 });

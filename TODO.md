@@ -140,10 +140,10 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   [owner materials](docs/actor-assets.md): ARC building trim, Harvester
   cabs, infantry markings, and Circle building markings. ARC mirror
   playtests read friend and foe at a glance on the field and minimap.
-- [ ] **1.39** Add the ARC Relay Station and Sentry Turret as data-driven
-  content. Verify support loss, reconnection, placement, targeting, and the
-  expansion or protection choices they are intended to provide. Exclude Relay
-  Stations from assembled skirmishes' qualifying buildings.
+- [x] **1.39** Data-driven Relay Stations extend ARC support; Sentry Turrets
+  acquire hostiles and accept manual targets. Placement, outages, reconnection,
+  remote income, raid protection, and saved continuation are verified. Relays
+  do not count toward skirmish survival; completed Turrets do.
 - [ ] **1.40** Implement building repair through each headquarters'
   infrastructure pool, following [recovery rules](DESIGN.md#repair-and-healing).
   Cover payment, cancellation, paused work, disconnection, and competition with

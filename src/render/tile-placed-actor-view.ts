@@ -24,7 +24,7 @@ import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
-import type { Actor, ActorDefinition } from "../simulation/actor";
+import type { Actor, ActorDefinition, CombatState } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
 import type { BuildingActivityKind } from "../simulation/production";
 import type { Rgb } from "../content/presentation";
@@ -73,6 +73,8 @@ export type TilePlacedActorDetailsFactory = (
   loopSeconds?: number;
   /** Each activity's motion; none moves a part that `update` moves. */
   activities?: BuildingMotions;
+  /** Turns weapon parts toward a world heading, such as a turret's aim. */
+  aim?: (heading: number) => void;
   dispose: () => void;
 };
 
@@ -95,7 +97,9 @@ export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
 
 /** A drawn building, whose owner colors its reserved model areas. */
 export type OwnedTilePlacedActor = TilePlacedActorState &
-  Readonly<Pick<Actor, "owner">>;
+  Readonly<Pick<Actor, "owner">> & {
+    readonly combat?: Readonly<Pick<CombatState, "aimFacing">>;
+  };
 
 export type TilePlacedActorViewRegistry = {
   update: (
@@ -438,7 +442,8 @@ export function createTilePlacedActorViewRegistry(
       return {
         root,
         top,
-        update: ({ construction }: TilePlacedActorState) => {
+        update: ({ construction, combat }: OwnedTilePlacedActor) => {
+          details?.aim?.(combat?.aimFacing ?? facing);
           growing = construction?.active === true;
           if (!progress || !construction) return;
           progress.bar.setFill(

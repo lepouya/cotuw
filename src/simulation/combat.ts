@@ -114,6 +114,10 @@ export type CombatContext = {
   visibleTargets: (actor: Actor) => Actor[];
   /** Whether a bounded route gets within weapon range of the target. */
   reachableTarget: (actor: Actor, target: Actor) => boolean;
+  /** Whether the weapon reaches the target from here with a clear shot. */
+  inFiringReach: (actor: Actor, target: Actor) => boolean;
+  /** The nearest detected hostile the actor can fire on, by stable ID on ties. */
+  nearestFiringTarget: (actor: Actor) => Actor | undefined;
   /** Whether a bounded route arrives at the point. */
   reachablePoint: (actor: Actor, point: WorldPosition) => boolean;
   /** The actor's order target, while it remains a detected valid target. */
@@ -174,6 +178,8 @@ export type CombatWorld = {
   hit?: (attacker: Actor, target: Actor, damage: number) => void;
   /** Multiplies an owner's damage and its effective health. */
   combatScale?: (owner: string) => number;
+  /** Offline buildings and other inactive actors hold fire but keep orders. */
+  canFight?: (actor: Actor) => boolean;
 };
 
 export function validateCombatDefinition(definition: ActorDefinition): void {
@@ -396,8 +402,8 @@ export function noteAttackMoveRoute(
 /**
  * Updates orders, chases, and fires for armed actors in stable ID order, then
  * applies the tick's damage together and destroys actors left without health.
- * Territories and guards choose automatic targets; any armed actor without an
- * order answers an attacker already in range.
+ * Controllers choose automatic targets; any armed actor without an order
+ * answers an attacker already in range.
  */
 export function updateCombat(world: CombatWorld): AttackEvent[] {
   const combatScale = world.combatScale ?? (() => 1);
@@ -459,6 +465,10 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       : world.detects(actor.owner, target);
   const engageable = (actor: Actor, target: Actor | undefined) =>
     targetable(actor, target) && detected(actor, target!);
+  const inFiringReach = (actor: Actor, target: Actor) =>
+    weaponReach(actor, target, definitions, world.map) <=
+      definitionOf(actor).weapon!.range && lineOfFire(actor, target, world);
+  let extent: number | undefined;
   const arrived = (actor: Actor, point: WorldPosition) =>
     distance(actor.worldPosition, point) <= arrivalRadius(actor);
   /** Where a route inside the actor's bounds towards `point` ends, if any. */
@@ -533,6 +543,14 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
         ) <= definitionOf(actor).weapon!.range
       );
     },
+    inFiringReach,
+    nearestFiringTarget: (actor) =>
+      context.nearestTarget(
+        actor,
+        definitionOf(actor).weapon!.range +
+          (extent ??= targetExtent(definitions, world.map)),
+        (target) => inFiringReach(actor, target),
+      ),
     reachablePoint: (actor, point) => {
       const end = destination(actor, point);
       return !!end && distance(end, point) <= arrivalRadius(actor);
@@ -624,6 +642,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
   for (const actor of sorted) {
     const definition = definitionOf(actor);
     const weapon = definition.weapon;
+    if (actor.construction || world.canFight?.(actor) === false) continue;
     if (actor.attackMove && !actor.combat?.attack) {
       if (actor.attackMove.blocked) resumeAttackMove(actor);
       if (!actor.movement && !actor.attackMove?.blocked)
@@ -642,10 +661,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     const ordered = !!actor.combat?.attack;
     const target = ordered ? followOrder(actor) : context.recentAttacker(actor);
     if (!target) continue;
-    if (
-      weaponReach(actor, target, definitions, world.map) > weapon.range ||
-      !lineOfFire(actor, target, world)
-    ) {
+    if (!inFiringReach(actor, target)) {
       // Answering fire never leaves the current route; armed buildings
       // cannot close the distance, so they give up the order.
       if (ordered && movable(actor)) chase(actor, target.worldPosition);
@@ -703,6 +719,22 @@ export const guardController: CombatController = {
 };
 
 /**
+ * Armed buildings keep a manual or automatic target while it stays in firing
+ * reach, then switch to the nearest detected hostile they can hit.
+ */
+export const turretController: CombatController = {
+  applies: (definition) => !!definition.footprint && !!definition.weapon,
+  plan: (actor, context) => {
+    const current = context.currentTarget(actor);
+    if (current && context.inFiringReach(actor, current)) return true;
+    if (actor.combat?.attack) context.endAttack(actor);
+    const target = context.nearestFiringTarget(actor);
+    if (target) context.engage(actor, target);
+    return true;
+  },
+};
+
+/**
  * An idle guard engages the nearest detected hostile near it that its chase
  * radius allows; an automatic engagement ends once its target was last seen
  * beyond that radius from the post.
@@ -744,6 +776,26 @@ function canTarget(
     target.occupancyLayer === attacker.occupancyLayer &&
     world.hostile(attacker.owner, target.owner)
   );
+}
+
+function targetExtent(
+  definitions: ReadonlyMap<string, ActorDefinition>,
+  map: TerrainGrid | undefined,
+): number {
+  let extent = 0;
+  for (const definition of definitions.values()) {
+    const tiles = definition.footprint?.occupiedTiles;
+    if (!tiles || !map) {
+      extent = Math.max(extent, definition.movement?.radius ?? 0);
+      continue;
+    }
+    const xs = tiles.map(({ x }) => x);
+    const zs = tiles.map(({ z }) => z);
+    const width = Math.max(...xs) - Math.min(...xs) + 1;
+    const depth = Math.max(...zs) - Math.min(...zs) + 1;
+    extent = Math.max(extent, (Math.hypot(width, depth) * map.tileSize) / 2);
+  }
+  return extent;
 }
 
 /** Distance from the attacker's center to the target's footprint or body. */

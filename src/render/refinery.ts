@@ -19,16 +19,11 @@ export const createRefineryDetails: TilePlacedActorDetailsFactory = (
   placement,
   sharedMaterial,
 ) => {
-  const { assembly, material, pivot, box, cylinder } = createBuildingAssembly(
-    root,
-    placement,
-    sharedMaterial,
-    [0.16, 0.15, 0.12],
-  );
+  const { assembly, material, owner, pivot, box, cylinder } =
+    createBuildingAssembly(root, placement, sharedMaterial, [0.16, 0.15, 0.12]);
   const steel = material("steel", [0.3, 0.4, 0.42]);
   const hull = material("hull", [0.52, 0.45, 0.3]);
   const dark = material("bay", [0.09, 0.1, 0.1]);
-  const owner = material("owner", [0.94, 0.46, 0.12]);
   const fanSurface = material("fan", [0.85, 0.68, 0.25]);
   const beacon = material("beacon", [1, 0.65, 0.15], true);
   const processing = material("processing-light", [0.2, 1, 0.65], true);

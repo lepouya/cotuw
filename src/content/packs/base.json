@@ -2,13 +2,14 @@
   "format": "cotuw-content",
   "formatVersion": 3,
   "id": "base",
-  "version": 9,
+  "version": 10,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
     "circle": "Circle of Repose",
     "wildlife": "Wildlife"
   },
+  "skirmishExcludedBuildingIds": ["arc-relay-station"],
   "actors": [
     {
       "id": "circle-musterhall",
@@ -512,6 +513,92 @@
         "regenerationDelaySeconds": 5,
         "regenerationPerSecond": 5
       }
+    },
+    {
+      "id": "arc-relay-station",
+      "faction": "arc",
+      "health": 400,
+      "support": {
+        "radius": 16
+      },
+      "vision": {
+        "radius": 8
+      },
+      "materialsCost": 50,
+      "constructionSeconds": 8,
+      "behaviorId": "idle",
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      }
+    },
+    {
+      "id": "arc-sentry-turret",
+      "faction": "arc",
+      "health": 350,
+      "support": {
+        "radius": 6
+      },
+      "vision": {
+        "radius": 8
+      },
+      "materialsCost": 75,
+      "constructionSeconds": 8,
+      "behaviorId": "idle",
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      },
+      "weapon": {
+        "damage": 5,
+        "damageType": "kinetic",
+        "range": 7,
+        "cooldownSeconds": 0.25
+      }
     }
   ],
   "aiProfiles": [
@@ -906,6 +993,46 @@
             {
               "cue": "refinery-door-close",
               "at": 1.95
+            }
+          ]
+        }
+      }
+    },
+    "arc-relay-station": {
+      "name": "Relay Station",
+      "description": "Extends connected construction support; provides no infrastructure slots",
+      "build": {
+        "id": "build-relay",
+        "label": "Build Relay Station",
+        "order": 3
+      },
+      "damageEffect": "mechanical",
+      "building": {
+        "height": 0.2,
+        "color": [0.3, 0.36, 0.42],
+        "details": "relay"
+      }
+    },
+    "arc-sentry-turret": {
+      "name": "Sentry Turret",
+      "description": "Rapid-fire defense; requires connected support",
+      "build": {
+        "id": "build-sentry",
+        "label": "Build Sentry Turret",
+        "order": 4
+      },
+      "attackEffect": "tracer",
+      "damageEffect": "mechanical",
+      "building": {
+        "height": 0.25,
+        "color": [0.32, 0.38, 0.3],
+        "details": "sentry"
+      },
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "rifle"
             }
           ]
         }

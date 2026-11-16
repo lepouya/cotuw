@@ -135,8 +135,9 @@ can be read, edited by hand, and loaded again.
   actors use the same type list, independently of their faction.
 - Only surviving, completed, tile-placed buildings of those types prevent
   elimination. Include the types specified in
-  [skirmish results](../DESIGN.md#m1-skirmish-results), including defenses and
-  excluding Relay Stations, as roster content becomes available.
+  [skirmish results](../DESIGN.md#m1-skirmish-results). Assembled skirmishes
+  list every pack building except the pack's `skirmishExcludedBuildingIds`,
+  so defenses count and Relay Stations do not.
 - Both owners are evaluated once after commands, combat, and construction.
   Sales count; a building completed that tick counts. Inactive buildings
   count, while unfinished construction and mobile units do not.

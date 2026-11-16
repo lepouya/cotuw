@@ -11,7 +11,7 @@ export const createBarracksDetails: TilePlacedActorDetailsFactory = (
   placement,
   sharedMaterial,
 ) => {
-  const { assembly, material, box, fan } = createBuildingAssembly(
+  const { assembly, material, owner, box, fan } = createBuildingAssembly(
     root,
     placement,
     sharedMaterial,
@@ -20,7 +20,6 @@ export const createBarracksDetails: TilePlacedActorDetailsFactory = (
   const armor = material("armor", [0.32, 0.4, 0.29]);
   const trim = material("trim", [0.63, 0.67, 0.56]);
   const dark = material("door", [0.08, 0.13, 0.12]);
-  const owner = material("owner", [0.94, 0.46, 0.12]);
   box("quarters", [2.65, 0.85, 1.55], [0, 0.43, -0.1], armor);
   box("roof", [2.82, 0.12, 1.74], [0, 0.91, -0.1], trim);
   box("entrance", [0.8, 0.65, 0.04], [0, 0.33, 0.69], dark);

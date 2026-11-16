@@ -25,6 +25,9 @@ For ARC, follow the in-game guides. Build a Materials Refinery
 and its Harvester, gather Materials, then build a Field Barracks and train
 Troopers and Scouts. Defeat the lone wolf and all five den wolves while
 protecting your Command Center. Victory allows continued free play.
+Relay Stations extend ARC's connected support toward remote sites. Sentry
+Turrets protect nearby approaches while connected; select one and click or
+tap a visible enemy to prioritize it.
 
 Click or tap to select and command. Drag a box to select units; touch uses
 **Box select**. **Pan** enables camera dragging, and **View** offers camera

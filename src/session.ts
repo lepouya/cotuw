@@ -471,6 +471,15 @@ async function assembleGameSession(
     onGroundTarget: (target, queued) => groundTarget()?.choose(target, queued),
     cancelGroundTarget: () => cancelGroundTargets(),
     canMove: (actorId) => !!player.ownMobileActor(actorId),
+    canIssueAttack: (actorId) => {
+      const actor = player.ownActor(actorId);
+      // Unarmed units take the order so the receipt can report them.
+      return (
+        !!actor &&
+        (player.isMobile(actor) ||
+          !!definitionsById.get(actor.definitionId)!.weapon)
+      );
+    },
     moveLabel: (target) => {
       const tile = map.tileAtWorldPosition(target.x, target.z);
       const economy = player.economy();

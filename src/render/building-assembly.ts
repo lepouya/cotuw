@@ -106,5 +106,7 @@ export function createBuildingAssembly(
     box("fan-cross", [0.08, thickness, length], [0, 0, 0], surface, blade);
     return blade;
   };
-  return { assembly, material, pivot, box, cylinder, fan };
+  /** Trim that sessions recolor with each owner's color. */
+  const owner = material("owner", [0.94, 0.46, 0.12]);
+  return { assembly, material, owner, pivot, box, cylinder, fan };
 }

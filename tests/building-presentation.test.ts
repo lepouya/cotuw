@@ -14,6 +14,12 @@ import { ARC_ACTOR_DEFINITIONS, BASE_CONTENT } from "./helpers/content";
 import { TerrainMap } from "../src/map";
 import { createBarracksDetails } from "../src/render/barracks";
 import { createRefineryDetails } from "../src/render/refinery";
+import { createSentryDetails } from "../src/render/sentry";
+import { BUILTIN_BUILDING_DETAILS } from "../src/render/builtin-models";
+import {
+  createOwnerMaterials,
+  isOwnerMaterial,
+} from "../src/render/owner-materials";
 import {
   loadModelAsset,
   modelBuildingDetails,
@@ -438,5 +444,111 @@ test.each(["circle-heartgrove", "circle-conservatory", "circle-musterhall"])(
         )
         .every((mesh) => mesh.isEnabled()),
     ).toBe(true);
+  },
+);
+
+test("the Sentry housing follows committed aim relative to its placement", () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 12, height: 12, tileSize: 1 });
+  const sentry = BASE_CONTENT.actors.find(
+    ({ id }) => id === "arc-sentry-turret",
+  )!;
+  const views = createTilePlacedActorViewRegistry(
+    scene,
+    map,
+    [sentry],
+    new Map([
+      [
+        sentry.id,
+        {
+          height: 0.25,
+          color: [0.3, 0.3, 0.3],
+          createDetails: createSentryDetails,
+        },
+      ],
+    ]),
+  );
+  const actor = createTilePlacedActor(
+    map,
+    sentry,
+    { actorId: "sentry", origin: { x: 4, z: 4 }, quarterTurns: 1 },
+    "player",
+  );
+  const turret = () =>
+    scene.getTransformNodeByName("tile-placed-actor-sentry-root-turret")!;
+  views.update([actor]);
+  expect(turret().rotation.y).toBeCloseTo(0);
+  views.update([
+    { ...actor, combat: { aimFacing: actor.facing + Math.PI / 2 } },
+  ]);
+  expect(turret().rotation.y).toBeCloseTo(Math.PI / 2);
+  views.dispose();
+});
+
+test.each(
+  BASE_CONTENT.actors.filter(
+    ({ id }) => !!BASE_CONTENT.presentation[id]?.building?.details,
+  ),
+)(
+  "$id stand-ins share owner markings without recoloring their body",
+  (definition) => {
+    const scene = testScene();
+    const map = new TerrainMap({ width: 12, height: 12, tileSize: 1 });
+    const { details, ...appearance } =
+      BASE_CONTENT.presentation[definition.id]!.building!;
+    const colors = new Map<string, [number, number, number]>([
+      ["west", [0.2, 0.45, 1]],
+      ["east", [0.92, 0.18, 0.15]],
+    ]);
+    const ownerMaterials = createOwnerMaterials(colors);
+    const views = createTilePlacedActorViewRegistry(
+      scene,
+      map,
+      [definition],
+      new Map([
+        [
+          definition.id,
+          { ...appearance, createDetails: BUILTIN_BUILDING_DETAILS[details!] },
+        ],
+      ]),
+      { ownerMaterials },
+    );
+    const actors = ["west", "west", "east"].map((owner, index) =>
+      createTilePlacedActor(
+        map,
+        definition,
+        { actorId: `building-${index}`, origin: { x: 2 + index * 3, z: 4 } },
+        owner,
+      ),
+    );
+    try {
+      views.update(actors);
+      const meshes = actors.map(({ id }) =>
+        scene
+          .getTransformNodeByName(`tile-placed-actor-${id}-root`)!
+          .getChildMeshes(),
+      );
+      const markings = meshes.map((parts) =>
+        parts.filter(({ material }) => isOwnerMaterial(material?.name ?? "")),
+      );
+      for (const [index, parts] of markings.entries()) {
+        expect(parts.length).toBeGreaterThan(0);
+        for (const part of parts)
+          expect((part.material as StandardMaterial).diffuseColor).toEqual(
+            new Color3(...colors.get(actors[index]!.owner)!),
+          );
+      }
+      expect(markings[0]![0]!.material).toBe(markings[1]![0]!.material);
+      expect(markings[0]![0]!.material).not.toBe(markings[2]![0]!.material);
+      const bodies = meshes.map((parts) =>
+        parts.filter(({ material }) => !isOwnerMaterial(material?.name ?? "")),
+      );
+      expect(bodies[0]!.length).toBeGreaterThan(0);
+      for (const [index, part] of bodies[0]!.entries())
+        expect(part.material).toBe(bodies[2]![index]!.material);
+    } finally {
+      views.dispose();
+      ownerMaterials.dispose();
+    }
   },
 );

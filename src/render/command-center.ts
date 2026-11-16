@@ -8,7 +8,7 @@ export const createCommandCenterDetails: TilePlacedActorDetailsFactory = (
   placement,
   sharedMaterial,
 ) => {
-  const { assembly, material, pivot, box, fan } = createBuildingAssembly(
+  const { assembly, material, owner, pivot, box, fan } = createBuildingAssembly(
     root,
     placement,
     sharedMaterial,
@@ -17,7 +17,6 @@ export const createCommandCenterDetails: TilePlacedActorDetailsFactory = (
   const armor = material("armor", [0.22, 0.32, 0.34]);
   const trim = material("trim", [0.55, 0.64, 0.61]);
   const dark = material("equipment", [0.08, 0.13, 0.16]);
-  const owner = material("owner", [0.94, 0.46, 0.12]);
   const glass = material("windows", [0.12, 0.78, 0.85], true);
   box("lower-deck", [1.88, 0.12, 1.88], [0, 0.06, 0], trim);
   box("command-cabin", [1.38, 0.8, 1.2], [0, 0.52, -0.12], armor);

@@ -33,6 +33,9 @@ bundled packs through the same parser future mod packs will use.
   `infrastructure.slots` supplies capacity per headquarters actor.
 - Optional `factionNames` maps simulation faction IDs to nonempty display
   names for the sidebar heading. Unnamed factions use a generic heading.
+- Optional `skirmishExcludedBuildingIds` lists distinct building definition IDs,
+  such as Relay Stations, that assembled skirmishes leave out of
+  `qualifyingDefinitionIds`.
 - `movementProfiles` prices each terrain type and slope for ground movement.
 - Optional `aiProfiles` lists the behavior scenarios assign to AI owners. Each
   has a distinct `id`, `roundSeconds` between planning rounds, positive

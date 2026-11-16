@@ -166,7 +166,10 @@ export function createSkirmishScenario(
     skirmish: {
       owners: rivals,
       qualifyingDefinitionIds: content.actors
-        .filter(({ footprint }) => footprint)
+        .filter(
+          ({ id, footprint }) =>
+            footprint && !content.skirmishExcludedBuildingIds?.includes(id),
+        )
         .map(({ id }) => id),
       startingResourceSites: Object.fromEntries(
         skirmishMap.starts.map(({ id, startingResourceAreaId }) => {

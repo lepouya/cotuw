@@ -5,6 +5,7 @@ import { contextActionKinds } from "../src/render/command-input";
 const state = (selectedIds: string[], options = {}) => ({
   selectedIds,
   movers: selectedIds.filter((id) => id.startsWith("unit")),
+  attackers: selectedIds.filter((id) => id.startsWith("unit")),
   boxMode: false,
   additive: false,
   canAttack: (id: string) => id === "wolf",
@@ -66,4 +67,12 @@ test("ground targets move a selection or clear a stationary one", () => {
   ]);
   expect(contextActionKinds({ ground: true }, state([]))).toEqual([]);
   expect(contextActionKinds({ ground: false }, state(["unit-1"]))).toEqual([]);
+});
+
+test("armed buildings attack hostiles but take no ground orders", () => {
+  const sentry = state(["sentry"], { attackers: ["sentry"] });
+  expect(contextActionKinds({ actorId: "wolf", ground: true }, sentry)).toEqual(
+    ["attack", "select"],
+  );
+  expect(contextActionKinds({ ground: true }, sentry)).toEqual(["clear"]);
 });

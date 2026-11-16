@@ -80,6 +80,8 @@ export type ContentPack = ContentReference & {
   /** Player-facing faction names, keyed by simulation faction ID. */
   factionNames?: Readonly<Record<string, string>>;
   actors: readonly ActorDefinition[];
+  /** Building definition IDs excluded from skirmish survival requirements. */
+  skirmishExcludedBuildingIds?: readonly string[];
   movementProfiles: readonly MovementProfile[];
   /** Behavior that scenarios assign to AI-controlled owners. */
   aiProfiles?: readonly AiProfile[];
@@ -171,6 +173,18 @@ export function parseContentPack(source: string): ContentPack {
       ))
   )
     throw invalid("needs faction IDs with nonempty display names");
+  const excluded = pack.skirmishExcludedBuildingIds;
+  if (
+    excluded !== undefined &&
+    (!isIdList(excluded) ||
+      excluded.some(
+        (id) =>
+          !pack.actors.some(
+            (actor: ActorDefinition) => actor.id === id && actor.footprint,
+          ),
+      ))
+  )
+    throw invalid("needs distinct building IDs for skirmish exclusions");
   const lighting = pack.view.lighting;
   if (
     !lighting ||

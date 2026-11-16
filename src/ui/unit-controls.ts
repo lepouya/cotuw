@@ -132,7 +132,7 @@ export function createUnitControls(
         message(
           [
             ...(accepted > queued
-              ? [`${count(accepted - queued, "unit")} attacking`]
+              ? [`${count(accepted - queued, "attack order")} accepted`]
               : []),
             ...(queued ? [`${count(queued, "attack order")} queued`] : []),
             ...(unarmed ? [`${count(unarmed, "unit")} cannot attack`] : []),

@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
+import { WEBKIT } from "./tags";
 import {
   activate,
   advance,
@@ -374,7 +375,13 @@ test("construction order and training cards follow the selected building", async
     await page
       .locator("#building-options button")
       .evaluateAll((buttons) => buttons.map(({ id }) => id)),
-  ).toEqual(["build-command-center", "build-refinery", "build-barracks"]);
+  ).toEqual([
+    "build-command-center",
+    "build-refinery",
+    "build-barracks",
+    "build-relay",
+    "build-sentry",
+  ]);
   await page.locator("#tab-units").click();
   const cards = page.locator("#training-options button:visible");
   await expect(cards).toHaveCount(0);
@@ -878,6 +885,119 @@ test("Harvester training cancellation refunds and frees its slot", async ({
 });
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
+  test(
+    "Relay expansion and manual Sentry targeting",
+    { tag: WEBKIT },
+    async ({ page }, testInfo) => {
+      await controlledOpening(page, { materials: 500 });
+      await place(page, "#build-relay", 12, 49, touch);
+      await page.evaluate(async () => {
+        const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+        const { createActor } = await import("/src/simulation/actor.ts");
+        const { view } = window.sessionHarness;
+        view.simulation.spawnActor(
+          createActor({
+            id: "expansion-scout",
+            definitionId: "arc-scout",
+            owner: "player",
+            worldPosition: prototypeTerrainMap().tileCenter(24, 52),
+          }),
+        );
+        view.camera.focusOnTile(24, 49);
+      });
+      await advance(page, 0.1);
+      await place(page, "#build-sentry", 24, 49, touch);
+      const sentryId = await page.evaluate(async () => {
+        const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+        const { createActor } = await import("/src/simulation/actor.ts");
+        const { simulation } = window.sessionHarness.view;
+        const turret = simulation.actors.find(
+          ({ definitionId }) => definitionId === "arc-sentry-turret",
+        )!;
+        for (const [id, x, z] of [
+          ["near-raider", 27, 48],
+          ["priority-raider", 25, 53],
+        ] as const)
+          simulation.spawnActor(
+            createActor({
+              id,
+              definitionId: "arc-scout",
+              owner: "wildlife",
+              worldPosition: prototypeTerrainMap().tileCenter(x, z),
+            }),
+          );
+        return turret.id;
+      });
+      await selectInSession(page, sentryId);
+      const target = await page.evaluate(async () => {
+        const { projectToCanvas, Vector3 } = await import("/e2e/harness.ts");
+        const { view } = window.sessionHarness;
+        const root = view.scene.getTransformNodeByName(
+          "actor-priority-raider-root",
+        )!;
+        const { min, max } = root.getHierarchyBoundingVectors(true);
+        return projectToCanvas(
+          view.scene,
+          document.querySelector<HTMLCanvasElement>("#game-canvas")!,
+          Vector3.Center(min, max),
+        );
+      });
+      await pressPoint(page, target, touch);
+      await advance(page, 0.1);
+      expect(
+        await page.evaluate((id) => {
+          const { simulation, scene } = window.sessionHarness.view;
+          const actor = simulation.actorById(id)!;
+          return {
+            target: actor.combat?.attack?.targetId,
+            moving: !!actor.movement,
+            aimed:
+              scene.getTransformNodeByName(
+                `tile-placed-actor-${id}-root-turret`,
+              )!.rotation.y ===
+              actor.combat!.aimFacing! - actor.facing,
+          };
+        }, sentryId),
+      ).toEqual({ target: "priority-raider", moving: false, aimed: true });
+      await expect(page.locator("#movement-status")).toContainText(
+        "1 attack order accepted",
+      );
+      await attachScreenshot(page, testInfo, `arc-expansion-${name}`);
+      await page.evaluate(() => {
+        const { simulation } = window.sessionHarness.view;
+        const relay = simulation.actors.find(
+          ({ definitionId }) => definitionId === "arc-relay-station",
+        )!;
+        simulation.submitCommand(
+          { kind: "sell-actor", actorId: relay.id },
+          { owner: "player" },
+        );
+      });
+      await advance(page, 0.1);
+      expect(
+        await page.evaluate((id) => {
+          const { view } = window.sessionHarness;
+          return {
+            connected: view.simulation.support!.nodes.find(
+              ({ actorId }) => actorId === id,
+            )!.connected,
+            offlineBadge: !!view.scene.getMeshByName(
+              `tile-placed-actor-${id}-root-offline`,
+            ),
+            shots: view.simulation.attacks.filter(
+              ({ attackerId }) => attackerId === id,
+            ).length,
+          };
+        }, sentryId),
+      ).toEqual({ connected: false, offlineBadge: true, shots: 0 });
+      await expect(page.locator("#game-canvas")).not.toHaveAttribute(
+        "data-simulation-fault",
+        "true",
+      );
+      expect(await page.evaluate(() => window.startupErrors)).toEqual([]);
+    },
+  );
+
   test("rally points support placement, cancellation, and production", async ({
     page,
   }, testInfo) => {

@@ -2,6 +2,8 @@ import { createBarracksDetails } from "./barracks";
 import { createCommandCenterDetails } from "./command-center";
 import { createHarvesterAppearance } from "./harvester";
 import { createRefineryDetails } from "./refinery";
+import { createRelayDetails } from "./relay";
+import { createSentryDetails } from "./sentry";
 import { createWolfAppearance } from "./wolf";
 
 import type {
@@ -38,4 +40,6 @@ export const BUILTIN_BUILDING_DETAILS: Readonly<
   barracks: createBarracksDetails,
   "command-center": createCommandCenterDetails,
   refinery: createRefineryDetails,
+  relay: createRelayDetails,
+  sentry: createSentryDetails,
 };

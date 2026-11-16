@@ -27,6 +27,17 @@ describe("content packs", () => {
     },
   );
 
+  test.each([{}, ["arc-relay-station", "arc-relay-station"], ["arc-scout"]])(
+    "rejects skirmish exclusions that are not distinct buildings: %j",
+    (ids) => {
+      expect(
+        withEdit((pack) => {
+          pack.skirmishExcludedBuildingIds = ids;
+        }),
+      ).toThrow("needs distinct building IDs for skirmish exclusions");
+    },
+  );
+
   test.each<[string, (pack: any) => void, string]>([
     ["a non-list", (pack) => (pack.aiProfiles = {}), "distinct IDs"],
     [

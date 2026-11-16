@@ -50,6 +50,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   such as `MATERIALS_COLOR`, so generated models match the stand-ins.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
+- Relay Stations and Sentry Turrets use procedural stand-ins with owner
+  markings from `src/render/relay.ts` and `src/render/sentry.ts`. The Sentry
+  housing turns to its committed aim through the details `aim` hook. Full
+  generated models and animation remain part of M1 task 1.43.
 - A material named `owner` or ending in `-owner` marks the owner-color area.
   Sessions give each owner a shared copy in its
   [owner color](content-packs.md), so keep those parts in their own mesh

@@ -44,6 +44,8 @@ export function contextActionKinds(
     selectedIds: readonly string[];
     /** Selected actors that can move. */
     movers: readonly string[];
+    /** Selected actors that take attack orders, including armed buildings. */
+    attackers: readonly string[];
     boxMode: boolean;
     additive: boolean;
     canCommand?: boolean;
@@ -52,12 +54,12 @@ export function contextActionKinds(
   },
 ): ContextActionKind[] {
   const { actorId } = target;
-  const { selectedIds, movers, boxMode, additive } = state;
+  const { selectedIds, movers, attackers, boxMode, additive } = state;
   if (actorId) {
     if (
       state.canCommand !== false &&
       !boxMode &&
-      movers.length > 0 &&
+      attackers.length > 0 &&
       state.canAttack(actorId)
     )
       return ["attack", "select"];
@@ -127,6 +129,8 @@ export type CommandInputOptions = {
   onGroundTarget?: (target: WorldPosition, queued: boolean) => void;
   cancelGroundTarget?: () => boolean;
   canMove?: (actorId: string) => boolean;
+  /** Whether a selected actor takes attack orders; defaults to `canMove`. */
+  canIssueAttack?: (actorId: string) => boolean;
   /** Whether an actor still exists and is visible to the player. */
   canSelect?: (actorId: string) => boolean;
   /** Inspection permits selection without offering simulation commands. */
@@ -171,6 +175,7 @@ export function createCommandInput(
     enabled = () => true,
     pointerEnabled = () => true,
     canMove = () => true,
+    canIssueAttack = canMove,
     canSelect = () => true,
     canCommand = () => true,
     canAttack = () => false,
@@ -306,11 +311,13 @@ export function createCommandInput(
     queued: boolean,
   ): ContextAction[] => {
     const movers = selection.ids.filter(canMove);
+    const attackers = selection.ids.filter(canIssueAttack);
     const kinds = contextActionKinds(
       { actorId: picked, ground: !!target },
       {
         selectedIds: selection.ids,
         movers,
+        attackers,
         boxMode,
         additive,
         canAttack,
@@ -333,10 +340,11 @@ export function createCommandInput(
       select(id, add);
       onWorldSelectionChanged?.(selection.ids);
     };
-    const currentMovers = () =>
-      movers.filter((id) => selection.ids.includes(id) && canMove(id));
+    // Delayed actions use only the members still selected and eligible.
+    const current = (ids: readonly string[], eligible: typeof canMove) =>
+      ids.filter((id) => selection.ids.includes(id) && eligible(id));
     const order = (kind: "move" | "attack-move") => {
-      const actorIds = currentMovers();
+      const actorIds = current(movers, canMove);
       if (!canCommand() || !actorIds.length) return;
       submitCommand(moveCommand(kind, actorIds, target!, queued));
     };
@@ -346,12 +354,13 @@ export function createCommandInput(
       },
       attack: () => {
         if (!canCommand() || !canAttack(picked!)) return;
-        for (const actorId of currentMovers())
+        for (const actorId of current(attackers, canIssueAttack))
           submitCommand({
             kind: "attack",
             actorId,
             targetId: picked!,
-            ...(queued && { queued }),
+            // Buildings cannot queue orders, so theirs replace the target.
+            ...(queued && canMove(actorId) && { queued }),
           });
       },
       select: () => choose(picked, false),

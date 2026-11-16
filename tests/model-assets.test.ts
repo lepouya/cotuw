@@ -15,9 +15,13 @@ import type { PBRMaterial } from "@babylonjs/core";
 import type { Rgb } from "../src/content/presentation";
 
 test.each(
-  BASE_CONTENT.actors.filter(
-    ({ faction }) => faction === "arc" || faction === "circle",
-  ),
+  BASE_CONTENT.actors.filter(({ id, faction }) => {
+    const { model, building } = BASE_CONTENT.presentation[id]!;
+    return (
+      (faction === "arc" || faction === "circle") &&
+      ((model && "glb" in model) || !!building?.glb)
+    );
+  }),
 )(
   "$id exports separate owner markings that instances can recolor and share",
   async ({ id }) => {

@@ -135,7 +135,13 @@ describe("combat", () => {
       definitions
         .filter((definition) => definition.weapon)
         .map((definition) => definition.id),
-    ).toEqual(["circle-sentinel", "arc-trooper", "wolf", "alpha-wolf"]);
+    ).toEqual([
+      "circle-sentinel",
+      "arc-trooper",
+      "wolf",
+      "alpha-wolf",
+      "arc-sentry-turret",
+    ]);
   });
 
   test("one idle Trooper engages and defeats a lone wolf deterministically", () => {

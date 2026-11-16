@@ -45,11 +45,16 @@ import {
 import { createCommandAuthority } from "./authority";
 import { tileKey } from "./grid";
 import { isOccupancyLayer, OccupancyGrid } from "./occupancy";
-import { createSupportResolver, validateSupportDefinition } from "./support";
+import {
+  createSupportResolver,
+  disconnectedBuildings,
+  validateSupportDefinition,
+} from "./support";
 import { TerrainGrid } from "./terrain";
 import {
   attackRejection,
   guardController,
+  turretController,
   startAttack,
   wreckDebris,
   noteAttackMoveRoute,
@@ -1750,6 +1755,9 @@ export function createMissionSimulation({
           startQueuedOrders(actor, state.tick, working);
 
         const navigationVersion = map?.navigationChanges.version ?? 0;
+        const disconnected = disconnectedBuildings(
+          working.economy && supportFor(working.actors),
+        );
         const tickAttacks = updateCombat({
           tick: state.tick,
           tickSeconds,
@@ -1758,6 +1766,7 @@ export function createMissionSimulation({
           controllers: [
             createTerritoryController(working.wildlife),
             guardController,
+            turretController,
           ],
           destination: (actor, point, routeBounds) => {
             const grid = behaviorFor(actor).navigationGrid?.(
@@ -1778,6 +1787,7 @@ export function createMissionSimulation({
           move: moveActor,
           hit: working.match?.hit,
           combatScale,
+          canFight: (actor) => !disconnected.has(actor.id),
           destroy: (actor) => {
             working.match?.lost(actor);
             recordObjectiveDestruction(

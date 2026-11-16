@@ -22,6 +22,8 @@ const BUILTIN_BUILDING_DETAIL_IDS = [
   "barracks",
   "command-center",
   "refinery",
+  "relay",
+  "sentry",
 ] as const;
 export type BuiltinBuildingDetailId =
   (typeof BUILTIN_BUILDING_DETAIL_IDS)[number];
