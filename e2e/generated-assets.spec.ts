@@ -165,7 +165,7 @@ test(
 );
 
 test(
-  "ARC support silhouettes stay distinct under one owner color",
+  "ARC infantry silhouettes stay distinct under one owner color",
   { tag: WEBKIT },
   async ({ page }, info) => {
     const errors = collectPageErrors(page);
@@ -183,11 +183,11 @@ test(
           await import("/src/render/owner-materials.ts");
         const { scene, canvas, camera, view } = createTestView({
           map: { width: 24, height: 20, tileSize: 1, createHeight: () => 0 },
-          size: { width: 1000, height: 650 },
+          size: { width: 1200, height: 650 },
           terrain: true,
         });
         lifetime.own(view);
-        canvas.id = "support-models";
+        canvas.id = "infantry-models";
         Object.assign(canvas.style, {
           position: "fixed",
           top: "0",
@@ -204,6 +204,8 @@ test(
         );
         const models = [];
         for (const [index, id] of [
+          "arc-trooper",
+          "arc-demolition-trooper",
           "arc-scout",
           "arc-medic",
           "arc-mechanic",
@@ -217,7 +219,7 @@ test(
             const instance = lifetime.own(
               appearance.instantiate(`${id}-${row}`, 0),
             );
-            instance.root.position.set((index - 1) * 3.5, 0, row * 4 - 2);
+            instance.root.position.set((index - 2) * 2.5, 0, row * 4 - 2);
             instance.root.rotation.y = facing;
             colors.apply(instance.root.getChildMeshes(), "player");
             instance.animate?.({ seconds: 0.1, distance: 0, turn: 0 });
@@ -233,18 +235,18 @@ test(
     });
     try {
       const result = await preview.evaluate(({ models }) => models);
-      expect(new Set(result.map(({ url }) => url)).size).toBe(3);
+      expect(new Set(result.map(({ url }) => url)).size).toBe(5);
       await page
-        .locator("#support-models")
-        .screenshot({ path: info.outputPath("support-models-detail.png") });
+        .locator("#infantry-models")
+        .screenshot({ path: info.outputPath("infantry-models-detail.png") });
       await preview.evaluate(async ({ view }) => {
         const { frames } = await import("/e2e/harness.ts");
         view.camera.zoomBy(3);
         await frames(2);
       });
       await page
-        .locator("#support-models")
-        .screenshot({ path: info.outputPath("support-models-gameplay.png") });
+        .locator("#infantry-models")
+        .screenshot({ path: info.outputPath("infantry-models-gameplay.png") });
       expect(errors).toEqual([]);
     } finally {
       await preview.evaluate(({ dispose }) => dispose());

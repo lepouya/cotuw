@@ -125,6 +125,103 @@ const ARC_RIFLE: Part[] = [
   ),
 ];
 
+const DEMOLITION_GEAR: Part[] = [
+  part(
+    "launcher-tube",
+    "spine",
+    "cylinder",
+    [0.32, 1.4, 0.32],
+    [0.43, 1.46, 0.35],
+    "armor",
+    Math.PI / 2,
+  ),
+  part(
+    "launcher-rear-collar",
+    "spine",
+    "cylinder",
+    [0.39, 0.18, 0.39],
+    [0.43, 1.46, -0.29],
+    "metal",
+    Math.PI / 2,
+  ),
+  part(
+    "launcher-muzzle",
+    "spine",
+    "torus",
+    [0.43, 0.55, 0.43],
+    [0.43, 1.46, 1.07],
+    "metal",
+    Math.PI / 2,
+  ),
+  part(
+    "launcher-bore",
+    "spine",
+    "cylinder",
+    [0.29, 0.04, 0.29],
+    [0.43, 1.46, 1.07],
+    "dark",
+    Math.PI / 2,
+  ),
+  part(
+    "launcher-grip",
+    "spine",
+    "box",
+    [0.12, 0.27, 0.12],
+    [0.43, 1.23, 0.5],
+    "dark",
+  ),
+  part(
+    "launcher-sight",
+    "spine",
+    "box",
+    [0.12, 0.1, 0.2],
+    [0.43, 1.68, 0.7],
+    "visor",
+  ),
+  part(
+    "launcher-mark",
+    "spine",
+    "box",
+    [0.025, 0.12, 0.2],
+    [0.6, 1.46, 0.7],
+    "owner",
+  ),
+  part(
+    "rocket-rack",
+    "spine",
+    "box",
+    [0.62, 0.5, 0.18],
+    [0, 1.32, -0.3],
+    "dark",
+  ),
+  ...mirrored((side, sign) => [
+    part(
+      `${side}-rocket-tube`,
+      "spine",
+      "cylinder",
+      [0.22, 0.75, 0.22],
+      [sign * 0.2, 1.42, -0.44],
+      "metal",
+    ),
+    part(
+      `${side}-rocket-cap`,
+      "spine",
+      "sphere",
+      [0.22, 0.24, 0.22],
+      [sign * 0.2, 1.82, -0.44],
+      "armor",
+    ),
+    part(
+      `${side}-rack-band`,
+      "spine",
+      "box",
+      [0.23, 0.11, 0.23],
+      [sign * 0.2, 1.34, -0.44],
+      "owner",
+    ),
+  ]),
+];
+
 /** Ground-relative body parts with explicit head, pack, and role equipment. */
 function arcParts({
   head = ARC_HEAD,
@@ -643,16 +740,25 @@ const CIRCLE_TRIM = {
   skin: [0.86, 0.73, 0.6],
 } satisfies Record<string, Vec3>;
 
-// The shoulders kick back early, then recover.
-const RIFLE_FIRE: Attack = {
-  clip: "fire",
-  frames: 8,
+/** Shoulders kick back early, then recover; `roll` twists heavier weapons. */
+const recoil = (
+  clip: string,
+  frames: number,
+  pitch: number,
+  roll = 0,
+): Attack => ({
+  clip,
+  frames,
   joints: ["spine", "head"],
   pose: (joint, phase) => {
     const kick = Math.sin(Math.PI * Math.sqrt(phase / (Math.PI * 2)));
-    return joint === "spine" ? [-0.12 * kick, 0, 0] : [0.06 * kick, 0, 0];
+    return joint === "spine"
+      ? [-pitch * kick, 0, roll * kick]
+      : [(pitch / 2) * kick, 0, 0];
   },
-};
+});
+const RIFLE_FIRE = recoil("fire", 8, 0.12);
+const LAUNCHER_FIRE = recoil("launch", 20, 0.2, 0.06);
 // Both arms push the focus forward and draw it back.
 const FOCUS_CHANNEL: Attack = {
   clip: "channel",
@@ -724,6 +830,20 @@ const INFANTRY_RECIPES = {
     stride: 1,
     stance: ARMS_AT_SIDES,
     attack: RIFLE_FIRE,
+  },
+  "arc-demolition-trooper": {
+    scale: 1,
+    palette: {
+      armor: [0.29, 0.34, 0.39],
+      cloth: [0.1, 0.14, 0.17],
+      owner: [0.97, 0.71, 0.26],
+      visor: [1, 0.56, 0.19],
+      skin: ARC_SKIN,
+    },
+    parts: arcParts({ backpack: [], gear: DEMOLITION_GEAR }),
+    stride: 0.9,
+    stance: { pitch: -0.65, spread: 0.1, forearm: -0.85, swing: 0.02 },
+    attack: LAUNCHER_FIRE,
   },
   "arc-scout": {
     scale: 0.84,

@@ -1757,6 +1757,9 @@ acceptance progress. The following sections define the selected scope.
 - ARC's **Demolition Trooper** is fragile, slow-firing infantry with a portable
   heavy launcher that outranges basic defenses. The Field Barracks trains it,
   and Medics restore its health.
+- Demolition Troopers wear charcoal armor and amber visors. A shoulder-mounted
+  launcher and paired rocket tubes on their backs distinguish them from rifle
+  infantry; their production portraits show the same equipment.
 - Building damage bonuses are additive per hit, apply to unfinished buildings
   too, and precede difficulty scaling. Buildings are actors whose definitions
   have a footprint; mobile targets take only the weapon's base damage.

@@ -1450,11 +1450,12 @@
         "id": "train-demolition-trooper",
         "label": "Train Demolition Trooper"
       },
+      "portrait": "arc-demolition-trooper",
       "attackEffect": "tracer",
       "damageEffect": "biological",
       "model": {
         "glb": {
-          "url": "assets/actors/arc-trooper.glb",
+          "url": "assets/actors/arc-demolition-trooper.glb",
           "bounds": {
             "radius": 0.45,
             "height": 1.95
@@ -1466,20 +1467,20 @@
               "left": "turn-left",
               "right": "turn-right"
             },
-            "attack": "fire",
+            "attack": "launch",
             "death": "death",
             "hit": "hit",
             "aim": "aim"
           },
-          "cycleDistance": 2.1
+          "cycleDistance": 1.89
         }
       },
       "frameEffects": {
         "attack": {
           "clip": "muzzle-flash",
           "url": "assets/effects/muzzle-flash.png",
-          "size": 0.6,
-          "anchor": [0.12, 1.15, 1.15]
+          "size": 0.8,
+          "anchor": [0.43, 1.46, 1.16]
         }
       },
       "audio": {

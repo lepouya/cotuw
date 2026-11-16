@@ -18,13 +18,17 @@ const FOUNDATION = `
   <path fill="#304c50" d="M20 32 59 49 59 69 20 51Z"/>
   <path fill="#42625f" d="M59 49 100 32 100 51 59 69Z"/>
   <path fill="#dab76e" d="M25 43 53 55 53 59 25 47Z"/>`;
-const infantry = (vest: string, gear: string) => `
+const infantry = (
+  vest: string,
+  gear: string,
+  { helmet = "#a6bbb0", visor = "#1d424b" } = {},
+) => `
   <ellipse fill="#152b31" cx="62" cy="73" rx="30" ry="5"/>
   <path stroke="#6e8983" stroke-width="11" d="M51 48 45 72M68 48 76 72"/>
   <path fill="${vest}" d="M43 27 60 22 78 29 72 52 48 52Z"/>
   <path stroke="#adc1b5" stroke-width="8" d="M46 31 34 48M75 32 87 45"/>
-  <path fill="#a6bbb0" d="M46 13Q60 0 74 13V24L60 30 46 24Z"/>
-  <path fill="#1d424b" d="M49 16H72V22H49Z"/>${gear}`;
+  <path fill="${helmet}" d="M46 13Q60 0 74 13V24L60 30 46 24Z"/>
+  <path fill="${visor}" d="M49 16H72V22H49Z"/>${gear}`;
 
 const GROVE_GROUND = `<ellipse fill="#142c29" cx="60" cy="70" rx="49" ry="8"/>`;
 const elf = (mantle: string, gear: string) => `
@@ -69,6 +73,22 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path stroke="#afc3c5" stroke-width="7" stroke-linecap="round" d="M88 65 98 29"/>
     <path fill="#c4d4d2" d="M91 32 88 24 91 14 96 12 96 23 101 24 105 14 110 17 109 28 102 34Z"/>
     <path stroke="#33474b" stroke-width="8" d="M89 61 92 50"/>`,
+  ),
+  "arc-demolition-trooper": infantry(
+    "#4a5763",
+    `
+    <path fill="#9caaaa" d="M26 24H34V53H26ZM36 20H44V49H36Z"/>
+    <path fill="#35414c" d="m26 24 4-9 4 9ZM36 20l4-9 4 9Z"/>
+    <path fill="#223039" d="M24 36H46V43H24Z"/>
+    <path fill="#6d9ad2" d="M57 5H64V15H57ZM55 33H63V44H55Z"/>
+    <path fill="#1b2831" d="M67 27 99 14 110 26 76 40Z"/>
+    <path fill="#596873" d="M67 27 99 14 104 19 72 33Z"/>
+    <path stroke="#b7c4c3" stroke-width="4" d="M70 28 77 37"/>
+    <ellipse fill="#b7c4c3" cx="106" cy="21" rx="8" ry="11" transform="rotate(-27 106 21)"/>
+    <ellipse fill="#111f28" cx="107" cy="21" rx="5" ry="7" transform="rotate(-27 107 21)"/>
+    <path fill="#f3b34e" d="m86 20 7-3 3 4-7 3Z"/>
+    <path stroke="#35414c" stroke-width="9" d="M77 37 72 45 59 40"/>`,
+    { helmet: "#3c4955", visor: "#f3b34e" },
   ),
   "circle-cultivator": elf(
     "#43583a",

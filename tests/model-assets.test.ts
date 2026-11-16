@@ -11,8 +11,29 @@ import {
   isOwnerMaterial,
 } from "../src/render/owner-materials";
 
-import type { PBRMaterial } from "@babylonjs/core";
+import type { AbstractMesh, PBRMaterial } from "@babylonjs/core";
 import type { Rgb } from "../src/content/presentation";
+
+/** Horizontal radius and height reached by the meshes' current pose. */
+function posedExtent(meshes: readonly AbstractMesh[]) {
+  let radius = 0;
+  let height = 0;
+  for (const mesh of meshes) {
+    const matrix = mesh.computeWorldMatrix(true);
+    mesh.skeleton?.prepare(true);
+    const positions = mesh.getPositionData(true);
+    if (!positions) continue;
+    for (let index = 0; index < positions.length; index += 3) {
+      const point = Vector3.TransformCoordinates(
+        Vector3.FromArray(positions, index),
+        matrix,
+      );
+      radius = Math.max(radius, Math.hypot(point.x, point.z));
+      height = Math.max(height, point.y);
+    }
+  }
+  return { radius, height };
+}
 
 test.each(
   BASE_CONTENT.actors.filter(({ id, faction }) => {
@@ -214,22 +235,7 @@ test("ARC support uses distinct unarmed geometry within its selection bounds", a
     scene.animate();
     // Selection uses a cylinder, including the posed support equipment.
     if (id !== "arc-scout") {
-      let radius = 0;
-      let height = 0;
-      for (const mesh of instance.root.getChildMeshes()) {
-        const matrix = mesh.computeWorldMatrix(true);
-        mesh.skeleton?.prepare(true);
-        const positions = mesh.getPositionData(true);
-        if (!positions) continue;
-        for (let index = 0; index < positions.length; index += 3) {
-          const point = Vector3.TransformCoordinates(
-            Vector3.FromArray(positions, index),
-            matrix,
-          );
-          radius = Math.max(radius, Math.hypot(point.x, point.z));
-          height = Math.max(height, point.y);
-        }
-      }
+      const { radius, height } = posedExtent(instance.root.getChildMeshes());
       expect(height, `${id} height`).toBeLessThanOrEqual(
         model.glb.bounds.height,
       );
@@ -244,4 +250,32 @@ test("ARC support uses distinct unarmed geometry within its selection bounds", a
   expect(bodies[0]).not.toEqual(bodies[1]);
   expect(bodies[0]).not.toEqual(bodies[2]);
   expect(bodies[1]).not.toEqual(bodies[2]);
+});
+
+test("Demolition infantry carries a distinct launcher within Trooper selection bounds", async () => {
+  const scene = testScene();
+  const models = ["arc-trooper", "arc-demolition-trooper"].map((id) => {
+    const model = BASE_CONTENT.presentation[id]!.model!;
+    if (!("glb" in model)) throw new Error("Expected generated infantry");
+    return model.glb;
+  });
+  expect(models[1].url).not.toBe(models[0].url);
+  // Armed infantry rings fit the body; weapons may extend past them.
+  expect(models[1].bounds).toEqual(models[0].bounds);
+  expect(models[1].clips.attack).toBe("launch");
+  const geometry = [];
+  for (const [index, model] of models.entries()) {
+    const asset = await loadSkinnedActorAppearance(scene, {
+      ...model,
+      url: glbDataUrl(model.url),
+    });
+    const instance = asset.instantiate(`infantry-${index}`, 0);
+    const body = instance.root
+      .getChildMeshes()
+      .find((mesh) => mesh.name.endsWith("-body"))!;
+    geometry.push(Array.from(body.getVerticesData(VertexBuffer.PositionKind)!));
+    instance.dispose();
+    asset.dispose();
+  }
+  expect(geometry[1]).not.toEqual(geometry[0]);
 });

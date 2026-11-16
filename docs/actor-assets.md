@@ -9,12 +9,14 @@ clips match their generators, and reject unregistered files in `public/assets`.
 ## Inventory
 
 - `npm run assets:infantry`: `scripts/infantry-model.ts` exports Trooper,
-  Scout, Medic, Mechanic, Sentinel, Wayfinder, and Cultivator meshes,
-  materials, skeletons, idle, walk, turn, hit, and death clips. Troopers use
-  aim and fire; Sentinels use aim and channeling clips. Circle personnel have
-  slender proportions, pointed ears, exposed faces, circlets, tunics, and
-  mantles with owner markings. ARC owner markings cover the shoulders, chest,
-  and helmet ridge.
+  Demolition Trooper, Scout, Medic, Mechanic, Sentinel, Wayfinder, and
+  Cultivator meshes, materials, skeletons, idle, walk, turn, hit, and death
+  clips. Troopers use aim and fire; Sentinels use aim and channeling clips.
+  Circle personnel have slender proportions, pointed ears, exposed faces,
+  circlets, tunics, and mantles with owner markings. ARC owner markings cover
+  the shoulders, chest, and helmet ridge.
+  Demolition Troopers use charcoal armor, amber visors, a shoulder launcher,
+  and paired rocket tubes, with a slower launch recoil clip.
   Sentinels wear layered leaf armor and channel violet focus artifacts;
   Wayfinders wear light hoods and carry wayfinding staves.
   Each asset ID has one recipe owning its scale, palette, geometry, gait, arm
@@ -90,9 +92,11 @@ Model export can log Babylon's bone uniform warning. `NullEngine` reports only
 optional `portrait` binding selects one; otherwise the actor's gameplay role
 chooses a generic icon. The Medic portrait shows pale armor, teal medical
 markings, a carry case, and a scanner; the Mechanic shows ochre work gear,
-a hard hat, and a wrench. Circle portraits show exposed elven faces, pointed
-ears, tunics, and role-specific gear: the Cultivator's pod and tending tool,
-Sentinel leaf armor and focus, and Wayfinder hood and stave. Building portraits
+a hard hat, and a wrench. The Demolition Trooper shows charcoal armor, an amber
+visor, a shoulder launcher, and paired rocket tubes. Circle portraits show
+exposed elven faces, pointed ears, tunics, and role-specific gear: the
+Cultivator's pod and tending tool, Sentinel leaf armor and focus, and Wayfinder
+hood and stave. Building portraits
 match the Heartgrove crown, Conservatory basin, and vaulted Musterhall.
 
 ## Mobile model contract
@@ -146,7 +150,8 @@ Each actor's `model.glb` presentation supplies the GLB URL, clip names,
 pick and selection bounds, and ground distance covered by one locomotion
 cycle. Optional `scale` scales the mesh; bounds and cycle distance
 use final world units. Support model tests measure posed vertices against
-the cylindrical bounds at rest. The runtime chooses clips from the rendered
+the cylindrical bounds at rest. Armed infantry bounds fit the body, so weapons
+may extend past them. The runtime chooses clips from the rendered
 pose, triggers, and remains, as [DESIGN.md](../DESIGN.md#actor-animation)
 describes. A replacement asset can use different joint names if its clips
 target the new rig consistently.

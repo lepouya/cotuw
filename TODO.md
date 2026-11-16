@@ -159,6 +159,8 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
 - [ ] **1.43** Complete the added ARC models, animation, command feedback,
   effects, and essential audio. Medic and Mechanic models and production
   portraits show distinct role equipment; models retain owner markings.
+  The Demolition Trooper's launcher model, launch recoil, and matching portrait
+  are verified. Complete its attack effect and weapon audio.
   Verify readability and generated asset contracts for each included actor.
   Give each owned model [owner materials](docs/actor-assets.md), as 1.71
   does; 1.53 follows the same path.

@@ -101,7 +101,7 @@ async function actorPoint(page: Page, id: string) {
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
   test(`Barracks trains and selects a Demolition Trooper ${WEBKIT}`, async ({
     page,
-  }) => {
+  }, info) => {
     const errors = collectPageErrors(page, { console: true });
     await opening(page);
     await activate(page.locator("#open-training"), touch);
@@ -109,6 +109,14 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     await expect(card).toBeEnabled();
     await card.scrollIntoViewIfNeeded();
     await expect(card).toBeInViewport({ ratio: 1 });
+    const portrait = card.locator(".actor-portrait");
+    await expect(portrait).toHaveAttribute(
+      "data-portrait",
+      "arc-demolition-trooper",
+    );
+    await portrait.screenshot({
+      path: info.outputPath("demolition-portrait.png"),
+    });
     const description = await card.getAttribute("aria-describedby");
     await expect(page.locator(`#${description}`)).toContainText(
       "bonus damage to buildings",
