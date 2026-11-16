@@ -29,8 +29,13 @@ import {
   isValidProductionQueue,
   removeProducer,
 } from "./production";
-import { costAmount, definedPrices, RESOURCE_IDS } from "./resources";
-import { balanceOf, credit, isValidLedger } from "./stockpiles";
+import {
+  costAmount,
+  costResource,
+  definedPrices,
+  RESOURCE_IDS,
+} from "./resources";
+import { balanceOf, credit, isValidLedger, stockpileOf } from "./stockpiles";
 import { disconnectedBuildings } from "./support";
 import { isCount, isId, isNonnegative } from "./validation";
 import { distance } from "./world";
@@ -329,6 +334,15 @@ export function validateEconomyState(
   }
   validateCultivation(economy, actors, definitions, tickSeconds);
   validateInfrastructure(actors, definitions);
+  for (const actor of actors)
+    if (actor.repair) {
+      const definition = definitions.get(actor.definitionId);
+      if (
+        !definition ||
+        !stockpileOf(economy, actor.owner, costResource(definition))
+      )
+        return invalid();
+    }
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   if (
     !hasValidHarvesting(economy, byId, definitions, tickSeconds) ||
@@ -359,6 +373,8 @@ export type EconomyWorld = {
   behaviors: ReadonlyMap<string, ActorBehavior>;
   map: TerrainView;
   tickSeconds: number;
+  /** The tick being advanced, before its end-of-tick checkpoint. */
+  tick: number;
   move: (actor: Actor, target: WorldPosition) => boolean;
   evaluateSpawn: (job: ProductionJob) => TrainingEvaluation;
   support: () => SupportView;
@@ -371,6 +387,7 @@ export type EconomyWorld = {
     sources: readonly CargoSource[],
   ) => void;
   complete?: (actor: Actor) => void;
+  spend?: (owner: string, definition: ActorDefinition, amount: number) => void;
 };
 
 export type EconomyCommandHooks = {

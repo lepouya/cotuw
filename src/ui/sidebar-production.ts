@@ -95,7 +95,7 @@ export function createSidebarProduction(
   const constructionQueue = el("div", {
     id: "construction-queue",
     class: "actor-list",
-    "aria-label": "Paid building construction",
+    "aria-label": "Building construction and repair",
   });
   const panelBuildings = el(
     "section",

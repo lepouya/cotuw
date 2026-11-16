@@ -10,7 +10,22 @@ import {
 } from "../simulation/economy";
 import { harvestingStalled } from "../simulation/harvesting";
 import { refineryOccupied } from "../simulation/production";
-import { costCurrency, costLabel, resourceName } from "../simulation/resources";
+import {
+  costCurrency,
+  costLabel,
+  costResource,
+  resourceName,
+} from "../simulation/resources";
+import type { Resource } from "../simulation/resources";
+import { compareInfrastructure } from "../simulation/infrastructure-queue";
+import {
+  nextRepairStep,
+  repairCharge,
+  repairRate,
+  repairRejection,
+  repairRestored,
+} from "../simulation/repair";
+import type { RepairReason } from "../simulation/repair";
 import type {
   CultivationSite,
   CultivatorState,
@@ -99,6 +114,8 @@ type EconomyAction = {
 
 export type EconomyElements = {
   constructionDetails: HTMLElement;
+  repairActions: HTMLElement;
+  repairDetails: HTMLElement;
   workerActivityHeading: HTMLElement;
   harvesterDetails: HTMLElement;
   gatherSites: HTMLElement;
@@ -208,6 +225,7 @@ export function createEconomyControls(
     constructionQueue: actionList(elements.constructionQueue),
     resourceOverview: actionList(elements.resourceOverview),
     productionQueue: actionList(elements.productionQueue),
+    repairActions: actionList(elements.repairActions),
   };
   const submit = (command: MissionCommand, shiftKey = false) => {
     if (!options.enabled()) return;
@@ -223,6 +241,7 @@ export function createEconomyControls(
   const secondsLeft = (work: { completedTicks: number; totalTicks: number }) =>
     Math.ceil((work.totalTicks - work.completedTicks) * simulation.tickSeconds);
   let lastResult = "";
+  let repairFailure: { actorId: string; text: string } | undefined;
   return {
     refresh: () => {
       const economy = options.economy()!;
@@ -266,6 +285,77 @@ export function createEconomyControls(
       const cultivationSites = cultivation?.sites ?? [];
       const enabled = options.enabled();
       const disconnected = options.offlineIds();
+      const repairs = owned
+        .filter((building) => building.repair)
+        .sort(compareInfrastructure);
+      const priorities = new Map<string, number>();
+      const counts = new Map<Resource, number>();
+      for (const building of repairs) {
+        const resource = costResource(definitions.get(building.definitionId)!);
+        const priority = (counts.get(resource) ?? 0) + 1;
+        counts.set(resource, priority);
+        priorities.set(building.id, priority);
+      }
+      /** Why infrastructure work has no usable headquarters, if it has none. */
+      const unhosted = ({
+        id,
+        definitionId,
+        headquartersId,
+      }: ActorRenderState) => {
+        if (!definitions.get(definitionId)?.growth && disconnected.has(id))
+          return "Disconnected · Paused";
+        if (!headquartersId)
+          return `No ${headquartersFor(definitionId)} · Paused`;
+        return undefined;
+      };
+      const repairStatus = (building: ActorRenderState) => {
+        if (building.repair!.active) return "Repairing";
+        return (
+          unhosted(building) ??
+          (building.repair!.unaffordable
+            ? "Insufficient resources · Paused"
+            : "Waiting for infrastructure")
+        );
+      };
+      const repairSummary = (building: ActorRenderState) => {
+        const job = building.repair!;
+        const definition = definitions.get(building.definitionId)!;
+        const currency = costCurrency(definition);
+        const total = repairCharge(job.missingHealth, definition);
+        const progress = percent(
+          repairRestored(job, definition),
+          job.missingHealth,
+        );
+        return `${repairStatus(building)} · ${progress}% · Your payment priority ${priorities.get(building.id)} · ${job.paidCost}/${total} ${currency} paid · Next step ${nextRepairStep(building, definition).cost} ${currency} · Up to ${repairRate(definition)} ${currency}/s`;
+      };
+      const canRepair = actor && !repairRejection(actor, definition, economy);
+      lists.repairActions.update(
+        actor?.repair
+          ? [
+              {
+                key: `cancel-repair:${actor.id}`,
+                text: "Cancel repair",
+                disabled: !enabled,
+                action: () =>
+                  submit({ kind: "cancel-repair", actorId: actor.id }),
+              },
+            ]
+          : canRepair
+            ? [
+                {
+                  key: `repair:${actor!.id}`,
+                  text: `Repair (up to ${repairCharge(definition!.health! - actor!.health!, definition!)} ${costCurrency(definition!)})`,
+                  disabled: !enabled,
+                  action: () => submit({ kind: "repair", actorId: actor!.id }),
+                },
+              ]
+            : [],
+      );
+      if (repairFailure?.actorId !== id) repairFailure = undefined;
+      elements.repairDetails.hidden = !actor?.repair && !repairFailure;
+      if (actor?.repair) setText(elements.repairDetails, repairSummary(actor));
+      else if (repairFailure)
+        setText(elements.repairDetails, repairFailure.text);
       const refineries = owned.filter(
         (actor) => definitions.get(actor.definitionId)?.refinery,
       );
@@ -410,34 +500,36 @@ export function createEconomyControls(
         lists.gatherSites.update([]);
       }
       const construction = owned.filter((actor) => actor.construction);
-      const constructionStatus = ({
-        id,
-        definitionId,
-        construction,
-        headquartersId,
-      }: ActorRenderState) => {
-        const growth = !!definitions.get(definitionId)?.growth;
-        if (construction?.active) return growth ? "Growing" : "Building";
+      const constructionStatus = (building: ActorRenderState) => {
+        const growth = !!definitions.get(building.definitionId)?.growth;
+        if (building.construction?.active)
+          return growth ? "Growing" : "Building";
         const tended = cultivation?.workers.some(
-          (worker) => worker.tendingId === id,
+          (worker) => worker.tendingId === building.id,
         );
         if (growth && !tended) return "Untended · Paused";
-        if (!growth && disconnected.has(id)) return "Disconnected · Paused";
-        if (!headquartersId)
-          return `No ${headquartersFor(definitionId)} · Paused`;
-        return growth
-          ? "Worker travelling or waiting for infrastructure"
-          : "Queued";
+        return (
+          unhosted(building) ??
+          (growth
+            ? "Worker travelling or waiting for infrastructure"
+            : "Queued")
+        );
       };
-      lists.constructionQueue.update(
-        construction.map((actor) => ({
+      lists.constructionQueue.update([
+        ...construction.map((actor) => ({
           key: `construction:${actor.id}`,
           text: `${options.names.get(actor.definitionId)} · ${constructionStatus(actor)} · ${secondsLeft(actor.construction!)}s remaining · Cancel (+${actor.construction!.paidCost})`,
           disabled: !enabled,
           action: () =>
             submit({ kind: "cancel-construction", actorId: actor.id }),
         })),
-      );
+        ...repairs.map((actor) => ({
+          key: `cancel-repair:${actor.id}`,
+          text: `${nameOf(actor.definitionId)} · ${repairSummary(actor)} · Cancel repair`,
+          disabled: !enabled,
+          action: () => submit({ kind: "cancel-repair", actorId: actor.id }),
+        })),
+      ]);
       const selectedConstruction = construction.find(
         (actor) => actor.id === id,
       );
@@ -597,6 +689,23 @@ export function createEconomyControls(
       if (lastResult) setText(elements.harvesterStatus, lastResult);
     },
     onOutcome: (outcome: CommandOutcome) => {
+      if (isOutcomeOf(outcome, "repair", "cancel-repair")) {
+        const reasons: Record<RepairReason | AuthorityReason, string> = {
+          unauthorized: "You cannot repair this building.",
+          "invalid-building": "Choose a completed building to repair.",
+          undamaged: "This building needs no repair.",
+          "already-repairing": "This building already has a repair job.",
+          "missing-resource": "This owner has no stockpile for repair.",
+          "missing-repair":
+            "This repair has already finished or been cancelled.",
+        };
+        repairFailure = outcome.accepted
+          ? undefined
+          : {
+              actorId: outcome.command.actorId,
+              text: reasons[outcome.reason ?? "invalid-building"],
+            };
+      }
       if (isOutcomeOf(outcome, ...ECONOMY_COMMAND_KINDS)) {
         const actor = options
           .ownActors()

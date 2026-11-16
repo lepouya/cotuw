@@ -76,6 +76,37 @@ function tracker() {
 }
 
 describe("mission alerts", () => {
+  test("groups repair resource pauses and reports only new transitions", () => {
+    const observe = tracker();
+    const repair = {
+      missingHealth: 20,
+      completedSteps: 0,
+      paidCost: 0,
+      priority: 1,
+      queuedTick: 0,
+    };
+    const first = actor("b1", "barracks", { repair });
+    const second = actor("b2", "barracks", {
+      repair: { ...repair, priority: 2 },
+    });
+    observe({ actors: [first, second] });
+    const blocked = [first, second].map((actor) => ({
+      ...actor,
+      repair: { ...actor.repair!, unaffordable: true },
+    }));
+    expect(observe({ actors: blocked })).toEqual([
+      {
+        priority: "normal",
+        text: "2 buildings awaiting repair resources. Repairs resume automatically.",
+        position: first.worldPosition,
+      },
+    ]);
+    for (let tick = 0; tick < 10; tick++)
+      expect(observe({ actors: blocked })).toEqual([]);
+    observe({ actors: [first, second] });
+    expect(observe({ actors: blocked })).toHaveLength(1);
+  });
+
   test("the first observation records a baseline", () => {
     const observe = tracker();
     expect(

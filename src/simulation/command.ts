@@ -6,6 +6,7 @@ import type { WorldPosition } from "./world";
 import type { QueuedOrder, RouteBounds } from "./actor";
 import type { EconomyReason } from "./economy";
 import type { AttackReason } from "./combat";
+import type { RepairReason } from "./repair";
 import { isFinitePosition } from "./world";
 import { isTileCoord } from "./grid";
 import { isId, isRecord } from "./validation";
@@ -112,6 +113,9 @@ export type CancelConstructionCommand = {
 };
 
 export type SellActorCommand = { kind: "sell-actor"; actorId: string };
+export type RepairCommand =
+  | { kind: "repair"; actorId: string }
+  | { kind: "cancel-repair"; actorId: string };
 
 export const ECONOMY_COMMAND_KINDS = [
   "gather",
@@ -159,6 +163,7 @@ export type MissionCommand =
   | TerrainCommand
   | ActorLifecycleCommand
   | EconomyCommand
+  | RepairCommand
   | SellActorCommand
   | CancelConstructionCommand;
 
@@ -245,6 +250,8 @@ export function commandActorIds(command: MissionCommand): readonly string[] {
     case "remove-actor":
     case "sell-actor":
     case "cancel-construction":
+    case "repair":
+    case "cancel-repair":
       return [command.actorId];
     case "group-move":
     case "group-attack-move":
@@ -327,6 +334,8 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
     case "remove-actor":
     case "sell-actor":
     case "cancel-construction":
+    case "repair":
+    case "cancel-repair":
     case "return-cargo":
     case "cancel-production":
       return isId(command.actorId);
@@ -363,7 +372,9 @@ type RejectionReason<C extends MissionCommand> =
           ? EconomyReason
           : C extends AttackCommand
             ? AttackReason
-            : never);
+            : C extends RepairCommand
+              ? RepairReason
+              : never);
 
 /** A command's outcome as the mission applies it, before naming its issuer. */
 export type CommandResult<C extends MissionCommand = MissionCommand> =

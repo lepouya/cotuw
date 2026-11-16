@@ -53,6 +53,16 @@ export function createSidebarSelection(
     class: "muted",
     hidden: true,
   });
+  const repairActions = el("div", {
+    id: "repair-actions",
+    class: "actor-list",
+  });
+  const repairDetails = el("p", {
+    id: "repair-details",
+    class: "muted",
+    role: "status",
+    hidden: true,
+  });
   const workerActivityHeading = el("h3", { id: "worker-activity-heading" });
   const harvesterDetails = el("p", { id: "harvester-details", class: "muted" });
   const gatherSites = el("div", { id: "gather-sites", class: "actor-list" });
@@ -132,6 +142,8 @@ export function createSidebarSelection(
     networkStatus,
     selectionInfo,
     constructionDetails,
+    repairDetails,
+    repairActions,
     harvesterActions,
     rallyControls,
     productionQueue,
@@ -189,6 +201,8 @@ export function createSidebarSelection(
     },
     economy: {
       constructionDetails,
+      repairDetails,
+      repairActions,
       workerActivityHeading,
       harvesterDetails,
       gatherSites,

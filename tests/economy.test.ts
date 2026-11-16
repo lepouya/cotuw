@@ -473,6 +473,10 @@ describe("Materials economy", () => {
       { completedTicks: 8 },
       { totalTicks: 9 },
       { paidCost: 99 },
+      { priority: 0 },
+      { priority: undefined },
+      { queuedTick: 999 },
+      { active: false },
     ]) {
       const saved = simulation.snapshot();
       Object.assign(actorIn(saved, "refinery").construction!, patch);

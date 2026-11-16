@@ -421,7 +421,12 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   does not cancel repair or stop an otherwise operational building.
 - Repair costs that amount multiplied by the starting missing-health fraction,
   using only common resources. Nothing is paid or reserved up front. Cumulative
-  step charges must equal the calculated job cost.
+  charges round up to whole resource units; each step pays only the increase
+  over prior cumulative charges. Restoring the recorded amount costs the
+  rounded job price.
+  Repair steps occur on shared simulation-second boundaries while active.
+  Explicit recovery can finish repair early; repair pays only for health its
+  own steps restore and releases its slot once the building is fully healed.
 - Unaffordable or disconnected repair pauses and later resumes. Cancellation
   keeps restored health because unpaid future ticks require no refund. One
   grouped alert explains an unaffordable pause without repeating each second.

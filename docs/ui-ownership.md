@@ -102,6 +102,8 @@ cover module interfaces, private DOM, asynchronous work, and cleanup.
 - `simulation.viewOf(playerOwner)` owns visibility and private economy rules.
   UI never reconstructs them from unrestricted state. Issuer-scoped feedback
   excludes other owners' command outcomes.
+  Repair priority labels rank the player's jobs per common resource; allied
+  owners' private work stays hidden even when resource balances are pooled.
 - `ui/world-shortcuts.ts` routes physical `KeyboardEvent.code` through one
   ordered handler list per key. Escape precedence is Pan, placement, targeting
   and camera focus, selection, then menu. Dialogs and contextual overlays take

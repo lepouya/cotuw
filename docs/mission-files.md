@@ -309,6 +309,14 @@ can be read, edited by hand, and loaded again.
   independently of construction. Construction saves whether it holds an active
   slot.
   Growth layers derive from completed ticks and save no rendering state.
+- Building `repair` saves `missingHealth`, `completedSteps`, cumulative
+  `paidCost`, `queuedTick`, and owner-local `priority`, plus `active` and
+  `unaffordable` when set. Construction may save `queuedTick` and `priority`;
+  authored work without them comes first in authored order. New jobs follow
+  outstanding work, so cancel/restart goes to the back. Same-tick work orders
+  by owner ID, then owner-local priority. Repair steps follow simulation-second
+  boundaries, which the saved mission tick preserves. Repair commands are
+  `repair` and `cancel-repair`, each naming an `actorId`.
 - Placement commands can carry selected `workerIds`. Evaluation chooses the
   nearest reachable eligible worker against the prospective footprint. A
   `tend` command names one worker and its unfinished `buildingId`.

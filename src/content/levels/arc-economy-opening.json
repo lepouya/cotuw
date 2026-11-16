@@ -1,6 +1,6 @@
 {
   "format": "cotuw-mission",
-  "version": 24,
+  "version": 25,
   "ticksPerSecond": 60,
   "scenario": {
     "id": "arc-economy-opening",

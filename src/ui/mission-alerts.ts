@@ -181,6 +181,18 @@ export function createAlertTracker({
         }
       }
 
+      const repairsPaused = current.actors.filter(
+        (actor) =>
+          actor.repair?.unaffordable &&
+          !beforeById.get(actor.id)?.repair?.unaffordable,
+      );
+      if (repairsPaused.length)
+        alerts.push({
+          priority: "normal",
+          text: `${plural(repairsPaused.length, "building")} awaiting repair resources. Repairs resume automatically.`,
+          position: repairsPaused[0]!.worldPosition,
+        });
+
       const dormantBefore = new Map(
         before.sites?.map(({ id, dormant }) => [id, dormant]),
       );

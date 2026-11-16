@@ -144,11 +144,10 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   acquire hostiles and accept manual targets. Placement, outages, reconnection,
   remote income, raid protection, and saved continuation are verified. Relays
   do not count toward skirmish survival; completed Turrets do.
-- [ ] **1.40** Implement building repair through each headquarters'
-  infrastructure pool, following [recovery rules](DESIGN.md#repair-and-healing).
-  Cover payment, cancellation, paused work, disconnection, and competition with
-  construction. Add repair jobs to `updateInfrastructure`'s work list and
-  `claimSlot`; they read the ledger for oldest-first per-second payment.
+- [x] **1.40** Contextual building repair shares headquarters capacity with
+  construction. Oldest-first pooled payments, cancellation, paused work,
+  disconnection, reassignment, and deterministic saved continuation are verified
+  for ARC and Circle, with mouse and touch controls in Chromium and WebKit.
 - [ ] **1.41** Add Medic and Mechanic support from the Field Barracks, including
   eligible targets, automatic service, manual priority, pursuit limits,
   single-provider rules, and save/load continuation. Verify personnel healing

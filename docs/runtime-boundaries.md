@@ -120,7 +120,14 @@ These contracts describe where new behaviors, views, and services attach.
   delivery, and interruptions. Regeneration and collection retain integer
   remainders; stable worker-ID ordering allocates the shared reserve without
   overdrawing. Movement, audio, and presentation never advance cultivation.
-- `simulation/infrastructure.ts` owns headquarters queues for construction.
+- `simulation/infrastructure.ts` owns headquarters queues for construction
+  and repair. Repair steps pay on simulation-second boundaries, oldest first
+  across each shared stockpile. Unaffordable work yields its slot until the
+  next payment boundary. `simulation/infrastructure-queue.ts` owns queue order,
+  owner-local priorities, and validation of shared job fields.
+  `simulation/repair.ts` owns
+  eligibility, cumulative whole-resource charges, and applying paid steps;
+  repairing a completed Circle building needs no worker.
   Growth uses its Heartgrove kind without a support chain; other
   construction needs support rooted at the hosting headquarters. Buildings
   retain their headquarters while eligible, including after completion.

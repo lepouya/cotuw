@@ -6,6 +6,7 @@ import { costResource, RESOURCE_IDS } from "./resources";
 import type { Resource } from "./resources";
 import type { SkirmishResult, SkirmishRules } from "./skirmish";
 import { depositedBy } from "./stockpiles";
+import { infrastructureJob } from "./infrastructure-queue";
 import type { EconomyView } from "./economy";
 import { disconnectedBuildings } from "./support";
 import type { SupportView } from "./support";
@@ -308,17 +309,20 @@ export function validateMatchMetrics(
     );
     const last = owner.history[owner.history.length - 1]!;
     const milestones = owner.milestones;
-    const refundable = resourceTotals();
-    for (const actor of actors)
-      if (actor.owner === owner.owner && actor.construction)
-        refundable[costResource(definitions.get(actor.definitionId)!)] +=
-          actor.construction.paidCost;
+    const outstandingPayments = resourceTotals();
+    for (const actor of actors) {
+      const job = infrastructureJob(actor);
+      if (actor.owner === owner.owner && job)
+        outstandingPayments[
+          costResource(definitions.get(actor.definitionId)!)
+        ] += job.paidCost;
+    }
     for (const job of economy?.production ?? [])
       if (
         actors.find((actor) => actor.id === job.producerId)!.owner ===
         owner.owner
       )
-        refundable[costResource(definitions.get(job.definitionId)!)] +=
+        outstandingPayments[costResource(definitions.get(job.definitionId)!)] +=
           job.paidCost;
     let knownTiles = tileCount;
     if (fog) {
@@ -332,7 +336,7 @@ export function validateMatchMetrics(
       last.explored > knownTiles ||
       (lastMatchesWorld && last.explored !== knownTiles) ||
       owner.peakArmy < army ||
-      RESOURCE_IDS.some((id) => owner.spent[id] < refundable[id]) ||
+      RESOURCE_IDS.some((id) => owner.spent[id] < outstandingPayments[id]) ||
       (lastMatchesWorld &&
         (last.units !== units || last.buildings !== buildings)) ||
       RESOURCE_IDS.some(

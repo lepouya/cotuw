@@ -112,11 +112,18 @@ export type Actor = {
   /** Persistent base affiliation; headquarters affiliate with themselves. */
   headquartersId?: string;
   /** Paid blueprint progress; absent once the building is operational. */
-  construction?: {
-    paidCost: number;
-    active?: boolean;
+  construction?: InfrastructureJob & {
     completedTicks: number;
     totalTicks: number;
+  };
+  /** A fixed amount of missing health, paid as infrastructure restores it. */
+  repair?: InfrastructureJob & {
+    priority: number;
+    queuedTick: number;
+    missingHealth: number;
+    completedSteps: number;
+    /** Paused until the next payment boundary. */
+    unaffordable?: boolean;
   };
   /** Ground destination used by newly produced units. */
   rallyPoint?: WorldPosition;
@@ -280,6 +287,18 @@ export type MovementOrder = {
   occupancyLayer?: OccupancyLayer;
   /** Plans leaving this circle are blocked rather than followed. */
   bounds?: RouteBounds;
+};
+
+/** Queue state shared by every kind of headquarters infrastructure work. */
+export type InfrastructureJob = {
+  /** Resources paid into the job so far. */
+  paidCost: number;
+  /** Owner-local order among same-tick work; absent for authored work. */
+  priority?: number;
+  /** Absent, with `priority`, for authored work that precedes submitted work. */
+  queuedTick?: number;
+  /** Holds a headquarters slot. */
+  active?: boolean;
 };
 
 /** Current health; absent health means undamaged. */

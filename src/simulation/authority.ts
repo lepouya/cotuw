@@ -114,6 +114,8 @@ export function createCommandAuthority(
         case "remove-actor":
         case "sell-actor":
         case "cancel-construction":
+        case "repair":
+        case "cancel-repair":
           return commands(issuer, command.actorId, view);
       }
     },

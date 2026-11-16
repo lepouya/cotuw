@@ -28,6 +28,10 @@ protecting your Command Center. Victory allows continued free play.
 Relay Stations extend ARC's connected support toward remote sites. Sentry
 Turrets protect nearby approaches while connected; select one and click or
 tap a visible enemy to prioritize it.
+Select a damaged building and choose **Repair** to restore it through its
+headquarters' shared construction capacity. Repair pays as it works and pauses
+when disconnected or short of resources. **Cancel repair** keeps restored
+health.
 
 Click or tap to select and command. Drag a box to select units; touch uses
 **Box select**. **Pan** enables camera dragging, and **View** offers camera

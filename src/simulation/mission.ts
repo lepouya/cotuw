@@ -131,6 +131,12 @@ import {
   validateEconomyState,
 } from "./economy";
 import { costAmount } from "./resources";
+import { repairRejection, validateRepair } from "./repair";
+import {
+  infrastructureJob,
+  isValidQueuePosition,
+  nextInfrastructurePriority,
+} from "./infrastructure-queue";
 import { chargeCost, refundCost, regroupStockpiles } from "./stockpiles";
 import type { EconomyCommandHooks, EconomyState, EconomyView } from "./economy";
 import {
@@ -166,6 +172,7 @@ import type {
   MoveCommand,
   ScheduledCommand,
   SingleCommand,
+  RepairCommand,
 } from "./command";
 import type { AuthorityView, ScriptControl } from "./authority";
 import type { NavigatingActor } from "./group-movement";
@@ -670,12 +677,14 @@ export function createMissionSimulation({
       }
     }
     const construction = actor.construction;
+    validateRepair(actor, definition, !!state.economy, state.tick);
     if (
       construction !== undefined &&
       (!construction ||
         !state.economy ||
         !isTilePlacedActor(actor) ||
         construction.paidCost !== costAmount(definition) ||
+        !isValidQueuePosition(construction, state.tick, false) ||
         !isCount(construction.completedTicks) ||
         construction.totalTicks !==
           secondsToTicks(definition.constructionSeconds, tickSeconds) ||
@@ -827,7 +836,7 @@ export function createMissionSimulation({
     for (const building of working.actors) {
       if (building.headquartersId === actor.id) {
         delete building.headquartersId;
-        if (building.construction) delete building.construction.active;
+        delete infrastructureJob(building)?.active;
       }
     }
     if (isTilePlacedActor(actor)) {
@@ -1048,13 +1057,10 @@ export function createMissionSimulation({
       matchContext,
       0,
     );
-    for (const actor of state.actors)
-      if (actor.construction)
-        recorder.spend(
-          actor.owner,
-          definitionFor(actor),
-          actor.construction.paidCost,
-        );
+    for (const actor of state.actors) {
+      const job = infrastructureJob(actor);
+      if (job) recorder.spend(actor.owner, definitionFor(actor), job.paidCost);
+    }
     for (const job of state.economy?.production ?? [])
       recorder.spend(
         actorsById.get(job.producerId)!.owner,
@@ -1304,6 +1310,37 @@ export function createMissionSimulation({
       ...(reason && { reason }),
     } as CommandResult<EconomyCommand>;
   };
+  const applyRepairCommand = (
+    command: RepairCommand,
+    tick: number,
+    working: WorkingActors,
+  ): CommandResult<RepairCommand> => {
+    const applied = structuredClone(command);
+    const actor = working.actorsById.get(applied.actorId);
+    const definition = actor && definitionFor(actor);
+    const reason =
+      applied.kind === "repair"
+        ? repairRejection(actor, definition, working.economy)
+        : actor?.repair
+          ? undefined
+          : "missing-repair";
+    // Cancellation refunds nothing; restored health and payments stay.
+    if (!reason && applied.kind === "cancel-repair") delete actor!.repair;
+    else if (!reason)
+      actor!.repair = {
+        missingHealth: definition!.health! - actor!.health!,
+        completedSteps: 0,
+        paidCost: 0,
+        priority: nextInfrastructurePriority(working.actors, actor!.owner),
+        queuedTick: tick,
+      };
+    return {
+      tick,
+      command: applied,
+      accepted: !reason,
+      ...(reason && { reason }),
+    } as CommandResult<RepairCommand>;
+  };
   const applyRemoval = (
     command: ActorRemovalCommand,
     tick: number,
@@ -1407,6 +1444,11 @@ export function createMissionSimulation({
         const definition = definitionFor(evaluation.actor);
         evaluation.actor.construction = {
           paidCost: pay(working, evaluation.actor.owner, definition),
+          priority: nextInfrastructurePriority(
+            working.actors,
+            evaluation.actor.owner,
+          ),
+          queuedTick: tick,
           completedTicks: 0,
           totalTicks: secondsToTicks(
             definition.constructionSeconds,
@@ -1465,6 +1507,8 @@ export function createMissionSimulation({
     "remove-actor": applyRemoval,
     "sell-actor": applyRemoval,
     "cancel-construction": applyRemoval,
+    repair: applyRepairCommand,
+    "cancel-repair": applyRepairCommand,
     attack: (command, tick, working) => {
       const applied = structuredClone(command);
       const actor = working.actorsById.get(applied.actorId);
@@ -1867,6 +1911,7 @@ export function createMissionSimulation({
               behaviors: behaviorsById,
               map: map!,
               tickSeconds,
+              tick: state.tick,
               move: moveActor,
               evaluateSpawn: ({ actorId, producerId, definitionId }) =>
                 checks.training(
@@ -1879,6 +1924,7 @@ export function createMissionSimulation({
               support: () => supportFor(working.actors),
               income: working.match?.income,
               complete: working.match?.completed,
+              spend: working.match?.spend,
               spawn: (actor, producerId) =>
                 stageProducedActor(working, actor, producerId),
               deliver: (refineryId, actorId) =>

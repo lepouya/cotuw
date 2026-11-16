@@ -227,6 +227,29 @@ const placeBarracks = (sim: MissionSimulation, actorId: string) =>
 const roundtrip = (sim: MissionSimulation) =>
   fixture(savedState(scenario, sim));
 
+test("repair payments count as spending and cancellation refunds nothing", () => {
+  const state = initial();
+  const building = actorIn(state, "home");
+  building.health = definition(CC).health! * 0.8;
+  const sim = fixture(state);
+  expect(command(sim, { kind: "repair", actorId: "home" }).accepted).toBe(true);
+  expect(player(sim).spent.materials).toBe(0);
+  advanceSeconds(sim, 2);
+  const paid = sim.actorById("home")!.repair!.paidCost;
+  expect(paid).toBeGreaterThan(0);
+  expect(player(sim).spent.materials).toBe(paid);
+  const invalid = savedState(scenario, sim);
+  invalid.metrics!.owners[0]!.spent.materials = 0;
+  expect(() => fixture(invalid)).toThrow("invalid match metrics");
+  const resumed = roundtrip(sim);
+  advanceSeconds(sim, 1);
+  advanceSeconds(resumed, 1);
+  expect(resumed.snapshot()).toEqual(sim.snapshot());
+  const spent = player(sim).spent.materials;
+  command(sim, { kind: "cancel-repair", actorId: "home" });
+  expect(player(sim).spent.materials).toBe(spent);
+});
+
 // Starting actors affect population and the peak, but never production counters.
 test("opening samples include starting actors, active vision and military readiness", () => {
   const state = initial();
