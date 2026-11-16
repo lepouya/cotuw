@@ -39,6 +39,8 @@ test("producers whose roster omits some units still classify", () => {
   const roster = new Map(
     [...definitions].filter(([id]) => id !== "arc-trooper"),
   );
+  expect(trainsArmy(BARRACKS, roster)).toBe(true);
+  roster.delete("arc-demolition-trooper");
   expect(trainsArmy(BARRACKS, roster)).toBe(false);
   expect(trainsArmy(BARRACKS, definitions)).toBe(true);
 });

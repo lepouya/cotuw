@@ -141,6 +141,7 @@ describe("combat", () => {
       "wolf",
       "alpha-wolf",
       "arc-sentry-turret",
+      "arc-demolition-trooper",
     ]);
   });
 

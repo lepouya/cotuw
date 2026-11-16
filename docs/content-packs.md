@@ -25,6 +25,9 @@ bundled packs through the same parser future mod packs will use.
   footprints, costs, and timings. The simulation validates the ones a mission
   uses when it loads. Actor IDs must be unique, and every actor needs its
   name, description, and the model or building geometry its rules require.
+- Weapons may set a nonnegative `buildingDamageBonus`, defaulting to zero,
+  that each hit adds against a definition with a footprint. The
+  [M1 roster](../DESIGN.md#m1-roster) defines its scaling rules.
 - `materialsCost` and `lifebloomCost` are mutually exclusive common-resource
   prices. Paid jobs retain the amount; their definition selects the balance.
   `cultivation: { capacity, rate }` identifies a mobile Cultivator; a completed

@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 3,
   "id": "base",
-  "version": 11,
+  "version": 12,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -348,7 +348,8 @@
           "arc-trooper",
           "arc-scout",
           "arc-medic",
-          "arc-mechanic"
+          "arc-mechanic",
+          "arc-demolition-trooper"
         ]
       },
       "footprint": {
@@ -655,6 +656,34 @@
       },
       "materialsCost": 40,
       "trainingSeconds": 6
+    },
+    {
+      "id": "arc-demolition-trooper",
+      "behaviorId": "terrain-move",
+      "faction": "arc",
+      "health": 60,
+      "recoveryKind": "biological",
+      "weapon": {
+        "damage": 6,
+        "buildingDamageBonus": 54,
+        "damageType": "kinetic",
+        "range": 10,
+        "cooldownSeconds": 3
+      },
+      "guard": {
+        "acquisitionRadius": 10,
+        "chaseRadius": 14
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.3
+      },
+      "vision": {
+        "radius": 10
+      },
+      "materialsCost": 50,
+      "trainingSeconds": 8
     }
   ],
   "aiProfiles": [
@@ -1411,6 +1440,55 @@
             "hit": "hit"
           },
           "cycleDistance": 1.8
+        }
+      }
+    },
+    "arc-demolition-trooper": {
+      "name": "Demolition Trooper",
+      "description": "Fragile, slow-firing infantry. Outranges basic defenses and deals bonus damage to buildings; needs protection from troops.",
+      "train": {
+        "id": "train-demolition-trooper",
+        "label": "Train Demolition Trooper"
+      },
+      "attackEffect": "tracer",
+      "damageEffect": "biological",
+      "model": {
+        "glb": {
+          "url": "assets/actors/arc-trooper.glb",
+          "bounds": {
+            "radius": 0.45,
+            "height": 1.95
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "attack": "fire",
+            "death": "death",
+            "hit": "hit",
+            "aim": "aim"
+          },
+          "cycleDistance": 2.1
+        }
+      },
+      "frameEffects": {
+        "attack": {
+          "clip": "muzzle-flash",
+          "url": "assets/effects/muzzle-flash.png",
+          "size": 0.6,
+          "anchor": [0.12, 1.15, 1.15]
+        }
+      },
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "rifle"
+            }
+          ]
         }
       }
     }

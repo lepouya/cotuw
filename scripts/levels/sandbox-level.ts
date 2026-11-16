@@ -1,6 +1,6 @@
 import { createMissionState } from "../../src/simulation/mission.ts";
 import { TerrainGrid } from "../../src/simulation/terrain.ts";
-import { BASE_CONTENT } from "./base-content.ts";
+import { actorDefinition, BASE_CONTENT } from "./base-content.ts";
 
 import type {
   MissionFile,
@@ -17,19 +17,25 @@ type SandboxOptions = Pick<
   briefing: Omit<ScenarioBriefing, "rules">;
 };
 
+const DEFAULT_BUILDINGS = [
+  "arc-command-center-prototype",
+  "arc-field-barracks",
+];
+const DEFAULT_ACTORS = [
+  ...new Set(
+    DEFAULT_BUILDINGS.flatMap(
+      (id) => actorDefinition(id).production?.unitDefinitionIds ?? [],
+    ),
+  ),
+  ...DEFAULT_BUILDINGS,
+];
+
 /** Free construction on authored terrain, with ARC content by default. */
 export function createSandboxLevel({
   terrain,
   briefing,
   content = BASE_CONTENT,
-  actors = [
-    "arc-trooper",
-    "arc-scout",
-    "arc-medic",
-    "arc-mechanic",
-    "arc-command-center-prototype",
-    "arc-field-barracks",
-  ],
+  actors = DEFAULT_ACTORS,
   ...scenario
 }: SandboxOptions): MissionFile {
   const map = new TerrainGrid(terrain);

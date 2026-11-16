@@ -99,6 +99,47 @@ async function actorPoint(page: Page, id: string) {
 }
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
+  test(`Barracks trains and selects a Demolition Trooper ${WEBKIT}`, async ({
+    page,
+  }) => {
+    const errors = collectPageErrors(page, { console: true });
+    await opening(page);
+    await activate(page.locator("#open-training"), touch);
+    const card = page.locator("#train-demolition-trooper");
+    await expect(card).toBeEnabled();
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toBeInViewport({ ratio: 1 });
+    const description = await card.getAttribute("aria-describedby");
+    await expect(page.locator(`#${description}`)).toContainText(
+      "bonus damage to buildings",
+    );
+    await expect(card).toContainText("50 Materials");
+    await activate(card, touch);
+    await advance(page, 8.2);
+    const id = await page.evaluate(
+      () =>
+        window.sessionHarness.view.simulation.actors.find(
+          ({ definitionId }) => definitionId === "arc-demolition-trooper",
+        )!.id,
+    );
+    await selectInSession(page, id);
+    await expect(page.locator("#selection-details")).toContainText(
+      "Demolition Trooper",
+    );
+    await expect(page.locator("#stop-units")).toBeEnabled();
+    await expect
+      .poll(() =>
+        page.evaluate((id) => {
+          const root = window.sessionHarness.view.scene.getTransformNodeByName(
+            `actor-${id}-root`,
+          );
+          return root?.getChildMeshes().some((mesh) => mesh.skeleton) ?? false;
+        }, id),
+      )
+      .toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test(`Barracks support training and manual recovery targeting ${WEBKIT}`, async ({
     page,
   }, info) => {

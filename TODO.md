@@ -152,9 +152,10 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   exclusive targets, bounded pursuit, and queued orders. Personnel healing,
   raid-damaged Harvester recovery, AI exclusions, and deterministic saves are
   verified, with mouse and touch controls in Chromium and WebKit.
-- [ ] **1.42** Add the Demolition Trooper to Field Barracks production.
-  Implement its single-target building damage bonus at `updateCombat`'s damage
-  site and verify the counter relationship and reason to field a mixed force.
+- [x] **1.42** Demolition Troopers share Barracks production and Medic recovery.
+  Building damage, defense outranging, infantry counters, mixed forces, and
+  saved continuation are verified, with mouse and touch training and selection
+  in Chromium and WebKit.
 - [ ] **1.43** Complete the added ARC models, animation, command feedback,
   effects, and essential audio. Medic and Mechanic models and production
   portraits show distinct role equipment; models retain owner markings.

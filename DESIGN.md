@@ -1757,6 +1757,9 @@ acceptance progress. The following sections define the selected scope.
 - ARC's **Demolition Trooper** is fragile, slow-firing infantry with a portable
   heavy launcher that outranges basic defenses. The Field Barracks trains it,
   and Medics restore its health.
+- Building damage bonuses are additive per hit, apply to unfinished buildings
+  too, and precede difficulty scaling. Buildings are actors whose definitions
+  have a footprint; mobile targets take only the weapon's base damage.
 - M1 includes Medics for ARC personnel and Mechanics for Harvesters, following
   the normal support rules. Both train at the Field Barracks and share its
   production queue with Troopers, Scouts, and Demolition Troopers. Surviving

@@ -25,6 +25,20 @@ const options = {
   },
 };
 
+test("the default sandbox includes every unit its buildings can train", () => {
+  const level = createSandboxLevel(options);
+  const actors = new Set(level.scenario.actors);
+  expect(actors).toContain("arc-command-center-prototype");
+  expect(actors).toContain("arc-field-barracks");
+  expect(actors.size).toBe(level.scenario.actors!.length);
+  for (const definition of BASE_CONTENT.actors)
+    if (actors.has(definition.id))
+      for (const unitId of definition.production?.unitDefinitionIds ?? [])
+        expect(actors.has(unitId), `${definition.id} trains ${unitId}`).toBe(
+          true,
+        );
+});
+
 test("sandbox content can limit available actors without changing the template", () => {
   const actors = ["arc-scout"];
   const level = createSandboxLevel({ ...options, actors });

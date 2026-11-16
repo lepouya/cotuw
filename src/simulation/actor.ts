@@ -103,6 +103,8 @@ export type Restoration = {
 /** Fixed damage dealt at a fixed cadence, without accuracy rolls. */
 export type Weapon = {
   damage: number;
+  /** Added to each hit against a building, including unfinished structures. */
+  buildingDamageBonus?: number;
   /**
    * Reserved for future armor matchups such as kinetic versus energy. Every
    * type currently deals its full damage.

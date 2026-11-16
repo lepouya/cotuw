@@ -35,6 +35,8 @@ health.
 Field Barracks also train Medics to heal personnel and Mechanics to repair
 surviving Harvesters. Idle providers service nearby damaged units for free;
 select one and click or tap an eligible damaged unit to prioritize it.
+Demolition Troopers share the Barracks queue. They outrange Sentry Turrets
+and deal heavy building damage; protect them from enemy infantry with Troopers.
 
 Click or tap to select and command. Drag a box to select units; touch uses
 **Box select**. **Pan** enables camera dragging, and **View** offers camera

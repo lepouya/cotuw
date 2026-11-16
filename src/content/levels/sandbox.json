@@ -4,12 +4,13 @@
   "ticksPerSecond": 60,
   "scenario": {
     "id": "sandbox",
-    "content": { "id": "base", "version": 11 },
+    "content": { "id": "base", "version": 12 },
     "actors": [
       "arc-trooper",
       "arc-scout",
       "arc-medic",
       "arc-mechanic",
+      "arc-demolition-trooper",
       "arc-command-center-prototype",
       "arc-field-barracks"
     ],

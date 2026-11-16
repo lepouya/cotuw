@@ -18,7 +18,7 @@ import { terrainSightlineClear } from "./terrain-sightline";
 import { tileAreaBounds } from "./terrain";
 import { tileKey } from "./grid";
 import { clearCombatOrders, compareIds, healthOf } from "./actor";
-import { isId, isPositive } from "./validation";
+import { isId, isNonnegative, isPositive } from "./validation";
 import {
   validateTerritoryActor,
   validateTerritoryDefinition,
@@ -31,6 +31,7 @@ import type {
   MovementOrder,
   RouteBounds,
   RouteRetryState,
+  Weapon,
 } from "./actor";
 import type { TileCoord } from "./grid";
 import type { OccupancyView } from "./occupancy";
@@ -189,6 +190,9 @@ export function validateCombatDefinition(definition: ActorDefinition): void {
     (health !== undefined && !isPositive(health)) ||
     (weapon &&
       (!isPositive(weapon.damage) ||
+        (weapon.buildingDamageBonus !== undefined &&
+          !isNonnegative(weapon.buildingDamageBonus)) ||
+        !Number.isFinite(weapon.damage + (weapon.buildingDamageBonus ?? 0)) ||
         !isId(weapon.damageType) ||
         !isPositive(weapon.range) ||
         !isPositive(weapon.cooldownSeconds))) ||
@@ -392,6 +396,12 @@ export function noteAttackMoveRoute(
   )
     order.blocked = { at: { ...order.target }, navigationVersion };
 }
+
+/** One hit's damage against a target before owner combat scaling. */
+const weaponDamage = (
+  weapon: Weapon,
+  target: Pick<ActorDefinition, "footprint">,
+) => weapon.damage + (target.footprint ? (weapon.buildingDamageBonus ?? 0) : 0);
 
 /**
  * Updates orders, chases, and fires for armed actors in stable ID order, then
@@ -678,7 +688,8 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
       targetId: target.id,
       from: { ...actor.worldPosition },
       to: { ...target.worldPosition },
-      damage: weapon.damage * combatScale(actor.owner),
+      damage:
+        weaponDamage(weapon, definitionOf(target)) * combatScale(actor.owner),
       damageType: weapon.damageType,
     });
   }
