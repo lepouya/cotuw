@@ -31,6 +31,12 @@ bundled packs through the same parser future mod packs will use.
   building with `cultivationDropoff: true` receives its cargo. `growth` names
   the worker and headquarters definitions for tended construction, and
   `infrastructure.slots` supplies capacity per headquarters actor.
+- Mobile units with health may name `recoveryKind`: `biological`,
+  `mechanical`, or `living-construct`. Unarmed providers name `restoration`
+  with distinct `targetKinds` they serve, `range`, `acquisitionRadius`,
+  `pursuitRadius`, and `healthPerSecond`. Distances are world units; all values
+  are positive, with range no greater than acquisition and acquisition no
+  greater than pursuit. Workers and buildings cannot also be providers.
 - Optional `factionNames` maps simulation faction IDs to nonempty display
   names for the sidebar heading. Unnamed factions use a generic heading.
 - Optional `skirmishExcludedBuildingIds` lists distinct building definition IDs,

@@ -28,11 +28,17 @@ import {
   validateProductionDefinitions,
 } from "./production";
 import type { BuildingActivity } from "./production";
-import { clampToBounds, isFinitePosition, withinBounds } from "./world";
+import {
+  clampToBounds,
+  isFinitePosition,
+  isPositionWithin,
+  withinBounds,
+} from "./world";
 import {
   clearCombatOrders,
   cloneData,
   deepFreeze,
+  isSupportUnit,
   isWorkerDefinition,
 } from "./actor";
 import {
@@ -132,6 +138,15 @@ import {
 } from "./economy";
 import { costAmount } from "./resources";
 import { repairRejection, validateRepair } from "./repair";
+import {
+  serviceAllows,
+  serviceRejection,
+  startService,
+  updateUnitSupport,
+  validateRestorationDefinition,
+  validateServiceActor,
+  validateServiceReferences,
+} from "./unit-support";
 import {
   infrastructureJob,
   isValidQueuePosition,
@@ -696,15 +711,12 @@ export function createMissionSimulation({
       (!isTilePlacedActor(actor) ||
         !definition.production ||
         !actor.rallyPoint ||
-        !isFinitePosition(actor.rallyPoint) ||
-        !withinBounds(actor.rallyPoint, worldBounds))
+        !isPositionWithin(actor.rallyPoint, worldBounds))
     )
       throw new RangeError(`Actor ${actor.id} has an invalid rally point.`);
     if (
       actor.movement !== undefined &&
-      (!actor.movement ||
-        !isFinitePosition(actor.movement.target) ||
-        !withinBounds(actor.movement.target, worldBounds))
+      (!actor.movement || !isPositionWithin(actor.movement.target, worldBounds))
     ) {
       throw new RangeError(`Actor ${actor.id} has an invalid move target.`);
     }
@@ -724,6 +736,7 @@ export function createMissionSimulation({
         ))
     )
       throw new RangeError(`Actor ${actor.id} has invalid queued orders.`);
+    validateServiceActor(actor, definition, worldBounds, state.tick);
     validateCombatActor(actor, definition, worldBounds);
     behaviorFor(actor).validateActor?.(actor, definition);
   };
@@ -762,21 +775,29 @@ export function createMissionSimulation({
       Object.assign(actor, tilePlacedPose(map!, actor, definition));
     }
     ensureValidActor(actor);
-    if (peers)
+    if (peers) {
+      const actors = [...peers, actor];
+      validateServiceReferences(actors, state.retiredActorIds, definitionsById);
       validateWildlife(
         state.wildlife,
-        [...peers, actor],
+        actors,
         definitionsById,
         state.retiredActorIds,
         worldBounds,
         state.tick,
       );
+    }
     const committed = deepFreeze(actor);
     actorsById.set(committed.id, committed);
     usedActorIds.add(committed.id);
     return committed;
   };
   state.actors = freezeActors(state.actors.map((actor) => register(actor)));
+  validateServiceReferences(
+    state.actors,
+    state.retiredActorIds,
+    definitionsById,
+  );
   validateSetup(authoredSetup, state, !!skirmish);
   const combatScale = combatScaling(authoredSetup);
   validateSkirmish(skirmish, state, {
@@ -900,6 +921,21 @@ export function createMissionSimulation({
       target: { ...target },
       ...(bounds && { bounds }),
     });
+  /** The reachable point nearest an automatic route's goal. */
+  const routeDestination = (
+    actor: Actor,
+    point: WorldPosition,
+    bounds?: RouteBounds,
+  ) => {
+    const grid = behaviorFor(actor).navigationGrid?.(
+      actor,
+      definitionFor(actor),
+      bounds,
+    );
+    return grid
+      ? navigationDestination(grid, actor.worldPosition, point)
+      : point;
+  };
   /** Copies committed state for changes that commit together. */
   const stageWorking = (): WorkingActors => {
     const actors = state.actors.map((actor) => cloneData(actor));
@@ -1112,6 +1148,9 @@ export function createMissionSimulation({
     );
     if (accepted) {
       clearCombatOrders(actor);
+      delete actor.service;
+      if (applied.kind === "stop" && isSupportUnit(definitionFor(actor)))
+        actor.serviceResumeTick = state.tick + 1;
       interruptWorker(actor, working.economy);
     }
     validateUpdate(actor, before);
@@ -1509,6 +1548,23 @@ export function createMissionSimulation({
     "cancel-construction": applyRemoval,
     repair: applyRepairCommand,
     "cancel-repair": applyRepairCommand,
+    service: (command, tick, working) => {
+      const actor = working.actorsById.get(command.actorId);
+      const target = working.actorsById.get(command.targetId);
+      const reason = serviceRejection(
+        actor,
+        target,
+        definitionsById,
+        working.actors,
+      );
+      if (!reason) startService(actor!, target!.id, true);
+      return {
+        tick,
+        command: structuredClone(command),
+        accepted: !reason,
+        ...(reason && { reason }),
+      };
+    },
     attack: (command, tick, working) => {
       const applied = structuredClone(command);
       const actor = working.actorsById.get(applied.actorId);
@@ -1812,16 +1868,7 @@ export function createMissionSimulation({
             guardController,
             turretController,
           ],
-          destination: (actor, point, routeBounds) => {
-            const grid = behaviorFor(actor).navigationGrid?.(
-              actor,
-              definitionFor(actor),
-              routeBounds,
-            );
-            return grid
-              ? navigationDestination(grid, actor.worldPosition, point)
-              : point;
-          },
+          destination: routeDestination,
           wrecks: working.wrecks,
           definitions: definitionsById,
           map,
@@ -1859,6 +1906,15 @@ export function createMissionSimulation({
         const verdict = objectivesFor(working.objectives);
         const defeated = verdict.result?.kind === "defeat";
         if (!defeated) {
+          updateUnitSupport({
+            actors: working.actors,
+            definitions: definitionsById,
+            tick: state.tick,
+            tickSeconds,
+            navigationVersion,
+            move: moveActor,
+            destination: routeDestination,
+          });
           const previousPositions = new Map(
             working.actors.map((actor) => [
               actor.id,
@@ -1944,7 +2000,8 @@ export function createMissionSimulation({
             previousPositions,
             ({ actor, definition }, point) =>
               withinBounds(point, worldBounds) &&
-              leashAllows(actor, definition, point),
+              leashAllows(actor, definition, point) &&
+              serviceAllows(actor, definition, point),
           );
         }
         // Committed actors are frozen, so they serve as their own identity.
@@ -2125,6 +2182,7 @@ function indexDefinitions(
     }
     validateSupportDefinition(definition);
     validateVisionDefinition(definition);
+    validateRestorationDefinition(definition);
     validateCombatDefinition(definition);
     deepFreeze(definition);
     behaviorRegistry

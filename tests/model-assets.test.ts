@@ -1,4 +1,4 @@
-import { Color3, VertexBuffer } from "@babylonjs/core";
+import { Color3, Vector3, VertexBuffer } from "@babylonjs/core";
 import { expect, test } from "vitest";
 
 import { testScene } from "./helpers/scene";
@@ -191,3 +191,57 @@ test.each(["command-center", "barracks", "refinery", "salvage"])(
     expect(scene.materials).toHaveLength(0);
   },
 );
+
+test("ARC support uses distinct unarmed geometry within its selection bounds", async () => {
+  const scene = testScene();
+  const bodies = [];
+  const urls = [];
+  for (const id of ["arc-scout", "arc-medic", "arc-mechanic"]) {
+    const model = BASE_CONTENT.presentation[id]!.model!;
+    if (!("glb" in model)) throw new Error("Expected generated infantry");
+    urls.push(model.glb.url);
+    expect(model.glb.clips.attack).toBeUndefined();
+    expect(model.glb.clips.aim).toBeUndefined();
+    const asset = await loadSkinnedActorAppearance(scene, {
+      ...model.glb,
+      url: glbDataUrl(model.glb.url),
+    });
+    const instance = asset.instantiate(id, 0);
+    const body = instance.root
+      .getChildMeshes()
+      .find((mesh) => mesh.name.endsWith(`${id}-body`))!;
+    bodies.push(Array.from(body.getVerticesData(VertexBuffer.PositionKind)!));
+    scene.animate();
+    // Selection uses a cylinder, including the posed support equipment.
+    if (id !== "arc-scout") {
+      let radius = 0;
+      let height = 0;
+      for (const mesh of instance.root.getChildMeshes()) {
+        const matrix = mesh.computeWorldMatrix(true);
+        mesh.skeleton?.prepare(true);
+        const positions = mesh.getPositionData(true);
+        if (!positions) continue;
+        for (let index = 0; index < positions.length; index += 3) {
+          const point = Vector3.TransformCoordinates(
+            Vector3.FromArray(positions, index),
+            matrix,
+          );
+          radius = Math.max(radius, Math.hypot(point.x, point.z));
+          height = Math.max(height, point.y);
+        }
+      }
+      expect(height, `${id} height`).toBeLessThanOrEqual(
+        model.glb.bounds.height,
+      );
+      expect(radius, `${id} radius`).toBeLessThanOrEqual(
+        model.glb.bounds.radius,
+      );
+    }
+    instance.dispose();
+    asset.dispose();
+  }
+  expect(new Set(urls).size).toBe(3);
+  expect(bodies[0]).not.toEqual(bodies[1]);
+  expect(bodies[0]).not.toEqual(bodies[2]);
+  expect(bodies[1]).not.toEqual(bodies[2]);
+});

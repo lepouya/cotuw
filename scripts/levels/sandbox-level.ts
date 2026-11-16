@@ -25,6 +25,8 @@ export function createSandboxLevel({
   actors = [
     "arc-trooper",
     "arc-scout",
+    "arc-medic",
+    "arc-mechanic",
     "arc-command-center-prototype",
     "arc-field-barracks",
   ],

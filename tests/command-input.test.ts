@@ -3,7 +3,10 @@ import { afterEach, expect, test, vi } from "vitest";
 import { createCommandInput } from "../src/render/command-input";
 
 import type { Scene } from "@babylonjs/core";
-import type { ContextAction } from "../src/render/command-input";
+import type {
+  CommandInputOptions,
+  ContextAction,
+} from "../src/render/command-input";
 
 const inputs: { dispose: () => void }[] = [];
 afterEach(() => {
@@ -11,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function fixture() {
+function fixture(options: Pick<CommandInputOptions, "service"> = {}) {
   const host = new EventTarget();
   const document = {
     defaultView: host,
@@ -52,6 +55,7 @@ function fixture() {
       canAttack: (id) => id === "wolf" && visible.has(id),
       canCommand: () => playing,
       submitCommand,
+      ...options,
       onContextMenu: (_x, _y, next) => {
         actions = next;
       },
@@ -179,4 +183,20 @@ test("deselect clears selection and reports whether there was any", () => {
   input.select("unit-1");
   expect(input.deselect()).toBe(true);
   expect(input.selectedActorIds).toEqual([]);
+});
+
+test("support targeting queues with Shift and yields to Add units mode", () => {
+  const run = vi.fn();
+  const service = vi.fn(() => ({ label: "Heal", run }));
+  const { input, menu } = fixture({ service });
+  input.select("unit-1");
+  const action = menu("unit-2", true)("service");
+  expect(action.label).toBe("Heal");
+  expect(service).toHaveBeenCalledWith("unit-2", true);
+  action.run();
+  expect(run).toHaveBeenCalledTimes(1);
+  input.setAdditiveMode(true);
+  service.mockClear();
+  expect(menu("unit-2")("service")).toBeUndefined();
+  expect(service).not.toHaveBeenCalled();
 });

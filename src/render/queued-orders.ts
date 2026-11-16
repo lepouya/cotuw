@@ -13,6 +13,7 @@ const ORDER_COLORS: Record<QueuedOrder["kind"], Color4> = {
   move: new Color4(1, 0.78, 0.24, 0.85),
   "attack-move": new Color4(1, 0.42, 0.12, 0.85),
   attack: new Color4(1, 0.25, 0.17, 0.85),
+  service: new Color4(0.3, 1, 0.55, 0.85),
   gather: new Color4(0.3, 0.8, 0.85, 0.85),
 };
 const DASH_LENGTH = 0.3;
@@ -49,6 +50,8 @@ export function createQueuedOrderView(
         actor.movement?.target ??
         actor.attackMove?.target ??
         actor.combat?.attack?.lastKnown ??
+        (actor.service &&
+          pointOf({ kind: "service", targetId: actor.service.targetId })) ??
         actor.worldPosition;
       for (const order of actor.orders ?? []) {
         const to = pointOf(order);

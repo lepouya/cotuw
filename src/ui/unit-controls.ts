@@ -2,7 +2,8 @@ import { isOutcomeOf } from "../simulation/command";
 import { setText } from "./dom";
 
 import type { CommandInput } from "../render/command-input";
-import type { CommandOutcome } from "../simulation/command";
+import type { AuthorityReason, CommandOutcome } from "../simulation/command";
+import type { ServiceReason } from "../simulation/unit-support";
 
 export type UnitControls = {
   boxSelect?: HTMLButtonElement;
@@ -16,6 +17,15 @@ export type UnitControls = {
 };
 
 export type MoveStatus = "accepted" | "partial" | "unreachable";
+
+const SERVICE_REJECTIONS: Record<ServiceReason | AuthorityReason, string> = {
+  "invalid-provider": "This unit cannot provide support",
+  "invalid-service-target": "This unit cannot service that target",
+  undamaged: "The target is already at full health",
+  "target-busy": "The target already has a provider",
+  "out-of-range": "The target is beyond pursuit range",
+  unauthorized: "This unit is not under your command",
+};
 
 /** Binds selection actions and reports receipts for committed move orders. */
 export function createUnitControls(
@@ -140,6 +150,23 @@ export function createUnitControls(
           ].join(" · ") + ".",
         );
       }
+      const services = outcomes.filter((outcome) =>
+        isOutcomeOf(outcome, "service"),
+      );
+      if (services.length)
+        message(
+          services
+            .map(({ accepted, queued, reason }) => {
+              if (accepted)
+                return queued
+                  ? "Support order queued"
+                  : "Support target prioritized";
+              return reason
+                ? SERVICE_REJECTIONS[reason]
+                : "Support order rejected";
+            })
+            .join(" · ") + ".",
+        );
       return status;
     },
     dispose: () => controller.abort(),

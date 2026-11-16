@@ -8,6 +8,7 @@ const EDGE_MARGIN = 8;
 
 // Shape as well as color tells the actions apart.
 const ICONS: Record<ContextActionKind, string> = {
+  service: "+",
   tend: "❧",
   attack: "⚔",
   select: "◉",

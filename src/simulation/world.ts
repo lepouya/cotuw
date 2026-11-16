@@ -31,8 +31,20 @@ export function withinBounds(
   return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
 }
 
+/** Whether untrusted data is a finite position inside the bounds. */
+export const isPositionWithin = (
+  value: unknown,
+  bounds: WorldBounds,
+): value is WorldPosition =>
+  isFinitePosition(value) && withinBounds(value, bounds);
+
 export function distance(left: WorldPosition, right: WorldPosition): number {
   return Math.hypot(left.x - right.x, left.z - right.z);
+}
+
+/** Facing angle that looks from one point towards another. */
+export function facingToward(from: WorldPosition, to: WorldPosition): number {
+  return Math.atan2(to.x - from.x, to.z - from.z);
 }
 
 export function clampToBounds(

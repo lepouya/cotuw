@@ -121,7 +121,7 @@ test("production pictures explain disabled cards and keep selection visible", as
   );
   await page.locator("#build-barracks").focus();
   await expect(page.getByRole("tooltip")).toContainText(
-    "Trains Trooper & Scout",
+    "Trains Trooper & Scout & Medic & Mechanic",
   );
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toBeHidden();

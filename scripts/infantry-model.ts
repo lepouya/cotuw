@@ -21,7 +21,7 @@ import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
 import type { Scene } from "@babylonjs/core";
 
 type Vec3 = [number, number, number];
-type Finish = "armor" | "cloth" | "owner" | "visor" | "dark" | "skin";
+type Finish = "armor" | "cloth" | "owner" | "visor" | "dark" | "skin" | "metal";
 type Joint = { name: string; parent?: string; offset: Vec3 };
 type Part = {
   name: string;
@@ -37,6 +37,7 @@ type Pose = (joint: string, phase: number) => Vec3;
 
 const KEY_STEP = 2;
 const DARK: Vec3 = [0.09, 0.13, 0.15];
+const METAL: Vec3 = [0.62, 0.68, 0.7];
 
 /** Resting arms: shoulder pitch and outward spread, mirrored on the right. */
 type Stance = { pitch: number; spread: number; forearm: number; swing: number };
@@ -44,7 +45,7 @@ type Stance = { pitch: number; spread: number; forearm: number; swing: number };
 type Attack = { clip: string; frames: number; joints: string[]; pose: Pose };
 type InfantryRecipe = {
   scale: number;
-  palette: Record<Exclude<Finish, "dark">, Vec3>;
+  palette: Record<Exclude<Finish, "dark" | "metal">, Vec3>;
   parts: readonly Part[];
   stride: number;
   stance: Stance;
@@ -74,26 +75,7 @@ const JOINTS: Joint[] = [
   ]),
 ];
 
-/** Positions are in the model's rest pose, relative to the ground point. */
-const ARC_PARTS: Part[] = [
-  part("waist", "pelvis", "box", [0.47, 0.2, 0.3], [0, 0.91, 0], "dark"),
-  part("chest", "spine", "box", [0.63, 0.47, 0.34], [0, 1.31, 0], "cloth"),
-  part(
-    "breastplate",
-    "spine",
-    "box",
-    [0.55, 0.34, 0.12],
-    [0, 1.34, 0.22],
-    "armor",
-  ),
-  part(
-    "chest-mark",
-    "spine",
-    "box",
-    [0.12, 0.13, 0.025],
-    [0, 1.39, 0.292],
-    "owner",
-  ),
+const ARC_BACKPACK: Part[] = [
   part(
     "backpack",
     "spine",
@@ -102,7 +84,8 @@ const ARC_PARTS: Part[] = [
     [0, 1.31, -0.26],
     "armor",
   ),
-  part("collar", "spine", "cylinder", [0.33, 0.13, 0.33], [0, 1.54, 0], "dark"),
+];
+const ARC_HEAD: Part[] = [
   part("helmet", "head", "sphere", [0.43, 0.35, 0.43], [0, 1.69, 0], "armor"),
   part("visor", "head", "box", [0.35, 0.13, 0.08], [0, 1.69, 0.2], "visor"),
   part(
@@ -113,72 +96,8 @@ const ARC_PARTS: Part[] = [
     [0, 1.86, 0],
     "owner",
   ),
-  ...mirrored((side, sign) => [
-    part(
-      `${side}-pauldron`,
-      `${side}-arm`,
-      "sphere",
-      [0.3, 0.24, 0.34],
-      [sign * 0.37, 1.37, 0],
-      "owner",
-    ),
-    part(
-      `${side}-upper-arm`,
-      `${side}-arm`,
-      "cylinder",
-      [0.15, 0.29, 0.15],
-      [sign * 0.38, 1.18, 0.03],
-      "cloth",
-    ),
-    part(
-      `${side}-forearm`,
-      `${side}-forearm`,
-      "box",
-      [0.17, 0.26, 0.18],
-      [sign * 0.4, 0.96, 0.12],
-      "armor",
-    ),
-    part(
-      `${side}-glove`,
-      `${side}-forearm`,
-      "box",
-      [0.15, 0.13, 0.16],
-      [sign * 0.4, 0.81, 0.16],
-      "dark",
-    ),
-    part(
-      `${side}-thigh`,
-      `${side}-leg`,
-      "cylinder",
-      [0.23, 0.43, 0.23],
-      [sign * 0.17, 0.65, 0],
-      "cloth",
-    ),
-    part(
-      `${side}-knee`,
-      `${side}-shin`,
-      "box",
-      [0.25, 0.18, 0.12],
-      [sign * 0.17, 0.45, 0.1],
-      "armor",
-    ),
-    part(
-      `${side}-shin-plate`,
-      `${side}-shin`,
-      "box",
-      [0.21, 0.32, 0.19],
-      [sign * 0.17, 0.26, 0],
-      "armor",
-    ),
-    part(
-      `${side}-boot`,
-      `${side}-shin`,
-      "box",
-      [0.24, 0.18, 0.37],
-      [sign * 0.17, 0.1, 0.08],
-      "dark",
-    ),
-  ]),
+];
+const ARC_RIFLE: Part[] = [
   part(
     "rifle-body",
     "spine",
@@ -204,6 +123,304 @@ const ARC_PARTS: Part[] = [
     [0.12, 1.24, 0.36],
     "owner",
   ),
+];
+
+/** Ground-relative body parts with explicit head, pack, and role equipment. */
+function arcParts({
+  head = ARC_HEAD,
+  backpack = ARC_BACKPACK,
+  gear = [],
+}: {
+  head?: readonly Part[];
+  backpack?: readonly Part[];
+  gear?: readonly Part[];
+} = {}): Part[] {
+  return [
+    part("waist", "pelvis", "box", [0.47, 0.2, 0.3], [0, 0.91, 0], "dark"),
+    part("chest", "spine", "box", [0.63, 0.47, 0.34], [0, 1.31, 0], "cloth"),
+    part(
+      "breastplate",
+      "spine",
+      "box",
+      [0.55, 0.34, 0.12],
+      [0, 1.34, 0.22],
+      "armor",
+    ),
+    part(
+      "chest-mark",
+      "spine",
+      "box",
+      [0.12, 0.13, 0.025],
+      [0, 1.39, 0.292],
+      "owner",
+    ),
+    ...backpack,
+    part(
+      "collar",
+      "spine",
+      "cylinder",
+      [0.33, 0.13, 0.33],
+      [0, 1.54, 0],
+      "dark",
+    ),
+    ...head,
+    ...mirrored((side, sign) => [
+      part(
+        `${side}-pauldron`,
+        `${side}-arm`,
+        "sphere",
+        [0.3, 0.24, 0.34],
+        [sign * 0.37, 1.37, 0],
+        "owner",
+      ),
+      part(
+        `${side}-upper-arm`,
+        `${side}-arm`,
+        "cylinder",
+        [0.15, 0.29, 0.15],
+        [sign * 0.38, 1.18, 0.03],
+        "cloth",
+      ),
+      part(
+        `${side}-forearm`,
+        `${side}-forearm`,
+        "box",
+        [0.17, 0.26, 0.18],
+        [sign * 0.4, 0.96, 0.12],
+        "armor",
+      ),
+      part(
+        `${side}-glove`,
+        `${side}-forearm`,
+        "box",
+        [0.15, 0.13, 0.16],
+        [sign * 0.4, 0.81, 0.16],
+        "dark",
+      ),
+      part(
+        `${side}-thigh`,
+        `${side}-leg`,
+        "cylinder",
+        [0.23, 0.43, 0.23],
+        [sign * 0.17, 0.65, 0],
+        "cloth",
+      ),
+      part(
+        `${side}-knee`,
+        `${side}-shin`,
+        "box",
+        [0.25, 0.18, 0.12],
+        [sign * 0.17, 0.45, 0.1],
+        "armor",
+      ),
+      part(
+        `${side}-shin-plate`,
+        `${side}-shin`,
+        "box",
+        [0.21, 0.32, 0.19],
+        [sign * 0.17, 0.26, 0],
+        "armor",
+      ),
+      part(
+        `${side}-boot`,
+        `${side}-shin`,
+        "box",
+        [0.24, 0.18, 0.37],
+        [sign * 0.17, 0.1, 0.08],
+        "dark",
+      ),
+    ]),
+    ...gear,
+  ];
+}
+
+const MEDIC_GEAR: Part[] = [
+  part(
+    "medical-pack",
+    "spine",
+    "box",
+    [0.58, 0.62, 0.3],
+    [0, 1.35, -0.34],
+    "armor",
+  ),
+  part(
+    "pack-medical-bar",
+    "spine",
+    "box",
+    [0.12, 0.39, 0.025],
+    [0, 1.39, -0.503],
+    "cloth",
+  ),
+  part(
+    "pack-medical-arms",
+    "spine",
+    "box",
+    [0.36, 0.12, 0.025],
+    [0, 1.39, -0.505],
+    "cloth",
+  ),
+  part(
+    "pack-handle",
+    "spine",
+    "box",
+    [0.28, 0.08, 0.11],
+    [0, 1.7, -0.34],
+    "dark",
+  ),
+  part(
+    "medical-bib",
+    "spine",
+    "box",
+    [0.31, 0.3, 0.04],
+    [0, 1.31, 0.3],
+    "armor",
+  ),
+  part(
+    "bib-medical-bar",
+    "spine",
+    "box",
+    [0.075, 0.23, 0.025],
+    [0, 1.33, 0.335],
+    "cloth",
+  ),
+  part(
+    "bib-medical-arms",
+    "spine",
+    "box",
+    [0.23, 0.075, 0.025],
+    [0, 1.33, 0.337],
+    "cloth",
+  ),
+  part(
+    "medical-case",
+    "left-forearm",
+    "box",
+    [0.29, 0.37, 0.24],
+    [-0.48, 0.64, 0.16],
+    "armor",
+  ),
+  part(
+    "case-stripe",
+    "left-forearm",
+    "box",
+    [0.3, 0.12, 0.25],
+    [-0.48, 0.67, 0.16],
+    "cloth",
+  ),
+  part(
+    "scanner",
+    "right-forearm",
+    "box",
+    [0.21, 0.11, 0.3],
+    [0.41, 0.99, 0.24],
+    "armor",
+  ),
+  part(
+    "scanner-display",
+    "right-forearm",
+    "box",
+    [0.14, 0.025, 0.16],
+    [0.41, 1.06, 0.26],
+    "visor",
+  ),
+];
+
+const MECHANIC_GEAR: Part[] = [
+  part("hard-hat", "head", "sphere", [0.5, 0.32, 0.46], [0, 1.72, 0], "armor"),
+  part(
+    "hat-brim",
+    "head",
+    "cylinder",
+    [0.61, 0.065, 0.56],
+    [0, 1.67, 0.02],
+    "armor",
+  ),
+  part("hat-stripe", "head", "box", [0.12, 0.055, 0.47], [0, 1.89, 0], "owner"),
+  part(
+    "face-shield",
+    "head",
+    "box",
+    [0.33, 0.13, 0.08],
+    [0, 1.63, 0.21],
+    "dark",
+  ),
+  part("headlamp", "head", "box", [0.16, 0.1, 0.07], [0, 1.74, 0.26], "visor"),
+  part(
+    "tool-pack",
+    "spine",
+    "box",
+    [0.68, 0.45, 0.23],
+    [0, 1.28, -0.29],
+    "dark",
+  ),
+  ...mirrored((side, sign) => [
+    part(
+      `${side}-service-tank`,
+      "spine",
+      "cylinder",
+      [0.23, 0.64, 0.23],
+      [sign * 0.27, 1.4, -0.4],
+      "metal",
+    ),
+    part(
+      `${side}-tank-cap`,
+      "spine",
+      "cylinder",
+      [0.25, 0.1, 0.25],
+      [sign * 0.27, 1.75, -0.4],
+      "armor",
+    ),
+    part(
+      `${side}-tool-pouch`,
+      "pelvis",
+      "box",
+      [0.25, 0.28, 0.28],
+      [sign * 0.3, 0.87, 0.02],
+      "armor",
+    ),
+    part(
+      `${side}-vest-strap`,
+      "spine",
+      "box",
+      [0.08, 0.37, 0.04],
+      [sign * 0.2, 1.33, 0.3],
+      "metal",
+    ),
+  ]),
+  part(
+    "wrench-shaft",
+    "right-forearm",
+    "box",
+    [0.09, 0.62, 0.1],
+    [0.47, 1.13, 0.23],
+    "metal",
+  ),
+  part(
+    "wrench-grip",
+    "right-forearm",
+    "box",
+    [0.12, 0.24, 0.13],
+    [0.47, 0.92, 0.23],
+    "dark",
+  ),
+  part(
+    "wrench-jaw-base",
+    "right-forearm",
+    "box",
+    [0.31, 0.1, 0.13],
+    [0.47, 1.47, 0.23],
+    "metal",
+  ),
+  ...mirrored((side, sign) => [
+    part(
+      `wrench-${side}-jaw`,
+      "right-forearm",
+      "box",
+      [0.09, 0.22, 0.13],
+      [0.47 + sign * 0.11, 1.6, 0.23],
+      "metal",
+    ),
+  ]),
 ];
 
 /** The shared Circle body; `mantle` sizes each role's cloak. */
@@ -503,7 +720,7 @@ const INFANTRY_RECIPES = {
       visor: [0.19, 0.72, 0.79],
       skin: ARC_SKIN,
     },
-    parts: ARC_PARTS,
+    parts: arcParts({ gear: ARC_RIFLE }),
     stride: 1,
     stance: ARMS_AT_SIDES,
     attack: RIFLE_FIRE,
@@ -517,9 +734,35 @@ const INFANTRY_RECIPES = {
       visor: [0.91, 0.76, 0.34],
       skin: ARC_SKIN,
     },
-    parts: ARC_PARTS.filter(({ name }) => !name.startsWith("rifle-")),
+    parts: arcParts(),
     stride: 1,
     stance: ARMS_AT_SIDES,
+  },
+  "arc-medic": {
+    scale: 0.97,
+    palette: {
+      armor: [0.88, 0.92, 0.85],
+      cloth: [0.12, 0.44, 0.34],
+      owner: [0.64, 0.9, 0.82],
+      visor: [0.32, 0.95, 0.73],
+      skin: ARC_SKIN,
+    },
+    parts: arcParts({ backpack: [], gear: MEDIC_GEAR }),
+    stride: 0.9,
+    stance: ARMS_AT_SIDES,
+  },
+  "arc-mechanic": {
+    scale: 1,
+    palette: {
+      armor: [0.87, 0.52, 0.16],
+      cloth: [0.22, 0.25, 0.26],
+      owner: [0.97, 0.71, 0.26],
+      visor: [1, 0.9, 0.55],
+      skin: ARC_SKIN,
+    },
+    parts: arcParts({ head: [], backpack: [], gear: MECHANIC_GEAR }),
+    stride: 0.85,
+    stance: { ...ARMS_AT_SIDES, swing: 0.08 },
   },
   "circle-sentinel": {
     scale: 1.04,
@@ -586,7 +829,7 @@ function buildInfantry(
 
   // glTF colors are linear. A vertex-colored body, the glowing visor, and
   // owner markings that sessions recolor keep each soldier to three draws.
-  const palette = { ...recipe.palette, dark: DARK };
+  const palette = { ...recipe.palette, dark: DARK, metal: METAL };
   const linear = (color: Vec3) => new Color3(...color).toLinearSpace();
   const body = new PBRMaterial(`${name}-body`, scene);
   body.albedoColor = Color3.White();

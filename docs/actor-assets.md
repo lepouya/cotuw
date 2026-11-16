@@ -9,20 +9,24 @@ clips match their generators, and reject unregistered files in `public/assets`.
 ## Inventory
 
 - `npm run assets:infantry`: `scripts/infantry-model.ts` exports Trooper,
-  Scout, Sentinel, Wayfinder, and Cultivator meshes, materials, skeletons,
-  idle, walk, turn, hit, and death clips. Troopers use aim and fire;
-  Sentinels use aim and channeling clips. Circle personnel have slender
-  proportions, pointed ears, exposed faces, circlets, tunics, and mantles,
-  with owner markings; ARC owner markings cover the shoulders, chest, and
-  helmet ridge.
+  Scout, Medic, Mechanic, Sentinel, Wayfinder, and Cultivator meshes,
+  materials, skeletons, idle, walk, turn, hit, and death clips. Troopers use
+  aim and fire; Sentinels use aim and channeling clips. Circle personnel have
+  slender proportions, pointed ears, exposed faces, circlets, tunics, and
+  mantles with owner markings. ARC owner markings cover the shoulders, chest,
+  and helmet ridge.
   Sentinels wear layered leaf armor and channel violet focus artifacts;
   Wayfinders wear light hoods and carry wayfinding staves.
   Each asset ID has one recipe owning its scale, palette, geometry, gait, arm
   stance, and optional attack layer; only armed recipes export attack and aim
-  clips. The shared exporter does not infer factions from role names. The
-  unarmed ARC Scout omits rifle geometry. Cultivators carry a pod and a
-  growth tool; their full-pose cultivation loop blends through the shared
-  work-animation contract.
+  clips. ARC recipes explicitly compose head, pack, and role equipment;
+  weapons are opt-in. The shared exporter does not infer factions from role
+  names. Unarmed Scouts omit rifle geometry. Medics wear pale armor with teal
+  medical markings, square medical packs, scanners, and carry cases. Mechanics
+  wear ochre work armor and hard hats, with twin service tanks, tool pouches,
+  and an open-ended wrench. Both keep separate owner markings and unarmed
+  animation clips. Cultivators carry a pod and a growth tool; their full-pose
+  cultivation loop blends through the shared work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, and Barracks meshes with idle machinery and activity clips; a
   skinned wolf with idle, walk, run, turn, bite, hit, and death; a rigid
@@ -84,7 +88,9 @@ Model export can log Babylon's bone uniform warning. `NullEngine` reports only
 
 `src/ui/actor-portrait.ts` draws original SVG card illustrations. Content's
 optional `portrait` binding selects one; otherwise the actor's gameplay role
-chooses a generic icon. Circle portraits show exposed elven faces, pointed
+chooses a generic icon. The Medic portrait shows pale armor, teal medical
+markings, a carry case, and a scanner; the Mechanic shows ochre work gear,
+a hard hat, and a wrench. Circle portraits show exposed elven faces, pointed
 ears, tunics, and role-specific gear: the Cultivator's pod and tending tool,
 Sentinel leaf armor and focus, and Wayfinder hood and stave. Building portraits
 match the Heartgrove crown, Conservatory basin, and vaulted Musterhall.
@@ -137,17 +143,18 @@ Register any additional extension centrally before exporting an asset that
 uses it.
 
 Each actor's `model.glb` presentation supplies the GLB URL, clip names,
-minimap color, pick and selection bounds, and ground distance covered by one
-locomotion cycle. Optional `scale` scales the mesh; bounds and cycle distance
-use final world units. The runtime chooses clips from the rendered
+pick and selection bounds, and ground distance covered by one locomotion
+cycle. Optional `scale` scales the mesh; bounds and cycle distance
+use final world units. Support model tests measure posed vertices against
+the cylindrical bounds at rest. The runtime chooses clips from the rendered
 pose, triggers, and remains, as [DESIGN.md](../DESIGN.md#actor-animation)
 describes. A replacement asset can use different joint names if its clips
 target the new rig consistently.
 
 Keep draw calls low: merge parts that share a material into one mesh. The
-placeholder infantry use one vertex-colored body mesh and one emissive visor
-mesh. Author PBR metallic-roughness materials with linear colors, since that is
-what glTF stores and the game renders.
+placeholder infantry use one vertex-colored body mesh, one emissive visor
+mesh, and one owner-material mesh. Author PBR metallic-roughness materials
+with linear colors, since that is what glTF stores and the game renders.
 
 ## Buildings and props
 

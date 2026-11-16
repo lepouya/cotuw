@@ -1,5 +1,10 @@
 import { expect, test } from "./fixtures";
-import { holdRequests, terrainPoint } from "./page-helpers";
+import {
+  collectPageErrors,
+  holdRequests,
+  terrainPoint,
+  withoutApp,
+} from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 test(
@@ -156,5 +161,94 @@ test(
       body: await page.locator("#generated-models").screenshot(),
       contentType: "image/png",
     });
+  },
+);
+
+test(
+  "ARC support silhouettes stay distinct under one owner color",
+  { tag: WEBKIT },
+  async ({ page }, info) => {
+    const errors = collectPageErrors(page);
+    await withoutApp(page);
+    await page.goto("/");
+    const preview = await page.evaluateHandle(async () => {
+      const { createLifetime } = await import("/src/lifetime.ts");
+      const lifetime = createLifetime();
+      try {
+        const { createTestView, frames } = await import("/e2e/harness.ts");
+        const { currentContentPack } = await import("/src/content/packs.ts");
+        const { loadSkinnedActorAppearance } =
+          await import("/src/render/skinned-actor-appearance.ts");
+        const { createOwnerMaterials } =
+          await import("/src/render/owner-materials.ts");
+        const { scene, canvas, camera, view } = createTestView({
+          map: { width: 24, height: 20, tileSize: 1, createHeight: () => 0 },
+          size: { width: 1000, height: 650 },
+          terrain: true,
+        });
+        lifetime.own(view);
+        canvas.id = "support-models";
+        Object.assign(canvas.style, {
+          position: "fixed",
+          top: "0",
+          left: "0",
+          zIndex: "50",
+        });
+        camera.alpha = -Math.PI / 2;
+        view.camera.zoomBy(1 / 3);
+        const pack = currentContentPack("base");
+        const colors = lifetime.own(
+          createOwnerMaterials(
+            new Map([["player", [0.2, 0.45, 1] as [number, number, number]]]),
+          ),
+        );
+        const models = [];
+        for (const [index, id] of [
+          "arc-scout",
+          "arc-medic",
+          "arc-mechanic",
+        ].entries()) {
+          const model = pack.presentation[id]!.model!;
+          if (!("glb" in model)) throw new Error("Expected generated infantry");
+          const appearance = lifetime.own(
+            await loadSkinnedActorAppearance(scene, model.glb),
+          );
+          for (const [row, facing] of [Math.PI, 0].entries()) {
+            const instance = lifetime.own(
+              appearance.instantiate(`${id}-${row}`, 0),
+            );
+            instance.root.position.set((index - 1) * 3.5, 0, row * 4 - 2);
+            instance.root.rotation.y = facing;
+            colors.apply(instance.root.getChildMeshes(), "player");
+            instance.animate?.({ seconds: 0.1, distance: 0, turn: 0 });
+          }
+          models.push({ id, url: model.glb.url });
+        }
+        await frames(3);
+        return { models, view, dispose: lifetime.dispose };
+      } catch (error) {
+        lifetime.dispose();
+        throw error;
+      }
+    });
+    try {
+      const result = await preview.evaluate(({ models }) => models);
+      expect(new Set(result.map(({ url }) => url)).size).toBe(3);
+      await page
+        .locator("#support-models")
+        .screenshot({ path: info.outputPath("support-models-detail.png") });
+      await preview.evaluate(async ({ view }) => {
+        const { frames } = await import("/e2e/harness.ts");
+        view.camera.zoomBy(3);
+        await frames(2);
+      });
+      await page
+        .locator("#support-models")
+        .screenshot({ path: info.outputPath("support-models-gameplay.png") });
+      expect(errors).toEqual([]);
+    } finally {
+      await preview.evaluate(({ dispose }) => dispose());
+      await preview.dispose();
+    }
   },
 );

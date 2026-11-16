@@ -1,5 +1,6 @@
 import { isTilePlacedActor, occupiedTilesFor } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
+import { isSupportUnit } from "../simulation/actor";
 import { createButton, createElement as el, setText } from "./dom";
 import { countByDefinition, inspectedActor } from "./sidebar-context";
 import type { ObservedActor } from "../simulation/owner-view";
@@ -18,6 +19,13 @@ function moveHint({ paused, boxMode }: SidebarState, subject: string) {
   return boxMode
     ? `Turn off Box select to move ${subject}.`
     : `Tap or click terrain to move ${subject}.`;
+}
+
+function supportHint(state: SidebarState) {
+  if (state.paused) return "Resume the mission to issue support orders.";
+  if (state.boxMode) return "Turn off Box select to prioritize recovery.";
+  if (state.additiveMode) return "Turn off Add units to prioritize recovery.";
+  return "Tap or click a damaged eligible unit to prioritize it.";
 }
 
 export function createSidebarSelection(
@@ -164,6 +172,21 @@ export function createSidebarSelection(
     );
     return `${name} · ${footprintSize(tiles)} · ${actor.tilePlacement.quarterTurns * 90}°`;
   };
+  /** A support unit's current service; undefined for other actors. */
+  const supportStatus = (actor: ObservedActor, state: SidebarState) => {
+    const definition = definitionById.get(actor.definitionId);
+    if (!definition || !isSupportUnit(definition) || !owns(actor))
+      return undefined;
+    const owned = state.ownActors?.find(({ id }) => id === actor.id);
+    const order = owned?.service;
+    const target =
+      order && state.actors.find(({ id }) => id === order.targetId);
+    if (!target) return "Automatic support while idle";
+    let action = "Servicing";
+    if (order.blocked) action = "Route blocked";
+    else if (owned.movement) action = "Approaching";
+    return `${action} ${nameFor(target.definitionId)}`;
+  };
   const infoOf = (actor: ObservedActor | undefined, state: SidebarState) => {
     if (!actor)
       return "Choose a unit or building on the map, or a field unit in Units.";
@@ -180,6 +203,9 @@ export function createSidebarSelection(
         .filter(Boolean)
         .join(" · ");
     const definition = definitionById.get(actor.definitionId);
+    const support = supportStatus(actor, state);
+    if (support)
+      return `${description ?? "Unit support"} · ${support} · ${supportHint(state)}`;
     if (definition?.production)
       return `${description ?? "Unit production"} · Trains ${trainedNames(definition).join(" and ")}.`;
     if (isTilePlacedActor(actor))
@@ -231,8 +257,10 @@ export function createSidebarSelection(
           `Health ${Math.ceil(actor.health ?? maximum)} / ${maximum}`,
         );
       const nextSelectionKey = JSON.stringify([
+        actor && supportStatus(actor, state),
         ids,
         state.boxMode ?? false,
+        state.additiveMode ?? false,
         state.paused ?? false,
         state.actors
           .filter(({ id }) => selected.has(id))

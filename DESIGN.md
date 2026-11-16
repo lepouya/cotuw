@@ -412,6 +412,26 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   service a target. It stops within range and follows a moving target only
   within a bounded pursuit distance. Move or Stop replaces service; damage
   alone does not cancel it. Ranges and rates are data-driven.
+- Unit support serves owned mobile units with the matching recovery kind.
+  Providers cannot service themselves, buildings, other owners, or destroyed
+  units. Medics can heal other Medics and Mechanics as personnel.
+- A manual priority must name a damaged eligible target within pursuit reach.
+  Existing providers keep their targets; a conflicting manual order rejects
+  without changing either provider. Simultaneous automatic choices order
+  providers by actor ID; equally near targets break ties by actor ID.
+- Service ends when the target reaches full health or becomes ineligible.
+  Automatic support resumes while idle. Queued orders take precedence over
+  acquiring another target. Stop suppresses automatic support for its command
+  tick; it may resume on the next tick.
+- Pursuit is bounded around where service began. Releasing a target beyond
+  that limit stops the provider in place. It skips that target automatically
+  until the target returns within acquisition radius of that original point,
+  reaches full health, or is destroyed. A new manual priority can assign the
+  target again with a new pursuit origin.
+- Blocked service retains its target and waits for target movement or
+  navigation changes before retrying. A queued order may replace blocked work.
+  Support restores health after combat resolves deaths and before movement;
+  damage alone does not interrupt surviving providers or their targets.
 - A building uses contextual **Repair** without a builder. Each simulated
   second, a paid repair step restores up to 1% of maximum health, with a
   smaller final step. Charge for that step before applying its health.
@@ -1742,6 +1762,10 @@ acceptance progress. The following sections define the selected scope.
   production queue with Troopers, Scouts, and Demolition Troopers. Surviving
   Harvesters can recover from raid damage through Mechanic support; buildings
   use their separate paid Repair action.
+- Medics wear pale armor with teal medical markings and square medical
+  packs. Mechanics wear ochre work armor and hard hats, with twin service
+  tanks and an open-ended wrench. Role equipment and silhouettes distinguish
+  both from Scouts, independently of their shared owner-color markings.
 - The Circle's **Briar Ram** is a tougher, slower living assault construct
   that approaches and batters structures. Sentinels protect its approach;
   committing it to an assault carries more risk than ranged bombardment.

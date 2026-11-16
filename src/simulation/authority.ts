@@ -105,6 +105,7 @@ export function createCommandAuthority(
         case "move":
         case "attack-move":
         case "attack":
+        case "service":
         case "stop":
         case "set-rally-point":
         case "tend":

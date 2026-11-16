@@ -78,6 +78,8 @@ import { createRallyPointView } from "./render/rally-point";
 import { createQueuedOrderView } from "./render/queued-orders";
 import { createUnitTraining } from "./ui/unit-training";
 import type { UnitTrainingControls } from "./ui/unit-training";
+import { serviceProvider } from "./simulation/unit-support";
+import type { RecoveryKind } from "./simulation/actor";
 import type { SidebarState } from "./ui/sidebar";
 import type { TopBarState } from "./ui/top-bar";
 import type { DefinitionButton } from "./ui/production-action";
@@ -116,6 +118,12 @@ const CAMERA_FRONTIER_MARGIN = 4;
 /** The trigger a building activity plays on the actor taking part. */
 const ACTIVITY_TRIGGERS: Partial<Record<BuildingActivityKind, ActorTrigger>> = {
   delivery: "unload",
+};
+/** Context labels for manual support, by the target's recovery kind. */
+const SERVICE_LABELS: Record<RecoveryKind, string> = {
+  biological: "Heal",
+  mechanical: "Repair unit",
+  "living-construct": "Repair unit",
 };
 
 export type GameSession = Omit<GameView, "dispose"> & {
@@ -335,6 +343,7 @@ async function assembleGameSession(
         );
         return site && map.tileCenter(site.tile.x, site.tile.z);
       }
+      case "service":
       case "attack":
         return player.shownActor(order.targetId)?.worldPosition;
     }
@@ -503,6 +512,32 @@ async function assembleGameSession(
     focusActor: (actorId) => focusActors([actorId]),
     canFollow: (actorId) => followableIds([actorId]).length > 0,
     followActor: (actorId) => followActors([actorId]),
+    service: (targetId, queued) => {
+      const target = player.ownActor(targetId);
+      // A target has one provider, even when several are selected.
+      const provider =
+        target &&
+        serviceProvider(
+          target,
+          input.selectedActorIds.flatMap((id) => player.ownActor(id) ?? []),
+          definitionsById,
+          player.actors().own,
+        );
+      if (!target || !provider) return undefined;
+      const command = {
+        kind: "service",
+        actorId: provider.id,
+        targetId,
+        ...(queued && { queued }),
+      } as const;
+      return {
+        label:
+          SERVICE_LABELS[
+            definitionsById.get(target.definitionId)!.recoveryKind!
+          ],
+        run: () => simulation.submitCommand(command, issuer),
+      };
+    },
     tend: (buildingId) => {
       if (!canCommand()) return undefined;
       const workerId = player.tendWorker(buildingId, input.selectedActorIds);
@@ -632,6 +667,7 @@ async function assembleGameSession(
     economyControls?.refresh();
     controls.onStateChanged?.({
       actors: player.actors().shown,
+      ownActors: player.actors().own,
       actorVersion: simulation.actorVersion,
       selectedActorIds: input.selectedActorIds,
       boxMode: input.boxMode,

@@ -167,6 +167,11 @@ These contracts describe where new behaviors, views, and services attach.
 - `simulation/order-queue.ts` owns which orders can wait, when an actor counts
   as busy, and queuing behind its current order. `simulation/mission.ts` starts
   queued orders through the normal command handlers.
+- `simulation/unit-support.ts` owns support eligibility, exclusive claims,
+  acquisition, bounded pursuit, healing, and saved-state validation. It runs
+  after combat resolves deaths and before behavior updates, routing through
+  `followRoute` with the mission's bounded `move` and `destination`. Contact
+  correction keeps servicing providers inside their pursuit bounds.
 - `simulation/cargo.ts` preserves ordered resource-source amounts, including
   fractional cultivation, independently of workers' current orders and sites.
   Both economies consume provenance on delivery before recording income.

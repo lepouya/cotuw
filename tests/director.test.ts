@@ -548,6 +548,40 @@ test("forces are claimed by one concern within its share", () => {
   });
 });
 
+test("support units neither consume force shares nor accept claims", () => {
+  const sim = fixture(
+    profile([allocation("first"), allocation("second")]),
+    {
+      first: once((context) => {
+        expect(context.claim("medic")).toBe(false);
+        expect(context.claim("mechanic")).toBe(false);
+        expect(context.claim("west-unit-1")).toBe(true);
+        expect(context.claim("west-unit-2")).toBe(true);
+        expect(context.claim("west-unit-3")).toBe(false);
+      }),
+      second: () => {},
+    },
+    {
+      change: (state) => {
+        for (const role of ["medic", "mechanic"])
+          state.actors.push(
+            createActor({
+              id: role,
+              definitionId: `arc-${role}`,
+              owner: "west",
+              worldPosition: terrain.tileCenter(10, 2),
+            }),
+          );
+      },
+    },
+  );
+  sim.tick();
+  expect(sim.ai.west!.claims).toEqual({
+    "west-unit-1": "first",
+    "west-unit-2": "first",
+  });
+});
+
 test("float error in a force share cannot add a unit to its quota", () => {
   const sim = fixture(
     // An exact quarter of four units, which floats compute above one.

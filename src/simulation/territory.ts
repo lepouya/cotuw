@@ -2,11 +2,16 @@ import { trackRouteProgress } from "./automatic-movement";
 import {
   distance,
   isFinitePosition,
+  isPositionWithin,
   samePosition,
-  withinBounds,
 } from "./world";
 import { isTick, secondsToTicks } from "./clock";
-import { insideRouteBounds, withinRouteBounds, WOLF_MODES } from "./actor";
+import {
+  insideRouteBounds,
+  restoreHealth,
+  withinRouteBounds,
+  WOLF_MODES,
+} from "./actor";
 import {
   isId,
   isIdList,
@@ -123,8 +128,7 @@ function isValidTerritoryState(
   definition: ActorDefinition,
   bounds: WorldBounds,
 ): boolean {
-  const point = (value: unknown): value is WorldPosition =>
-    isFinitePosition(value) && withinBounds(value, bounds);
+  const point = (value: unknown) => isPositionWithin(value, bounds);
   if (
     !state ||
     !point(state.home) ||
@@ -198,8 +202,7 @@ export function validateWildlife(
         !isTick(alert.id) ||
         alert.id < 1 ||
         alert.id >= state.nextAlertId ||
-        !isFinitePosition(alert.origin) ||
-        !withinBounds(alert.origin, bounds) ||
+        !isPositionWithin(alert.origin, bounds) ||
         !isTick(alert.createdTick) ||
         alert.createdTick > tick ||
         !isTick(alert.expiresTick) ||
@@ -555,9 +558,12 @@ function regenerate(actor: Actor, context: CombatContext): void {
   )
     return;
   state.mode = "regenerating";
-  actor.health += territory.regenerationPerSecond * context.tickSeconds;
-  if (actor.health >= definition.health!) {
-    delete actor.health;
+  if (
+    restoreHealth(
+      actor,
+      definition.health!,
+      territory.regenerationPerSecond * context.tickSeconds,
+    )
+  )
     state.mode = "idle-at-home";
-  }
 }

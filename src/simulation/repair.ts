@@ -1,7 +1,7 @@
 import { costAmount, costResource } from "./resources";
 import { stockpileOf } from "./stockpiles";
 import { isCount, isPositive, isRecord } from "./validation";
-import { healthOf } from "./actor";
+import { healthOf, restoreHealth } from "./actor";
 import { isValidQueuePosition } from "./infrastructure-queue";
 import type { Actor, ActorDefinition, ActorRenderState } from "./actor";
 import type { Ledger, LedgerView } from "./stockpiles";
@@ -98,12 +98,8 @@ export function applyRepairStep(
     step.cost;
   job.paidCost += step.cost;
   job.completedSteps += 1;
-  const health = Math.min(maximum, healthOf(building, maximum) + step.health);
-  // The final step must not leave a rounding-sized wound behind.
-  if (step.complete && maximum - health <= maximum * (8 * Number.EPSILON))
-    delete building.health;
-  else building.health = health;
-  if (step.complete) delete building.repair;
+  if (restoreHealth(building, maximum, step.health) || step.complete)
+    delete building.repair;
   return step.cost;
 }
 

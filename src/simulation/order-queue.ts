@@ -1,4 +1,4 @@
-import { isWorkerDefinition } from "./actor";
+import { isSupportUnit, isWorkerDefinition } from "./actor";
 import { workerHasOrder } from "./economy";
 import { isMobileActor } from "./placement";
 import { clampToBounds } from "./world";
@@ -23,6 +23,7 @@ export function isBusy(actor: Actor, economy: EconomyView | undefined) {
     (!!actor.movement && !actor.movement.blocked) ||
     (!!actor.attackMove && !actor.attackMove.blocked) ||
     !!actor.combat?.attack ||
+    (!!actor.service && !actor.service.blocked) ||
     (!!actor.combat?.returning && !actor.combat.returning.blocked) ||
     workerHasOrder(economy, actor.id)
   );
@@ -42,8 +43,9 @@ export function queuedOrderOf(
         target: clampToBounds(command.target, bounds),
         ...(requestedTarget && { requestedTarget: { ...requestedTarget } }),
       };
+    case "service":
     case "attack":
-      return { kind: "attack", targetId: command.targetId };
+      return { kind: command.kind, targetId: command.targetId };
     case "gather":
       return { kind: "gather", siteId: command.siteId };
     default:
@@ -57,8 +59,8 @@ export function canQueueOrder(
   hasEconomy: boolean,
 ): boolean {
   return (
-    (order.kind !== "attack" || !!definition.weapon) &&
-    (order.kind !== "gather" || (hasEconomy && isWorkerDefinition(definition)))
+    !queueRejection(order, definition) &&
+    (order.kind !== "gather" || hasEconomy)
   );
 }
 
@@ -66,13 +68,11 @@ export function canQueueOrder(
 function queueRejection(
   order: QueuedOrder | undefined,
   definition: ActorDefinition,
-): "unarmed" | "invalid-harvester" | undefined {
+): "unarmed" | "invalid-harvester" | "invalid-provider" | undefined {
+  if (order?.kind === "service" && !isSupportUnit(definition))
+    return "invalid-provider";
   if (order?.kind === "attack" && !definition.weapon) return "unarmed";
-  if (
-    order?.kind === "gather" &&
-    !definition.harvesting &&
-    !definition.cultivation
-  )
+  if (order?.kind === "gather" && !isWorkerDefinition(definition))
     return "invalid-harvester";
   return undefined;
 }

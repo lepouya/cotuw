@@ -1,7 +1,13 @@
-import { distance, POSITION_EPSILON, samePosition } from "./world";
+import {
+  distance,
+  isPositionWithin,
+  POSITION_EPSILON,
+  samePosition,
+} from "./world";
+import { isCount, isRecord } from "./validation";
 
 import type { Actor, RouteProgress, RouteRetryState } from "./actor";
-import type { WorldPosition } from "./world";
+import type { WorldBounds, WorldPosition } from "./world";
 
 /** A route keeps its plan until its point moves this far from the route's end. */
 const REPLAN_DISTANCE = 1;
@@ -44,6 +50,19 @@ export function followRoute(
   }
   block(point);
   return false;
+}
+
+/** Whether saved retry state names an in-bounds point and a version. */
+export function isRouteRetryState(
+  { blocked }: RouteRetryState,
+  bounds: WorldBounds,
+): boolean {
+  return (
+    blocked === undefined ||
+    (isRecord(blocked) &&
+      isPositionWithin(blocked.at, bounds) &&
+      isCount(blocked.navigationVersion))
+  );
 }
 
 /** Remaining route length includes any gap beyond a partial destination. */

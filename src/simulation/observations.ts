@@ -6,7 +6,7 @@ import {
   tilePlacedPose,
 } from "./placement";
 import { hasOwn, isCount, isId, isPositive, isRecord } from "./validation";
-import { isFinitePosition, withinBounds } from "./world";
+import { isPositionWithin } from "./world";
 
 import type {
   Actor,
@@ -213,8 +213,7 @@ function validActorSighting(sighting: ActorSighting, scope: ObservationScope) {
     !scope.actorIds.has(sighting.actorId) ||
     !scope.ownerIds.has(sighting.owner) ||
     sighting.owner === scope.viewer ||
-    !isFinitePosition(sighting.worldPosition) ||
-    !withinBounds(sighting.worldPosition, scope.bounds) ||
+    !isPositionWithin(sighting.worldPosition, scope.bounds) ||
     (definition.footprint !== undefined) !==
       (sighting.tilePlacement !== undefined) ||
     (sighting.health !== undefined &&

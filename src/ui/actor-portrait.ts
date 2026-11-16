@@ -43,6 +43,33 @@ const elf = (mantle: string, gear: string) => `
 
 /** Small original illustrations drawn in a 120 × 80 view box. */
 const PORTRAITS: Record<PortraitId, string> = {
+  "arc-medic": infantry(
+    "#dfeada",
+    `
+    <path fill="#f0f4e7" d="M46 13Q60 0 74 13V16H46Z"/>
+    <path fill="#6d9ad2" d="M57 5H64V16H57Z"/>
+    <path fill="#2d795f" d="M56 31H64V36H70V43H64V49H56V43H50V36H56Z"/>
+    <path fill="#293f3a" d="M25 43H40V50H36V47H29V50H25Z"/>
+    <rect fill="#e6efdf" x="22" y="49" width="22" height="21" rx="2"/>
+    <path fill="#2d795f" d="M30 53H36V57H40V63H36V67H30V63H26V57H30Z"/>
+    <path fill="#a9c8b6" d="M81 38 94 41 91 51 79 48Z"/>
+    <path fill="#74e5b7" d="M84 40 91 42 89 46 82 44Z"/>`,
+  ),
+  "arc-mechanic": infantry(
+    "#d88e2b",
+    `
+    <rect fill="#6e8185" x="29" y="24" width="12" height="28" rx="5"/>
+    <path fill="#e3a649" d="M29 26H41V32H29Z"/>
+    <path fill="#dc982f" d="M43 17Q44 3 60 3Q77 3 78 17Z"/>
+    <path fill="#f2b84d" d="M40 16H81V22H40Z"/>
+    <path fill="#6d9ad2" d="M57 5H64V16H57Z"/>
+    <rect fill="#ffedb4" x="56" y="17" width="9" height="6"/>
+    <path fill="#38484a" d="M45 45H74V54H45Z"/>
+    <path fill="#9fafae" d="M47 29H52V44H47ZM68 29H73V44H68Z"/>
+    <path stroke="#afc3c5" stroke-width="7" stroke-linecap="round" d="M88 65 98 29"/>
+    <path fill="#c4d4d2" d="M91 32 88 24 91 14 96 12 96 23 101 24 105 14 110 17 109 28 102 34Z"/>
+    <path stroke="#33474b" stroke-width="8" d="M89 61 92 50"/>`,
+  ),
   "circle-cultivator": elf(
     "#43583a",
     `

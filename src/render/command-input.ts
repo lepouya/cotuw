@@ -16,6 +16,7 @@ import type { SelectionRect } from "./selection";
 import type { WorldPosition } from "../simulation/world";
 
 export type ContextActionKind =
+  | "service"
   | "tend"
   | "attack"
   | "select"
@@ -76,6 +77,7 @@ export function contextActionKinds(
 }
 
 const CONTEXT_LABELS: Record<ContextActionKind, string> = {
+  service: "Support",
   tend: "Tend",
   attack: "Attack",
   select: "Select",
@@ -113,6 +115,11 @@ export type CommandInputOptions = {
   ) => void;
   /** Submits a tend order for this unfinished growth, when one is possible. */
   tend?: (actorId: string) => (() => void) | undefined;
+  /** Offers recovery of a target by selected providers. */
+  service?: (
+    actorId: string,
+    queued: boolean,
+  ) => { label: string; run: () => void } | undefined;
   /** Whether clicking this actor attacks it instead of selecting it. */
   canAttack?: (actorId: string) => boolean;
   /** Offers Focus on actors in the radial menu. */
@@ -180,6 +187,7 @@ export function createCommandInput(
     canCommand = () => true,
     canAttack = () => false,
     tend,
+    service,
     groundTargetMode = () => false,
     onGroundTarget,
     cancelGroundTarget,
@@ -330,6 +338,11 @@ export function createCommandInput(
         ? tend?.(picked)
         : undefined;
     if (tendAction) kinds.unshift("tend");
+    const serviceAction =
+      picked && !additiveMode && !boxMode && canCommand()
+        ? service?.(picked, queued)
+        : undefined;
+    if (serviceAction) kinds.unshift("service");
     // Camera actions follow the commands, so they are never the default.
     if (picked && !additive && focusActor) {
       kinds.push("focus");
@@ -349,6 +362,9 @@ export function createCommandInput(
       submitCommand(moveCommand(kind, actorIds, target!, queued));
     };
     const runs: Record<ContextActionKind, () => void> = {
+      service: () => {
+        if (canCommand()) serviceAction?.run();
+      },
       tend: () => {
         if (canCommand()) tendAction?.();
       },
@@ -379,6 +395,7 @@ export function createCommandInput(
     return kinds.map((kind) => ({
       kind,
       label:
+        (kind === "service" && serviceAction?.label) ||
         (kind === "move" && target && moveLabel(target)) ||
         CONTEXT_LABELS[kind],
       run: () => {

@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 3,
   "id": "base",
-  "version": 10,
+  "version": 11,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -247,6 +247,7 @@
       "behaviorId": "terrain-move",
       "faction": "arc",
       "health": 100,
+      "recoveryKind": "biological",
       "weapon": {
         "damage": 10,
         "damageType": "kinetic",
@@ -273,6 +274,7 @@
       "behaviorId": "terrain-move",
       "faction": "arc",
       "health": 40,
+      "recoveryKind": "biological",
       "movement": {
         "speed": 7,
         "profileId": "surface-ground",
@@ -342,7 +344,12 @@
       "constructionSeconds": 8,
       "behaviorId": "idle",
       "production": {
-        "unitDefinitionIds": ["arc-trooper", "arc-scout"]
+        "unitDefinitionIds": [
+          "arc-trooper",
+          "arc-scout",
+          "arc-medic",
+          "arc-mechanic"
+        ]
       },
       "footprint": {
         "layer": "surface",
@@ -437,6 +444,7 @@
       "id": "arc-harvester",
       "faction": "arc",
       "health": 150,
+      "recoveryKind": "mechanical",
       "behaviorId": "terrain-move",
       "materialsCost": 50,
       "trainingSeconds": 6,
@@ -599,6 +607,54 @@
         "range": 7,
         "cooldownSeconds": 0.25
       }
+    },
+    {
+      "id": "arc-medic",
+      "behaviorId": "terrain-move",
+      "faction": "arc",
+      "health": 60,
+      "recoveryKind": "biological",
+      "restoration": {
+        "targetKinds": ["biological"],
+        "range": 1.5,
+        "acquisitionRadius": 7,
+        "pursuitRadius": 10,
+        "healthPerSecond": 6
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.3
+      },
+      "vision": {
+        "radius": 7
+      },
+      "materialsCost": 40,
+      "trainingSeconds": 6
+    },
+    {
+      "id": "arc-mechanic",
+      "behaviorId": "terrain-move",
+      "faction": "arc",
+      "health": 80,
+      "recoveryKind": "biological",
+      "restoration": {
+        "targetKinds": ["mechanical"],
+        "range": 1.5,
+        "acquisitionRadius": 7,
+        "pursuitRadius": 10,
+        "healthPerSecond": 12
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.3
+      },
+      "vision": {
+        "radius": 7
+      },
+      "materialsCost": 40,
+      "trainingSeconds": 6
     }
   ],
   "aiProfiles": [
@@ -1297,6 +1353,66 @@
         }
       },
       "portrait": "circle-musterhall"
+    },
+    "arc-medic": {
+      "name": "Medic",
+      "description": "Heals personnel",
+      "train": {
+        "id": "train-medic",
+        "label": "Train Medic"
+      },
+      "damageEffect": "biological",
+      "portrait": "arc-medic",
+      "model": {
+        "glb": {
+          "url": "assets/actors/arc-medic.glb",
+          "bounds": {
+            "radius": 0.75,
+            "height": 1.9
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "death": "death",
+            "hit": "hit"
+          },
+          "cycleDistance": 1.8
+        }
+      }
+    },
+    "arc-mechanic": {
+      "name": "Mechanic",
+      "description": "Repairs Harvesters",
+      "train": {
+        "id": "train-mechanic",
+        "label": "Train Mechanic"
+      },
+      "damageEffect": "biological",
+      "portrait": "arc-mechanic",
+      "model": {
+        "glb": {
+          "url": "assets/actors/arc-mechanic.glb",
+          "bounds": {
+            "radius": 0.7,
+            "height": 2
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "death": "death",
+            "hit": "hit"
+          },
+          "cycleDistance": 1.8
+        }
+      }
     }
   },
   "clips": {

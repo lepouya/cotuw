@@ -1,5 +1,5 @@
 import { missionEnded } from "../simulation/mission-result";
-import type { ActorDefinition } from "../simulation/actor";
+import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { Resource } from "../simulation/resources";
 import type { OwnerRelation } from "../simulation/ownership";
@@ -14,6 +14,7 @@ import type { ActorPresentation } from "../content/presentation";
 export type SidebarState = {
   /** Own and currently detected actors only. */
   actors: readonly ObservedActor[];
+  ownActors?: readonly ActorRenderState[];
   actorVersion: number;
   selectedActorIds: readonly string[];
   boxMode?: boolean;

@@ -6,6 +6,7 @@ import type { WorldPosition } from "./world";
 import type { QueuedOrder, RouteBounds } from "./actor";
 import type { EconomyReason } from "./economy";
 import type { AttackReason } from "./combat";
+import type { ServiceReason } from "./unit-support";
 import type { RepairReason } from "./repair";
 import { isFinitePosition } from "./world";
 import { isTileCoord } from "./grid";
@@ -42,6 +43,13 @@ export type GroupAttackMoveCommand = Omit<GroupMoveCommand, "kind"> & {
 /** Orders an armed actor to pursue and attack a detected hostile. */
 export type AttackCommand = Queueable & {
   kind: "attack";
+  actorId: string;
+  targetId: string;
+};
+
+/** Prioritizes recovery of one eligible owned mobile unit. */
+export type ServiceCommand = Queueable & {
+  kind: "service";
   actorId: string;
   targetId: string;
 };
@@ -130,6 +138,7 @@ const QUEUEABLE_KINDS = [
   "move",
   "attack-move",
   "attack",
+  "service",
   "gather",
 ] as const satisfies readonly QueuedOrder["kind"][];
 
@@ -156,6 +165,7 @@ export type ActorRemovalCommand = Extract<
 export type MissionCommand =
   | ActorCommand
   | AttackCommand
+  | ServiceCommand
   | AttackMoveCommand
   | GroupAttackMoveCommand
   | SetRallyPointCommand
@@ -256,6 +266,7 @@ export function commandActorIds(command: MissionCommand): readonly string[] {
     case "group-move":
     case "group-attack-move":
       return command.actorIds;
+    case "service":
     case "attack":
       return [command.actorId, command.targetId];
     case "tend":
@@ -299,6 +310,7 @@ export function isMissionCommand(value: unknown): value is MissionCommand {
         Array.from(command.actorIds).every(isId) &&
         isFinitePosition(command.target)
       );
+    case "service":
     case "attack":
       return isId(command.actorId) && isId(command.targetId);
     case "set-rally-point":
@@ -374,7 +386,9 @@ type RejectionReason<C extends MissionCommand> =
             ? AttackReason
             : C extends RepairCommand
               ? RepairReason
-              : never);
+              : C extends ServiceCommand
+                ? ServiceReason
+                : never);
 
 /** A command's outcome as the mission applies it, before naming its issuer. */
 export type CommandResult<C extends MissionCommand = MissionCommand> =
@@ -424,6 +438,7 @@ export function isQueuedOrder(order: unknown): order is QueuedOrder {
         (order.requestedTarget === undefined ||
           isFinitePosition(order.requestedTarget))
       );
+    case "service":
     case "attack":
       return isId(order.targetId);
     case "gather":

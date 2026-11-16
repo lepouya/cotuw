@@ -148,22 +148,19 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   construction. Oldest-first pooled payments, cancellation, paused work,
   disconnection, reassignment, and deterministic saved continuation are verified
   for ARC and Circle, with mouse and touch controls in Chromium and WebKit.
-- [ ] **1.41** Add Medic and Mechanic support from the Field Barracks, including
-  eligible targets, automatic service, manual priority, pursuit limits,
-  single-provider rules, and save/load continuation. Verify personnel healing
-  and recovery of Harvesters that survive raid damage. Add order kinds through
-  `simulation/order-queue.ts`. Support units run outside `updateCombat`, so they
-  pursue through `followRoute` with their own `RouteRetryState` and the
-  mission's bounded `move` and `destination`. Keep support units out of AI
-  scout selection (`isScoutUnit`) and director force shares.
+- [x] **1.41** Medic and Mechanic support shares Barracks production, with
+  exclusive targets, bounded pursuit, and queued orders. Personnel healing,
+  raid-damaged Harvester recovery, AI exclusions, and deterministic saves are
+  verified, with mouse and touch controls in Chromium and WebKit.
 - [ ] **1.42** Add the Demolition Trooper to Field Barracks production.
   Implement its single-target building damage bonus at `updateCombat`'s damage
   site and verify the counter relationship and reason to field a mixed force.
-- [ ] **1.43** Generate and register the added ARC models, animation, command
-  feedback, effects, and essential audio. Verify readability and generated
-  asset contracts for each included actor. Give each owned model
-  [owner materials](docs/actor-assets.md), as 1.71 does; 1.53 follows the
-  same path.
+- [ ] **1.43** Complete the added ARC models, animation, command feedback,
+  effects, and essential audio. Medic and Mechanic models and production
+  portraits show distinct role equipment; models retain owner markings.
+  Verify readability and generated asset contracts for each included actor.
+  Give each owned model [owner materials](docs/actor-assets.md), as 1.71
+  does; 1.53 follows the same path.
 - [ ] **1.44** Implement [control groups](DESIGN.md#m1-control-groups),
   [idle-worker controls](DESIGN.md#m1-idle-worker-controls), and
   [matching-unit selection](DESIGN.md#m1-matching-unit-selection).

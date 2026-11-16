@@ -32,6 +32,9 @@ Select a damaged building and choose **Repair** to restore it through its
 headquarters' shared construction capacity. Repair pays as it works and pauses
 when disconnected or short of resources. **Cancel repair** keeps restored
 health.
+Field Barracks also train Medics to heal personnel and Mechanics to repair
+surviving Harvesters. Idle providers service nearby damaged units for free;
+select one and click or tap an eligible damaged unit to prioritize it.
 
 Click or tap to select and command. Drag a box to select units; touch uses
 **Box select**. **Pan** enables camera dragging, and **View** offers camera

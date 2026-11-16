@@ -1,5 +1,5 @@
 // Strategic control for AI owners, run by the mission before each tick's commands.
-import { compareIds, isWorkerDefinition } from "./actor";
+import { compareIds, isSupportUnit, isWorkerDefinition } from "./actor";
 import { isAiTuning } from "./ai-tuning";
 import { secondsToTicks } from "./clock";
 import { commandActorIds, isMissionCommand } from "./command";
@@ -465,11 +465,14 @@ function reconcileClaims(
   const fielded = new Set(
     view
       .actors()
-      .ownMobile.filter(
-        (actor) =>
+      .ownMobile.filter((actor) => {
+        const definition = definitions.get(actor.definitionId)!;
+        return (
           view.isMobile(actor) &&
-          !isWorkerDefinition(definitions.get(actor.definitionId)!),
-      )
+          !isWorkerDefinition(definition) &&
+          !isSupportUnit(definition)
+        );
+      })
       .map(({ id }) => id),
   );
   let units = fielded.size;

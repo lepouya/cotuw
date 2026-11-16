@@ -8,11 +8,11 @@ import {
 import {
   distance,
   distanceToBounds,
-  isFinitePosition,
-  withinBounds,
+  facingToward,
+  isPositionWithin,
 } from "./world";
 import { isTick, secondsToTicks } from "./clock";
-import { followRoute } from "./automatic-movement";
+import { followRoute, isRouteRetryState } from "./automatic-movement";
 import { createSpatialIndex } from "./spatial-index";
 import { terrainSightlineClear } from "./terrain-sightline";
 import { tileAreaBounds } from "./terrain";
@@ -208,13 +208,8 @@ export function validateCombatActor(
   bounds: WorldBounds,
 ): void {
   const { health, combat, attackMove } = actor;
-  const point = (value: unknown) =>
-    !!value &&
-    isFinitePosition(value as WorldPosition) &&
-    withinBounds(value as WorldPosition, bounds);
-  const retry = ({ blocked }: RouteRetryState) =>
-    blocked === undefined ||
-    (!!blocked && point(blocked.at) && isTick(blocked.navigationVersion));
+  const point = (value: unknown) => isPositionWithin(value, bounds);
+  const retry = (state: RouteRetryState) => isRouteRetryState(state, bounds);
   const { attack, returning, aimFacing } = combat ?? {};
   // Attack Moves belong to units, and automatic engagements cannot drive one.
   const validAttackMove =
@@ -300,8 +295,7 @@ export function validateWrecks(
         !retiredIds.has(wreck.actorId) ||
         !owners.has(wreck.owner) ||
         seen.has(wreck.actorId) ||
-        !isFinitePosition(wreck.worldPosition) ||
-        !withinBounds(wreck.worldPosition, bounds) ||
+        !isPositionWithin(wreck.worldPosition, bounds) ||
         !Number.isFinite(wreck.facing) ||
         !isTick(wreck.tick) ||
         wreck.tick > tick ||
@@ -671,10 +665,7 @@ export function updateCombat(world: CombatWorld): AttackEvent[] {
     if (ordered) delete actor.movement;
     controller?.firing?.(actor, context);
     const combat = (actor.combat ??= {});
-    const aim = Math.atan2(
-      target.worldPosition.x - actor.worldPosition.x,
-      target.worldPosition.z - actor.worldPosition.z,
-    );
+    const aim = facingToward(actor.worldPosition, target.worldPosition);
     if (isTilePlacedActor(actor)) combat.aimFacing = aim;
     else actor.facing = aim;
     if ((combat.weaponReadyTick ?? 0) > tick) continue;

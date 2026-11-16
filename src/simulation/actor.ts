@@ -14,6 +14,10 @@ export type ActorDefinition = {
   faction?: string;
   /** Maximum health. Only actors with health can be damaged or destroyed. */
   health?: number;
+  /** How support units restore this unit's health. */
+  recoveryKind?: RecoveryKind;
+  /** Support units restore owned units of these recovery kinds. */
+  restoration?: Restoration;
   /** Armed actors attack hostile actors that have health. */
   weapon?: Weapon;
   /** An idle unit engages detected hostiles near it, then returns to post. */
@@ -79,6 +83,23 @@ export type ActorDefinition = {
   };
 };
 
+export const RECOVERY_KINDS = [
+  "biological",
+  "mechanical",
+  "living-construct",
+] as const;
+export type RecoveryKind = (typeof RECOVERY_KINDS)[number];
+
+export type Restoration = {
+  targetKinds: RecoveryKind[];
+  /** Service distance beyond the target's movement radius. */
+  range: number;
+  acquisitionRadius: number;
+  /** Pursuit limit around the point where service began. */
+  pursuitRadius: number;
+  healthPerSecond: number;
+};
+
 /** Fixed damage dealt at a fixed cadence, without accuracy rolls. */
 export type Weapon = {
   damage: number;
@@ -140,6 +161,15 @@ export type Actor = {
   combat?: CombatState;
   /** Present for actors whose definition has a territory. */
   territory?: TerritoryState;
+  service?: RouteRetryState & {
+    targetId: string;
+    origin: WorldPosition;
+    manual?: true;
+  };
+  /** Leash releases cannot restart pursuit through automatic acquisition. */
+  serviceExcluded?: { targetId: string; origin: WorldPosition }[];
+  /** Stop suppresses automatic service for its command tick. */
+  serviceResumeTick?: number;
   /** Orders that start in sequence once the current one ends. */
   orders?: QueuedOrder[];
 };
@@ -152,7 +182,7 @@ export type QueuedOrder =
       /** The group's click, when this actor's slot only approaches it. */
       requestedTarget?: WorldPosition;
     }
-  | { kind: "attack"; targetId: string }
+  | { kind: "attack" | "service"; targetId: string }
   | { kind: "gather"; siteId: string };
 
 export type CombatState = {
@@ -306,6 +336,20 @@ export function healthOf(actor: Pick<Actor, "health">, max: number): number {
   return actor.health ?? max;
 }
 
+/** Adds health up to the maximum; returns whether the actor is now full. */
+export function restoreHealth(
+  actor: Pick<Actor, "health">,
+  maximum: number,
+  amount: number,
+): boolean {
+  const health = Math.min(maximum, healthOf(actor, maximum) + amount);
+  // Full health must not leave a rounding-sized wound behind.
+  const full = maximum - health <= maximum * (8 * Number.EPSILON);
+  if (full) delete actor.health;
+  else actor.health = health;
+  return full;
+}
+
 /** Whether a definition's units gather a resource for their owner. */
 export const isWorkerDefinition = (
   definition: Pick<ActorDefinition, "harvesting" | "cultivation">,
@@ -323,11 +367,16 @@ export const isIncomeBuilding = (
   definition: Pick<ActorDefinition, "refinery" | "cultivationDropoff">,
 ) => !!definition.refinery || !!definition.cultivationDropoff;
 
-/** Unarmed mobile units that neither gather nor build, such as scouts. */
+/** Units that restore other units' health. */
+export const isSupportUnit = (definition: ActorDefinition) =>
+  !!definition.restoration;
+
+/** Unarmed explorers without worker or support duties. */
 export const isScoutUnit = (definition: ActorDefinition) =>
   !!definition.movement &&
   !!definition.vision &&
   !definition.weapon &&
+  !isSupportUnit(definition) &&
   !definition.footprint &&
   !isWorkerDefinition(definition);
 

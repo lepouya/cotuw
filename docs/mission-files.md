@@ -347,13 +347,26 @@ and facing from `tilePlacement`, whose `origin` is in tiles.
 
 - Mobile actors may carry a nonempty `orders` list. Omit it for an empty queue.
 - Each entry is a `move` or `attack-move` with a world `target`, an `attack`
-  with a `targetId`, or a `gather` with a `siteId`.
+  or `service` with a `targetId`, or a `gather` with a `siteId`.
 - Group destinations may include `requestedTarget`, the original group click.
   Both positions must lie within mission bounds.
 - Queues start in sequence after the current order ends. Targets and paths
   are checked when the order starts; removed or unavailable targets are skipped.
-- Queued attacks require a weapon and queued Gather requires harvesting rules.
+- Queued attacks require a weapon, service requires restoration rules, and
+  Gather requires harvesting rules.
   Scheduled queueable commands use `queued: true` to append instead of replace.
+- Unit support saves `service` with `targetId`, pursuit `origin`, optional
+  `manual: true`, and a `blocked` route retry state. Its active movement must
+  share the service origin and pursuit radius; blocked service has no route.
+  Service cannot coexist with Attack Move or Stop suspension. Only one
+  provider may claim a target. References must name known active or retired
+  actors.
+  `serviceExcluded` lists released `{ targetId, origin }` pairs until they
+  qualify for automatic acquisition again. `serviceResumeTick` suppresses
+  acquisition during Stop's tick. These fields belong only to providers.
+- Manual support commands are `{ kind: "service", actorId, targetId }`, with
+  optional `queued: true`. Support health and route state use simulation ticks;
+  saves preserve ongoing work without restarting it.
 
 ## Validation
 

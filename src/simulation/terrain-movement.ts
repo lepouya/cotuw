@@ -8,12 +8,7 @@ import {
   traversalCostAt,
 } from "./navigation";
 import { isOccupancyLayer } from "./occupancy";
-import {
-  POSITION_EPSILON,
-  distanceToBounds,
-  isFinitePosition,
-  withinBounds,
-} from "./world";
+import { POSITION_EPSILON, distanceToBounds, isPositionWithin } from "./world";
 import { tileAreaBounds } from "./terrain";
 import { compareIds, withinRouteBounds } from "./actor";
 import { isCount, isPositive } from "./validation";
@@ -163,7 +158,7 @@ export function createTerrainMoveBehavior(
         return;
       }
       const onMap = (point: WorldPosition) =>
-        isFinitePosition(point) && withinBounds(point, map.worldBounds);
+        isPositionWithin(point, map.worldBounds);
       const waypoints = order.waypoints ?? [];
       if (
         !Array.isArray(waypoints) ||

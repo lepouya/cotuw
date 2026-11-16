@@ -35,6 +35,8 @@ const PORTRAIT_IDS = [
   "harvester",
   "armed",
   "unarmed",
+  "arc-medic",
+  "arc-mechanic",
   "circle-cultivator",
   "circle-sentinel",
   "circle-wayfinder",

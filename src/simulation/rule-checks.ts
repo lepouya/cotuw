@@ -23,7 +23,7 @@ import {
   supportsPosition,
 } from "./support";
 import { isId } from "./validation";
-import { isFinitePosition, withinBounds } from "./world";
+import { isPositionWithin } from "./world";
 
 import type { Actor, ActorBehavior, ActorDefinition } from "./actor";
 import type { TrainUnitCommand } from "./command";
@@ -237,8 +237,7 @@ export function createRuleChecks({
       !producer ||
       !unitIds.length ||
       !target ||
-      !isFinitePosition(target) ||
-      !withinBounds(target, bounds)
+      !isPositionWithin(target, bounds)
     )
       return false;
     const tile = map.tileAtWorldPosition(target.x, target.z);
