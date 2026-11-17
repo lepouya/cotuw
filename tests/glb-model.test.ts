@@ -268,3 +268,31 @@ test("reused glTF meshes still permit independent instance materials", async () 
   second.dispose();
   asset.dispose();
 });
+
+test.each(["missing", "ambiguous", "animated"])(
+  "rejects %s aim pivots and releases failed assets",
+  async (problem) => {
+    const scene = testScene();
+    const url = editedGlbDataUrl("/assets/models/sentry.glb", (gltf) => {
+      const pivot = gltf.nodes.findIndex(
+        (node: any) => node.name === "sentry-turret",
+      );
+      if (problem === "missing") gltf.nodes[pivot].name = "other";
+      if (problem === "ambiguous") {
+        gltf.nodes.push({ name: "sentry-turret" });
+        gltf.scenes[0].nodes.push(gltf.nodes.length - 1);
+      }
+      if (problem === "animated")
+        gltf.animations[0].channels[0].target.node = pivot;
+    });
+    await expect(
+      loadModelAsset(scene, { url, aimNode: "sentry-turret" }),
+    ).rejects.toThrow(
+      problem === "animated"
+        ? "aim node must not be controlled by animation"
+        : "needs one aim node named sentry-turret",
+    );
+    expect(scene.meshes).toHaveLength(0);
+    expect(scene.animationGroups).toHaveLength(0);
+  },
+);

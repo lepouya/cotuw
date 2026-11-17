@@ -394,10 +394,16 @@ test("construction order and training cards follow the selected building", async
   await expect(cards).toHaveCount(1);
   await expect(cards).toBeDisabled();
   await selectInSession(page, "test-barracks");
-  await expect(cards).toHaveCount(2);
+  await expect(cards).toHaveCount(5);
   expect(
     await cards.evaluateAll((buttons) => buttons.map(({ id }) => id)),
-  ).toEqual(["train-trooper", "train-scout"]);
+  ).toEqual([
+    "train-trooper",
+    "train-scout",
+    "train-medic",
+    "train-mechanic",
+    "train-demolition-trooper",
+  ]);
   await selectInSession(page, "starting-command-center");
   await expect(cards).toHaveCount(0);
   await expect(page.locator("#production-status")).toContainText("on the map");
@@ -945,17 +951,23 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
       await pressPoint(page, target, touch);
       await advance(page, 0.1);
       expect(
-        await page.evaluate((id) => {
+        await page.evaluate(async (id) => {
           const { simulation, scene } = window.sessionHarness.view;
+          const { Vector3 } = await import("/e2e/harness.ts");
           const actor = simulation.actorById(id)!;
+          const turret = scene.getTransformNodeByName(
+            `tile-placed-actor-${id}-root-model-sentry-turret`,
+          )!;
+          const direction = turret.getDirection(Vector3.Forward()).normalize();
+          const heading = actor.combat!.aimFacing!;
           return {
             target: actor.combat?.attack?.targetId,
             moving: !!actor.movement,
             aimed:
-              scene.getTransformNodeByName(
-                `tile-placed-actor-${id}-root-turret`,
-              )!.rotation.y ===
-              actor.combat!.aimFacing! - actor.facing,
+              Vector3.Dot(
+                direction,
+                new Vector3(Math.sin(heading), 0, Math.cos(heading)),
+              ) > 0.999,
           };
         }, sentryId),
       ).toEqual({ target: "priority-raider", moving: false, aimed: true });

@@ -6,7 +6,7 @@ import {
   TransformNode,
   Vector3,
 } from "@babylonjs/core";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import { testScene } from "./helpers/scene";
 import { glbDataUrl } from "./helpers/assets";
@@ -226,6 +226,25 @@ test("reduced motion skips activities and settles one in progress at rest", () =
   views.animate(0, 1);
   expect(leaf(scene).position.x).toBeCloseTo(0.2);
   views.dispose();
+});
+
+test("reduced motion restores building idle motion to rest", () => {
+  let reduced = false;
+  const { views, appearances, actor } = setup(() => reduced);
+  const update = vi.fn();
+  appearances.set(barracks.id, {
+    ...appearances.get(barracks.id)!,
+    createDetails: () => ({ update, dispose: () => {} }),
+  });
+  views.update([actor]);
+  views.animate(1.2, 0.1);
+  expect(update).toHaveBeenLastCalledWith(1.2);
+  reduced = true;
+  views.animate(1.2, 0.1);
+  expect(update).toHaveBeenLastCalledWith(0);
+  reduced = false;
+  views.animate(1.3, 0.1);
+  expect(update).toHaveBeenLastCalledWith(1.3);
 });
 
 test("terrain rebuilds retain activity time; disconnection and removal clear it", () => {

@@ -11,6 +11,41 @@ import {
 } from "./page-helpers";
 import type { Page } from "@playwright/test";
 
+async function repairBadge(page: Page, id: string) {
+  return page.evaluate(async (id) => {
+    const { gameScene, Vector3 } = await import("/e2e/harness.ts");
+    const scene = gameScene();
+    const wrench = scene.getMeshByName(`repair-badge-${id}-wrench`);
+    if (!wrench) return undefined;
+    const viewport = scene.activeCamera!.viewport.toGlobal(
+      scene.getEngine().getRenderWidth(),
+      scene.getEngine().getRenderHeight(),
+    );
+    const screenY = (name: string) => {
+      const mesh = scene.getMeshByName(name)!;
+      return mesh
+        .getBoundingInfo()
+        .boundingBox.vectors.map(
+          (point) =>
+            Vector3.Project(
+              point,
+              mesh.getWorldMatrix(),
+              scene.getTransformMatrix(),
+              viewport,
+            ).y,
+        );
+    };
+    return {
+      visible:
+        wrench.isEnabled() && wrench.isVisible && wrench.getTotalVertices() > 0,
+      paused: scene.getMeshByName(`repair-badge-${id}-pause-1`)!.isEnabled(),
+      clearsHealthBar:
+        Math.max(...screenY(`repair-badge-${id}-background`)) <
+        Math.min(...screenY(`health-bar-${id}-frame`)),
+    };
+  }, id);
+}
+
 async function startRepair(page: Page, materials: number) {
   await withoutApp(page);
   await page.goto("/");
@@ -62,6 +97,11 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     await expect(details).toContainText("Repairing");
     await expect(details).toContainText("Your payment priority 1");
     await expect(details).toContainText("Materials/s");
+    expect(await repairBadge(page, opening.id)).toEqual({
+      visible: true,
+      paused: false,
+      clearsHealthBar: true,
+    });
     const afterRepair = await page.evaluate((id) => {
       const sim = window.sessionHarness.view.simulation;
       return {
@@ -81,6 +121,16 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
       ),
     ).toBe(afterRepair.health);
     await page.screenshot({ path: info.outputPath("repair-controls.png") });
+    await page.evaluate(() =>
+      window.sessionHarness.view.camera.setPreset("top-down"),
+    );
+    await advance(page, 0.4);
+    expect(await repairBadge(page, opening.id)).toEqual({
+      visible: true,
+      paused: false,
+      clearsHealthBar: true,
+    });
+    await page.screenshot({ path: info.outputPath("repair-top-down.png") });
     await page.evaluate(() => window.sessionHarness.view.resume());
     await activate(repair, touch);
     await advance(page, 0.1);
@@ -90,6 +140,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     );
     await expect(repair).toHaveText(/Repair/);
     await expect(details).toBeHidden();
+    expect(await repairBadge(page, opening.id)).toBeUndefined();
     await advance(page, 2);
     expect(
       await page.evaluate(
@@ -100,6 +151,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     await activate(repair, touch);
     await advance(page, 25);
     await expect(repair).toHaveCount(0);
+    expect(await repairBadge(page, opening.id)).toBeUndefined();
     await expect(page.locator("#selection-health")).toHaveText(
       `Health ${opening.maximum} / ${opening.maximum}`,
     );
@@ -108,7 +160,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
 
   test(`unaffordable repair explains its pause without repeated alerts ${WEBKIT}`, async ({
     page,
-  }) => {
+  }, info) => {
     const errors = collectPageErrors(page);
     const opening = await startRepair(page, 0);
     const repair = page.locator("#repair-actions button");
@@ -118,6 +170,12 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     await expect(page.locator("#repair-details")).toContainText(
       "Insufficient resources · Paused",
     );
+    expect(await repairBadge(page, opening.id)).toEqual({
+      visible: true,
+      paused: true,
+      clearsHealthBar: true,
+    });
+    await page.screenshot({ path: info.outputPath("repair-paused.png") });
     const alerts = page
       .locator("#alert-history li")
       .filter({ hasText: "awaiting repair resources" });
@@ -133,6 +191,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     await activate(repair, touch);
     await advance(page, 0.1);
     await expect(page.locator("#repair-details")).toBeHidden();
+    expect(await repairBadge(page, opening.id)).toBeUndefined();
     expect(errors).toEqual([]);
   });
 });

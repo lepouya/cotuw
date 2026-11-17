@@ -1,5 +1,9 @@
 // Every bundled file under public/assets, with the code that generates it.
 import { PNG } from "pngjs";
+import {
+  buildLaunchFlashSheet,
+  LAUNCH_FLASH_CLIP,
+} from "./launch-flash-sheet.ts";
 
 import {
   buildAudioPreview,
@@ -64,8 +68,12 @@ export const ASSET_FAMILIES: Readonly<Record<string, AssetFamily>> = {
   effects: {
     assets: [
       { path: "effects/muzzle-flash.png", build: buildMuzzleFlashSheet },
+      { path: "effects/launch-flash.png", build: buildLaunchFlashSheet },
     ],
-    clips: { "muzzle-flash": MUZZLE_FLASH_CLIP },
+    clips: {
+      "muzzle-flash": MUZZLE_FLASH_CLIP,
+      "launch-flash": LAUNCH_FLASH_CLIP,
+    },
   },
   infantry: {
     assets: INFANTRY_IDS.map((id) => ({

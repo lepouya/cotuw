@@ -1,6 +1,7 @@
 import { economyForOwner, workingWorkerIds } from "./economy";
 import { knownEconomy } from "./observations";
 import { ownerRelation } from "./ownership";
+import { activeUnitServices } from "./unit-support";
 import { isMobileActor, isTilePlacedActor } from "./placement";
 import { disconnectedBuildings, supportForOwner } from "./support";
 
@@ -245,6 +246,17 @@ export function createOwnerView({
       );
     },
   );
+  /** Shown providers actively servicing shown targets, whoever owns them. */
+  const services = cached(
+    () => [simulation.actors] as const,
+    ([committed]) => {
+      const { shownById } = actors();
+      return activeUnitServices(committed, definitions).filter(
+        ({ providerId, targetId }) =>
+          shownById.has(providerId) && shownById.has(targetId),
+      );
+    },
+  );
   /** Shown buildings visibly cut off from support, whoever owns them. */
   const offlineIds = cached(
     () => [simulation.support, simulation.actors] as const,
@@ -272,6 +284,7 @@ export function createOwnerView({
     support,
     wrecks,
     workingIds,
+    services,
     offlineIds,
     shownActor: (id: string | undefined) =>
       id === undefined ? undefined : actors().shownById.get(id),

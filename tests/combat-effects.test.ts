@@ -1,4 +1,4 @@
-import { MeshBuilder } from "@babylonjs/core";
+import { MeshBuilder, Vector3 } from "@babylonjs/core";
 import { expect, test, vi } from "vitest";
 
 import { testScene } from "./helpers/scene";
@@ -59,6 +59,64 @@ function fixture() {
     },
   };
 }
+
+test("rocket trails use the muzzle anchor and keep impact size independent of range", () => {
+  const { effects, instances, reduce } = fixture();
+  const from = new Vector3(-1, 2, 0);
+  const to = new Vector3(3, 1, 0);
+  effects.hit(hit, "rocket", { from, to });
+  expect(instances).toHaveLength(2);
+  const [impact, trail] = instances;
+  expect(impact.root.position.asArray()).toEqual(to.asArray());
+  expect(impact.root.scaling.asArray()).toEqual([1, 1, 1]);
+  expect(trail.root.position.asArray()).toEqual(from.asArray());
+  expect(trail.root.scaling.z).toBeCloseTo(Vector3.Distance(from, to));
+  effects.update(0.1);
+  expect(impact.pose).toHaveBeenLastCalledWith(0.1);
+  reduce();
+  effects.update(0.05);
+  expect(impact.pose).toHaveBeenLastCalledWith(0);
+  effects.update(1);
+  expect(instances.every(({ root }) => root.isDisposed())).toBe(true);
+});
+
+test("observed rocket impacts do not reveal hidden shooters or unseen targets", () => {
+  const { effects, instances } = fixture();
+  effects.hit(hit, "rocket", { showFrom: false, showTo: true });
+  expect(instances).toHaveLength(1);
+  effects.hit(hit, "rocket", { showFrom: true, showTo: false });
+  effects.hit(hit, "rocket", { showFrom: false, showTo: false });
+  expect(instances).toHaveLength(1);
+  for (let index = 0; index < COMBAT_EFFECT_LIMIT; index++)
+    effects.hit(hit, "rocket");
+  expect(instances.filter(({ root }) => !root.isDisposed())).toHaveLength(
+    COMBAT_EFFECT_LIMIT,
+  );
+  effects.dispose();
+  expect(
+    instances.every(({ dispose }) => dispose.mock.calls.length === 1),
+  ).toBe(true);
+});
+
+test.each(["tracer", "bolt", "bite"] as const)(
+  "%s effects respect hidden endpoints with models and fallback geometry",
+  (style) => {
+    const { effects, instances, scene } = fixture();
+    const fallback = createCombatEffectsView(
+      scene,
+      new TerrainMap({ width: 10, height: 10, tileSize: 1 }),
+    );
+    for (const view of [effects, fallback]) {
+      view.hit(hit, style, { showFrom: true, showTo: false });
+      view.hit(hit, style, { showFrom: false, showTo: false });
+      expect(scene.meshes).toHaveLength(0);
+      view.hit(hit, style, { showFrom: false, showTo: true });
+      expect(scene.meshes).toHaveLength(style === "bite" ? 1 : 0);
+      view.dispose();
+    }
+    expect(instances).toHaveLength(style === "bite" ? 1 : 0);
+  },
+);
 
 test("catch-up bursts evict old instances and keep rendering work bounded", () => {
   const { scene, asset, instances, effects } = fixture();

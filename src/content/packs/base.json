@@ -1007,6 +1007,7 @@
     "arc-field-barracks": {
       "name": "Field Barracks",
       "description": "Infantry production",
+      "portrait": "arc-field-barracks",
       "build": {
         "id": "build-barracks",
         "label": "Build Field Barracks",
@@ -1086,6 +1087,7 @@
     "arc-relay-station": {
       "name": "Relay Station",
       "description": "Extends connected construction support; provides no infrastructure slots",
+      "portrait": "arc-relay-station",
       "build": {
         "id": "build-relay",
         "label": "Build Relay Station",
@@ -1095,23 +1097,35 @@
       "building": {
         "height": 0.2,
         "color": [0.3, 0.36, 0.42],
-        "details": "relay"
+        "glb": {
+          "url": "assets/models/relay.glb",
+          "idle": "idle"
+        }
       }
     },
     "arc-sentry-turret": {
       "name": "Sentry Turret",
       "description": "Rapid-fire defense; requires connected support",
+      "portrait": "arc-sentry-turret",
       "build": {
         "id": "build-sentry",
         "label": "Build Sentry Turret",
         "order": 4
       },
       "attackEffect": "tracer",
+      "attackAnchor": [0, 0.95, 1.25],
       "damageEffect": "mechanical",
       "building": {
         "height": 0.25,
         "color": [0.32, 0.38, 0.3],
-        "details": "sentry"
+        "glb": {
+          "url": "assets/models/sentry.glb",
+          "idle": "idle",
+          "aimNode": "sentry-turret",
+          "activities": {
+            "attack": "attack"
+          }
+        }
       },
       "audio": {
         "events": {
@@ -1391,6 +1405,12 @@
         "label": "Train Medic"
       },
       "damageEffect": "biological",
+      "serviceEffect": "medical",
+      "audio": {
+        "loops": {
+          "servicing": "medical-service"
+        }
+      },
       "portrait": "arc-medic",
       "model": {
         "glb": {
@@ -1401,6 +1421,7 @@
           },
           "clips": {
             "idle": "idle",
+            "work": "treat",
             "locomotion": "walk",
             "turn": {
               "left": "turn-left",
@@ -1421,6 +1442,12 @@
         "label": "Train Mechanic"
       },
       "damageEffect": "biological",
+      "serviceEffect": "mechanical",
+      "audio": {
+        "loops": {
+          "servicing": "mechanical-service"
+        }
+      },
       "portrait": "arc-mechanic",
       "model": {
         "glb": {
@@ -1431,6 +1458,7 @@
           },
           "clips": {
             "idle": "idle",
+            "work": "repair",
             "locomotion": "walk",
             "turn": {
               "left": "turn-left",
@@ -1451,7 +1479,7 @@
         "label": "Train Demolition Trooper"
       },
       "portrait": "arc-demolition-trooper",
-      "attackEffect": "tracer",
+      "attackEffect": "rocket",
       "damageEffect": "biological",
       "model": {
         "glb": {
@@ -1477,17 +1505,22 @@
       },
       "frameEffects": {
         "attack": {
-          "clip": "muzzle-flash",
-          "url": "assets/effects/muzzle-flash.png",
-          "size": 0.8,
+          "clip": "launch-flash",
+          "url": "assets/effects/launch-flash.png",
+          "size": 1.15,
           "anchor": [0.43, 1.46, 1.16]
         }
       },
       "audio": {
         "events": {
+          "attack.impact": [
+            {
+              "cue": "launcher-impact"
+            }
+          ],
           "attack": [
             {
-              "cue": "rifle"
+              "cue": "launcher-launch"
             }
           ]
         }
@@ -1556,6 +1589,29 @@
         }
       ],
       "playback": "loop"
+    },
+    "launch-flash": {
+      "columns": 4,
+      "rows": 1,
+      "frames": [
+        {
+          "cell": 0,
+          "seconds": 0.04
+        },
+        {
+          "cell": 1,
+          "seconds": 0.045
+        },
+        {
+          "cell": 2,
+          "seconds": 0.05
+        },
+        {
+          "cell": 3,
+          "seconds": 0.065
+        }
+      ],
+      "playback": "once"
     }
   },
   "terrain": {
@@ -1783,6 +1839,13 @@
     }
   },
   "props": {
+    "rocket": {
+      "url": "assets/models/rocket.glb"
+    },
+    "rocket-impact": {
+      "url": "assets/models/rocket-impact.glb",
+      "idle": "burst"
+    },
     "foundation": {
       "url": "assets/models/foundation.glb"
     },
@@ -1855,6 +1918,22 @@
   ],
   "audio": {
     "clips": {
+      "launcher-impact": {
+        "url": "assets/audio/launcher-impact.wav",
+        "loop": false
+      },
+      "launcher-launch": {
+        "url": "assets/audio/launcher-launch.wav",
+        "loop": false
+      },
+      "mechanical-service": {
+        "url": "assets/audio/mechanical-service.wav",
+        "loop": true
+      },
+      "medical-service": {
+        "url": "assets/audio/medical-service.wav",
+        "loop": true
+      },
       "command-accepted": {
         "url": "assets/audio/command-accepted.wav",
         "loop": false
@@ -1965,6 +2044,40 @@
       }
     },
     "cues": {
+      "launcher-impact": {
+        "clips": ["launcher-impact"],
+        "gain": 0.55,
+        "cooldown": 0.08,
+        "voices": 4,
+        "priority": 3,
+        "range": 45
+      },
+      "launcher-launch": {
+        "clips": ["launcher-launch"],
+        "gain": 0.55,
+        "cooldown": 0.08,
+        "voices": 4,
+        "priority": 3,
+        "range": 45
+      },
+      "mechanical-service": {
+        "clips": ["mechanical-service"],
+        "gain": 0.3,
+        "cooldown": 0,
+        "voices": 3,
+        "priority": 1,
+        "range": 30,
+        "unselectedGain": 0.3
+      },
+      "medical-service": {
+        "clips": ["medical-service"],
+        "gain": 0.25,
+        "cooldown": 0,
+        "voices": 3,
+        "priority": 1,
+        "range": 30,
+        "unselectedGain": 0.3
+      },
       "circle-cast": {
         "clips": ["circle-cast-1", "circle-cast-2"],
         "gain": 0.48,

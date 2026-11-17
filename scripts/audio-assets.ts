@@ -7,6 +7,20 @@ export const SOUND_ASSETS = {
   "rifle-1": { seconds: 0.65, label: "Trooper rifle · variant 1" },
   "rifle-2": { seconds: 0.65, label: "Trooper rifle · variant 2" },
   "rifle-3": { seconds: 0.65, label: "Trooper rifle · variant 3" },
+  "launcher-launch": { seconds: 0.9, label: "Heavy launcher ignition" },
+  "launcher-impact": { seconds: 0.7, label: "Heavy launcher impact" },
+  "medical-service": {
+    seconds: 4,
+    label: "Medic scanner",
+    loop: true,
+    peak: 0.2,
+  },
+  "mechanical-service": {
+    seconds: 4,
+    label: "Mechanic servicing",
+    loop: true,
+    peak: 0.24,
+  },
   "circle-cast-1": { seconds: 0.8, label: "Living focus · variant 1" },
   "circle-cast-2": { seconds: 0.8, label: "Living focus · variant 2" },
   "circle-cultivation": {
@@ -411,6 +425,46 @@ function phrase(
 
 // Every sound ID needs a recipe, so the type checker rejects a missing one.
 const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
+  "launcher-launch": (target) => {
+    noise(target, 0, 0.4, 0.8, 1101, 0.08);
+    voice(
+      target,
+      0,
+      0.6,
+      (t) =>
+        Math.min(1, t / 0.008) *
+        Math.exp(-9 * t) *
+        (0.6 * Math.sin(TAU * (100 * t - 45 * t * t)) + 0.2 * sine(180, t)),
+    );
+    echo(target, 0.11, 0.16, 2);
+  },
+  "launcher-impact": (target) => {
+    thump(target, 0, 0.9);
+    noise(target, 0, 0.5, 1, 1102, 0.12);
+    note(target, 0.01, 34, 0.5, 0.4);
+    echo(target, 0.08, 0.17, 2);
+  },
+  "medical-service": (target) => {
+    voice(
+      target,
+      0,
+      4,
+      (t) =>
+        (0.65 + 0.35 * Math.cos(TAU * 0.5 * t)) *
+        (0.6 * sine(640, t) + 0.22 * sine(960, t) + 0.1 * sine(1280, t)),
+    );
+  },
+  "mechanical-service": (target) => {
+    voice(
+      target,
+      0,
+      4,
+      (t) =>
+        0.12 * sine(72, t) +
+        (0.5 + 0.5 * Math.cos(TAU * 2 * t)) ** 8 *
+          (0.45 * sine(240, t) + 0.2 * sine(690, t) + 0.1 * sine(1110, t)),
+    );
+  },
   "command-accepted": (target) => {
     note(target, 0, 81, 0.12, 0.6);
     note(target, 0.065, 88, 0.16, 0.45);

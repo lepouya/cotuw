@@ -11,6 +11,7 @@ import {
   expectTerrainReady,
   placeBuilding,
   terrainPoint,
+  withoutApp,
 } from "./page-helpers";
 import { QUICK, WEBKIT } from "./tags";
 
@@ -151,6 +152,41 @@ test("production pictures explain disabled cards and keep selection visible", as
     "Field Barracks",
   );
   await expect(page.locator("[data-rally-controls]")).toBeVisible();
+});
+
+test(`ARC building cards show distinct role portraits ${WEBKIT}`, async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await withoutApp(page);
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
+    const { level } = await import("/e2e/missions.ts");
+    await startSidebarSession(level());
+  });
+  await expectTerrainReady(page);
+  const portraits = [
+    ["build-barracks", "arc-field-barracks"],
+    ["build-relay", "arc-relay-station"],
+    ["build-sentry", "arc-sentry-turret"],
+  ];
+  const art: string[] = [];
+  for (const [button, portrait] of portraits) {
+    const card = page.locator(".production-card", {
+      has: page.locator(`#${button}`),
+    });
+    const image = card.locator("svg");
+    await expect(image).toHaveAttribute("data-portrait", portrait);
+    art.push(await image.innerHTML());
+  }
+  expect(new Set(art).size).toBe(portraits.length);
+  await page
+    .locator(".production-card", { has: page.locator("#build-sentry") })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: info.outputPath("arc-building-portraits.png"),
+  });
 });
 
 test("goal lists reconcile changed content, order, and failure status", async ({

@@ -165,6 +165,54 @@ function committed(
   return { simulation, view };
 }
 
+test("support loops follow the shared service activity rather than pending orders", () => {
+  const scene = sceneSpy();
+  const { simulation, view } = committed({
+    actors: [{ ...building, definitionId: "arc-medic" }],
+  });
+  let active = true;
+  const adapter = createMissionAudio(
+    scene,
+    simulation,
+    {
+      ...view,
+      services: () =>
+        active ? [{ providerId: "b", targetId: "patient" }] : [],
+    },
+    8,
+  );
+  expect(scene.sync).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: "b", states: ["servicing"] }),
+  ]);
+  active = false;
+  adapter.observe();
+  expect(scene.sync).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: "b", states: ["idle"] }),
+  ]);
+});
+
+test("weapon impact audio uses the observed target position", () => {
+  const scene = sceneSpy();
+  const source = {
+    ...building,
+    id: "launcher",
+    definitionId: "arc-demolition-trooper",
+  };
+  const target = { ...building, id: "target", worldPosition: { x: 5, z: 3 } };
+  const { simulation, view } = committed({ actors: [source, target] });
+  const adapter = createMissionAudio(scene, simulation, view, 8);
+  simulation.attacks = [{ attackerId: "launcher", targetId: "target" }];
+  adapter.observe();
+  expect(scene.emit).toHaveBeenCalledWith(
+    "attack.impact",
+    expect.objectContaining({
+      id: "target",
+      definitionId: "arc-demolition-trooper",
+      position: target.worldPosition,
+    }),
+  );
+});
+
 test("preloading follows bindings and the selected arrangement, including all cue variants", () => {
   const { mixer } = device();
   const scene = createAudioScene(

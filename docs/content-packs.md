@@ -67,8 +67,14 @@ bundled packs through the same parser future mod packs will use.
   - Optional `portrait` selects an original SVG production illustration from
     `PORTRAIT_IDS` in `content/presentation.ts`. Circle actors bind distinct
     portraits. Omitted portraits fall back to a generic gameplay-role icon.
-  - `attackEffect` is `"tracer"`, `"bolt"` (violet Circle focus fire), or
-    `"bite"`.
+  - `attackEffect` is `"tracer"`, `"bolt"` (violet Circle focus fire),
+    `"bite"`, or `"rocket"`, a launcher streak with a `rocket-impact` burst.
+    Optional `attackAnchor` is the muzzle's `[x, y, z]` in model space; on
+    buildings it uses tile units above the roof. Mobile actors otherwise use
+    their attack frame effect's anchor.
+  - `serviceEffect` on a restoration provider is `"medical"` or
+    `"mechanical"`. It selects the symbol shown on service orders and above
+    actively serviced targets.
   - `damageEffect` is `"mechanical"` smoke and fire, `"biological"` drops, or
     `"living"` falling leaves, shown at 60% health or below; absent shows none.
   - `regenerationEffect: true` shows the `regeneration` prop while a visible
@@ -88,8 +94,9 @@ bundled packs through the same parser future mod packs will use.
     actor's model space: `[x, y, z]` from its ground point, facing +Z.
   - `building` sets a tile-placed actor's height, colors, and optional
     built-in `details`, such as `"command-center"`, or a `glb` with `url`, an
-    optional `idle` clip, and optional `activities` that name a clip for
-    `exit` or `delivery`. A building cannot name both kinds of art.
+    optional `idle` clip, optional `activities` that name a clip for `exit`,
+    `delivery`, or each fired `attack`, and an optional `aimNode` yaw pivot.
+    A building cannot name both kinds of art.
 - Optional `audio` defines clips, cue variants, global event sequences, default
   object bindings, and exploration and combat music.
   `presentation[actorId].audio` assigns named events and state loops to one
@@ -97,9 +104,9 @@ bundled packs through the same parser future mod packs will use.
   the schema, supported mission events, and extension points. Audio bindings
   are validated even on unused presentation entries.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
-  `materials-mound`, `cultivation-site`, `leaf`, `salvage`, `tracer`, `bolt`,
-  `bite`, `smoke`, `fire`, `wound`, `regeneration`, and `bird` GLBs with `url`
-  and an optional `idle` clip.
+  `materials-mound`, `cultivation-site`, `leaf`, `salvage`, `tracer`,
+  `rocket`, `rocket-impact`, `bolt`, `bite`, `smoke`, `fire`, `wound`,
+  `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.
 - `materialsStages` lists `{ above, scale }` in descending order. A remaining
   fraction strictly greater than `above` uses that scale. Cutoffs lie in
   `[0, 1)`, scales are positive and decrease, and the last cutoff is zero.

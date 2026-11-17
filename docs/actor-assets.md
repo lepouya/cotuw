@@ -27,10 +27,13 @@ clips match their generators, and reject unregistered files in `public/assets`.
   medical markings, square medical packs, scanners, and carry cases. Mechanics
   wear ochre work armor and hard hats, with twin service tanks, tool pouches,
   and an open-ended wrench. Both keep separate owner markings and unarmed
-  animation clips. Cultivators carry a pod and a growth tool; their full-pose
+  animation clips. Medics use a scanner gesture in `treat`; Mechanics turn
+  their wrench in `repair`. These full-pose work loops run only during active
+  service. Cultivators carry a pod and a growth tool; their full-pose
   cultivation loop blends through the shared work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
-  Refinery, and Barracks meshes with idle machinery and activity clips; a
+  Refinery, Barracks, Relay, and Sentry meshes with idle machinery and
+  activity or firing clips; a
   skinned wolf with idle, walk, run, turn, bite, hit, and death; a rigid
   Harvester with idle, transit, deploy, harvest, stow, unload, hit, and death;
   crystal resource mounds; animated salvage; foundations; construction
@@ -38,6 +41,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   bite marks; smoke puffs; flickering fire; wound drops; a pulsing regeneration
   halo; and a bird with a wing-beat clip. The alpha wolf scales the generated
   wolf asset.
+  Launcher shots use a smoke-and-ember streak plus a separately sized impact
+  burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
   Conservatory basin and canopy, vaulted Musterhall, and renewable bloom
   markers. Each ID has one recipe naming its size, frame, focus height, and
@@ -51,15 +56,16 @@ clips match their generators, and reject unregistered files in `public/assets`.
   the built-in models and the export script, which receives named parts and
   adds rigging and clips. A building's details declare `loopSeconds`, the period
   of their motion, which becomes the exported idle clip, and `activities`, whose
-  one-shot motions become clips named for each activity. The base pack loads
-  the resulting GLBs during gameplay. The script also imports runtime colors,
-  such as `MATERIALS_COLOR`, so generated models match the stand-ins.
+  one-shot motions become clips named for each activity or `attack`. The base
+  pack loads the resulting GLBs during gameplay. The script also imports
+  runtime colors, such as `MATERIALS_COLOR`, so generated models match the
+  stand-ins.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
-- Relay Stations and Sentry Turrets use procedural stand-ins with owner
-  markings from `src/render/relay.ts` and `src/render/sentry.ts`. The Sentry
-  housing turns to its committed aim through the details `aim` hook. Full
-  generated models and animation remain part of M1 task 1.43.
+- Relay Stations sweep an antenna and pulse a signal lamp. Sentry Turrets
+  retain a separate yaw pivot for committed aim, with recoil and twin muzzle
+  flashes per shot. Their generated GLBs use owner markings; procedural
+  details remain available for content that selects them.
 - A material named `owner` or ending in `-owner` marks the owner-color area.
   Sessions give each owner a shared copy in its
   [owner color](content-packs.md), so keep those parts in their own mesh
@@ -76,15 +82,23 @@ clips match their generators, and reject unregistered files in `public/assets`.
 - `npm run assets:grass`: `scripts/grass-sheet.ts` generates dense and sparse
   grass sprite sheets with looping sway.
 - `npm run assets:effects`: `scripts/muzzle-flash-sheet.ts` generates the
-  Trooper's muzzle-flash sprite sheet.
+  Trooper's muzzle-flash sprite sheet. `scripts/launch-flash-sheet.ts` generates
+  the launcher's broader amber pressure flash and exhaust cloud.
 
 Each command prints its textures' minimap colors and its clip definitions;
 update matching content-pack graphics when changing the art.
 Generated terrain edges match by construction.
 Foundations and rubble are unit-cube models scaled to their placement.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
+Active support shows a small medical cross or mechanical wrench at the target.
+Service orders and repair badges share these symbols from
+`src/render/symbols.ts`.
+Only work with both participants visible reaches animation, effects, and audio.
 Model export can log Babylon's bone uniform warning. `NullEngine` reports only
 16 vertex uniform vectors, and the warning does not affect the GLB.
+Content's optional `attackAnchor` positions a shot's muzzle in model space;
+otherwise a frame effect's attack anchor supplies it. Building anchors use
+tile units above the roof. Shots land halfway up the target as drawn.
 
 ## Production portraits
 
@@ -172,6 +186,10 @@ duplicate channels, and activity endpoints that differ from the model's rest
 pose. Instances own clips and node visibility. Materials are shared; offline
 dimming and construction-stage clipping clone the materials they change.
 Preview opacity stays on the meshes.
+An optional `aimNode` names an unanimated yaw pivot. An `attack` activity
+clip plays once per committed shot under the same rest and channel rules.
+Aiming remains independent of idle and firing, including on rotated buildings.
+The aim node's name must be unique within its model.
 
 The pack's `props` names foundations, scaffolds, rubble, mounds, salvage,
 tracers, bite marks, smoke, fire, wound drops, regeneration, and birds by URL,

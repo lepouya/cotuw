@@ -36,6 +36,8 @@ export const DEFAULT_ACTOR_COLOR: Rgb = [0.871, 0.345, 0.122];
 export type ActorAnimationState = {
   /** Gathering, as a Harvester at a Materials patch. */
   working?: boolean;
+  /** Holds a work pose without advancing its loop, as during mission pause. */
+  workPaused?: boolean;
   /** Holding a detected target within weapon range. */
   aiming?: boolean;
   /** Pursuing, as a wolf chasing an intruder. */

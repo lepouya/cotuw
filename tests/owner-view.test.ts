@@ -6,6 +6,7 @@ import { createRelations } from "../src/simulation/ownership";
 import { createHarvesterState } from "../src/simulation/harvesting";
 import { createCultivatorState } from "../src/simulation/cultivation";
 import { createObservations } from "../src/simulation/observations";
+import { BASE_CONTENT } from "./helpers/content";
 
 import type {
   ActorDefinition,
@@ -88,6 +89,58 @@ function fixture() {
     });
   return { simulation, view, player: view(), rules };
 }
+
+test("service activity exposes work only when both participants are visible and in reach", () => {
+  const { simulation, rules } = fixture();
+  const medic = {
+    ...createActor({
+      id: "medic",
+      definitionId: "arc-medic",
+      owner: "wildlife",
+      worldPosition: { x: 0, z: 0 },
+    }),
+    service: { targetId: "patient", origin: { x: 0, z: 0 } },
+  };
+  const patient = {
+    ...createActor({
+      id: "patient",
+      definitionId: "arc-trooper",
+      owner: "wildlife",
+      worldPosition: { x: 1, z: 0 },
+    }),
+    health: 20,
+  };
+  simulation.actors = [medic, patient];
+  const view = createOwnerView({
+    simulation,
+    knowledge,
+    faction: "arc",
+    definitions: new Map(BASE_CONTENT.actors.map((actor) => [actor.id, actor])),
+    rules: () => rules,
+  });
+  const refresh = () => {
+    simulation.actors = [...simulation.actors];
+  };
+  expect(view.services()).toEqual([]);
+  simulation.seen.add("medic");
+  refresh();
+  expect(view.services()).toEqual([]);
+  simulation.seen.add("patient");
+  refresh();
+  expect(view.services()).toEqual([
+    { providerId: "medic", targetId: "patient" },
+  ]);
+  expect(view.shownActor("medic")).not.toHaveProperty("service");
+  patient.worldPosition.x = 15;
+  refresh();
+  expect(view.services()).toEqual([]);
+  patient.worldPosition.x = 1;
+  patient.health = BASE_CONTENT.actors.find(
+    ({ id }) => id === "arc-trooper",
+  )!.health!;
+  refresh();
+  expect(view.services()).toEqual([]);
+});
 
 test("hidden hostiles stay out of the owner's lookups and groups", () => {
   const { simulation, player } = fixture();

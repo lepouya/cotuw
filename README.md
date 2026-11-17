@@ -32,6 +32,8 @@ Select a damaged building and choose **Repair** to restore it through its
 headquarters' shared construction capacity. Repair pays as it works and pauses
 when disconnected or short of resources. **Cancel repair** keeps restored
 health.
+Repairing buildings show a wrench badge; amber pause marks indicate waiting
+work.
 Field Barracks also train Medics to heal personnel and Mechanics to repair
 surviving Harvesters. Idle providers service nearby damaged units for free;
 select one and click or tap an eligible damaged unit to prioritize it.

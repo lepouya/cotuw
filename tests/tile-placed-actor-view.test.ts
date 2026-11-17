@@ -475,3 +475,56 @@ test("offline buildings dim locally, stop machinery, and restore shared material
   expect(scene.getMeshByName(offline.name)!.material).toBe(live.material);
   views.dispose();
 });
+
+test("repair badges follow jobs without rebuilding buildings and release their views", () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 8, height: 8, tileSize: 1 });
+  const views = createTilePlacedActorViewRegistry(
+    scene,
+    map,
+    [definition],
+    new Map(),
+  );
+  const actor = placed(map, "repairing", 2, 2);
+  const name = `repair-badge-${actor.id}`;
+  views.update([actor]);
+  const building = scene.getTransformNodeByName(
+    `tile-placed-actor-${actor.id}-root`,
+  );
+  expect(scene.getTransformNodeByName(name)).toBeNull();
+
+  actor.repair = {
+    missingHealth: 10,
+    completedSteps: 0,
+    paidCost: 0,
+    priority: 1,
+    queuedTick: 0,
+    active: true,
+  };
+  views.update([actor]);
+  const badge = scene.getTransformNodeByName(name)!;
+  const wrench = scene.getMeshByName(`${name}-wrench`)!;
+  const activeMaterial = wrench.material;
+  expect(badge.parent).toBe(building);
+  expect(badge.getChildMeshes().every((mesh) => !mesh.isPickable)).toBe(true);
+  expect(scene.getMeshByName(`${name}-pause-1`)!.isEnabled()).toBe(false);
+
+  actor.repair.active = false;
+  views.update([actor]);
+  expect(wrench.material).not.toBe(activeMaterial);
+  expect(scene.getMeshByName(`${name}-pause-1`)!.isEnabled()).toBe(true);
+  expect(
+    scene.getTransformNodeByName(`tile-placed-actor-${actor.id}-root`),
+  ).toBe(building);
+
+  delete actor.repair;
+  views.update([actor]);
+  expect(badge.isDisposed()).toBe(true);
+  expect(scene.getTransformNodeByName(name)).toBeNull();
+  views.update([{ ...actor, repair: { active: true } }]);
+  const restored = scene.getTransformNodeByName(name)!;
+  views.update([]);
+  expect(restored.isDisposed()).toBe(true);
+  views.dispose();
+  expect(scene.materials).not.toContain(activeMaterial);
+});

@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   actorAnimationState,
   extractHealthAndDamageEffects,
+  extractServiceEffects,
+  shotEnds,
   UNIT_BAR_CLEARANCE,
 } from "../src/render/session-effects";
 import { TerrainMap } from "../src/map";
@@ -223,5 +225,154 @@ describe("actorAnimationState", () => {
       map,
     );
     expect(stateHidden.aiming).toBe(false);
+  });
+});
+
+describe("shot and service placement", () => {
+  const map = new TerrainMap({
+    width: 10,
+    height: 10,
+    tileSize: 2,
+    createHeight: () => 5,
+  });
+  const presentations = new Map<string, ActorPresentation>([
+    [
+      "launcher",
+      {
+        name: "Launcher",
+        description: "",
+        frameEffects: {
+          attack: {
+            clip: "flash",
+            url: "flash.png",
+            size: 1,
+            anchor: [1, 2, 3],
+          },
+        },
+      },
+    ],
+    ["sentry", { name: "Sentry", description: "", attackAnchor: [0, 1, 1] }],
+    ["medic", { name: "Medic", description: "", serviceEffect: "medical" }],
+  ]);
+  const context = {
+    appearances: new Map([
+      ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as ActorAppearance],
+    ]),
+    presentationOf: (id: string) => presentations.get(id),
+    groundPositionOf: (id: string) =>
+      id === "patient" ? { x: 4, z: 4 } : undefined,
+    buildingTopHeightOf: () => 9,
+    roofHeightOf: () => 6,
+    map,
+  };
+  const hit = (attackerDefinitionId: string) => ({
+    attackerId: "a",
+    attackerDefinitionId,
+    targetId: "t",
+    from: { x: 2, z: 2 },
+    to: { x: 8, z: 2 },
+    damage: 1,
+    damageType: "kinetic" as const,
+  });
+  const unit = (id: string, definitionId: string, facing = 0) => ({
+    ...createActor({
+      id,
+      definitionId,
+      owner: "player",
+      worldPosition: { x: 2, z: 2 },
+    }),
+    facing,
+  });
+
+  test("anchors turn with the attacker and shots land halfway up targets", () => {
+    const attacker = unit("a", "launcher", Math.PI / 2);
+    const target = unit("t", "trooper");
+    const { from, to } = shotEnds(hit("launcher"), attacker, target, context);
+    expect(from!.x).toBeCloseTo(5);
+    expect(from!.y).toBeCloseTo(7);
+    expect(from!.z).toBeCloseTo(1);
+    expect(to!.asArray()).toEqual([8, 5.6, 2]);
+    expect(shotEnds(hit("launcher"), undefined, undefined, context)).toEqual({
+      from: undefined,
+      to: undefined,
+    });
+  });
+
+  test("building anchors use tile units above the roof and follow aim", () => {
+    const sentry = {
+      ...unit("a", "sentry"),
+      tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
+      combat: { aimFacing: Math.PI },
+    };
+    const { from } = shotEnds(hit("sentry"), sentry, undefined, context);
+    expect(from!.x).toBeCloseTo(2);
+    expect(from!.y).toBeCloseTo(8);
+    expect(from!.z).toBeCloseTo(0);
+  });
+
+  test("lethal building hits keep their model height through shown remains", () => {
+    const remains = {
+      id: "t",
+      definitionId: "sentry",
+      facing: 0,
+      tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 },
+    };
+    const { to } = shotEnds(hit("launcher"), undefined, remains, context);
+    expect(to!.asArray()).toEqual([8, 7, 2]);
+  });
+
+  test.each(["builtin", "glb"])(
+    "%s attack anchors follow the mobile model scale",
+    (kind) => {
+      const model: ActorPresentation["model"] =
+        kind === "builtin"
+          ? { builtin: "wolf", scale: 2 }
+          : {
+              glb: {
+                url: "model.glb",
+                scale: 2,
+                bounds: { radius: 1, height: 2 },
+                clips: { idle: "idle", locomotion: "walk" },
+                cycleDistance: 1,
+              },
+            };
+      const { from } = shotEnds(
+        hit("launcher"),
+        unit("a", "launcher", Math.PI / 2),
+        undefined,
+        {
+          ...context,
+          presentationOf: () => ({ ...presentations.get("launcher")!, model }),
+        },
+      );
+      expect(from!.x).toBeCloseTo(8);
+      expect(from!.y).toBeCloseTo(9);
+      expect(from!.z).toBeCloseTo(0);
+    },
+  );
+
+  test("service symbols follow drawn targets of styled providers", () => {
+    const actors = new Map(
+      [unit("medic", "medic"), unit("patient", "trooper"), unit("x", "x")].map(
+        (actor) => [actor.id, actor],
+      ),
+    );
+    expect(
+      extractServiceEffects(
+        [
+          { providerId: "medic", targetId: "patient" },
+          { providerId: "x", targetId: "patient" },
+        ],
+        (id) => actors.get(id),
+        context,
+      ),
+    ).toEqual([
+      {
+        id: "medic",
+        style: "medical",
+        position: { x: 4, z: 4 },
+        height: 1.2 + UNIT_BAR_CLEARANCE,
+      },
+    ]);
   });
 });

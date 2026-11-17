@@ -168,6 +168,7 @@ function instantiate(
   let deathProgress = 0;
   /** Undefined until the first state, which settles without a transition. */
   let working: boolean | undefined;
+  let workPaused = false;
   /** How far the work pose is deployed, from 0 at idle to 1 at work. */
   let collector = 0;
   let aiming = false;
@@ -182,6 +183,7 @@ function instantiate(
       if (dead) return;
       aiming = !!state.aiming;
       running = !!state.running;
+      workPaused = !!state.workPaused;
       if (!work) return;
       const next = !!state.working;
       if (working === undefined) collector = next ? 1 : 0;
@@ -218,7 +220,9 @@ function instantiate(
       }
       if (work) {
         // The loop starts from its first frame where deployment ends.
-        workSeconds = work.weight ? workSeconds + motion.seconds : 0;
+        workSeconds = work.weight
+          ? workSeconds + (workPaused ? 0 : motion.seconds)
+          : 0;
         work.weight = working && !transitioning ? 1 : 0;
         seek(work, reduced ? 0 : (workSeconds / clipSeconds(work)) % 1);
       }

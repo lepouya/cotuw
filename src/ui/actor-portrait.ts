@@ -47,6 +47,34 @@ const elf = (mantle: string, gear: string) => `
 
 /** Small original illustrations drawn in a 120 × 80 view box. */
 const PORTRAITS: Record<PortraitId, string> = {
+  "arc-field-barracks": `${FOUNDATION}
+    <path fill="#182c30" d="M65 46 94 34 94 55 65 67Z"/>
+    <path fill="#8fa29b" d="M63 43 96 30 96 35 63 49Z"/>
+    <path stroke="#527075" stroke-width="2" d="M69 47 91 38M69 52 91 43M69 57 91 48"/>
+    <path fill="#6d9ad2" d="m30 32 18 7v7l-18-7Z"/>
+    <path stroke="#b9cac0" stroke-width="3" d="M30 23 44 29M39 19 53 25"/>
+    <path stroke="#adbdb5" stroke-width="3" d="M88 26V5"/>
+    <path fill="#6d9ad2" d="M90 5 108 9 90 15Z"/>`,
+  "arc-relay-station": `
+    <path fill="#233e42" d="m18 61 43-13 60 10-46 19Z"/>
+    <path fill="#58727e" d="m28 46 41-13 23 9-39 15Z"/>
+    <path fill="#30464f" d="m28 46 25 11v11L28 57Z"/>
+    <path fill="#405b66" d="m53 57 39-15v12L53 68Z"/>
+    <path fill="#6d9ad2" d="m28 48 25 11 39-15v5L53 64 28 53Z"/>
+    <path stroke="#a8bfbe" stroke-width="5" d="M61 48V7"/>
+    <path stroke="#6d9ad2" stroke-width="6" d="M36 15H86M39 28H83"/>
+    <path stroke="#d7e5db" stroke-width="3" d="M36 10V20M86 10V20M39 23V33M83 23V33"/>`,
+  "arc-sentry-turret": `
+    <ellipse fill="#233e42" cx="59" cy="65" rx="42" ry="12"/>
+    <path fill="#405b50" d="M32 49H86V62Q59 80 32 62Z"/>
+    <ellipse fill="#7c9483" cx="59" cy="49" rx="27" ry="10"/>
+    <path stroke="#6d9ad2" stroke-width="7" d="M44 49H76"/>
+    <path fill="#415647" d="M32 26 60 16 82 26 55 40Z"/>
+    <path fill="#2c4039" d="M32 26 55 40v16L32 43Z"/>
+    <path fill="#607565" d="M55 40 82 26v17L55 56Z"/>
+    <path stroke="#a5b7ad" stroke-width="9" d="M66 33 99 22M73 42 106 31"/>
+    <path stroke="#182c30" stroke-width="5" d="m97 23 7-2m0 11 7-2"/>
+    <path fill="#f0bd65" d="m37 32 9 5v5l-9-5Z"/>`,
   "arc-medic": infantry(
     "#dfeada",
     `

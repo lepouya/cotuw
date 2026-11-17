@@ -41,6 +41,27 @@ function flinchingBone(id: string) {
   return id.startsWith("arc-") ? "spine" : "wolf";
 }
 
+test.each(["arc-medic", "arc-mechanic"])(
+  "%s works independently and holds its work pose while paused",
+  async (id) => {
+    const { first, step, node } = await load(id);
+    const angle = () => node("right-arm").rotationQuaternion!.x;
+    step(0);
+    const idle = angle();
+    first.setAnimationState!({ working: true });
+    step(0.1);
+    step(0.3);
+    expect(Math.abs(angle() - idle)).toBeGreaterThan(0.1);
+    const working = angle();
+    first.setAnimationState!({ working: true, workPaused: true });
+    step(0.7);
+    expect(angle()).toBeCloseTo(working);
+    first.setAnimationState!({ working: false });
+    step(0);
+    expect(angle()).toBeCloseTo(idle);
+  },
+);
+
 test.each(["arc-trooper", "arc-scout", "wolf", "alpha-wolf", "arc-harvester"])(
   "%s flinches independently, restarts on another hit, and gives death priority",
   async (id) => {

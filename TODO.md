@@ -148,6 +148,7 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   construction. Oldest-first pooled payments, cancellation, paused work,
   disconnection, reassignment, and deterministic saved continuation are verified
   for ARC and Circle, with mouse and touch controls in Chromium and WebKit.
+  World-space wrench badges distinguish active and paused repair jobs.
 - [x] **1.41** Medic and Mechanic support shares Barracks production, with
   exclusive targets, bounded pursuit, and queued orders. Personnel healing,
   raid-damaged Harvester recovery, AI exclusions, and deterministic saves are
@@ -156,14 +157,10 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   Building damage, defense outranging, infantry counters, mixed forces, and
   saved continuation are verified, with mouse and touch training and selection
   in Chromium and WebKit.
-- [ ] **1.43** Complete the added ARC models, animation, command feedback,
-  effects, and essential audio. Medic and Mechanic models and production
-  portraits show distinct role equipment; models retain owner markings.
-  The Demolition Trooper's launcher model, launch recoil, and matching portrait
-  are verified. Complete its attack effect and weapon audio.
-  Verify readability and generated asset contracts for each included actor.
-  Give each owned model [owner materials](docs/actor-assets.md), as 1.71
-  does; 1.53 follows the same path.
+- [x] **1.43** Added ARC models, animation, command feedback, effects,
+  portraits, and essential audio are verified. Full automated checks and the
+  packaged macOS smoke check pass. Player listening confirms the busy-base
+  mix works without becoming overwhelming.
 - [ ] **1.44** Implement [control groups](DESIGN.md#m1-control-groups),
   [idle-worker controls](DESIGN.md#m1-idle-worker-controls), and
   [matching-unit selection](DESIGN.md#m1-matching-unit-selection).

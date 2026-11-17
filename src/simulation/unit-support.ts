@@ -41,6 +41,28 @@ export type ServiceReason =
 
 type Definitions = ReadonlyMap<string, ActorDefinition>;
 
+export type ServiceActivity = { providerId: string; targetId: string };
+
+/** Current work from committed state; pursuit and blocked orders are silent. */
+export function activeUnitServices(
+  actors: readonly ActorRenderState[],
+  definitions: Definitions,
+): ServiceActivity[] {
+  const byId = new Map(actors.map((actor) => [actor.id, actor]));
+  return actors.flatMap((provider) => {
+    const order = provider.service;
+    const target = order && byId.get(order.targetId);
+    return target &&
+      !provider.movement &&
+      !order.blocked &&
+      canService(provider, target, definitions) &&
+      distance(provider.worldPosition, target.worldPosition) <=
+        serviceReach(provider, target, definitions)
+      ? [{ providerId: provider.id, targetId: target.id }]
+      : [];
+  });
+}
+
 /** Whether a surviving unit can receive this provider's service. */
 function serviceable(
   provider: ActorRenderState,
@@ -97,6 +119,15 @@ export function serviceRejection(
     return "out-of-range";
   return undefined;
 }
+
+/** Restoration reaches from the provider's center to the target's edge. */
+const serviceReach = (
+  provider: ActorRenderState,
+  target: ActorRenderState,
+  definitions: Definitions,
+) =>
+  definitions.get(provider.definitionId)!.restoration!.range +
+  (definitions.get(target.definitionId)!.movement?.radius ?? 0);
 
 /** Whether the target needs recovery this provider can supply. */
 const canService = (
@@ -352,7 +383,7 @@ export function updateUnitSupport(world: {
     const order = provider.service!;
     const target = byId.get(order.targetId)!;
     const targetDefinition = definitions.get(target.definitionId)!;
-    const reach = rules.range + (targetDefinition.movement?.radius ?? 0);
+    const reach = serviceReach(provider, target, definitions);
     if (distance(provider.worldPosition, target.worldPosition) <= reach) {
       delete provider.movement;
       delete order.blocked;

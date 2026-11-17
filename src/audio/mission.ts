@@ -22,7 +22,13 @@ export function createMissionAudio(
   >,
   view: Pick<
     OwnerView,
-    "actors" | "economy" | "offlineIds" | "owns" | "workingIds" | "wrecks"
+    | "actors"
+    | "economy"
+    | "offlineIds"
+    | "owns"
+    | "workingIds"
+    | "wrecks"
+    | "services"
   >,
   combatHoldSeconds: number,
 ) {
@@ -58,6 +64,9 @@ export function createMissionAudio(
         .map((job) => job.producerId),
     );
     const workers = view.workingIds();
+    const servicing = new Set(
+      view.services().map(({ providerId }) => providerId),
+    );
     const offline = view.offlineIds();
     const emitters = shown.map((actor) => {
       if (actor.construction || offline.has(actor.id))
@@ -74,6 +83,7 @@ export function createMissionAudio(
       const states = [
         ...(moving ? ["moving"] : []),
         ...(workers.has(actor.id) ? ["working"] : []),
+        ...(servicing.has(actor.id) ? ["servicing"] : []),
         ...(producers.has(actor.id) ? ["training"] : []),
       ];
       return emitterOf(actor, states.length ? states : ["idle"]);
@@ -114,6 +124,12 @@ export function createMissionAudio(
         const attacker = participant(hit.attackerId);
         const target = participant(hit.targetId);
         if (attacker) scene.emit("attack", attacker);
+        if (attacker && target)
+          scene.emit("attack.impact", {
+            ...attacker,
+            id: target.id,
+            position: target.position,
+          });
         if (target) scene.emit("damage", target);
         if (attacker || target) combatUntil = seconds() + combatHoldSeconds;
       }

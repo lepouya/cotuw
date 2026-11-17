@@ -2,8 +2,10 @@ import {
   AbstractMesh,
   AnimationGroup,
   LoadAssetContainerAsync,
+  Matrix,
   MeshBuilder,
   TransformNode,
+  Vector3,
 } from "@babylonjs/core";
 import { RegisterSceneLoaderPlugin } from "@babylonjs/core/Loading/sceneLoader.js";
 import { GLTFFileLoaderMetadata } from "@babylonjs/loaders/glTF/glTFFileLoader.metadata.js";
@@ -41,6 +43,8 @@ export type ModelInstance = {
   root: TransformNode;
   pose: (seconds: number) => void;
   activities?: BuildingMotions;
+  /** Turns the aim node toward a heading in the instance root's space. */
+  aim?: (heading: number) => void;
   dispose: () => void;
 };
 export type ModelAsset = {
@@ -338,6 +342,22 @@ export async function loadModelAsset(
           return [kind, clip] as const;
         },
       );
+      const aimNodes = graphics.aimNode
+        ? assets.getNodes().filter((node) => node.name === graphics.aimNode)
+        : [];
+      if (
+        graphics.aimNode &&
+        (aimNodes.length !== 1 || !(aimNodes[0] instanceof TransformNode))
+      )
+        throw invalid(`needs one aim node named ${graphics.aimNode}`);
+      const aim = aimNodes[0];
+      if (
+        aim &&
+        assets.animationGroups.some((group) =>
+          group.targetedAnimations.some(({ target }) => target === aim),
+        )
+      )
+        throw invalid("aim node must not be controlled by animation");
       for (const group of assets.animationGroups) group.stop();
       const topHeight = Math.max(
         ...assets.meshes
@@ -369,11 +389,33 @@ export async function loadModelAsset(
         return group;
       };
       const group = idle && clone(idle);
+      const aim =
+        graphics.aimNode &&
+        (root
+          .getDescendants()
+          .find((node) => node.name === `${name}-${graphics.aimNode}`) as
+          TransformNode | undefined);
       return {
         root,
         pose: (seconds) => {
           if (group) seekClip(group, seconds, true);
         },
+        ...(aim && {
+          aim: (heading: number) => {
+            // Imported GLBs can reflect an axis when converting handedness.
+            const direction = Vector3.TransformNormal(
+              new Vector3(Math.sin(heading), 0, Math.cos(heading)),
+              root.computeWorldMatrix(true),
+            );
+            const parent = aim.parent as TransformNode;
+            const local = Vector3.TransformNormal(
+              direction,
+              Matrix.Invert(parent.computeWorldMatrix(true)),
+            );
+            aim.rotationQuaternion = null;
+            aim.rotation.y = Math.atan2(local.x, local.z);
+          },
+        }),
         activities: Object.fromEntries(
           activities.map(([kind, source]) => {
             const motion = clone(source);
@@ -412,6 +454,9 @@ export function modelBuildingDetails(
       update: instance.pose,
       loopSeconds: asset.loopSeconds,
       activities: instance.activities,
+      aim:
+        instance.aim &&
+        ((heading) => instance.aim!(heading - placement.facing)),
       dispose: instance.dispose,
     };
   };

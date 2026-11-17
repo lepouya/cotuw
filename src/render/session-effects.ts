@@ -1,24 +1,25 @@
 import { Vector3 } from "@babylonjs/core";
 import { weaponReach } from "../simulation/combat";
 import { isTilePlacedActor } from "../simulation/placement";
-import { healthBarOpacity } from "./health-bars";
+import { BUILDING_BAR_HEIGHT, healthBarOpacity } from "./health-bars";
 import { damageSeverity } from "./damage-effects";
 
 import type { ActorAppearance, ActorAnimationState } from "./actor";
 import type { DamagedActor } from "./damage-effects";
 import type { HealthBar } from "./health-bars";
 import type { RegeneratingActor } from "./regeneration-effects";
+import type { ServiceEffect } from "./service-effects";
 import type { ActorDefinition } from "../simulation/actor";
+import type { AttackEvent } from "../simulation/combat";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { TilePlacedActorState } from "../simulation/placement";
 import type { ActorPresentation } from "../content/presentation";
 import type { TerrainMap } from "../map";
+import type { ServiceActivity } from "../simulation/unit-support";
 import type { WorldPosition } from "../simulation/world";
 
 /** Health bars sit this far above unit models and over buildings. */
 export const UNIT_BAR_CLEARANCE = 0.3;
-/** Clears a construction progress bar below it. */
-const BUILDING_BAR_HEIGHT = 2.9;
 
 export type ExtractedEffects = {
   bars: HealthBar[];
@@ -38,6 +39,22 @@ export type EffectContext = {
   selectedActorIds: readonly string[];
 };
 
+type DrawnActor = Pick<ObservedActor, "id" | "definitionId" | "tilePlacement">;
+
+/** How high a shown actor is drawn above its ground point. */
+function drawnHeight(
+  actor: DrawnActor,
+  ground: number,
+  {
+    appearances,
+    buildingTopHeightOf,
+  }: Pick<EffectContext, "appearances" | "buildingTopHeightOf">,
+) {
+  return isTilePlacedActor(actor)
+    ? (buildingTopHeightOf(actor) ?? ground + 1) - ground
+    : (appearances.get(actor.definitionId)?.bounds.height ?? 1);
+}
+
 /**
  * Extracts visible health bars, damage effects, and regeneration effects for
  * the committed actors a viewer is shown on the current frame.
@@ -51,7 +68,6 @@ export function extractHealthAndDamageEffects(
     appearances,
     presentationOf,
     groundPositionOf,
-    buildingTopHeightOf,
     map,
     completedTicks,
     tickSeconds,
@@ -111,9 +127,7 @@ export function extractHealthAndDamageEffects(
         style,
         severity,
         position,
-        height: placed
-          ? (buildingTopHeightOf(actor) ?? ground + 1) - ground
-          : (bounds?.height ?? 1),
+        height: drawnHeight(actor, ground, context),
         radius,
       });
   }
@@ -138,4 +152,92 @@ export function actorAnimationState(
       weaponReach(actor, shownTarget, definitions, map) <= weapon.range,
     running: actor.territory?.mode === "pursuing",
   };
+}
+
+export type ShotContext = Pick<
+  EffectContext,
+  "appearances" | "presentationOf" | "buildingTopHeightOf" | "map"
+> & {
+  /** Where a building's art is seated; its attack anchor starts there. */
+  roofHeightOf: (actor: TilePlacedActorState) => number | undefined;
+};
+
+/**
+ * A shot leaves the attacker's anchor, turned to its aim, and lands halfway up
+ * the target as drawn. An end without a shown actor keeps the default.
+ */
+export function shotEnds(
+  hit: AttackEvent,
+  attacker: ObservedActor | undefined,
+  target: DrawnActor | undefined,
+  context: ShotContext,
+): { from?: Vector3; to?: Vector3 } {
+  const { map } = context;
+  const presentation = context.presentationOf(hit.attackerDefinitionId);
+  const anchor =
+    presentation?.attackAnchor ?? presentation?.frameEffects?.attack?.anchor;
+  let from: Vector3 | undefined;
+  if (attacker && anchor) {
+    const placed = isTilePlacedActor(attacker);
+    const model = presentation?.model;
+    const scale = placed
+      ? map.tileSize
+      : model && "glb" in model
+        ? (model.glb.scale ?? 1)
+        : (model?.scale ?? 1);
+    const [x, y, z] = anchor.map((value) => value * scale) as [
+      number,
+      number,
+      number,
+    ];
+    const base =
+      (placed ? context.roofHeightOf(attacker) : undefined) ??
+      map.heightAtWorldPosition(hit.from.x, hit.from.z);
+    const heading = attacker.combat?.aimFacing ?? attacker.facing;
+    const cos = Math.cos(heading);
+    const sin = Math.sin(heading);
+    from = new Vector3(
+      hit.from.x + x * cos + z * sin,
+      base + y,
+      hit.from.z + z * cos - x * sin,
+    );
+  }
+  const ground = map.heightAtWorldPosition(hit.to.x, hit.to.z);
+  const to =
+    target &&
+    new Vector3(
+      hit.to.x,
+      ground + drawnHeight(target, ground, context) / 2,
+      hit.to.z,
+    );
+  return { from, to };
+}
+
+/** Service symbols float above each target that a styled provider works on. */
+export function extractServiceEffects(
+  services: readonly ServiceActivity[],
+  shownActor: (id: string) => ObservedActor | undefined,
+  {
+    appearances,
+    presentationOf,
+    groundPositionOf,
+  }: Pick<EffectContext, "appearances" | "presentationOf" | "groundPositionOf">,
+): ServiceEffect[] {
+  return services.flatMap(({ providerId, targetId }) => {
+    const provider = shownActor(providerId);
+    const target = shownActor(targetId);
+    const style =
+      provider && presentationOf(provider.definitionId)?.serviceEffect;
+    if (!target || !style) return [];
+    return [
+      {
+        id: providerId,
+        style,
+        position: groundPositionOf(targetId) ?? target.worldPosition,
+        height:
+          (appearances.get(target.definitionId)?.bounds.height ?? 1) +
+          UNIT_BAR_CLEARANCE,
+      },
+    ];
+  });
 }

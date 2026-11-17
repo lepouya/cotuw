@@ -1,14 +1,18 @@
 import { Color3, MeshBuilder, Vector3 } from "@babylonjs/core";
 import { groundCross, groundPoint, groundRing } from "./ground-marker";
 import { hierarchyMeshes } from "./glb-model";
+import { SERVICE_COLORS, SERVICE_SYMBOLS } from "./symbols";
 import { createLifetime } from "../lifetime";
 
-import type { AttackEffectStyle } from "../content/presentation";
+import type {
+  AttackEffectStyle,
+  ServiceEffectStyle,
+} from "../content/presentation";
 import type { AbstractMesh, LinesMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { AttackEvent } from "../simulation/combat";
 import type { WorldPosition } from "../simulation/world";
-import type { ModelAsset } from "./glb-model";
+import type { ModelAsset, ModelInstance } from "./glb-model";
 
 const MUZZLE_HEIGHT = 1.2;
 const HIT_HEIGHT = 0.6;
@@ -16,19 +20,29 @@ const HIT_HEIGHT = 0.6;
 export const TRACER_COLOR = new Color3(1, 0.92, 0.55);
 export const BOLT_COLOR = new Color3(0.72, 0.38, 1);
 export const BITE_COLOR = new Color3(1, 0.3, 0.22);
+export const ROCKET_COLOR = new Color3(1, 0.65, 0.2);
 const TARGET_COLOR = new Color3(0.95, 0.18, 0.15);
 const TARGET_LIFE = 0.6;
+/** Separately sized bursts at the target, named as content props. */
+export type ImpactEffectStyle = "rocket-impact";
 /**
  * Beams stretch from the muzzle to the target; strikes sit at the target.
+ * A shown impact can appear alone without revealing a hidden shooter.
  * Fallback lines stand in until an effect's model loads.
  */
 const ATTACK_EFFECTS: Record<
   AttackEffectStyle,
-  { life: number; color: Color3; beam: boolean }
+  { life: number; color: Color3; beam: boolean; impact?: ImpactEffectStyle }
 > = {
   tracer: { life: 0.12, color: TRACER_COLOR, beam: true },
   bolt: { life: 0.3, color: BOLT_COLOR, beam: true },
   bite: { life: 0.3, color: BITE_COLOR, beam: false },
+  rocket: {
+    life: 0.35,
+    color: ROCKET_COLOR,
+    beam: true,
+    impact: "rocket-impact",
+  },
 };
 /** Catch-up ticks must not accumulate an unbounded number of effect models. */
 export const COMBAT_EFFECT_LIMIT = 64;
@@ -37,8 +51,9 @@ export const COMBAT_EFFECT_LIMIT = 64;
 export function createCombatEffectsView(
   scene: Scene,
   map: TerrainMap,
-  assetFor: (style: AttackEffectStyle) => ModelAsset | undefined = () =>
-    undefined,
+  assetFor: (
+    style: AttackEffectStyle | ImpactEffectStyle,
+  ) => ModelAsset | undefined = () => undefined,
   reducedMotion: () => boolean = () => false,
 ) {
   const effects: {
@@ -75,21 +90,84 @@ export function createCombatEffectsView(
       () => mesh.dispose(),
     );
   };
+  const addModel = (model: ModelInstance, life: number, animated: boolean) => {
+    const meshes = hierarchyMeshes(model.root);
+    track(
+      meshes,
+      life,
+      (opacity) => {
+        for (const mesh of meshes) mesh.visibility = opacity;
+      },
+      model.dispose,
+      animated
+        ? (seconds) => model.pose(reducedMotion() ? 0 : seconds)
+        : undefined,
+    );
+  };
   const above = (point: Readonly<WorldPosition>, height: number) =>
     groundPoint(map, point, height);
+  const sampleGround = (point: Readonly<WorldPosition>) =>
+    groundPoint(map, point, 0.12);
   return {
-    /** Draws a hit; `style` comes from the attacker's presentation. */
-    hit: (event: AttackEvent, style: AttackEffectStyle) => {
+    /**
+     * Draws a hit; `style` comes from the attacker's presentation. `from` and
+     * `to` replace the default muzzle and hit points; `showFrom` and `showTo`
+     * say which ends the viewer sees.
+     */
+    hit: (
+      event: AttackEvent,
+      style: AttackEffectStyle,
+      placement: {
+        from?: Vector3;
+        to?: Vector3;
+        showFrom?: boolean;
+        showTo?: boolean;
+      } = {},
+    ) => {
       if (disposed) return;
-      const from = above(event.from, MUZZLE_HEIGHT);
-      const to = above(event.to, HIT_HEIGHT);
+      const from = placement.from ?? above(event.from, MUZZLE_HEIGHT);
+      const to = placement.to ?? above(event.to, HIT_HEIGHT);
       // Shots start at the muzzle rather than the shooter's center.
-      const start = from.add(to.subtract(from).normalize().scale(0.35));
+      const start = placement.from
+        ? from
+        : from.add(to.subtract(from).normalize().scale(0.35));
       const heading = Math.atan2(
         event.to.x - event.from.x,
         event.to.z - event.from.z,
       );
-      const { life, color, beam } = ATTACK_EFFECTS[style];
+      const { life, color, beam, impact } = ATTACK_EFFECTS[style];
+      if (placement.showTo === false) return;
+      // A line to an unseen muzzle exposes the shooter's exact position.
+      if (beam && placement.showFrom === false && !impact) return;
+      if (impact) {
+        const burstAsset = assetFor(impact);
+        const burst = burstAsset?.instantiate(impact);
+        if (burst) {
+          burst.root.position.copyFrom(to);
+          addModel(burst, life, !!burstAsset?.loopSeconds);
+        } else
+          add(
+            MeshBuilder.CreateLineSystem(
+              impact,
+              {
+                lines: [
+                  [
+                    to.add(new Vector3(-0.35, 0, 0)),
+                    to.add(new Vector3(0.35, 0, 0)),
+                  ],
+                  [
+                    to.add(new Vector3(0, -0.35, 0)),
+                    to.add(new Vector3(0, 0.35, 0)),
+                  ],
+                ],
+              },
+              scene,
+            ),
+            color,
+            life,
+          );
+        if (placement.showFrom === false) return;
+      }
       const asset = assetFor(style);
       const model = asset?.instantiate(style);
       if (model) {
@@ -102,18 +180,7 @@ export function createCombatEffectsView(
           root.position.copyFrom(to);
           root.rotation.y = heading;
         }
-        const meshes = hierarchyMeshes(root);
-        track(
-          meshes,
-          life,
-          (opacity) => {
-            for (const mesh of meshes) mesh.visibility = opacity;
-          },
-          model.dispose,
-          asset?.loopSeconds
-            ? (seconds) => model.pose(reducedMotion() ? 0 : seconds)
-            : undefined,
-        );
+        addModel(model, life, !!asset?.loopSeconds);
         return;
       }
       if (beam) {
@@ -138,20 +205,38 @@ export function createCombatEffectsView(
     /** Acknowledges an accepted attack order at its target. */
     markTarget: (point: Readonly<WorldPosition>) => {
       if (disposed) return;
-      const sample = (ground: Readonly<WorldPosition>) =>
-        groundPoint(map, ground, 0.12);
       add(
         MeshBuilder.CreateLineSystem(
           "attack-target",
           {
             lines: [
-              groundRing(point, 0.7, 32, sample),
-              ...groundCross(point, 0.5, sample),
+              groundRing(point, 0.7, 32, sampleGround),
+              ...groundCross(point, 0.5, sampleGround),
             ],
           },
           scene,
         ),
         TARGET_COLOR,
+        TARGET_LIFE,
+      );
+    },
+    /** Acknowledges an accepted service order with the provider's symbol. */
+    markService: (
+      point: Readonly<WorldPosition>,
+      style: ServiceEffectStyle,
+    ) => {
+      if (disposed) return;
+      const lines = [
+        groundRing(point, 0.65, 24, sampleGround),
+        ...SERVICE_SYMBOLS[style].map((line) =>
+          line.map(([x, z]) =>
+            sampleGround({ x: point.x + x * 0.4, z: point.z + z * 0.4 }),
+          ),
+        ),
+      ];
+      add(
+        MeshBuilder.CreateLineSystem("service-target", { lines }, scene),
+        SERVICE_COLORS[style],
         TARGET_LIFE,
       );
     },

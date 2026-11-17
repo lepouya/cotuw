@@ -89,8 +89,14 @@ registration in the [asset inventory](audio-assets.md).
   interface, reading actors, production, work, and remains through
   `viewOf(playerOwner)`. Add new gameplay event or state detection here, after
   a successful tick; simulation code never imports audio. Existing events are
-  `attack`, `damage`, `production.start`, `trained`, and `activity.<kind>`.
-  States are `moving`, `working`, `training`, `constructing`, and `idle`.
+  `attack`, `attack.impact`, `damage`, `production.start`, `trained`, and
+  `activity.<kind>`. `attack.impact` uses the attacker's bindings at the
+  observed target's position; both participants must be visible or shown
+  remains.
+  States are `moving`, `working`, `servicing`, `training`, `constructing`, and
+  `idle`. `servicing` uses the owner view's active service activity shared with
+  animation and target effects. Approaching, blocked, finished, and hidden
+  service supplies no active loop state.
   `moving` compares positions between observations; only own actors can use a
   route on first sight, so a newly detected foreign actor has no `moving` loop
   until its next observation. Active construction of any faction uses

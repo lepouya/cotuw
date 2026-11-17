@@ -39,6 +39,7 @@ import { createHealthBarView } from "./render/health-bars";
 import { createCombatEffectsView } from "./render/combat-effects";
 import { createDamageEffectsView } from "./render/damage-effects";
 import { createRegenerationEffectsView } from "./render/regeneration-effects";
+import { createServiceEffectsView } from "./render/service-effects";
 import { createAmbientBirdsView } from "./render/ambient-birds";
 import { createWreckView } from "./render/wrecks";
 import { createFrameEffectsView } from "./render/frame-effects";
@@ -59,6 +60,8 @@ import { createSessionMap } from "./render/terrain-style";
 import {
   actorAnimationState,
   extractHealthAndDamageEffects,
+  extractServiceEffects,
+  shotEnds,
 } from "./render/session-effects";
 import {
   createSessionAssets,
@@ -370,6 +373,9 @@ async function assembleGameSession(
     reducedMotion,
   );
   own(regenerationEffects);
+  const serviceEffects = own(
+    createServiceEffectsView(view.scene, map, reducedMotion),
+  );
   const birds = createAmbientBirdsView(map, mission.scenario.flocks ?? [], {
     bird: () => propAssets.get("bird"),
     explored,
@@ -922,16 +928,20 @@ async function assembleGameSession(
    * Selected actors and those in recent combat show health bars. Damaged and
    * regenerating actors show the effects their presentation names.
    */
+  const drawn = {
+    appearances,
+    presentationOf,
+    groundPositionOf: (id: string) => actorViews.groundPosition(id),
+    buildingTopHeightOf: tilePlacedViews.topHeight,
+    roofHeightOf: tilePlacedViews.roofHeight,
+    map,
+  };
   const updateHealth = (frameSeconds: number) => {
     const { bars, damaged, regenerating } = extractHealthAndDamageEffects(
       player.actors().shown,
       {
+        ...drawn,
         definitions: definitionsById,
-        appearances,
-        presentationOf,
-        groundPositionOf: (id) => actorViews.groundPosition(id),
-        buildingTopHeightOf: tilePlacedViews.topHeight,
-        map,
         completedTicks: simulation.completedTicks,
         tickSeconds: simulation.tickSeconds,
         selectedActorIds: input.selectedActorIds,
@@ -1006,20 +1016,39 @@ async function assembleGameSession(
         updateWrecks(0);
         knownWreckActorVersion = simulation.actorVersion;
       }
-      // Completion and activity can share a tick; pose the committed building.
-      if (simulation.buildingActivity.length)
+      // Pose committed buildings first; completion can share a tick with
+      // their first activity or shot.
+      if (
+        simulation.buildingActivity.length ||
+        simulation.attacks.some(({ attackerId }) => {
+          const actor = player.shownActor(attackerId);
+          return actor && isTilePlacedActor(actor);
+        })
+      )
         tilePlacedViews.update(player.actors().placed, player.offlineIds());
+      const shownRemains = new Map(
+        player
+          .wrecks()
+          .map((wreck) => [wreck.actorId, { ...wreck, id: wreck.actorId }]),
+      );
       const markedTargets = new Set<string>();
       for (const hit of simulation.attacks) {
         const style = presentationOf(hit.attackerDefinitionId)?.attackEffect;
-        if (
-          style &&
-          (simulation.sees(playerOwner, hit.from) ||
-            simulation.sees(playerOwner, hit.to))
-        )
-          combatEffects.hit(hit, style);
-        if (player.shownActor(hit.attackerId))
+        const attacker = player.shownActor(hit.attackerId);
+        const target =
+          player.shownActor(hit.targetId) ?? shownRemains.get(hit.targetId);
+        const showFrom = !!attacker || shownRemains.has(hit.attackerId);
+        const showTo = !!target;
+        if (style && (showFrom || showTo))
+          combatEffects.hit(hit, style, {
+            ...shotEnds(hit, attacker, target, drawn),
+            showFrom,
+            showTo,
+          });
+        if (attacker) {
           actorViews.play(hit.attackerId, "attack");
+          tilePlacedViews.play(hit.attackerId, "attack");
+        }
         if (player.shownActor(hit.targetId))
           actorViews.play(hit.targetId, "hit");
       }
@@ -1044,6 +1073,16 @@ async function assembleGameSession(
         rally.onOutcome(outcome);
         economyControls?.onOutcome(outcome);
         const { command, accepted } = outcome;
+        if (command.kind === "service" && accepted) {
+          const target = player.shownActor(command.targetId);
+          const provider = player.shownActor(command.actorId);
+          const style =
+            provider && presentationOf(provider.definitionId)?.serviceEffect;
+          if (target && style && !markedTargets.has(target.id)) {
+            markedTargets.add(target.id);
+            combatEffects.markService(target.worldPosition, style);
+          }
+        }
         if (command.kind === "attack") {
           const target = player.shownActor(command.targetId);
           if (accepted && target && !markedTargets.has(target.id)) {
@@ -1116,9 +1155,23 @@ async function assembleGameSession(
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
     birds.update(frameSeconds);
-    const gathering = player.workingIds();
-    actorViews.update(shownMobile, loop.tickProgress(), frameSeconds, (actor) =>
-      animationStateOf(actor, gathering),
+    const services = player.services();
+    const working = new Set([
+      ...player.workingIds(),
+      ...services.map(({ providerId }) => providerId),
+    ]);
+    actorViews.update(
+      shownMobile,
+      loop.tickProgress(),
+      frameSeconds,
+      (actor) => ({
+        ...animationStateOf(actor, working),
+        workPaused: !playing,
+      }),
+    );
+    serviceEffects.update(
+      extractServiceEffects(services, player.shownActor, drawn),
+      playing ? frameSeconds : 0,
     );
     // Other owners' routes would reveal their intent.
     movementPath.update(player.actors().ownMobile);

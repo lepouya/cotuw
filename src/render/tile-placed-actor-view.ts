@@ -14,6 +14,8 @@ import { createLifetime } from "../lifetime";
 import { isRgb } from "../content/presentation";
 import { createFootprintOverlay } from "./footprint-overlay";
 import { createScreenBar } from "./screen-bar";
+import { createRepairBadge } from "./repair-badge";
+import { BUILDING_BAR_HEIGHT } from "./health-bars";
 import {
   constructionStage,
   stageBlueprint,
@@ -26,8 +28,7 @@ import type { AbstractMesh, Scene } from "@babylonjs/core";
 import type { TerrainMap, TileCoord } from "../map";
 import type { Actor, ActorDefinition, CombatState } from "../simulation/actor";
 import type { TilePlacedActorState } from "../simulation/placement";
-import type { BuildingActivityKind } from "../simulation/production";
-import type { Rgb } from "../content/presentation";
+import type { BuildingMotionKind, Rgb } from "../content/presentation";
 import type { OwnerMaterials } from "./owner-materials";
 import type { ModelAsset, ModelInstance } from "./glb-model";
 
@@ -43,9 +44,9 @@ export type BuildingMotion = {
   seconds: number;
   pose: (seconds: number) => void;
 };
-/** Motions that play once per building activity. */
+/** Motions that play once per building activity or fired shot. */
 export type BuildingMotions = Partial<
-  Record<BuildingActivityKind, BuildingMotion>
+  Record<BuildingMotionKind, BuildingMotion>
 >;
 
 /**
@@ -71,7 +72,7 @@ export type TilePlacedActorDetailsFactory = (
   update: (elapsedSeconds: number) => void;
   /** `update` repeats after this many seconds, so it can loop as one clip. */
   loopSeconds?: number;
-  /** Each activity's motion; none moves a part that `update` moves. */
+  /** Each one-shot motion; none moves a part that `update` moves. */
   activities?: BuildingMotions;
   /** Turns weapon parts toward a world heading, such as a turret's aim. */
   aim?: (heading: number) => void;
@@ -99,6 +100,7 @@ export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
 export type OwnedTilePlacedActor = TilePlacedActorState &
   Readonly<Pick<Actor, "owner">> & {
     readonly combat?: Readonly<Pick<CombatState, "aimFacing">>;
+    readonly repair?: Readonly<Pick<NonNullable<Actor["repair"]>, "active">>;
   };
 
 export type TilePlacedActorViewRegistry = {
@@ -111,8 +113,10 @@ export type TilePlacedActorViewRegistry = {
    * `frameSeconds` of real time.
    */
   animate: (elapsedSeconds: number, frameSeconds?: number) => void;
-  /** Starts an activity's motion unless motion is reduced. */
-  play: (actorId: string, kind: BuildingActivityKind) => void;
+  /** Starts a one-shot motion unless motion is reduced. */
+  play: (actorId: string, kind: BuildingMotionKind) => void;
+  /** The world height where a building's art is seated. */
+  roofHeight: (actor: TilePlacedActorState) => number | undefined;
   /**
    * The world height of a building's highest point as drawn, or as its
    * placement and art would draw it when it has no view, such as remains.
@@ -173,7 +177,7 @@ export function createTilePlacedActorViewRegistry(
   // Keep activity time when terrain or loaded art replaces a view.
   const playing = new Map<
     string,
-    { kind: BuildingActivityKind; seconds: number }
+    { kind: BuildingMotionKind; seconds: number }
   >();
   const terrainObserver = map.onChangedObservable.add((bounds) => {
     terrainRevision += 1;
@@ -260,6 +264,13 @@ export function createTilePlacedActorViewRegistry(
   ) =>
     Math.max(...tiles.flatMap(cornerHeights)) +
     (appearance?.height ?? DEFAULT_HEIGHT);
+  const roofHeight = (actor: TilePlacedActorState) => {
+    const appearance = appearances.get(actor.definitionId);
+    const definition = definitionsById.get(actor.definitionId);
+    return appearance && definition
+      ? roofOf(occupiedTilesFor(actor, definition), appearance)
+      : undefined;
+  };
 
   // One column per occupied tile, from its lowest corner to a shared roof, so
   // the body matches the footprint's shape and never floats on a slope.
@@ -437,13 +448,43 @@ export function createTilePlacedActorViewRegistry(
         progress = { bar, fill, paused };
       }
       const active = !constructing && !disconnected;
+      const motionFor = (kind: BuildingMotionKind) =>
+        details?.activities?.[kind];
+      let repairBadge: ReturnType<typeof createRepairBadge> | undefined;
+      lifetime.defer(() => repairBadge?.dispose());
+      const showRepair = (repair: OwnedTilePlacedActor["repair"]) => {
+        if (!repair) {
+          repairBadge?.dispose();
+          repairBadge = undefined;
+          return;
+        }
+        if (!repairBadge) {
+          repairBadge = createRepairBadge(
+            scene,
+            `repair-badge-${actor.id}`,
+            shared,
+          );
+          repairBadge.root.parent = root;
+          repairBadge.root.position.set(
+            worldPosition.x,
+            Math.max(
+              top,
+              map.heightAtWorldPosition(worldPosition.x, worldPosition.z) +
+                BUILDING_BAR_HEIGHT,
+            ),
+            worldPosition.z,
+          );
+        }
+        repairBadge.update(repair.active === true);
+      };
       let growing = actor.construction?.active === true;
       if (!active) playing.delete(actor.id);
       return {
         root,
         top,
-        update: ({ construction, combat }: OwnedTilePlacedActor) => {
+        update: ({ construction, combat, repair }: OwnedTilePlacedActor) => {
           details?.aim?.(combat?.aimFacing ?? facing);
+          showRepair(repair);
           growing = construction?.active === true;
           if (!progress || !construction) return;
           progress.bar.setFill(
@@ -455,13 +496,13 @@ export function createTilePlacedActorViewRegistry(
         },
         animate: (seconds: number, frameSeconds: number) => {
           details?.update(
-            active || (definition.growth && growing && !reducedMotion())
+            !reducedMotion() && (active || (definition.growth && growing))
               ? seconds
               : 0,
           );
           const activity = playing.get(actor.id);
           if (!activity) return;
-          const motion = details?.activities?.[activity.kind];
+          const motion = motionFor(activity.kind);
           if (!motion) {
             playing.delete(actor.id);
             return;
@@ -471,13 +512,12 @@ export function createTilePlacedActorViewRegistry(
           motion.pose(Math.min(activity.seconds, motion.seconds));
           if (activity.seconds >= motion.seconds) playing.delete(actor.id);
         },
-        play: (kind: BuildingActivityKind) => {
-          const motion = details?.activities?.[kind];
+        play: (kind: BuildingMotionKind) => {
+          const motion = motionFor(kind);
           if (!motion || !active || reducedMotion()) return;
-          // A new activity replaces one in progress.
+          // A new motion replaces one in progress.
           const previous = playing.get(actor.id);
-          const previousMotion =
-            previous && details?.activities?.[previous.kind];
+          const previousMotion = previous && motionFor(previous.kind);
           previousMotion?.pose(previousMotion.seconds);
           motion.pose(0);
           playing.set(actor.id, { kind, seconds: 0 });
@@ -552,17 +592,15 @@ export function createTilePlacedActorViewRegistry(
       for (const view of roots.values()) view.animate(seconds, frameSeconds);
     },
     play: (actorId, kind) => roots.get(actorId)?.play(kind),
+    roofHeight,
     topHeight: (actor) => {
       const drawn = roots.get(actor.id)?.top;
       if (drawn !== undefined) return drawn;
-      const appearance = appearances.get(actor.definitionId);
-      const definition = definitionsById.get(actor.definitionId);
-      if (!appearance || !definition) return undefined;
+      const roof = roofHeight(actor);
+      if (roof === undefined) return undefined;
       // Seated models are scaled to the tile size.
-      return (
-        roofOf(occupiedTilesFor(actor, definition), appearance) +
-        (appearance.modelTopHeight ?? 1) * map.tileSize
-      );
+      const top = appearances.get(actor.definitionId)!.modelTopHeight ?? 1;
+      return roof + top * map.tileSize;
     },
     actorIdForMesh: (mesh) => {
       for (

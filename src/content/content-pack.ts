@@ -61,6 +61,8 @@ const PROP_IDS = [
   "cultivation-site",
   "salvage",
   "tracer",
+  "rocket",
+  "rocket-impact",
   "bolt",
   "bite",
   "smoke",

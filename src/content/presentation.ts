@@ -12,7 +12,6 @@ import { deepFreeze } from "../simulation/actor";
 import { BUILDING_ACTIVITY_KINDS } from "../simulation/production";
 
 import type { ActorDefinition } from "../simulation/actor";
-import type { BuildingActivityKind } from "../simulation/production";
 import type { AudioBindings } from "./audio";
 
 /** Built-in presentation names accepted by authored content. */
@@ -28,6 +27,10 @@ const BUILTIN_BUILDING_DETAIL_IDS = [
 export type BuiltinBuildingDetailId =
   (typeof BUILTIN_BUILDING_DETAIL_IDS)[number];
 
+/** One-shot building motions: committed activities and each fired shot. */
+const BUILDING_MOTION_KINDS = [...BUILDING_ACTIVITY_KINDS, "attack"] as const;
+export type BuildingMotionKind = (typeof BUILDING_MOTION_KINDS)[number];
+
 const PORTRAIT_IDS = [
   "refinery",
   "headquarters",
@@ -35,6 +38,9 @@ const PORTRAIT_IDS = [
   "harvester",
   "armed",
   "unarmed",
+  "arc-field-barracks",
+  "arc-relay-station",
+  "arc-sentry-turret",
   "arc-medic",
   "arc-mechanic",
   "arc-demolition-trooper",
@@ -48,6 +54,12 @@ const PORTRAIT_IDS = [
 export type PortraitId = (typeof PORTRAIT_IDS)[number];
 
 export type Rgb = [number, number, number];
+
+/** A model-space offset, facing +Z. */
+export type ModelPoint = [number, number, number];
+
+const isModelPoint = (value: unknown): value is ModelPoint =>
+  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 
 export function isRgb(value: unknown): value is Rgb {
   return (
@@ -171,11 +183,13 @@ export function validateActorGraphics(
 export type ModelGraphics = {
   url: string;
   idle?: string;
+  /** A model-space yaw pivot, separate from clip-controlled channels. */
+  aimNode?: string;
   /**
-   * Clips that play once per building activity. Each starts and ends at rest
+   * Clips that play once per building motion. Each starts and ends at rest
    * and keys no channel that idle keys.
    */
-  activities?: Partial<Record<BuildingActivityKind, string>>;
+  activities?: Partial<Record<BuildingMotionKind, string>>;
 };
 
 export function validateModelGraphics(
@@ -184,7 +198,8 @@ export function validateModelGraphics(
   if (
     !isRecord(graphics) ||
     !isId(graphics.url) ||
-    (graphics.idle !== undefined && !isId(graphics.idle))
+    (graphics.idle !== undefined && !isId(graphics.idle)) ||
+    (graphics.aimNode !== undefined && !isId(graphics.aimNode))
   )
     throw new RangeError("A model needs a URL and a valid idle clip name");
   const activities = graphics.activities;
@@ -192,8 +207,7 @@ export function validateModelGraphics(
     activities !== undefined &&
     (!isRecord(activities) ||
       Object.entries(activities).some(
-        ([kind, clip]) =>
-          !isOneOf(BUILDING_ACTIVITY_KINDS, kind) || !isId(clip),
+        ([kind, clip]) => !isOneOf(BUILDING_MOTION_KINDS, kind) || !isId(clip),
       ))
   )
     throw new RangeError(
@@ -209,7 +223,7 @@ export type FrameEffect = {
   /** Edge length in world units. */
   size: number;
   /** In the actor's model space: from its ground point, facing +Z. */
-  anchor: [number, number, number];
+  anchor: ModelPoint;
 };
 
 export type FrameEffects = Partial<Record<ActorTrigger, FrameEffect>>;
@@ -230,9 +244,7 @@ function validateFrameEffects(
       !hasOwn(clips, effect.clip) ||
       !isId(effect.url) ||
       !isPositive(effect.size) ||
-      !Array.isArray(effect.anchor) ||
-      effect.anchor.length !== 3 ||
-      !effect.anchor.every(Number.isFinite)
+      !isModelPoint(effect.anchor)
     )
       throw new RangeError(
         `The ${trigger} frame effect for ${actorId} is invalid.`,
@@ -240,8 +252,12 @@ function validateFrameEffects(
 }
 
 /** How an attacker's hits are drawn. */
-const ATTACK_EFFECT_STYLES = ["tracer", "bite", "bolt"] as const;
+const ATTACK_EFFECT_STYLES = ["tracer", "bite", "bolt", "rocket"] as const;
 export type AttackEffectStyle = (typeof ATTACK_EFFECT_STYLES)[number];
+
+/** How a support unit's active service is drawn at its target. */
+const SERVICE_EFFECT_STYLES = ["medical", "mechanical"] as const;
+export type ServiceEffectStyle = (typeof SERVICE_EFFECT_STYLES)[number];
 
 /** How damage on an actor is drawn. */
 const DAMAGE_EFFECT_STYLES = ["mechanical", "biological", "living"] as const;
@@ -295,9 +311,12 @@ export type ActorPresentation = {
   build?: { id: string; label: string; order?: number };
   train?: { id: string; label: string };
   attackEffect?: AttackEffectStyle;
+  /** Where shots leave the model; buildings use tile units above the roof. */
+  attackAnchor?: ModelPoint;
   /** How damage shows once health drops; absent shows none. */
   damageEffect?: DamageEffectStyle;
   regenerationEffect?: boolean;
+  serviceEffect?: ServiceEffectStyle;
   model?: ActorModel;
   frameEffects?: FrameEffects;
   building?: {
@@ -357,6 +376,11 @@ export function validateActorPresentation(
   )
     throw invalid(`gives ${actor.id} an unknown attack effect`);
   if (
+    presentation.attackAnchor !== undefined &&
+    !isModelPoint(presentation.attackAnchor)
+  )
+    throw invalid(`gives ${actor.id} an invalid attack anchor`);
+  if (
     presentation.damageEffect !== undefined &&
     !isOneOf(DAMAGE_EFFECT_STYLES, presentation.damageEffect)
   )
@@ -366,6 +390,12 @@ export function validateActorPresentation(
     typeof presentation.regenerationEffect !== "boolean"
   )
     throw invalid(`gives ${actor.id} an invalid regeneration effect`);
+  if (
+    presentation.serviceEffect !== undefined &&
+    (!actor.restoration ||
+      !isOneOf(SERVICE_EFFECT_STYLES, presentation.serviceEffect))
+  )
+    throw invalid(`gives ${actor.id} an invalid service effect`);
   const model = presentation.model;
   if (model !== undefined) {
     if (!isRecord(model) || "glb" in model === "builtin" in model)

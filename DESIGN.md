@@ -671,6 +671,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   selection details. The orders toolbar stays below both scrolling panels and
   remains visible as their content grows. Tab arrows, Home, and End navigate
   the production tabs.
+  Field Barracks, Relay Station, and Sentry Turret cards have distinct
+  portraits showing their entrance, antenna mast, and twin gun barrels.
 - The top bar owns the game menu, resources, objectives, alerts, elapsed mission
   time, and single-player pause and speed controls. The left holds Menu, Pause,
   and ½×, 1×, 2×, and 4× speed. The center shows the first unfinished victory
@@ -1061,11 +1063,20 @@ These systems are outside M1.
   processing lamp.
   Activity time survives terrain and asset refreshes; disconnection or actor
   removal clears it.
+- Relay antennas sweep and their signal lamps pulse while operational.
+  Sentry Turrets turn a separate yaw pivot toward their committed aim and
+  recoil with twin muzzle flashes per shot. Generated models preserve this
+  aiming independently of idle and firing clips. Construction, disconnection,
+  and reduced motion hold operational animation at rest.
 - ARC construction shows three equal stages of progress: the foundation inside a
   scaffold at half the building's height, then the building cut off at half
   height inside a full scaffold, then the whole building inside the scaffold.
   Blueprints stay translucent under their progress bar, and completion removes
   the scaffold.
+- Owned buildings with repair jobs show a camera-facing wrench above the
+  model. Active repairs use green; queued, disconnected, or unaffordable
+  repairs use amber with pause marks. Completion or cancellation removes the
+  badge. The badge remains still under reduced motion and rebuilds on loading.
 - Actors whose presentation names a damage effect show it at 60% health or
   less and more strongly at 30% or less. Mechanical actors, such as ARC
   buildings and Harvesters, release intermittent smoke puffs when moderately
@@ -1760,6 +1771,11 @@ acceptance progress. The following sections define the selected scope.
 - Demolition Troopers wear charcoal armor and amber visors. A shoulder-mounted
   launcher and paired rocket tubes on their backs distinguish them from rifle
   infantry; their production portraits show the same equipment.
+- Launcher shots show an amber pressure flash, a brief smoke-and-ember streak,
+  and an impact burst, with distinct ignition and impact sounds. Visuals follow
+  committed hits without adding travel time or splash damage. A visible impact
+  draws no trail toward a hidden shooter. Reduced motion holds effect shapes
+  while they fade.
 - Building damage bonuses are additive per hit, apply to unfinished buildings
   too, and precede difficulty scaling. Buildings are actors whose definitions
   have a footprint; mobile targets take only the weapon's base damage.
@@ -1772,6 +1788,10 @@ acceptance progress. The following sections define the selected scope.
   packs. Mechanics wear ochre work armor and hard hats, with twin service
   tanks and an open-ended wrench. Role equipment and silhouettes distinguish
   both from Scouts, independently of their shared owner-color markings.
+- Active Medic and Mechanic service uses role-specific tool gestures with
+  subtle effects on the target. Healing and mechanical repair have distinct
+  cues. Approaching or blocked providers show no active work effect. Reduced
+  motion holds a still service cue while health restoration is active.
 - The Circle's **Briar Ram** is a tougher, slower living assault construct
   that approaches and batters structures. Sentinels protect its approach;
   committing it to an assault carries more risk than ranged bombardment.

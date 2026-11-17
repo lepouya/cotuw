@@ -1,10 +1,10 @@
-import { Color3, Vector3, VertexBuffer } from "@babylonjs/core";
+import { Color3, TransformNode, Vector3, VertexBuffer } from "@babylonjs/core";
 import { expect, test } from "vitest";
 
 import { testScene } from "./helpers/scene";
 import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
-import { loadModelAsset } from "../src/render/glb-model";
+import { loadModelAsset, modelBuildingDetails } from "../src/render/glb-model";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 import {
   createOwnerMaterials,
@@ -34,6 +34,62 @@ function posedExtent(meshes: readonly AbstractMesh[]) {
   }
   return { radius, height };
 }
+
+test("generated Turrets keep instance aiming independent of idle and firing", async () => {
+  const scene = testScene();
+  const graphics =
+    BASE_CONTENT.presentation["arc-sentry-turret"]!.building!.glb!;
+  const asset = await loadModelAsset(scene, {
+    ...graphics,
+    url: glbDataUrl(graphics.url),
+  });
+  const first = asset.instantiate("first");
+  const second = asset.instantiate("second");
+  const yaw = () =>
+    first.root
+      .getDescendants()
+      .find((node) => node.name === "first-sentry-turret") as TransformNode;
+  const carriage = first.root
+    .getDescendants()
+    .find((node) => node.name === "first-sentry-carriage") as TransformNode;
+  first.aim!(Math.PI / 2);
+  first.pose(0.7);
+  first.activities!.attack!.pose(0.08);
+  scene.animate();
+  yaw().computeWorldMatrix(true);
+  expect(yaw().getDirection(Vector3.Forward()).normalize().x).toBeCloseTo(1);
+  expect(carriage.position.z).toBeLessThan(-0.05);
+  const other = second.root
+    .getDescendants()
+    .find((node) => node.name === "second-sentry-carriage") as TransformNode;
+  expect(other.position.z).toBeCloseTo(0);
+  first.activities!.attack!.pose(first.activities!.attack!.seconds);
+  scene.animate();
+  expect(carriage.position.z).toBeCloseTo(0);
+  const root = new TransformNode("placed", scene);
+  const details = modelBuildingDetails(asset)(
+    root,
+    { center: Vector3.Zero(), roof: 0, tileSize: 1, facing: Math.PI / 2 },
+    () => {
+      throw new Error("Unused");
+    },
+  );
+  details.aim!(Math.PI);
+  const placedYaw = root
+    .getDescendants()
+    .find(
+      (node) => node.name === "placed-model-sentry-turret",
+    ) as TransformNode;
+  placedYaw.computeWorldMatrix(true);
+  expect(placedYaw.getDirection(Vector3.Forward()).normalize().z).toBeCloseTo(
+    -1,
+  );
+  details.dispose();
+  root.dispose();
+  first.dispose();
+  second.dispose();
+  asset.dispose();
+});
 
 test.each(
   BASE_CONTENT.actors.filter(({ id, faction }) => {

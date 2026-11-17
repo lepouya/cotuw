@@ -14,6 +14,12 @@ The page also ships in the browser build.
   signals for committed command results.
 - `rifle-1`, `rifle-2`, and `rifle-3`: percussive rifle reports with different
   seeded noise and metallic overtones.
+- `launcher-launch` and `launcher-impact`: a low ignition whoosh and a brief
+  bass-heavy impact, with independent positional playback and voice limits.
+- `medical-service`: a quiet periodic scanner tone during active healing.
+- `mechanical-service`: a soft motor bed with rhythmic tool chatter during
+  active mechanical repair. Both support loops have seamless four-second
+  periods and lower gains when their provider is unselected.
 - `circle-cast-1` and `circle-cast-2`: soft wooden onsets, rising resonant
   tones, and brief magical echoes for the Sentinel's living focus.
 - `living-hit`: leaf-like rustling, warm resonance, and a faint tonal tail

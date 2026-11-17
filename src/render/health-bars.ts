@@ -10,6 +10,8 @@ const SEGMENTS = 5;
 /** Unselected actors show bars this long after combat, then fade out. */
 const COMBAT_SECONDS = 3;
 const FADE_SECONDS = 1;
+/** Building health bars sit this far above the ground. */
+export const BUILDING_BAR_HEIGHT = 2.9;
 
 /** Selected actors always show a bar; others only during and after combat. */
 export function healthBarOpacity(

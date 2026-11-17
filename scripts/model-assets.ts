@@ -16,6 +16,7 @@ import { createBarracksDetails } from "../src/render/barracks.ts";
 import {
   BITE_COLOR,
   BOLT_COLOR,
+  ROCKET_COLOR,
   TRACER_COLOR,
 } from "../src/render/combat-effects.ts";
 import { createCommandCenterDetails } from "../src/render/command-center.ts";
@@ -30,6 +31,8 @@ import {
   SALVAGE_COLOR,
 } from "../src/render/materials-sites.ts";
 import { createRefineryDetails } from "../src/render/refinery.ts";
+import { createRelayDetails } from "../src/render/relay.ts";
+import { createSentryDetails } from "../src/render/sentry.ts";
 import { createWolfParts } from "../src/render/wolf.ts";
 import { CIRCLE_MODELS } from "./circle-models.ts";
 import { exportGlb, rigidSkin } from "./glb-export.ts";
@@ -278,6 +281,72 @@ function tracer(scene: Scene, name: string) {
   beam.parent = root;
   beam.position.z = 0.5;
   beam.material = material;
+}
+
+function rocket(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const hot = unlit(scene, `${name}-hot`, ROCKET_COLOR);
+  const smoke = surface(scene, `${name}-smoke`, [0.6, 0.59, 0.53], 0.3);
+  const core = MeshBuilder.CreateBox(
+    "rocket-streak",
+    { width: 0.065, height: 0.065, depth: 1 },
+    scene,
+  );
+  core.parent = root;
+  core.position.z = 0.5;
+  core.material = hot;
+  const parts: Mesh[] = [];
+  for (let index = 0; index < 5; index++) {
+    const puff = MeshBuilder.CreateSphere(
+      `trail-${index}`,
+      { diameter: 0.16 - index * 0.018, segments: 4 },
+      scene,
+    );
+    puff.parent = root;
+    puff.position.set(Math.sin(index * 2) * 0.04, 0.03, 0.1 + index * 0.17);
+    puff.scaling.z = 0.7;
+    parts.push(puff);
+  }
+  merge(root, "rocket-smoke", parts, smoke);
+}
+
+function rocketImpact(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const bloom = new TransformNode("impact-bloom", scene);
+  bloom.parent = root;
+  const hot = unlit(scene, "impact-hot", new Color3(1, 0.63, 0.15));
+  const parts: Mesh[] = [];
+  for (let index = 0; index < 9; index++) {
+    const angle = (index / 9) * Math.PI * 2;
+    const ray = MeshBuilder.CreateBox(
+      `impact-ray-${index}`,
+      { width: 0.07, height: 0.6, depth: 0.07 },
+      scene,
+    );
+    ray.parent = bloom;
+    ray.rotation.z = angle;
+    ray.position.set(
+      Math.sin(angle) * 0.15,
+      Math.cos(angle) * 0.15,
+      Math.sin(index * 3) * 0.12,
+    );
+    parts.push(ray);
+  }
+  const core = MeshBuilder.CreateSphere(
+    "impact-core",
+    { diameter: 0.4, segments: 6 },
+    scene,
+  );
+  core.parent = bloom;
+  parts.push(core);
+  merge(bloom, "impact-flare", parts, hot);
+  clip(
+    root,
+    "burst",
+    0.4,
+    (seconds) => bloom.scaling.setAll(0.45 + seconds * 2),
+    false,
+  );
 }
 
 function bolt(scene: Scene, name: string) {
@@ -771,6 +840,8 @@ const BUILDERS = {
   "command-center": building(createCommandCenterDetails),
   barracks: building(createBarracksDetails),
   refinery: building(createRefineryDetails),
+  relay: building(createRelayDetails),
+  sentry: building(createSentryDetails),
   harvester,
   wolf,
   "materials-mound": materialsMound,
@@ -779,6 +850,8 @@ const BUILDERS = {
   foundation,
   scaffold,
   tracer,
+  rocket,
+  "rocket-impact": rocketImpact,
   bolt,
   bite,
   smoke,

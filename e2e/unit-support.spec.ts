@@ -29,6 +29,7 @@ async function opening(page: Page) {
     });
     const scenario = defineScenario({
       id: "support-controls",
+      content: level().scenario.content,
       tileSize: 1,
       terrainTypeIds: [...map.terrainTypeIds],
       terrain: map.terrainState(),
@@ -99,6 +100,96 @@ async function actorPoint(page: Page, id: string) {
 }
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
+  test(`support work effects survive pause and load, then clear on completion ${WEBKIT}`, async ({
+    page,
+  }, info) => {
+    const errors = collectPageErrors(page, { console: true });
+    await opening(page);
+    await page.evaluate(async () => {
+      const { createActor } = await import("/src/simulation/actor.ts");
+      const { simulation } = window.sessionHarness.view;
+      for (const [id, definitionId, targetId] of [
+        ["field-medic", "arc-medic", "trooper"],
+        ["field-mechanic", "arc-mechanic", "harvester"],
+      ] as const) {
+        const { x, z } = simulation.actorById(targetId)!.worldPosition;
+        simulation.spawnActor(
+          createActor({
+            id,
+            definitionId,
+            owner: "player",
+            worldPosition: { x: x + 1.3, z },
+          }),
+        );
+        simulation.submitCommand(
+          { kind: "service", actorId: id, targetId },
+          { owner: "player" },
+        );
+      }
+    });
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-models-ready",
+      "true",
+    );
+    await advance(page, 0.2);
+    const state = () =>
+      page.evaluate(() => {
+        const { scene } = window.sessionHarness.view;
+        return ["field-medic", "field-mechanic"].map((id) => {
+          const effect = scene.getTransformNodeByName(`service-effect-${id}`);
+          const symbol = scene.getTransformNodeByName(
+            `service-effect-${id}-symbol`,
+          );
+          const arm = scene.getTransformNodeByName(`actor-${id}-right-arm`);
+          return {
+            visible: !!effect,
+            scale: symbol?.scaling.x,
+            arm: arm?.rotationQuaternion?.x,
+          };
+        });
+      });
+    expect((await state()).every(({ visible }) => visible)).toBe(true);
+    await page.evaluate(() => window.sessionHarness.view.pause());
+    const paused = await state();
+    await advance(page, 1);
+    expect(await state()).toEqual(paused);
+    await page.screenshot({
+      path: info.outputPath("support-work-effects.png"),
+    });
+    await page.evaluate(async () => {
+      const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
+      const { loadMission } = await import("/src/mission-loading.ts");
+      const { controlSessionClock } = await import("/e2e/harness.ts");
+      const old = window.sessionHarness.view;
+      const source = old.save({
+        name: "Active support",
+        savedAt: "2026-11-16T00:00:00Z",
+      });
+      await old.disposeAsync();
+      const { view } = await startSidebarSession(loadMission(source));
+      controlSessionClock(view);
+    });
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-models-ready",
+      "true",
+    );
+    await advance(page, 0.1);
+    expect((await state()).every(({ visible }) => visible)).toBe(true);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.evaluate(() => window.sessionHarness.view.pause());
+    await advance(page, 0.1);
+    await expect
+      .poll(async () => (await state()).every(({ scale }) => scale === 1))
+      .toBe(true);
+    const reduced = await state();
+    await advance(page, 1);
+    expect(await state()).toEqual(reduced);
+    await page.evaluate(() => window.sessionHarness.view.resume());
+    await advance(page, 60);
+    expect((await state()).every(({ visible }) => !visible)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test(`Barracks trains and selects a Demolition Trooper ${WEBKIT}`, async ({
     page,
   }, info) => {

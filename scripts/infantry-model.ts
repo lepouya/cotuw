@@ -49,7 +49,7 @@ type InfantryRecipe = {
   parts: readonly Part[];
   stride: number;
   stance: Stance;
-  work?: boolean;
+  work?: "cultivate" | "treat" | "repair";
   /** Armed roles also get an aim layer. */
   attack?: Attack;
 };
@@ -780,7 +780,7 @@ const FOCUS_CHANNEL: Attack = {
 
 const INFANTRY_RECIPES = {
   "circle-cultivator": {
-    work: true,
+    work: "cultivate",
     scale: 0.94,
     palette: {
       armor: [0.68, 0.56, 0.33],
@@ -859,6 +859,7 @@ const INFANTRY_RECIPES = {
     stance: ARMS_AT_SIDES,
   },
   "arc-medic": {
+    work: "treat",
     scale: 0.97,
     palette: {
       armor: [0.88, 0.92, 0.85],
@@ -872,6 +873,7 @@ const INFANTRY_RECIPES = {
     stance: ARMS_AT_SIDES,
   },
   "arc-mechanic": {
+    work: "repair",
     scale: 1,
     palette: {
       armor: [0.87, 0.52, 0.16],
@@ -1038,7 +1040,16 @@ function buildInfantry(
   );
   shift(idle, 60, (phase) => [0, (Math.cos(phase) - 1) * 0.004, 0]);
   if (recipe.work) {
-    const work = clip("cultivate", 60, (joint, phase) => {
+    const work = clip(recipe.work, 60, (joint, phase) => {
+      if (recipe.work !== "cultivate") {
+        const pulse = Math.sin(phase * (recipe.work === "repair" ? 2 : 1));
+        if (joint === "spine") return [0.1 + pulse * 0.03, 0, 0];
+        if (joint === "right-arm") return [-0.65 + pulse * 0.12, 0, 0.05];
+        if (joint === "right-forearm")
+          return [-0.5 + pulse * (recipe.work === "repair" ? 0.3 : 0.12), 0, 0];
+        if (joint === "left-arm") return [-0.2, 0, -0.1];
+        return neutral(joint);
+      }
       if (joint === "spine") return [0.18 + Math.sin(phase) * 0.04, 0, 0];
       if (joint.endsWith("forearm"))
         return [-0.6 - Math.sin(phase) * 0.2, 0, 0];
