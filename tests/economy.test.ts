@@ -20,6 +20,7 @@ import {
   harvestingStalled,
 } from "../src/simulation/harvesting";
 import { createActor } from "../src/simulation/actor";
+import { idleWorkerIds } from "../src/simulation/economy";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import {
@@ -637,8 +638,16 @@ describe("Materials economy", () => {
       simulation.economy!.sites.map((site) => site.remainingMaterials),
     ).toEqual([0, 0, 100]);
     expect(worker(simulation).cargo).toBe(0);
+    expect(idleWorkerIds(simulation.economy, simulation.actorById)).toEqual([
+      "worker",
+    ]);
     expect(command(simulation, gather("far")).accepted).toBe(true);
     until(simulation, () => balance(simulation) === 290);
+    until(simulation, () => worker(simulation).phase === "depleted");
+    command(simulation, { kind: "remove-actor", actorId: "refinery" });
+    expect(idleWorkerIds(simulation.economy, simulation.actorById)).toEqual([
+      "worker",
+    ]);
   });
 
   test("Move and Stop preserve cargo; changing patches deposits before new collection", () => {
@@ -649,6 +658,9 @@ describe("Materials economy", () => {
     command(simulation, { kind: "stop", actorId: "worker" });
     advanceTicks(simulation, 5);
     expect(worker(simulation)).toMatchObject({ cargo, phase: "idle" });
+    expect(idleWorkerIds(simulation.economy, simulation.actorById)).toEqual([
+      "worker",
+    ]);
     command(simulation, {
       kind: "move",
       actorId: "worker",
@@ -670,6 +682,7 @@ describe("Materials economy", () => {
     const cargo = worker(simulation).cargo;
     command(simulation, { kind: "remove-actor", actorId: "refinery" });
     expect(worker(simulation)).toMatchObject({ cargo, phase: "unassigned" });
+    expect(idleWorkerIds(simulation.economy, simulation.actorById)).toEqual([]);
     const position = map.tileCenter(14, 9);
     expect(
       command(simulation, { kind: "move", actorId: "worker", target: position })

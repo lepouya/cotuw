@@ -3,6 +3,7 @@ import { expect, test, vi } from "vitest";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import {
   createSessionSimulation,
+  loadLevel,
   loadMission,
   missionIncompatibility,
 } from "../src/mission-loading";
@@ -66,6 +67,18 @@ test("rejects owners beyond the content pack's color palette", () => {
   expect(() => loadMission(JSON.stringify(file))).toThrow(
     "a color for every owner",
   );
+});
+
+test("starting a level clears saved interface state at every difficulty", () => {
+  const file = JSON.parse(LEVEL_SOURCES.get("arc-economy-opening")!);
+  file.uiState = {
+    controlGroups: { "1": ["starting-command-center"] },
+    dismissedPopups: ["harvester-operations"],
+  };
+  const source = JSON.stringify(file);
+  expect(loadMission(source).uiState).toEqual(file.uiState);
+  for (const difficulty of [undefined, "easy", "normal", "hard"] as const)
+    expect(loadLevel(source, difficulty).uiState).toBeUndefined();
 });
 
 test("explains why this build cannot load a stored mission", () => {

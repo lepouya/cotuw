@@ -303,6 +303,7 @@ export function createApplication({
         playerFaction,
         factionName: factionName(next.content, playerFaction),
         selectActor: (id, additive) => session?.selectActor(id, additive),
+        selectType: (id, scope) => session?.selectType(id, scope),
       });
       sidebar = activeSidebar;
       session = await createGameSession(canvas, minimap, {

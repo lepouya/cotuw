@@ -94,22 +94,27 @@ cover module interfaces, private DOM, asynchronous work, and cleanup.
     roster, including actors of another faction type.
   - `sidebar-selection.ts`: inspection, worker, rally, and queue hosts.
   - `sidebar-goals.ts`: briefing and objectives.
-  - `sidebar-orders.ts`: placement and order controls.
-- Economy, rally, and network binders receive typed controls; each action has
-  one binding owner. Cards and keyed lists retain unchanged nodes, focus, and
-  disclosure state. `createKeyedList` releases removed rows and their listeners.
-  Display authored content as text. Disabled cards retain explanations.
+  - `sidebar-orders.ts`: placement, order, and idle-worker controls. It mounts
+    the Groups panel from `ui/control-groups.ts`.
+- Economy, rally, network, `ui/control-groups.ts`, and `ui/idle-workers.ts`
+  binders receive typed controls; each action has one binding owner. Control
+  groups live in the session and save as interface state, not simulation.
+  Cards and keyed lists retain unchanged nodes, focus, and disclosure state.
+  `createKeyedList` releases removed rows and their listeners. Display authored
+  content as text. Disabled cards retain explanations.
 - `simulation.viewOf(playerOwner)` owns visibility and private economy rules.
   UI never reconstructs them from unrestricted state. Issuer-scoped feedback
   excludes other owners' command outcomes.
   Repair priority labels rank the player's jobs per common resource; allied
   owners' private work stays hidden even when resource balances are pooled.
 - `ui/world-shortcuts.ts` routes physical `KeyboardEvent.code` through one
-  ordered handler list per key. Escape precedence is Pan, placement, targeting
-  and camera focus, selection, then menu. Dialogs and contextual overlays take
-  their keys in capture; world shortcuts respect the input guard. Audio unlock
-  and modal-local keys remain available inside dialogs. Held camera navigation
-  belongs to `render/camera.ts`.
+  ordered handler list per key, with `Control+` naming Control chords and
+  Shift passed to handlers. Escape precedence is Pan, placement, a pending
+  group action or the Groups panel, targeting and camera focus, selection,
+  then menu. Dialogs and contextual overlays take their keys in capture;
+  world shortcuts respect the input guard. Audio unlock and modal-local keys
+  remain available inside dialogs. Held camera navigation belongs to
+  `render/camera.ts`.
 - `ui/building-placement.ts` owns the tool; `render/placement-preview.ts` draws
   it. World modules expose actions instead of installing competing shortcuts.
 - `ui/top-bar.ts` owns top-bar markup/state. `ui/notifications.ts` owns alerts

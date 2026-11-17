@@ -161,14 +161,9 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   portraits, and essential audio are verified. Full automated checks and the
   packaged macOS smoke check pass. Player listening confirms the busy-base
   mix works without becoming overwhelming.
-- [ ] **1.44** Implement [control groups](DESIGN.md#m1-control-groups),
-  [idle-worker controls](DESIGN.md#m1-idle-worker-controls), and
-  [matching-unit selection](DESIGN.md#m1-matching-unit-selection).
-  Verify keyboard and on-screen actions in browser and desktop builds,
-  including Mac Control, mixed selections, and Add units mode. Cover destroyed
-  group members and workers with cargo, pending orders, or waiting assignments.
-  Extend `MissionFile.uiState` for groups; verify load filters invalid members,
-  new missions and restart clear groups, and bindings remain device preferences.
+- [x] **1.44** Control groups, idle-worker actions, and matching-unit selection
+  with mission UI persistence, verified in Chromium, WebKit, and packaged
+  macOS, including Mac Control, mixed selections, and waiting workers.
 - [ ] **1.45** Implement [command shortcuts](DESIGN.md#m1-command-shortcuts)
   and [keyboard preferences](DESIGN.md#m1-keyboard-preferences). Verify queued
   targeting, Stop, placement/card precedence, dialog/form focus, disabled

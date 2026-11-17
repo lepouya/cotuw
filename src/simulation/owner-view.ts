@@ -1,4 +1,4 @@
-import { economyForOwner, workingWorkerIds } from "./economy";
+import { economyForOwner, idleWorkerIds, workingWorkerIds } from "./economy";
 import { knownEconomy } from "./observations";
 import { ownerRelation } from "./ownership";
 import { activeUnitServices } from "./unit-support";
@@ -269,6 +269,11 @@ export function createOwnerView({
   );
   const ownActor = (id: string | undefined) =>
     id === undefined ? undefined : actors().ownById.get(id);
+  const idleIds = cached(
+    () => [economy(), actors().ownById] as const,
+    ([known, ownById]): readonly string[] =>
+      idleWorkerIds(known, (id) => ownById.get(id)),
+  );
   const checks = rules({ actors, economy, knowledge, wrecks, support });
   return {
     owner,
@@ -284,6 +289,7 @@ export function createOwnerView({
     support,
     wrecks,
     workingIds,
+    idleWorkerIds: idleIds,
     services,
     offlineIds,
     shownActor: (id: string | undefined) =>

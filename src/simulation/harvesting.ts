@@ -185,6 +185,8 @@ export function removeHarvestingActor(
     if (worker.refineryId !== actorId) continue;
     // Idle Harvesters keep manual movement.
     if (worker.phase !== "idle") interrupted.push(worker.actorId);
+    // A spent patch is no longer an assignment to resume.
+    if (worker.phase === "depleted") delete worker.targetSiteId;
     delete worker.refineryId;
     worker.phase = "unassigned";
   }

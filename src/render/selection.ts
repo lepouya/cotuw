@@ -5,6 +5,8 @@ export type SelectionRect = {
   bottom: number;
 };
 
+export type UnitTypeScope = "view" | "map";
+
 /** Buildings stay individual; additive and box selection contain mobile units. */
 export function createSelection(isMobile: (id: string) => boolean) {
   let ids: readonly string[] = [];

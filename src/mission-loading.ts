@@ -106,12 +106,15 @@ export function loadMission(source: string): LoadedMission {
   return prepareMission(parseMission(source, SIMULATION_TICK_SECONDS));
 }
 
-/** Starts a level at a difficulty, or as authored without one. */
+/** Starts a level with fresh interface state at its authored or chosen difficulty. */
 export function loadLevel(
   source: string,
   difficulty?: Difficulty,
 ): LoadedMission {
-  const file = parseMission(source, SIMULATION_TICK_SECONDS);
+  const file = {
+    ...parseMission(source, SIMULATION_TICK_SECONDS),
+    uiState: undefined,
+  };
   // A level authored at this difficulty keeps its own enemy owners.
   if (!difficulty || difficulty === file.scenario.setup?.difficulty)
     return prepareMission(file);

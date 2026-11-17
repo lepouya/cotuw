@@ -92,10 +92,27 @@ export type SaveInfo = { name: string; savedAt: string };
 const SAVE_POLICIES = ["objectives", "skirmish"] as const;
 export type SavePolicy = (typeof SAVE_POLICIES)[number];
 
+/** Control group keys, in number-row order. */
+export const CONTROL_GROUP_SLOTS = [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "0",
+] as const;
+export type ControlGroupSlot = (typeof CONTROL_GROUP_SLOTS)[number];
+
 /** Player interface state a save keeps outside the simulation. */
 export type MissionUiState = {
   /** Scenario popups the player dismissed. */
   dismissedPopups?: string[];
+  /** Unit IDs by group; loading drops members the player no longer commands. */
+  controlGroups?: Partial<Record<ControlGroupSlot, string[]>>;
 };
 
 /** A level is a mission file at tick 0; a save is the same format later on. */
@@ -308,6 +325,19 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
   )
     throw new RangeError(
       "Dismissed popups must be distinct IDs of the scenario's popups.",
+    );
+  const groups = uiState?.controlGroups;
+  if (
+    groups !== undefined &&
+    (!isRecord(groups) ||
+      Object.entries(groups).some(
+        ([slot, ids]) =>
+          !CONTROL_GROUP_SLOTS.includes(slot as ControlGroupSlot) ||
+          !isIdList(ids),
+      ))
+  )
+    throw new RangeError(
+      "Control groups must map number keys 0-9 to distinct actor IDs.",
     );
   if (
     scenario.flocks !== undefined &&

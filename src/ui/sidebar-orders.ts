@@ -1,4 +1,5 @@
 import { isMobileActor } from "../simulation/placement";
+import { createControlGroupPanel } from "./control-groups";
 import { createButton, createElement as el, setText } from "./dom";
 import { ordersLocked, selectionLocked } from "./sidebar-context";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
@@ -87,6 +88,16 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
     "aria-pressed": "false",
     disabled: true,
   });
+  const controlGroups = createControlGroupPanel();
+  // Always shown, so Attack Move appearing never adds a toolbar row.
+  const idleWorkers = createButton("Idle workers (0)", {
+    id: "idle-workers",
+    disabled: true,
+  });
+  const selectIdleWorkers = createButton("Select idle", {
+    id: "select-idle-workers",
+    disabled: true,
+  });
   const movementStatus = el("p", {
     id: "movement-status",
     class: "muted",
@@ -111,7 +122,11 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
       clearSelection,
       focusSelection,
       followSelection,
+      controlGroups.toggle,
+      idleWorkers,
+      selectIdleWorkers,
     ),
+    controlGroups.panel,
     movementStatus,
   );
   return {
@@ -128,6 +143,8 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
       focusSelection,
       followSelection,
       movementStatus,
+      controlGroups,
+      idleWorkers: { next: idleWorkers, selectAll: selectIdleWorkers },
       rotate: rotateBuilding,
       confirm: confirmBuilding,
       cancel: cancelBuilding,

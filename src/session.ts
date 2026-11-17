@@ -73,6 +73,11 @@ import { startSimulationLoop } from "./simulation/loop";
 import { createBuildingPlacement } from "./ui/building-placement";
 import { createPlacementPreview } from "./render/placement-preview";
 import { createUnitControls } from "./ui/unit-controls";
+import { createControlGroupControls } from "./ui/control-groups";
+import type { ControlGroupElements } from "./ui/control-groups";
+import { createIdleWorkerControls } from "./ui/idle-workers";
+import type { IdleWorkerElements } from "./ui/idle-workers";
+import type { UnitTypeScope } from "./render/selection";
 import type { UnitControls } from "./ui/unit-controls";
 import type { CameraControls } from "./ui/camera-controls";
 import { createRallyControls } from "./ui/rally-controls";
@@ -152,6 +157,8 @@ export type GameSession = Omit<GameView, "dispose"> & {
   save: (info: SaveInfo) => string;
   selectActor: (actorId: string | undefined, additive?: boolean) => void;
   selectActors: (actorIds: readonly string[]) => void;
+  /** Selects own units of a type, adding to selection in Add units mode. */
+  selectType: (definitionId: string, scope: UnitTypeScope) => void;
 };
 
 export type GameSessionControls = BuildingPlacementControls &
@@ -184,6 +191,8 @@ export type GameSessionControls = BuildingPlacementControls &
     cameraControls?: Pick<CameraControls, "bind">;
     /** Lets Backquote cycle a diagnostics panel through the mission's AI owners. */
     aiOverlay?: boolean;
+    controlGroups?: ControlGroupElements;
+    idleWorkers?: IdleWorkerElements;
   };
 
 declare global {
@@ -431,7 +440,12 @@ async function assembleGameSession(
   /** Finished missions and faults permit inspection only. */
   const halted = () => simulationFaulted || missionEnded(simulation.result);
   const canCommand = () => playing && !halted();
+  /** Placement and faults lock selection; finished missions stay inspectable. */
+  const selectionUnlocked = () => !placement.active && !simulationFaulted;
   let controlsDirty = true;
+  const markChanged = () => {
+    controlsDirty = true;
+  };
   const showActor = (actorId: string) => {
     const actor = player.shownActor(actorId);
     if (actor) controls.showActor?.(actor);
@@ -466,6 +480,24 @@ async function assembleGameSession(
     const tracked = followableIds(ids);
     if (tracked.length) view.camera.follow(() => cameraPointFor(tracked));
   };
+  /** Own mobile units of a type, in view or anywhere on the map. */
+  const unitsOfType = (definitionId: string, scope: UnitTypeScope) => {
+    if (scope === "view")
+      return actorViews
+        .actorIdsInRect(canvas, canvas.getBoundingClientRect())
+        .filter(
+          (id) => player.ownMobileActor(id)?.definitionId === definitionId,
+        );
+    return player
+      .actors()
+      .ownMobile.filter(
+        (actor) =>
+          actor.definitionId === definitionId && player.isMobile(actor),
+      )
+      .map(({ id }) => id);
+  };
+  const ownUnitIds = () =>
+    input.selectedActorIds.filter((id) => !!player.ownMobileActor(id));
   const input = createCommandInput(canvas, view.scene, {
     actorIdForMesh: (mesh) => {
       const id =
@@ -478,7 +510,12 @@ async function assembleGameSession(
       return tile && map.tileCenter(tile.x, tile.z);
     },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
-    enabled: () => !placement.active && !simulationFaulted,
+    sameTypeInView: (actorId) => {
+      const unit = player.ownMobileActor(actorId);
+      // Picking the unit proves it is visible even if its center is clipped.
+      return unit ? [unit.id, ...unitsOfType(unit.definitionId, "view")] : [];
+    },
+    enabled: selectionUnlocked,
     pointerEnabled: () => !view.camera.primaryPanActive,
     canCommand,
     canSelect: (id) => !!player.shownActor(id),
@@ -669,6 +706,8 @@ async function assembleGameSession(
     network.refresh();
     rally.refresh();
     attackMove.refresh();
+    groups.refresh();
+    idleWorkers.refresh();
     training.refresh();
     economyControls?.refresh();
     controls.onStateChanged?.({
@@ -771,6 +810,7 @@ async function assembleGameSession(
       showActor(actorId);
     },
     onStart: (definition) => {
+      groups.close();
       cancelGroundTargets();
       input.setBoxMode(false);
       input.setAdditiveMode(false);
@@ -819,12 +859,9 @@ async function assembleGameSession(
   });
   own(training);
   const attackMove = createAttackMoveControls(simulation, player, controls, {
-    selectedMobileIds: () =>
-      input.selectedActorIds.filter((id) => !!player.ownMobileActor(id)),
-    enabled: () => canCommand() && !placement.active,
-    changed: () => {
-      controlsDirty = true;
-    },
+    selectedMobileIds: ownUnitIds,
+    enabled: () => canCommand() && selectionUnlocked(),
+    changed: markChanged,
     onStart: () => {
       rally.cancel();
       input.setBoxMode(false);
@@ -834,9 +871,7 @@ async function assembleGameSession(
   });
   own(attackMove);
   const rally = createRallyControls(simulation, player, controls, {
-    changed: () => {
-      controlsDirty = true;
-    },
+    changed: markChanged,
     selectedActor: () => player.ownActor(input.selectedActorId),
     isProducer: (id) => !!definitionsById.get(id)?.production,
     enabled: () => canCommand() && !placement.active,
@@ -882,18 +917,15 @@ async function assembleGameSession(
   if (economyControls) own(economyControls);
   view.camera.setTouchPanFilter(
     (event) =>
-      !placement.active &&
-      !simulationFaulted &&
+      selectionUnlocked() &&
       !input.boxMode &&
       // Ground targeting ignores actors, so drags from them may pan too.
       (!!groundTarget() ||
         input.actorIdAt(event.clientX, event.clientY) === undefined),
   );
   const unitControls = createUnitControls(input, controls, {
-    enabled: () => !placement.active && !simulationFaulted,
-    changed: () => {
-      controlsDirty = true;
-    },
+    enabled: selectionUnlocked,
+    changed: markChanged,
     focus: () => focusActors(input.selectedActorIds),
     toggleFollow: () => {
       if (view.camera.following) view.camera.cancelFocus();
@@ -901,6 +933,25 @@ async function assembleGameSession(
     },
   });
   own(unitControls);
+  const groups = own(
+    createControlGroupControls(controls.controlGroups, {
+      saved: mission.uiState?.controlGroups,
+      commands: (id) => !!player.ownMobileActor(id),
+      selectedIds: () => input.selectedActorIds,
+      select: (ids) => input.selectMany(ids),
+      focus: focusActors,
+      enabled: selectionUnlocked,
+      changed: markChanged,
+    }),
+  );
+  const idleWorkers = own(
+    createIdleWorkerControls(controls.idleWorkers, {
+      idleIds: player.idleWorkerIds,
+      select: (ids) => input.selectMany(ids),
+      focus: focusActors,
+      enabled: selectionUnlocked,
+    }),
+  );
   if (controls.cameraControls)
     lifetime.defer(controls.cameraControls.bind(view.camera));
   view.camera.onViewChangedObservable.add(() => {
@@ -966,6 +1017,7 @@ async function assembleGameSession(
   const cancelInteractions = () => {
     radial.close();
     input.cancelGesture();
+    groups.close();
     cancelGroundTargets();
     placement.cancel();
     controlsDirty = true;
@@ -1128,6 +1180,7 @@ async function assembleGameSession(
     }
     if (simulation.actorVersion !== knownActorVersion) {
       knownActorVersion = simulation.actorVersion;
+      groups.retain();
       controlsDirty = true;
     }
     if (placement.active) placement.update();
@@ -1254,19 +1307,29 @@ async function assembleGameSession(
         mission.scenario,
         simulation.snapshot(),
         SIMULATION_TICK_SECONDS,
-        { save: info, uiState: popups.uiState() },
+        { save: info, uiState: uiState() },
       ),
     selectActor: (actorId, additive = false) => {
-      if (simulationFaulted || placement.active) return;
+      if (!selectionUnlocked()) return;
       input.select(
         player.shownActor(actorId)?.id,
         additive || input.additiveMode,
       );
     },
     selectActors: (ids) => {
-      if (simulationFaulted || placement.active) return;
+      if (!selectionUnlocked()) return;
       input.selectMany(ids.filter((id) => !!player.shownActor(id)));
     },
+    selectType: (definitionId, scope) => {
+      if (!selectionUnlocked()) return;
+      const ids = unitsOfType(definitionId, scope);
+      if (ids.length) input.selectMany(ids, input.additiveMode);
+    },
+  };
+  /** Player interface state for a save, absent while there is none. */
+  const uiState = () => {
+    const state = { ...popups.uiState(), ...groups.uiState() };
+    return Object.keys(state).length ? state : undefined;
   };
   const modelsReady = assets.load({
     onBuildingUpdated: () => {
@@ -1302,6 +1365,7 @@ async function assembleGameSession(
       Escape: [
         view.camera.cancelPan,
         whilePlacing(placement.cancel),
+        groups.escape,
         () => {
           if (simulationFaulted) return false;
           if (!cancelGroundTargets() && !view.camera.cancelFocus())
@@ -1317,6 +1381,11 @@ async function assembleGameSession(
       ],
       KeyR: [whilePlacing(placement.rotate)],
       KeyS: [() => input.stop() > 0],
+      Period: [
+        ({ shiftKey }) =>
+          shiftKey ? idleWorkers.selectAll() : idleWorkers.next(),
+      ],
+      ...groups.shortcuts,
       ...(aiOverlay && {
         Backquote: [
           () => {

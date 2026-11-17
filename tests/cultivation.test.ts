@@ -25,6 +25,7 @@ import {
   cultivationEfficiency,
 } from "../src/simulation/cultivation";
 import { TerrainGrid } from "../src/simulation/terrain";
+import { idleWorkerIds } from "../src/simulation/economy";
 import { defineScenario } from "../src/simulation/scenario";
 
 import type {
@@ -238,6 +239,7 @@ test("cultivation preserves cargo on interruption and delivers before changing s
     phase: "idle",
   });
   expect(sim.economy!.cultivation!.workers[0]!.siteId).toBeUndefined();
+  expect(idleWorkerIds(sim.economy, sim.actorById)).toEqual(["worker"]);
   command(sim, { kind: "gather", actorId: "worker", siteId: "far" });
   expect(sim.economy!.cultivation!.workers[0]!.phase).toBe("returning");
   untilSeconds(sim, () => balance(sim, "lifebloom") >= cargo);
@@ -249,6 +251,7 @@ test("cultivation preserves cargo on interruption and delivers before changing s
     () => sim.economy!.cultivation!.workers[0]!.phase === "no-dropoff",
   );
   expect(sim.economy!.cultivation!.workers[0]!.cargo).toBe(30);
+  expect(idleWorkerIds(sim.economy, sim.actorById)).toEqual([]);
   advanceSeconds(sim, 2);
   expect(sim.economy!.cultivation!.workers[0]!.cargo).toBe(30);
 });
@@ -344,6 +347,7 @@ test("single-worker growth yields blocked slots without preempting active work",
   command(sim, { kind: "tend", actorId: "a", buildingId: "first" });
   advanceSeconds(sim, 1);
   expect(sim.actorById("first")!.construction!.completedTicks).toBe(progress);
+  expect(idleWorkerIds(sim.economy, sim.actorById)).toEqual([]);
   expect(sim.actorById("second")!.construction?.active).toBe(true);
   untilSeconds(sim, () => !sim.actorById("second")!.construction);
   untilSeconds(sim, () => !!sim.actorById("first")!.construction?.active);
@@ -546,6 +550,7 @@ test("dormant workers keep assignments and resume automatically after recovery",
     () => sim.economy!.cultivation!.workers[0]!.phase === "waiting",
   );
   expect(sim.economy!.cultivation!.workers[0]!.siteId).toBe("near");
+  expect(idleWorkerIds(sim.economy, sim.actorById)).toEqual([]);
   untilSeconds(sim, () => !sim.economy!.cultivation!.sites[0]!.dormant, 60);
   expect(sim.economy!.cultivation!.workers[0]!.phase).toBe("gathering");
   expect(sim.economy!.cultivation!.sites[0]!.reserve).toBeGreaterThan(59000);

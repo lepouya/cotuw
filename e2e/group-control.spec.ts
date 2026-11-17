@@ -104,9 +104,8 @@ test(
     await expect(page.locator("#selection-details")).toHaveText(
       "2 units selected",
     );
-    await expect(page.locator("#selection-info")).toContainText(
-      "Trooper × 1 · Scout × 1",
-    );
+    await expect(page.locator("#selection-types")).toContainText("Trooper × 1");
+    await expect(page.locator("#selection-types")).toContainText("Scout × 1");
     const bounds = await groupBounds(page);
     const cameraBefore = await cameraPose(page);
     await page.mouse.move(bounds.left, bounds.top);
@@ -162,6 +161,34 @@ test(
     await expect(page.locator("#game-canvas")).not.toHaveAttribute(
       "data-actor-target",
     );
+  },
+);
+
+test(
+  "quicksaves restore control groups and restarting clears them",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.goto("/?level=sandbox");
+    await trainTestUnits(page, ["trooper"]);
+    await page.locator("#unit-roster button").first().click();
+    await page.keyboard.press("Control+Shift+Digit1");
+    await page.keyboard.press("F5");
+    await expect(page.locator("#notifications")).toContainText(
+      "Quick save complete: Quicksave",
+    );
+    await page.keyboard.press("F9");
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+    await page.locator("#resume-mission").click();
+    await page.keyboard.press("Digit1");
+    await expect.poll(() => selected(page)).toEqual(["trained-unit-1"]);
+    await page.locator("#open-menu").click();
+    await page.locator("#restart-mission").click();
+    await expect(page.locator("#game-menu")).toBeHidden();
+    await page.locator("#toggle-control-groups").click();
+    await expect(page.locator("#control-group-1")).toHaveAccessibleName(
+      "Group 1, empty",
+    );
+    await expect(page.locator("#control-group-1")).toBeDisabled();
   },
 );
 

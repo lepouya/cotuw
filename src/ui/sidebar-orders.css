@@ -4,6 +4,7 @@
 }
 
 .game-sidebar .unit-controls {
+  position: relative;
   padding: 0.5rem 0.75rem;
   border-top: 1px solid #354c48;
 }
@@ -24,6 +25,53 @@
   background: #304e4d;
 }
 
+.game-sidebar #control-groups {
+  position: absolute;
+  bottom: 100%;
+  inset-inline: 0;
+  display: grid;
+  gap: 0.2rem;
+  max-height: 55dvh;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  border-block: 1px solid #607161;
+  background: #142729;
+  box-shadow: 0 -0.3rem 1rem rgb(0 0 0 / 30%);
+  z-index: 1;
+}
+
+.game-sidebar #control-groups .group-slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.2rem;
+}
+
+.game-sidebar #control-groups .group-slots button {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.15rem;
+  padding: 0.3rem 0.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-sidebar #control-groups .group-slots small {
+  color: #a9bbb3;
+  font-size: 0.65rem;
+}
+
+.game-sidebar #control-groups .action-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.game-sidebar #control-group-status {
+  margin: 0;
+}
+
+.game-sidebar #control-group-status:empty {
+  display: none;
+}
+
 .game-sidebar #movement-status,
 .game-sidebar #placement-status {
   max-height: 4.5em;
@@ -42,6 +90,15 @@
   .game-sidebar .placement-panel p {
     margin-bottom: 0;
     font-size: 0.7rem;
+  }
+
+  .game-sidebar .placement-panel .action-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .game-sidebar .placement-panel button {
+    padding: 0.3rem;
   }
 }
 

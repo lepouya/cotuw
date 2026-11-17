@@ -94,9 +94,12 @@ can be read, edited by hand, and loaded again.
     result tick, and permits saving after every result. The skirmish map
     preview uses it. Owner-based skirmish rules reject an explicit
     `"objectives"` policy.
-- `uiState` holds player interface state outside the simulation. Levels omit
-  it. `uiState.dismissedPopups` lists the popup IDs the player dismissed;
-  removing an ID shows that popup again.
+- `uiState` holds player interface state outside the simulation. Starting or
+  restarting a level ignores it. `uiState.dismissedPopups` lists the
+  popup IDs the player dismissed; removing an ID shows that popup again.
+  `uiState.controlGroups` maps number keys `"1"` to `"9"` and `"0"` to
+  distinct actor IDs. Loading keeps only the player's surviving mobile units,
+  so unknown or foreign IDs are dropped rather than rejected.
 - `state` holds the complete simulation state. `state.scenarioId` must match
   `scenario.id`.
 

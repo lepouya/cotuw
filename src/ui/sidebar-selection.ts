@@ -1,12 +1,35 @@
-import { isTilePlacedActor, occupiedTilesFor } from "../simulation/placement";
+import {
+  isMobileActor,
+  isTilePlacedActor,
+  occupiedTilesFor,
+} from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
 import { isSupportUnit } from "../simulation/actor";
-import { createButton, createElement as el, setText } from "./dom";
-import { countByDefinition, inspectedActor } from "./sidebar-context";
+import {
+  createButton,
+  createElement as el,
+  createKeyedList,
+  setText,
+} from "./dom";
+import {
+  countByDefinition,
+  inspectedActor,
+  selectionLocked,
+} from "./sidebar-context";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { OwnerRelation } from "../simulation/ownership";
+import type { UnitTypeScope } from "../render/selection";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-selection.css";
+
+const TYPE_SCOPES: readonly {
+  scope: UnitTypeScope;
+  text: string;
+  place: string;
+}[] = [
+  { scope: "view", text: "In view", place: "in view" },
+  { scope: "map", text: "Across map", place: "across the map" },
+];
 
 const RELATION_LABELS: Record<Exclude<OwnerRelation, "own">, string> = {
   allied: "Allied",
@@ -35,6 +58,7 @@ export function createSidebarSelection(
     trainedNames,
     owns,
     presentations,
+    selectType,
     signal,
   }: SidebarContext,
   showTraining: () => void,
@@ -56,6 +80,50 @@ export function createSidebarSelection(
     hidden: true,
   });
   const selectionInfo = el("p", { id: "selection-info", class: "muted" });
+  const selectionTypes = el("div", {
+    id: "selection-types",
+    class: "actor-list",
+    "aria-label": "Selected unit types",
+  });
+  type TypeRow = { definitionId: string; count: number; disabled: boolean };
+  const typeRows = createKeyedList<TypeRow>(
+    selectionTypes,
+    ({ definitionId }) => definitionId,
+    ({ definitionId }) => {
+      const name = nameFor(definitionId);
+      const controller = new AbortController();
+      const label = el("span", {});
+      const listening = { signal: controller.signal };
+      const buttons = selectType
+        ? TYPE_SCOPES.map(({ scope, text, place }) => {
+            const button = createButton(text, {
+              "data-select-type": scope,
+              "aria-label": `Select every ${name} ${place}`,
+            });
+            button.addEventListener(
+              "click",
+              () => selectType(definitionId, scope),
+              listening,
+            );
+            return button;
+          })
+        : [];
+      return {
+        node: el(
+          "div",
+          { class: "selection-type", "data-definition-id": definitionId },
+          label,
+          ...buttons,
+        ),
+        dispose: () => controller.abort(),
+        update: ({ count, disabled }) => {
+          setText(label, `${name} × ${count}`);
+          for (const button of buttons) button.disabled = disabled;
+        },
+      };
+    },
+    signal,
+  );
   const constructionDetails = el("p", {
     id: "construction-details",
     class: "muted",
@@ -149,6 +217,7 @@ export function createSidebarSelection(
     selectionHealth,
     networkStatus,
     selectionInfo,
+    selectionTypes,
     constructionDetails,
     repairDetails,
     repairActions,
@@ -243,9 +312,9 @@ export function createSidebarSelection(
     update: (state: SidebarState) => {
       const ids = state.selectedActorIds;
       const selected = new Set(ids);
-      removeBuilding.hidden = !state.actors.some(
-        (shown) =>
-          selected.has(shown.id) && owns(shown) && isTilePlacedActor(shown),
+      const selectedActors = state.actors.filter(({ id }) => selected.has(id));
+      removeBuilding.hidden = !selectedActors.some(
+        (actor) => owns(actor) && isTilePlacedActor(actor),
       );
       const actor = inspectedActor(state);
       const definition = actor && definitionById.get(actor.definitionId);
@@ -256,15 +325,15 @@ export function createSidebarSelection(
           selectionHealth,
           `Health ${Math.ceil(actor.health ?? maximum)} / ${maximum}`,
         );
+      const disabled = selectionLocked(state);
       const nextSelectionKey = JSON.stringify([
         actor && supportStatus(actor, state),
         ids,
         state.boxMode ?? false,
         state.additiveMode ?? false,
         state.paused ?? false,
-        state.actors
-          .filter(({ id }) => selected.has(id))
-          .map((shown) => state.relationTo(shown)),
+        disabled,
+        selectedActors.map((actor) => state.relationTo(actor)),
       ]);
       if (
         state.actorVersion === actorVersion &&
@@ -274,18 +343,21 @@ export function createSidebarSelection(
       actorVersion = state.actorVersion;
       selectionKey = nextSelectionKey;
       openTraining.hidden = !actor || !owns(actor) || !definition?.production;
+      const units = selectedActors.filter(
+        (shown) =>
+          owns(shown) &&
+          isMobileActor(shown, definitionById.get(shown.definitionId)),
+      );
+      typeRows.update(
+        [...countByDefinition(units)].map(([definitionId, count]) => ({
+          definitionId,
+          count,
+          disabled,
+        })),
+      );
       if (ids.length > 1) {
-        const actorsById = new Map(
-          state.actors.map((shown) => [shown.id, shown]),
-        );
-        const counts = countByDefinition(
-          ids.flatMap((id) => actorsById.get(id) ?? []),
-        );
         setText(selectionDetails, `${ids.length} units selected`);
-        setText(
-          selectionInfo,
-          `${[...counts].map(([id, count]) => `${nameFor(id)} × ${count}`).join(" · ")}. ${moveHint(state, "the group")}`,
-        );
+        setText(selectionInfo, moveHint(state, "the group"));
         return;
       }
       setText(selectionDetails, titleOf(actor));

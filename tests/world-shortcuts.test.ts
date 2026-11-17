@@ -52,9 +52,37 @@ test("routes physical keys to the first handler that takes them", () => {
   expect(calls).toEqual(["stop"]);
 });
 
+test("routes Control chords separately and passes Shift to handlers", () => {
+  const calls: string[] = [];
+  const { press } = fixture({
+    Digit1: [
+      ({ shiftKey }) => {
+        calls.push(shiftKey ? "add" : "recall");
+        return true;
+      },
+    ],
+    "Control+Digit1": [
+      ({ shiftKey }) => {
+        calls.push(shiftKey ? "assign" : "ignored");
+        return shiftKey;
+      },
+    ],
+  });
+  press("Digit1");
+  // Shifted number-row keys type other characters but keep their codes.
+  press("Digit1", { shiftKey: true, key: "!" });
+  expect(press("Digit1", { ctrlKey: true }).defaultPrevented).toBe(false);
+  expect(
+    press("Digit1", { ctrlKey: true, shiftKey: true }).defaultPrevented,
+  ).toBe(true);
+  expect(calls).toEqual(["recall", "add", "ignored", "assign"]);
+});
+
 test.each([
   ["repeated", { repeat: true }],
-  ["modified", { ctrlKey: true }],
+  ["Control-held", { ctrlKey: true }],
+  ["Meta-held", { metaKey: true }],
+  ["Alt-held", { altKey: true }],
   ["handled", { handled: true }],
   ["typed", { target: { closest: () => ({}) } as unknown as EventTarget }],
 ] as const)("ignores %s keys", (_name, init) => {

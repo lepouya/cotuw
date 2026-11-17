@@ -41,12 +41,18 @@ Demolition Troopers share the Barracks queue. They outrange Sentry Turrets
 and deal heavy building damage; protect them from enemy infantry with Troopers.
 
 Click or tap to select and command. Drag a box to select units; touch uses
-**Box select**. **Pan** enables camera dragging, and **View** offers camera
-presets. **Goals** shows objectives and preparation. **Menu**, `F10`, or `Esc`
-opens save, load, restart, audio, and Main menu controls. `Esc` first cancels
-active tools or clears selection. Choose **½×**, **1×**, **2×**, or **4×** in
-the top bar to change game speed. `F5` quicksaves and `F9` quickloads. Loading
-starts paused for inspection.
+**Box select**. Double-click a unit to select its type in view, or use the
+selection panel's **In view** and **Across map**. Shift-double-click or enable
+**Add units** to keep the current selection. `Ctrl`+`Shift`+number assigns a
+control group, including on Mac. `Shift`+number adds to it, and number recalls
+it. Press twice to focus.
+**Groups** offers the same on screen. `.` cycles idle workers and `Shift`+`.`
+selects them all, as do **Idle workers** and **Select idle**. **Pan** enables
+camera dragging, and **View** offers camera presets. **Goals** shows objectives
+and preparation. **Menu**, `F10`, or `Esc` opens save, load, restart, audio,
+and Main menu controls. `Esc` first cancels active tools or clears selection.
+Choose **½×**, **1×**, **2×**, or **4×** in the top bar to change game speed.
+`F5` quicksaves and `F9` quickloads. Loading starts paused for inspection.
 
 ## Development
 

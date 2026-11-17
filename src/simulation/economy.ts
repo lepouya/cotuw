@@ -1,4 +1,4 @@
-import { healthOf, nearestTo } from "./actor";
+import { compareIds, healthOf, nearestTo } from "./actor";
 import {
   applyCultivationCommand,
   createCultivatorState,
@@ -49,7 +49,7 @@ import type {
 } from "./actor";
 import type { CargoSource } from "./cargo";
 import type { EconomyCommand } from "./command";
-import type { CultivationState } from "./cultivation";
+import type { CultivationState, CultivatorState } from "./cultivation";
 import type { HarvesterState, MaterialsSite } from "./harvesting";
 import type { TileCoord } from "./grid";
 import type { SharesHeadquarters } from "./infrastructure";
@@ -153,6 +153,15 @@ export function interruptWorker(actor: Actor, economy?: EconomyState) {
   interruptHarvesting(actor, economy);
 }
 
+const cultivationAssigned = (worker: DeepReadonly<CultivatorState>) =>
+  !!(
+    worker.siteId ||
+    worker.tendingId ||
+    worker.dropoffId ||
+    worker.phase === "returning" ||
+    worker.phase === "no-dropoff"
+  );
+
 /** Automatic work owns the actor until it ends or is explicitly replaced. */
 export function workerHasOrder(
   economy: EconomyView | undefined,
@@ -161,14 +170,7 @@ export function workerHasOrder(
   const cultivator = economy?.cultivation?.workers.find(
     (worker) => worker.actorId === actorId,
   );
-  if (cultivator)
-    return !!(
-      cultivator.siteId ||
-      cultivator.tendingId ||
-      cultivator.dropoffId ||
-      cultivator.phase === "returning" ||
-      cultivator.phase === "no-dropoff"
-    );
+  if (cultivator) return cultivationAssigned(cultivator);
   return !!economy?.harvesters.some(
     (worker) =>
       worker.actorId === actorId &&
@@ -196,6 +198,45 @@ export function workingWorkerIds(
       )
       .map((worker) => worker.actorId),
   );
+}
+
+/**
+ * Own workers without a work assignment or pending orders, in stable ID
+ * order. Waiting, blocked, and tending workers keep their assignments, as
+ * does a Harvester that lost its Refinery during a patch assignment.
+ */
+export function idleWorkerIds(
+  economy: EconomyView | undefined,
+  actorById: (id: string) => ActorRenderState | undefined,
+): string[] {
+  const free = (actorId: string) => {
+    const actor = actorById(actorId);
+    return (
+      !!actor &&
+      !actor.movement &&
+      !actor.attackMove &&
+      !actor.orders?.length &&
+      !actor.combat?.attack &&
+      !actor.combat?.returning &&
+      !actor.service
+    );
+  };
+  const idle = new Set<string>();
+  const assigned = new Set<string>();
+  for (const { actorId, phase, targetSiteId } of economy?.harvesters ?? []) {
+    const finished =
+      phase === "idle" ||
+      phase === "depleted" ||
+      (phase === "unassigned" && !targetSiteId);
+    (finished ? idle : assigned).add(actorId);
+  }
+  for (const worker of economy?.cultivation?.workers ?? []) {
+    const finished = worker.phase === "idle" && !cultivationAssigned(worker);
+    (finished ? idle : assigned).add(worker.actorId);
+  }
+  return [...idle]
+    .filter((id) => !assigned.has(id) && free(id))
+    .sort(compareIds);
 }
 
 export type EconomyReason =

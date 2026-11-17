@@ -17,7 +17,7 @@ export function createPointerGesture<T>(
     move?: (event: PointerEvent, gesture: PointerGesture<T>) => void;
     end?: (event: PointerEvent, gesture: PointerGesture<T>) => void;
     /** Runs whenever a gesture ends, before `end` if it completed. */
-    release?: () => void;
+    release?: (completed: boolean) => void;
     enabled?: () => boolean;
     capture?: boolean;
   },
@@ -30,12 +30,13 @@ export function createPointerGesture<T>(
   let gesture: PointerGesture<T> | undefined;
   // Capture stays until the pointer is released: other gestures on the same
   // target share it, and releasing it early would cancel them too.
-  const cancel = () => {
+  const release = (completed: boolean) => {
     if (!gesture) return false;
     gesture = undefined;
-    options.release?.();
+    options.release?.(completed);
     return true;
   };
+  const cancel = () => release(false);
   const down = (event: PointerEvent) => {
     pointers.add(event.pointerId);
     if (pointers.size > 1) {
@@ -69,9 +70,10 @@ export function createPointerGesture<T>(
     if (gesture?.start.pointerId !== event.pointerId) return;
     move(event);
     const completed = gesture;
-    cancel();
-    if (completed && event.button === completed.start.button)
-      options.end?.(event, completed);
+    if (!completed) return;
+    const sameButton = event.button === completed.start.button;
+    release(sameButton);
+    if (sameButton) options.end?.(event, completed);
   };
   const cancelled = (event: PointerEvent) => {
     pointers.delete(event.pointerId);

@@ -34,6 +34,7 @@ export async function startSidebarSession(
       playerOwner,
       playerFaction: factionOf(owners, playerOwner),
       selectActor: (id, additive) => view?.selectActor(id, additive),
+      selectType: (id, scope) => view?.selectType(id, scope),
     },
   );
   view = await createGameSession(

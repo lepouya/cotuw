@@ -725,7 +725,10 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   it twice quickly focuses the camera on its surviving members. Destroyed
   members drop out; newly trained units join only through manual assignment.
 - An on-screen Groups panel provides numbered recall buttons and explicit
-  Assign, Add, and Clear actions for touch and pointer users.
+  Assign, Add, and Clear actions for touch and pointer users. Each action
+  applies to the next group chosen by button or number key. Escape cancels a
+  pending action or closes the panel. Building placement closes the panel.
+  Closing the panel cancels its action.
 - Number-row keys recall groups; a quick repeated press selects and focuses.
   Ctrl+Shift+number replaces that group's membership with the selected units;
   Shift+number adds selected units. Clear uses the Groups panel. These defaults
@@ -741,13 +744,15 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 - Period selects and focuses the next owned idle Harvester or Cultivator;
   repeated presses cycle through them. Shift+Period selects all idle workers
   without moving the camera. An Idle workers button shows their count and
-  cycles through them, with a Select all action for touch and pointer users.
+  cycles through them, with **Select idle** for selecting them all.
 - Idle workers have no active work assignment or pending orders. A Harvester's
   Refinery affiliation alone does not make it busy. Workers stopped
   manually or finished with an exhausted ARC site qualify, including those
   carrying resources. Cultivators waiting for site recovery, workers awaiting
   a delivery route, and workers assigned to paused construction retain their
-  assignments and show their waiting or blocked status instead.
+  assignments and show their waiting or blocked status instead. A Harvester
+  that loses its Refinery during a patch assignment awaits a delivery route;
+  one with no patch assignment is idle.
 
 ### M1 matching-unit selection
 

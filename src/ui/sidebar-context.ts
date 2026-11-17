@@ -10,6 +10,7 @@ import type {
   ScenarioGoal,
 } from "../simulation/mission-file";
 import type { ActorPresentation } from "../content/presentation";
+import type { UnitTypeScope } from "../render/selection";
 
 export type SidebarState = {
   /** Own and currently detected actors only. */
@@ -39,6 +40,8 @@ export type SidebarOptions = {
   goals: readonly ScenarioGoal[];
   briefing?: ScenarioBriefing;
   selectActor: (id: string, additive?: boolean) => void;
+  /** Selects the player's units of a type in view or across the map. */
+  selectType?: (definitionId: string, scope: UnitTypeScope) => void;
   playerOwner: string;
   /** The player's faction, whose roster supplies the construction menu. */
   playerFaction?: string;

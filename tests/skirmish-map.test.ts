@@ -400,6 +400,8 @@ test("custom maps keep their identity and restart from their registered level", 
     scenario,
     createScenarioState(scenario, BASE_CONTENT.actors),
     SIMULATION_TICK_SECONDS,
+    // Hand-edited levels may carry interface state; restarts start without it.
+    { uiState: { controlGroups: { "1": ["west-worker"] } } },
   );
   const opening = loadMission(source);
   const simulation = createSessionSimulation(opening);
@@ -415,6 +417,8 @@ test("custom maps keep their identity and restart from their registered level", 
   expect(restarted.state.tick).toBe(0);
   expect(restarted.state.terrain).toEqual(opening.state.terrain);
   expect(restarted.scenario.setup).toEqual(opening.scenario.setup);
+  expect(opening.uiState?.controlGroups).toEqual({ "1": ["west-worker"] });
+  expect(restarted.uiState).toBeUndefined();
 });
 
 test("assembly requires an authored home resource area", () => {

@@ -296,6 +296,20 @@ test.each([
     "scenario's popups",
   ],
   [
+    "a control group outside the number row",
+    (file: any) => {
+      file.uiState = { controlGroups: { "10": ["trooper-1"] } };
+    },
+    "number keys 0-9",
+  ],
+  [
+    "repeated control group members",
+    (file: any) => {
+      file.uiState = { controlGroups: { "1": ["trooper-1", "trooper-1"] } };
+    },
+    "distinct actor IDs",
+  ],
+  [
     "a non-object uiState",
     (file: any) => {
       file.uiState = ["intro"];
@@ -483,7 +497,7 @@ test("mission tick rates must be finite numbers", () => {
   }
 });
 
-test("dismissed popups and bird flocks survive saving and loading", () => {
+test("interface state and bird flocks survive saving and loading", () => {
   const mission = loadMission(LEVEL_SOURCES.get("arc-economy-opening")!);
   expect(mission.scenario.flocks).toHaveLength(1);
   expect(mission.scenario.popups?.map(({ id }) => id)).toEqual([
@@ -497,10 +511,19 @@ test("dismissed popups and bird flocks survive saving and loading", () => {
     mission.scenario,
     mission.state,
     SIMULATION_TICK_SECONDS,
-    { uiState: { dismissedPopups: ["harvester-operations"] } },
+    {
+      uiState: {
+        dismissedPopups: ["harvester-operations"],
+        // Members are filtered when a session restores them, not here.
+        controlGroups: { "1": ["harvester-1", "gone"], "0": ["trooper-2"] },
+      },
+    },
   );
   const loaded = loadMission(source);
-  expect(loaded.uiState).toEqual({ dismissedPopups: ["harvester-operations"] });
+  expect(loaded.uiState).toEqual({
+    dismissedPopups: ["harvester-operations"],
+    controlGroups: { "1": ["harvester-1", "gone"], "0": ["trooper-2"] },
+  });
   expect(loaded.state).not.toHaveProperty("dismissedPopups");
   expect(loaded.scenario.flocks).toEqual(mission.scenario.flocks);
 });

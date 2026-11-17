@@ -28,6 +28,10 @@ export type ContextActionKind =
   | "focus"
   | "follow";
 
+/** Clicks on the same actor within these limits form a double click. */
+const DOUBLE_CLICK_MILLISECONDS = 400;
+const DOUBLE_CLICK_PIXELS = 10;
+
 /** A world command the radial menu offers. */
 export type ContextAction = {
   kind: ContextActionKind;
@@ -142,6 +146,11 @@ export type CommandInputOptions = {
   canSelect?: (actorId: string) => boolean;
   /** Inspection permits selection without offering simulation commands. */
   canCommand?: () => boolean;
+  /**
+   * Units a double click on this actor selects: the player's mobile units of
+   * its type in view. Empty leaves the click to its normal action.
+   */
+  sameTypeInView?: (actorId: string) => readonly string[];
 };
 
 export type CommandInput = {
@@ -196,9 +205,63 @@ export function createCommandInput(
     focusActor,
     canFollow = () => false,
     followActor,
+    sameTypeInView = () => [],
   }: CommandInputOptions,
 ): CommandInput {
   const selection = createSelection(canMove);
+  let lastClick:
+    { event: PointerEvent; actorId: string; additive: boolean } | undefined;
+  const clickController = new AbortController();
+  const resetClick = () => {
+    lastClick = undefined;
+  };
+  const signal = clickController.signal;
+  canvas.ownerDocument.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.target !== canvas) resetClick();
+    },
+    { capture: true, signal },
+  );
+  // Held Shift repeats on some platforms; it must not split a Shift-double-click.
+  canvas.ownerDocument.addEventListener(
+    "keydown",
+    (event) => {
+      if (!event.repeat) resetClick();
+    },
+    { signal },
+  );
+  canvas.ownerDocument.defaultView?.addEventListener("blur", resetClick, {
+    signal,
+  });
+  canvas.ownerDocument.addEventListener("visibilitychange", resetClick, {
+    signal,
+  });
+  /** Whether this primary click on an actor completes a double click. */
+  const completesDoubleClick = (
+    event: PointerEvent,
+    actorId: string | undefined,
+    additive: boolean,
+  ) => {
+    const previous = lastClick;
+    const elapsed = previous
+      ? event.timeStamp - previous.event.timeStamp
+      : Infinity;
+    const double =
+      !!previous &&
+      previous.actorId === actorId &&
+      previous.additive === additive &&
+      previous.event.pointerType === event.pointerType &&
+      elapsed >= 0 &&
+      elapsed <= DOUBLE_CLICK_MILLISECONDS &&
+      Math.hypot(
+        event.clientX - previous.event.clientX,
+        event.clientY - previous.event.clientY,
+      ) <= DOUBLE_CLICK_PIXELS;
+    // A third click starts a new pair.
+    lastClick = !double && actorId ? { event, actorId, additive } : undefined;
+    return double;
+  };
   let boxMode = false;
   let additiveMode = false;
   let queueMode = false;
@@ -246,6 +309,8 @@ export function createCommandInput(
     start: (event) => {
       const secondary =
         event.button === 2 && !!onContextMenu && !groundTargetMode();
+      if (event.button !== 0 || groundTargetMode() || !pointerEnabled())
+        resetClick();
       // Pan mode reserves only primary gestures.
       if (!secondary && (event.button !== 0 || !pointerEnabled()))
         return undefined;
@@ -260,8 +325,9 @@ export function createCommandInput(
         queued: event.shiftKey || queueMode,
       };
     },
-    release: () => {
+    release: (completed) => {
       box.hidden = true;
+      if (!completed) resetClick();
     },
     move: (event, gesture) => {
       if (!gesture.data.box) return;
@@ -276,9 +342,8 @@ export function createCommandInput(
     },
     end: (event, gesture) => {
       const { additive, box, secondary, queued } = gesture.data;
-      // A secondary drag pans the camera instead.
-      if (secondary && gesture.dragged) return;
       if (gesture.dragged) {
+        resetClick();
         if (box) {
           selectMany(actorIdsInRect(rectAt(gesture.start, event)), additive);
           onWorldSelectionChanged?.(selection.ids);
@@ -302,6 +367,16 @@ export function createCommandInput(
           : undefined);
       if (groundTargetMode()) {
         if (target) onGroundTarget?.(target, queued);
+        return;
+      }
+      // Secondary presses already ended any pending pair.
+      const double =
+        !secondary && completesDoubleClick(event, picked, additive);
+      const matches =
+        double && picked ? sameTypeInView(picked).filter(canSelect) : [];
+      if (matches.length) {
+        selectMany(matches, additive);
+        onWorldSelectionChanged?.(selection.ids);
         return;
       }
       const actions = contextActions(picked, target, additive, queued);
@@ -404,7 +479,10 @@ export function createCommandInput(
       },
     }));
   };
-  const cancelGesture = pointer.cancel;
+  const cancelGesture = () => {
+    resetClick();
+    return pointer.cancel();
+  };
   const stop = () => {
     if (!enabled() || !canCommand()) return 0;
     cancelGroundTarget?.();
@@ -459,6 +537,7 @@ export function createCommandInput(
     deselect,
     cancelGesture,
     dispose: () => {
+      clickController.abort();
       pointer.dispose();
       box.remove();
     },

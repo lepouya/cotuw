@@ -22,6 +22,28 @@
   margin-block: 0.75rem;
 }
 
+.game-sidebar #selection-types:not(:empty) {
+  margin-block: 0.5rem;
+  gap: 0.25rem;
+}
+
+.game-sidebar .selection-type {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.game-sidebar .selection-type span {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+
+.game-sidebar .selection-type button {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.72rem;
+}
+
 @media (max-height: 600px) {
   .game-sidebar #panel-selection {
     padding: 0.5rem 0.75rem;

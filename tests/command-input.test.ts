@@ -14,9 +14,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function fixture(options: Pick<CommandInputOptions, "service"> = {}) {
+function fixture(
+  options: Pick<CommandInputOptions, "service" | "sameTypeInView"> = {},
+) {
   const host = new EventTarget();
-  const document = {
+  const document = Object.assign(new EventTarget(), {
     defaultView: host,
     querySelector: () => null,
     createElement: () => ({
@@ -26,7 +28,7 @@ function fixture(options: Pick<CommandInputOptions, "service"> = {}) {
       remove: () => {},
     }),
     body: { append: () => {} },
-  };
+  });
   vi.stubGlobal("document", document);
   vi.stubGlobal("window", host);
   const canvas = Object.assign(new EventTarget(), {
@@ -77,9 +79,34 @@ function fixture(options: Pick<CommandInputOptions, "service"> = {}) {
     return (kind: ContextAction["kind"]) =>
       actions.find((action) => action.kind === kind)!;
   };
+  /** A primary click at a time in milliseconds. */
+  const click = (
+    actorId: string | undefined,
+    timeStamp: number,
+    shiftKey = false,
+    end = "pointerup",
+  ) => {
+    picked = actorId;
+    for (const type of ["pointerdown", end]) {
+      const event = Object.assign(new Event(type), {
+        button: 0,
+        shiftKey,
+        clientX: 10,
+        clientY: 10,
+        pointerId: 1,
+        pointerType: "mouse",
+      });
+      Object.defineProperty(event, "timeStamp", { value: timeStamp });
+      canvas.dispatchEvent(event);
+    }
+  };
   return {
     input,
     menu,
+    click,
+    clickElsewhere: () => document.dispatchEvent(new Event("pointerdown")),
+    keyDown: (repeat = false) =>
+      document.dispatchEvent(Object.assign(new Event("keydown"), { repeat })),
     visible,
     submitCommand,
     pause: () => {
@@ -199,4 +226,80 @@ test("support targeting queues with Shift and yields to Add units mode", () => {
   service.mockClear();
   expect(menu("unit-2")("service")).toBeUndefined();
   expect(service).not.toHaveBeenCalled();
+});
+
+test("double clicks select the unit's type in view, adding with Shift", () => {
+  const { input, click, keyDown, visible } = fixture({
+    sameTypeInView: (id) =>
+      id === "unit-1" ? ["unit-1", "unit-3", "hidden-unit"] : [],
+  });
+  visible.add("unit-3");
+  input.select("unit-2");
+  click("unit-1", 1000);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
+  click("unit-1", 1300);
+  // Members the player cannot select are left out.
+  expect(input.selectedActorIds).toEqual(["unit-1", "unit-3"]);
+  // A third click is an ordinary click again.
+  click("unit-1", 1500);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
+  input.select("unit-2");
+  click("unit-1", 3000, true);
+  // A held Shift's key repeats keep the pair; a new key press ends it.
+  keyDown(true);
+  click("unit-1", 3200, true);
+  expect(input.selectedActorIds).toEqual(["unit-1", "unit-2", "unit-3"]);
+  // Slow clicks and clicks on different actors stay single clicks.
+  input.select(undefined);
+  click("unit-1", 5000);
+  click("unit-1", 5500);
+  click("unit-2", 5600);
+  expect(input.selectedActorIds).toEqual(["unit-2"]);
+  // Types without matches, such as hostile actors, keep their normal action.
+  click("wolf", 6000);
+  click("wolf", 6100);
+  expect(input.selectedActorIds).toEqual(["unit-2"]);
+  click("unit-1", 7000);
+  keyDown();
+  click("unit-1", 7100);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
+});
+
+test("terrain clicks and secondary gestures interrupt double clicks", () => {
+  const { input, click, menu } = fixture({
+    sameTypeInView: () => ["unit-1", "unit-2"],
+  });
+  click("unit-1", 1000);
+  click(undefined, 1100);
+  click("unit-1", 1200);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
+  menu("unit-1");
+  click("unit-1", 1300);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
+});
+
+test("a cancelled pointer interrupts double clicks", () => {
+  const { input, click } = fixture({
+    sameTypeInView: () => ["unit-1", "unit-2"],
+  });
+  click("unit-1", 1000);
+  click("unit-1", 1100, false, "pointercancel");
+  click("unit-1", 1200);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
+});
+
+test("sidebar actions interrupt double clicks on command targets", () => {
+  const { input, click, clickElsewhere, submitCommand } = fixture({
+    service: () => ({
+      label: "Heal",
+      run: () => submitCommand({ kind: "service" }),
+    }),
+    sameTypeInView: () => ["unit-2"],
+  });
+  input.select("unit-1");
+  click("unit-2", 1000);
+  clickElsewhere();
+  click("unit-2", 1200);
+  expect(submitCommand).toHaveBeenCalledTimes(2);
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
 });
