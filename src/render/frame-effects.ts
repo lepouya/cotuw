@@ -66,6 +66,8 @@ export function createFrameEffectsView(
   const sources = new Map<string, Source>();
   let disposed = false;
   const active: {
+    node: TransformNode;
+    effect: FrameEffect;
     anchor: TransformNode;
     mesh: Mesh;
     source: Source;
@@ -127,6 +129,14 @@ export function createFrameEffectsView(
     /** Starts `effect` in `node`'s space, following it until either ends. */
     play: (effect: FrameEffect, node: TransformNode) => {
       if (disposed || node.isDisposed()) return;
+      const previous = active.find(
+        (entry) => entry.node === node && entry.effect === effect,
+      );
+      if (previous) {
+        previous.seconds = 0;
+        show(previous);
+        return;
+      }
       const source = sourceFor(effect);
       // A billboard ignores its parent's rotation, so a plain node carries the
       // anchor round with the actor's facing.
@@ -142,7 +152,7 @@ export function createFrameEffectsView(
       mesh.billboardMode = Mesh.BILLBOARDMODE_ALL;
       mesh.isPickable = false;
       mesh.renderingGroupId = 1;
-      const playing = { anchor, mesh, source, seconds: 0 };
+      const playing = { node, effect, anchor, mesh, source, seconds: 0 };
       active.push(playing);
       show(playing);
     },

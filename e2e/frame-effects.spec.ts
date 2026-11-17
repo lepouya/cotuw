@@ -41,6 +41,7 @@ test(
         await frames(1);
       }
       effects.play(flash, actor);
+      const firstFrame = frame();
       const firstVisible = shown()[0]?.isVisible;
       const mesh = shown()[0]!;
       for (const node of [actor, mesh.parent!, mesh])
@@ -50,6 +51,15 @@ test(
       effects.update(0);
       mesh.computeWorldMatrix(true);
       const scaledSize = [mesh.absoluteScaling.x, mesh.absoluteScaling.y];
+      effects.update(0.06);
+      for (let index = 0; index < 100; index++) effects.play(flash, actor);
+      const coalesced = shown().length;
+      const restarted = frame() === firstFrame;
+      const other = new TransformNode("other-actor", scene);
+      effects.play(flash, other);
+      const independent = shown().length;
+      other.dispose();
+      effects.update(0);
       // Five 0.03-second steps pass the clip's 0.13 seconds.
       const played = [frame()];
       for (let step = 0; step < 5; step++) {
@@ -80,6 +90,9 @@ test(
       return {
         firstVisible,
         scaledSize,
+        coalesced,
+        restarted,
+        independent,
         afterDisposal,
         anchor: [x, y, z].map((value) => Math.round(value * 100) / 100),
         distinct: new Set(played.filter(Boolean)).size,
@@ -94,6 +107,9 @@ test(
     expect(result.anchor).toEqual([2.15, 1.15, 0.88]);
     for (const size of result.scaledSize) expect(size).toBeCloseTo(1, 6);
     expect(result.firstVisible).toBe(true);
+    expect(result.coalesced).toBe(1);
+    expect(result.restarted).toBe(true);
+    expect(result.independent).toBe(2);
     expect(result.afterDisposal).toBe(0);
     expect(result.distinct).toBeGreaterThan(2);
     expect(result.ended).toBe(0);
