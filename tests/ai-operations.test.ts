@@ -41,7 +41,7 @@ const trooper = (id: string, x: number, z: number, owner = "own") =>
     worldPosition: { x, z },
   });
 
-function fixture(units: Actor[]) {
+function fixture(units: Actor[], providers: Actor[] = []) {
   const hostiles: Actor[] = [];
   const issued: MissionCommand[] = [];
   const released: string[] = [];
@@ -62,8 +62,12 @@ function fixture(units: Actor[]) {
         return true;
       },
       view: {
-        ownMobileActor: (id: string) => units.find((unit) => unit.id === id),
-        actors: () => ({ shown: hostiles }),
+        ownMobileActor: (id: string) =>
+          [...units, ...providers].find((unit) => unit.id === id),
+        actors: () => ({
+          shown: hostiles,
+          ownMobile: [...units, ...providers],
+        }),
         relationTo: () => "hostile",
       },
     }) as unknown as AiConcernContext;
@@ -394,4 +398,94 @@ test("withdrawal leaves reassigned units alone and retries unsent orders", () =>
     { kind: "group-move", actorIds: ["unit-0", "unit-2"], target: home },
   ]);
   expect(memory).toEqual({});
+});
+
+const medic = (id: string, x: number, z: number) =>
+  createActor({
+    id,
+    owner: "own",
+    definitionId: "arc-medic",
+    worldPosition: { x, z },
+  });
+
+test("an assembling group takes the nearest providers its members need", () => {
+  const units = group(10, home.x, home.z);
+  const providers = [
+    medic("far-medic", 60, 60),
+    medic("near-medic", home.x, home.z + 1),
+    medic("second-medic", home.x + 2, home.z + 2),
+    createActor({
+      id: "mechanic",
+      owner: "own",
+      definitionId: "arc-mechanic",
+      worldPosition: home,
+    }),
+  ];
+  const { operation, step } = fixture(units, providers);
+  step();
+  expect(ARC_AI_TUNING.operations.supportUnits).toBe(5);
+  expect(operation.support).toEqual(["near-medic", "second-medic"]);
+  const strength = (actors: Actor[]) =>
+    strengthOf({ definitions } as unknown as AiConcernContext, actors);
+  expect(strength([...units, ...providers])).toBe(strength(units));
+});
+
+test("providers follow the group and are released with it", () => {
+  const units = group(5, home.x, home.z);
+  const provider = medic("medic", home.x, home.z);
+  const { operation, issued, released, step } = fixture(units, [provider]);
+  step();
+  expect(operation).toMatchObject({ phase: "advance", support: ["medic"] });
+  for (const unit of units) unit.worldPosition = { x: 50, z: 50 };
+  issued.length = 0;
+  step();
+  expect(issued).toContainEqual({
+    kind: "group-move",
+    actorIds: ["medic"],
+    target: { x: 50, z: 50 },
+  });
+  // A provider at work or under way keeps its order.
+  issued.length = 0;
+  provider.service = {
+    targetId: "unit-0",
+    origin: provider.worldPosition,
+  } as Actor["service"];
+  step();
+  expect(issued.filter(({ kind }) => kind === "group-move")).toEqual([]);
+  delete provider.service;
+  endOperation({} as AiConcernContext, operation, "completed");
+  for (const unit of [...units, provider]) unit.worldPosition = home;
+  expect(step()).toBe("ended");
+  expect(released).toEqual([...units.map(({ id }) => id), "medic"]);
+});
+
+test("an escort returns home even when the fighting group is gone", () => {
+  const units = group(5, home.x, home.z);
+  const provider = medic("medic", 50, 50);
+  const { operation, issued, released, lost, step } = fixture(units, [
+    provider,
+  ]);
+  step();
+  units.forEach(({ id }) => lost.add(id));
+  issued.length = 0;
+  expect(step()).toBe("failed");
+  expect(operation.phase).toBe("return");
+  expect(issued).toEqual([
+    { kind: "group-move", actorIds: ["medic"], target: home },
+  ]);
+  provider.worldPosition = home;
+  expect(step()).toBe("ended");
+  expect(released).toEqual(["medic"]);
+});
+
+test("an advancing raid takes no providers on the way", () => {
+  const units = group(5, home.x, home.z);
+  const { operation, step } = fixture(units);
+  step();
+  expect(operation.phase).toBe("advance");
+  const late = fixture(units, [medic("medic", home.x, home.z)]);
+  late.operation.phase = "advance";
+  late.step();
+  expect(late.operation.support).toBeUndefined();
+  expect(operation.support).toBeUndefined();
 });

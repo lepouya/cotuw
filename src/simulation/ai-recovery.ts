@@ -5,6 +5,7 @@ import {
   definitionOf,
   headquarters,
   isOnline,
+  isPlacementMemory,
   ownBuildings,
   place,
   rosterBuildings,
@@ -16,6 +17,7 @@ import { costResource } from "./resources";
 import { balanceOf } from "./stockpiles";
 
 import type { ActorDefinition } from "./actor";
+import type { PlacementMemory } from "./ai-planning";
 import type { AiConcern, AiConcernContext } from "./director";
 import type { Resource } from "./resources";
 
@@ -65,6 +67,8 @@ export const recovery: AiConcern = (context) => {
   );
 };
 
+recovery.validateMemory = isPlacementMemory;
+
 /**
  * Without a completed headquarters, places one beside the first surviving
  * building with room, which the emergency rule allows while disconnected.
@@ -87,8 +91,12 @@ function replaceHeadquarters(
       building.construction && definitionOf(context, building).infrastructure,
   );
   if (restores && !underway)
-    survivors.some(({ worldPosition }) =>
-      place(context, terrain, definition, worldPosition),
+    place(
+      context,
+      context.memory as PlacementMemory,
+      terrain,
+      definition,
+      survivors.map(({ worldPosition }) => worldPosition),
     );
   return { price: totalPrice([definition]), urgent: true };
 }

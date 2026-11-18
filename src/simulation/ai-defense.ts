@@ -1,8 +1,9 @@
 // Faction-neutral local defense of the base and its workers.
-import { compareIds, isWorkerDefinition } from "./actor";
-import { definitionOf, headquarters } from "./ai-planning";
+import { compareIds, nearestTo } from "./actor";
+import { headquarters } from "./ai-planning";
 import {
   armyUnits,
+  baseThreats,
   endOperation,
   hasValidOperations,
   launchOperation,
@@ -12,7 +13,6 @@ import {
   stepOperation,
   withdrawOperations,
   strengthOf,
-  visibleHostiles,
 } from "./ai-operations";
 import { secondsToTicks } from "./clock";
 import { isCount } from "./validation";
@@ -35,20 +35,8 @@ export const defense: AiConcern = (context) => {
   const { terrain, tick } = context;
   if (!terrain) return;
   const memory = context.memory as DefenseMemory;
-  const assets = context.view
-    .actors()
-    .own.filter(
-      (actor) =>
-        !!actor.tilePlacement ||
-        isWorkerDefinition(definitionOf(context, actor)),
-    );
   const tuning = context.tuning.defense;
-  const range = tuning.threatTiles * terrain.tileSize;
-  const threats = visibleHostiles(context).filter((hostile) =>
-    assets.some(
-      (asset) => distance(asset.worldPosition, hostile.worldPosition) <= range,
-    ),
-  );
+  const threats = baseThreats(context, terrain);
   let operation: Operation | undefined = memory.operations?.[0];
   if (threats.length) {
     delete memory.calmTick;
@@ -125,11 +113,7 @@ function commitDefenders(
   const added: string[] = [];
   const candidates = armyUnits(context)
     .filter(({ id }) => !held.has(id))
-    .sort(
-      (a, b) =>
-        distance(a.worldPosition, operation.target) -
-          distance(b.worldPosition, operation.target) || compareIds(a.id, b.id),
-    );
+    .sort(nearestTo(operation.target));
   for (const unit of candidates) {
     if (strengthOf(context, committed) >= threat * context.tuning.defense.odds)
       break;

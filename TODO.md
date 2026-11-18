@@ -169,12 +169,9 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
   production precedence, queued targeting, Stop, input focus, disabled cards,
   and compact touch controls. Packaged macOS verifies binding capture and
   Cmd+Q.
-- [ ] **1.46** Extend ARC AI build plans and operations to use the selected
-  expansion, defense, recovery, and combat content. Include Refineries at
-  scouted remote deposits, which need support reach; Harvesters otherwise
-  haul to home Refineries. Move build-plan constants into profile `tuning`.
-  Reassess active attacks when a crisis needs their units, following
-  [faction strategy](DESIGN.md#faction-strategy).
+- [x] **1.46** ARC AI uses [tuned build plans](DESIGN.md#m1-arc-ai-plan)
+  for remote income, Relay recovery, defenses, repairs, and mixed forces.
+  Automated tests cover crisis recalls and deterministic continuation.
 - [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
   units, and controls with the 1.02 cohort, in the same sessions as 1.02 and
   1.57. Play against the harness AI on the rough

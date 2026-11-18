@@ -80,6 +80,9 @@ test(
         expect(units.length).toBeGreaterThan(share * 0.85);
         expect(simulation.ai[owner]!.nextRoundTick).toBeGreaterThan(0);
         expect(simulation.ai[owner]!.posture).not.toBe("establishing");
+        expect(simulation.ai[owner]!.claims[`${owner}-scout-0`]).toBe(
+          "scouting",
+        );
       }
       // The AI trains nothing; queued units are the probe's reinforcements.
       for (const { definitionId } of simulation.economy!.production)

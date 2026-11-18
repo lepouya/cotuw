@@ -78,8 +78,9 @@ const AI_PROFILE_ID = "arc-skirmish";
 /** Play past the opening grace by this much before measuring the AI. */
 const AI_ENGAGED_SECONDS = 60;
 /**
- * The probe alone trains replacements, so AI recruitment cannot push the
- * scene past its scale. Other concern commands still run.
+ * The probe alone trains replacements, and the AI places no buildings, so
+ * neither recruitment nor expansion moves the scene off its scale. Other
+ * concern commands still run.
  */
 export const BENCHMARK_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map<
   string,
@@ -91,7 +92,9 @@ export const BENCHMARK_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map<
       concern({
         ...context,
         issue: (command) =>
-          command.kind !== "train-unit" && context.issue(command),
+          command.kind !== "train-unit" &&
+          command.kind !== "place-actor" &&
+          context.issue(command),
       });
     }, concern),
   ]),
@@ -328,6 +331,8 @@ export function createBenchmarkMission(
         target: lane(2 * (leg % 2)),
       });
     scoutIds.forEach((actorId, index) => {
+      // The director owns one scout's routes in the AI workload.
+      if (ai && index === 0) return;
       // Staggered orders spread route searches across ticks, as play does.
       const offset = ticksIn((index / scoutIds.length) * SCOUT_SECONDS);
       for (let leg = 0; leg * SCOUT_SECONDS < scriptSeconds; leg++)
@@ -435,10 +440,10 @@ export function measureWorkload(
   const activity = activityTracker();
   const audit = matchAudit(simulation);
   const tick = () => {
-    simulation.tick();
+    const outcomes = simulation.tick();
     // The director planned this tick from its starting state.
     const planned = simulation.completedTicks - 1;
-    activity.observe(simulation.ai, planned);
+    activity.observe(simulation.ai, planned, outcomes);
     audit.observe(planned);
   };
   try {

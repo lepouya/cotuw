@@ -3,6 +3,7 @@ import { secondsToTicks } from "./clock";
 import {
   hasOwn,
   isCount,
+  isId,
   isNonnegative,
   isPositive,
   isRecord,
@@ -12,6 +13,8 @@ import {
 export type AiTuning = {
   /** Reports this old are uncertain and prompt fresh scouting. */
   readonly staleReportSeconds: number;
+  /** The wait after a building search finds no site before the next. */
+  readonly placementRetrySeconds: number;
   readonly scouting: {
     /** The wait before replacing a lost scout. */
     readonly replacementSeconds: number;
@@ -66,28 +69,51 @@ export type AiTuning = {
     readonly retreatOdds: number;
     /** A group depleted below this share of its strength must clearly win. */
     readonly depletedShare: number;
+    /** A group takes one support provider per this many members. */
+    readonly supportUnits: number;
   };
+  /** Build-plan sections, each owned and validated by the concern it names. */
+  readonly plans?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 };
 
 /** A check of one value; durations also need a safe tick count. */
-type Check = (value: unknown, tickSeconds?: number) => boolean;
+export type Check = (value: unknown, tickSeconds?: number) => boolean;
 /** The checks for each tuning value, shaped like the tuning itself. */
-type Spec<T> = {
-  readonly [K in keyof T]-?: T[K] extends number ? Check : Spec<T[K]>;
+export type Spec<T> = {
+  readonly [K in keyof T]-?: T[K] extends number ? Check : Check | Spec<T[K]>;
 };
+/** A concern's plan section checks, for plans it reads as its own type. */
+export type PlanSpec = { readonly [key: string]: Check | PlanSpec };
 
-const isPositiveCount: Check = (value) => isCount(value) && isPositive(value);
-const isShare: Check = (value) => isPositive(value) && value <= 1;
+export const isPositiveCount: Check = (value) =>
+  isCount(value) && isPositive(value);
+export const isShare: Check = (value) => isPositive(value) && value <= 1;
+/** A nonempty list where every entry passes `check`. */
+export const listOf =
+  (check: Check): Check =>
+  (value, tickSeconds) =>
+    Array.isArray(value) &&
+    value.length > 0 &&
+    Array.from(value).every((entry) => check(entry, tickSeconds));
+/** A record of definition IDs, each passing `check`. */
+export const weightsOf =
+  (check: Check): Check =>
+  (value, tickSeconds) =>
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([key, entry]) => isId(key) && check(entry, tickSeconds),
+    );
 /** Concerns add durations to ticks they save, so the sum must stay safe. */
-const duration =
+export const duration =
   (check: Check): Check =>
   (value, tickSeconds) =>
     check(value) &&
     (tickSeconds === undefined ||
       isCount(secondsToTicks(value as number, tickSeconds)));
 
-const TUNING_SPEC: Spec<AiTuning> = {
+const TUNING_SPEC: Spec<Omit<AiTuning, "plans">> = {
   staleReportSeconds: duration(isPositive),
+  placementRetrySeconds: duration(isPositive),
   scouting: {
     replacementSeconds: duration(isNonnegative),
     sweepTiles: isPositiveCount,
@@ -122,31 +148,40 @@ const TUNING_SPEC: Spec<AiTuning> = {
     engagementTiles: isPositive,
     retreatOdds: isPositive,
     depletedShare: isShare,
+    supportUnits: isPositiveCount,
   },
 };
 
 /** Whether `value` has exactly the spec's keys, each valid. */
-function matches(
-  spec: Readonly<Record<string, unknown>>,
+export function matchesSpec(
+  spec: PlanSpec,
   value: unknown,
   tickSeconds: number | undefined,
 ): boolean {
   return (
     isRecord(value) &&
     Object.keys(value).every((key) => hasOwn(spec, key)) &&
-    Object.entries(spec).every(([key, check]) =>
-      typeof check === "function"
-        ? (check as Check)(value[key], tickSeconds)
-        : matches(check as Record<string, unknown>, value[key], tickSeconds),
+    Object.entries(spec).every(
+      ([key, check]) =>
+        hasOwn(value, key) &&
+        (typeof check === "function"
+          ? check(value[key], tickSeconds)
+          : matchesSpec(check, value[key], tickSeconds)),
     )
   );
 }
+
+const withoutPlans = ({ plans: _plans, ...rest }: Record<string, unknown>) =>
+  rest;
 
 /** With `tickSeconds`, durations must also convert to safe tick counts. */
 export const isAiTuning = (
   value: unknown,
   tickSeconds?: number,
 ): value is AiTuning =>
-  matches(TUNING_SPEC, value, tickSeconds) &&
+  isRecord(value) &&
+  (value.plans === undefined ||
+    (isRecord(value.plans) && Object.values(value.plans).every(isRecord))) &&
+  matchesSpec(TUNING_SPEC, withoutPlans(value), tickSeconds) &&
   (value as AiTuning).offense.raid.minUnits <=
     (value as AiTuning).offense.raid.maxUnits;

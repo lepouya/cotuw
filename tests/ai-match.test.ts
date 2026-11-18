@@ -35,7 +35,13 @@ const withoutActivity = ({
 }: MatchRun["report"]) => ({
   ...report,
   owners: owners.map(
-    ({ postureTicks: _, operations: __, refused: ___, ...owner }) => owner,
+    ({
+      postureTicks: _,
+      operations: __,
+      refused: ___,
+      ordered: ____,
+      ...owner
+    }) => owner,
   ),
 });
 
@@ -328,6 +334,8 @@ test("diagnostics and saved continuation preserve active concerns", () => {
     ...mission.content,
     aiProfiles: mission.content.aiProfiles!.map((profile) => ({
       ...profile,
+      // Scripted postures list none of the profile's plans.
+      tuning: { ...profile.tuning, plans: undefined },
       postures: {
         establishing: names.map((concern) => ({
           concern,
@@ -405,6 +413,8 @@ test("reports count posture time and operations seen during the run", () => {
     ...mission.content,
     aiProfiles: mission.content.aiProfiles!.map((profile) => ({
       ...profile,
+      // Scripted postures list none of the profile's plans.
+      tuning: { ...profile.tuning, plans: undefined },
       postures: {
         establishing: [{ concern: "script", budget: 1, forces: 1 }],
       },
@@ -449,6 +459,8 @@ test("a case ends at its result, with the concerns supplied", () => {
   };
   const profiles = mission.content.aiProfiles!.map((profile) => ({
     ...profile,
+    // Scripted postures list none of the profile's plans.
+    tuning: { ...profile.tuning, plans: undefined },
     postures: {
       establishing: [{ concern: "concede", budget: 1, forces: 1 }],
     },
@@ -480,6 +492,8 @@ test("a throwing tick reports a fault with the last committed state", () => {
     ...mission.content,
     aiProfiles: mission.content.aiProfiles!.map((profile) => ({
       ...profile,
+      // Scripted postures list none of the profile's plans.
+      tuning: { ...profile.tuning, plans: undefined },
       postures: {
         establishing: [{ concern: "fragile", budget: 1, forces: 1 }],
       },

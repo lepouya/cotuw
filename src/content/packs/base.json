@@ -694,6 +694,7 @@
       "commandsPerTick": 8,
       "tuning": {
         "staleReportSeconds": 180,
+        "placementRetrySeconds": 10,
         "scouting": {
           "replacementSeconds": 60,
           "sweepTiles": 20,
@@ -709,7 +710,7 @@
         "offense": {
           "graceSeconds": 240,
           "raid": { "minUnits": 4, "maxUnits": 6, "odds": 2 },
-          "attack": { "units": 12, "odds": 1.25 },
+          "attack": { "units": 8, "odds": 1.25 },
           "defendedTiles": 14,
           "raidRedirectTiles": 16,
           "avoidSeconds": 120,
@@ -723,7 +724,47 @@
           "maxRetries": 3,
           "engagementTiles": 12,
           "retreatOdds": 1.5,
-          "depletedShare": 0.3
+          "depletedShare": 0.3,
+          "supportUnits": 5
+        },
+        "plans": {
+          "arc-income": {
+            "essentialRefineries": 1,
+            "refineries": 2,
+            "siteStepTiles": 3
+          },
+          "arc-production": {
+            "essentialProducers": 1,
+            "producers": 2,
+            "fullProductionWorkers": 3,
+            "siteOffsetTiles": 6
+          },
+          "arc-expansion": {
+            "startRefineries": 2,
+            "limit": 2,
+            "refineries": 2,
+            "depletedShare": 0.4,
+            "depositTiles": 3,
+            "enemyTiles": 16,
+            "maxRelays": 2,
+            "siteStepTiles": 3
+          },
+          "arc-defenses": {
+            "remote": 2,
+            "raided": 1,
+            "guardTiles": 8,
+            "standoffTiles": 3
+          },
+          "forces": {
+            "queued": 2,
+            "rallyTiles": [5, 3],
+            "mix": { "arc-trooper": 4, "arc-demolition-trooper": 1 },
+            "defendedMix": { "arc-trooper": 2, "arc-demolition-trooper": 1 },
+            "support": { "arc-medic": 6, "arc-mechanic": 4 },
+            "stationTiles": 5,
+            "stationOffsetTiles": 2
+          },
+          "repair": { "healthShare": 0.75 }
         }
       },
       "postures": {
@@ -749,9 +790,12 @@
             "forces": 0,
             "essential": true
           },
+          { "concern": "arc-expansion", "budget": 4, "forces": 0 },
+          { "concern": "arc-defenses", "budget": 1, "forces": 0 },
           { "concern": "recovery", "budget": 2, "forces": 0 },
           { "concern": "forces", "budget": 2, "forces": 0 },
           { "concern": "arc-production", "budget": 1, "forces": 0 },
+          { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "offense", "budget": 0, "forces": 8 }
         ],
         "pressuring": [
@@ -764,9 +808,12 @@
             "forces": 0,
             "essential": true
           },
+          { "concern": "arc-expansion", "budget": 1, "forces": 0 },
+          { "concern": "arc-defenses", "budget": 1, "forces": 0 },
           { "concern": "recovery", "budget": 2, "forces": 0 },
           { "concern": "forces", "budget": 2, "forces": 0 },
-          { "concern": "arc-production", "budget": 1, "forces": 0 }
+          { "concern": "arc-production", "budget": 1, "forces": 0 },
+          { "concern": "repair", "budget": 1, "forces": 0 }
         ],
         "defending": [
           { "concern": "defense", "budget": 0, "forces": 0, "essential": true },
@@ -778,8 +825,11 @@
           },
           { "concern": "recovery", "budget": 2, "forces": 0 },
           { "concern": "forces", "budget": 3, "forces": 0 },
+          { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "offense", "budget": 0, "forces": 8 },
+          { "concern": "arc-expansion", "budget": 1, "forces": 0 },
+          { "concern": "arc-defenses", "budget": 1, "forces": 0 },
           { "concern": "arc-production", "budget": 1, "forces": 0 }
         ],
         "recovering": [
@@ -804,6 +854,8 @@
           },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "offense", "budget": 0, "forces": 8 },
+          { "concern": "arc-expansion", "budget": 1, "forces": 0 },
+          { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "forces", "budget": 0, "forces": 0 }
         ]
       }

@@ -29,6 +29,7 @@ import {
   defineScenario,
 } from "../src/simulation/scenario";
 import { TerrainGrid } from "../src/simulation/terrain";
+import { isPositiveCount } from "../src/simulation/ai-tuning";
 
 import type {
   AiAllocation,
@@ -153,6 +154,14 @@ const allocation = (
   ...(essential && { essential }),
 });
 
+/** A concern whose profile must supply a positive whole `count`. */
+const planned: AiConcern = Object.assign(() => {}, {
+  planSpec: { count: isPositiveCount },
+});
+const withPlans = (
+  plans: Record<string, Record<string, unknown>>,
+): Partial<AiProfile> => ({ tuning: { ...ARC_AI_TUNING, plans } });
+
 const simulations: MissionSimulation[] = [];
 afterEach(() => simulations.splice(0).forEach((sim) => sim.dispose()));
 
@@ -258,6 +267,7 @@ test.each(["place-actor", "train-unit"] as const)(
             kind === "place-actor"
               ? place(
                   context,
+                  {},
                   context.terrain!,
                   context.definitions.get("arc-materials-refinery")!,
                   context.view.ownActor("west-hq")!.worldPosition,
@@ -548,18 +558,28 @@ test("forces are claimed by one concern within its share", () => {
   });
 });
 
-test("support units neither consume force shares nor accept claims", () => {
+test("support units are claimed outside force shares", () => {
   const sim = fixture(
     profile([allocation("first"), allocation("second")]),
     {
       first: once((context) => {
-        expect(context.claim("medic")).toBe(false);
-        expect(context.claim("mechanic")).toBe(false);
+        expect(context.claim("medic")).toBe(true);
+        expect(context.claim("mechanic")).toBe(true);
         expect(context.claim("west-unit-1")).toBe(true);
         expect(context.claim("west-unit-2")).toBe(true);
         expect(context.claim("west-unit-3")).toBe(false);
+        expect(context.claimed()).toEqual([
+          "mechanic",
+          "medic",
+          "west-unit-1",
+          "west-unit-2",
+        ]);
       }),
-      second: () => {},
+      // Providers held by another concern stay with it.
+      second: once((context) => {
+        expect(context.claim("medic")).toBe(false);
+        context.release("medic");
+      }),
     },
     {
       change: (state) => {
@@ -577,6 +597,8 @@ test("support units neither consume force shares nor accept claims", () => {
   );
   sim.tick();
   expect(sim.ai.west!.claims).toEqual({
+    mechanic: "first",
+    medic: "first",
     "west-unit-1": "first",
     "west-unit-2": "first",
   });
@@ -1426,6 +1448,41 @@ test.each<[string, () => void, string]>([
         {},
       ),
     "unsafe tuning duration",
+  ],
+  [
+    "a missing plan",
+    () => fixture(profile([allocation("a")]), { a: planned }),
+    'needs a valid "a" plan',
+  ],
+  [
+    "an invalid plan",
+    () =>
+      fixture(profile([allocation("a")], withPlans({ a: { count: 0 } })), {
+        a: planned,
+      }),
+    'needs a valid "a" plan',
+  ],
+  [
+    "a plan with an unknown value",
+    () =>
+      fixture(
+        profile([allocation("a")], withPlans({ a: { count: 1, extra: 1 } })),
+        { a: planned },
+      ),
+    'needs a valid "a" plan',
+  ],
+  [
+    "a plan for an unlisted concern",
+    () => fixture(profile([], withPlans({ a: { count: 1 } })), { a: planned }),
+    'plan for unlisted concern "a"',
+  ],
+  [
+    "a plan for a concern with no specification",
+    () =>
+      fixture(profile([allocation("a")], withPlans({ a: {} })), {
+        a: () => {},
+      }),
+    'plan for concern "a" without a plan specification',
   ],
 ])("rejects %s", (_, start, message) => {
   expect(start).toThrow(message);

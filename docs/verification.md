@@ -164,25 +164,29 @@ resumes toward the same limit. The sets are:
 
 - `arc-mirror`: the baseline ARC mirror by start slot and difficulty.
 - `arc-recovery`: Normal mirrors in which west loses its Harvesters, its
-  income, its Field Barracks, or its Command Center at 6:00. Reports give
-  when a new actor of each lost definition was completed. A case passes only
-  when the removal takes effect and every listed definition is restored
-  before the match ends. Headquarters loss is an accepted loss, so that case
-  needs only a clean, completed match.
-- `arc-continuation`: saves a Normal mirror at 9:30 during its first attacks,
-  resumes it, and requires identical complete mission state, including AI,
-  observations, and metric histories, to an uninterrupted run. Ending before
-  the checkpoint, or a `--cutoff` at or before it, fails this check.
+  income, its Field Barracks, or its Command Center at 6:00, or its Relay
+  Stations at 9:00. Reports give when a new actor of each lost definition was
+  completed. A case passes when the removal takes effect and every listed
+  definition is restored before the match ends. Headquarters loss is an
+  accepted loss, so that case needs only a clean, completed match.
+- `arc-continuation`: saves a Normal mirror at 12:30 during west's first
+  attack, resumes it, and requires identical complete mission state,
+  including AI, observations, and metric histories, to an uninterrupted run.
+  Ending before the checkpoint, or a `--cutoff` at or before it, fails this
+  check.
 
 Reports in `.checks/ai-matches/<case>.json` give the revision, wall-clock and
 simulation time, status, result, effective scaling, and each owner's
 milestones, totals, latest sample, and AI diagnostics. Each AI owner also
-reports ticks per posture, refused commands by kind and reason, and its
-operations by kind: launches, first launch and advance ticks, and ends by
-outcome. Groups that disappear without an outcome count as disbanded; claims
-can be reassigned without units dying. These count only the ticks a run plays,
-so a resumed run omits earlier activity. The console prints each owner's first
-raid and attack.
+reports ticks per posture, accepted commands by kind and purchased definition,
+refused commands by kind and reason, and operations by kind:
+launches, first launch and advance ticks, and ends by outcome, including
+crisis recalls. Groups that disappear without an outcome count as disbanded;
+claims can be reassigned without units dying. These count only the ticks a
+run plays, so a resumed run omits earlier activity. The console prints each
+owner's first raid and attack, and its first expansion income, Relays and
+defenses placed, repairs started, and recalls. Group orders count once per
+unit that executes the command.
 
 A once-a-second audit checks that claims and operation units belong to their AI,
 claims of lost units clear by the owner's next planning round, and saved AI
@@ -224,13 +228,14 @@ Scenes start at the named scale, and a probe orders replacements for combat
 losses. Replacements count toward the target while they train; reports give
 the actual fielded population throughout measurement.
 
-- By default both owners play the `arc-skirmish` profile with AI training
-  commands declined, so only the probe trains. The load script keeps
-  movement and combat active alongside AI orders. The scene is played a
+- By default both owners play the `arc-skirmish` profile with the probe
+  handling training and authored buildings setting the scale. The AI directs
+  a scout for each owner, and the load script keeps movement and combat
+  active alongside AI orders. The scene is played a
   minute past the profile's opening grace, saved, and loaded before measuring.
   A run without measured combat, a full measurement window, the target
   building count, or at least 85% of its target units fails. The report adds
-  each AI's posture time, operations, refusals, and the
+  each AI's posture time, operations, issued and refused commands, and the
   [match audit](#m1-headless-acceptance).
 - `--no-ai` measures the scripted scene instead, where orders to scouts lost
   in combat account for any `move` rejections. Compare its tick costs with

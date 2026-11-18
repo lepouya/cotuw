@@ -269,6 +269,8 @@ test("own units name their latest attacker only while it is detected", () => {
   simulation.actors = [trooper, actor("wolf", "wolf", "wildlife")];
 
   expect(player.ownActor("trooper")?.combat).toEqual({ activeTick: 2 });
+  expect(player.ownDamageTick("trooper")).toBe(2);
+  expect(player.ownDamageTick("wolf")).toBeUndefined();
 
   simulation.seen.add("wolf");
   simulation.actors = [...simulation.actors];
@@ -277,6 +279,7 @@ test("own units name their latest attacker only while it is detected", () => {
   // Remains do not reveal who fired.
   simulation.actors = [trooper];
   expect(player.ownActor("trooper")?.combat).toEqual({ activeTick: 2 });
+  expect(player.ownDamageTick("trooper")).toBe(2);
 });
 
 test("the owner economy keeps private work and income scoped to ownership", () => {

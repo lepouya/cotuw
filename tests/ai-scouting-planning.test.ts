@@ -68,10 +68,12 @@ function fixture(faction = "arc", tickSeconds = 0.1) {
     },
     view: {
       faction,
-      ownMobileActor: () => fielded,
+      ownMobileActor: (id: string | undefined) =>
+        fielded?.id === id ? fielded : undefined,
       economy: () => ({ production: [] }),
       actors: () => ({
         own: [headquarters, producer, ...(fielded ? [fielded] : [])],
+        ownMobile: fielded ? [fielded] : [],
       }),
       offlineIds: () => new Set<string>(),
       evaluateTraining: () => ({ accepted: true }),

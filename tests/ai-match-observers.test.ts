@@ -8,6 +8,7 @@ import {
 import { createActor } from "../src/simulation/actor";
 import { createAiState } from "../src/simulation/director";
 
+import type { CommandOutcome, MissionCommand } from "../src/simulation/command";
 import type { AiState } from "../src/simulation/director";
 import type { MissionSimulation } from "../src/simulation/mission";
 
@@ -173,4 +174,32 @@ test("a defense redirected after it ended counts as another launch", () => {
     firstAdvanceTick: 0,
     ended: { completed: 2 },
   });
+});
+
+test("accepted AI commands are tallied by kind and purchase", () => {
+  const tracker = activityTracker();
+  const outcome = (
+    command: MissionCommand,
+    issuer: CommandOutcome["issuer"],
+    accepted = true,
+  ) => ({ command, issuer, accepted }) as CommandOutcome;
+  const place = {
+    kind: "place-actor",
+    actorId: "relay",
+    definitionId: "arc-relay-station",
+    origin: { x: 0, z: 0 },
+  } as const;
+  tracker.observe(createAiState([{ owner: "west" }]), 0, [
+    outcome(place, { owner: "west", ai: true }),
+    outcome({ kind: "repair", actorId: "hq" }, { owner: "west", ai: true }),
+    outcome({ kind: "repair", actorId: "hq" }, { owner: "west", ai: true }),
+    outcome(place, { owner: "west", ai: true }, false),
+    outcome(place, { owner: "west" }),
+    outcome(place, { owner: "east", ai: true }),
+  ]);
+  expect(tracker.report("west")!.ordered).toEqual({
+    "place-actor:arc-relay-station": 1,
+    repair: 2,
+  });
+  expect(tracker.report("east")).toBeUndefined();
 });

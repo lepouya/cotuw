@@ -141,11 +141,18 @@ test("recovery keeps damaged production whose sale would pay nothing", () => {
     "arc-materials-refinery",
   );
   try {
+    const barracks = new Set(
+      westOf(sim, "arc-field-barracks").map(({ id }) => id),
+    );
     run(seconds(5), () => sim.ai.west!.posture === "recovering");
     results.push(...runTicks(sim, seconds(5)));
-    expect(results.some(({ command }) => command.kind === "sell-actor")).toBe(
-      false,
-    );
+    // Other buildings, such as a Relay, may still be sold for a refund.
+    expect(
+      results.some(
+        ({ command }) =>
+          command.kind === "sell-actor" && barracks.has(command.actorId),
+      ),
+    ).toBe(false);
     expect(westOf(sim, "arc-field-barracks")).not.toHaveLength(0);
   } finally {
     sim.dispose();

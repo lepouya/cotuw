@@ -1,5 +1,8 @@
 // Tick-by-tick observers that headless matches report from.
-import { operationsOf } from "../../src/simulation/ai-operations.ts";
+import {
+  operationMembers,
+  operationsOf,
+} from "../../src/simulation/ai-operations.ts";
 import { secondsToTicks } from "../../src/simulation/clock.ts";
 import {
   hasOwn,
@@ -13,6 +16,7 @@ import type {
   OperationKind,
   OperationOutcome,
 } from "../../src/simulation/ai-operations.ts";
+import type { CommandOutcome } from "../../src/simulation/command.ts";
 import type { AiPosture, AiState } from "../../src/simulation/director.ts";
 import type { MissionSimulation } from "../../src/simulation/mission.ts";
 
@@ -32,6 +36,11 @@ export type OwnerActivity = {
   operations: Partial<Record<OperationKind, OperationSummary>>;
   /** Refused AI commands by kind and reason. */
   refused: Record<string, number>;
+  /**
+   * Accepted AI commands by kind; purchases also name their definition, as
+   * in `place-actor:arc-relay-station`.
+   */
+  ordered: Record<string, number>;
 };
 
 /**
@@ -47,7 +56,11 @@ export function activityTracker() {
     }
   >();
   let previous: unknown;
-  const observe = (ai: DeepReadonly<AiState>, tick: number) => {
+  const observe = (
+    ai: DeepReadonly<AiState>,
+    tick: number,
+    outcomes: readonly CommandOutcome[] = [],
+  ) => {
     const changed = ai !== previous;
     previous = ai;
     for (const [owner, state] of Object.entries(ai)) {
@@ -59,6 +72,7 @@ export function activityTracker() {
             postureTicks: {},
             operations: {},
             refused: {},
+            ordered: {},
             running: new Map(),
           }),
         );
@@ -100,6 +114,16 @@ export function activityTracker() {
         }
       }
     }
+    for (const { command, accepted, issuer } of outcomes) {
+      const ordered =
+        issuer.ai && accepted && owners.get(issuer.owner)?.ordered;
+      if (!ordered) continue;
+      const key =
+        command.kind === "place-actor" || command.kind === "train-unit"
+          ? `${command.kind}:${command.definitionId}`
+          : command.kind;
+      ordered[key] = (ordered[key] ?? 0) + 1;
+    }
   };
   const report = (owner: string): OwnerActivity | undefined => {
     const activity = owners.get(owner);
@@ -108,6 +132,7 @@ export function activityTracker() {
         postureTicks: activity.postureTicks,
         operations: activity.operations,
         refused: activity.refused,
+        ordered: activity.ordered,
       }
     );
   };
@@ -151,7 +176,7 @@ export function matchAudit(simulation: MissionSimulation) {
           report(`${owner} ${concern} claims another owner's unit`);
       }
       for (const { concern, operation } of operationsOf(state.memory))
-        for (const id of operation.units)
+        for (const id of operationMembers(operation))
           if (actors.has(id) && actors.get(id)!.owner !== owner)
             report(`${owner} ${concern} operation holds another owner's unit`);
       if (JSON.stringify(state).length > MEMORY_LIMIT_CHARACTERS)

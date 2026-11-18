@@ -1,15 +1,22 @@
 // Faction-neutral raids on observed income and attacks on observed bases.
-import { compareIds, isIncomeBuilding } from "./actor";
 import {
+  compareIds,
+  isIncomeBuilding,
+  nearestTo as nearestActorTo,
+} from "./actor";
+import {
+  hostileBuildings,
   isAvoided,
   isAvoidedList,
-  isStaleReport,
+  knownDefenders,
   recentAvoided,
 } from "./ai-planning";
 import {
   armyUnits,
+  baseThreats,
   endOperation,
   hasValidOperations,
+  isCommitted,
   launchOperation,
   redirectOperation,
   stagingPoint,
@@ -42,7 +49,8 @@ type Launch = { kind: "raid" | "attack"; target: Target; units: string[] };
  * Raids exposed enemy income and attacks enemy bases from observations, after
  * the opening grace period. Developing requests pressuring once an operation
  * is possible; pressuring launches them and returns to developing when none
- * is active or possible. Other postures only continue running operations.
+ * is active or possible. Other postures only continue running operations,
+ * and a crisis recalls those not committed when home cannot meet its threat.
  */
 export const offense: AiConcern = (context) => {
   const { terrain, tick } = context;
@@ -55,34 +63,49 @@ export const offense: AiConcern = (context) => {
     secondsToTicks(tuning.avoidSeconds, context.tickSeconds),
   );
   const buildings = hostileBuildings(context);
+  const previous = memory.operations ?? [];
+  const held = new Set(context.claimed());
+  const recall = crisisNeedsUnits(context, terrain, previous, held);
+  const escorts = new Map<string, Operation>();
+  for (const operation of previous)
+    for (const id of operation.support ?? [])
+      if (!escorts.has(id)) escorts.set(id, operation);
   const operations: Operation[] = [];
-  for (const operation of memory.operations ?? []) {
+  for (const operation of previous) {
+    if (
+      recall &&
+      operation.phase !== "return" &&
+      !isCommitted(context, terrain, operation, held)
+    )
+      endOperation(context, operation, "recalled");
     if (operation.phase !== "return")
       resolve(context, terrain, operation, buildings);
     const event = stepOperation(context, terrain, operation, {
       retreats: true,
+      supportAvailable: (id) =>
+        !escorts.has(id) || escorts.get(id) === operation,
     });
     if (event === "failed") avoid.push({ ...operation.target, tick });
-    if (event !== "ended") operations.push(operation);
+    if (event !== "ended") {
+      operations.push(operation);
+      for (const id of operation.support ?? []) escorts.set(id, operation);
+    }
   }
   const home = stagingPoint(context);
-  const graced =
+  const canLaunch =
+    (context.posture === "developing" || context.posture === "pressuring") &&
     tick >= secondsToTicks(tuning.graceSeconds, context.tickSeconds);
   // Claims test which units the posture's share allows; unused ones go back.
   const busy = new Set(operations.flatMap(({ units }) => units));
   const free =
-    graced && home
+    canLaunch && home
       ? armyUnits(context)
-          .sort(
-            (a, b) =>
-              distance(a.worldPosition, home) -
-                distance(b.worldPosition, home) || compareIds(a.id, b.id),
-          )
+          .sort(nearestActorTo(home))
           .filter(({ id }) => !busy.has(id) && context.claim(id))
       : [];
   const range = tuning.avoidTiles * terrain.tileSize;
   const launch =
-    graced && home
+    canLaunch && home
       ? nextLaunch(
           context,
           terrain,
@@ -125,29 +148,36 @@ export const offense: AiConcern = (context) => {
 
 offense.withdraw = withdrawOperations;
 
+/**
+ * Whether a crisis posture faces threats that the army units outside these
+ * operations cannot meet at defense odds.
+ */
+function crisisNeedsUnits(
+  context: AiConcernContext,
+  terrain: TerrainView,
+  operations: readonly Operation[],
+  held: ReadonlySet<string>,
+) {
+  if (context.posture !== "defending" && context.posture !== "recovering")
+    return false;
+  if (!operations.length) return false;
+  const threats = baseThreats(context, terrain);
+  if (!threats.length) return false;
+  const away = new Set(
+    operations.flatMap(({ units }) => units.filter((id) => held.has(id))),
+  );
+  const home = armyUnits(context).filter(({ id }) => !away.has(id));
+  return (
+    strengthOf(context, home) <
+    strengthOf(context, threats) * context.tuning.defense.odds
+  );
+}
+
 offense.validateMemory = (memory) =>
   hasValidOperations(memory) &&
   isAvoidedList(memory.avoid) &&
   (memory.nextId === undefined ||
     (isCount(memory.nextId) && memory.nextId > 0));
-
-/** Known hostile buildings, in ID order. */
-const hostileBuildings = (context: AiConcernContext) =>
-  context.view.knowledge.observations.actors.filter(
-    (sighting) =>
-      !!sighting.tilePlacement &&
-      context.view.relationTo(sighting) === "hostile",
-  );
-
-/** Known armed buildings and recently reported armed units. */
-function knownDefenders(context: AiConcernContext) {
-  return context.view.knowledge.observations.actors.filter(
-    (sighting) =>
-      (!!sighting.tilePlacement || !isStaleReport(context, sighting.tick)) &&
-      context.view.relationTo(sighting) === "hostile" &&
-      !!context.definitions.get(sighting.definitionId)?.weapon,
-  );
-}
 
 const nearestTo = <T extends Target>(
   point: WorldPosition,

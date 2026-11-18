@@ -1,6 +1,6 @@
 // Strategic control for AI owners, run by the mission before each tick's commands.
 import { compareIds, isSupportUnit, isWorkerDefinition } from "./actor";
-import { isAiTuning } from "./ai-tuning";
+import { isAiTuning, matchesSpec } from "./ai-tuning";
 import { secondsToTicks } from "./clock";
 import { commandActorIds, isMissionCommand } from "./command";
 import {
@@ -23,7 +23,7 @@ import {
 } from "./validation";
 
 import type { ActorDefinition, DeepReadonly } from "./actor";
-import type { AiTuning } from "./ai-tuning";
+import type { AiTuning, Check, PlanSpec } from "./ai-tuning";
 import type { CommandResult, MissionCommand } from "./command";
 import type { OwnerView } from "./owner-view";
 import type { Resource } from "./resources";
@@ -118,6 +118,8 @@ export type AiConcernContext = {
   readonly definitions: ReadonlyMap<string, ActorDefinition>;
   readonly posture: AiPosture;
   readonly tuning: AiTuning;
+  /** This concern's section of `tuning.plans`, checked by its `planSpec`. */
+  readonly plan: Readonly<Record<string, unknown>>;
   /** The concern's saved state; it must stay JSON. */
   readonly memory: Record<string, unknown>;
   /** This concern's refused commands since its previous turn. */
@@ -140,7 +142,10 @@ export type AiConcernContext = {
   newActorId: (definitionId: string) => string;
   /** This concern's claimed actors, by stable ID. */
   claimed: () => string[];
-  /** Whether this concern now holds a fielded non-worker unit of the owner. */
+  /**
+   * Whether this concern now holds a fielded non-worker unit of the owner.
+   * Support providers count toward no force share.
+   */
   claim: (actorId: string) => boolean;
   release: (actorId: string) => void;
   /**
@@ -155,7 +160,13 @@ export type AiConcernContext = {
  */
 export type AiWithdrawalContext = Pick<
   AiConcernContext,
-  "tick" | "tickSeconds" | "view" | "terrain" | "definitions" | "tuning"
+  | "tick"
+  | "tickSeconds"
+  | "view"
+  | "terrain"
+  | "definitions"
+  | "tuning"
+  | "plan"
 > & {
   readonly memory: Record<string, unknown>;
   /** Own actors that no active concern has claimed. */
@@ -165,9 +176,22 @@ export type AiWithdrawalContext = Pick<
 export type AiConcern = ((context: AiConcernContext) => void) & {
   /** Validates this concern's saved state before a mission starts. */
   validateMemory?: (memory: Record<string, unknown>) => boolean;
+  /** The plan section a profile listing this concern must supply. */
+  planSpec?: PlanSpec;
   /** Ends work after leaving a posture; false requests another tick's turn. */
   withdraw?: (context: AiWithdrawalContext) => boolean | void;
 };
+
+/** Defines a concern and the checks for every field of its typed plan. */
+export function plannedConcern<Plan extends Record<string, unknown>>(
+  planSpec: Readonly<Record<keyof Plan, Check>>,
+  run: (context: AiConcernContext, plan: Plan) => void,
+): AiConcern {
+  return Object.assign(
+    (context: AiConcernContext) => run(context, context.plan as Plan),
+    { planSpec },
+  );
+}
 
 /** Budget reservations to return if a command is refused. */
 export type AiCommandSource = {
@@ -303,13 +327,37 @@ export function validateAiControllers(
       throw new RangeError(
         `AI profile ${profile.id} has an unsafe tuning duration.`,
       );
-    for (const concern of profileConcerns(profile))
+    const listed = new Set(profileConcerns(profile));
+    for (const concern of listed) {
+      const planSpec = concerns.get(concern)?.planSpec;
       if (!concerns.has(concern))
         throw new RangeError(
           `AI profile ${profile.id} uses unknown concern "${concern}".`,
         );
+      if (
+        planSpec &&
+        !matchesSpec(planSpec, planOf(profile, concern), tickSeconds)
+      )
+        throw new RangeError(
+          `AI profile ${profile.id} needs a valid "${concern}" plan.`,
+        );
+    }
+    for (const concern of Object.keys(profile.tuning.plans ?? {}))
+      if (!listed.has(concern))
+        throw new RangeError(
+          `AI profile ${profile.id} has a plan for unlisted concern "${concern}".`,
+        );
+      else if (!concerns.get(concern)?.planSpec)
+        throw new RangeError(
+          `AI profile ${profile.id} has a plan for concern "${concern}" without a plan specification.`,
+        );
   }
 }
+
+const planOf = ({ tuning: { plans } }: AiProfile, concern: string) =>
+  plans && hasOwn(plans, concern) ? plans[concern] : undefined;
+
+const NO_PLAN = Object.freeze({});
 
 /** Offsets each owner's first round, so owners plan on separate ticks. */
 export const createAiState = (owners: readonly { owner: string }[]): AiState =>
@@ -451,7 +499,10 @@ function beginRound(
 }
 
 type ForceAllocation = {
+  /** Claimable units: non-workers, including support providers. */
   fielded: ReadonlySet<string>;
+  /** Providers, which no force share counts. */
+  support: ReadonlySet<string>;
   quotas: ReadonlyMap<string, number>;
 };
 
@@ -462,20 +513,15 @@ function reconcileClaims(
   view: OwnerView,
   definitions: DirectorHost["definitions"],
 ): ForceAllocation {
-  const fielded = new Set(
-    view
-      .actors()
-      .ownMobile.filter((actor) => {
-        const definition = definitions.get(actor.definitionId)!;
-        return (
-          view.isMobile(actor) &&
-          !isWorkerDefinition(definition) &&
-          !isSupportUnit(definition)
-        );
-      })
-      .map(({ id }) => id),
-  );
-  let units = fielded.size;
+  const fielded = new Set<string>();
+  const support = new Set<string>();
+  for (const actor of view.actors().ownMobile) {
+    const definition = definitions.get(actor.definitionId)!;
+    if (!view.isMobile(actor) || isWorkerDefinition(definition)) continue;
+    fielded.add(actor.id);
+    if (isSupportUnit(definition)) support.add(actor.id);
+  }
+  let units = fielded.size - support.size;
   let weight = allocations.reduce((sum, { forces }) => sum + forces, 0);
   const quotas = new Map<string, number>();
   for (const { concern, forces, essential } of allocations) {
@@ -492,10 +538,13 @@ function reconcileClaims(
   for (const actorId of Object.keys(ai.claims).sort(compareIds)) {
     const concern = ai.claims[actorId]!;
     const quota = remaining.get(concern) ?? 0;
-    if (!fielded.has(actorId) || quota <= 0) delete ai.claims[actorId];
+    if (!fielded.has(actorId) || !remaining.has(concern))
+      delete ai.claims[actorId];
+    else if (support.has(actorId)) continue;
+    else if (quota <= 0) delete ai.claims[actorId];
     else remaining.set(concern, quota - 1);
   }
-  return { fielded, quotas };
+  return { fielded, support, quotas };
 }
 
 function concernContext(
@@ -557,6 +606,10 @@ function concernContext(
       .sort(compareIds);
   const held = (actorId: string) =>
     hasOwn(ai.claims, actorId) ? ai.claims[actorId] : undefined;
+  /** This concern's claims that count toward its force share. */
+  let sharedClaims = Object.keys(ai.claims).filter(
+    (actorId) => ai.claims[actorId] === concern && !forces.support.has(actorId),
+  ).length;
   if (!hasOwn(ai.memory, concern)) ai.memory = { ...ai.memory, [concern]: {} };
   const rejections = ai.rejections.filter((entry) => entry.concern === concern);
   ai.rejections = ai.rejections.filter((entry) => entry.concern !== concern);
@@ -568,6 +621,7 @@ function concernContext(
     definitions: host.definitions,
     posture: ai.posture,
     tuning: profile.tuning,
+    plan: planOf(profile, concern) ?? NO_PLAN,
     memory: ai.memory[concern]!,
     rejections,
     funds,
@@ -613,15 +667,25 @@ function concernContext(
       } else {
         if (
           holder !== undefined ||
-          claimed().length >= forces.quotas.get(concern)!
+          (!forces.support.has(actorId) &&
+            sharedClaims >= forces.quotas.get(concern)!)
         )
           return false;
       }
-      ai.claims = { ...ai.claims, [actorId]: concern };
+      // Defined rather than assigned, so IDs such as __proto__ stay data.
+      Object.defineProperty(ai.claims, actorId, {
+        value: concern,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      if (!forces.support.has(actorId)) sharedClaims += 1;
       return true;
     },
     release: (actorId) => {
-      if (held(actorId) === concern) delete ai.claims[actorId];
+      if (held(actorId) !== concern) return;
+      delete ai.claims[actorId];
+      if (!forces.support.has(actorId)) sharedClaims -= 1;
     },
     requestPosture: (posture) => {
       if (!isOneOf(AI_POSTURES, posture) || !hasOwn(profile.postures, posture))
@@ -665,6 +729,7 @@ function withdrawConcern(
     terrain: host.terrain,
     definitions: host.definitions,
     tuning: profile.tuning,
+    plan: planOf(profile, concern) ?? NO_PLAN,
     memory,
     canOrder,
     issue: (command) => {

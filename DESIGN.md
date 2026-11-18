@@ -1431,6 +1431,35 @@ Posture selection and spending follow these rules:
   thresholds, reinforcement budgets, and follow-up destinations are tunable or
   mission-authored.
 
+### M1 ARC AI plan
+
+Counts, shares, and thresholds below are profile tuning values.
+
+- Each build-plan concern owns a tuning section and validates it. A profile
+  supplies sections only for the concerns it lists.
+- Expansion uses Relay Stations and Refineries; the AI builds no second
+  Command Center in M1. Once home Refineries are staffed while developing or
+  pressuring, it expands once to the nearest scouted deposit away from known
+  enemies. Further expansions follow when worked deposits fall below a
+  remaining share, up to a limit. Broken support chains are restored before
+  new sites are taken, once no enemy building or visible armed enemy is near
+  the deposit. An expansion that loses its Refineries there is abandoned.
+- Sentry Turrets guard remote Refineries as they come online. A hit on a
+  Refinery or its Harvester also prompts a guard, even if the attacker
+  escapes sight.
+- Building repair runs in every posture after establishing, including
+  defending. It reserves the unpaid cost and yields its headquarters slot
+  to waiting construction.
+- Army training keeps a share of Demolition Troopers, raised once enemy
+  static defenses are observed. Attacks take whatever units are free.
+- Medics are trained in proportion to infantry and accompany attacks, raids,
+  and defense without counting toward group strength. Mechanics stay near
+  Refineries and Harvesters unless they can also service the army.
+- When defending or recovering and home units cannot meet the threat at
+  defense odds, the AI recalls operations that are assembling or not yet
+  engaged near their target. Engaged operations that are not outmatched
+  continue.
+
 ### M0 wolves
 
 - Wolves use idle-at-home, alerted, pursuing, attacking, investigating,

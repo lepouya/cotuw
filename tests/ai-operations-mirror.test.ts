@@ -31,14 +31,17 @@ const seconds = (count: number) =>
   secondsToTicks(count, SIMULATION_TICK_SECONDS);
 const definitions = new Map(MIRROR.content.actors.map((d) => [d.id, d]));
 /** Both owners' first raids are advancing by then. */
-const RAIDS_SECONDS = 35;
-/** West's first raid has launched by then. */
-const WEST_RAID_SECONDS = 25;
+const RAIDS_SECONDS = 120;
+/** Seconds after the grace until shortly before west's first raid. */
+const LEAD_SECONDS = 105;
+/** West's first raid has launched this long after the lead. */
+const WEST_RAID_SECONDS = 10;
 const operations = (sim: MissionSimulation | MissionState, owner = "west") =>
   operationsOf(sim.ai[owner]!.memory);
 
 let simulation: MissionSimulation;
 let graced: MissionState;
+let leading: MissionState;
 const opening: { posture: string; operations: number; claims: string[] }[] = [];
 
 // The undisturbed opening up to the end of the offensive grace period.
@@ -57,6 +60,8 @@ beforeAll(() => {
     }
   }
   graced = simulation.snapshot();
+  runTicks(simulation, seconds(LEAD_SECONDS));
+  leading = simulation.snapshot();
 }, 30_000);
 afterAll(() => simulation.dispose());
 
@@ -107,8 +112,9 @@ test("a raid sets out against observed enemy income after the grace", () => {
 });
 
 test("an operation continues identically after save and load", () => {
-  const sim = resumeMirror(structuredClone(graced));
+  const sim = resumeMirror(structuredClone(leading));
   try {
+    expect(operations(sim)).toHaveLength(0);
     runTicks(sim, seconds(WEST_RAID_SECONDS));
     expect(operations(sim)).toHaveLength(1);
     const saved = savedState(MIRROR.scenario, sim);
@@ -131,8 +137,8 @@ test("an operation continues identically after save and load", () => {
 });
 
 test("active operations continue identically through bounded clock catch-up", () => {
-  const whole = resumeMirror(structuredClone(graced));
-  const batched = resumeMirror(structuredClone(graced));
+  const whole = resumeMirror(structuredClone(leading));
+  const batched = resumeMirror(structuredClone(leading));
   let now = 0;
   const loop = startSimulationLoop(batched, {
     pumpMilliseconds: 60_000,

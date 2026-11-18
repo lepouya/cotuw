@@ -2,9 +2,10 @@ import { expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
 import { trainsArmy } from "../src/simulation/actor";
-import { affords, findPlacement } from "../src/simulation/ai-planning";
+import { affords, findPlacement, place } from "../src/simulation/ai-planning";
 import { TerrainGrid } from "../src/simulation/terrain";
 
+import type { PlacementMemory } from "../src/simulation/ai-planning";
 import type { AiConcernContext } from "../src/simulation/director";
 import type { ActorPlacement } from "../src/simulation/placement";
 
@@ -18,7 +19,10 @@ const terrain = new TerrainGrid({
 });
 
 /** A concern context whose placement check accepts on-map footprints. */
-function context(funds: number, accepts = () => true) {
+function context(
+  funds: number,
+  accepts: (placement: ActorPlacement) => boolean = () => true,
+) {
   const checked: ActorPlacement[] = [];
   const stub = {
     definitions,
@@ -28,7 +32,7 @@ function context(funds: number, accepts = () => true) {
       knowledge: { sites: [] },
       evaluatePlacement: (placement: ActorPlacement) => {
         checked.push(placement);
-        return { accepted: accepts() };
+        return { accepted: accepts(placement) };
       },
     },
   } as unknown as AiConcernContext;
@@ -69,4 +73,83 @@ test("placement gives up when no candidate is accepted", () => {
   expect(
     findPlacement(stub, terrain, BARRACKS, { x: 0, z: 0 }, "placement"),
   ).toBeUndefined();
+});
+
+/** A placing context at `tick`, whose commands `issue` accepts or refuses. */
+const placing = (
+  stub: AiConcernContext,
+  tick: number,
+  issue: () => boolean = () => true,
+) =>
+  ({
+    ...stub,
+    tick,
+    tickSeconds: 0.1,
+    tuning: { placementRetrySeconds: 10 },
+    newActorId: () => "placement",
+    issue,
+  }) as unknown as AiConcernContext;
+
+test("a search that finds no site waits before searching again", () => {
+  const { stub, checked } = context(1000, () => false);
+  const memory: PlacementMemory = {};
+  const anchor = { x: 0, z: 0 };
+  expect(place(placing(stub, 100), memory, terrain, BARRACKS, anchor)).toBe(
+    false,
+  );
+  expect(memory.placementRetryTick).toBe(200);
+  const searched = checked.length;
+  expect(searched).toBeGreaterThan(0);
+  place(placing(stub, 199), memory, terrain, BARRACKS, anchor);
+  expect(checked).toHaveLength(searched);
+  place(placing(stub, 200), memory, terrain, BARRACKS, anchor);
+  expect(checked.length).toBeGreaterThan(searched);
+});
+
+test("placement tries each anchor in one search before waiting", () => {
+  // Only sites beyond the first anchor's search are valid.
+  const { stub } = context(1000, ({ origin }) => origin.x >= 12);
+  const memory: PlacementMemory = {};
+  let issued = 0;
+  const near = terrain.tileCenter(2, 2);
+  const far = terrain.tileCenter(15, 15);
+  expect(
+    place(
+      placing(stub, 100, () => ++issued > 0),
+      memory,
+      terrain,
+      BARRACKS,
+      [near, far],
+    ),
+  ).toBe(true);
+  expect(issued).toBe(1);
+  expect(memory).toEqual({});
+});
+
+test("a refused placement also waits before searching again", () => {
+  const { stub } = context(1000);
+  const memory: PlacementMemory = {};
+  expect(
+    place(
+      placing(stub, 100, () => false),
+      memory,
+      terrain,
+      BARRACKS,
+      {
+        x: 0,
+        z: 0,
+      },
+    ),
+  ).toBe(false);
+  expect(memory).toEqual({ placementRetryTick: 200 });
+});
+
+test("an unaffordable placement neither searches nor waits", () => {
+  const { stub, checked } = context(0);
+  const memory: PlacementMemory = {};
+  expect(
+    place(placing(stub, 5), memory, terrain, BARRACKS, { x: 0, z: 0 }),
+  ).toBe(false);
+  expect(checked).toEqual([]);
+  expect(memory).toEqual({});
 });

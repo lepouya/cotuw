@@ -159,12 +159,16 @@ export function createOwnerView({
   const isMobile = (
     actor: Pick<ActorRenderState, "definitionId" | "tilePlacement">,
   ) => isMobileActor(actor, definitions.get(actor.definitionId));
+  const actorIndex = cached(
+    () => [simulation.actors] as const,
+    ([committed]) => new Map(committed.map((actor) => [actor.id, actor])),
+  );
   /** Committed actors this owner may see, grouped for views and controls. */
   const actors = cached(
     // Actors and vision change only on commit, which replaces the actor list.
     () => [simulation.actors] as const,
     ([committed]) => {
-      const byId = new Map(committed.map((actor) => [actor.id, actor]));
+      const byId = actorIndex();
       const shownIds = new Set(
         committed.filter(shows).map((actor) => actor.id),
       );
@@ -295,6 +299,11 @@ export function createOwnerView({
     shownActor: (id: string | undefined) =>
       id === undefined ? undefined : actors().shownById.get(id),
     ownActor,
+    /** Latest combat damage to an own actor, even from an unseen source. */
+    ownDamageTick: (id: string) => {
+      const actor = actorIndex().get(id);
+      return actor && owns(actor) ? actor.combat?.lastHit?.tick : undefined;
+    },
     ownMobileActor: (id: string | undefined) => {
       const found = ownActor(id);
       return found && isMobile(found) ? found : undefined;

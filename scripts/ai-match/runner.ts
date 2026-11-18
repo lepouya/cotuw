@@ -10,6 +10,8 @@ import {
   secondsToTicks,
   SIMULATION_TICK_SECONDS,
 } from "../../src/simulation/clock.ts";
+import { currentContentPack } from "../../src/content/packs.ts";
+import { isRelay, isStaticDefense } from "../../src/simulation/ai-planning.ts";
 import { aiDiagnostics } from "../../src/simulation/director.ts";
 import {
   parseMission,
@@ -26,6 +28,7 @@ import { activityTracker, disruptionTracker, matchAudit } from "./observers.ts";
 import type { SkirmishChoice } from "../../src/content/skirmish.ts";
 import type { SkirmishFaction } from "../../src/content/skirmish-map.ts";
 import type { LoadedMission } from "../../src/mission-loading.ts";
+import type { ActorDefinition } from "../../src/simulation/actor.ts";
 import type { OperationKind } from "../../src/simulation/ai-operations.ts";
 import type {
   AiConcern,
@@ -95,11 +98,14 @@ const NORMAL_WEST = ARC_MIRROR_CASES.find(
   ({ id }) => id === "arc-mirror-west-normal",
 )!;
 
-/** West loses part of its base at 6:00, before either side attacks a base. */
+/**
+ * West loses part of its base, by default at 6:00, before either side
+ * attacks a base.
+ */
 const lossCase = (
   name: string,
   definitionIds: string[],
-  options: Pick<Disruption, "accepted"> = {},
+  options: Partial<Pick<Disruption, "accepted" | "minutes">> = {},
 ): MatchCase => ({
   id: `arc-recovery-${name}`,
   choice: NORMAL_WEST.choice,
@@ -110,15 +116,17 @@ export const ARC_RECOVERY_CASES: readonly MatchCase[] = [
   lossCase("workers", ["arc-harvester"]),
   lossCase("income", ["arc-harvester", "arc-materials-refinery"]),
   lossCase("production", ["arc-field-barracks"]),
+  // Once the first expansion stands, which cuts its Refineries off.
+  lossCase("relay", ["arc-relay-station"], { minutes: 9 }),
   // A replacement needs more Materials banked than a 6:00 base holds.
   lossCase("headquarters", ["arc-command-center-prototype"], {
     accepted: true,
   }),
 ];
 
-/** Saved during the first attacks, with operations under way. */
+/** Saved during the first attack, with operations under way. */
 export const ARC_CONTINUATION_CASES: readonly MatchCase[] = [
-  { ...NORMAL_WEST, id: "arc-continuation", resumeAtMinutes: 9.5 },
+  { ...NORMAL_WEST, id: "arc-continuation", resumeAtMinutes: 12.5 },
 ];
 
 /** Named case sets the command line runs; every set by default. */
@@ -198,6 +206,41 @@ export const launchSummary = (report: MatchReport) =>
         return tick === undefined ? "none" : formatTick(tick);
       };
       return `${owner} raid ${first("raid")}, attack ${first("attack")}`;
+    })
+    .join("; ");
+
+/** Skirmish cases play the base pack, whose roles name placed buildings. */
+const BASE_DEFINITIONS = new Map(
+  currentContentPack("base").actors.map((definition) => [
+    definition.id,
+    definition,
+  ]),
+);
+
+/**
+ * Each owner's first expansion income, relays and static defenses placed,
+ * repairs started, and operations recalled in a crisis.
+ */
+export const baseSummary = (report: MatchReport) =>
+  report.owners
+    .map(({ owner, milestones, ordered = {}, operations = {} }) => {
+      const placed = (role: (definition: ActorDefinition) => boolean) =>
+        Object.entries(ordered).reduce((sum, [key, count]) => {
+          const [kind, id] = key.split(":");
+          const definition = id && BASE_DEFINITIONS.get(id);
+          return kind === "place-actor" && definition && role(definition)
+            ? sum + count
+            : sum;
+        }, 0);
+      const recalled = Object.values(operations).reduce(
+        (sum, { ended }) => sum + (ended.recalled ?? 0),
+        0,
+      );
+      const expansion =
+        milestones.firstExpansion === undefined
+          ? "none"
+          : formatTick(milestones.firstExpansion);
+      return `${owner} expansion ${expansion}, ${placed(isRelay)} relays, ${placed(isStaticDefense)} defenses, ${ordered.repair ?? 0} repairs, ${recalled} recalls`;
     })
     .join("; ");
 
@@ -330,10 +373,10 @@ function simulateMatch(
     try {
       while (!simulation.result && simulation.completedTicks < cutoffTicks) {
         losses.apply();
-        simulation.tick();
+        const outcomes = simulation.tick();
         // The director planned this tick from its starting state.
         const tick = simulation.completedTicks - 1;
-        activity.observe(simulation.ai, tick);
+        activity.observe(simulation.ai, tick, outcomes);
         audit.observe(tick);
         losses.observe(tick);
       }

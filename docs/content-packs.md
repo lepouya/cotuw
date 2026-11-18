@@ -55,7 +55,10 @@ bundled packs through the same parser future mod packs will use.
   `tuning` holds the concerns' thresholds and timing, with distances in tiles,
   durations in seconds, and odds as strength ratios. Every value is required
   and unknown keys are rejected; `AiTuning` in `simulation/ai-tuning.ts`
-  documents each one.
+  documents each one. Optional `tuning.plans` maps a listed concern to its
+  build-plan section, which that concern's `planSpec` validates. A profile
+  supplies sections for exactly its listed concerns with a `planSpec`.
+  Each concern's plan type documents its values.
 - Relative asset `url` values resolve against the page. The bundled pack uses
   paths such as `assets/models/wolf.glb` to support hosting under a subpath.
 - `presentation` maps actor IDs to what the player sees:

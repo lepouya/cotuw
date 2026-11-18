@@ -168,7 +168,7 @@ scouting.validateMemory = (memory) => {
   );
 };
 
-/** Trains or replaces the scout, returning it only while claimed. */
+/** Uses a fielded scout or trains a replacement, returning only claimed units. */
 function fieldScout(
   context: AiConcernContext,
   memory: ScoutMemory,
@@ -201,6 +201,23 @@ function fieldScout(
     }
     for (const key of ["scoutId", "goal", "health"] as const)
       delete memory[key];
+  }
+  const fielded = context.view
+    .actors()
+    .ownMobile.filter((actor) => isScoutUnit(definitionOf(context, actor)))
+    .sort(
+      (a, b) =>
+        definitionOf(context, b).vision!.radius -
+          definitionOf(context, a).vision!.radius || compareIds(a.id, b.id),
+    );
+  if (fielded.length) {
+    context.releaseFunds();
+    const available = fielded.find(({ id }) => context.claim(id));
+    if (available) {
+      memory.scoutId = available.id;
+      delete memory.replaceTick;
+    }
+    return available;
   }
   const unit = scoutDefinition(context);
   if (!unit) {

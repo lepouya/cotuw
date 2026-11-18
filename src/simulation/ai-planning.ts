@@ -35,6 +35,10 @@ export const definitionOf = (
   actor: Pick<ActorRenderState, "definitionId">,
 ) => context.definitions.get(actor.definitionId)!;
 
+/** A support provider is free to reposition between assignments. */
+export const idleProvider = (actor: ActorRenderState) =>
+  !actor.movement && !actor.service && !actor.orders?.length;
+
 /** Own buildings, in ID order, including unfinished ones. */
 export const ownBuildings = (
   context: AiConcernContext,
@@ -83,6 +87,58 @@ export const usableBuildings = (
     isUsable(context, building),
   );
 
+/** Buildings that only extend support. */
+export const isRelay = (definition: ActorDefinition) =>
+  !!definition.support &&
+  !definition.support.root &&
+  !definition.infrastructure &&
+  !definition.production &&
+  !definition.refinery &&
+  !definition.cultivationDropoff &&
+  !definition.weapon;
+
+/** Armed buildings. */
+export const isStaticDefense = (definition: ActorDefinition) =>
+  !!definition.footprint && !!definition.weapon;
+
+/** Postures that build only the essential base, before growing it. */
+export const isRestoring = ({ posture }: Pick<AiConcernContext, "posture">) =>
+  posture === "establishing" || posture === "recovering";
+
+/** Postures that take on new sites and producers. */
+export const isGrowing = ({ posture }: Pick<AiConcernContext, "posture">) =>
+  posture === "developing" || posture === "pressuring";
+
+/** Own completed support nodes linked to a root. */
+export const connectedNodes = (context: AiConcernContext) =>
+  (context.view.support()?.nodes ?? []).filter(
+    (node) =>
+      node.owner === context.view.owner && node.complete && node.connected,
+  );
+
+/** The worker trained by a Materials Refinery. */
+export const harvesterOf = (
+  context: AiConcernContext,
+  refinery: ActorDefinition,
+) => context.definitions.get(refinery.refinery!.harvesterDefinitionId)!;
+
+/** Known hostile buildings, in ID order. */
+export const hostileBuildings = (context: AiConcernContext) =>
+  context.view.knowledge.observations.actors.filter(
+    (sighting) =>
+      !!sighting.tilePlacement &&
+      context.view.relationTo(sighting) === "hostile",
+  );
+
+/** Known armed hostile buildings and recently reported armed units. */
+export const knownDefenders = (context: AiConcernContext) =>
+  context.view.knowledge.observations.actors.filter(
+    (sighting) =>
+      (!!sighting.tilePlacement || !isStaleReport(context, sighting.tick)) &&
+      context.view.relationTo(sighting) === "hostile" &&
+      !!context.definitions.get(sighting.definitionId)?.weapon,
+  );
+
 /** Matches definitions that train army units. */
 export const armyProducer =
   (context: AiConcernContext) => (definition: ActorDefinition) =>
@@ -126,9 +182,17 @@ function reservedTiles(context: AiConcernContext) {
   return reserved;
 }
 
+type PlacementSearch = {
+  /** Prefer sites nearest this point within the search around the anchor. */
+  toward?: WorldPosition;
+  /** Restrict the site by the building's actual center. */
+  accepts?: (position: WorldPosition) => boolean;
+};
+
 /**
  * The valid origin nearest `anchor` whose footprint keeps a clear tile from
- * other buildings and sites, so routes and exits stay open.
+ * other buildings and sites, so routes and exits stay open. With `toward`,
+ * it is instead the valid origin around `anchor` nearest that point.
  */
 export function findPlacement(
   context: AiConcernContext,
@@ -136,11 +200,19 @@ export function findPlacement(
   definition: ActorDefinition,
   anchor: WorldPosition,
   actorId: string,
+  { toward, accepts }: PlacementSearch = {},
 ): TileCoord | undefined {
   const point = clampToBounds(anchor, terrain.worldBounds);
   const center = terrain.tileAtWorldPosition(point.x, point.z);
   const reserved = reservedTiles(context);
-  for (const offset of PLACEMENT_OFFSETS) {
+  let offsets = PLACEMENT_OFFSETS;
+  if (toward) {
+    const goal = terrain.tileAtWorldPosition(toward.x, toward.z);
+    const gap = ({ x, z }: TileCoord) =>
+      (center.x + x - goal.x) ** 2 + (center.z + z - goal.z) ** 2;
+    offsets = [...offsets].sort((a, b) => gap(a) - gap(b));
+  }
+  for (const offset of offsets) {
     const origin = { x: center.x + offset.x, z: center.z + offset.z };
     const tiles = definition.footprint!.occupiedTiles.map(({ x, z }) => ({
       x: origin.x + x,
@@ -158,29 +230,64 @@ export function findPlacement(
       definitionId: definition.id,
       origin,
     });
-    if (evaluation.accepted) return origin;
+    if (
+      evaluation.accepted &&
+      (!accepts || accepts(evaluation.actor.worldPosition))
+    )
+      return origin;
   }
 }
 
-/** Places a building near `anchor` when funds and a valid site allow. */
+/** When a concern may next search for a building site. */
+export type PlacementMemory = { placementRetryTick?: number };
+
+export const isPlacementMemory = (memory: Record<string, unknown>) =>
+  memory.placementRetryTick === undefined || isCount(memory.placementRetryTick);
+
+/**
+ * Places a building at the first of `anchors` with a valid site when funds
+ * allow. Each search scans every candidate, so a placement that finds no site
+ * or is refused waits the profile's `placementRetrySeconds`.
+ */
 export function place(
   context: AiConcernContext,
+  memory: PlacementMemory,
   terrain: TerrainView,
   definition: ActorDefinition,
-  anchor: WorldPosition,
+  anchors: WorldPosition | readonly WorldPosition[],
+  search?: PlacementSearch,
 ) {
   if (!affords(context, definition)) return false;
+  if (memory.placementRetryTick !== undefined) {
+    if (context.tick < memory.placementRetryTick) return false;
+    delete memory.placementRetryTick;
+  }
   const actorId = context.newActorId(definition.id);
-  const origin = findPlacement(context, terrain, definition, anchor, actorId);
-  return (
-    !!origin &&
-    context.issue({
-      kind: "place-actor",
+  for (const anchor of Array.isArray(anchors) ? anchors : [anchors]) {
+    const origin = findPlacement(
+      context,
+      terrain,
+      definition,
+      anchor,
       actorId,
-      definitionId: definition.id,
-      origin,
-    })
-  );
+      search,
+    );
+    if (!origin) continue;
+    if (
+      context.issue({
+        kind: "place-actor",
+        actorId,
+        definitionId: definition.id,
+        origin,
+      })
+    )
+      return true;
+    break;
+  }
+  memory.placementRetryTick =
+    context.tick +
+    secondsToTicks(context.tuning.placementRetrySeconds, context.tickSeconds);
+  return false;
 }
 
 /**

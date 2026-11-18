@@ -1,9 +1,16 @@
 // Group controller for faction operations: assembly, advance, and return.
-import { compareIds, healthOf, isArmyUnit } from "./actor";
+import {
+  compareIds,
+  healthOf,
+  isArmyUnit,
+  isWorkerDefinition,
+  nearestTo,
+} from "./actor";
 import {
   armyProducer,
   definitionOf,
   headquarters,
+  idleProvider,
   usableBuildings,
 } from "./ai-planning";
 import { secondsToTicks } from "./clock";
@@ -24,7 +31,12 @@ import type { WorldPosition } from "./world";
 
 const OPERATION_KINDS = ["defend", "raid", "attack"] as const;
 const OPERATION_PHASES = ["assemble", "advance", "return"] as const;
-const OPERATION_OUTCOMES = ["completed", "failed", "cancelled"] as const;
+const OPERATION_OUTCOMES = [
+  "completed",
+  "failed",
+  "cancelled",
+  "recalled",
+] as const;
 export type OperationKind = (typeof OPERATION_KINDS)[number];
 export type OperationOutcome = (typeof OPERATION_OUTCOMES)[number];
 
@@ -45,6 +57,8 @@ export type Operation = {
   /** A temporary assembly point during an advance. */
   regroup?: WorldPosition;
   units: string[];
+  /** Providers following the group; they never count toward its strength. */
+  support?: string[];
   /** Fighting strength as the advance began; losses are judged against it. */
   strength?: number;
   outcome?: OperationOutcome;
@@ -62,6 +76,17 @@ export type Operation = {
 /** Planning turns can run before operations exist; absent means none. */
 export type OperationsMemory = { operations?: Operation[] };
 
+export const operationMembers = ({
+  units,
+  support,
+}: {
+  units: readonly string[];
+  support?: readonly string[];
+}) => (support ? [...units, ...support] : units);
+
+const movingMembers = (operation: Operation) =>
+  operation.phase === "return" ? operationMembers(operation) : operation.units;
+
 /** Checks saved operations before either planning or diagnostics reads them. */
 export function isOperation(value: unknown): value is Operation {
   return (
@@ -74,6 +99,7 @@ export function isOperation(value: unknown): value is Operation {
     (value.regroup === undefined || isFinitePosition(value.regroup)) &&
     (value.targetId === undefined || isId(value.targetId)) &&
     isIdList(value.units) &&
+    (value.support === undefined || isIdList(value.support)) &&
     (value.strength === undefined || isNonnegative(value.strength)) &&
     (value.outcome === undefined ||
       isOneOf(OPERATION_OUTCOMES, value.outcome)) &&
@@ -118,6 +144,23 @@ export const visibleHostiles = (context: AiConcernContext) =>
         context.view.relationTo(actor) === "hostile" &&
         !!context.definitions.get(actor.definitionId)?.weapon,
     );
+
+/** Detected armed hostiles near own buildings and workers. */
+export function baseThreats(context: AiConcernContext, terrain: TerrainView) {
+  const assets = context.view
+    .actors()
+    .own.filter(
+      (actor) =>
+        !!actor.tilePlacement ||
+        isWorkerDefinition(definitionOf(context, actor)),
+    );
+  const range = context.tuning.defense.threatTiles * terrain.tileSize;
+  return visibleHostiles(context).filter((hostile) =>
+    assets.some(
+      (asset) => distance(asset.worldPosition, hostile.worldPosition) <= range,
+    ),
+  );
+}
 
 /** Own fielded army units, in ID order. */
 export const armyUnits = (context: AiConcernContext) =>
@@ -254,6 +297,25 @@ function outmatched(
   return threat > own * (depleted ? 1 / retreatOdds : retreatOdds);
 }
 
+/** Advancing, fighting, and near its target, so a recall would waste it. */
+export function isCommitted(
+  context: AiConcernContext,
+  terrain: TerrainView,
+  operation: Operation,
+  held: ReadonlySet<string>,
+) {
+  if (operation.phase !== "advance") return false;
+  const units = operation.units.flatMap((id) => {
+    const unit = held.has(id) && context.view.ownMobileActor(id);
+    return unit ? [unit] : [];
+  });
+  return (
+    units.some((unit) => unit.combat?.attack) &&
+    distance(centerOf(units), operation.target) <=
+      context.tuning.operations.engagementTiles * terrain.tileSize
+  );
+}
+
 /** Begins the advance, recording the strength that sets out. */
 function beginAdvance(
   context: AiConcernContext,
@@ -266,32 +328,103 @@ function beginAdvance(
 }
 
 /**
+ * Claims providers for an assembling group or a defense, one per
+ * `supportUnits` members it can service, nearest the group first.
+ */
+function escort(
+  context: AiConcernContext,
+  operation: Operation,
+  units: readonly ActorRenderState[],
+  center: WorldPosition,
+  supportAvailable: (id: string) => boolean,
+) {
+  const wanted = Math.floor(
+    units.length / context.tuning.operations.supportUnits,
+  );
+  const support = operation.support ?? [];
+  if (support.length >= wanted) return;
+  const kinds = new Set(
+    units.flatMap((unit) => definitionOf(context, unit).recoveryKind ?? []),
+  );
+  const candidates = context.view
+    .actors()
+    .ownMobile.filter((actor) => {
+      const restoration = definitionOf(context, actor).restoration;
+      return (
+        !!restoration &&
+        !support.includes(actor.id) &&
+        supportAvailable(actor.id) &&
+        restoration.targetKinds.some((kind) => kinds.has(kind))
+      );
+    })
+    .sort(nearestTo(center));
+  for (const candidate of candidates) {
+    if (support.length >= wanted) break;
+    if (context.claim(candidate.id)) support.push(candidate.id);
+  }
+  if (support.length) operation.support = support.sort(compareIds);
+}
+
+/** Sends idle providers that fell behind to the group's center. */
+function follow(
+  context: AiConcernContext,
+  terrain: TerrainView,
+  operation: Operation,
+  center: WorldPosition,
+) {
+  const range = context.tuning.operations.gatherTiles * terrain.tileSize;
+  const behind = (operation.support ?? []).filter((id) => {
+    const provider = context.view.ownMobileActor(id)!;
+    return (
+      idleProvider(provider) && distance(provider.worldPosition, center) > range
+    );
+  });
+  if (behind.length)
+    context.issue({ kind: "group-move", actorIds: behind, target: center });
+}
+
+/**
  * Runs one turn of an operation's group: it assembles at its rally point,
  * advances on its target, regroups when strung out, and returns home after
  * it ends. Stalls and refused orders are retried a bounded number of times.
- * With `retreats`, an outmatched advance fails. The group is released once
- * home or gone.
+ * With `retreats`, an outmatched advance fails. The group and its providers
+ * are released once home or gone.
  */
 export function stepOperation(
   context: AiConcernContext,
   terrain: TerrainView,
   operation: Operation,
-  { retreats }: { retreats: boolean },
+  {
+    retreats,
+    supportAvailable = () => true,
+  }: { retreats: boolean; supportAvailable?: (id: string) => boolean },
 ): OperationEvent {
   const { tick } = context;
   const tuning = context.tuning.operations;
   operation.units = operation.units.filter((id) => context.claim(id));
-  const units = operation.units.map((id) => context.view.ownMobileActor(id)!);
-  if (!units.length) return "ended";
+  const support = (operation.support ?? []).filter(
+    (id) => supportAvailable(id) && context.claim(id),
+  );
+  if (support.length) operation.support = support;
+  else delete operation.support;
   const disband = () => {
-    for (const id of operation.units) context.release(id);
+    for (const id of operationMembers(operation)) context.release(id);
     return "ended" as const;
   };
+  if (!operation.units.length && !support.length) return disband();
   let event: OperationEvent;
   const fail = () => {
     endOperation(context, operation, "failed");
     event = "failed";
   };
+  if (!operation.units.length && operation.phase !== "return") fail();
+  const units = operation.units.map((id) => context.view.ownMobileActor(id)!);
+  const center = units.length ? centerOf(units) : operation.rally;
+  if (
+    operation.phase !== "return" &&
+    (operation.phase === "assemble" || operation.kind === "defend")
+  )
+    escort(context, operation, units, center, supportAvailable);
   // A crowded group leaves out members already beside the order's point;
   // they cannot get closer, which is not a stall.
   const gatherRange = tuning.gatherTiles * terrain.tileSize;
@@ -299,7 +432,7 @@ export function stepOperation(
     context.rejections.some(
       ({ command }) =>
         (command.kind === "move" || command.kind === "attack-move") &&
-        operation.units.includes(command.actorId) &&
+        movingMembers(operation).includes(command.actorId) &&
         distance(
           context.view.ownMobileActor(command.actorId)!.worldPosition,
           command.target,
@@ -310,7 +443,6 @@ export function stepOperation(
     delete operation.issued;
   }
   const engaged = units.some((unit) => unit.combat?.attack);
-  const center = centerOf(units);
   if (operation.phase === "advance") {
     if (
       retreats &&
@@ -332,29 +464,33 @@ export function stepOperation(
       )
     ) {
       // The unit nearest the center stands where the others can meet it.
-      const [meeting] = [...units].sort(
-        (a, b) =>
-          distance(a.worldPosition, center) -
-            distance(b.worldPosition, center) || compareIds(a.id, b.id),
-      );
+      const [meeting] = [...units].sort(nearestTo(center));
       operation.regroups += 1;
       operation.regroup = { ...meeting!.worldPosition };
       enterPhase(context, operation, "assemble");
     }
   }
   const rally = operation.regroup ?? operation.rally;
+  const positions = movingMembers(operation).map(
+    (id) => context.view.ownMobileActor(id)!.worldPosition,
+  );
   const gathered = () =>
-    units.every((unit) => distance(unit.worldPosition, rally) <= gatherRange);
-  // A failure is reported before the group can disband.
-  if (operation.phase === "return" && !event && gathered()) return disband();
+    positions.every((position) => distance(position, rally) <= gatherRange);
+  // Keep a newly ended operation for one turn and replace its prior order.
+  if (
+    operation.phase === "return" &&
+    (operation.issued || operation.progressTick !== tick) &&
+    gathered()
+  )
+    return disband();
   if (operation.phase === "assemble" && gathered())
     beginAdvance(context, operation, units);
   const destination = operation.phase === "advance" ? operation.target : rally;
   const remaining =
-    units.reduce(
-      (sum, unit) => sum + distance(unit.worldPosition, destination),
+    positions.reduce(
+      (sum, position) => sum + distance(position, destination),
       0,
-    ) / units.length;
+    ) / positions.length;
   const fighting = units.some(
     (unit) => (unit.combat?.activeTick ?? -1) > operation.progressTick,
   );
@@ -380,9 +516,10 @@ export function stepOperation(
   }
   if (
     !operation.issued &&
-    context.issue(groupOrder(operation, [...operation.units]))
+    context.issue(groupOrder(operation, [...movingMembers(operation)]))
   )
     operation.issued = true;
+  if (operation.phase !== "return") follow(context, terrain, operation, center);
   return event;
 }
 
@@ -390,14 +527,18 @@ export function stepOperation(
 export function withdrawOperations(context: AiWithdrawalContext) {
   const memory = context.memory as OperationsMemory;
   const pending = (memory.operations ?? []).filter((operation) => {
-    operation.units = operation.units.filter(
-      (id) => context.view.ownMobileActor(id) && context.canOrder(id),
-    );
+    const available = (id: string) =>
+      context.view.ownMobileActor(id) && context.canOrder(id);
+    operation.units = operation.units.filter(available);
+    const support = operation.support?.filter(available);
+    if (support?.length) operation.support = support;
+    else delete operation.support;
+    const survivors = operationMembers(operation);
     return (
-      operation.units.length > 0 &&
+      survivors.length > 0 &&
       !context.issue({
         kind: "group-move",
-        actorIds: operation.units,
+        actorIds: [...survivors],
         target: operation.rally,
       })
     );

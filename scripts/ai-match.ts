@@ -23,8 +23,14 @@ if (cutoffMinutes !== undefined && !isPositive(cutoffMinutes))
 const { module } = await runnerImport<typeof import("./ai-match/runner.ts")>(
   fileURLToPath(new URL("ai-match/runner.ts", import.meta.url)),
 );
-const { CASE_SETS, disruptionSummary, launchSummary, passed, runMatch } =
-  module;
+const {
+  CASE_SETS,
+  baseSummary,
+  disruptionSummary,
+  launchSummary,
+  passed,
+  runMatch,
+} = module;
 const allCases = [...CASE_SETS.values()].flat();
 const selected = (name: string) =>
   CASE_SETS.get(name) ?? allCases.filter(({ id }) => id === name);
@@ -71,6 +77,7 @@ for (const matchCase of cases) {
     `${report.case}: ${describe(report, statePath)} at ${formatElapsed(report.seconds)} (${wallSeconds.toFixed(1)} s)`,
   );
   console.log(`  ${launchSummary(report)}`);
+  console.log(`  ${baseSummary(report)}`);
   for (const line of disruptionSummary(report)) console.log(`  ${line}`);
   if (report.continuation)
     console.log(`  save/load continuation ${report.continuation}`);
