@@ -164,14 +164,11 @@ upgrades, and research deferred. Task IDs remain stable across phase changes.
 - [x] **1.44** Control groups, idle-worker actions, and matching-unit selection
   with mission UI persistence, verified in Chromium, WebKit, and packaged
   macOS, including Mac Control, mixed selections, and waiting workers.
-- [ ] **1.45** Implement [command shortcuts](DESIGN.md#m1-command-shortcuts)
-  and [keyboard preferences](DESIGN.md#m1-keyboard-preferences). Verify queued
-  targeting, Stop, placement/card precedence, dialog/form focus, disabled
-  explanations, and compact landscape controls. Test QWERTY, AZERTY, QWERTZ,
-  number-row modifiers, missing automatic layout labels, and host-reserved keys.
-  Replace static hints in `ui/sidebar-orders.ts` with current bindings. Use
-  one active-tool state so card shortcuts wait during placement. Share device
-  preference storage with audio; keep it independent of mission saves.
+- [x] **1.45** Command shortcuts and device keyboard preferences with live
+  hints, layout selection, and conflict checks. Chromium and WebKit verify
+  production precedence, queued targeting, Stop, input focus, disabled cards,
+  and compact touch controls. Packaged macOS verifies binding capture and
+  Cmd+Q.
 - [ ] **1.46** Extend ARC AI build plans and operations to use the selected
   expansion, defense, recovery, and combat content. Include Refineries at
   scouted remote deposits, which need support reach; Harvesters otherwise

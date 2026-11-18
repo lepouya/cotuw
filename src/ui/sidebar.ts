@@ -57,6 +57,11 @@ export function createSidebar(root: HTMLElement, options: SidebarOptions) {
     return {
       controls: {
         ...orders.controls,
+        showBuildings: navigation.showBuildings,
+        activateProductionSlot: (index: number) => {
+          const panel = navigation.activeProductionPanel();
+          return !!panel && production.activateSlot(panel, index);
+        },
         buildings: production.buildings,
         train: production.train,
         productionStatus: production.productionStatus,

@@ -17,7 +17,7 @@ dependencies, and progress.
 The title screen offers **New mission**, **Load**, **Options**, and **Exit**.
 New mission opens the wolf-den setup screen: choose Easy, Normal, or Hard, then
 ARC's base-building mission or the Circle's worker-tended cultivation slice.
-Options provides master, sound, and music volume and mute controls; preferences
+Options provides audio controls and keyboard layout and rebinding. Preferences
 persist on this device. Leaving a mission through **Main menu** returns to the
 title screen. Exit closes the desktop app; browsers show a close-tab message.
 
@@ -51,6 +51,10 @@ selects them all, as do **Idle workers** and **Select idle**. **Pan** enables
 camera dragging, and **View** offers camera presets. **Goals** shows objectives
 and preparation. **Menu**, `F10`, or `Esc` opens save, load, restart, audio,
 and Main menu controls. `Esc` first cancels active tools or clears selection.
+On a US QWERTY layout, `A` starts Attack Move targeting, `S` stops selected
+units, and `B` opens Buildings. `Q/W/E/R/T` activate the first five
+cards in the open production panel. While placing a building, `R` rotates
+it. Hold Shift when choosing an Attack Move destination to queue waypoints.
 Choose **½×**, **1×**, **2×**, or **4×** in the top bar to change game speed.
 `F5` quicksaves and `F9` quickloads. Loading starts paused for inspection.
 

@@ -1,3 +1,4 @@
+import { createWorldTools, type WorldTools } from "./world-tools";
 import { createPrimaryClick } from "../render/primary-click";
 import { worldInputAvailable } from "../render/input-focus";
 import { isOutcomeOf } from "../simulation/command";
@@ -58,6 +59,7 @@ export type BuildingPlacementChoice = {
 
 export type BuildingPlacementOptions = {
   buildings: readonly BuildingPlacementChoice[];
+  tools?: WorldTools;
   /** Draws the candidate; it must accept every building definition. */
   preview: PlacementPreview;
   controls: BuildingPlacementControls;
@@ -84,6 +86,7 @@ export function createBuildingPlacement(
   player: Pick<OwnerView, "owner" | "evaluatePlacement" | "ownActor">,
   {
     buildings,
+    tools = createWorldTools(),
     preview,
     controls,
     enabled = () => true,
@@ -100,7 +103,7 @@ export function createBuildingPlacement(
     pointerEnabled() && worldInputAvailable(canvas.ownerDocument);
   let definition = buildings[0]?.definition;
   let name = buildings[0]?.name ?? "";
-  let active = false;
+  const active = () => tools.active === "placement";
   let faulted = false;
   let quarterTurns = 0;
   let origin: TileCoord | undefined;
@@ -127,7 +130,7 @@ export function createBuildingPlacement(
   const placementKey = () => JSON.stringify([origin, quarterTurns]);
   /** The candidate at the current state, as the owner's knowledge judges it. */
   const evaluate = (): PlacementCandidate | undefined => {
-    const candidate = active ? placement() : undefined;
+    const candidate = active() ? placement() : undefined;
     if (!candidate) return undefined;
     const evaluation = player.evaluatePlacement(candidate);
     const tender = evaluation.accepted
@@ -142,14 +145,15 @@ export function createBuildingPlacement(
     };
   };
   const update = () => {
+    const placing = active();
     const available = enabled();
-    if (active && pointer && !pendingId && acceptsPointer())
+    if (placing && pointer && !pendingId && acceptsPointer())
       origin = preview.tileAt(pointer);
     if (rejection && rejection.placement !== placementKey())
       rejection = undefined;
     // Ticks can move units onto the footprint or change the terrain under it.
     const nextStateKey = JSON.stringify([
-      active,
+      placing,
       faulted,
       available,
       pendingId,
@@ -174,7 +178,7 @@ export function createBuildingPlacement(
     if (!changed) return;
     const evaluation = shown?.evaluation;
     const nextUiKey = JSON.stringify([
-      active,
+      placing,
       faulted,
       available,
       pendingId,
@@ -186,10 +190,10 @@ export function createBuildingPlacement(
     ]);
     if (nextUiKey === uiKey) return;
     uiKey = nextUiKey;
-    canvas.dataset.placementActive = String(active);
+    canvas.dataset.placementActive = String(placing);
     canvas.dataset.placementStatus = pendingId
       ? "pending"
-      : !active
+      : !placing
         ? "idle"
         : !evaluation
           ? "choose-location"
@@ -198,18 +202,15 @@ export function createBuildingPlacement(
             : evaluation.reason;
     canvas.dataset.placementRotation = String(quarterTurns);
     canvas.dataset.placementOrigin = origin ? tileKey(origin) : "";
-    for (const { build } of buildings) {
-      if (build) build.disabled = active || faulted || !available;
-    }
     if (controls.rotate)
       controls.rotate.disabled =
-        !active || !!pendingId || faulted || !available;
+        !placing || !!pendingId || faulted || !available;
     if (controls.cancel)
-      controls.cancel.disabled = !active || !!pendingId || faulted;
+      controls.cancel.disabled = !placing || !!pendingId || faulted;
     if (controls.confirm)
       controls.confirm.disabled =
         !evaluation?.accepted || !!pendingId || faulted || !available;
-    if (active) {
+    if (placing) {
       message(
         pendingId
           ? `Placing ${name}…`
@@ -224,9 +225,9 @@ export function createBuildingPlacement(
     }
   };
   const start = (building: BuildingPlacementChoice) => {
-    if (active || faulted || !enabled()) return;
+    if (active() || faulted || !enabled() || building.build?.disabled) return;
+    if (!tools.activate("placement", cancel)) return;
     ({ definition, name } = building);
-    active = true;
     origin = undefined;
     pointer = undefined;
     quarterTurns = 0;
@@ -234,20 +235,20 @@ export function createBuildingPlacement(
     update();
   };
   const cancel = () => {
-    if (!active || pendingId) return;
-    active = false;
+    if (!active() || pendingId) return;
+    tools.end("placement");
     origin = undefined;
     pointer = undefined;
     message("Placement cancelled.");
     update();
   };
   const rotate = () => {
-    if (!active || pendingId || faulted) return;
+    if (!active() || pendingId || faulted || !enabled()) return;
     quarterTurns = (quarterTurns + 1) % 4;
     update();
   };
   const confirm = () => {
-    if (!active || pendingId || faulted || !enabled()) return;
+    if (!active() || pendingId || faulted || !enabled()) return;
     const candidate = placement();
     if (!candidate || !player.evaluatePlacement(candidate).accepted) {
       onInvalid?.();
@@ -263,7 +264,7 @@ export function createBuildingPlacement(
     update();
   };
   const move = (event: PointerEvent) => {
-    if (!active || pendingId || !acceptsPointer()) return;
+    if (!active() || pendingId || !acceptsPointer()) return;
     if (event.pointerType !== "touch") pointer = event;
   };
   const click = createPrimaryClick(
@@ -275,7 +276,7 @@ export function createBuildingPlacement(
       // Touch taps choose a footprint so a finger never obscures confirmation.
       if (event.pointerType !== "touch") confirm();
     },
-    () => active && !pendingId && !faulted && enabled() && acceptsPointer(),
+    () => active() && !pendingId && !faulted && enabled() && acceptsPointer(),
   );
   const leave = () => {
     pointer = undefined;
@@ -300,19 +301,17 @@ export function createBuildingPlacement(
       : "No buildings available.",
   );
   return {
-    /** Ends placement unless its command is pending. */
-    cancel,
     rotate,
     cancelGesture: () => {
       leave();
       return click.cancel();
     },
     get active() {
-      return active;
+      return active();
     },
     /** The building being placed, while placement is active. */
     get definitionId() {
-      return active ? definition?.id : undefined;
+      return active() ? definition?.id : undefined;
     },
     update,
     onOutcome: (outcome: CommandOutcome) => {
@@ -324,7 +323,7 @@ export function createBuildingPlacement(
       const { command, accepted, reason } = outcome;
       pendingId = undefined;
       if (accepted) {
-        active = false;
+        tools.end("placement");
         origin = undefined;
         pointer = undefined;
         message(`${name} placed.`);
@@ -341,7 +340,7 @@ export function createBuildingPlacement(
     },
     fault: () => {
       faulted = true;
-      active = false;
+      tools.end("placement");
       pendingId = undefined;
       update();
       const { result } = simulation;

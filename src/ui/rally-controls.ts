@@ -1,3 +1,4 @@
+import type { WorldTools } from "./world-tools";
 import { setText } from "./dom";
 
 import type { ActorRenderState } from "../simulation/actor";
@@ -29,37 +30,41 @@ export function createRallyControls(
     isProducer: (definitionId: string) => boolean;
     enabled: () => boolean;
     onStart: () => void;
+    tools: WorldTools;
     changed: () => void;
   },
 ) {
   const elements = controls.rally;
   const controller = new AbortController();
+  const active = () => options.tools.active === "rally";
   let choosingFor: string | undefined;
   let result = "";
   let knownSelection: string | undefined;
   const cancel = () => {
-    const active = choosingFor !== undefined;
+    const wasActive = active();
+    options.tools.end("rally");
     choosingFor = undefined;
     result = "";
-    if (active) options.changed();
-    return active;
+    if (wasActive) options.changed();
   };
   for (const action of RALLY_ACTIONS)
     elements?.[action].addEventListener(
       "click",
       () => {
         if (!options.enabled()) return;
-        const id = options.selectedActor()?.id;
+        const actor = options.selectedActor();
         if (action === "cancel") cancel();
-        else if (id && action === "set") {
+        else if (!actor || !options.isProducer(actor.definitionId)) return;
+        else if (action === "set") {
+          if (!options.tools.activate("rally", cancel)) return;
           options.onStart();
-          choosingFor = id;
+          choosingFor = actor.id;
           result = "";
           options.changed();
-        } else if (id && action === "clear") {
+        } else if (actor.rallyPoint) {
           cancel();
           simulation.submitCommand(
-            { kind: "set-rally-point", actorId: id },
+            { kind: "set-rally-point", actorId: actor.id },
             { owner: player.owner },
           );
         }
@@ -67,12 +72,12 @@ export function createRallyControls(
       { signal: controller.signal },
     );
   return {
-    get active() {
-      return choosingFor !== undefined;
-    },
-    cancel,
     choose: (target: WorldPosition) => {
-      if (!choosingFor || !options.enabled()) return;
+      if (!choosingFor) return;
+      if (!options.enabled() || choosingFor !== options.selectedActor()?.id) {
+        cancel();
+        return;
+      }
       if (!player.evaluateRallyPoint(choosingFor, target)) {
         result = "Choose passable ground clear of buildings.";
         options.changed();

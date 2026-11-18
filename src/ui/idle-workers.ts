@@ -3,6 +3,7 @@ import { setText } from "./dom";
 
 export type IdleWorkerElements = {
   next: HTMLButtonElement;
+  nextLabel?: HTMLElement;
   selectAll: HTMLButtonElement;
 };
 
@@ -58,7 +59,7 @@ export function createIdleWorkerControls(
       if (!elements) return;
       const count = idleIds().length;
       const disabled = !enabled() || !count;
-      setText(elements.next, `Idle workers (${count})`);
+      setText(elements.nextLabel ?? elements.next, `Idle workers (${count})`);
       elements.next.disabled = disabled;
       elements.selectAll.disabled = disabled;
     },

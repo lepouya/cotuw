@@ -1,0 +1,26 @@
+#menu-keyboard {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+
+#menu-keyboard h3,
+#menu-keyboard p {
+  margin: 0;
+}
+
+#menu-keyboard summary {
+  cursor: pointer;
+}
+
+.keyboard-binding {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-block: 0.25rem;
+}
+
+.keyboard-status:empty {
+  display: none;
+}

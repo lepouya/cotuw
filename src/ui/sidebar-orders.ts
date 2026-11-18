@@ -1,3 +1,4 @@
+import { bindShortcutHint, createShortcutHint } from "./shortcut-hint";
 import { isMobileActor } from "../simulation/placement";
 import { createControlGroupPanel } from "./control-groups";
 import { createButton, createElement as el, setText } from "./dom";
@@ -8,8 +9,13 @@ import "./sidebar-orders.css";
 const setPressed = (button: HTMLButtonElement, pressed?: boolean) =>
   button.setAttribute("aria-pressed", String(!!pressed));
 
-export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
-  const rotateBuilding = createButton("Rotate 90° (R)", {
+export function createSidebarOrders({
+  definitionById,
+  owns,
+  keyboard,
+  signal,
+}: SidebarContext) {
+  const rotateBuilding = createButton("Rotate 90°", {
     id: "rotate-building",
     disabled: true,
   });
@@ -17,7 +23,7 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
     id: "confirm-building",
     disabled: true,
   });
-  const cancelBuilding = createButton("Cancel (Esc)", {
+  const cancelBuilding = createButton("Cancel", {
     id: "cancel-building",
     disabled: true,
   });
@@ -62,7 +68,7 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
     id: "queue-orders",
     "aria-pressed": "false",
   });
-  const attackMove = createButton("⚔ Attack Move", {
+  const attackMove = createButton("Attack Move", {
     id: "attack-move",
     "aria-pressed": "false",
     hidden: true,
@@ -71,7 +77,7 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
     id: "cancel-attack-move",
     hidden: true,
   });
-  const stopUnits = createButton("Stop (S)", {
+  const stopUnits = createButton("Stop", {
     id: "stop-units",
     disabled: true,
   });
@@ -88,16 +94,25 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
     "aria-pressed": "false",
     disabled: true,
   });
-  const controlGroups = createControlGroupPanel();
+  const controlGroups = createControlGroupPanel(keyboard, signal);
   // Always shown, so Attack Move appearing never adds a toolbar row.
-  const idleWorkers = createButton("Idle workers (0)", {
+  const idleWorkers = createButton("", {
     id: "idle-workers",
     disabled: true,
   });
+  const idleLabel = el("span", {}, "Idle workers (0)");
+  idleWorkers.append(idleLabel);
   const selectIdleWorkers = createButton("Select idle", {
     id: "select-idle-workers",
     disabled: true,
   });
+  bindShortcutHint(rotateBuilding, keyboard, "rotate", signal);
+  bindShortcutHint(attackMove, keyboard, "attackMove", signal);
+  bindShortcutHint(stopUnits, keyboard, "stop", signal);
+  bindShortcutHint(idleWorkers, keyboard, "idleNext", signal);
+  bindShortcutHint(selectIdleWorkers, keyboard, "idleAll", signal);
+  createShortcutHint(cancelBuilding)("Esc");
+  createShortcutHint(cancelAttackMove)("Esc");
   const movementStatus = el("p", {
     id: "movement-status",
     class: "muted",
@@ -144,7 +159,11 @@ export function createSidebarOrders({ definitionById, owns }: SidebarContext) {
       followSelection,
       movementStatus,
       controlGroups,
-      idleWorkers: { next: idleWorkers, selectAll: selectIdleWorkers },
+      idleWorkers: {
+        next: idleWorkers,
+        nextLabel: idleLabel,
+        selectAll: selectIdleWorkers,
+      },
       rotate: rotateBuilding,
       confirm: confirmBuilding,
       cancel: cancelBuilding,

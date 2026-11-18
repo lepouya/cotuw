@@ -1,3 +1,6 @@
+import { GROUP_SHORTCUTS } from "./keyboard-preferences";
+import { createShortcutHint } from "./shortcut-hint";
+import type { KeyboardBindings } from "./keyboard-preferences";
 import { compareIds } from "../simulation/actor";
 import { CONTROL_GROUP_SLOTS } from "../simulation/mission-file";
 import { createButton, createElement as el, setText } from "./dom";
@@ -6,7 +9,6 @@ import type {
   ControlGroupSlot,
   MissionUiState,
 } from "../simulation/mission-file";
-import type { WorldShortcutHandler } from "./world-shortcuts";
 
 /** A second recall of the same group within this time also focuses it. */
 const REPEAT_RECALL_MILLISECONDS = 500;
@@ -42,7 +44,10 @@ export type ControlGroupElements = {
   status: HTMLElement;
 };
 
-export function createControlGroupPanel(): ControlGroupElements {
+export function createControlGroupPanel(
+  preferences: KeyboardBindings,
+  signal: AbortSignal,
+): ControlGroupElements {
   const toggle = createButton("Groups", {
     id: "toggle-control-groups",
     "aria-expanded": "false",
@@ -56,6 +61,16 @@ export function createControlGroupPanel(): ControlGroupElements {
       slot,
       count,
     );
+    const hint = createShortcutHint(button);
+    const bindings = GROUP_SHORTCUTS.filter(
+      (shortcut) => shortcut.slot === slot,
+    );
+    preferences.subscribe(() => {
+      hint(preferences.label(bindings[0]!.id));
+      button.title = bindings
+        .map(({ name, id }) => `${name} · ${preferences.label(id)}`)
+        .join("\n");
+    }, signal);
     return { slot, button, count };
   });
   const actions = GROUP_ACTIONS.map(({ id, label }) => ({
@@ -257,17 +272,9 @@ export function createControlGroupControls(
         listen,
       );
   }
-  const shortcuts: Record<string, readonly WorldShortcutHandler[]> = {};
-  for (const slot of CONTROL_GROUP_SLOTS) {
-    shortcuts[`Digit${slot}`] = [
-      ({ shiftKey }) => (shiftKey ? store(slot, "add") : recall(slot)),
-    ];
-    shortcuts[`Control+Digit${slot}`] = [
-      ({ shiftKey }) => shiftKey && store(slot, "assign"),
-    ];
-  }
   return {
-    shortcuts,
+    recall,
+    store,
     close,
     escape,
     /** Drops members the player no longer commands. */

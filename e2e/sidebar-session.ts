@@ -28,6 +28,7 @@ export async function startSidebarSession(
     document.querySelector<HTMLElement>("#game-sidebar")!,
     {
       definitions: mission.definitions,
+      keyboard: controls.keyboard,
       presentations: new Map(Object.entries(mission.content.presentation)),
       economy: !!economy,
       goals,

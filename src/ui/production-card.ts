@@ -1,3 +1,4 @@
+import { createShortcutHint } from "./shortcut-hint";
 import "./production-card.css";
 import type { PortraitId } from "../content/presentation";
 import { createActorPortrait } from "./actor-portrait";
@@ -12,6 +13,8 @@ let nextDescriptionId = 0;
 export type ProductionCard = DefinitionButton & {
   card: HTMLElement;
   explain: NonNullable<DefinitionButton["explain"]>;
+  setShortcut: (label: string) => void;
+  activate: () => void;
 };
 
 /** Creates production cards under `root` and their shared tooltip. */
@@ -136,6 +139,11 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
         portrait?: PortraitId;
       },
     ): ProductionCard => {
+      const name = el(
+        "span",
+        { class: "option-name" },
+        el("strong", {}, content.name),
+      );
       const button = el(
         "button",
         {
@@ -145,10 +153,11 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
           "aria-label": action.label,
         },
         createActorPortrait(definition, content.portrait),
-        el("strong", {}, content.name),
+        name,
       );
       if (content.cost !== undefined)
         button.append(el("span", { class: "option-cost" }, content.cost));
+      const setShortcut = createShortcutHint(button, name);
       const description = el("span", { class: "sr-only" }, content.details);
       do {
         description.id = `production-description-${++nextDescriptionId}`;
@@ -236,6 +245,14 @@ export function createProductionCards(root: HTMLElement, parent: AbortSignal) {
         definitionId: definition.id,
         button,
         card,
+        setShortcut,
+        activate: () => {
+          if (!button.disabled) button.click();
+          else {
+            card.focus();
+            show(shown);
+          }
+        },
         explain: (reason, hadFocus = false) => {
           // Disabled buttons cannot take focus, so their card does instead.
           card.tabIndex = button.disabled ? 0 : -1;

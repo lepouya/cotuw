@@ -49,6 +49,7 @@
 .game-sidebar #control-groups .group-slots button {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.15rem;
   padding: 0.3rem 0.1rem;

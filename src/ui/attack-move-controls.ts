@@ -1,3 +1,4 @@
+import type { WorldTools } from "./world-tools";
 import { moveCommand } from "../simulation/command";
 import { setText } from "./dom";
 
@@ -19,72 +20,80 @@ export function createAttackMoveControls(
     selectedMobileIds: () => readonly string[];
     enabled: () => boolean;
     onStart: () => void;
+    tools: WorldTools;
     changed: () => void;
   },
 ) {
   const controller = new AbortController();
+  const active = () => options.tools.active === "attackMove";
   let choosingFor: string[] = [];
   const message = (text: string) => setText(controls.movementStatus, text);
-  const cancel = () => {
-    if (!choosingFor.length) return false;
+  const selectionMatches = (ids: readonly string[]) =>
+    ids.length === choosingFor.length &&
+    ids.every((id, index) => id === choosingFor[index]);
+  const end = () => {
+    options.tools.end("attackMove");
     choosingFor = [];
+  };
+  const cancel = () => {
+    if (!active()) return;
+    end();
     message("Attack Move cancelled.");
+    options.changed();
+  };
+  const start = () => {
+    if (!options.enabled()) return false;
+    const ids = options.selectedMobileIds();
+    if (!ids.length) return false;
+    if (!options.tools.activate("attackMove", cancel)) return false;
+    options.onStart();
+    choosingFor = [...ids];
+    message(
+      "Click or tap a destination to advance and engage. Cancel or Esc exits.",
+    );
     options.changed();
     return true;
   };
-  controls.attackMove?.addEventListener(
-    "click",
-    () => {
-      if (!options.enabled()) return;
-      const ids = options.selectedMobileIds();
-      if (!ids.length) return;
-      options.onStart();
-      choosingFor = [...ids];
-      message(
-        "Click or tap a destination to advance and engage. Cancel or Esc exits.",
-      );
-      options.changed();
-    },
-    { signal: controller.signal },
-  );
+  controls.attackMove?.addEventListener("click", start, {
+    signal: controller.signal,
+  });
   controls.cancelAttackMove?.addEventListener("click", cancel, {
     signal: controller.signal,
   });
   return {
-    get active() {
-      return choosingFor.length > 0;
-    },
-    cancel,
+    start,
     /** A queued target keeps the mode open for further waypoints. */
     choose: (target: WorldPosition, queued = false) => {
-      if (!choosingFor.length || !options.enabled()) return;
+      if (!active()) return false;
+      if (
+        !options.enabled() ||
+        !selectionMatches(options.selectedMobileIds())
+      ) {
+        cancel();
+        return false;
+      }
       simulation.submitCommand(
         moveCommand("attack-move", choosingFor, target, queued),
         { owner: player.owner },
       );
       if (queued) message("Attack Move queued. Choose another or Cancel.");
       else {
-        choosingFor = [];
+        end();
         message("Attack Move submitted.");
       }
       options.changed();
+      return true;
     },
     refresh: () => {
       const ids = options.selectedMobileIds();
-      const reselected =
-        ids.length !== choosingFor.length ||
-        ids.some((id, index) => id !== choosingFor[index]);
-      if (choosingFor.length && (!options.enabled() || reselected)) cancel();
+      if (active() && (!options.enabled() || !selectionMatches(ids))) cancel();
       if (controls.attackMove) {
         controls.attackMove.hidden = !ids.length;
         controls.attackMove.disabled = !options.enabled();
-        controls.attackMove.setAttribute(
-          "aria-pressed",
-          String(choosingFor.length > 0),
-        );
+        controls.attackMove.setAttribute("aria-pressed", String(active()));
       }
       if (controls.cancelAttackMove)
-        controls.cancelAttackMove.hidden = !choosingFor.length;
+        controls.cancelAttackMove.hidden = !active();
     },
     dispose: () => controller.abort(),
   };

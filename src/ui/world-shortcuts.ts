@@ -1,40 +1,31 @@
 import { isTextEntry, worldKeyboardAvailable } from "../render/input-focus";
 
-/** Returns whether it handled the key, which ends the key's routing. */
-export type WorldShortcutHandler = (keys: { shiftKey: boolean }) => boolean;
-
-/**
- * Handlers by physical key (`KeyboardEvent.code`), in precedence order.
- * `Control+` prefixes a code held with Control, on every platform.
- */
+/** Fixed actions by physical key, ordered by which action gets first use. */
 export type WorldShortcuts = Readonly<
-  Partial<Record<string, readonly WorldShortcutHandler[]>>
+  Partial<Record<string, readonly (() => boolean)[]>>
 >;
 
-/**
- * Routes unrepeated world key presses, with or without Shift or Control, to
- * the first handler that takes them. Alt and Meta chords stay with the host.
- * Dialogs and contextual UI handle their keys first, in the capture phase,
- * and form fields keep theirs. Returns a function that unbinds.
- */
+/** Applies the world input guard before fixed keys and gameplay bindings. */
 export function bindWorldShortcuts(
   document: Document,
   shortcuts: WorldShortcuts,
+  gameplay?: (event: KeyboardEvent) => boolean,
 ): () => void {
   const host = document.defaultView;
   const key = (event: KeyboardEvent) => {
     if (
       event.defaultPrevented ||
       event.repeat ||
+      event.isComposing ||
       event.metaKey ||
       event.altKey ||
       isTextEntry(event.target) ||
       !worldKeyboardAvailable(document)
     )
       return;
-    const code = event.ctrlKey ? `Control+${event.code}` : event.code;
-    const keys = { shiftKey: event.shiftKey };
-    if (shortcuts[code]?.some((handle) => handle(keys))) event.preventDefault();
+    const fixed =
+      !event.ctrlKey && shortcuts[event.code]?.some((handle) => handle());
+    if (fixed || gameplay?.(event)) event.preventDefault();
   };
   host?.addEventListener("keydown", key);
   return () => host?.removeEventListener("keydown", key);

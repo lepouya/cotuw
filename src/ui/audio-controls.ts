@@ -1,5 +1,6 @@
 import { AUDIO_CHANNELS, DEFAULT_AUDIO_SETTINGS } from "../audio/mixer";
 import { isRecord } from "../simulation/validation";
+import { devicePreferences } from "./device-preferences";
 import { mountFeature } from "./dom";
 import markup from "./audio-controls.html?raw";
 import "./audio-controls.css";
@@ -59,12 +60,7 @@ function bindControls(
   device: AudioControlDevice,
   { lifetime, signal, element }: FeatureScope,
 ) {
-  let settings = structuredClone(DEFAULT_AUDIO_SETTINGS);
-  try {
-    settings = readAudioSettings(localStorage.getItem(STORAGE_KEY));
-  } catch {
-    /* Storage may be disabled. */
-  }
+  const settings = readAudioSettings(devicePreferences.read(STORAGE_KEY));
   device.setSettings(settings);
   for (const channel of AUDIO_CHANNELS) {
     const volume = element<HTMLInputElement>(`audio-${channel}-volume`);
@@ -94,11 +90,7 @@ function bindControls(
     const save = () => {
       device.setSettings(settings);
       show();
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-      } catch {
-        /* Playback does not require storage. */
-      }
+      devicePreferences.write(STORAGE_KEY, settings);
     };
     volume.addEventListener(
       "input",

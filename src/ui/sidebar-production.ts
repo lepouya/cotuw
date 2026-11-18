@@ -1,3 +1,4 @@
+import { PRODUCTION_SHORTCUTS } from "./keyboard-preferences";
 import { footprintSize } from "../simulation/grid";
 import {
   costAmount,
@@ -70,6 +71,9 @@ export function createSidebarProduction(
     economy,
     playerFaction,
     playerOwner,
+    root,
+    keyboard,
+    signal,
   } = context;
   const buildOrder = ({ id }: ActorDefinition) =>
     presentations.get(id)?.build?.order ?? 0;
@@ -234,6 +238,18 @@ export function createSidebarProduction(
       : "";
   };
   let shownRoster = "";
+  let trainingRoster: readonly string[] | undefined;
+  let visibleTraining: typeof train = [];
+  const applyHints = (actions: typeof buildings) => {
+    actions.forEach((card, index) => {
+      const shortcut = PRODUCTION_SHORTCUTS[index];
+      card.setShortcut(shortcut ? keyboard.label(shortcut.id) : "");
+    });
+  };
+  keyboard.subscribe(() => {
+    applyHints(buildings);
+    applyHints(visibleTraining);
+  }, signal);
   return {
     panelBuildings,
     panelUnits,
@@ -244,6 +260,14 @@ export function createSidebarProduction(
     train,
     productionStatus,
     hideTooltip: cards.hide,
+    activateSlot(panel: "buildings" | "units", index: number) {
+      const action = (panel === "buildings" ? buildings : visibleTraining)[
+        index
+      ];
+      if (!action) return false;
+      action.activate();
+      return true;
+    },
     update: (state: SidebarState) => {
       const blocker = productionBlocker(
         {
@@ -265,12 +289,22 @@ export function createSidebarProduction(
         inspected && owns(inspected)
           ? trainableUnitIds(inspected, definitionById)
           : [];
-      for (const { definitionId, card } of train) {
-        const hadFocus = card.contains(document.activeElement);
-        card.hidden = !trainable.includes(definitionId);
-        if (!card.hidden) continue;
-        cards.hide(card);
-        if (hadFocus) focusUnits();
+      const nextTrainingRoster = trainable.length ? trainable : undefined;
+      if (trainingRoster !== nextTrainingRoster) {
+        trainingRoster = nextTrainingRoster;
+        visibleTraining = train.filter(({ definitionId, card }) => {
+          const visible = !!nextTrainingRoster?.includes(definitionId);
+          const hidden = !visible;
+          if (card.hidden === hidden) return visible;
+          const hadFocus = card.contains(root.ownerDocument.activeElement);
+          card.hidden = hidden;
+          if (!visible) {
+            cards.hide(card);
+            if (hadFocus) focusUnits();
+          }
+          return visible;
+        });
+        applyHints(visibleTraining);
       }
       const ids = state.selectedActorIds;
       const disabled = selectionLocked(state);

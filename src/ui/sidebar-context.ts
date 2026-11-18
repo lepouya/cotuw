@@ -1,3 +1,5 @@
+import { DEFAULT_KEYBOARD } from "./keyboard-preferences";
+import type { KeyboardBindings } from "./keyboard-preferences";
 import { missionEnded } from "../simulation/mission-result";
 import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { ObservedActor } from "../simulation/owner-view";
@@ -35,6 +37,7 @@ export type SidebarState = {
 
 export type SidebarOptions = {
   definitions: readonly ActorDefinition[];
+  keyboard?: KeyboardBindings;
   economy?: boolean;
   presentations: ReadonlyMap<string, ActorPresentation>;
   goals: readonly ScenarioGoal[];
@@ -60,6 +63,7 @@ export function createSidebarContext(
   const nameFor = (id: string) => options.presentations.get(id)?.name ?? id;
   return {
     ...options,
+    keyboard: options.keyboard ?? DEFAULT_KEYBOARD,
     root,
     signal,
     definitionById: new Map(

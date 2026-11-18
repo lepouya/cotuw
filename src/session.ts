@@ -107,6 +107,14 @@ import { createPopupTracker } from "./ui/popups";
 import { contextualMoveCommands } from "./ui/contextual-move";
 import { createRadialMenu } from "./ui/radial-menu";
 import { createLifetime } from "./lifetime";
+import { worldKeyboardAvailable } from "./render/input-focus";
+import {
+  DEFAULT_KEYBOARD,
+  GROUP_SHORTCUTS,
+  PRODUCTION_SHORTCUTS,
+} from "./ui/keyboard-preferences";
+import { createWorldTools } from "./ui/world-tools";
+import type { KeyboardBindings, ShortcutId } from "./ui/keyboard-preferences";
 import { bindWorldShortcuts } from "./ui/world-shortcuts";
 import { createAiOverlay } from "./ui/ai-overlay";
 import type { ScenarioPopup } from "./simulation/mission-file";
@@ -169,6 +177,9 @@ export type GameSessionControls = BuildingPlacementControls &
   AttackMoveControls & {
     mission: LoadedMission;
     audio?: AudioMixer;
+    keyboard?: KeyboardBindings;
+    showBuildings?: () => void;
+    activateProductionSlot?: (index: number) => boolean;
     startPaused?: boolean;
     onMenu?: () => void;
     onResult?: (result: MissionResult) => void;
@@ -440,8 +451,10 @@ async function assembleGameSession(
   /** Finished missions and faults permit inspection only. */
   const halted = () => simulationFaulted || missionEnded(simulation.result);
   const canCommand = () => playing && !halted();
+  const tools = createWorldTools();
   /** Placement and faults lock selection; finished missions stay inspectable. */
-  const selectionUnlocked = () => !placement.active && !simulationFaulted;
+  const selectionUnlocked = () =>
+    tools.active !== "placement" && !simulationFaulted;
   let controlsDirty = true;
   const markChanged = () => {
     controlsDirty = true;
@@ -637,11 +650,10 @@ async function assembleGameSession(
   const minimap = createMinimap(view.scene, map, view.camera, minimapCanvas, {
     fog: () => player.knowledge.fog,
     reducedMotion,
-    commandMode: () => attackMove.active,
+    commandMode: () => tools.active === "attackMove",
     onCommand: (target, shiftKey) => {
       if (!explored(map.tileAtWorldPosition(target.x, target.z))) return false;
-      attackMove.choose(target, shiftKey || input.queueMode);
-      return true;
+      return attackMove.choose(target, shiftKey || input.queueMode);
     },
     // Structures first, so unit markers draw over them.
     actors: () => [
@@ -737,6 +749,14 @@ async function assembleGameSession(
     controlsDirty = false;
     raisePopup();
   };
+  const refreshStaleControls = () => {
+    if (
+      controlsDirty ||
+      simulation.completedTicks !== knownControlsTick ||
+      placement.active !== knownPlacementActive
+    )
+      refreshControls();
+  };
   const popups = createPopupTracker(
     mission.scenario.popups ?? [],
     mission.uiState,
@@ -794,6 +814,7 @@ async function assembleGameSession(
   );
   const placement = createBuildingPlacement(canvas, map, simulation, player, {
     preview: placementPreview,
+    tools,
     buildings: buildings.map((definition) => ({
       definition,
       name: names.get(definition.id)!,
@@ -811,7 +832,6 @@ async function assembleGameSession(
     },
     onStart: (definition) => {
       groups.close();
-      cancelGroundTargets();
       input.setBoxMode(false);
       input.setAdditiveMode(false);
       input.setQueueMode(false);
@@ -859,11 +879,11 @@ async function assembleGameSession(
   });
   own(training);
   const attackMove = createAttackMoveControls(simulation, player, controls, {
+    tools,
     selectedMobileIds: ownUnitIds,
     enabled: () => canCommand() && selectionUnlocked(),
     changed: markChanged,
     onStart: () => {
-      rally.cancel();
       input.setBoxMode(false);
       input.setAdditiveMode(false);
       input.cancelGesture();
@@ -871,23 +891,24 @@ async function assembleGameSession(
   });
   own(attackMove);
   const rally = createRallyControls(simulation, player, controls, {
+    tools,
     changed: markChanged,
     selectedActor: () => player.ownActor(input.selectedActorId),
     isProducer: (id) => !!definitionsById.get(id)?.production,
     enabled: () => canCommand() && !placement.active,
     onStart: () => {
-      attackMove.cancel();
       input.setBoxMode(false);
       input.setAdditiveMode(false);
     },
   });
   own(rally);
-  /** Modes that claim the next ground click; at most one is active. */
-  const groundTargets = [attackMove, rally];
-  const groundTarget = () => groundTargets.find(({ active }) => active);
-  /** Returns whether any mode was active. */
+  const targeting = { attackMove, rally };
+  const groundTarget = () => {
+    const tool = tools.active;
+    return tool && tool !== "placement" ? targeting[tool] : undefined;
+  };
   const cancelGroundTargets = () =>
-    groundTargets.map((mode) => mode.cancel()).some(Boolean);
+    tools.active !== "placement" && tools.cancel();
   const network = createNetworkControls(player, controls, {
     selectedActorId: selectedOwnActorId,
     tileSize: map.tileSize,
@@ -1018,8 +1039,7 @@ async function assembleGameSession(
     radial.close();
     input.cancelGesture();
     groups.close();
-    cancelGroundTargets();
-    placement.cancel();
+    tools.cancel();
     controlsDirty = true;
   };
   /** Ends active interactions once the session halts. */
@@ -1188,12 +1208,7 @@ async function assembleGameSession(
     if (fog) canvas.dataset.exploredTiles = String(fog.exploredCount);
     const known = player.economy();
     if (known) materialsView?.update(known);
-    if (
-      controlsDirty ||
-      simulation.completedTicks !== knownControlsTick ||
-      placement.active !== knownPlacementActive
-    )
-      refreshControls();
+    refreshStaleControls();
     const frameTime = performance.now();
     const frameSeconds = (frameTime - previousFrameTime) / 1000;
     previousFrameTime = frameTime;
@@ -1359,42 +1374,67 @@ async function assembleGameSession(
     action();
     return true;
   };
+  const shortcuts: Partial<Record<ShortcutId, () => boolean>> = {
+    attackMove: attackMove.start,
+    stop: () => input.stop() > 0,
+    buildings: () => {
+      controls.showBuildings?.();
+      return !!controls.showBuildings;
+    },
+    rotate: whilePlacing(placement.rotate),
+    idleNext: idleWorkers.next,
+    idleAll: idleWorkers.selectAll,
+  };
+  for (const { id, slot, operation } of GROUP_SHORTCUTS)
+    shortcuts[id] = () =>
+      operation === "recall"
+        ? groups.recall(slot)
+        : groups.store(slot, operation);
+  for (const [index, { id }] of PRODUCTION_SHORTCUTS.entries())
+    shortcuts[id] = () => {
+      // Cards must reflect this tick; the refresh may also raise a popup.
+      refreshStaleControls();
+      if (!worldKeyboardAvailable(canvas.ownerDocument)) return false;
+      return controls.activateProductionSlot?.(index) ?? false;
+    };
+  const keyboard = controls.keyboard ?? DEFAULT_KEYBOARD;
+  const gameplayShortcut = (event: KeyboardEvent) => {
+    const action = keyboard.actionFor(event, tools.active === "placement");
+    return action !== undefined && !!shortcuts[action]?.();
+  };
   lifetime.defer(
-    bindWorldShortcuts(canvas.ownerDocument, {
-      // Pan mode, then tools, focus, and selection precede the menu.
-      Escape: [
-        view.camera.cancelPan,
-        whilePlacing(placement.cancel),
-        groups.escape,
-        () => {
-          if (simulationFaulted) return false;
-          if (!cancelGroundTargets() && !view.camera.cancelFocus())
-            return false;
-          input.cancelGesture();
-          return true;
-        },
-        input.deselect,
-        () => {
-          controls.onMenu?.();
-          return !!controls.onMenu;
-        },
-      ],
-      KeyR: [whilePlacing(placement.rotate)],
-      KeyS: [() => input.stop() > 0],
-      Period: [
-        ({ shiftKey }) =>
-          shiftKey ? idleWorkers.selectAll() : idleWorkers.next(),
-      ],
-      ...groups.shortcuts,
-      ...(aiOverlay && {
-        Backquote: [
+    bindWorldShortcuts(
+      canvas.ownerDocument,
+      {
+        // Pan mode, then tools, focus, and selection precede the menu.
+        Escape: [
+          view.camera.cancelPan,
+          whilePlacing(tools.cancel),
+          groups.escape,
           () => {
-            aiOverlay.toggle();
+            if (simulationFaulted) return false;
+            if (!cancelGroundTargets() && !view.camera.cancelFocus())
+              return false;
+            input.cancelGesture();
             return true;
           },
+          input.deselect,
+          () => {
+            controls.onMenu?.();
+            return !!controls.onMenu;
+          },
         ],
-      }),
-    }),
+        ...(aiOverlay && {
+          Backquote: [
+            () => {
+              aiOverlay.toggle();
+              return true;
+            },
+          ],
+        }),
+      },
+      gameplayShortcut,
+    ),
   );
   try {
     if (import.meta.env.COTUW_BENCHMARK) {

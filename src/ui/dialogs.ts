@@ -1,3 +1,6 @@
+import { createKeyboardOptions } from "./keyboard-options";
+import { createKeyboardPreferences } from "./keyboard-preferences";
+import type { KeyboardPreferences } from "./keyboard-preferences";
 import { errorMessage } from "../errors";
 import { createAudioControls } from "./audio-controls";
 import { mountFeature } from "./dom";
@@ -32,6 +35,7 @@ type DialogMission = {
 type DialogOptions = SaveOperations & {
   version: string;
   audio: AudioControlDevice;
+  keyboard?: KeyboardPreferences;
   /** Returns the same handle throughout a mission for pause restoration. */
   mission: () => DialogMission | undefined;
   focusWorld: () => void;
@@ -91,10 +95,17 @@ function bindDialogs(
   const status = element("game-menu-status");
   const actions = element("game-menu-actions");
   const audioRoot = element("menu-audio");
+  const keyboardRoot = element("menu-keyboard");
   const resume = element("resume-mission");
   const version = element("game-version");
   version.textContent = `Prototype demo · v${options.version}`;
   lifetime.own(createAudioControls(audioRoot, options.audio));
+  const keyboard = lifetime.own(
+    createKeyboardOptions(
+      keyboardRoot,
+      options.keyboard ?? createKeyboardPreferences(),
+    ),
+  );
   const back = () => {
     if (!busy) showPanel("actions");
   };
@@ -155,6 +166,7 @@ function bindDialogs(
     revision++;
     panelPending = false;
     savePanel.clear();
+    keyboard.cancel();
     options.cancelLoad();
   };
   function report(message: string) {
@@ -193,8 +205,9 @@ function bindDialogs(
     for (const control of dialog.querySelectorAll<
       HTMLInputElement | HTMLButtonElement
     >("button, input")) {
-      // Audio settings stay available, including during busy work.
-      if (audioRoot.contains(control)) continue;
+      // Settings remain available during busy work.
+      if (audioRoot.contains(control) || keyboardRoot.contains(control))
+        continue;
       control.disabled =
         busy ||
         !view ||

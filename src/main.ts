@@ -7,6 +7,7 @@ import { errorMessage } from "./errors";
 import { isTextEntry, worldKeyboardAvailable } from "./render/input-focus";
 import { createCameraControls } from "./ui/camera-controls";
 import { createDialogs } from "./ui/dialogs";
+import { deviceKeyboardPreferences } from "./ui/keyboard-preferences";
 import { createNotifications } from "./ui/notifications";
 import { createTopBar } from "./ui/top-bar";
 
@@ -16,10 +17,12 @@ const canvas = byId<HTMLCanvasElement>("game-canvas");
 
 const notifications = createNotifications(byId("mission-alerts"));
 const audio = createAudioMixer();
+const keyboard = deviceKeyboardPreferences(window);
 // Dialog and top bar actions run only after the application below exists.
 const dialogs = createDialogs(byId("game-dialogs"), {
   version,
   audio,
+  keyboard,
   mission: () => app.session(),
   focusWorld: () => canvas.focus({ preventScroll: true }),
   notify: notifications.message,
@@ -48,6 +51,7 @@ const app = createApplication({
   canvas,
   minimap: byId<HTMLCanvasElement>("minimap"),
   audio,
+  keyboard,
   sidebarRoot: byId("game-sidebar"),
   cameraControls: createCameraControls(byId("camera-controls")),
   dialogs,
@@ -70,6 +74,7 @@ window.addEventListener("keydown", (event) => {
   const action = APPLICATION_KEYS.get(event.code);
   if (
     !action ||
+    event.defaultPrevented ||
     event.ctrlKey ||
     event.metaKey ||
     event.altKey ||
@@ -77,7 +82,12 @@ window.addEventListener("keydown", (event) => {
   )
     return;
   event.preventDefault();
-  if (!event.repeat && app.ready() && worldKeyboardAvailable(document))
+  if (
+    !event.repeat &&
+    !isTextEntry(event.target) &&
+    app.ready() &&
+    worldKeyboardAvailable(document)
+  )
     void Promise.resolve(action()).catch((error) =>
       dialogs.report(errorMessage(error)),
     );

@@ -6,9 +6,10 @@ cover module interfaces, private DOM, asynchronous work, and cleanup.
 
 ## Composition
 
-- `src/main.ts` composes audio, application operations, shell roots, UI, and
-  shortcuts. Session creation stays dynamically imported so title controls work
-  before the renderer loads. UI modules do not import the session.
+- `src/main.ts` composes audio, keyboard preferences, application operations,
+  shell roots, UI, and shortcuts. Session creation stays dynamically imported
+  so title controls work before the renderer loads. UI modules do not import
+  the session.
 - `src/application.ts` owns platform creation, the active mission, level
   registry, restart source, replacement, persistence operations, load validity,
   and menu view data. It uses callbacks instead of querying UI elements.
@@ -75,10 +76,10 @@ cover module interfaces, private DOM, asynchronous work, and cleanup.
 - `ui/mission-setup.ts` owns faction/difficulty choice and emits `start`.
   Panels supply content, opening focus, and optional replacement text.
   `ui/mission-result.ts` supplies shared result text and actions.
-- `ui/audio-controls.ts` owns settings markup, binding, and CSS. Dialogs mount
-  and dispose it; bootstrap owns the mixer. Keep one application-lifetime
-  subtree
-  across menus and mission resets to retain focus, values, and subscriptions.
+- `ui/audio-controls.ts` and `ui/keyboard-options.ts` own settings markup,
+  binding, and CSS. Dialogs keep both mounted across menus and mission resets.
+  Bootstrap owns the mixer and keyboard preferences. Both settings features
+  use `ui/device-preferences.ts` for device storage.
 
 ## Sidebar and mission controls
 
@@ -107,16 +108,20 @@ cover module interfaces, private DOM, asynchronous work, and cleanup.
   excludes other owners' command outcomes.
   Repair priority labels rank the player's jobs per common resource; allied
   owners' private work stays hidden even when resource balances are pooled.
-- `ui/world-shortcuts.ts` routes physical `KeyboardEvent.code` through one
-  ordered handler list per key, with `Control+` naming Control chords and
-  Shift passed to handlers. Escape precedence is Pan, placement, a pending
-  group action or the Groups panel, targeting and camera focus, selection,
-  then menu. Dialogs and contextual overlays take their keys in capture;
-  world shortcuts respect the input guard. Audio unlock and modal-local keys
-  remain available inside dialogs. Held camera navigation belongs to
-  `render/camera.ts`.
-- `ui/building-placement.ts` owns the tool; `render/placement-preview.ts` draws
-  it. World modules expose actions instead of installing competing shortcuts.
+- `ui/world-shortcuts.ts` applies the world input guard and routes fixed keys
+  before configurable gameplay shortcuts. `ui/keyboard-preferences.ts` owns
+  physical bindings, conflicts, and labels. Escape precedence is Pan,
+  placement, a pending group action or the Groups panel, targeting and camera
+  focus, selection, then menu. Dialogs and contextual overlays take their keys
+  in capture; world shortcuts respect the input guard. Audio unlock and
+  modal-local keys remain available inside dialogs. Held camera navigation
+  belongs to `render/camera.ts`.
+- `ui/world-tools.ts` owns the active placement, Attack Move, or rally tool.
+  Each tool owns its pending target data and controls. A pending placement
+  can refuse cancellation until the simulation resolves it.
+  `render/placement-preview.ts` draws placement. The sidebar owns construction
+  card availability and maps shortcuts to the same cards used by pointer
+  input.
 - `ui/top-bar.ts` owns top-bar markup/state. `ui/notifications.ts` owns alerts
   and supplies the toggle hosted there. `ui/mission-alerts.ts` derives grouped
   alerts through the owner view.

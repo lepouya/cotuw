@@ -4,13 +4,20 @@ import { bindWorldShortcuts } from "../src/ui/world-shortcuts";
 
 import type { WorldShortcuts } from "../src/ui/world-shortcuts";
 
-function fixture(shortcuts: WorldShortcuts) {
+function fixture(
+  shortcuts: WorldShortcuts,
+  gameplay?: (event: KeyboardEvent) => boolean,
+) {
   const host = new EventTarget();
   const document = { defaultView: host, hidden: false, modal: false };
   Object.assign(document, {
     querySelector: () => (document.modal ? {} : null),
   });
-  const unbind = bindWorldShortcuts(document as unknown as Document, shortcuts);
+  const unbind = bindWorldShortcuts(
+    document as unknown as Document,
+    shortcuts,
+    gameplay,
+  );
   const press = (
     code: string,
     {
@@ -52,34 +59,19 @@ test("routes physical keys to the first handler that takes them", () => {
   expect(calls).toEqual(["stop"]);
 });
 
-test("routes Control chords separately and passes Shift to handlers", () => {
-  const calls: string[] = [];
-  const { press } = fixture({
-    Digit1: [
-      ({ shiftKey }) => {
-        calls.push(shiftKey ? "add" : "recall");
-        return true;
-      },
-    ],
-    "Control+Digit1": [
-      ({ shiftKey }) => {
-        calls.push(shiftKey ? "assign" : "ignored");
-        return shiftKey;
-      },
-    ],
-  });
-  press("Digit1");
-  // Shifted number-row keys type other characters but keep their codes.
-  press("Digit1", { shiftKey: true, key: "!" });
-  expect(press("Digit1", { ctrlKey: true }).defaultPrevented).toBe(false);
-  expect(
-    press("Digit1", { ctrlKey: true, shiftKey: true }).defaultPrevented,
-  ).toBe(true);
-  expect(calls).toEqual(["recall", "add", "ignored", "assign"]);
+test("fixed keys run first and gameplay receives the full chord", () => {
+  const gameplay = vi.fn(() => true);
+  const { press } = fixture({ Escape: [() => true] }, gameplay);
+  press("Escape");
+  expect(gameplay).not.toHaveBeenCalled();
+  const event = press("Digit1", { key: "!", shiftKey: true, ctrlKey: true });
+  expect(gameplay).toHaveBeenCalledWith(event);
+  expect(event.defaultPrevented).toBe(true);
 });
 
 test.each([
   ["repeated", { repeat: true }],
+  ["composing", { isComposing: true }],
   ["Control-held", { ctrlKey: true }],
   ["Meta-held", { metaKey: true }],
   ["Alt-held", { altKey: true }],

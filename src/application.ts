@@ -1,3 +1,4 @@
+import type { KeyboardBindings } from "./ui/keyboard-preferences";
 import { factionName } from "./content/content-pack";
 import { LEVEL_SOURCES } from "./content/levels";
 import { errorMessage } from "./errors";
@@ -73,6 +74,7 @@ export type ApplicationOptions = {
   canvas: HTMLCanvasElement;
   minimap: HTMLCanvasElement;
   audio: AudioMixer;
+  keyboard?: KeyboardBindings;
   /** Each mission mounts its sidebar into this root. */
   sidebarRoot: HTMLElement;
   cameraControls: Pick<CameraControls, "bind">;
@@ -98,6 +100,7 @@ export function createApplication({
   canvas,
   minimap,
   audio,
+  keyboard,
   sidebarRoot,
   cameraControls,
   dialogs,
@@ -295,6 +298,7 @@ export function createApplication({
       // Registered before session creation, so a failed start releases it.
       const activeSidebar = createSidebar(sidebarRoot, {
         definitions: next.definitions,
+        keyboard,
         economy: !!next.state.economy,
         presentations: new Map(Object.entries(next.content.presentation)),
         goals: next.scenario.goals ?? [],
@@ -310,6 +314,7 @@ export function createApplication({
         ...activeSidebar.controls,
         mission: next,
         audio,
+        keyboard,
         startPaused: loaded,
         aiOverlay,
         onMenu: () => {

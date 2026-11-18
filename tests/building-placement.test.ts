@@ -258,8 +258,18 @@ test("faults clear the preview and prevent further placement", () => {
       "tile-placed-actor-building-preview-root",
     ),
   ).toBeNull();
-  expect(current.controls.build.disabled).toBe(true);
   expect(current.controls.confirm.disabled).toBe(true);
+  current.controls.build.click();
+  expect(current.placement.active).toBe(false);
+});
+
+test("ending placement leaves construction card availability with the sidebar", () => {
+  current = fixture();
+  current.begin();
+  current.controls.build.disabled = true;
+  current.controls.cancel.click();
+  expect(current.placement.active).toBe(false);
+  expect(current.controls.build.disabled).toBe(true);
   current.controls.build.click();
   expect(current.placement.active).toBe(false);
 });

@@ -796,15 +796,21 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
 ### M1 keyboard preferences
 
 - M1 includes basic keyboard rebinding in Options for gameplay actions and
-  production-card slots. Support European and other keyboard layouts without
-  requiring players to switch their system layout.
+  production-card slots. The actions are Attack Move, Stop, opening Buildings,
+  placement rotation, the five production slots, both idle-worker actions, and
+  each group recall, add, and assign action. Camera navigation, menu,
+  quicksave, quickload, Escape, and diagnostics keep fixed keys.
 - Gameplay defaults follow physical key positions. Letter and punctuation
   names in these defaults refer to the US QWERTY layout; labels show the
   corresponding keys on the player's layout. Production slots retain their
   five adjacent positions, and groups use the ten number-row positions even
-  where those keys produce other characters. Players can rebind each action.
-- Buttons and cards show current bindings. Flag conflicts between actions
-  that can respond in the same context, and provide Reset to defaults.
+  where those keys produce other characters. Options supports automatic layout
+  labels and manual US QWERTY, French AZERTY, and German QWERTZ labels. When
+  automatic labels are unavailable, hints use recorded characters where
+  available and US key-position labels otherwise.
+- Buttons and cards show current bindings. Reject conflicts between actions
+  active in the same context and show the existing action. Keep host-reserved
+  chords available to the host and offer Reset to defaults.
 - Bindings are player preferences shared across missions, independent of
   mission saves.
 

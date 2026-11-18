@@ -90,6 +90,7 @@ forEachProfile(PROFILES, (profile) => {
         document.querySelector("#panel-selection")!.append(list);
       });
       const orders = page.locator(".unit-controls");
+      await expect(orders.locator("#attack-move")).toBeVisible();
       const before = await orders.boundingBox();
       for (const button of await orders.locator("button:visible").all())
         await expect(button).toBeInViewport({ ratio: 1 });

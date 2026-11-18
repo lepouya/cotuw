@@ -1,0 +1,19 @@
+.shortcut-hint {
+  display: inline-block;
+  margin-inline-start: 0.2em;
+  padding-inline: 0.2em;
+  border: 1px solid currentColor;
+  border-radius: 0.2em;
+  font: inherit;
+  font-size: 0.8em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.shortcut-hint::before {
+  content: attr(data-key);
+}
+
+.shortcut-hint[hidden] {
+  display: none;
+}

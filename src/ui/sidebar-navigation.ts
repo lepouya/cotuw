@@ -1,3 +1,4 @@
+import { bindShortcutHint } from "./shortcut-hint";
 import { createButton, createElement as el } from "./dom";
 import type { SidebarContext } from "./sidebar-context";
 
@@ -17,7 +18,7 @@ type SidebarPanels = {
 
 /** Owns the header, production tabs, and which panel is showing. */
 export function createSidebarNavigation(
-  { root, signal, factionName, briefing }: SidebarContext,
+  { root, signal, factionName, briefing, keyboard }: SidebarContext,
   panels: SidebarPanels,
   onShow: () => void,
 ) {
@@ -33,6 +34,7 @@ export function createSidebarNavigation(
     productionTab("Buildings", panels.buildings),
     productionTab("Units", panels.units),
   ];
+  bindShortcutHint(tabs[0]!.button, keyboard, "buildings", signal);
   const goalsButton = createButton("Goals", {
     id: "tab-goals",
     "aria-controls": panels.goals.id,
@@ -114,6 +116,11 @@ export function createSidebarNavigation(
     ),
     pane: el("div", { class: "production-pane" }, tabList, content),
     show,
+    showBuildings: () => show(panels.buildings),
+    activeProductionPanel: () => {
+      if (!panels.buildings.hidden) return "buildings";
+      if (!panels.units.hidden) return "units";
+    },
     focusUnits: () => tabs[1]!.button.focus(),
   };
 }

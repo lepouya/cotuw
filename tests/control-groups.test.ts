@@ -77,15 +77,11 @@ function fixture(saved?: Partial<Record<ControlGroupSlot, string[]>>) {
     now: () => state.time,
   });
   controls.refresh();
-  const press = (slot: ControlGroupSlot, shiftKey = false, control = false) =>
-    controls.shortcuts[`${control ? "Control+" : ""}Digit${slot}`]!.some(
-      (handle) => handle({ shiftKey }),
-    );
   const group = (slot: ControlGroupSlot) =>
     slots.find((entry) => entry.slot === slot)!;
   const action = (id: (typeof actions)[number]["id"]) =>
     actions.find((entry) => entry.id === id)!.button;
-  return { controls, elements, state, select, focus, press, group, action };
+  return { controls, elements, state, select, focus, group, action };
 }
 
 test("loading keeps only members the player still commands", () => {
@@ -93,36 +89,36 @@ test("loading keeps only members the player still commands", () => {
   expect(controls.uiState()).toEqual({ controlGroups: { "3": ["u1"] } });
 });
 
-test("keyboard assignment, addition, and recall; repeated recall focuses", () => {
-  const { controls, state, select, focus, press } = fixture();
-  expect(press("1")).toBe(false);
-  expect(press("1", true, true)).toBe(false);
+test("assignment, addition, and recall; repeated recall focuses", () => {
+  const { controls, state, select, focus } = fixture();
+  expect(controls.recall("1")).toBe(false);
+  expect(controls.store("1", "assign")).toBe(false);
   state.selected = ["u2", "u1"];
-  expect(press("1", true, true)).toBe(true);
+  expect(controls.store("1", "assign")).toBe(true);
   state.selected = ["u3"];
-  expect(press("1", true)).toBe(true);
+  expect(controls.store("1", "add")).toBe(true);
   state.selected = [];
   state.time = 1000;
-  expect(press("1")).toBe(true);
+  expect(controls.recall("1")).toBe(true);
   expect(select).toHaveBeenLastCalledWith(["u1", "u2", "u3"]);
   expect(focus).not.toHaveBeenCalled();
   state.time = 1400;
-  press("1");
+  controls.recall("1");
   expect(focus).toHaveBeenCalledWith(["u1", "u2", "u3"]);
   // A slow repeat recalls without focusing.
   state.time = 3000;
-  press("1");
+  controls.recall("1");
   expect(focus).toHaveBeenCalledTimes(1);
   // Destroyed members drop out; nothing joins the group automatically.
   state.commanded.delete("u2");
   state.commanded.add("u4");
   expect(controls.uiState()).toEqual({ controlGroups: { "1": ["u1", "u3"] } });
-  expect(press("4")).toBe(false);
-  press("1");
+  expect(controls.recall("4")).toBe(false);
+  controls.recall("1");
   expect(select).toHaveBeenLastCalledWith(["u1", "u3"]);
   expect(focus).toHaveBeenCalledTimes(1);
   state.enabled = false;
-  expect(press("1")).toBe(false);
+  expect(controls.recall("1")).toBe(false);
 });
 
 test("panel modes apply to the next chosen group", () => {
@@ -183,19 +179,19 @@ test("panel modes apply to the next chosen group", () => {
   expect(controls.escape()).toBe(false);
 });
 
-test("number keys apply a pending panel action to their group", () => {
-  const { controls, elements, state, select, press, action } = fixture({
+test("direct group recall applies a pending panel action", () => {
+  const { controls, elements, state, select, action } = fixture({
     "5": ["u3"],
   });
   elements.toggle.click();
   state.selected = ["u1"];
   controls.refresh();
   action("assign").click();
-  expect(press("4")).toBe(true);
+  expect(controls.recall("4")).toBe(true);
   expect(select).not.toHaveBeenCalled();
   expect(action("assign").getAttribute("aria-pressed")).toBe("false");
   action("clear").click();
-  expect(press("6")).toBe(false);
-  expect(press("5")).toBe(true);
+  expect(controls.recall("6")).toBe(false);
+  expect(controls.recall("5")).toBe(true);
   expect(controls.uiState()).toEqual({ controlGroups: { "4": ["u1"] } });
 });

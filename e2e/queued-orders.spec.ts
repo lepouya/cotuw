@@ -90,23 +90,46 @@ async function minimapTarget(page: Page) {
   });
 }
 
-test("Shift queues Attack Move on the minimap and retains target mode", async ({
-  page,
-}) => {
-  await opening(page);
-  const target = await minimapTarget(page);
-  await page.locator("#attack-move").click();
-  await page.keyboard.down("Shift");
-  await page.mouse.click(target.x, target.y);
-  await page.keyboard.up("Shift");
-  // An idle unit starts immediately; the targeting mode still stays queued.
-  await expect(page.locator("#movement-status")).toContainText(
-    /Attack Move order (accepted|queued)/,
-  );
-  await expect(page.locator("#cancel-attack-move")).toBeVisible();
-  await page.mouse.click(target.x, target.y);
-  await expect(page.locator("#cancel-attack-move")).toBeHidden();
-});
+test(
+  "A starts Attack Move and Shift queues minimap destinations",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await opening(page);
+    const target = await minimapTarget(page);
+    await page.keyboard.press("KeyA");
+    await page.keyboard.down("Shift");
+    await page.mouse.click(target.x, target.y);
+    await page.keyboard.up("Shift");
+    // An idle unit starts immediately; the targeting mode still stays queued.
+    await expect(page.locator("#movement-status")).toContainText(
+      /Attack Move order (accepted|queued)/,
+    );
+    await expect(page.locator("#cancel-attack-move")).toBeVisible();
+    await page.mouse.click(target.x, target.y);
+    await expect(page.locator("#cancel-attack-move")).toBeHidden();
+  },
+);
+
+test(
+  "Stop clears queued Attack Move orders and keeps selection",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await opening(page);
+    const points = await routePoints(page, ROUTE);
+    await page.keyboard.press("KeyA");
+    await page.keyboard.down("Shift");
+    for (const point of points) await page.mouse.click(point.x, point.y);
+    await page.keyboard.up("Shift");
+    await expect.poll(() => preview(page)).toBe(true);
+    await page.keyboard.press("KeyS");
+    await expect.poll(() => preview(page)).toBe(false);
+    await expect(page.locator("#cancel-attack-move")).toBeHidden();
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-selected-actors",
+      '["trained-unit-1"]',
+    );
+  },
+);
 
 test("Shift-click queues moves behind the current one with a route preview", async ({
   page,
