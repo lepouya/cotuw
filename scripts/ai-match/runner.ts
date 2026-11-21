@@ -126,7 +126,7 @@ export const ARC_RECOVERY_CASES: readonly MatchCase[] = [
 
 /** Saved during the first attack, with operations under way. */
 export const ARC_CONTINUATION_CASES: readonly MatchCase[] = [
-  { ...NORMAL_WEST, id: "arc-continuation", resumeAtMinutes: 12.5 },
+  { ...NORMAL_WEST, id: "arc-continuation", resumeAtMinutes: 10 },
 ];
 
 /** Named case sets the command line runs; every set by default. */

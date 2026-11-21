@@ -17,8 +17,8 @@ import {
   secondsToTicks,
   SIMULATION_TICK_SECONDS,
 } from "../src/simulation/clock";
-import { distance } from "../src/simulation/world";
 import { startSimulationLoop } from "../src/simulation/loop";
+import { distance } from "../src/simulation/world";
 
 import type { CommandOutcome } from "../src/simulation/command";
 import type {
@@ -180,7 +180,8 @@ test.each([
   },
 );
 
-test("defense meets raiders near the base, then stands down", () => {
+/** Two east Troopers placed beside west's Refinery, holding still. */
+function raidedRefinery() {
   const state = structuredClone(graced);
   const refinery = state.actors.find(
     ({ owner, definitionId }) =>
@@ -192,6 +193,7 @@ test("defense meets raiders near the base, then stands down", () => {
         owner === "east" && definitionId === "arc-trooper",
     )
     .slice(0, 2);
+  expect(raiders).toHaveLength(2);
   const home = state.actors.find(({ id }) => id === "west-headquarters")!;
   const offset = 6;
   const toward = {
@@ -211,7 +213,11 @@ test("defense meets raiders near the base, then stands down", () => {
   });
   // Raiders hold still, so only defense decides the outcome.
   const concerns = new Map(BUILT_IN_AI_CONCERNS).set("offense", () => {});
-  const sim = resumeMirror(dueRound(state), concerns);
+  return { sim: resumeMirror(dueRound(state), concerns), raiders };
+}
+
+test("defense meets raiders near the base, then stands down", () => {
+  const { sim, raiders } = raidedRefinery();
   try {
     const results: CommandOutcome[] = runTicks(sim, ROUND_TICKS);
     const [defense] = operations(sim);
@@ -238,6 +244,62 @@ test("defense meets raiders near the base, then stands down", () => {
     expect(
       results.filter(({ issuer, accepted }) => issuer.ai && !accepted),
     ).toEqual([]);
+  } finally {
+    sim.dispose();
+  }
+}, 30_000);
+
+test("defenders stop at the base's edge when raiders retreat", () => {
+  const { sim, raiders } = raidedRefinery();
+  try {
+    runTicks(sim, ROUND_TICKS);
+    const operation = operations(sim)[0]?.operation;
+    expect(operation?.phase).toBe("advance");
+    const defenders = operation!.units;
+    const engaged = () =>
+      defenders.some((id) => sim.actorById(id)?.combat?.attack);
+    for (let tick = 0; tick < seconds(20) && !engaged(); tick++) sim.tick();
+    expect(engaged()).toBe(true);
+    const home = sim.actorById("east-headquarters")!.worldPosition;
+    sim.submitCommand(
+      {
+        kind: "group-move",
+        actorIds: raiders.map(({ id }) => id),
+        target: { ...home },
+      },
+      { owner: "east" },
+    );
+    expect(sim.tick()).toEqual(
+      expect.arrayContaining(
+        raiders.map(({ id }) =>
+          expect.objectContaining({
+            accepted: true,
+            command: expect.objectContaining({ kind: "move", actorId: id }),
+          }),
+        ),
+      ),
+    );
+    const calm = () => sim.ai.west!.memory.defense?.calmTick !== undefined;
+    let outcomes: CommandOutcome[] = [];
+    for (let tick = 0; tick < seconds(20) && !calm(); tick++)
+      outcomes = sim.tick();
+    expect(calm()).toBe(true);
+    expect(raiders.some(({ id }) => sim.actorById(id))).toBe(true);
+    expect(sim.ai.west!.posture).toBe("defending");
+    expect(operations(sim)[0]?.operation).toMatchObject({
+      phase: "return",
+      outcome: "completed",
+    });
+    const returning = outcomes.flatMap(({ accepted, command, issuer }) =>
+      accepted && issuer.owner === "west" && command.kind === "move"
+        ? [command.actorId]
+        : [],
+    );
+    expect(returning).toEqual(expect.arrayContaining(defenders));
+    for (const id of defenders)
+      expect(sim.actorById(id)?.attackMove).toBeUndefined();
+    runTicks(sim, seconds(20));
+    expect(operations(sim)).toEqual([]);
   } finally {
     sim.dispose();
   }

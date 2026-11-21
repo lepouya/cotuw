@@ -476,12 +476,8 @@ export function stepOperation(
   );
   const gathered = () =>
     positions.every((position) => distance(position, rally) <= gatherRange);
-  // Keep a newly ended operation for one turn and replace its prior order.
-  if (
-    operation.phase === "return" &&
-    (operation.issued || operation.progressTick !== tick) &&
-    gathered()
-  )
+  // Even a group already at its rally must replace its prior order.
+  if (operation.phase === "return" && operation.issued && gathered())
     return disband();
   if (operation.phase === "assemble" && gathered())
     beginAdvance(context, operation, units);

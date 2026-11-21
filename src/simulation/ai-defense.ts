@@ -28,8 +28,9 @@ type DefenseMemory = OperationsMemory & {
 
 /**
  * Meets detected armed hostiles near own buildings and workers with enough
- * nearby army units, in every posture that lists it. It requests the
- * defending posture while threatened and holds it until threats stay away.
+ * nearby army units, in every posture that lists it. Defenders return once
+ * no threat remains near the base. It requests the defending posture while
+ * threatened and holds it until threats stay away.
  */
 export const defense: AiConcern = (context) => {
   const { terrain, tick } = context;
@@ -42,13 +43,9 @@ export const defense: AiConcern = (context) => {
     delete memory.calmTick;
     context.requestPosture("defending");
     const home = headquarters(context)?.worldPosition;
-    const [nearest] = [...threats].sort(
-      (a, b) =>
-        (home
-          ? distance(a.worldPosition, home) - distance(b.worldPosition, home)
-          : 0) || compareIds(a.id, b.id),
-    );
-    const target = nearest!.worldPosition;
+    threats.sort(home ? nearestTo(home) : (a, b) => compareIds(a.id, b.id));
+    const nearest = threats[0]!;
+    const target = nearest.worldPosition;
     const rally = stagingPoint(context) ?? target;
     if (!operation)
       operation = launchOperation(context, {
@@ -67,20 +64,15 @@ export const defense: AiConcern = (context) => {
       redirectOperation(context, operation, target);
     commitDefenders(context, operation, strengthOf(context, threats));
   } else {
+    if (operation && operation.phase !== "return")
+      endOperation(context, operation, "completed");
     memory.calmTick ??= tick;
-    const calm =
-      tick - memory.calmTick >=
-      secondsToTicks(tuning.calmSeconds, context.tickSeconds);
-    if (!calm) {
-      // Holding the posture keeps lower-urgency requests waiting.
-      if (context.posture === "defending") context.requestPosture("defending");
-    } else {
-      if (operation && operation.phase !== "return")
-        endOperation(context, operation, "completed");
-      if (
-        context.posture === "defending" &&
-        !context.requestPosture("developing")
-      )
+    if (context.posture === "defending") {
+      const calm =
+        tick - memory.calmTick >=
+        secondsToTicks(tuning.calmSeconds, context.tickSeconds);
+      if (!calm) context.requestPosture("defending");
+      else if (!context.requestPosture("developing"))
         context.requestPosture("establishing");
     }
   }

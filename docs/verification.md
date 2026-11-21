@@ -169,7 +169,7 @@ resumes toward the same limit. The sets are:
   completed. A case passes when the removal takes effect and every listed
   definition is restored before the match ends. Headquarters loss is an
   accepted loss, so that case needs only a clean, completed match.
-- `arc-continuation`: saves a Normal mirror at 12:30 during west's first
+- `arc-continuation`: saves a Normal mirror at 10:00 during east's first
   attack, resumes it, and requires identical complete mission state,
   including AI, observations, and metric histories, to an uninterrupted run.
   Ending before the checkpoint, or a `--cutoff` at or before it, fails this

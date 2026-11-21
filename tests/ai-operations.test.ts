@@ -284,6 +284,32 @@ test("a strung-out advance regroups at its middle unit", () => {
   });
 });
 
+test("a group at home waits for its return order before disbanding", () => {
+  const units = group(2, home.x, home.z);
+  const { operation, context, step, issued, released, wait } = fixture(units);
+  step();
+  endOperation(context(), operation, "completed");
+  issued.length = 0;
+  const limited = () =>
+    stepOperation({ ...context(), issue: () => false }, terrain, operation, {
+      retreats: true,
+    });
+  expect(limited()).toBeUndefined();
+  wait(1);
+  expect(limited()).toBeUndefined();
+  expect(released).toEqual([]);
+  expect(step()).toBeUndefined();
+  expect(issued).toEqual([
+    {
+      kind: "group-move",
+      actorIds: units.map(({ id }) => id),
+      target: home,
+    },
+  ]);
+  expect(step()).toBe("ended");
+  expect(released).toEqual(units.map(({ id }) => id));
+});
+
 test("a regrouped operation returns home before releasing survivors", () => {
   const units = [
     trooper("a", 20, 20),
@@ -433,7 +459,9 @@ test("an assembling group takes the nearest providers its members need", () => {
 test("providers follow the group and are released with it", () => {
   const units = group(5, home.x, home.z);
   const provider = medic("medic", home.x, home.z);
-  const { operation, issued, released, step } = fixture(units, [provider]);
+  const { operation, context, issued, released, step } = fixture(units, [
+    provider,
+  ]);
   step();
   expect(operation).toMatchObject({ phase: "advance", support: ["medic"] });
   for (const unit of units) unit.worldPosition = { x: 50, z: 50 };
@@ -453,8 +481,9 @@ test("providers follow the group and are released with it", () => {
   step();
   expect(issued.filter(({ kind }) => kind === "group-move")).toEqual([]);
   delete provider.service;
-  endOperation({} as AiConcernContext, operation, "completed");
+  endOperation(context(), operation, "completed");
   for (const unit of [...units, provider]) unit.worldPosition = home;
+  expect(step()).toBeUndefined();
   expect(step()).toBe("ended");
   expect(released).toEqual([...units.map(({ id }) => id), "medic"]);
 });

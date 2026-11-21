@@ -1447,6 +1447,9 @@ Counts, shares, and thresholds below are profile tuning values.
 - Sentry Turrets guard remote Refineries as they come online. A hit on a
   Refinery or its Harvester also prompts a guard, even if the attacker
   escapes sight.
+- Local defense groups return to their rally as soon as no detected armed
+  enemy is near an owned building or worker. The defending posture holds
+  through its configured calm period.
 - Building repair runs in every posture after establishing, including
   defending. It reserves the unpaid cost and yields its headquarters slot
   to waiting construction.
