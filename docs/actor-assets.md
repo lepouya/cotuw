@@ -96,6 +96,12 @@ Service orders and repair badges share these symbols from
 Only work with both participants visible reaches animation, effects, and audio.
 Model export can log Babylon's bone uniform warning. `NullEngine` reports only
 16 vertex uniform vectors, and the warning does not affect the GLB.
+
+The shared exporter omits the optional tool version stamp from generated GLBs.
+When updating Babylon, update core, loaders, and serializers together. Run the
+asset checks and the browser model-loading and animation specs to catch changes
+to the export or rendering behavior.
+
 Content's optional `attackAnchor` positions a shot's muzzle in model space;
 otherwise a frame effect's attack anchor supplies it. Building anchors use
 tile units above the roof. Shots land halfway up the target as drawn.

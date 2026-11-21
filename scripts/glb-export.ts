@@ -24,7 +24,7 @@ export async function exportGlb(
     const blob = data.files[`${name}.glb`];
     if (!(blob instanceof Blob))
       throw new Error(`Exporter did not produce ${name}.glb`);
-    return roundJsonToFloat32(new Uint8Array(await blob.arrayBuffer()));
+    return normalizeGlbJson(new Uint8Array(await blob.arrayBuffer()));
   } finally {
     scene.dispose();
     engine.dispose();
@@ -32,10 +32,10 @@ export async function exportGlb(
 }
 
 /**
- * Rounds fractional JSON numbers to float32 so committed GLBs match across
- * platforms whose Math functions differ in the last float64 bit.
+ * Keeps generated GLBs stable across exporter version stamps and platforms
+ * whose Math functions differ in the last float64 bit.
  */
-function roundJsonToFloat32(glb: Uint8Array): Uint8Array {
+function normalizeGlbJson(glb: Uint8Array): Uint8Array {
   const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
   const jsonLength = view.getUint32(12, true);
   const json = JSON.parse(
@@ -45,6 +45,7 @@ function roundJsonToFloat32(glb: Uint8Array): Uint8Array {
         ? Math.fround(value)
         : value,
   );
+  delete json.asset.generator;
   const text = new TextEncoder().encode(JSON.stringify(json));
   // GLB chunks are 4-byte aligned; JSON pads with spaces.
   const padded = Math.ceil(text.length / 4) * 4;
