@@ -35,11 +35,11 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await mission.press(
         '#gather-sites [data-economy-action="gather:near-materials-1"]',
       );
-      await mission.materials(100);
+      await mission.waitForStockpile(100);
       await mission.place("barracks", 16, 54, {
         completion: "Barracks & Training",
       });
-      await mission.materials(45);
+      await mission.waitForStockpile(45);
       await mission.press("#train-scout");
       await mission.press("#train-trooper");
       await mission.advance(7);
@@ -88,7 +88,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await mission.focus(16, 54);
       await mission.press("#tab-units");
       await mission.ground(16, 54);
-      await mission.materials(125);
+      await mission.waitForStockpile(125);
       const training = page.locator("#train-trooper");
       await training.scrollIntoViewIfNeeded();
       // Allow fractional scroll rounding while keeping the touch target clear.
@@ -141,12 +141,12 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await mission.focus(16, 54);
       await mission.press("#tab-units");
       await mission.ground(16, 54);
-      await mission.materials(25);
+      await mission.waitForStockpile(25);
       const units = await page.locator("#unit-roster button").count();
       await mission.press("#train-trooper");
       await mission.advance(4);
       await expect(page.locator("#unit-roster button")).toHaveCount(units + 1);
-      await mission.materials(125);
+      await mission.waitForStockpile(125);
       await mission.focus(15, 48);
       const buildings = Number(
         await page

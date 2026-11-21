@@ -198,20 +198,40 @@ export class MissionDriver {
       "false",
     );
     await this.advance(8);
-    if (guides.completion) await this.explanation(guides.completion);
+    if (guides.completion) {
+      const guide = this.page.locator("#explanation");
+      await this.advanceUntil(() => guide.isVisible(), {
+        interval: 1,
+        limit: 30,
+        description: `the "${guides.completion}" guide to appear`,
+      });
+      await this.explanation(guides.completion);
+    }
   }
 
-  async materials(minimum: number) {
-    for (let elapsed = 0; elapsed <= 300; elapsed += 10) {
-      if (
-        Number(await this.page.locator("#materials-counter").textContent()) >=
-        minimum
-      )
-        return;
-      if (elapsed < 300) await this.advance(10);
+  private async advanceUntil(
+    ready: () => Promise<boolean>,
+    {
+      interval,
+      limit,
+      description,
+    }: { interval: number; limit: number; description: string },
+  ) {
+    let elapsed = 0;
+    while (!(await ready())) {
+      if (elapsed >= limit)
+        throw new Error(`Waited ${limit} seconds for ${description}.`);
+      const seconds = Math.min(interval, limit - elapsed);
+      await this.advance(seconds);
+      elapsed += seconds;
     }
-    throw new Error(
-      `Gathering did not deliver ${minimum} Materials within five minutes.`,
+  }
+
+  async waitForStockpile(minimum: number) {
+    const balance = this.page.locator("#materials-counter");
+    await this.advanceUntil(
+      async () => Number(await balance.textContent()) >= minimum,
+      { interval: 10, limit: 300, description: `a stockpile of ${minimum}` },
     );
   }
 

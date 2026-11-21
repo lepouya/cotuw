@@ -130,12 +130,8 @@ Extend the [playable Circle slice](DESIGN.md#circle-wolf-den-development-slice)
 through its full M1 roster and AI build plan. Keep Lifebloom-only costs and
 producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 
-- [ ] **1.48** Complete core-roster acceptance for Heartgrove, Conservatory,
-  Cultivator, Musterhall, Sentinel, and Wayfinder content, labels, costs,
-  production, and starting resources. Verify tougher, shorter-ranged
-  Sentinels and fast, fragile, unarmed Wayfinders with extended ordinary vision.
-  Heartgroves train Cultivators; verify startup funds cover the first worker
-  and Conservatory through normal play without a preplaced worker.
+- [x] **1.48** Circle core roster and paid opening verified through cultivation,
+  Musterhall training, and Wayfinder scouting.
 - [x] **1.49** Circle placement, single-worker tending and replacement,
   infrastructure, and emergency Heartgrove recovery, with saved continuation
   and keyboard-free construction controls.

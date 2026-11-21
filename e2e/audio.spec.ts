@@ -264,11 +264,11 @@ test(
     ).toBe(false);
     await mission.select("Harvester");
     await expect.poll(gain).toBeGreaterThan(selectedGain * 0.9);
-    await mission.materials(100);
+    await mission.waitForStockpile(100);
     await mission.place("barracks", 16, 54, {
       completion: "Barracks & Training",
     });
-    await mission.materials(45);
+    await mission.waitForStockpile(45);
     await mission.press("#train-trooper");
     await mission.advance(6);
     const starts = await page.evaluate(() => window.audioStarts);

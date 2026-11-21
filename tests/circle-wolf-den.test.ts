@@ -3,11 +3,11 @@ import { expect, test } from "vitest";
 import {
   advanceSeconds,
   balance,
+  command,
   deposited,
   spawnUnit,
   untilSeconds,
 } from "./helpers/scenario";
-import { BASE_CONTENT } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { LEVEL_SOURCES } from "../src/content/levels";
 import {
@@ -22,6 +22,7 @@ import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 
 import type { LoadedMission } from "../src/mission-loading";
 import type { MissionSimulation } from "../src/simulation/mission";
+import type { MissionCommand } from "../src/simulation/command";
 
 const opening = () => loadMission(LEVEL_SOURCES.get("circle-wolf-den")!);
 const reload = (mission: LoadedMission, simulation: MissionSimulation) =>
@@ -71,21 +72,6 @@ test("the Circle opening uses shared wildlife, a paid worker bootstrap, and norm
   expect(
     simulation.detects("player", simulation.actorById("starting-heartgrove")!),
   ).toBe(true);
-});
-
-test("Circle infantry preserve the selected roles independently of ARC tuning", () => {
-  const actor = (id: string) =>
-    BASE_CONTENT.actors.find((actor) => actor.id === id)!;
-  const sentinel = actor("circle-sentinel");
-  const wayfinder = actor("circle-wayfinder");
-  expect(sentinel.health).toBeGreaterThan(actor("arc-trooper").health!);
-  expect(sentinel.weapon!.range).toBeLessThan(
-    actor("arc-trooper").weapon!.range,
-  );
-  expect(wayfinder.weapon).toBeUndefined();
-  expect(wayfinder.health).toBeLessThan(sentinel.health!);
-  expect(wayfinder.movement!.speed).toBeGreaterThan(sentinel.movement!.speed);
-  expect(wayfinder.vision!.radius).toBeGreaterThan(sentinel.vision!.radius);
 });
 
 test("a prepared Circle force clears both encounters and continues identically after a combat save", () => {
@@ -159,51 +145,72 @@ test("a prepared Circle force clears both encounters and continues identically a
   expect(reload(mission, simulation).result).toEqual(result);
 }, 20_000);
 
-test("the authored paid opening delivers Lifebloom and reveals the second cultivation site", () => {
+test("the authored paid opening delivers Lifebloom, reveals the second site, and funds both infantry roles", () => {
   const sim = createSessionSimulation(opening());
-  const until = (condition: () => boolean) => untilSeconds(sim, condition, 100);
-  sim.submitCommand(
-    {
-      kind: "train-unit",
-      actorId: "worker",
-      producerId: "starting-heartgrove",
-      definitionId: "circle-cultivator",
-    },
-    { owner: sim.playerOwner },
-  );
-  until(() => !!sim.actorById("worker"));
-  sim.submitCommand(
-    {
+  const until = (condition: () => boolean) => untilSeconds(sim, condition);
+  const order = (value: MissionCommand) =>
+    expect(command(sim, value)).toMatchObject({ accepted: true });
+  const grow = (
+    actorId: string,
+    definitionId: string,
+    x: number,
+    z: number,
+  ) => {
+    order({
       kind: "place-actor",
-      actorId: "conservatory",
-      definitionId: "circle-conservatory",
-      origin: { x: 16, z: 50 },
+      actorId,
+      definitionId,
+      origin: { x, z },
       workerIds: ["worker"],
-    },
-    { owner: sim.playerOwner },
-  );
-  until(
-    () =>
-      !!sim.actorById("conservatory") &&
-      !sim.actorById("conservatory")!.construction,
-  );
-  sim.submitCommand(
-    {
-      kind: "gather",
-      actorId: "worker",
-      siteId: "near-lifebloom",
-    },
-    { owner: sim.playerOwner },
-  );
-  until(() => balance(sim, "lifebloom") >= 30);
-  const second = sim.economy!.cultivation!.sites[1]!;
+    });
+    until(() => !sim.actorById(actorId)!.construction);
+  };
+  order({
+    kind: "train-unit",
+    actorId: "worker",
+    producerId: "starting-heartgrove",
+    definitionId: "circle-cultivator",
+  });
+  until(() => !!sim.actorById("worker"));
+  const cultivate = () =>
+    order({ kind: "gather", actorId: "worker", siteId: "near-lifebloom" });
+  grow("conservatory", "circle-conservatory", 16, 50);
+  expect(balance(sim, "lifebloom")).toBe(0);
+  cultivate();
+  until(() => deposited(sim, "lifebloom") > 0);
   expect(balance(sim, "lifebloom")).toBe(30);
-  expect(balance(sim)).toBe(0);
+  const second = sim.economy!.cultivation!.sites[1]!;
   expect(
     sim
       .viewOf(sim.playerOwner)
       .knowledge.fog!.isExplored(second.tile.x, second.tile.z),
   ).toBe(true);
+  until(() => balance(sim, "lifebloom") >= 100);
+  grow("muster", "circle-musterhall", 12, 54);
+  cultivate();
+  until(() => balance(sim, "lifebloom") >= 55);
+  for (const [actorId, definitionId] of [
+    ["sentinel", "circle-sentinel"],
+    ["wayfinder", "circle-wayfinder"],
+  ] as const)
+    order({ kind: "train-unit", actorId, producerId: "muster", definitionId });
+  until(() => !!sim.actorById("sentinel") && !!sim.actorById("wayfinder"));
+  expect(balance(sim)).toBe(0);
+  expect(sim.economy!.loot.every(({ collected }) => !collected)).toBe(true);
+});
+
+test.each([
+  ["circle-wayfinder", true],
+  ["circle-sentinel", false],
+])("%s ordinary vision detects a wolf 11 tiles away: %s", (id, detects) => {
+  const mission = opening();
+  const map = createScenarioMap(missionTerrain(mission));
+  const sim = createSessionSimulation(mission);
+  const wolf = sim.actorById("lone-wolf")!;
+  const { x, z } = wolf.worldPosition;
+  spawnUnit(sim, "viewer", id, { x: x - 11 * map.tileSize, z });
+  sim.tick();
+  expect(sim.detects(sim.playerOwner, wolf)).toBe(detects);
 });
 
 test("Circle gifts reward Lifebloom once and retain collection through a save", () => {

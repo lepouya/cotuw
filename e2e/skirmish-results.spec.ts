@@ -194,9 +194,9 @@ test(
     await driver.press(
       '#gather-sites [data-economy-action="gather:near-materials-1"]',
     );
-    await driver.materials(100);
+    await driver.waitForStockpile(100);
     await driver.place("barracks", 16, 54);
-    await driver.materials(45);
+    await driver.waitForStockpile(45);
     await driver.press("#train-scout");
     await driver.press("#train-trooper");
     await driver.advance(7);

@@ -135,6 +135,58 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
 });
 
 test(
+  "Circle normal play grows a Musterhall that trains Sentinels and Wayfinders",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page, { console: true });
+    const mission = new MissionDriver(page);
+    const selected = page.locator("#selection-details");
+    const cultivate = async () => {
+      await mission.select("Cultivator");
+      await mission.press('[data-economy-action="cultivate:near-lifebloom"]');
+    };
+    await mission.opening({ faction: "circle" });
+    await mission.ground(9, 51);
+    await expect(selected).toContainText("Heartgrove");
+    await mission.press("#train-circle-cultivator");
+    await mission.advance(5);
+    await mission.select("Cultivator");
+    await mission.place("circle-conservatory", 16, 50, {
+      placement: "Tending growth",
+      completion: "Cultivating Lifebloom",
+    });
+    await cultivate();
+    await mission.waitForStockpile(100);
+    await mission.place("circle-musterhall", 12, 54, {
+      completion: "Gather your expedition",
+    });
+    await cultivate();
+    await mission.waitForStockpile(55);
+    await mission.ground(12, 55);
+    await expect(selected).toContainText("Musterhall");
+    await expect(page.locator("#selection-info")).toHaveText(
+      "Circle infantry production · Trains Sentinel and Wayfinder.",
+    );
+    for (const [id, label, cost] of [
+      ["sentinel", "Train Sentinel", "35 Lifebloom"],
+      ["wayfinder", "Train Wayfinder", "20 Lifebloom"],
+    ]) {
+      const selector = `#train-circle-${id}`;
+      const card = page.locator(selector);
+      await expect(card).toHaveAccessibleName(label);
+      await expect(card.locator(".option-cost")).toHaveText(cost);
+      await mission.press(selector);
+    }
+    await mission.advance(10);
+    await mission.press("#tab-units");
+    const roster = page.locator("#unit-roster button");
+    await expect(roster.filter({ hasText: "Sentinel" })).toHaveCount(1);
+    await expect(roster.filter({ hasText: "Wayfinder" })).toHaveCount(1);
+    expect(errors).toEqual([]);
+  },
+);
+
+test(
   "Circle growth explains its worker and resumes through both Tend actions",
   { tag: WEBKIT },
   async ({ page }) => {

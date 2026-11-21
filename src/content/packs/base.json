@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 3,
   "id": "base",
-  "version": 12,
+  "version": 13,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -185,6 +185,7 @@
       "faction": "circle",
       "behaviorId": "terrain-move",
       "health": 60,
+      "recoveryKind": "biological",
       "movement": {
         "speed": 4,
         "profileId": "surface-ground",
@@ -205,6 +206,7 @@
       "behaviorId": "terrain-move",
       "faction": "circle",
       "health": 150,
+      "recoveryKind": "biological",
       "weapon": {
         "damage": 10,
         "damageType": "arcane",
@@ -231,6 +233,7 @@
       "behaviorId": "terrain-move",
       "faction": "circle",
       "health": 40,
+      "recoveryKind": "biological",
       "movement": {
         "speed": 7,
         "profileId": "surface-ground",
@@ -1358,7 +1361,7 @@
     },
     "circle-heartgrove": {
       "name": "Heartgrove",
-      "description": "Trains Cultivators and supplies one growth slot",
+      "description": "Circle headquarters for growth and repair",
       "build": {
         "id": "build-circle-heartgrove",
         "label": "Grow Heartgrove",
@@ -1420,7 +1423,7 @@
     },
     "circle-musterhall": {
       "name": "Musterhall",
-      "description": "Trains Sentinels and Wayfinders",
+      "description": "Circle infantry production",
       "build": {
         "id": "build-circle-musterhall",
         "label": "Grow Musterhall",
