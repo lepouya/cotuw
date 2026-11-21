@@ -1746,15 +1746,12 @@ roster and a distinct construction or cultivation mechanic.
 
 - M0's mission remains ARC's introduction. A short Circle introductory
   scenario teaches its economy and construction before the skirmish.
-- Develop the Circle introduction as a wolf-den playable slice, reusing M0's
-  terrain and wildlife encounters with Circle-specific resources and guidance.
-  Bring it up as the required shared foundations become available, without
-  waiting for the ARC AI harness or expanded ARC roster to be complete.
+- The Circle introduction uses the wolf-den map and wildlife encounters
+  with Circle-specific resources and guidance.
 - The skirmish mission-start dialog selects ARC or Circle and Easy, Normal,
   or Hard difficulty. Faction choice and difficulty are independent.
-- The AI is developed first as ARC against ARC on the existing roster. That
-  mirror matchup is a development harness, not a shipped option. It requires
-  an actor's controlling owner to be distinct from its definition's faction.
+- The ARC mirror matchup is available through development links for AI
+  verification.
 - M1 adds control groups, an idle-worker control, double-click and
   select-all-of-type selection, and keyboard bindings for Attack Move,
   production, and building actions, each with a touch alternative.

@@ -8,15 +8,13 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phases A through C are complete except for deferred cohort task 1.02. The
-Circle cultivation slice is playable with acceptance work remaining.
+Phase E is active. The Circle cultivation slice is playable, and cohort task
+1.02 continues with 1.57.
 
 ### Using this checklist
 
-- Work through the phases in order, except the Circle wolf-den slice below
-  may progress alongside phases B-D as its prerequisites become ready, and
-  1.02 is deferred. Tasks within a phase may overlap; explicit dependencies
-  take precedence.
+- Work through the phases in order. Tasks may overlap when their dependencies
+  are met.
 - Task IDs are the milestone number and a task number, independent of phase
   letters. Keep them stable once work starts. Check a task only when its
   stated outcome is verified, including appropriate checks for implementation
@@ -34,17 +32,14 @@ Circle cultivation slice is playable with acceptance work remaining.
 
 ### A. Baseline and design decisions
 
-Design decisions are complete. The external cohort is deferred until the AI
-is playable.
-
 - [x] **1.01** Reproducible browser playtest bundle, tester instructions, and
   report template. See
   [playtest preparation](docs/verification.md#playtest-preparation).
-- [ ] **1.02** Recruit five to eight RTS-familiar and less experienced players
-  once the enemy AI is playable. Run one cohort through 1.47 and 1.57,
-  covering controls, clarity, pacing, reliability, assistance, and abandonment.
-  Revise the session scope for that build and turn findings into prioritized
-  issues for controls and onboarding.
+- [ ] **1.02** Complete playtesting with a cohort of five to eight RTS-familiar
+  and less experienced players through 1.57. Cover controls, clarity, pacing,
+  reliability, assistance, and abandonment. Turn findings into prioritized
+  issues for controls and onboarding. Follow
+  [playtest preparation](docs/verification.md#playtest-preparation).
 - [x] **1.03** Circle construction and infrastructure rules.
 - [x] **1.04** Cultivation, dormancy, delivery, and recovery rules.
 - [x] **1.05** Minimum roster, roles, counters, and producers.
@@ -82,11 +77,10 @@ The ARC introduction remains the regression baseline.
 - [x] **1.25** End-of-tick owner elimination, frozen verdicts, and draws.
 - [x] **1.26** Exact match metrics, cargo provenance, and sampled histories.
 - [x] **1.27** Mission/content formats, validation, and deterministic saves.
-  Control-group persistence belongs to 1.44.
 - [x] **1.28** Pre-AI scale profiling. Normal ticks meet the pre-AI budget and
   sustain 2× pace in Chromium and WebKit. WebKit rendering misses the frame
-  budget, and stress scenes fall behind at 2×; 1.38 and 1.64 own AI-enabled
-  verification and remaining performance work.
+  budget, and stress scenes fall behind at 2×. Complete-match performance
+  belongs to 1.64.
 
 Use [runtime contracts](docs/runtime-boundaries.md),
 [UI ownership](docs/ui-ownership.md), and
@@ -94,106 +88,47 @@ Use [runtime contracts](docs/runtime-boundaries.md),
 
 ### C. AI development harness
 
-Complete. A deterministic director plays AI owners through `viewOf(owner)`
-and owner-issued commands. The ARC mirror on the rough map establishes and
-rebuilds its base, scouts, defends, raids, and attacks through shared rules.
-It remains a development matchup, launched by `ai=` links.
+Complete. The [AI rules](DESIGN.md#npc-ai),
+[runtime contracts](docs/runtime-boundaries.md), and
+[headless checks](docs/verification.md#m1-headless-acceptance) cover the
+director and development matchup.
 
-- [x] **1.29** Director with pack profiles, prioritized concerns, shared
-  budgets and force claims, urgency-ranked postures, and counted per-tick
-  limits.
-- [x] **1.30** Headless runner (`npm run ai:match`) with ARC mirror,
-  recovery, and continuation case sets and a 30-minute cutoff.
+- [x] **1.29** Deterministic, owner-scoped AI director with pack profiles.
+- [x] **1.30** Headless skirmish runner with match reports.
 - [x] **1.31** Development AI overlay for `ai=` links.
-- [x] **1.32** Saved AI state with validated concern memory and deterministic
-  continuation across clock batching and pending withdrawal orders.
-- [x] **1.33** ARC build plan for income, producers, and forces using normal
-  placement and costs.
-- [x] **1.34** Paid recovery after worker, income, production, support-link,
-  and headquarters losses.
-- [x] **1.35** Faction-neutral scouting of authored sites, stale reports, and
-  unseen buildings.
-- [x] **1.36** Faction-neutral defense, raid, and attack operations, withdrawn
-  within tick limits when a posture omits them, preserving reassigned units.
-- [x] **1.37** Profile tuning separate from difficulty. Normal mirrors end
-  near 13:40, below the 15-minute target, with raids near 4:20 and attacks
-  near 9:20. Losing the headquarters before a replacement is affordable is an
-  accepted loss.
-- [x] **1.38** Mirror audit, recovery, and continuation cases pass. The AI
-  benchmark holds 200 units and 40 buildings at about 4.0 ms p95 and 4.9 ms
-  p99, at the tick budget.
-
-Use [runtime contracts](docs/runtime-boundaries.md) and
-[headless acceptance](docs/verification.md#m1-headless-acceptance) when
-extending the AI.
+- [x] **1.32** Validated AI saves and deterministic continuation.
+- [x] **1.33** ARC build plan for income, production, and army growth.
+- [x] **1.34** Paid base recovery.
+- [x] **1.35** Shared observation-driven scouting.
+- [x] **1.36** Shared defense, raid, attack, and withdrawal operations.
+- [x] **1.37** ARC profile tuning independent of difficulty scaling.
+- [x] **1.38** ARC mirror, recovery, continuation, and headless scale checks.
 
 ### D. Expanded ARC base and controls
 
-Use the roster from 1.05 and extend the functioning ARC AI as content lands.
-M1 uses common resources and producer-based availability, with rare resources,
-upgrades, and research deferred. Task IDs remain stable across phase changes.
+Complete. The expanded ARC roster is playable with the
+[ARC AI plan](DESIGN.md#m1-arc-ai-plan) and
+[shared controls](DESIGN.md#controls-and-interface).
 
-- [x] **1.58** Optional-system scope: rare resources, mixed yields, upgrades,
-  and research are deferred beyond M1.
-- [x] **1.71** Each owner takes a content-pack palette color in mission
-  order, shown on minimap markers, remains, and models'
-  [owner materials](docs/actor-assets.md): ARC building trim, Harvester
-  cabs, infantry markings, and Circle building markings. ARC mirror
-  playtests read friend and foe at a glance on the field and minimap.
-- [x] **1.39** Data-driven Relay Stations extend ARC support; Sentry Turrets
-  acquire hostiles and accept manual targets. Placement, outages, reconnection,
-  remote income, raid protection, and saved continuation are verified. Relays
-  do not count toward skirmish survival; completed Turrets do.
-- [x] **1.40** Contextual building repair shares headquarters capacity with
-  construction. Oldest-first pooled payments, cancellation, paused work,
-  disconnection, reassignment, and deterministic saved continuation are verified
-  for ARC and Circle, with mouse and touch controls in Chromium and WebKit.
-  World-space wrench badges distinguish active and paused repair jobs.
-- [x] **1.41** Medic and Mechanic support shares Barracks production, with
-  exclusive targets, bounded pursuit, and queued orders. Personnel healing,
-  raid-damaged Harvester recovery, AI exclusions, and deterministic saves are
-  verified, with mouse and touch controls in Chromium and WebKit.
-- [x] **1.42** Demolition Troopers share Barracks production and Medic recovery.
-  Building damage, defense outranging, infantry counters, mixed forces, and
-  saved continuation are verified, with mouse and touch training and selection
-  in Chromium and WebKit.
-- [x] **1.43** Added ARC models, animation, command feedback, effects,
-  portraits, and essential audio are verified. Full automated checks and the
-  packaged macOS smoke check pass. Player listening confirms the busy-base
-  mix works without becoming overwhelming.
-- [x] **1.44** Control groups, idle-worker actions, and matching-unit selection
-  with mission UI persistence, verified in Chromium, WebKit, and packaged
-  macOS, including Mac Control, mixed selections, and waiting workers.
-- [x] **1.45** Command shortcuts and device keyboard preferences with live
-  hints, layout selection, and conflict checks. Chromium and WebKit verify
-  production precedence, queued targeting, Stop, input focus, disabled cards,
-  and compact touch controls. Packaged macOS verifies binding capture and
-  Cmd+Q.
-- [x] **1.46** ARC AI uses [tuned build plans](DESIGN.md#m1-arc-ai-plan)
-  for remote income, Relay recovery, defenses, repairs, and mixed forces.
-  Automated tests cover crisis recalls and deterministic continuation.
-- [ ] **1.47** Playtest ARC expansion, base layout, defense, rebuilding, support
-  units, and controls with the 1.02 cohort, in the same sessions as 1.02 and
-  1.57. Play against the harness AI on the rough
-  map through a development link or test-build entry; keep the mirror matchup
-  out of the normal menu. Check whether repair under attack blocks rebuilding
-  excessively; propose any rule changes explicitly before tuning beyond the
-  locked infrastructure rules. Fix and retest recurring blockers.
-
-Phase gate: the expanded ARC base can grow, defend, recover, and field useful
-mixed forces under both player and AI control.
+- [x] **1.39** Relay Stations and Sentry Turrets.
+- [x] **1.40** Building repair through headquarters queues with status feedback.
+- [x] **1.41** Medic and Mechanic support.
+- [x] **1.42** Demolition Trooper defense breaking.
+- [x] **1.43** ARC roster models, animation, feedback, and audio.
+- [x] **1.44** Saved control groups, idle-worker and select-by-type actions.
+- [x] **1.45** Rebindable gameplay and production shortcuts.
+- [x] **1.46** ARC AI expansion, defense, repairs, and mixed forces.
+- [x] **1.47** ARC playtest feedback and local-defense follow-up.
+  Further coverage belongs to 1.57 and pacing to 1.63.
+- [x] **1.58** M1 optional-system scope. See
+  [resources and progression](DESIGN.md#m1-resources-and-progression).
+- [x] **1.71** Owner colors in models, remains, and minimap markers.
 
 ### E. Circle playable loop and introduction
 
-Use the construction, cultivation, roster, and presentation choices from
-phase A and the required shared foundations from phase B. Develop the
-wolf-den slice alongside the ARC AI and roster; faction AI integration still
-requires phase C. Use Lifebloom-only costs and producer-based availability.
-
-The [playable slice](DESIGN.md#circle-wolf-den-development-slice) includes
-core infantry, paid worker production, tended growth, renewable cultivation,
-feedback, guides, generated art/audio, and focused save checks. Full task
-acceptance remains open below; normal-menu skirmish launch belongs to 1.60.
+Extend the [playable Circle slice](DESIGN.md#circle-wolf-den-development-slice)
+through its full M1 roster and AI build plan. Keep Lifebloom-only costs and
+producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 
 - [ ] **1.48** Complete core-roster acceptance for Heartgrove, Conservatory,
   Cultivator, Musterhall, Sentinel, and Wayfinder content, labels, costs,
@@ -238,13 +173,20 @@ acceptance remains open below; normal-menu skirmish launch belongs to 1.60.
   dormancy, recovery, and support work. Preserve site reserves and dormancy
   state, worker cargo, cultivation progress, assignments, and queued orders.
 - [ ] **1.57** Playtest the Circle introduction and base loop with the 1.02
-  cohort, in the same sessions as 1.02 and 1.47, launched through the demo
-  setup screen or a development link. Verify RTS-familiar newcomers understand
-  its differences, establish and sustain a base, and explain a useful
-  cultivation decision. Refine cultivation rates, reserve capacity, cargo
-  capacity, and
-  dormancy thresholds using the playable slice. Fix and retest recurring
-  confusion before full-match balancing.
+  cohort. Add Circle tester instructions. Launch through the demo setup or a
+  development link. Verify RTS-familiar newcomers understand its differences,
+  establish and sustain a base, and explain a useful cultivation decision.
+  Refine cultivation rates, reserve capacity, cargo capacity, and dormancy
+  thresholds using the playable slice. Fix and retest recurring confusion
+  before full-match balancing.
+  - Testers who still need the ARC skirmish follow the
+    [ARC instructions](docs/playtest-instructions.md). Cover expansion and
+    Relay Stations, base layout, recovery after losses, Mechanics, control
+    groups, shortcuts, and idle-worker controls. Check whether repair under
+    attack blocks rebuilding. Propose rule changes before tuning beyond the
+    locked infrastructure rules.
+  - A blocker reported by two or more testers is recurring. Fix it with
+    regression coverage and replay the affected paths on a rebuilt bundle.
 
 Phase gate: Circle play is a complete, understandable loop with a meaningful
 cultivation distinction, and its AI can sustain the same economy and roster.
@@ -256,9 +198,9 @@ and producer-based progression scope from 1.06.
 
 - [ ] **1.59** Finish the map with viable routes, expansion opportunities,
   scouting landmarks, and defensible starts for both player assignments.
-  Verify both factions' paid first income and restart from either slot. The
-  Normal ARC mirror's winner depends on start slot; find whether the map or
-  tie-breaking causes it.
+  Verify both factions' paid first income and restart from either slot. East
+  wins both Normal ARC mirror cases. Check whether the map or AI tie-breaking
+  gives east the advantage.
 - [ ] **1.60** Extend the demo setup screen to offer the complete Circle
   introduction and skirmish launch. Preserve independent ARC/Circle and
   Easy/Normal/Hard choices and access to ARC's introduction.
@@ -278,6 +220,10 @@ and producer-based progression scope from 1.06.
   profiles. Tune pacing on Normal; verify scaling, results, and save/load on
   Easy and Hard. Require results by the 30-minute simulation cutoff; preserve
   unfinished cases for diagnosis. Test recovery and disruption separately.
+  - Normal ARC mirrors finish below the
+    [15 to 25 minute target](DESIGN.md#m1-pacing-and-acceptance). Tune and
+    verify post-raid income recovery and counterattack pressure after early
+    Harvester losses.
 - [ ] **1.64** Measure the complete skirmish with AI at 200 mobile units and
   40 buildings across both owners on the M3 Pro/18 GB development Mac. Meet
   the tick-time and frame-rate budgets in production browser and packaged

@@ -281,11 +281,9 @@ COTUW_REALTIME_PLAYTHROUGH=1 npx playwright test e2e/mission.spec.ts \
 ## Playtest preparation
 
 Use a fixed revision and the checked bundle for reproducible reports and
-saved bug cases. GitHub Pages hosts browser playtests. The cohort in task 1.02
-is deferred until AI is playable and combines ARC and Circle sessions under
-1.47 and 1.57. Agree on session scope and a report-return channel before
-recruitment and distribution. The bundled tester instructions cover ARC's
-introduction; adapt them to the selected session scope before distribution.
+saved bug cases. GitHub Pages hosts browser playtests. Follow the active
+cohort scope in [TODO.md](../TODO.md) and the session protocol in the
+[tester instructions](playtest-instructions.md).
 
 From a clean checkout of the selected revision, using Node.js 26:
 
@@ -328,18 +326,19 @@ rm -rf .git
 
 Smoke-test the served production bundle from the title screen. Verify model
 and audio loading, the opening guide, one construction and training cycle,
-save/load, restart, and return to the title screen. Record browser and OS
-versions, build revision, URL, and results. Automated checks alone do not
-establish this distribution check or human mission clarity.
+save/load, restart, and return to the title screen. Open the round's skirmish
+link and confirm that the AI builds its base. Complete one player construction
+and training cycle, export a save, and verify that restart keeps the slot,
+difficulty, and AI assignment. Before the first unobserved round, the
+organizer plays one complete skirmish on the bundle. Record browser and OS
+versions, build revision, URL, and results.
+Automated checks alone do not establish this distribution check or human
+mission clarity.
 
-Give participants the [instructions](playtest-instructions.md) and a copy of
-the [report template](playtest-report.md). Observe without teaching controls
-or strategy unless requested or blocked; record every intervention. Cover
-controls, clarity, pacing, reliability, assistance, and abandonment. Use
-participant codes and keep recruitment/contact details outside the repository.
-Turn actionable findings into prioritized issues linked to affected tasks;
-record a disposition for other observations. Build preparation alone does not
-satisfy playtest acceptance.
+For observed sessions, give help only on request or when the player is
+blocked, and record each intervention. Use participant codes. Keep contact
+details, reports, and saves outside the repository. Link actionable findings
+to issues and affected tasks, and record a disposition for other observations.
 
 ## Human acceptance
 

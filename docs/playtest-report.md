@@ -1,17 +1,18 @@
 # Playtest report
 
 Use a participant code instead of personal contact details. Keep one report
-per attempt. Times below are real elapsed time from starting the mission;
-record simulation time separately where available.
+per attempt. Attempt times are real elapsed time from starting the mission;
+observations use the game time shown in the top bar.
 
 ## Session
 
 - Participant code:
 - Date:
-- Build revision from `build.json`:
-- Bundle `distributionReady` value:
+- Build revision from the organizer or `build.json`:
+- Bundle `distributionReady` value, if available:
 - Play URL:
-- Mission and faction:
+- Mission: introduction / skirmish:
+- Faction: ARC / Circle:
 - Start slot, for skirmishes:
 - Difficulty:
 - Operating system and version:
@@ -30,7 +31,7 @@ record simulation time separately where available.
 - Pauses and speed changes:
 - When did you first understand your goal?
 - Which controls were difficult to discover or use?
-- Which instructions or feedback were unclear?
+- Which instructions or feedback were unclear, and what was missing?
 - When did the game feel too slow, too fast, or difficult?
 - What did you expect to happen that did not happen?
 - If you stopped, when and why?
@@ -38,17 +39,34 @@ record simulation time separately where available.
 - For Circle, what did you change to sustain cultivation?
 - Would you try another mission? Why?
 
-## Observations and assistance
+## Skirmish
 
-Copy this entry for each confusing moment, failure, or intervention. Include
-successful discoveries when they explain how the player learned a system.
+Answer for skirmish attempts; leave blank what you did not try.
 
-- Elapsed time:
-- Player's goal or expectation:
+- Did you expand to another deposit? What helped or got in the way, such as
+  Relay Stations or support coverage?
+- How did you lay out your base, and did placement ever block you?
+- How did you defend against raids and attacks? Were Sentry Turrets useful?
+- What did you lose, and how did you rebuild it?
+- Did repairs ever delay construction you wanted? When, and what did you do?
+- Did you use Medics, Mechanics, or Demolition Troopers? What did they add?
+- Did you use control groups, shortcuts, idle-worker or select-matching
+  controls? Which were hard to find or use?
+- How did the opponent's raids and attacks feel: too early, fair, too late,
+  too strong, or too weak?
+
+## Observations and help
+
+Copy this entry for each confusing moment, failure, or time you looked for
+help. Include successful discoveries when they explain how you learned a
+system.
+
+- Elapsed game time:
+- Your goal or expectation:
 - Action and observed response:
 - Guidance visible or opened:
-- Assistance: none / hint / explicit steps / observer took over:
-- Assistance requested or prompted, and why:
+- Help sought: none / in-game guide / outside source / organizer:
+- Why you needed it:
 - Outcome and time lost:
 
 ## Reliability and reproduction
