@@ -52,6 +52,7 @@
   }
 
   .production-card .option-cost {
+    grid-column: 1 / -1;
     margin-top: 0;
   }
 }
