@@ -61,6 +61,7 @@ export function createSidebarContext(
   signal: AbortSignal,
 ) {
   const nameFor = (id: string) => options.presentations.get(id)?.name ?? id;
+  const list = new Intl.ListFormat("en", { type: "conjunction" });
   return {
     ...options,
     keyboard: options.keyboard ?? DEFAULT_KEYBOARD,
@@ -70,8 +71,9 @@ export function createSidebarContext(
       options.definitions.map((definition) => [definition.id, definition]),
     ),
     nameFor,
+    /** A producer's trainable units as one readable list. */
     trainedNames: (definition: ActorDefinition) =>
-      definition.production!.unitDefinitionIds.map(nameFor),
+      list.format(definition.production!.unitDefinitionIds.map(nameFor)),
     owns: (actor: Pick<ObservedActor, "owner">) =>
       actor.owner === options.playerOwner,
   };

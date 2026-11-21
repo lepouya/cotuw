@@ -276,7 +276,7 @@ export function createSidebarSelection(
     if (support)
       return `${description ?? "Unit support"} · ${support} · ${supportHint(state)}`;
     if (definition?.production)
-      return `${description ?? "Unit production"} · Trains ${trainedNames(definition).join(" and ")}.`;
+      return `${description ?? "Unit production"} · Trains ${trainedNames(definition)}.`;
     if (isTilePlacedActor(actor))
       return `${description ?? "Building"} · Select Buildings to expand your base.`;
     if (definition?.movement)

@@ -187,7 +187,7 @@ export function createSidebarProduction(
     });
   const buildings = buildable.map((definition) => {
     const trains = definition.production
-      ? `Trains ${trainedNames(definition).join(" & ")} · `
+      ? `Trains ${trainedNames(definition)} · `
       : "";
     return addCard(
       buildingOptions,
