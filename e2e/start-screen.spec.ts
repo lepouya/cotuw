@@ -278,6 +278,10 @@ test.describe("skirmish links", () => {
         await expect(canvas).toHaveAttribute("data-models-ready", "true");
         await expect(page.locator("body")).toContainText(resource);
         await attachScreenshot(page, info, `skirmish-${faction}`);
+        await page.locator("#tab-goals").click();
+        await expect(page.locator("#scenario-goals-note")).toHaveText(
+          "An owner with no completed buildings is eliminated. Not counted: Relay Station.",
+        );
         await page.keyboard.press("Escape");
         await expect(page.locator("#restart-mission")).toBeVisible();
         await page.locator("#restart-mission").click();

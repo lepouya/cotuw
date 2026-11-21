@@ -477,6 +477,20 @@ test.each([
   expect(() => assembleSkirmish(choice)).toThrow(message);
 });
 
+test("the goals note names the buildings survival ignores", () => {
+  const scenario = createSkirmishScenario({
+    factions: { west: "arc", east: "circle" },
+    playerSlot: "west",
+    difficulty: "normal",
+  });
+  expect(scenario.skirmish?.qualifyingDefinitionIds).not.toContain(
+    "arc-relay-station",
+  );
+  expect(scenario.briefing?.goalsNote).toBe(
+    "An owner with no completed buildings is eliminated. Not counted: Relay Station.",
+  );
+});
+
 test("skirmish links resolve matchups, sides, and difficulty", () => {
   expect(skirmishLink(new URLSearchParams("level=sandbox"))).toBeUndefined();
   expect(skirmishLink(new URLSearchParams("skirmish=arc-circle"))).toEqual({

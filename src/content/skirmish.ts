@@ -143,6 +143,10 @@ export function createSkirmishScenario(
     return { start, faction, opening: SKIRMISH_OPENINGS[faction] };
   });
   const content = currentContentPack("base");
+  const excludedBuildingIds = content.skirmishExcludedBuildingIds ?? [];
+  const excludedBuildings = excludedBuildingIds.map(
+    (id) => content.presentation[id]!.name,
+  );
   const map = new TerrainGrid(skirmishMap.terrain);
   const owners = slots.map(({ start, faction }) => ({ id: start.id, faction }));
   const [first, second] = skirmishMap.starts;
@@ -167,8 +171,7 @@ export function createSkirmishScenario(
       owners: rivals,
       qualifyingDefinitionIds: content.actors
         .filter(
-          ({ id, footprint }) =>
-            footprint && !content.skirmishExcludedBuildingIds?.includes(id),
+          ({ id, footprint }) => footprint && !excludedBuildingIds.includes(id),
         )
         .map(({ id }) => id),
       startingResourceSites: Object.fromEntries(
@@ -193,9 +196,13 @@ export function createSkirmishScenario(
       label: "Skirmish",
       title: "Outlast your rival",
       description:
-        "Establish income, build your forces, and destroy every enemy building.",
+        "Establish income and build an army to destroy the rival base.",
       goalsHeading: "Win the skirmish",
-      goalsNote: "An owner with no completed buildings is eliminated.",
+      goalsNote:
+        "An owner with no completed buildings is eliminated." +
+        (excludedBuildings.length
+          ? ` Not counted: ${excludedBuildings.join(", ")}.`
+          : ""),
       rules: "Both sides start with one headquarters · Normal costs and timing",
     },
     buildings: slots.map(({ start, faction, opening }) => ({
