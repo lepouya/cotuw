@@ -98,10 +98,3 @@ export const selectionLocked = (state: SidebarState) =>
 /** Whether simulation orders are locked for this state. */
 export const ordersLocked = (state: SidebarState) =>
   selectionLocked(state) || missionEnded(state.result);
-
-export function countByDefinition(actors: Iterable<ObservedActor>) {
-  const counts = new Map<string, number>();
-  for (const { definitionId } of actors)
-    counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);
-  return counts;
-}

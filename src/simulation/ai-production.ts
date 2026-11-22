@@ -1,5 +1,5 @@
 // Faction-neutral army producers, built once income exists.
-import { isWorkerDefinition } from "./actor";
+import { countByDefinition, isWorkerDefinition } from "./actor";
 import {
   armyProducer,
   headquarters,
@@ -65,18 +65,14 @@ export const production = plannedConcern<ProductionPlan>(
       context.releaseFunds();
       return;
     }
-    // The type with the fewest producers, earliest in content order.
-    const count = (id: string) =>
-      producers.filter(({ definitionId }) => definitionId === id).length;
-    const [definition] = rosterBuildings(context, army).sort(
-      (a, b) => count(a.id) - count(b.id),
-    );
-    if (
-      !definition ||
-      !hasIncome ||
-      producers.some((producer) => producer.construction)
-    )
+    if (!hasIncome || producers.some((producer) => producer.construction))
       return;
+    // The type with the fewest producers, earliest in content order.
+    const counts = countByDefinition(producers);
+    const [definition] = rosterBuildings(context, army).sort(
+      (a, b) => (counts.get(a.id) ?? 0) - (counts.get(b.id) ?? 0),
+    );
+    if (!definition) return;
     place(
       context,
       context.memory as PlacementMemory,

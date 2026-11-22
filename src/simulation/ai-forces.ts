@@ -1,6 +1,7 @@
 // Faction-neutral army training, support providers, and rally points.
 import {
   compareIds,
+  countByDefinition,
   isArmyUnit,
   isIncomeBuilding,
   isSupportUnit,
@@ -45,14 +46,10 @@ type ForcesPlan = {
 
 /** Own mobile units and queued orders, by definition ID. */
 function unitCounts(context: AiConcernContext) {
-  const counts = new Map<string, number>();
-  const add = (definitionId: string) =>
-    counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);
-  for (const actor of context.view.actors().ownMobile)
-    if (context.view.isMobile(actor)) add(actor.definitionId);
-  for (const { definitionId } of context.view.economy()?.production ?? [])
-    add(definitionId);
-  return counts;
+  return countByDefinition([
+    ...context.view.actors().ownMobile.filter(context.view.isMobile),
+    ...(context.view.economy()?.production ?? []),
+  ]);
 }
 
 /** Counts possible service recipients of each kind once per planning turn. */

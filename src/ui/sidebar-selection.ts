@@ -4,18 +4,14 @@ import {
   occupiedTilesFor,
 } from "../simulation/placement";
 import { footprintSize } from "../simulation/grid";
-import { isSupportUnit } from "../simulation/actor";
+import { countByDefinition, isSupportUnit } from "../simulation/actor";
 import {
   createButton,
   createElement as el,
   createKeyedList,
   setText,
 } from "./dom";
-import {
-  countByDefinition,
-  inspectedActor,
-  selectionLocked,
-} from "./sidebar-context";
+import { inspectedActor, selectionLocked } from "./sidebar-context";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { OwnerRelation } from "../simulation/ownership";
 import type { UnitTypeScope } from "../render/selection";

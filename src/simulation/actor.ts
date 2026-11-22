@@ -397,6 +397,15 @@ export function compareIds(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+export function countByDefinition(
+  entries: Iterable<Pick<Actor, "definitionId">>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const { definitionId } of entries)
+    counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);
+  return counts;
+}
+
 /** Orders actors nearest-first from a point, breaking ties by ID. */
 export const nearestTo =
   (point: WorldPosition) =>

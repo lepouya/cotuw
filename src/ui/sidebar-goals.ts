@@ -1,7 +1,7 @@
 import { createGoalList } from "./goals";
 import { createElement as el, setText } from "./dom";
 import { presentResult } from "./mission-result";
-import { countByDefinition } from "./sidebar-context";
+import { countByDefinition } from "../simulation/actor";
 import { rosterIncludes } from "../simulation/ownership";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-goals.css";
