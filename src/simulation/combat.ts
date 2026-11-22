@@ -6,6 +6,7 @@ import {
   occupiedTilesFor,
 } from "./placement";
 import {
+  clampToBounds,
   distance,
   distanceToBounds,
   facingToward,
@@ -35,6 +36,7 @@ import type {
 } from "./actor";
 import type { TileCoord } from "./grid";
 import type { OccupancyView } from "./occupancy";
+import type { TilePlacedActorState } from "./placement";
 import type { TerrainGrid, TerrainView } from "./terrain";
 import type { WorldBounds, WorldPosition } from "./world";
 
@@ -800,6 +802,29 @@ function targetExtent(
   return extent;
 }
 
+/** The point of a placed building's footprint nearest to `from`. */
+export function footprintContact(
+  from: WorldPosition,
+  target: TilePlacedActorState,
+  definition: ActorDefinition,
+  map: Pick<TerrainView, "worldPositionAt">,
+): WorldPosition {
+  let contact = from;
+  let nearest = Infinity;
+  for (const { x, z } of occupiedTilesFor(target, definition)) {
+    const point = clampToBounds(
+      from,
+      tileAreaBounds(map, { minX: x, minZ: z, maxX: x, maxZ: z }),
+    );
+    const gap = distance(point, from);
+    if (gap < nearest) {
+      contact = point;
+      nearest = gap;
+    }
+  }
+  return contact;
+}
+
 /** Distance from the attacker's center to the target's footprint or body. */
 export function weaponReach(
   attacker: Pick<ActorRenderState, "worldPosition">,
@@ -811,16 +836,11 @@ export function weaponReach(
   map: TerrainGrid | undefined,
 ): number {
   const definition = definitions.get(target.definitionId)!;
-  if (map && isTilePlacedActor(target)) {
-    return Math.min(
-      ...occupiedTilesFor(target, definition).map(({ x, z }) =>
-        distanceToBounds(
-          attacker.worldPosition,
-          tileAreaBounds(map, { minX: x, minZ: z, maxX: x, maxZ: z }),
-        ),
-      ),
+  if (map && isTilePlacedActor(target))
+    return distance(
+      attacker.worldPosition,
+      footprintContact(attacker.worldPosition, target, definition, map),
     );
-  }
   return Math.max(
     0,
     distance(attacker.worldPosition, target.worldPosition) -

@@ -76,12 +76,14 @@ bundled packs through the same parser future mod packs will use.
     `PORTRAIT_IDS` in `content/presentation.ts`. Circle actors bind distinct
     portraits. Omitted portraits fall back to a generic gameplay-role icon.
   - `attackEffect` is `"tracer"`, `"bolt"` (violet Circle focus fire),
-    `"bite"`, or `"rocket"`, a launcher streak with a `rocket-impact` burst.
+    `"bite"`, `"strike"` (a construct's splintering melee blow), or
+    `"rocket"`, a launcher streak with a `rocket-impact` burst.
     Optional `attackAnchor` is the muzzle's `[x, y, z]` in model space; on
     buildings it uses tile units above the roof. Mobile actors otherwise use
     their attack frame effect's anchor.
-  - `serviceEffect` on a restoration provider is `"medical"` or
-    `"mechanical"`. It selects the symbol shown on service orders and above
+  - `serviceEffect` on a restoration provider is `"medical"`,
+    `"mechanical"`, `"healing"` (a Circle leaf), or `"construct-repair"` (a
+    thorned sprig). It selects the symbol shown on service orders and above
     actively serviced targets.
   - `damageEffect` is `"mechanical"` smoke and fire, `"biological"` drops, or
     `"living"` falling leaves, shown at 60% health or below; absent shows none.
@@ -113,7 +115,8 @@ bundled packs through the same parser future mod packs will use.
   are validated even on unused presentation entries.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
   `materials-mound`, `cultivation-site`, `leaf`, `salvage`, `tracer`,
-  `rocket`, `rocket-impact`, `bolt`, `bite`, `smoke`, `fire`, `wound`,
+  `rocket`, `rocket-impact`, `bolt`, `bite`, `strike`, `smoke`, `fire`,
+  `wound`,
   `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.
 - `materialsStages` lists `{ above, scale }` in descending order. A remaining
   fraction strictly greater than `above` uses that scale. Cutoffs lie in

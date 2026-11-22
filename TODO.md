@@ -140,18 +140,16 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   delivery and content-pack site tuning.
 - [x] **1.51** Cultivation and growth feedback verified, including site
   inspection, dormancy alerts, worker badges, and construction status.
-- [ ] **1.52** Add Healer and Artificer support, the Thornspire, Briar Ram,
-  and Construct Nursery. Circle expansion uses existing structures. Verify
-  target eligibility, counter relationships, recovery, production requirements,
-  the Briar Ram's single-target building damage bonus, and the Nursery's shared
-  Briar Ram/Artificer queue. Musterhalls train Healers.
-- [ ] **1.53** Complete full-roster assets and presentation acceptance under
-  [Circle direction](DESIGN.md#m1-circle-presentation). Extend the slice's
-  generated models, growth layers, effects, work/weapon audio, and faction
-  music for the remaining roster. Verify silhouettes, owner markings,
-  entrances, weapons, interrupted growth, saved progress, damage/repair,
-  destruction, reduced motion, and mix readability at gameplay scale.
-  Rebuild assets reproducibly and verify pack bindings.
+- [x] **1.52** Healer and Artificer support, Thornspire defense, and Briar Ram
+  siege combat verified. The Construct Nursery grows Rams and trains
+  Artificers in one queue. Musterhalls train Healers.
+- [ ] **1.53** Complete full-roster presentation acceptance under
+  [Circle direction](DESIGN.md#m1-circle-presentation). Generated models,
+  growth layers, and effects cover the full roster from 1.52; add work/weapon
+  audio and faction music for the remaining roster. Verify silhouettes,
+  owner markings, entrances, weapons, interrupted growth, saved progress,
+  damage/repair, destruction, reduced motion, and mix readability at gameplay
+  scale. Rebuild assets reproducibly and verify pack bindings.
 - [ ] **1.54** Finish the Circle introduction using the wolf-den slice.
   Verify it teaches cultivation, dormancy, construction, and production before
   skirmish play. Keep M0 available as ARC's introduction.

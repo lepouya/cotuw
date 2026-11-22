@@ -32,14 +32,52 @@ export const CROSS_SYMBOL: Symbol2d = [
   ],
 ];
 
+/** A leaf outline with its midrib. */
+export const LEAF_SYMBOL: Symbol2d = [
+  [
+    [0, -0.85],
+    [0.45, -0.25],
+    [0.38, 0.4],
+    [0, 0.85],
+    [-0.38, 0.4],
+    [-0.45, -0.25],
+    [0, -0.85],
+  ],
+  [
+    [0, -0.85],
+    [0, 0.55],
+  ],
+];
+
+/** A curved stem with paired thorns, as grown into a construct's plates. */
+export const SPRIG_SYMBOL: Symbol2d = [
+  [
+    [-0.25, -0.85],
+    [0, -0.1],
+    [0.1, 0.85],
+  ],
+  [
+    [-0.05, -0.3],
+    [0.55, -0.05],
+  ],
+  [
+    [0.05, 0.35],
+    [-0.5, 0.6],
+  ],
+];
+
 export const SERVICE_SYMBOLS: Readonly<Record<ServiceEffectStyle, Symbol2d>> = {
   medical: CROSS_SYMBOL,
   mechanical: WRENCH_SYMBOL,
+  healing: LEAF_SYMBOL,
+  "construct-repair": SPRIG_SYMBOL,
 };
 
 export const SERVICE_COLORS: Readonly<Record<ServiceEffectStyle, Color3>> = {
   medical: new Color3(0.3, 1, 0.75),
   mechanical: new Color3(1, 0.72, 0.2),
+  healing: new Color3(0.72, 1, 0.45),
+  "construct-repair": new Color3(0.78, 0.52, 1),
 };
 
 /** A flat mesh of `width`-wide strokes in the XY plane, scaled by `size`. */

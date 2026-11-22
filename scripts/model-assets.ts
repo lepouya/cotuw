@@ -17,6 +17,7 @@ import {
   BITE_COLOR,
   BOLT_COLOR,
   ROCKET_COLOR,
+  STRIKE_COLOR,
   TRACER_COLOR,
 } from "../src/render/combat-effects.ts";
 import { createCommandCenterDetails } from "../src/render/command-center.ts";
@@ -170,6 +171,164 @@ function wolf(scene: Scene, name: string) {
     hips.forEach((hip) => {
       hip.rotation.x = -fall * 0.3;
     });
+  });
+}
+
+/**
+ * A low, broad living construct facing +Z: pale armor plates over dark
+ * joints, a sheltered violet core, and a thorn-framed head that strikes.
+ */
+function briarRam(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const armor = surface(scene, "ram-armor", [0.82, 0.74, 0.52]);
+  const joints = surface(scene, "ram-joints", [0.22, 0.15, 0.1]);
+  const core = surface(scene, "ram-core", [0.58, 0.28, 0.88], 0.6);
+  const owner = surface(scene, "ram-owner", [0.48, 0.76, 0.59]);
+  const blob = (
+    id: string,
+    size: [number, number, number],
+    position: [number, number, number],
+    material: StandardMaterial,
+    parent: TransformNode = root,
+  ) => {
+    const mesh = MeshBuilder.CreateSphere(
+      id,
+      { diameter: 1, segments: 8 },
+      scene,
+    );
+    mesh.parent = parent;
+    mesh.position.set(...position);
+    mesh.scaling.set(...size);
+    mesh.material = material;
+    return mesh;
+  };
+  blob("ram-body", [0.95, 0.62, 1.45], [0, 0.85, 0], joints);
+  blob("ram-core", [0.34, 0.28, 0.2], [0, 0.72, 0.62], core);
+  // Overlapping back plates, front plates lapping over rear ones.
+  for (let i = 0; i < 4; i++) {
+    const plate = blob(
+      `ram-plate-${i}`,
+      [1.05 - i * 0.05, 0.28, 0.5],
+      [0, 1.13 - Math.abs(i - 1.5) * 0.03, 0.48 - i * 0.32],
+      armor,
+    );
+    plate.rotation.x = -0.18;
+  }
+  for (const side of [-1, 1]) {
+    blob(
+      `ram-flank-${side}`,
+      [0.14, 0.42, 1.1],
+      [side * 0.47, 0.88, -0.02],
+      armor,
+    );
+    const band = MeshBuilder.CreateBox(
+      `ram-band-${side}`,
+      { width: 0.04, height: 0.16, depth: 0.7 },
+      scene,
+    );
+    band.parent = root;
+    band.position.set(side * 0.55, 0.92, 0);
+    band.material = owner;
+  }
+  const head = blob("ram-head", [0.5, 0.42, 0.5], [0, 0.92, 0.82], armor);
+  blob("ram-brow", [0.56, 0.2, 0.32], [0, 0.26, 0.18], armor, head);
+  blob("ram-muzzle", [0.32, 0.26, 0.3], [0, -0.1, 0.32], joints, head);
+  for (const side of [-1, 1]) {
+    const thorn = MeshBuilder.CreateCylinder(
+      `ram-thorn-${side}`,
+      { height: 0.42, diameterTop: 0, diameterBottom: 0.1, tessellation: 6 },
+      scene,
+    );
+    thorn.parent = head;
+    thorn.position.set(side * 0.24, 0.26, 0.1);
+    thorn.rotation.set(0.7, 0, -side * 0.55);
+    thorn.material = joints;
+  }
+  const hips = [
+    [-0.36, 0.45],
+    [0.36, 0.45],
+    [-0.36, -0.45],
+    [0.36, -0.45],
+  ].map(([x, z], index) => {
+    const hip = new TransformNode(`ram-leg-${index}`, scene);
+    hip.parent = root;
+    hip.position.set(x!, 0.72, z!);
+    const leg = MeshBuilder.CreateCylinder(
+      `ram-leg-${index}-mesh`,
+      { height: 0.66, diameterTop: 0.3, diameterBottom: 0.22, tessellation: 7 },
+      scene,
+    );
+    leg.parent = hip;
+    leg.position.y = -0.33;
+    leg.material = joints;
+    blob(`ram-foot-${index}`, [0.32, 0.14, 0.36], [0, -0.66, 0.03], armor, hip);
+    return hip;
+  });
+  const headJoint = skin(root).get(head)!;
+  const restHead = headJoint.position.clone();
+  clip(root, "idle", 3, (seconds) => {
+    headJoint.rotation.x = Math.sin((seconds / 3) * Math.PI * 2) * 0.03;
+  });
+  // Diagonal pairs step together with deliberate, planted feet.
+  clip(root, "walk", 1.4, (seconds) => {
+    const phase = (seconds / 1.4) * Math.PI * 2;
+    hips.forEach((hip, index) => {
+      hip.rotation.x =
+        Math.sin(phase + (index === 0 || index === 3 ? 0 : Math.PI)) * 0.38;
+    });
+    root.position.y = (1 - Math.cos(phase * 2)) * 0.02;
+    headJoint.rotation.x = Math.sin(phase * 2) * 0.03;
+  });
+  for (const [turn, sign] of [
+    ["turn-left", -1],
+    ["turn-right", 1],
+  ] as const)
+    clip(
+      root,
+      turn,
+      0.4,
+      (seconds) => {
+        const amount = seconds / 0.4;
+        root.rotation.z = -sign * amount * 0.06;
+        headJoint.rotation.y = sign * amount * 0.15;
+      },
+      false,
+    );
+  clip(
+    root,
+    "hit",
+    0.4,
+    (seconds) => {
+      const flinch = Math.sin((seconds / 0.4) * Math.PI);
+      headJoint.rotation.x = -flinch * 0.15;
+      root.rotation.z = flinch * 0.05;
+    },
+    false,
+  );
+  // The hit is already committed when this clip starts. Lunge, then settle.
+  clip(
+    root,
+    "strike",
+    0.6,
+    (seconds) => {
+      const t = seconds / 0.6;
+      const travel = t < 0.2 ? t / 0.2 : (1 - t) / 0.8;
+      const blow = travel ** 2;
+      headJoint.rotation.x = blow * 0.15;
+      headJoint.position.z = restHead.z + blow * 0.28;
+      root.position.z = blow * 0.12;
+    },
+    false,
+  );
+  // Legs buckle outward and the body settles into an inert husk.
+  clip(root, "death", 1.2, (seconds) => {
+    const fall = (seconds / 1.2) ** 2;
+    hips.forEach((hip, index) => {
+      hip.rotation.z = (index % 2 ? -1 : 1) * fall * 1.1;
+    });
+    root.position.y = -fall * 0.42;
+    root.rotation.z = fall * 0.18;
+    headJoint.rotation.x = fall * 0.4;
   });
 }
 
@@ -427,6 +586,32 @@ function bite(scene: Scene, name: string) {
     slash.position.x = side * 0.12;
     slash.rotation.z = -0.5;
     slash.material = material;
+  }
+}
+
+/** Splintered wood and a violet ring where a construct's blow lands. */
+function strike(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const splinter = unlit(scene, name, STRIKE_COLOR);
+  const ring = MeshBuilder.CreateTorus(
+    `${name}-ring`,
+    { diameter: 0.5, thickness: 0.03, tessellation: 18 },
+    scene,
+  );
+  ring.parent = root;
+  ring.rotation.x = Math.PI / 2;
+  ring.material = unlit(scene, `${name}-ring`, BOLT_COLOR);
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3 + 0.3;
+    const shard = MeshBuilder.CreateBox(
+      `${name}-shard-${i}`,
+      { width: 0.035, height: 0.26, depth: 0.035 },
+      scene,
+    );
+    shard.parent = root;
+    shard.position.set(Math.cos(angle) * 0.24, Math.sin(angle) * 0.24, 0);
+    shard.rotation.z = angle - Math.PI / 2;
+    shard.material = splinter;
   }
 }
 
@@ -844,6 +1029,7 @@ const BUILDERS = {
   sentry: building(createSentryDetails),
   harvester,
   wolf,
+  "circle-briar-ram": briarRam,
   "materials-mound": materialsMound,
   salvage,
   rubble,
@@ -854,6 +1040,7 @@ const BUILDERS = {
   "rocket-impact": rocketImpact,
   bolt,
   bite,
+  strike,
   smoke,
   fire,
   leaf,

@@ -85,6 +85,10 @@ then hides it.
 Choose Circle in New mission or use `/?level=circle-wolf-den` for the
 [Circle cultivation slice](DESIGN.md#circle-wolf-den-development-slice), which
 in-game guides introduce. It uses the existing single-player control model.
+Musterhalls also train Healers for Circle personnel. Construct Nurseries grow
+Briar Rams, slow living constructs that batter buildings, and train
+Artificers to repair them. Thornspires are tough, shorter-range living
+defenses.
 
 Levels and assets are generated from source and committed. `npm run levels`
 rebuilds bundled levels, replacing hand edits; `npm run assets` rebuilds all

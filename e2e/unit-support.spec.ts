@@ -3,6 +3,7 @@ import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
 import {
   activate,
+  actorPoint,
   advance,
   collectPageErrors,
   expectTerrainReady,
@@ -71,32 +72,6 @@ async function opening(page: Page) {
   });
   await expectTerrainReady(page);
   await selectInSession(page, "barracks");
-}
-
-async function actorPoint(page: Page, id: string) {
-  return page.evaluate(async (id) => {
-    const { Vector3, projectToCanvas } = await import("/e2e/harness.ts");
-    const { view } = window.sessionHarness;
-    const root = view.scene.getTransformNodeByName(`actor-${id}-root`)!;
-    const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
-    const bounds = canvas.getBoundingClientRect();
-    const points = [1.2, 0.9, 0.6].map((height) =>
-      root.getAbsolutePosition().add(new Vector3(0, height, 0)),
-    );
-    for (const point of points) {
-      const screen = projectToCanvas(view.scene, canvas, point);
-      const pick = view.scene.pick(
-        screen.x - bounds.left,
-        screen.y - bounds.top,
-      );
-      if (pick?.pickedMesh?.isDescendantOf(root))
-        return {
-          ...screen,
-          clear: document.elementFromPoint(screen.x, screen.y) === canvas,
-        };
-    }
-    throw new Error(`No clickable mesh point for ${id}`);
-  }, id);
 }
 
 forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
@@ -295,10 +270,10 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
       }
       await activate(page.locator("#focus-selection"), touch);
       await advance(page, 0.5);
-      let target = await actorPoint(page, targetId);
+      let target = await actorPoint(page, targetId, [1.2, 0.9, 0.6]);
       expect(target.clear).toBe(true);
       await activate(page.locator("#queue-orders"), touch);
-      target = await actorPoint(page, targetId);
+      target = await actorPoint(page, targetId, [1.2, 0.9, 0.6]);
       await pressPoint(page, target, touch);
       await advance(page, 0.1);
       await expect(page.locator("#movement-status")).toContainText(
@@ -311,7 +286,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
         ),
       ).toEqual([{ kind: "service", targetId }]);
       await activate(page.locator("#queue-orders"), touch);
-      target = await actorPoint(page, targetId);
+      target = await actorPoint(page, targetId, [1.2, 0.9, 0.6]);
       await pressPoint(page, target, touch);
       await advance(page, 0.1);
       await expect(page.locator("#movement-status")).toContainText(

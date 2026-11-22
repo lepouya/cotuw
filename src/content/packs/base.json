@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 4,
   "id": "base",
-  "version": 13,
+  "version": 14,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -60,7 +60,11 @@
         "maxSlope": 0.75
       },
       "production": {
-        "unitDefinitionIds": ["circle-sentinel", "circle-wayfinder"]
+        "unitDefinitionIds": [
+          "circle-sentinel",
+          "circle-wayfinder",
+          "circle-healer"
+        ]
       }
     },
     {
@@ -244,6 +248,176 @@
       },
       "lifebloomCost": 20,
       "trainingSeconds": 3
+    },
+    {
+      "id": "circle-healer",
+      "behaviorId": "terrain-move",
+      "faction": "circle",
+      "health": 60,
+      "recoveryKind": "biological",
+      "restoration": {
+        "targetKinds": ["biological"],
+        "range": 1.5,
+        "acquisitionRadius": 7,
+        "pursuitRadius": 10,
+        "healthPerSecond": 6
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.3
+      },
+      "vision": {
+        "radius": 7
+      },
+      "lifebloomCost": 40,
+      "trainingSeconds": 6
+    },
+    {
+      "id": "circle-artificer",
+      "behaviorId": "terrain-move",
+      "faction": "circle",
+      "health": 80,
+      "recoveryKind": "biological",
+      "restoration": {
+        "targetKinds": ["living-construct"],
+        "range": 1.5,
+        "acquisitionRadius": 7,
+        "pursuitRadius": 10,
+        "healthPerSecond": 12
+      },
+      "movement": {
+        "speed": 4,
+        "profileId": "surface-ground",
+        "radius": 0.3
+      },
+      "vision": {
+        "radius": 7
+      },
+      "lifebloomCost": 40,
+      "trainingSeconds": 6
+    },
+    {
+      "id": "circle-briar-ram",
+      "behaviorId": "terrain-move",
+      "faction": "circle",
+      "health": 450,
+      "recoveryKind": "living-construct",
+      "weapon": {
+        "damage": 8,
+        "buildingDamageBonus": 60,
+        "damageType": "kinetic",
+        "range": 1,
+        "cooldownSeconds": 2
+      },
+      "guard": {
+        "acquisitionRadius": 6,
+        "chaseRadius": 10
+      },
+      "movement": {
+        "speed": 2.5,
+        "profileId": "surface-ground",
+        "radius": 0.6
+      },
+      "vision": {
+        "radius": 6
+      },
+      "lifebloomCost": 100,
+      "trainingSeconds": 12
+    },
+    {
+      "id": "circle-thornspire",
+      "behaviorId": "idle",
+      "faction": "circle",
+      "health": 600,
+      "vision": {
+        "radius": 8
+      },
+      "lifebloomCost": 100,
+      "constructionSeconds": 10,
+      "growth": {
+        "workerDefinitionId": "circle-cultivator",
+        "headquartersDefinitionId": "circle-heartgrove"
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [{ "x": 0, "z": 0 }],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      },
+      "weapon": {
+        "damage": 20,
+        "damageType": "arcane",
+        "range": 6.5,
+        "cooldownSeconds": 1.5
+      }
+    },
+    {
+      "id": "circle-construct-nursery",
+      "behaviorId": "idle",
+      "faction": "circle",
+      "health": 900,
+      "vision": {
+        "radius": 8
+      },
+      "lifebloomCost": 125,
+      "constructionSeconds": 10,
+      "growth": {
+        "workerDefinitionId": "circle-cultivator",
+        "headquartersDefinitionId": "circle-heartgrove"
+      },
+      "footprint": {
+        "layer": "surface",
+        "occupiedTiles": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "z": 2
+          },
+          {
+            "x": 1,
+            "z": 2
+          },
+          {
+            "x": 2,
+            "z": 2
+          }
+        ],
+        "blocksMovement": true
+      },
+      "placement": {
+        "terrainTypeIds": ["plain", "path", "rough"],
+        "maxSlope": 0.75
+      },
+      "production": {
+        "unitDefinitionIds": ["circle-briar-ram", "circle-artificer"]
+      }
     },
     {
       "id": "arc-trooper",
@@ -885,6 +1059,202 @@
     }
   ],
   "presentation": {
+    "circle-healer": {
+      "name": "Healer",
+      "description": "Heals personnel",
+      "train": {
+        "id": "train-circle-healer",
+        "label": "Train Healer"
+      },
+      "damageEffect": "biological",
+      "serviceEffect": "healing",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        }
+      },
+      "portrait": "circle-healer",
+      "model": {
+        "glb": {
+          "url": "assets/actors/circle-healer.glb",
+          "bounds": {
+            "radius": 0.6,
+            "height": 1.95
+          },
+          "clips": {
+            "idle": "idle",
+            "work": "cast",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "death": "death",
+            "hit": "hit"
+          },
+          "cycleDistance": 1.85
+        }
+      }
+    },
+    "circle-artificer": {
+      "name": "Artificer",
+      "description": "Repairs living constructs such as Briar Rams",
+      "train": {
+        "id": "train-circle-artificer",
+        "label": "Train Artificer"
+      },
+      "damageEffect": "biological",
+      "serviceEffect": "construct-repair",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        }
+      },
+      "portrait": "circle-artificer",
+      "model": {
+        "glb": {
+          "url": "assets/actors/circle-artificer.glb",
+          "bounds": {
+            "radius": 0.55,
+            "height": 1.95
+          },
+          "clips": {
+            "idle": "idle",
+            "work": "mend",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "death": "death",
+            "hit": "hit"
+          },
+          "cycleDistance": 1.85
+        }
+      }
+    },
+    "circle-briar-ram": {
+      "name": "Briar Ram",
+      "description": "Slow, tough living construct. Batters buildings with heavy strikes; weak against troops.",
+      "train": {
+        "id": "train-circle-briar-ram",
+        "label": "Grow Briar Ram"
+      },
+      "attackEffect": "strike",
+      "damageEffect": "living",
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        }
+      },
+      "portrait": "circle-briar-ram",
+      "model": {
+        "glb": {
+          "url": "assets/models/circle-briar-ram.glb",
+          "bounds": {
+            "radius": 0.8,
+            "height": 1.45
+          },
+          "clips": {
+            "idle": "idle",
+            "locomotion": "walk",
+            "turn": {
+              "left": "turn-left",
+              "right": "turn-right"
+            },
+            "attack": "strike",
+            "death": "death",
+            "hit": "hit"
+          },
+          "cycleDistance": 1.6
+        }
+      }
+    },
+    "circle-thornspire": {
+      "name": "Thornspire",
+      "description": "Tough living defense with shorter range and heavy bolts",
+      "build": {
+        "id": "build-circle-thornspire",
+        "label": "Grow Thornspire",
+        "order": 4
+      },
+      "attackEffect": "bolt",
+      "attackAnchor": [0, 2.35, 0],
+      "damageEffect": "living",
+      "portrait": "circle-thornspire",
+      "building": {
+        "height": 0.12,
+        "color": [0.38, 0.29, 0.18],
+        "glb": {
+          "url": "assets/models/circle-thornspire.glb",
+          "idle": "idle",
+          "aimNode": "circle-thornspire-crown",
+          "activities": {
+            "attack": "attack"
+          }
+        }
+      },
+      "audio": {
+        "events": {
+          "attack": [
+            {
+              "cue": "circle-cast"
+            }
+          ],
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        },
+        "loops": {
+          "constructing": "circle-growth"
+        }
+      }
+    },
+    "circle-construct-nursery": {
+      "name": "Construct Nursery",
+      "description": "Grows Briar Rams and trains Artificers",
+      "build": {
+        "id": "build-circle-construct-nursery",
+        "label": "Grow Construct Nursery",
+        "order": 3
+      },
+      "damageEffect": "living",
+      "portrait": "circle-construct-nursery",
+      "building": {
+        "height": 0.12,
+        "color": [0.38, 0.29, 0.18],
+        "glb": {
+          "url": "assets/models/circle-construct-nursery.glb",
+          "idle": "idle"
+        }
+      },
+      "audio": {
+        "events": {
+          "damage": [
+            {
+              "cue": "living-hit"
+            }
+          ]
+        },
+        "loops": {
+          "constructing": "circle-growth"
+        }
+      }
+    },
     "circle-sentinel": {
       "name": "Sentinel",
       "description": "Tough, short-ranged Circle infantry",
@@ -1901,6 +2271,7 @@
     }
   },
   "props": {
+    "strike": { "url": "assets/models/strike.glb" },
     "rocket": {
       "url": "assets/models/rocket.glb"
     },

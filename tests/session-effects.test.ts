@@ -254,8 +254,23 @@ describe("shot and service placement", () => {
     ],
     ["sentry", { name: "Sentry", description: "", attackAnchor: [0, 1, 1] }],
     ["medic", { name: "Medic", description: "", serviceEffect: "medical" }],
+    ["ram", { name: "Ram", description: "", attackEffect: "strike" }],
   ]);
   const context = {
+    definitions: new Map<string, ActorDefinition>([
+      [
+        "sentry",
+        {
+          id: "sentry",
+          behaviorId: "idle",
+          footprint: {
+            layer: "surface",
+            occupiedTiles: [{ x: 0, z: 0 }],
+            blocksMovement: true,
+          },
+        },
+      ],
+    ]),
     appearances: new Map([
       ["trooper", { bounds: { radius: 0.5, height: 1.2 } } as ActorAppearance],
     ]),
@@ -320,6 +335,22 @@ describe("shot and service placement", () => {
     };
     const { to } = shotEnds(hit("launcher"), undefined, remains, context);
     expect(to!.asArray()).toEqual([8, 7, 2]);
+  });
+
+  test("melee splinters land at the building edge for a visible striker", () => {
+    const attacker = unit("a", "ram");
+    const remains = {
+      id: "t",
+      definitionId: "sentry",
+      tilePlacement: { origin: { x: 6, z: 5 }, quarterTurns: 0 },
+    };
+    const strike = { ...hit("ram"), from: { x: 0, z: 1 }, to: { x: 3, z: 1 } };
+    expect(shotEnds(strike, attacker, remains, context).to?.asArray()).toEqual([
+      2, 7, 1,
+    ]);
+    expect(shotEnds(strike, undefined, remains, context).to?.asArray()).toEqual(
+      [3, 7, 1],
+    );
   });
 
   test.each(["builtin", "glb"])(

@@ -49,7 +49,7 @@ type InfantryRecipe = {
   parts: readonly Part[];
   stride: number;
   stance: Stance;
-  work?: "cultivate" | "treat" | "repair";
+  work?: keyof typeof WORK_POSES;
   /** Armed roles also get an aim layer. */
   attack?: Attack;
 };
@@ -708,6 +708,135 @@ const WAYFINDER_GEAR: Part[] = [
   ),
 ];
 
+const HEALER_GEAR: Part[] = [
+  part("stole", "spine", "leaf", [0.36, 0.7, 0.1], [0, 1.2, 0.2], "owner"),
+  part(
+    "mantle-hem",
+    "spine",
+    "leaf",
+    [0.95, 0.5, 0.36],
+    [0, 0.72, -0.3],
+    "cloth",
+  ),
+  part(
+    "heart-seed",
+    "spine",
+    "leaf",
+    [0.1, 0.16, 0.08],
+    [0, 1.42, 0.24],
+    "visor",
+  ),
+  ...mirrored((side, sign): Part[] => [
+    {
+      ...part(
+        `${side}-shoulder-drape`,
+        `${side}-arm`,
+        "leaf",
+        [0.3, 0.42, 0.26],
+        [sign * 0.33, 1.38, 0],
+        "cloth",
+      ),
+      tiltZ: -sign * 0.5,
+    },
+    part(
+      `${side}-palm-glow`,
+      `${side}-forearm`,
+      "leaf",
+      [0.1, 0.17, 0.08],
+      [sign * 0.4, 0.76, 0.25],
+      "visor",
+    ),
+  ]),
+];
+
+const ARTIFICER_GEAR: Part[] = [
+  ...mirrored((side, sign): Part[] => [
+    {
+      ...part(
+        `${side}-harness-strap`,
+        "spine",
+        "box",
+        [0.07, 0.62, 0.05],
+        [sign * 0.1, 1.3, 0.23],
+        "armor",
+      ),
+      tiltZ: sign * 0.45,
+    },
+    part(
+      `${side}-tool-pouch`,
+      "pelvis",
+      "box",
+      [0.14, 0.18, 0.12],
+      [sign * 0.27, 0.9, 0.12],
+      "armor",
+    ),
+    part(
+      `${side}-bracer`,
+      `${side}-forearm`,
+      "cylinder",
+      [0.15, 0.2, 0.15],
+      [sign * 0.37, 0.95, 0.11],
+      "armor",
+    ),
+  ]),
+  part(
+    "harness-buckle",
+    "spine",
+    "sphere",
+    [0.12, 0.12, 0.06],
+    [0, 1.3, 0.27],
+    "owner",
+  ),
+  part(
+    "tool-belt",
+    "pelvis",
+    "torus",
+    [0.47, 0.1, 0.36],
+    [0, 0.93, 0],
+    "armor",
+  ),
+  part(
+    "tool-frame",
+    "spine",
+    "box",
+    [0.42, 0.55, 0.14],
+    [0, 1.3, -0.3],
+    "armor",
+  ),
+  part(
+    "frame-shaper",
+    "spine",
+    "cylinder",
+    [0.04, 0.75, 0.04],
+    [0.14, 1.45, -0.38],
+    "dark",
+  ),
+  part(
+    "frame-shaper-seed",
+    "spine",
+    "leaf",
+    [0.08, 0.14, 0.08],
+    [0.14, 1.86, -0.38],
+    "visor",
+  ),
+  part(
+    "shaping-awl",
+    "right-forearm",
+    "cylinder",
+    [0.05, 0.4, 0.05],
+    [0.38, 0.72, 0.24],
+    "dark",
+  ),
+  part(
+    "awl-tip",
+    "right-forearm",
+    "leaf",
+    [0.07, 0.13, 0.07],
+    [0.38, 0.5, 0.27],
+    "visor",
+  ),
+];
+
 function part(
   name: string,
   joint: string,
@@ -777,6 +906,47 @@ const FOCUS_CHANNEL: Attack = {
     return joint === "spine" ? [-0.12 * release, 0, 0] : [0.04 * release, 0, 0];
   },
 };
+
+/** Work clips override the joints involved in a gesture. */
+type WorkPose = (joint: string, phase: number) => Vec3 | undefined;
+
+function toolGesture(strokes: number, forearmTravel: number): WorkPose {
+  return (joint, phase) => {
+    const pulse = Math.sin(phase * strokes);
+    if (joint === "spine") return [0.1 + pulse * 0.03, 0, 0];
+    if (joint === "right-arm") return [-0.65 + pulse * 0.12, 0, 0.05];
+    if (joint === "right-forearm") return [-0.5 + pulse * forearmTravel, 0, 0];
+    if (joint === "left-arm") return [-0.2, 0, -0.1];
+  };
+}
+
+const WORK_POSES = {
+  treat: toolGesture(1, 0.12),
+  repair: toolGesture(2, 0.3),
+  cultivate: (joint, phase) => {
+    const pulse = Math.sin(phase);
+    if (joint === "spine") return [0.18 + pulse * 0.04, 0, 0];
+    if (joint.endsWith("forearm")) return [-0.6 - pulse * 0.2, 0, 0];
+    if (joint.endsWith("arm")) return [-0.4 + pulse * 0.12, 0, 0];
+  },
+  // Open palms raised toward the patient.
+  cast: (joint, phase) => {
+    const pulse = Math.sin(phase);
+    if (joint === "spine") return [-0.04 + pulse * 0.02, 0, 0];
+    if (joint === "left-arm") return [-0.95 + pulse * 0.08, 0, -0.28];
+    if (joint === "right-arm") return [-0.95 + pulse * 0.08, 0, 0.28];
+    if (joint.endsWith("forearm")) return [-0.3 - pulse * 0.06, 0, 0];
+  },
+  // A forward lean shaping the construct with the awl.
+  mend: (joint, phase) => {
+    const stroke = Math.sin(phase * 2);
+    if (joint === "spine") return [0.24 + Math.sin(phase) * 0.03, 0, 0];
+    if (joint === "right-arm") return [-0.85 + stroke * 0.15, 0, 0.08];
+    if (joint === "right-forearm") return [-0.4 + stroke * 0.3, 0, 0];
+    if (joint === "left-arm") return [-0.7, 0, -0.12];
+    if (joint === "left-forearm") return [-0.45, 0, 0];
+  },
+} satisfies Record<string, WorkPose>;
 
 const INFANTRY_RECIPES = {
   "circle-cultivator": {
@@ -897,6 +1067,30 @@ const INFANTRY_RECIPES = {
     stride: 0.8,
     stance: FOCUS_HELD,
     attack: FOCUS_CHANNEL,
+  },
+  "circle-healer": {
+    work: "cast",
+    scale: 0.96,
+    palette: {
+      armor: [0.8, 0.77, 0.6],
+      cloth: [0.62, 0.78, 0.7],
+      ...CIRCLE_TRIM,
+    },
+    parts: [...elvenParts([0.9, 1.3, 0.34]), ...HEALER_GEAR],
+    stride: 0.75,
+    stance: ARMS_AT_SIDES,
+  },
+  "circle-artificer": {
+    work: "mend",
+    scale: 1,
+    palette: {
+      armor: [0.45, 0.33, 0.2],
+      cloth: [0.36, 0.3, 0.22],
+      ...CIRCLE_TRIM,
+    },
+    parts: [...elvenParts([0.45, 0.6, 0.22]), ...ARTIFICER_GEAR],
+    stride: 0.85,
+    stance: { ...ARMS_AT_SIDES, swing: 0.12 },
   },
   "circle-wayfinder": {
     scale: 0.88,
@@ -1040,22 +1234,12 @@ function buildInfantry(
   );
   shift(idle, 60, (phase) => [0, (Math.cos(phase) - 1) * 0.004, 0]);
   if (recipe.work) {
-    const work = clip(recipe.work, 60, (joint, phase) => {
-      if (recipe.work !== "cultivate") {
-        const pulse = Math.sin(phase * (recipe.work === "repair" ? 2 : 1));
-        if (joint === "spine") return [0.1 + pulse * 0.03, 0, 0];
-        if (joint === "right-arm") return [-0.65 + pulse * 0.12, 0, 0.05];
-        if (joint === "right-forearm")
-          return [-0.5 + pulse * (recipe.work === "repair" ? 0.3 : 0.12), 0, 0];
-        if (joint === "left-arm") return [-0.2, 0, -0.1];
-        return neutral(joint);
-      }
-      if (joint === "spine") return [0.18 + Math.sin(phase) * 0.04, 0, 0];
-      if (joint.endsWith("forearm"))
-        return [-0.6 - Math.sin(phase) * 0.2, 0, 0];
-      if (joint.endsWith("arm")) return [-0.4 + Math.sin(phase) * 0.12, 0, 0];
-      return neutral(joint);
-    });
+    const pose = WORK_POSES[recipe.work];
+    const work = clip(
+      recipe.work,
+      60,
+      (joint, phase) => pose(joint, phase) ?? neutral(joint),
+    );
     // Keys the pelvis at rest because blending needs idle's channels.
     shift(work, 60, () => [0, 0, 0]);
   }

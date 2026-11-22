@@ -13,6 +13,7 @@ import {
 } from "../simulation/validation";
 import { validateAudioBindings, validateAudioContent } from "./audio";
 import {
+  ATTACK_EFFECT_STYLES,
   isRgb,
   validateActorPresentation,
   validateMaterialsStages,
@@ -62,11 +63,9 @@ const PROP_IDS = [
   "materials-mound",
   "cultivation-site",
   "salvage",
-  "tracer",
-  "rocket",
+  // Each attack style draws its hits with the prop of the same name.
+  ...ATTACK_EFFECT_STYLES,
   "rocket-impact",
-  "bolt",
-  "bite",
   "smoke",
   "fire",
   "wound",

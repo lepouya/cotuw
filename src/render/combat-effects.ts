@@ -21,6 +21,7 @@ export const TRACER_COLOR = new Color3(1, 0.92, 0.55);
 export const BOLT_COLOR = new Color3(0.72, 0.38, 1);
 export const BITE_COLOR = new Color3(1, 0.3, 0.22);
 export const ROCKET_COLOR = new Color3(1, 0.65, 0.2);
+export const STRIKE_COLOR = new Color3(0.95, 0.82, 0.55);
 const TARGET_COLOR = new Color3(0.95, 0.18, 0.15);
 const TARGET_LIFE = 0.6;
 /** Separately sized bursts at the target, named as content props. */
@@ -37,6 +38,7 @@ const ATTACK_EFFECTS: Record<
   tracer: { life: 0.12, color: TRACER_COLOR, beam: true },
   bolt: { life: 0.3, color: BOLT_COLOR, beam: true },
   bite: { life: 0.3, color: BITE_COLOR, beam: false },
+  strike: { life: 0.35, color: STRIKE_COLOR, beam: false },
   rocket: {
     life: 0.35,
     color: ROCKET_COLOR,
@@ -44,6 +46,9 @@ const ATTACK_EFFECTS: Record<
     impact: "rocket-impact",
   },
 };
+/** Whether a style marks the target itself rather than drawing a shot. */
+export const isContactEffect = (style: AttackEffectStyle) =>
+  !ATTACK_EFFECTS[style].beam;
 /** Catch-up ticks must not accumulate an unbounded number of effect models. */
 export const COMBAT_EFFECT_LIMIT = 64;
 

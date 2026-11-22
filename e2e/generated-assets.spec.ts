@@ -116,12 +116,15 @@ test(
         "arc-harvester",
         "circle-sentinel",
         "circle-wayfinder",
+        "circle-healer",
+        "circle-artificer",
+        "circle-briar-ram",
       ].entries()) {
         const model = pack.presentation[id]!.model!;
         if (!("glb" in model)) throw new Error("Expected a generated model");
         const appearance = await loadSkinnedActorAppearance(scene, model.glb);
         const actor = appearance.instantiate(id, 0);
-        actor.root.position.set(-9 + index * 3, 0, 2);
+        actor.root.position.set(-9 + index * 1.8, 0, 2);
         actor.setAnimationState?.({ working: true });
         actor.animate?.({ seconds: 0.1, distance: 0.15, turn: 0 });
         actor.play?.("attack");
@@ -130,13 +133,15 @@ test(
         "arc-command-center-prototype",
         "arc-field-barracks",
         "arc-materials-refinery",
+        "circle-construct-nursery",
+        "circle-thornspire",
       ].entries()) {
         const asset = await loadModelAsset(
           scene,
           pack.presentation[id]!.building!.glb!,
         );
         const model = asset.instantiate(id);
-        model.root.position.set(-5 + index * 5, 0, -2);
+        model.root.position.set(-8 + index * 4, 0, -2);
         model.pose(1);
       }
       for (const [index, id] of (
@@ -155,7 +160,7 @@ test(
         ).length,
       };
     });
-    expect(result.skins).toBeGreaterThanOrEqual(7);
+    expect(result.skins).toBeGreaterThanOrEqual(10);
     expect(result.meshes).toBeGreaterThan(30);
     await testInfo.attach("generated-models", {
       body: await page.locator("#generated-models").screenshot(),
@@ -164,93 +169,110 @@ test(
   },
 );
 
-test(
-  "ARC infantry silhouettes stay distinct under one owner color",
-  { tag: WEBKIT },
-  async ({ page }, info) => {
-    const errors = collectPageErrors(page);
-    await withoutApp(page);
-    await page.goto("/");
-    const preview = await page.evaluateHandle(async () => {
-      const { createLifetime } = await import("/src/lifetime.ts");
-      const lifetime = createLifetime();
-      try {
-        const { createTestView, frames } = await import("/e2e/harness.ts");
-        const { currentContentPack } = await import("/src/content/packs.ts");
-        const { loadSkinnedActorAppearance } =
-          await import("/src/render/skinned-actor-appearance.ts");
-        const { createOwnerMaterials } =
-          await import("/src/render/owner-materials.ts");
-        const { scene, canvas, camera, view } = createTestView({
-          map: { width: 24, height: 20, tileSize: 1, createHeight: () => 0 },
-          size: { width: 1200, height: 650 },
-          terrain: true,
-        });
-        lifetime.own(view);
-        canvas.id = "infantry-models";
-        Object.assign(canvas.style, {
-          position: "fixed",
-          top: "0",
-          left: "0",
-          zIndex: "50",
-        });
-        camera.alpha = -Math.PI / 2;
-        view.camera.zoomBy(1 / 3);
-        const pack = currentContentPack("base");
-        const colors = lifetime.own(
-          createOwnerMaterials(
-            new Map([["player", [0.2, 0.45, 1] as [number, number, number]]]),
-          ),
-        );
-        const models = [];
-        for (const [index, id] of [
-          "arc-trooper",
-          "arc-demolition-trooper",
-          "arc-scout",
-          "arc-medic",
-          "arc-mechanic",
-        ].entries()) {
-          const model = pack.presentation[id]!.model!;
-          if (!("glb" in model)) throw new Error("Expected generated infantry");
-          const appearance = lifetime.own(
-            await loadSkinnedActorAppearance(scene, model.glb),
+for (const [roster, ids] of [
+  [
+    "ARC",
+    [
+      "arc-trooper",
+      "arc-demolition-trooper",
+      "arc-scout",
+      "arc-medic",
+      "arc-mechanic",
+    ],
+  ],
+  [
+    "Circle",
+    [
+      "circle-cultivator",
+      "circle-sentinel",
+      "circle-wayfinder",
+      "circle-healer",
+      "circle-artificer",
+    ],
+  ],
+] as const)
+  test(
+    `${roster} infantry silhouettes stay distinct under one owner color`,
+    { tag: WEBKIT },
+    async ({ page }, info) => {
+      const errors = collectPageErrors(page);
+      await withoutApp(page);
+      await page.goto("/");
+      const preview = await page.evaluateHandle(async (ids) => {
+        const { createLifetime } = await import("/src/lifetime.ts");
+        const lifetime = createLifetime();
+        try {
+          const { createTestView, frames } = await import("/e2e/harness.ts");
+          const { currentContentPack } = await import("/src/content/packs.ts");
+          const { loadSkinnedActorAppearance } =
+            await import("/src/render/skinned-actor-appearance.ts");
+          const { createOwnerMaterials } =
+            await import("/src/render/owner-materials.ts");
+          const { scene, canvas, camera, view } = createTestView({
+            map: { width: 24, height: 20, tileSize: 1, createHeight: () => 0 },
+            size: { width: 1200, height: 650 },
+            terrain: true,
+          });
+          lifetime.own(view);
+          canvas.id = "infantry-models";
+          Object.assign(canvas.style, {
+            position: "fixed",
+            top: "0",
+            left: "0",
+            zIndex: "50",
+          });
+          camera.alpha = -Math.PI / 2;
+          view.camera.zoomBy(1 / 3);
+          const pack = currentContentPack("base");
+          const colors = lifetime.own(
+            createOwnerMaterials(
+              new Map([["player", [0.2, 0.45, 1] as [number, number, number]]]),
+            ),
           );
-          for (const [row, facing] of [Math.PI, 0].entries()) {
-            const instance = lifetime.own(
-              appearance.instantiate(`${id}-${row}`, 0),
+          const models = [];
+          for (const [index, id] of ids.entries()) {
+            const model = pack.presentation[id]!.model!;
+            if (!("glb" in model))
+              throw new Error("Expected generated infantry");
+            const appearance = lifetime.own(
+              await loadSkinnedActorAppearance(scene, model.glb),
             );
-            instance.root.position.set((index - 2) * 2.5, 0, row * 4 - 2);
-            instance.root.rotation.y = facing;
-            colors.apply(instance.root.getChildMeshes(), "player");
-            instance.animate?.({ seconds: 0.1, distance: 0, turn: 0 });
+            for (const [row, facing] of [Math.PI, 0].entries()) {
+              const instance = lifetime.own(
+                appearance.instantiate(`${id}-${row}`, 0),
+              );
+              instance.root.position.set((index - 2) * 2.5, 0, row * 4 - 2);
+              instance.root.rotation.y = facing;
+              colors.apply(instance.root.getChildMeshes(), "player");
+              instance.animate?.({ seconds: 0.1, distance: 0, turn: 0 });
+            }
+            models.push({ id, url: model.glb.url });
           }
-          models.push({ id, url: model.glb.url });
+          await frames(3);
+          return { models, view, dispose: lifetime.dispose };
+        } catch (error) {
+          lifetime.dispose();
+          throw error;
         }
-        await frames(3);
-        return { models, view, dispose: lifetime.dispose };
-      } catch (error) {
-        lifetime.dispose();
-        throw error;
+      }, ids);
+      try {
+        const result = await preview.evaluate(({ models }) => models);
+        expect(new Set(result.map(({ url }) => url)).size).toBe(5);
+        await page.locator("#infantry-models").screenshot({
+          path: info.outputPath(`${roster}-infantry-models-detail.png`),
+        });
+        await preview.evaluate(async ({ view }) => {
+          const { frames } = await import("/e2e/harness.ts");
+          view.camera.zoomBy(3);
+          await frames(2);
+        });
+        await page.locator("#infantry-models").screenshot({
+          path: info.outputPath(`${roster}-infantry-models-gameplay.png`),
+        });
+        expect(errors).toEqual([]);
+      } finally {
+        await preview.evaluate(({ dispose }) => dispose());
+        await preview.dispose();
       }
-    });
-    try {
-      const result = await preview.evaluate(({ models }) => models);
-      expect(new Set(result.map(({ url }) => url)).size).toBe(5);
-      await page
-        .locator("#infantry-models")
-        .screenshot({ path: info.outputPath("infantry-models-detail.png") });
-      await preview.evaluate(async ({ view }) => {
-        const { frames } = await import("/e2e/harness.ts");
-        view.camera.zoomBy(3);
-        await frames(2);
-      });
-      await page
-        .locator("#infantry-models")
-        .screenshot({ path: info.outputPath("infantry-models-gameplay.png") });
-      expect(errors).toEqual([]);
-    } finally {
-      await preview.evaluate(({ dispose }) => dispose());
-      await preview.dispose();
-    }
-  },
-);
+    },
+  );

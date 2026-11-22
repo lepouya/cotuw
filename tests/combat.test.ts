@@ -137,6 +137,8 @@ describe("combat", () => {
         .map((definition) => definition.id),
     ).toEqual([
       "circle-sentinel",
+      "circle-briar-ram",
+      "circle-thornspire",
       "arc-trooper",
       "wolf",
       "alpha-wolf",

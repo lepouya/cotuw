@@ -143,6 +143,47 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#aa7edd" d="m88 8 4 5-5 7-3-5Z"/>
     <path fill="#6b9980" d="m44 36 12 4-7 24-9-5Z"/>`,
   ),
+  "circle-healer": elf(
+    "#6f9c8c",
+    `
+    <path fill="#8fc2ae" d="M40 30Q26 48 28 70L44 70 47 36ZM80 30Q94 48 92 70L76 70 73 36Z"/>
+    <path fill="none" stroke="#dbbd97" stroke-width="5" stroke-linecap="round" d="M44 40 30 34M76 40 90 34"/>
+    <path fill="#b9f28c" d="M26 33Q19 23 27 17Q34 25 26 33ZM94 33Q101 23 93 17Q86 25 94 33Z"/>
+    <path fill="#d7b3ed" d="m60 41 5 6-5 7-5-7Z"/>`,
+  ),
+  "circle-artificer": elf(
+    "#5b4a33",
+    `
+    <path fill="#7a6544" d="M47 30 73 30 75 52 45 52Z"/>
+    <path fill="none" stroke="#2f2618" stroke-width="4" d="M46 33 74 50M74 33 46 50"/>
+    <path fill="#3a2e1f" d="M42 52H78V58H42Z"/>
+    <path fill="#c9b27b" d="M46 58H51V67H46ZM55 58H60V64H55ZM69 58H74V68H69Z"/>
+    <path fill="none" stroke="#cbbb90" stroke-width="4" stroke-linecap="round" d="M84 70 92 38"/>
+    <path fill="#aa7edd" d="m92 30 6 5-4 8-6-4Z"/>`,
+  ),
+  "circle-briar-ram": `${GROVE_GROUND}
+    <path stroke="#3a2a1b" stroke-width="9" stroke-linecap="round" d="M30 50 28 68M46 52 46 69M74 52 76 69M88 50 92 67"/>
+    <path fill="#d4c79c" d="M20 44Q22 26 50 25Q80 22 92 36L96 52 22 54Z"/>
+    <path fill="#b7a879" d="M28 31 46 27 44 40 26 42ZM50 26 70 25 68 38 49 39ZM72 27 89 34 86 44 71 41Z"/>
+    <path fill="#c9bb8c" d="M90 34Q104 31 110 44L104 56 92 54Z"/>
+    <path fill="none" stroke="#5c3f26" stroke-width="4" stroke-linecap="round" d="M96 32Q94 18 104 15M104 35Q108 22 116 23"/>
+    <path fill="#9a63d1" d="M56 44Q62 40 66 45 62 50 57 49Z"/>
+    <path fill="#76abd1" d="M34 46H52V50H34Z"/>`,
+  "circle-thornspire": `${GROVE_GROUND}
+    <path fill="#2e2015" d="M42 70Q50 60 52 66L68 66Q70 60 78 70Z"/>
+    <path fill="#cbbd90" d="M52 68 54 24H66L68 68Z"/>
+    <path fill="#a7996c" d="M54 60 42 52 54 50ZM66 52 79 44 66 42ZM54 42 44 34 55 33ZM66 34 76 26 66 26Z"/>
+    <path fill="#245a3e" d="M50 26 60 6 70 26 60 22Z"/>
+    <path fill="#be8bf0" d="M56 22Q60 12 64 22 60 30 56 22Z"/>
+    <path fill="#76abd1" d="M55 55H65V60H55Z"/>`,
+  "circle-construct-nursery": `${GROVE_GROUND}
+    <path fill="#204b37" d="M14 54Q20 16 60 14Q100 16 106 54Z"/>
+    <path fill="none" stroke="#bdb28b" stroke-width="6" stroke-linecap="round"
+      d="M16 66Q16 22 60 18Q104 22 104 66M30 67Q32 34 60 32Q88 34 90 67"/>
+    <path fill="#102e28" d="M44 68Q44 44 60 42Q76 44 76 68Z"/>
+    <ellipse fill="#c7b78c" cx="60" cy="66" rx="20" ry="5"/>
+    <path fill="#9a63d1" d="m60 48 5 6-5 7-5-7Z"/>
+    <path stroke="#76abd1" stroke-width="3" d="M24 40 30 44M96 40 90 44"/>`,
   "circle-heartgrove": `${GROVE_GROUND}
     <path fill="none" stroke="#b9ab7d" stroke-width="9" stroke-linecap="round"
       d="M60 65 60 23M30 68Q35 37 60 46Q84 38 92 68M60 46 36 25M60 39 84 18"/>

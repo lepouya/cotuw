@@ -3,6 +3,7 @@ import { afterEach, expect, test } from "vitest";
 import { BASE_CONTENT } from "./helpers/content";
 import {
   actorIn,
+  advanceCollectingHits,
   advanceSeconds,
   balance,
   command,
@@ -17,7 +18,6 @@ import { defineScenario } from "../src/simulation/scenario";
 import { TerrainGrid } from "../src/simulation/terrain";
 
 import type { ActorDefinition } from "../src/simulation/actor";
-import type { AttackEvent } from "../src/simulation/combat";
 import type {
   MissionSimulation,
   MissionState,
@@ -356,11 +356,7 @@ test("a Trooper screen protects a specialist while it breaks a defended position
       command(sim, { kind: "attack", actorId: "demo", targetId: "sentry" })
         .accepted,
     ).toBe(true);
-    const hits: AttackEvent[] = [...sim.attacks];
-    for (let tick = 0; tick < 25 / sim.tickSeconds; tick++) {
-      sim.tick();
-      hits.push(...sim.attacks);
-    }
+    const hits = [...sim.attacks, ...advanceCollectingHits(sim, 25)];
     return { sim, hits };
   };
   const exposed = run(false).sim;

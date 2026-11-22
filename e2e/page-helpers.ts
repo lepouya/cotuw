@@ -117,6 +117,38 @@ export async function terrainPoint(page: Page, x: number, z: number) {
   );
 }
 
+/** Projects an actor's pickable model and reports whether it clears the UI. */
+export async function actorPoint(
+  page: Page,
+  id: string,
+  heights: readonly number[],
+) {
+  return page.evaluate(
+    async ({ id, heights }) => {
+      const { Vector3, projectToCanvas } = await import("/e2e/harness.ts");
+      const { view } = window.sessionHarness;
+      const root = view.scene.getTransformNodeByName(`actor-${id}-root`)!;
+      const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
+      const bounds = canvas.getBoundingClientRect();
+      for (const height of heights) {
+        const point = root.getAbsolutePosition().add(new Vector3(0, height, 0));
+        const screen = projectToCanvas(view.scene, canvas, point);
+        const pick = view.scene.pick(
+          screen.x - bounds.left,
+          screen.y - bounds.top,
+        );
+        if (pick?.pickedMesh?.isDescendantOf(root))
+          return {
+            ...screen,
+            clear: document.elementFromPoint(screen.x, screen.y) === canvas,
+          };
+      }
+      throw new Error(`No clickable mesh point for ${id}`);
+    },
+    { id, heights },
+  );
+}
+
 /** Serves the production HTML and styles without the app, out of the title. */
 export async function withoutApp(page: Page) {
   await page.route(

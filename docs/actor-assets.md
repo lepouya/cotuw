@@ -9,49 +9,56 @@ clips match their generators, and reject unregistered files in `public/assets`.
 ## Inventory
 
 - `npm run assets:infantry`: `scripts/infantry-model.ts` exports Trooper,
-  Demolition Trooper, Scout, Medic, Mechanic, Sentinel, Wayfinder, and
-  Cultivator meshes, materials, skeletons, idle, walk, turn, hit, and death
-  clips. Troopers use aim and fire; Sentinels use aim and channeling clips.
-  Circle personnel have slender proportions, pointed ears, exposed faces,
+  Demolition Trooper, Scout, Medic, Mechanic, Sentinel, Wayfinder, Healer,
+  Artificer, and Cultivator meshes, materials, skeletons, idle, walk, turn, hit,
+  and death clips. Troopers use aim and fire; Sentinels use aim and channeling
+  clips. Circle personnel have slender proportions, pointed ears, exposed faces,
   circlets, tunics, and mantles with owner markings. ARC owner markings cover
-  the shoulders, chest, and helmet ridge.
-  Demolition Troopers use charcoal armor, amber visors, a shoulder launcher,
-  and paired rocket tubes, with a slower launch recoil clip.
-  Sentinels wear layered leaf armor and channel violet focus artifacts;
-  Wayfinders wear light hoods and carry wayfinding staves.
-  Each asset ID has one recipe owning its scale, palette, geometry, gait, arm
-  stance, and optional attack layer; only armed recipes export attack and aim
-  clips. ARC recipes explicitly compose head, pack, and role equipment;
-  weapons are opt-in. The shared exporter does not infer factions from role
-  names. Unarmed Scouts omit rifle geometry. Medics wear pale armor with teal
-  medical markings, square medical packs, scanners, and carry cases. Mechanics
-  wear ochre work armor and hard hats, with twin service tanks, tool pouches,
-  and an open-ended wrench. Both keep separate owner markings and unarmed
-  animation clips. Medics use a scanner gesture in `treat`; Mechanics turn
-  their wrench in `repair`. These full-pose work loops run only during active
-  service. Cultivators carry a pod and a growth tool; their full-pose
+  the shoulders, chest, and helmet ridge. Demolition Troopers use charcoal
+  armor, amber visors, a shoulder launcher, and paired rocket tubes, with a
+  slower launch recoil clip. Sentinels wear layered leaf armor and channel
+  violet focus artifacts; Wayfinders wear light hoods and carry wayfinding
+  staves. Healers wear long flowing mantles, an owner stole, and glowing palms,
+  raising open hands in `cast`. Artificers wear fitted work gear, a tool
+  harness, belt pouches, and a back frame, leaning in to shape a construct with
+  an awl in `mend`. Each asset ID has one recipe owning its scale, palette,
+  geometry, gait, arm stance, and optional attack layer; only armed recipes
+  export attack and aim clips. ARC recipes explicitly compose head, pack, and
+  role equipment; weapons are opt-in. The shared exporter does not infer
+  factions from role names. Unarmed Scouts omit rifle geometry. Medics wear pale
+  armor with teal medical markings, square medical packs, scanners, and carry
+  cases. Mechanics wear ochre work armor and hard hats, with twin service tanks,
+  tool pouches, and an open-ended wrench. Both keep separate owner markings and
+  unarmed animation clips. Medics use a scanner gesture in `treat`; Mechanics
+  turn their wrench in `repair`. These full-pose work loops run only during
+  active service. Cultivators carry a pod and a growth tool; their full-pose
   cultivation loop blends through the shared work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
-  Refinery, Barracks, Relay, and Sentry meshes with idle machinery and
-  activity or firing clips; a
-  skinned wolf with idle, walk, run, turn, bite, hit, and death; a rigid
-  Harvester with idle, transit, deploy, harvest, stow, unload, hit, and death;
-  crystal resource mounds; animated salvage; foundations; construction
-  scaffolds; debris rubble; tracers; pulsing violet focus strands and sparks;
-  bite marks; smoke puffs; flickering fire; wound drops; a pulsing regeneration
-  halo; and a bird with a wing-beat clip. The alpha wolf scales the generated
-  wolf asset.
+  Refinery, Barracks, Relay, and Sentry meshes with idle machinery and activity
+  or firing clips; a skinned wolf with idle, walk, run, turn, bite, hit, and
+  death; a skinned Briar Ram with pale overlapping plates, dark joints, a
+  sheltered violet core, owner flank bands, and a thorn-framed head, using idle,
+  a planted diagonal walk, turn, a lunging `strike`, hit, and a buckling death
+  that settles into a husk; a rigid Harvester with idle, transit, deploy,
+  harvest, stow, unload, hit, and death; crystal resource mounds; animated
+  salvage; foundations; construction scaffolds; debris rubble; tracers; pulsing
+  violet focus strands and sparks; bite marks; splintered strike bursts; smoke
+  puffs; flickering fire; wound drops; a pulsing regeneration halo; and a bird
+  with a wing-beat clip. The alpha wolf scales the generated wolf asset.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
-  Conservatory basin and canopy, vaulted Musterhall, and renewable bloom
-  markers. Each ID has one recipe naming its size, frame, focus height, and
-  basin. Owned buildings carry an owner marking; neutral sites do not. Named
-  `growth-roots`, `growth-ribs`, and `growth-canopy` meshes
-  define three construction layers without scaffolding. Active growth pulses;
-  untended or capacity-blocked work holds still with a grey progress bar.
-  Saved tick progress restores the layer. Static parts batch by layer and
-  material, keeping the animated focus separate. Falling leaves show damage.
+  Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle
+  with an open front arch, Thornspire column, and renewable bloom markers. Each
+  ID has one recipe naming its size, frame, focus height, and basin. Owned
+  buildings carry an owner marking; neutral sites do not. Named `growth-roots`,
+  `growth-ribs`, and `growth-canopy` meshes define three construction layers
+  without scaffolding. Active growth pulses; untended or capacity-blocked work
+  holds still with a grey progress bar. Saved tick progress restores the layer.
+  Static parts batch by layer and material, keeping the animated focus separate.
+  Parts on animated pivots stay separate too: the Thornspire's crown is its
+  `aimNode`, and its petals open in the `attack` clip. Falling leaves show
+  damage.
 - Building details and the wolf and Harvester parts in `src/render` supply both
   the built-in models and the export script, which receives named parts and
   adds rigging and clips. A building's details declare `loopSeconds`, the period
@@ -90,7 +97,8 @@ update matching content-pack graphics when changing the art.
 Generated terrain edges match by construction.
 Foundations and rubble are unit-cube models scaled to their placement.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
-Active support shows a small medical cross or mechanical wrench at the target.
+Active support shows a small medical cross, mechanical wrench, Circle leaf, or
+thorned sprig at the target.
 Service orders and repair badges share these symbols from
 `src/render/symbols.ts`.
 Only work with both participants visible reaches animation, effects, and audio.
@@ -116,8 +124,10 @@ a hard hat, and a wrench. The Demolition Trooper shows charcoal armor, an amber
 visor, a shoulder launcher, and paired rocket tubes. Circle portraits show
 exposed elven faces, pointed ears, tunics, and role-specific gear: the
 Cultivator's pod and tending tool, Sentinel leaf armor and focus, and Wayfinder
-hood and stave. Building portraits
-match the Heartgrove crown, Conservatory basin, and vaulted Musterhall.
+hood and stave, Healer mantle and glowing palms, and Artificer harness and
+tools. The Briar Ram portrait shows its plated body and curved thorns.
+Building portraits match the Heartgrove crown, Conservatory basin, vaulted
+Musterhall, Nursery cradle, and thorn-plated Thornspire.
 
 ## Mobile model contract
 

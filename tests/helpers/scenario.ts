@@ -17,6 +17,7 @@ import {
 import { createTerrainMoveBehavior } from "../../src/simulation/terrain-movement";
 
 import type { ActorBehavior } from "../../src/simulation/actor";
+import type { AttackEvent } from "../../src/simulation/combat";
 import type {
   CommandIssuer,
   MissionCommand,
@@ -140,6 +141,16 @@ export function advanceTicks(sim: MissionSimulation, ticks: number) {
 export function advanceSeconds(sim: MissionSimulation, seconds: number) {
   for (let tick = 0; tick < Math.round(seconds / sim.tickSeconds); tick++)
     sim.tick();
+}
+
+/** Advances `seconds` and returns every hit those ticks resolved. */
+export function advanceCollectingHits(sim: MissionSimulation, seconds: number) {
+  const hits: AttackEvent[] = [];
+  for (let tick = 0; tick < Math.round(seconds / sim.tickSeconds); tick++) {
+    sim.tick();
+    hits.push(...sim.attacks);
+  }
+  return hits;
 }
 
 /** Ticks until `predicate` holds, failing after `seconds` of mission time. */

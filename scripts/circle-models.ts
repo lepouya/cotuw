@@ -6,6 +6,9 @@ import type { Scene, StandardMaterial } from "@babylonjs/core";
 
 type Vec3 = readonly [number, number, number];
 
+/** The Thornspire's crown opens and closes once per shot. */
+const FIRE_SECONDS = 0.4;
+
 type StructureRecipe = {
   halfWidth: number;
   halfDepth: number;
@@ -16,6 +19,8 @@ type StructureRecipe = {
   basin?: boolean;
   /** Owned buildings carry a marker; neutral resource sites do not. */
   owned: boolean;
+  /** Where the owner marker sits, when the default front face is open. */
+  ownerAt?: Vec3;
 };
 
 /** What a frame draws with. */
@@ -129,6 +134,135 @@ const FRAMES = {
       plate("growth-ribs-pool", [0, 0.2, 0], [1.2, 0.14, 1.2], core);
     }
   },
+  /** A thorn-plated column under an opening crown that aims its shots. */
+  spire: ({
+    name,
+    scene,
+    root,
+    recipe,
+    wood,
+    core,
+    stem,
+    plate,
+  }: FrameContext) => {
+    const { height } = recipe;
+    stem(
+      "growth-ribs-column",
+      [
+        [0, 0, 0],
+        [0.06, height * 0.4, 0.03],
+        [-0.04, height * 0.75, 0],
+        [0, height * 0.82, 0],
+      ],
+      0.24,
+    );
+    for (let i = 0; i < 8; i++) {
+      const angle = (i * Math.PI) / 4 + (i % 2) * 0.35;
+      const y = 0.45 + (i % 4) * 0.38;
+      const thorn = plate(
+        `growth-canopy-thorn-${i}`,
+        [Math.cos(angle) * 0.3, y, Math.sin(angle) * 0.3],
+        [0.16, 0.55, 0.16],
+        wood,
+      );
+      // Plates lean out and up from the column like grown thorns.
+      thorn.rotation.set(Math.sin(angle) * 0.7, 0, -Math.cos(angle) * 0.7);
+    }
+    // The crown turns with the weapon; its petals open to fire.
+    const crown = new TransformNode(`${name}-crown`, scene);
+    crown.parent = root;
+    crown.position.y = height * 0.82;
+    const petals: TransformNode[] = [];
+    for (let i = 0; i < 4; i++) {
+      const pivot = new TransformNode(`${name}-petal-${i}`, scene);
+      pivot.parent = crown;
+      pivot.rotation.y = (i * Math.PI) / 2;
+      petals.push(pivot);
+      const petal = MeshBuilder.CreateSphere(
+        `${name}-growth-canopy-crown-${i}`,
+        { diameter: 1, segments: 6 },
+        scene,
+      );
+      petal.parent = pivot;
+      petal.material = wood;
+      petal.position.set(0, 0.22, 0.17);
+      petal.scaling.set(0.22, 0.5, 0.1);
+      petal.rotation.x = 0.35;
+    }
+    const focus = MeshBuilder.CreateSphere(
+      `${name}-growth-canopy-crown-core`,
+      { diameter: 1, segments: 8 },
+      scene,
+    );
+    focus.parent = crown;
+    focus.material = core;
+    focus.position.y = 0.2;
+    focus.scaling.set(0.26, 0.32, 0.26);
+    return () =>
+      clip(
+        root,
+        "attack",
+        FIRE_SECONDS,
+        (seconds) => {
+          const open = Math.sin((seconds / FIRE_SECONDS) * Math.PI);
+          for (const petal of petals) petal.rotation.x = open * 0.6;
+        },
+        false,
+      );
+  },
+  /** A rounded cradle of protective arches, open at the front for constructs. */
+  cradle: ({
+    name,
+    scene,
+    root,
+    recipe,
+    wood,
+    core,
+    stem,
+    plate,
+  }: FrameContext) => {
+    const { halfWidth, halfDepth, height } = recipe;
+    for (let i = 0; i < 7; i++) {
+      // Arches ring the bed except for the front quarter.
+      const angle = (Math.PI * 3) / 4 + (i * Math.PI * 1.5) / 6;
+      const x = Math.cos(angle);
+      const z = Math.sin(angle);
+      stem(
+        `growth-ribs-arch-${i}`,
+        [
+          [x * halfWidth, 0, z * halfDepth],
+          [x * halfWidth * 0.92, height * 0.55, z * halfDepth * 0.92],
+          [x * 0.4, height, z * 0.4],
+        ],
+        0.11,
+      );
+      plate(
+        `growth-canopy-${i}`,
+        [x * halfWidth * 0.62, height * 0.82, z * halfDepth * 0.62],
+        [0.85, 0.22, 0.6],
+      ).rotation.y = -angle;
+    }
+    stem(
+      "growth-ribs-entrance",
+      [
+        [-0.8, 0, halfDepth],
+        [-0.75, 1.3, halfDepth],
+        [0, 1.75, halfDepth],
+        [0.75, 1.3, halfDepth],
+        [0.8, 0, halfDepth],
+      ],
+      0.12,
+    );
+    const bed = MeshBuilder.CreateTorus(
+      `${name}-growth-roots-bed`,
+      { diameter: 1.9, thickness: 0.22, tessellation: 24 },
+      scene,
+    );
+    bed.parent = root;
+    bed.position.y = 0.15;
+    bed.material = wood;
+    plate("growth-ribs-pool", [0, 0.14, 0], [1.6, 0.1, 1.6], core);
+  },
   /** A ring of flowering stems. */
   bloom: ({ stem, plate, core }: FrameContext) => {
     for (let i = 0; i < 7; i++) {
@@ -180,6 +314,24 @@ const CIRCLE_STRUCTURES = {
     frame: "arches",
     focusHeight: 0.65,
     owned: true,
+  },
+  "circle-construct-nursery": {
+    halfWidth: 1.3,
+    halfDepth: 1.3,
+    height: 2.2,
+    frame: "cradle",
+    focusHeight: 0.6,
+    owned: true,
+    ownerAt: [0, 1.75, 1.36],
+  },
+  "circle-thornspire": {
+    halfWidth: 0.45,
+    halfDepth: 0.45,
+    height: 2.6,
+    frame: "spire",
+    focusHeight: 1.1,
+    owned: true,
+    ownerAt: [0, 0.9, 0.27],
   },
   "cultivation-site": {
     halfWidth: 0.65,
@@ -250,7 +402,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
       bark,
     );
   }
-  FRAMES[recipe.frame]({
+  const addFrameClips = FRAMES[recipe.frame]({
     name,
     scene,
     root,
@@ -263,7 +415,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
   if (recipe.owned)
     plate(
       "growth-canopy-owner",
-      [0, height * 0.62, halfDepth * 0.85],
+      recipe.ownerAt ?? [0, height * 0.62, halfDepth * 0.85],
       [0.35, 0.3, 0.12],
       finish("owner", [0.48, 0.76, 0.59]),
     );
@@ -276,11 +428,11 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
   // Keep the animated focus separate; static parts batch by growth layer.
   for (const layer of ["roots", "ribs", "canopy"]) {
     const groups = new Map<StandardMaterial, Mesh[]>();
-    for (const mesh of root.getChildMeshes()) {
+    for (const mesh of root.getChildMeshes(true)) {
       if (
         !(mesh instanceof Mesh) ||
         !mesh.name.includes(`growth-${layer}`) ||
-        mesh.name.endsWith("-focus")
+        mesh === pulse
       )
         continue;
       const material = mesh.material as StandardMaterial;
@@ -304,6 +456,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     },
     false,
   );
+  addFrameClips?.();
 }
 
 export const CIRCLE_MODELS = Object.fromEntries(

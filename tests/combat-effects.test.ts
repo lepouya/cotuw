@@ -98,7 +98,7 @@ test("observed rocket impacts do not reveal hidden shooters or unseen targets", 
   ).toBe(true);
 });
 
-test.each(["tracer", "bolt", "bite"] as const)(
+test.each(["tracer", "bolt", "bite", "strike"] as const)(
   "%s effects respect hidden endpoints with models and fallback geometry",
   (style) => {
     const { effects, instances, scene } = fixture();
@@ -106,15 +106,16 @@ test.each(["tracer", "bolt", "bite"] as const)(
       scene,
       new TerrainMap({ width: 10, height: 10, tileSize: 1 }),
     );
+    const targetOnly = style === "bite" || style === "strike";
     for (const view of [effects, fallback]) {
       view.hit(hit, style, { showFrom: true, showTo: false });
       view.hit(hit, style, { showFrom: false, showTo: false });
       expect(scene.meshes).toHaveLength(0);
       view.hit(hit, style, { showFrom: false, showTo: true });
-      expect(scene.meshes).toHaveLength(style === "bite" ? 1 : 0);
+      expect(scene.meshes).toHaveLength(targetOnly ? 1 : 0);
       view.dispose();
     }
-    expect(instances).toHaveLength(style === "bite" ? 1 : 0);
+    expect(instances).toHaveLength(targetOnly ? 1 : 0);
   },
 );
 

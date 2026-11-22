@@ -1,8 +1,9 @@
 import { cultivationRouteBlocked } from "../simulation/cultivation";
 import { Vector3 } from "@babylonjs/core";
-import { weaponReach } from "../simulation/combat";
+import { footprintContact, weaponReach } from "../simulation/combat";
 import { isTilePlacedActor } from "../simulation/placement";
 import { BUILDING_BAR_HEIGHT, healthBarOpacity } from "./health-bars";
+import { isContactEffect } from "./combat-effects";
 import { damageSeverity } from "./damage-effects";
 
 import type { ActorAppearance, ActorAnimationState } from "./actor";
@@ -159,15 +160,17 @@ export function actorAnimationState(
 
 export type ShotContext = Pick<
   EffectContext,
-  "appearances" | "presentationOf" | "buildingTopHeightOf" | "map"
+  "appearances" | "definitions" | "presentationOf" | "buildingTopHeightOf"
 > & {
+  map: TerrainMap;
   /** Where a building's art is seated; its attack anchor starts there. */
   roofHeightOf: (actor: TilePlacedActorState) => number | undefined;
 };
 
 /**
  * A shot leaves the attacker's anchor, turned to its aim, and lands halfway up
- * the target as drawn. An end without a shown actor keeps the default.
+ * the target as drawn. Contact effects from a visible attacker land on a
+ * building's near edge.
  */
 export function shotEnds(
   hit: AttackEvent,
@@ -206,12 +209,23 @@ export function shotEnds(
     );
   }
   const ground = map.heightAtWorldPosition(hit.to.x, hit.to.z);
+  const definition = target && context.definitions.get(target.definitionId);
+  const style = presentation?.attackEffect;
+  const impact =
+    (attacker &&
+      style &&
+      isContactEffect(style) &&
+      target &&
+      definition?.footprint &&
+      isTilePlacedActor(target) &&
+      footprintContact(hit.from, target, definition, map)) ||
+    hit.to;
   const to =
     target &&
     new Vector3(
-      hit.to.x,
+      impact.x,
       ground + drawnHeight(target, ground, context) / 2,
-      hit.to.z,
+      impact.z,
     );
   return { from, to };
 }

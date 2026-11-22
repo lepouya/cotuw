@@ -376,7 +376,13 @@ test("activity clips may not key channels that idle keys", async () => {
   ).rejects.toThrow("activity clips named by activity kind");
 });
 
-test.each(["circle-heartgrove", "circle-conservatory", "circle-musterhall"])(
+test.each([
+  "circle-heartgrove",
+  "circle-conservatory",
+  "circle-musterhall",
+  "circle-construct-nursery",
+  "circle-thornspire",
+])(
   "%s reveals roots, ribs and canopy with paused growth feedback",
   async (id) => {
     const scene = testScene();
@@ -428,7 +434,8 @@ test.each(["circle-heartgrove", "circle-conservatory", "circle-musterhall"])(
           (mesh) =>
             mesh.name.includes("growing") && mesh.name.includes("growth-"),
         ).length,
-      ).toBeLessThanOrEqual(8);
+        // The Thornspire's crown petals stay separate to open when it fires.
+      ).toBeLessThanOrEqual(id === "circle-thornspire" ? 10 : 8);
       for (const layer of ["roots", "ribs", "canopy"])
         expect(part(layer).length).toBeGreaterThan(0);
       expect(part("roots").every((mesh) => mesh.isEnabled())).toBe(true);
@@ -465,6 +472,53 @@ test.each(["circle-heartgrove", "circle-conservatory", "circle-musterhall"])(
     ).toBe(true);
   },
 );
+
+test("the Thornspire crown follows committed aim and opens to fire", async () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 12, height: 12, tileSize: 1 });
+  const id = "circle-thornspire";
+  const definition = BASE_CONTENT.actors.find((actor) => actor.id === id)!;
+  const graphics = BASE_CONTENT.presentation[id]!.building!;
+  const model = await loadModelAsset(scene, {
+    ...graphics.glb!,
+    url: glbDataUrl(graphics.glb!.url),
+  });
+  const views = createTilePlacedActorViewRegistry(
+    scene,
+    map,
+    [definition],
+    new Map([
+      [id, { ...graphics, createDetails: modelBuildingDetails(model) }],
+    ]),
+  );
+  const actor = createTilePlacedActor(
+    map,
+    definition,
+    { actorId: "spire", origin: { x: 4, z: 4 } },
+    "player",
+  );
+  const node = (suffix: string) =>
+    scene.transformNodes.find(
+      (each) => each.name.includes("spire") && each.name.endsWith(suffix),
+    )!;
+  views.update([actor]);
+  const crown = node("circle-thornspire-crown");
+  expect(crown).toBeDefined();
+  const heading = () =>
+    Vector3.TransformNormal(Vector3.Forward(), crown.computeWorldMatrix(true));
+  const before = heading();
+  views.update([
+    { ...actor, combat: { aimFacing: actor.facing + Math.PI / 2 } },
+  ]);
+  const after = heading();
+  expect(Vector3.Dot(before, after)).toBeCloseTo(0);
+  const petal = node("circle-thornspire-petal-0");
+  const rest = petal.rotationQuaternion!.clone();
+  views.play("spire", "attack");
+  views.animate(0.2, 0.2);
+  expect(petal.rotationQuaternion!.equalsWithEpsilon(rest, 1e-3)).toBe(false);
+  views.dispose();
+});
 
 test("the Sentry housing follows committed aim relative to its placement", () => {
   const scene = testScene();

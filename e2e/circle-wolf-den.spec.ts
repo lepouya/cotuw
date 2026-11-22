@@ -167,7 +167,7 @@ test(
     await mission.ground(12, 55);
     await expect(selected).toContainText("Musterhall");
     await expect(page.locator("#selection-info")).toHaveText(
-      "Circle infantry production · Trains Sentinel and Wayfinder.",
+      "Circle infantry production · Trains Sentinel, Wayfinder, and Healer.",
     );
     for (const [id, label, cost] of [
       ["sentinel", "Train Sentinel", "35 Lifebloom"],

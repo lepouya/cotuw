@@ -1789,9 +1789,11 @@ acceptance progress. The following sections define the selected scope.
   Easy/Normal/Hard choice defaulting to Normal. Development links also support
   assembled skirmishes; normal-menu skirmish launch is pending.
 - Owners, economies, headquarters queues, command authority, visibility, and
-  persistence use the shared foundations. Extended support/defense/construct
-  content, faction AI, full-roster presentation, and introduction acceptance
-  remain in [TODO.md](TODO.md#e-circle-playable-loop-and-introduction).
+  persistence use the shared foundations. Healers, Thornspires, and the
+  Construct Nursery's Briar Rams and Artificers are available without
+  dedicated goals. Faction AI, full-roster presentation acceptance, and
+  introduction acceptance remain in
+  [TODO.md](TODO.md#e-circle-playable-loop-and-introduction).
 - Wolves validate movement, scouting, combat readability, and basic durability.
   Structure counters, defense breaking, support, AI, and match pacing require
   focused encounters and full skirmishes rather than wolf-only acceptance.
@@ -1862,8 +1864,15 @@ acceptance progress. The following sections define the selected scope.
   Both use single-target attacks, automatically engage detected hostiles, and
   accept manual attack targets. Normal faction construction and repair rules
   apply, including ARC support connections and Cultivator tending for growth.
+  Growing Thornspires do not fire.
+- Weapon reach runs from an armed building's center but to a building target's
+  edge, so a defense's footprint shortens its effective reach against ranged
+  attackers. The Thornspire occupies one tile, letting its shorter range still
+  answer Troopers that attack it.
 - Demolition Troopers outrange these basic defenses. Briar Rams can withstand
-  defensive fire long enough to approach and attack.
+  defensive fire long enough to approach and attack. A lone Briar Ram defeats
+  a lone Thornspire, while two Sentinels, costing less than a Ram, defeat an
+  exposed Ram.
 - ARC's Relay Station is an inexpensive, unarmed building with a larger
   support radius than ordinary structures. It extends the connected network
   toward resource sites and forward positions. Losing an upstream connection
@@ -1912,11 +1921,16 @@ acceptance progress. The following sections define the selected scope.
 - Healers have flowing mantles and open-handed casting poses.
 - Artificers wear fitted work gear with prominent tool harnesses for tending
   constructs.
+- Active Healer service shows a leaf cue at the target and Artificer service a
+  thorned sprig, distinct from ARC's cross and wrench. Healers raise open
+  palms; Artificers lean in to shape the construct. Reduced motion holds the
+  cue still.
 - The Briar Ram is a heavy quadruped with a low, broad body, four thick
   root-like legs, overlapping pale wood armor, and a reinforced head framed
   by curved thorns. Dark flexible joints and a partially sheltered violet
   core share the faction palette. It walks with deliberate steps, plants its
-  feet, and delivers a short, forceful head strike at melee range.
+  feet, and delivers a short, forceful head strike at melee range. Each blow
+  shows a brief splintering burst at the target.
 - Circle construction has three stages, each covering one third of progress:
   roots establish and the central structure emerges; ribs and arches rise;
   then armor plates, leaves, and canopy elements unfold into the mature form.
@@ -1954,7 +1968,8 @@ acceptance progress. The following sections define the selected scope.
   and layered plates, humanoid and quadruped rigs, articulated clips, and
   original synthesis and composition. Implementation extends presentation for
   progress-selected growth forms, living damage and debris, and faction music
-  selection. Task 1.53 owns assets, integration, and gameplay-scale validation.
+  selection. The full roster has generated models; task 1.53 owns remaining
+  audio, music, and gameplay-scale validation.
 
 ### M1 resources and progression
 

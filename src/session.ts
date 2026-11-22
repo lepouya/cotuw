@@ -1050,6 +1050,7 @@ async function assembleGameSession(
    * regenerating actors show the effects their presentation names.
    */
   const drawn = {
+    definitions: definitionsById,
     appearances,
     presentationOf,
     groundPositionOf: (id: string) => actorViews.groundPosition(id),
@@ -1062,7 +1063,6 @@ async function assembleGameSession(
       player.actors().shown,
       {
         ...drawn,
-        definitions: definitionsById,
         completedTicks: simulation.completedTicks,
         tickSeconds: simulation.tickSeconds,
         selectedActorIds: input.selectedActorIds,

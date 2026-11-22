@@ -50,6 +50,11 @@ const PORTRAIT_IDS = [
   "circle-heartgrove",
   "circle-conservatory",
   "circle-musterhall",
+  "circle-healer",
+  "circle-artificer",
+  "circle-briar-ram",
+  "circle-thornspire",
+  "circle-construct-nursery",
 ] as const;
 export type PortraitId = (typeof PORTRAIT_IDS)[number];
 
@@ -252,11 +257,22 @@ function validateFrameEffects(
 }
 
 /** How an attacker's hits are drawn. */
-const ATTACK_EFFECT_STYLES = ["tracer", "bite", "bolt", "rocket"] as const;
+export const ATTACK_EFFECT_STYLES = [
+  "tracer",
+  "bite",
+  "bolt",
+  "rocket",
+  "strike",
+] as const;
 export type AttackEffectStyle = (typeof ATTACK_EFFECT_STYLES)[number];
 
 /** How a support unit's active service is drawn at its target. */
-const SERVICE_EFFECT_STYLES = ["medical", "mechanical"] as const;
+const SERVICE_EFFECT_STYLES = [
+  "medical",
+  "mechanical",
+  "healing",
+  "construct-repair",
+] as const;
 export type ServiceEffectStyle = (typeof SERVICE_EFFECT_STYLES)[number];
 
 /** How damage on an actor is drawn. */
