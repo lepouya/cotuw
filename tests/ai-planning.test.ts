@@ -2,10 +2,18 @@ import { expect, test } from "vitest";
 
 import { BASE_CONTENT } from "./helpers/content";
 import { trainsArmy } from "../src/simulation/actor";
-import { affords, findPlacement, place } from "../src/simulation/ai-planning";
+import {
+  affords,
+  findPlacement,
+  groupSites,
+  place,
+  sitesNear,
+  tendGrowth,
+} from "../src/simulation/ai-planning";
 import { TerrainGrid } from "../src/simulation/terrain";
 
 import type { PlacementMemory } from "../src/simulation/ai-planning";
+import type { MissionCommand } from "../src/simulation/command";
 import type { AiConcernContext } from "../src/simulation/director";
 import type { ActorPlacement } from "../src/simulation/placement";
 
@@ -152,4 +160,93 @@ test("an unaffordable placement neither searches nor waits", () => {
   ).toBe(false);
   expect(checked).toEqual([]);
   expect(memory).toEqual({});
+});
+
+test("site groups keep ID order as later sites merge them", () => {
+  const sites = [0, 4, 8, 2, 6].map((x, index) => ({
+    id: String(index),
+    tile: { x, z: 0 },
+  }));
+  expect(groupSites([...sites].reverse(), 2)).toEqual([sites]);
+});
+
+test("same-tick growth and tending reserve distinct workers", () => {
+  const workers = ["first", "second"].map((id) => ({
+    id,
+    definitionId: "circle-cultivator",
+  }));
+  const definition = definitions.get("circle-conservatory")!;
+  const issuedCommands: MissionCommand[] = [];
+  const { stub } = context(1000);
+  const planning = (actorId: string) =>
+    ({
+      ...placing(stub, 100),
+      issuedCommands,
+      newActorId: () => actorId,
+      issue: (command: MissionCommand) => !!issuedCommands.push(command),
+      view: {
+        ...stub.view,
+        actors: () => ({
+          placed: [],
+          own: [
+            {
+              id: "untended",
+              definitionId: definition.id,
+              construction: {},
+              tilePlacement: {},
+            },
+          ],
+          ownMobile: workers,
+        }),
+        economy: () => ({
+          cultivation: {
+            workers: workers.map(({ id }) => ({ actorId: id })),
+          },
+        }),
+        tendWorker: (_id: string, candidates: readonly string[]) =>
+          candidates[0],
+        evaluatePlacement: ({ workerIds }: ActorPlacement) => ({
+          accepted: !!workerIds?.length,
+          workerId: workerIds?.[0],
+        }),
+      },
+    }) as unknown as AiConcernContext;
+  tendGrowth(planning("income"));
+  const anchor = terrain.tileCenter(3, 3);
+  expect(place(planning("new"), {}, terrain, definition, anchor)).toBe(true);
+  expect(place(planning("later"), {}, terrain, definition, anchor)).toBe(false);
+  expect(issuedCommands).toEqual([
+    { kind: "tend", actorId: "first", buildingId: "untended" },
+    expect.objectContaining({ kind: "place-actor", workerIds: ["second"] }),
+  ]);
+});
+
+test("sites near a point follow the workers that gather them", () => {
+  const sites = (faction: string | undefined) =>
+    ({
+      definitions,
+      terrain,
+      view: {
+        faction,
+        economy: () => ({
+          sites: [
+            { id: "spent", tile: { x: 1, z: 1 }, remainingMaterials: 0 },
+            { id: "far", tile: { x: 9, z: 9 }, remainingMaterials: 10 },
+          ],
+          cultivation: { sites: [{ id: "grove", tile: { x: 2, z: 2 } }] },
+        }),
+      },
+    }) as unknown as AiConcernContext;
+  const ids = (found: ReturnType<typeof sitesNear>) =>
+    found.map(({ id }) => id);
+  const point = terrain.tileCenter(0, 0);
+  expect(ids(sitesNear(sites("arc"), point))).toEqual(["far"]);
+  expect(ids(sitesNear(sites("circle"), point))).toEqual(["grove"]);
+  // An owner without one faction gathers both, unless a worker is named.
+  expect(ids(sitesNear(sites(undefined), point))).toEqual(["grove", "far"]);
+  expect(
+    ids(
+      sitesNear(sites(undefined), point, [definitions.get("arc-harvester")!]),
+    ),
+  ).toEqual(["far"]);
 });

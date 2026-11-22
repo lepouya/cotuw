@@ -106,7 +106,11 @@ test("disruptions track prototype-named definitions and resume boundaries", () =
   actors.push({ ...actor, id: "replacement" });
   tracker.observe(12);
   expect(tracker.results()).toMatchObject([
-    { removed: 1, restoredTicks: { ["__proto__"]: 12 } },
+    {
+      removed: 1,
+      removedByDefinition: { ["__proto__"]: 1 },
+      restoredTicks: { ["__proto__"]: 12 },
+    },
   ]);
   expect(
     disruptionTracker(simulation, [{ ...disruption, minutes: 0 }]).results(),

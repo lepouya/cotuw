@@ -18,11 +18,11 @@ import {
 import { isPositiveCount, listOf, weightsOf } from "./ai-tuning";
 import { plannedConcern } from "./director";
 import { economyWorkers } from "./economy";
+import { trainableUnitIds } from "./production";
 import { isPositive } from "./validation";
 import { distance } from "./world";
 
 import type { ActorDefinition } from "./actor";
-import type { Building } from "./ai-planning";
 import type { AiConcernContext } from "./director";
 import type { EconomyView } from "./economy";
 
@@ -71,24 +71,20 @@ function recoveryCounts(context: AiConcernContext) {
 }
 
 /**
- * The next unit for `producer`: a support provider its units need, else the
- * army unit furthest below its share of the current mix.
+ * The first support provider due at this producer, based on its recipients
+ * and the providers already fielded or in production.
  */
-function nextUnit(
+function supportDue(
   context: AiConcernContext,
   plan: ForcesPlan,
-  producer: Building,
+  trains: readonly string[],
   counts: ReadonlyMap<string, number>,
   recipients: ReturnType<typeof recoveryCounts>,
-  defended: boolean,
 ): ActorDefinition | undefined {
-  const trains = new Set(
-    definitionOf(context, producer).production!.unitDefinitionIds,
-  );
-  const trainable = (id: string) =>
-    trains.has(id) ? context.definitions.get(id) : undefined;
   for (const [id, per] of Object.entries(plan.support)) {
-    const provider = trainable(id);
+    const provider = trains.includes(id)
+      ? context.definitions.get(id)
+      : undefined;
     if (!provider?.restoration) continue;
     const units = provider.restoration.targetKinds.reduce(
       (sum, kind) => sum + (recipients.get(kind) ?? 0),
@@ -96,15 +92,18 @@ function nextUnit(
     );
     if ((counts.get(id) ?? 0) < Math.floor(units / per)) return provider;
   }
+}
+
+/** The army unit furthest below its share among all usable producers. */
+function nextArmyUnit(
+  mix: readonly { unit: ActorDefinition; weight: number }[],
+  counts: ReadonlyMap<string, number>,
+): ActorDefinition | undefined {
   let next: ActorDefinition | undefined;
   let lowestFill = Infinity;
-  for (const [id, weight] of Object.entries(
-    defended ? plan.defendedMix : plan.mix,
-  )) {
-    const unit = trainable(id);
-    if (!unit || !isArmyUnit(unit)) continue;
+  for (const { unit, weight } of mix) {
     // The share it would fill with one more, so heavy weights lead.
-    const fill = ((counts.get(id) ?? 0) + 1) / weight;
+    const fill = ((counts.get(unit.id) ?? 0) + 1) / weight;
     if (fill >= lowestFill) continue;
     next = unit;
     lowestFill = fill;
@@ -133,13 +132,27 @@ export const trainForces = plannedConcern<ForcesPlan>(
     const economy = context.view.economy();
     if (!economy || !terrain) return;
     const home = headquarters(context);
-    const producers = usableBuildings(context, armyProducer(context));
+    const producers = usableBuildings(context, armyProducer(context)).map(
+      (building) => ({
+        building,
+        trains: trainableUnitIds(building, context.definitions),
+      }),
+    );
     const counts = unitCounts(context);
     const recipients = recoveryCounts(context);
     const defended = knownDefenders(context).some(
       ({ tilePlacement }) => !!tilePlacement,
     );
-    for (const producer of producers) {
+    const trainable = new Set(producers.flatMap(({ trains }) => trains));
+    const mix = Object.entries(defended ? plan.defendedMix : plan.mix).flatMap(
+      ([id, weight]) => {
+        const unit = trainable.has(id)
+          ? context.definitions.get(id)
+          : undefined;
+        return unit && isArmyUnit(unit) ? [{ unit, weight }] : [];
+      },
+    );
+    for (const { building: producer, trains } of producers) {
       if (
         !producer.rallyPoint ||
         !context.view.evaluateRallyPoint(producer.id, producer.rallyPoint)
@@ -165,15 +178,16 @@ export const trainForces = plannedConcern<ForcesPlan>(
         ({ producerId }) => producerId === producer.id,
       ).length;
       while (queued < plan.queued) {
-        const unit = nextUnit(
-          context,
-          plan,
-          producer,
-          counts,
-          recipients,
-          defended,
-        );
-        if (!unit || !train(context, producer, unit)) break;
+        const unit =
+          supportDue(context, plan, trains, counts, recipients) ??
+          nextArmyUnit(mix, counts);
+        // Leave the funds for the producer that trains the next unit.
+        if (
+          !unit ||
+          !trains.includes(unit.id) ||
+          !train(context, producer, unit)
+        )
+          break;
         counts.set(unit.id, (counts.get(unit.id) ?? 0) + 1);
         queued += 1;
       }

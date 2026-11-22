@@ -166,14 +166,20 @@ resumes toward the same limit. The sets are:
 - `arc-recovery`: Normal mirrors in which west loses its Harvesters, its
   income, its Field Barracks, or its Command Center at 6:00, or its Relay
   Stations at 9:00. Reports give when a new actor of each lost definition was
-  completed. A case passes when the removal takes effect and every listed
-  definition is restored before the match ends. Headquarters loss is an
-  accepted loss, so that case needs only a clean, completed match.
+  completed. A case passes when every listed definition is removed and
+  restored before the match ends. Headquarters loss requires removal and a
+  clean, completed match.
 - `arc-continuation`: saves a Normal mirror at 10:00 during east's first
   attack, resumes it, and requires identical complete mission state,
   including AI, observations, and metric histories, to an uninterrupted run.
   Ending before the checkpoint, or a `--cutoff` at or before it, fails this
   check.
+- `circle-mirror`, `circle-recovery`, and `circle-continuation`: the same
+  checks for the Circle. Recovery cases remove west's Cultivators, its
+  Conservatories, both together, its Musterhall and Construct Nursery, or its
+  Heartgrove at 6:00. Headquarters loss is accepted.
+- `cross-faction`: Normal ARC-versus-Circle matches with each faction in the
+  west slot, which must complete without faults or audit problems.
 
 Reports in `.checks/ai-matches/<case>.json` give the revision, wall-clock and
 simulation time, status, result, effective scaling, and each owner's

@@ -18,7 +18,7 @@ test(
     const errors = collectPageErrors(page, { console: true });
     await openSkirmish(
       page,
-      "skirmish=arc-arc&ai=west:arc-skirmish,east:arc-skirmish",
+      "skirmish=arc-circle&ai=west:arc-skirmish,east:circle-skirmish",
     );
     const overlay = page.locator("#ai-overlay");
     await expect(overlay).toBeHidden();

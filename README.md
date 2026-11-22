@@ -79,7 +79,8 @@ Use `/?level=skirmish-map` to inspect the rough M1 battlefield the same way.
 Use `/?skirmish=arc-circle&player=east&difficulty=hard` to start an assembled
 skirmish. Add `&ai=west:arc-skirmish` to let the ARC AI build its base,
 train forces, scout, defend, raid observed income, attack known bases, and
-rebuild after losses.
+rebuild after losses. Use `/?skirmish=arc-circle&ai=east:circle-skirmish`
+to play ARC against the Circle AI.
 Development AI links offer a diagnostics overlay; Backquote cycles AI owners,
 then hides it.
 Choose Circle in New mission or use `/?level=circle-wolf-den` to play the

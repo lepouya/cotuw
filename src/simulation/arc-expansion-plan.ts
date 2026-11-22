@@ -3,6 +3,7 @@ import { compareIds } from "./actor";
 import {
   affords,
   connectedNodes,
+  groupSites,
   harvesterOf,
   headquarters,
   hostileBuildings,
@@ -71,24 +72,7 @@ export function depositsOf(
   terrain: TerrainView,
   tiles: number,
 ): Deposit[] {
-  const groups: SiteLocation[][] = [];
-  for (const site of [...locations].sort((a, b) => compareIds(a.id, b.id))) {
-    const near = groups.filter((group) =>
-      group.some(
-        ({ tile }) =>
-          Math.max(
-            Math.abs(tile.x - site.tile.x),
-            Math.abs(tile.z - site.tile.z),
-          ) <= tiles,
-      ),
-    );
-    const [first, ...rest] = near;
-    if (!first) groups.push([site]);
-    else {
-      first.push(site, ...rest.flat());
-      for (const merged of rest) groups.splice(groups.indexOf(merged), 1);
-    }
-  }
+  const groups = groupSites(locations, tiles);
   const observed = new Map(sites.map((site) => [site.id, site]));
   return groups.map((group) => {
     const positions = group.map(({ tile }) =>

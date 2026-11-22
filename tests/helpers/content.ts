@@ -16,3 +16,7 @@ const { plans, ...sharedTuning } = BASE_CONTENT.aiProfiles!.find(
 export const ARC_AI_TUNING = sharedTuning;
 /** The standard ARC skirmish profile's plan sections, by concern. */
 export const ARC_AI_PLANS = plans!;
+/** The standard Circle skirmish profile's plan sections, by concern. */
+export const CIRCLE_AI_PLANS = BASE_CONTENT.aiProfiles!.find(
+  ({ id }) => id === "circle-skirmish",
+)!.tuning.plans!;

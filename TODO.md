@@ -149,10 +149,11 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 - [x] **1.54** The [Circle introduction](DESIGN.md#circle-introduction)
   guides cultivation, site strain and dormancy, construction, and production.
   Headless, mouse, and phone playthroughs verify victory within ten minutes.
-- [ ] **1.55** Add the Circle AI build plan and operations for its economy,
-  infrastructure, roster, and recovery. Exercise it through the shared harness.
-  Recovery assumes income buildings train their own workers; have each
-  faction plan report its income-restart price and progress first.
+- [x] **1.55** The [Circle AI plan](DESIGN.md#m1-circle-ai-plan) covers
+  cultivation, tending, expansion, Thornspires, the full roster, and recovery
+  through faction-reported restart prices. `circle-mirror`, `circle-recovery`,
+  `circle-continuation`, and `cross-faction` headless sets pass; Normal Circle
+  mirrors finish around 17 minutes.
 - [ ] **1.56** Verify Circle saves and deterministic continuation through
   construction, tending assignments and worker replacement, cultivation,
   dormancy, recovery, and support work. Preserve site reserves and dormancy
@@ -205,7 +206,7 @@ and producer-based progression scope from 1.06.
   profiles. Tune pacing on Normal; verify scaling, results, and save/load on
   Easy and Hard. Require results by the 30-minute simulation cutoff; preserve
   unfinished cases for diagnosis. Test recovery and disruption separately.
-  - Normal ARC mirrors finish below the
+  - Normal ARC mirrors and cross-faction development cases finish below the
     [15 to 25 minute target](DESIGN.md#m1-pacing-and-acceptance). Tune and
     verify post-raid income recovery and counterattack pressure after early
     Harvester losses.

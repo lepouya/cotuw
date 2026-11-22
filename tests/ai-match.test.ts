@@ -3,6 +3,8 @@ import { expect, test, vi } from "vitest";
 import {
   ARC_MIRROR_CASES,
   CASE_SETS,
+  CIRCLE_MIRROR_CASES,
+  CROSS_FACTION_CASES,
   passed,
   playMatch,
   runMatch,
@@ -24,6 +26,7 @@ import { DIFFICULTIES } from "../src/simulation/mission-setup";
 import { createScenarioMap } from "../src/simulation/scenario";
 
 import type { MatchCase, MatchRun } from "../scripts/ai-match/runner";
+import type { SkirmishFaction } from "../src/content/skirmish-map";
 import type { AiConcern } from "../src/simulation/director";
 
 /** Drops counters observed only during this segment of the match. */
@@ -58,7 +61,7 @@ const shortCase = (id: string): MatchCase => ({
   cutoffMinutes: SHORT,
 });
 
-test("ARC mirror cases cover both player slots at every difficulty", () => {
+test("mirror cases cover both player slots at every difficulty", () => {
   expect(ARC_MIRROR_CASES.map(({ id }) => id)).toEqual([
     "arc-mirror-west-easy",
     "arc-mirror-west-normal",
@@ -67,8 +70,15 @@ test("ARC mirror cases cover both player slots at every difficulty", () => {
     "arc-mirror-east-normal",
     "arc-mirror-east-hard",
   ]);
-  for (const { choice } of ARC_MIRROR_CASES)
+  expect(CIRCLE_MIRROR_CASES.map(({ id }) => id)).toEqual(
+    ARC_MIRROR_CASES.map(({ id }) => id.replace("arc-", "circle-")),
+  );
+  for (const { choice } of [...CASE_SETS.values()].flat())
     expect(skirmishChoiceError(choice)).toBeUndefined();
+  expect(CROSS_FACTION_CASES.map(({ choice }) => choice.factions)).toEqual([
+    { west: "arc", east: "circle" },
+    { west: "circle", east: "arc" },
+  ]);
   const ids = [...CASE_SETS.values()].flatMap((cases) =>
     cases.map(({ id }) => id),
   );
@@ -77,8 +87,11 @@ test("ARC mirror cases cover both player slots at every difficulty", () => {
 
 test("case sets need a standard AI profile for every faction", () => {
   expect(() =>
-    skirmishCases("arc-circle", { west: "arc", east: "circle" }),
-  ).toThrow("Faction circle has no standard AI.");
+    skirmishCases("arc-wildlife", {
+      west: "arc",
+      east: "wildlife" as SkirmishFaction,
+    }),
+  ).toThrow("Faction wildlife has no standard AI.");
 });
 
 test("an unfinished case stops at the cutoff with its state and diagnostics", () => {
@@ -309,8 +322,32 @@ test("a completed match does not pass recovery without replacing its losses", ()
   });
   expect(run.report.status).toBe("completed");
   expect(run.report.disruptions).toMatchObject([
-    { removed: 1, restoredTicks: {} },
+    {
+      removed: 1,
+      removedByDefinition: { "arc-command-center-prototype": 1 },
+      restoredTicks: {},
+    },
   ]);
+  expect(passed(run.report)).toBe(false);
+  expect(run.preservedState).toBeDefined();
+});
+
+test("a disruption must remove an actor of every listed definition", () => {
+  const run = runMatch({
+    ...shortCase("arc-mirror-west-normal"),
+    disruptions: [
+      {
+        minutes: 0,
+        owner: "west",
+        definitionIds: ["arc-command-center-prototype", "arc-harvester"],
+        accepted: true,
+      },
+    ],
+  });
+  expect(run.report.status).toBe("completed");
+  expect(run.report.disruptions?.[0]?.removedByDefinition).toEqual({
+    "arc-command-center-prototype": 1,
+  });
   expect(passed(run.report)).toBe(false);
   expect(run.preservedState).toBeDefined();
 });

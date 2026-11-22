@@ -200,13 +200,13 @@ test("the developing base expands, defends its expansion, and fields a mixed arm
         of("arc-sentry-turret").filter(
           ({ worldPosition }) =>
             distance(worldPosition, refinery.worldPosition) <=
-            (plans["arc-defenses"]!.guardTiles as number),
+            (plans["income-defenses"]!.guardTiles as number),
         );
       for (const refinery of remote)
         expect(guards(refinery).length).toBeGreaterThan(0);
       expect(
         new Set(remote.flatMap((refinery) => guards(refinery))).size,
-      ).toBeGreaterThanOrEqual(plans["arc-defenses"]!.remote as number);
+      ).toBeGreaterThanOrEqual(plans["income-defenses"]!.remote as number);
       const harvesters = sim.economy!.harvesters.filter(({ actorId }) =>
         sim.viewOf(owner).ownActor(actorId),
       );
@@ -365,7 +365,7 @@ test("a raided home Refinery gets a Sentry Turret even if the raider escaped sig
   try {
     expect(sim.viewOf("west").shownActor(raider.id)).toBeUndefined();
     const results = runTicks(sim, minutes(0.5));
-    expect(sim.ai.west!.memory["arc-defenses"]).toMatchObject({
+    expect(sim.ai.west!.memory["income-defenses"]).toMatchObject({
       raided: [refinery.id],
     });
     const turrets = results.filter(
@@ -381,7 +381,7 @@ test("a raided home Refinery gets a Sentry Turret even if the raider escaped sig
         return (
           !!turret &&
           distance(turret.worldPosition, refinery.worldPosition) <=
-            (PLANS["arc-defenses"]!.guardTiles as number)
+            (PLANS["income-defenses"]!.guardTiles as number)
         );
       }),
     ).toBe(true);
@@ -428,7 +428,7 @@ test.each([1, 2])(
     state.economy!.stockpiles.forEach((stockpile) => (stockpile.amount = 1000));
     dueRound(state);
     const concerns = new Map(BUILT_IN_AI_CONCERNS);
-    for (const name of ["arc-production", "forces"])
+    for (const name of ["production", "forces"])
       concerns.set(
         name,
         Object.assign(() => {}, concerns.get(name)),

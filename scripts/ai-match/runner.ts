@@ -64,6 +64,7 @@ export type MatchCase = {
 /** The profile each faction's AI uses in baseline cases. */
 const STANDARD_PROFILES: Partial<Record<SkirmishFaction, string>> = {
   arc: "arc-skirmish",
+  circle: "circle-skirmish",
 };
 
 /**
@@ -94,39 +95,76 @@ export const ARC_MIRROR_CASES = skirmishCases("arc-mirror", {
   east: "arc",
 });
 
-const NORMAL_WEST = ARC_MIRROR_CASES.find(
-  ({ id }) => id === "arc-mirror-west-normal",
-)!;
+export const CIRCLE_MIRROR_CASES = skirmishCases("circle-mirror", {
+  west: "circle",
+  east: "circle",
+});
+
+const normalWest = (cases: readonly MatchCase[]) =>
+  cases.find(
+    ({ choice }) =>
+      choice.playerSlot === "west" && choice.difficulty === "normal",
+  )!;
 
 /**
  * West loses part of its base, by default at 6:00, before either side
  * attacks a base.
  */
-const lossCase = (
-  name: string,
-  definitionIds: string[],
-  options: Partial<Pick<Disruption, "accepted" | "minutes">> = {},
-): MatchCase => ({
-  id: `arc-recovery-${name}`,
-  choice: NORMAL_WEST.choice,
-  disruptions: [{ minutes: 6, owner: "west", definitionIds, ...options }],
-});
+const lossCase =
+  (set: string, mirror: readonly MatchCase[]) =>
+  (
+    name: string,
+    definitionIds: string[],
+    options: Partial<Pick<Disruption, "accepted" | "minutes">> = {},
+  ): MatchCase => ({
+    id: `${set}-${name}`,
+    choice: normalWest(mirror).choice,
+    disruptions: [{ minutes: 6, owner: "west", definitionIds, ...options }],
+  });
 
+const arcLoss = lossCase("arc-recovery", ARC_MIRROR_CASES);
 export const ARC_RECOVERY_CASES: readonly MatchCase[] = [
-  lossCase("workers", ["arc-harvester"]),
-  lossCase("income", ["arc-harvester", "arc-materials-refinery"]),
-  lossCase("production", ["arc-field-barracks"]),
+  arcLoss("workers", ["arc-harvester"]),
+  arcLoss("income", ["arc-harvester", "arc-materials-refinery"]),
+  arcLoss("production", ["arc-field-barracks"]),
   // Once the first expansion stands, which cuts its Refineries off.
-  lossCase("relay", ["arc-relay-station"], { minutes: 9 }),
+  arcLoss("relay", ["arc-relay-station"], { minutes: 9 }),
   // A replacement needs more Materials banked than a 6:00 base holds.
-  lossCase("headquarters", ["arc-command-center-prototype"], {
+  arcLoss("headquarters", ["arc-command-center-prototype"], {
     accepted: true,
   }),
 ];
 
+const circleLoss = lossCase("circle-recovery", CIRCLE_MIRROR_CASES);
+export const CIRCLE_RECOVERY_CASES: readonly MatchCase[] = [
+  circleLoss("workers", ["circle-cultivator"]),
+  circleLoss("income", ["circle-conservatory"]),
+  circleLoss("economy", ["circle-cultivator", "circle-conservatory"]),
+  circleLoss("production", ["circle-musterhall", "circle-construct-nursery"]),
+  // Emergency regrowth needs banked Lifebloom and a surviving Cultivator.
+  circleLoss("headquarters", ["circle-heartgrove"], { accepted: true }),
+];
+
 /** Saved during the first attack, with operations under way. */
 export const ARC_CONTINUATION_CASES: readonly MatchCase[] = [
-  { ...NORMAL_WEST, id: "arc-continuation", resumeAtMinutes: 10 },
+  {
+    ...normalWest(ARC_MIRROR_CASES),
+    id: "arc-continuation",
+    resumeAtMinutes: 10,
+  },
+];
+export const CIRCLE_CONTINUATION_CASES: readonly MatchCase[] = [
+  {
+    ...normalWest(CIRCLE_MIRROR_CASES),
+    id: "circle-continuation",
+    resumeAtMinutes: 10,
+  },
+];
+
+/** Normal ARC-versus-Circle matches from each slot, checked for completion. */
+export const CROSS_FACTION_CASES: readonly MatchCase[] = [
+  normalWest(skirmishCases("arc-circle", { west: "arc", east: "circle" })),
+  normalWest(skirmishCases("circle-arc", { west: "circle", east: "arc" })),
 ];
 
 /** Named case sets the command line runs; every set by default. */
@@ -134,6 +172,10 @@ export const CASE_SETS: ReadonlyMap<string, readonly MatchCase[]> = new Map([
   ["arc-mirror", ARC_MIRROR_CASES],
   ["arc-recovery", ARC_RECOVERY_CASES],
   ["arc-continuation", ARC_CONTINUATION_CASES],
+  ["circle-mirror", CIRCLE_MIRROR_CASES],
+  ["circle-recovery", CIRCLE_RECOVERY_CASES],
+  ["circle-continuation", CIRCLE_CONTINUATION_CASES],
+  ["cross-faction", CROSS_FACTION_CASES],
 ]);
 
 export type OwnerReport = Omit<OwnerMetrics, "history"> & {
@@ -188,9 +230,12 @@ export const passed = (report: MatchReport) =>
   report.status === "completed" &&
   !report.audit.length &&
   (report.disruptions ?? []).every(
-    ({ removed, definitionIds, restoredTicks, accepted }) =>
-      removed > 0 &&
-      (accepted || definitionIds.every((id) => hasOwn(restoredTicks, id))),
+    ({ definitionIds, removedByDefinition, restoredTicks, accepted }) =>
+      definitionIds.every(
+        (id) =>
+          hasOwn(removedByDefinition, id) &&
+          (accepted || hasOwn(restoredTicks, id)),
+      ),
   ) &&
   (report.continuation === undefined || report.continuation === "matched");
 
@@ -247,11 +292,22 @@ export const baseSummary = (report: MatchReport) =>
 /** Each disruption's losses and when the owner completed them again. */
 export const disruptionSummary = (report: MatchReport) =>
   (report.disruptions ?? []).map(
-    ({ owner, minutes, removed, definitionIds, restoredTicks, accepted }) => {
-      const restored = definitionIds.map(
-        (id) =>
-          `${id} ${hasOwn(restoredTicks, id) ? formatTick(restoredTicks[id]!) : "never"}`,
-      );
+    ({
+      owner,
+      minutes,
+      removed,
+      definitionIds,
+      removedByDefinition,
+      restoredTicks,
+      accepted,
+    }) => {
+      const restored = definitionIds.map((id) => {
+        if (!hasOwn(removedByDefinition, id)) return `${id} not removed`;
+        const time = hasOwn(restoredTicks, id)
+          ? formatTick(restoredTicks[id]!)
+          : "never";
+        return `${id} ${time}`;
+      });
       return `${owner} lost ${removed} at ${formatElapsed(minutes * 60)}${accepted ? " (accepted)" : ""}; restored ${restored.join(", ")}`;
     },
   );

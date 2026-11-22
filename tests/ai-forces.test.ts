@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { ARC_AI_PLANS, BASE_CONTENT } from "./helpers/content";
+import { ARC_AI_PLANS, BASE_CONTENT, CIRCLE_AI_PLANS } from "./helpers/content";
 import { createActor } from "../src/simulation/actor";
 import { trainForces } from "../src/simulation/ai-forces";
 import { depositsOf } from "../src/simulation/arc-expansion-plan";
@@ -28,18 +28,30 @@ const unit = (id: string, definitionId: string) =>
     worldPosition: terrain.tileCenter(20, 20),
   });
 
-/** Trains one order per turn at a Barracks with every unit it lists. */
-function fixture(units: Actor[], sightings: ActorSighting[] = []) {
-  const barracks = {
-    ...unit("barracks", "arc-field-barracks"),
-    tilePlacement: { origin: { x: 18, z: 18 }, quarterTurns: 0 },
+const producer = (id: string, definitionId: string, x: number) =>
+  ({
+    ...unit(id, definitionId),
+    tilePlacement: { origin: { x, z: 18 }, quarterTurns: 0 },
     rallyPoint: terrain.tileCenter(25, 25),
-  } as Actor;
+  }) as Actor;
+
+/**
+ * Trains one order per turn at each producer, by default a Barracks with
+ * every unit it lists.
+ */
+function fixture(
+  units: Actor[],
+  sightings: ActorSighting[] = [],
+  {
+    producers = [producer("barracks", "arc-field-barracks", 18)],
+    plans = ARC_AI_PLANS,
+  } = {},
+) {
   const trained: string[] = [];
   const context = {
     terrain,
     definitions,
-    plan: { ...ARC_AI_PLANS.forces, queued: 1 },
+    plan: { ...plans.forces, queued: 1 },
     funds: () => 1000,
     newActorId: (id: string) => `${id}:${trained.length}`,
     claim: () => true,
@@ -48,7 +60,7 @@ function fixture(units: Actor[], sightings: ActorSighting[] = []) {
       return true;
     },
     view: {
-      actors: () => ({ own: [barracks, ...units], ownMobile: units }),
+      actors: () => ({ own: [...producers, ...units], ownMobile: units }),
       isMobile: () => true,
       offlineIds: () => new Set(),
       ownActor: () => undefined,
@@ -63,6 +75,12 @@ function fixture(units: Actor[], sightings: ActorSighting[] = []) {
     next: () => {
       trainForces(context);
       return trained[trained.length - 1];
+    },
+    /** Every order of one turn. */
+    turn: () => {
+      trained.length = 0;
+      trainForces(context);
+      return [...trained];
     },
   };
 }
@@ -79,6 +97,25 @@ test("training follows the mix, with the heaviest share first", () => {
   expect(fixture([]).next()).toBe("arc-trooper");
   expect(fixture(troopers(3)).next()).toBe("arc-trooper");
   expect(fixture(troopers(4)).next()).toBe("arc-demolition-trooper");
+});
+
+test("producers save for the unit furthest below its share", () => {
+  const sentinels = (count: number) =>
+    Array.from({ length: count }, (_, index) =>
+      unit(`sentinel-${index}`, "circle-sentinel"),
+    );
+  const circle = {
+    producers: [
+      producer("musterhall", "circle-musterhall", 14),
+      producer("nursery", "circle-construct-nursery", 22),
+    ],
+    plans: CIRCLE_AI_PLANS,
+  };
+  expect(fixture(sentinels(2), [], circle).turn()).toEqual(["circle-sentinel"]);
+  // The Musterhall waits while the Nursery grows the Briar Ram.
+  expect(fixture(sentinels(4), [], circle).turn()).toEqual([
+    "circle-briar-ram",
+  ]);
 });
 
 test("known static defenses shift training toward Demolition Troopers", () => {

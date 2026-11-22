@@ -1,5 +1,5 @@
 // Faction-neutral reading and ordering helpers for director concerns.
-import { compareIds, trainsArmy } from "./actor";
+import { compareIds, isWorkerDefinition, trainsArmy } from "./actor";
 import { secondsToTicks } from "./clock";
 import { tileKey } from "./grid";
 import { rosterIncludes } from "./ownership";
@@ -122,6 +122,74 @@ export const harvesterOf = (
   refinery: ActorDefinition,
 ) => context.definitions.get(refinery.refinery!.harvesterDefinitionId)!;
 
+/**
+ * Sighted sites the given workers, by default the roster's, can gather, at
+ * their last-seen state, nearest to `point` first. Exhausted Materials sites
+ * are left out; renewable sites never run out. Gather orders need explored
+ * sites, so unscouted sites wait for scouting.
+ */
+export function sitesNear(
+  context: AiConcernContext,
+  point: WorldPosition,
+  workers: readonly ActorDefinition[] = [
+    ...context.definitions.values(),
+  ].filter(
+    (definition) =>
+      rosterIncludes(context.view.faction, definition) &&
+      isWorkerDefinition(definition),
+  ),
+) {
+  const economy = context.view.economy();
+  const located = ({ id, tile }: { id: string; tile: TileCoord }) => ({
+    id,
+    position: context.terrain!.tileCenter(tile.x, tile.z),
+  });
+  return [
+    ...(workers.some(({ harvesting }) => harvesting)
+      ? (economy?.sites ?? [])
+          .filter((site) => site.remainingMaterials > 0)
+          .map(located)
+      : []),
+    ...(workers.some(({ cultivation }) => cultivation)
+      ? (economy?.cultivation?.sites ?? []).map(located)
+      : []),
+  ].sort(
+    (a, b) =>
+      distance(point, a.position) - distance(point, b.position) ||
+      compareIds(a.id, b.id),
+  );
+}
+
+/**
+ * Groups sites by authored location, joining sites this many tiles apart, so
+ * sightings cannot change a group. Each group keeps ID order and is named by
+ * its first site.
+ */
+export function groupSites<T extends { id: string; tile: TileCoord }>(
+  locations: readonly T[],
+  tiles: number,
+): T[][] {
+  const groups: T[][] = [];
+  for (const site of [...locations].sort((a, b) => compareIds(a.id, b.id))) {
+    const near = groups.filter((group) =>
+      group.some(
+        ({ tile }) =>
+          Math.max(
+            Math.abs(tile.x - site.tile.x),
+            Math.abs(tile.z - site.tile.z),
+          ) <= tiles,
+      ),
+    );
+    const [first, ...rest] = near;
+    if (!first) groups.push([site]);
+    else {
+      first.push(site, ...rest.flat());
+      for (const merged of rest) groups.splice(groups.indexOf(merged), 1);
+    }
+  }
+  return groups.map((group) => group.sort((a, b) => compareIds(a.id, b.id)));
+}
+
 /** Known hostile buildings, in ID order. */
 export const hostileBuildings = (context: AiConcernContext) =>
   context.view.knowledge.observations.actors.filter(
@@ -187,6 +255,8 @@ type PlacementSearch = {
   toward?: WorldPosition;
   /** Restrict the site by the building's actual center. */
   accepts?: (position: WorldPosition) => boolean;
+  /** Workers that may tend worker-grown buildings. */
+  workerIds?: readonly string[];
 };
 
 /**
@@ -200,8 +270,8 @@ export function findPlacement(
   definition: ActorDefinition,
   anchor: WorldPosition,
   actorId: string,
-  { toward, accepts }: PlacementSearch = {},
-): TileCoord | undefined {
+  { toward, accepts, workerIds }: PlacementSearch = {},
+) {
   const point = clampToBounds(anchor, terrain.worldBounds);
   const center = terrain.tileAtWorldPosition(point.x, point.z);
   const reserved = reservedTiles(context);
@@ -229,12 +299,70 @@ export function findPlacement(
       actorId,
       definitionId: definition.id,
       origin,
+      ...(workerIds && { workerIds: [...workerIds] }),
     });
     if (
       evaluation.accepted &&
       (!accepts || accepts(evaluation.actor.worldPosition))
     )
-      return origin;
+      return { origin, workerId: evaluation.workerId };
+  }
+}
+
+/** Workers tending now or queued to start tending this tick. */
+export function tendingWorkers(context: AiConcernContext) {
+  const tending = new Set(
+    (context.view.economy()?.cultivation?.workers ?? []).flatMap(
+      ({ actorId, tendingId }) => (tendingId ? [actorId] : []),
+    ),
+  );
+  for (const command of context.issuedCommands) {
+    if (command.kind === "tend") tending.add(command.actorId);
+    if (command.kind === "place-actor")
+      for (const id of command.workerIds ?? []) tending.add(id);
+  }
+  return tending;
+}
+
+/** Own workers that can grow `building` and are not tending, in ID order. */
+function freeTenders(
+  context: AiConcernContext,
+  building: ActorDefinition,
+): string[] {
+  const tending = tendingWorkers(context);
+  return context.view
+    .actors()
+    .ownMobile.filter(
+      ({ id, definitionId }) =>
+        definitionId === building.growth?.workerDefinitionId &&
+        !tending.has(id),
+    )
+    .map(({ id }) => id)
+    .sort(compareIds);
+}
+
+/**
+ * Gives each own unfinished growth without a tender the nearest free worker
+ * that can reach it, in building ID order.
+ */
+export function tendGrowth(context: AiConcernContext) {
+  const workers = context.view.economy()?.cultivation?.workers ?? [];
+  const tended = new Set(workers.flatMap(({ tendingId }) => tendingId ?? []));
+  for (const building of ownBuildings(
+    context,
+    (definition) => !!definition.growth,
+  )) {
+    if (!building.construction || tended.has(building.id)) continue;
+    const workerId = context.view.tendWorker(
+      building.id,
+      freeTenders(context, definitionOf(context, building)),
+    );
+    if (workerId)
+      context.issue({
+        kind: "tend",
+        actorId: workerId,
+        buildingId: building.id,
+      });
   }
 }
 
@@ -262,23 +390,29 @@ export function place(
     if (context.tick < memory.placementRetryTick) return false;
     delete memory.placementRetryTick;
   }
+  const workerIds = definition.growth
+    ? freeTenders(context, definition)
+    : undefined;
+  if (workerIds && !workerIds.length) return false;
   const actorId = context.newActorId(definition.id);
   for (const anchor of Array.isArray(anchors) ? anchors : [anchors]) {
-    const origin = findPlacement(
+    const placement = findPlacement(
       context,
       terrain,
       definition,
       anchor,
       actorId,
-      search,
+      { ...search, workerIds },
     );
-    if (!origin) continue;
+    if (!placement) continue;
+    const { origin, workerId } = placement;
     if (
       context.issue({
         kind: "place-actor",
         actorId,
         definitionId: definition.id,
         origin,
+        ...(workerId && { workerIds: [workerId] }),
       })
     )
       return true;

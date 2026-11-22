@@ -202,13 +202,17 @@ export type Disruption = {
 export type DisruptionReport = Disruption & {
   /** The owner's matching actors that the removal took away. */
   removed: number;
+  removedByDefinition: Record<string, number>;
   /** When a new one was completed again; absent if it never was. */
   restoredTicks: Record<string, number>;
 };
 
 /** Applies disruptions on schedule and notes when each loss was replaced. */
 export function disruptionTracker(
-  simulation: MissionSimulation,
+  simulation: Pick<
+    MissionSimulation,
+    "actors" | "completedTicks" | "owners" | "submitCommand" | "tickSeconds"
+  >,
   disruptions: readonly Disruption[],
 ) {
   const { tickSeconds } = simulation;
@@ -231,11 +235,12 @@ export function disruptionTracker(
       ): DisruptionReport & {
         tick: number;
         /** The actors whose removal was submitted, once it was. */
-        targets?: ReadonlySet<string>;
+        targets?: ReadonlyMap<string, string>;
       } => ({
         ...disruption,
         tick: secondsToTicks(disruption.minutes * 60, tickSeconds),
         removed: 0,
+        removedByDefinition: {},
         restoredTicks: {},
       }),
     )
@@ -244,16 +249,16 @@ export function disruptionTracker(
   const apply = () => {
     for (const report of reports) {
       if (report.targets || simulation.completedTicks < report.tick) continue;
-      report.targets = new Set(
+      report.targets = new Map(
         simulation.actors
           .filter(
             (actor) =>
               actor.owner === report.owner &&
               report.definitionIds.includes(actor.definitionId),
           )
-          .map(({ id }) => id),
+          .map(({ id, definitionId }) => [id, definitionId]),
       );
-      for (const actorId of report.targets)
+      for (const actorId of report.targets.keys())
         simulation.submitCommand(
           { kind: "remove-actor", actorId },
           { owner: report.owner },
@@ -262,15 +267,22 @@ export function disruptionTracker(
   };
   /** Counts removals that took effect; only other actors restore a loss. */
   const observe = (tick: number) => {
-    const present = new Set(simulation.actors.map(({ id }) => id));
     for (const report of reports) {
       const { targets } = report;
       if (!targets || tick < report.tick) continue;
-      if (tick === report.tick)
-        report.removed = [...targets].filter((id) => !present.has(id)).length;
-      else
+      if (tick === report.tick) {
+        const present = new Set(simulation.actors.map(({ id }) => id));
+        const counts = new Map<string, number>();
+        for (const [id, definitionId] of targets) {
+          if (present.has(id)) continue;
+          counts.set(definitionId, (counts.get(definitionId) ?? 0) + 1);
+          report.removed += 1;
+        }
+        report.removedByDefinition = Object.fromEntries(counts);
+      } else {
         for (const definitionId of report.definitionIds)
           if (
+            hasOwn(report.removedByDefinition, definitionId) &&
             !hasOwn(report.restoredTicks, definitionId) &&
             simulation.actors.some(
               (actor) =>
@@ -284,6 +296,7 @@ export function disruptionTracker(
               ...report.restoredTicks,
               [definitionId]: tick,
             };
+      }
     }
   };
   const results = (): DisruptionReport[] =>

@@ -124,6 +124,8 @@ export type AiConcernContext = {
   readonly memory: Record<string, unknown>;
   /** This concern's refused commands since its previous turn. */
   readonly rejections: readonly AiRejection[];
+  /** Commands this owner has queued so far this tick. */
+  readonly issuedCommands: readonly MissionCommand[];
   /** What this concern may spend of a resource. */
   funds: (resource: Resource) => number;
   /**
@@ -555,14 +557,14 @@ function concernContext(
     view,
     tick,
     host,
-    spent,
+    issued,
     forces,
   }: {
     view: OwnerView;
     tick: number;
     host: DirectorHost;
     /** The owner's commands so far this tick, across its concerns. */
-    spent: { commands: number };
+    issued: MissionCommand[];
     forces: ForceAllocation;
   },
 ): AiConcernContext {
@@ -624,6 +626,7 @@ function concernContext(
     plan: planOf(profile, concern) ?? NO_PLAN,
     memory: ai.memory[concern]!,
     rejections,
+    issuedCommands: issued,
     funds,
     releaseFunds: (keep = {}) => {
       const account = ai.budgets[concern]!;
@@ -636,7 +639,7 @@ function concernContext(
     },
     issue: (command) => {
       if (
-        spent.commands >= profile.commandsPerTick ||
+        issued.length >= profile.commandsPerTick ||
         !isMissionCommand(command) ||
         !staysInView(view, command)
       )
@@ -651,7 +654,7 @@ function concernContext(
           : [];
       if (!debits) return false;
       host.submit(command, { owner, concern, debits });
-      spent.commands += 1;
+      issued.push(command);
       return true;
     },
     newActorId: (definitionId) =>
@@ -709,12 +712,12 @@ function withdrawConcern(
     view,
     tick,
     host,
-    spent,
+    issued,
   }: {
     view: OwnerView;
     tick: number;
     host: DirectorHost;
-    spent: { commands: number };
+    issued: MissionCommand[];
   },
 ) {
   const withdraw = host.concerns.get(concern)!.withdraw;
@@ -734,7 +737,7 @@ function withdrawConcern(
     canOrder,
     issue: (command) => {
       if (
-        spent.commands >= profile.commandsPerTick ||
+        issued.length >= profile.commandsPerTick ||
         !isMissionCommand(command) ||
         command.kind === "place-actor" ||
         command.kind === "train-unit" ||
@@ -745,7 +748,7 @@ function withdrawConcern(
       )
         return false;
       host.submit(command, { owner: view.owner, concern, debits: [] });
-      spent.commands += 1;
+      issued.push(command);
       return true;
     },
   });
@@ -793,7 +796,7 @@ export function advanceDirector(
       view,
       host.definitions,
     );
-    const spent = { commands: 0 };
+    const issued: MissionCommand[] = [];
     let turns = 0;
     working.withdrawing = (working.withdrawing ?? []).filter((concern) => {
       if (turns >= profile.concernsPerTick) return true;
@@ -802,7 +805,7 @@ export function advanceDirector(
         view,
         tick,
         host,
-        spent,
+        issued,
       });
     });
     if (!working.withdrawing.length) delete working.withdrawing;
@@ -817,7 +820,7 @@ export function advanceDirector(
         view,
         tick,
         host,
-        spent,
+        issued,
         forces,
       });
       host.concerns.get(allocations[index]!.concern)!(context);

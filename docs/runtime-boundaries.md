@@ -44,8 +44,11 @@ These contracts describe where new behaviors, views, and services attach.
   or disposal methods.
 - Director concerns are built-in code that profiles name by ID, registered in
   `simulation/ai-concerns.ts` with the shared ones; sessions use that registry
-  unless a caller supplies concerns. Faction plans such as
-  `simulation/arc-concerns.ts` build on `simulation/ai-planning.ts`. Group
+  unless a caller supplies concerns. Faction plans in
+  `simulation/arc-concerns.ts` and `simulation/circle-concerns.ts` build on
+  `simulation/ai-planning.ts`. Concerns use the owner's commands for the
+  current tick to reserve workers assigned to new or untended growth.
+  Production, income defenses, and forces are faction-neutral. Group
   operations run through `simulation/ai-operations.ts`; a concern saves each
   in its memory's `operations` list, which diagnostics read. Operations keep
   their home rally separate from temporary regrouping points. When a round
@@ -57,7 +60,10 @@ These contracts describe where new behaviors, views, and services attach.
   later tick.
   `simulation/ai-recovery.ts` keeps a reserve for restoring income and
   switches between recovering and developing as the base loses and regains
-  its headquarters, income, or army production. Income plans own all worker
+  its headquarters, income, or army production. Each faction's income plan
+  supplies an `IncomeRestartReport`, registered by faction, giving the price
+  to restart income from nothing and what restarting needs now; recovery
+  reserves the first and sells against the second. Income plans own all worker
   training; defense holds its posture until its calm interval ends. Posture
   requests rank defending, then recovering, then the rest; among equals the
   higher-priority concern's request wins. Each concern receives

@@ -1474,6 +1474,34 @@ Counts, shares, and thresholds below are profile tuning values.
   engaged near their target. Engaged operations that are not outmatched
   continue.
 
+### M1 Circle AI plan
+
+Counts, shares, and thresholds below are profile tuning values. The
+[ARC plan](#m1-arc-ai-plan)'s concern tuning, local defense, repair, and
+recall rules apply unchanged.
+
+- Each known Lifebloom site takes at most a set number of Cultivators. New
+  and idle Cultivators go to the healthiest known site near a Conservatory,
+  using last-seen reserves. When a site turns Dormant, its Cultivators move
+  to a known non-dormant site with room, or wait if none has room.
+- Growth borrows the nearest Cultivator that can reach the building and
+  returns it to cultivation on completion. Untended growth gets a new tender
+  in the same way.
+- Expansion grows Conservatories beside other Lifebloom sites once home sites
+  are full, away from known enemies. The AI grows no second Heartgrove in M1
+  apart from emergency replacement, which needs a surviving Cultivator.
+- Thornspires guard remote Conservatories, and a raid on a Conservatory or
+  its Cultivators prompts one.
+- Army training keeps a share of Briar Rams, raised once enemy static
+  defenses are observed. A producer waits while the unit furthest below its
+  share trains elsewhere, so the Nursery's Rams are funded. Healers follow
+  biological units. Artificers follow Rams.
+- The Musterhall comes before the Construct Nursery. Production ranks with
+  income ahead of expansion, so lost producers regrow first.
+- Each faction's income plan reports the price to restart income from its
+  current state and whether that restart is underway. Recovery reserves and
+  sells against that report.
+
 ### M0 wolves
 
 - Wolves use idle-at-home, alerted, pursuing, attacking, investigating,
