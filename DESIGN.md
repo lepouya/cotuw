@@ -1481,9 +1481,10 @@ Counts, shares, and thresholds below are profile tuning values. The
 recall rules apply unchanged.
 
 - Each known Lifebloom site takes at most a set number of Cultivators. New
-  and idle Cultivators go to the healthiest known site near a Conservatory,
-  using last-seen reserves. When a site turns Dormant, its Cultivators move
-  to a known non-dormant site with room, or wait if none has room.
+  and idle Cultivators go to the healthiest reachable site near a
+  Conservatory, using last-seen reserves. If a site turns Dormant or its
+  route is blocked, Cultivators move to a known open site they can reach
+  with room, or keep their assignment if none is available.
 - Growth borrows the nearest Cultivator that can reach the building and
   returns it to cultivation on completion. Untended growth gets a new tender
   in the same way.

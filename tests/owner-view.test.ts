@@ -59,6 +59,7 @@ function fixture() {
       queued: true,
     })),
     rallyPoint: vi.fn(() => true),
+    reachesTile: vi.fn(() => true),
     tendWorker: vi.fn(
       (_id: string, workerIds: readonly string[]) => workerIds[0],
     ),
@@ -415,6 +416,9 @@ test("rule checks answer only for the owner's own actors", () => {
   expect(player.evaluateRallyPoint("barracks", target)).toBe(true);
   expect(player.evaluateRallyPoint("wolf", target)).toBe(false);
   expect(rules.rallyPoint).toHaveBeenCalledOnce();
+  expect(player.canReachTile("trooper", target)).toBe(true);
+  expect(player.canReachTile("wolf", target)).toBe(false);
+  expect(rules.reachesTile).toHaveBeenCalledOnce();
   expect(player.tendWorker("barracks", ["wolf", "trooper"])).toBe("trooper");
   expect(player.tendWorker("wolf", ["trooper"])).toBeUndefined();
   player.evaluatePlacement({

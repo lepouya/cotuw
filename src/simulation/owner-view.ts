@@ -15,6 +15,7 @@ import type {
   TerritoryState,
 } from "./actor";
 import type { EconomyView } from "./economy";
+import type { TileCoord } from "./grid";
 import type { Wreck } from "./combat";
 import type { SupportView } from "./support";
 import type { TrainUnitCommand } from "./command";
@@ -30,6 +31,7 @@ export type OwnerRuleChecks = {
   placement: (placement: ActorPlacement) => PlacementEvaluation;
   training: (command: TrainUnitCommand) => TrainingEvaluation;
   rallyPoint: (actorId: string, target: WorldPosition) => boolean;
+  reachesTile: (actorId: string, tile: TileCoord) => boolean;
   tendWorker: (
     buildingId: string,
     workerIds: readonly string[],
@@ -318,6 +320,11 @@ export function createOwnerView({
         : { accepted: false, reason: "missing-producer" },
     evaluateRallyPoint: (actorId: string, target: WorldPosition) =>
       !!ownActor(actorId) && checks.rallyPoint(actorId, target),
+    /** Whether an own actor can reach a known tile through known occupancy. */
+    canReachTile: (actorId: string, tile: TileCoord) =>
+      !!ownActor(actorId) &&
+      knowledge.knowsTile(tile) &&
+      checks.reachesTile(actorId, tile),
     /** The nearest own candidate that can reach and tend own, unfinished growth. */
     tendWorker: (buildingId: string, workerIds: readonly string[]) =>
       ownActor(buildingId)

@@ -7,6 +7,7 @@ import {
   footprintPlacementFor,
   isTilePlacedActor,
 } from "./placement";
+import { workerNavigation } from "./worker-navigation";
 
 import type { Actor, ActorBehavior, ActorDefinition } from "./actor";
 import type { NavigationGrid } from "./navigation";
@@ -175,6 +176,18 @@ export function createOwnerRuleChecks(
         target,
         world(),
       ),
+    reachesTile: (id, tile) => {
+      const { actors, behaviors } = world();
+      const actor = actors.find((actor) => actor.id === id);
+      return (
+        !!actor &&
+        !!map?.containsTile(tile.x, tile.z) &&
+        workerNavigation({ definitions, behaviors, map }).reachable(
+          actor,
+          map.tileCenter(tile.x, tile.z),
+        )
+      );
+    },
     tendWorker: (id, workerIds) => checks.tendWorker(id, workerIds, world()),
   };
 }

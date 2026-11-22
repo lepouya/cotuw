@@ -220,6 +220,50 @@ test("an idle Cultivator waits when the only open site is full", () => {
   }
 });
 
+test("a Cultivator leaves an open site when its route becomes impassable", () => {
+  const state = structuredClone(developed);
+  const cultivation = state.economy!.cultivation!;
+  const own = new Set(
+    ownedBy(state, "west", "circle-cultivator").map(({ id }) => id),
+  );
+  const worker = cultivation.workers.find(
+    ({ actorId, siteId, phase }) =>
+      own.has(actorId) && siteId && phase === "gathering",
+  )!;
+  const site = cultivation.sites.find(({ id }) => id === worker.siteId)!;
+  const alternative = cultivation.workers.find(
+    ({ actorId, siteId }) =>
+      own.has(actorId) &&
+      siteId !== undefined &&
+      siteId !== site.id &&
+      cultivation.sites.some(({ id, dormant }) => id === siteId && !dormant),
+  )!;
+  state.terrain!.tiles[MAP.tileIndex(site.tile.x, site.tile.z)] = {
+    typeId: "water",
+  };
+  worker.phase = "blocked";
+  const sim = resume(state);
+  try {
+    expect(sim.viewOf("west").canReachTile(worker.actorId, site.tile)).toBe(
+      false,
+    );
+    remove(sim, [alternative.actorId]);
+    const results = runTicks(sim, ROUND);
+    expect(results).toContainEqual(
+      expect.objectContaining({
+        accepted: true,
+        command: {
+          kind: "gather",
+          actorId: worker.actorId,
+          siteId: alternative.siteId,
+        },
+      }),
+    );
+  } finally {
+    sim.dispose();
+  }
+});
+
 test("growth that loses its tender borrows the nearest free Cultivator", () => {
   const sim = resume(developed);
   try {

@@ -20,11 +20,13 @@ import {
 import { visibleHostiles } from "./ai-operations";
 import { restartOf } from "./ai-recovery";
 import { isPositiveCount } from "./ai-tuning";
+import { siteRouteBlocked } from "./cultivation";
 import { plannedConcern } from "./director";
 import { isCount, isIdList, isNonnegative } from "./validation";
 import { distance } from "./world";
 
 import type { Building, PlacementMemory } from "./ai-planning";
+import type { ActorDefinition } from "./actor";
 import type { IncomeRestartReport } from "./ai-recovery";
 import type { CultivationSite } from "./cultivation";
 import type { AiConcern, AiConcernContext } from "./director";
@@ -67,8 +69,11 @@ type ExpansionMemory = PlacementMemory & {
 
 type KnownSite = CultivationSite & { position: WorldPosition };
 
+const isConservatory = ({ cultivationDropoff }: ActorDefinition) =>
+  !!cultivationDropoff;
+
 const conservatoryOf = (context: AiConcernContext) =>
-  rosterBuildings(context, (definition) => !!definition.cultivationDropoff)[0];
+  rosterBuildings(context, isConservatory)[0];
 
 /** The roster's first Cultivator trained at a headquarters. */
 function cultivatorOf(context: AiConcernContext) {
@@ -128,10 +133,7 @@ export const circleIncome = plannedConcern<IncomePlan>(
     const cultivator = cultivatorOf(context);
     if (!economy || !terrain || !conservatory || !cultivator) return;
     tendGrowth(context);
-    const conservatories = ownBuildings(
-      context,
-      (definition) => !!definition.cultivationDropoff,
-    );
+    const conservatories = ownBuildings(context, isConservatory);
     const completed = conservatories.filter(
       (building) => !building.construction,
     );
@@ -197,9 +199,8 @@ export const circleIncome = plannedConcern<IncomePlan>(
 );
 
 /**
- * Sends idle Cultivators, and those on Dormant or unserved sites, to the
- * served site with room that is open, fullest in reserve, and nearest a
- * Conservatory. Workers wait when every open site is full.
+ * Sends idle Cultivators and those on blocked, Dormant, or unserved sites to
+ * reachable open sites with room, preferring reserve and drop-off proximity.
  */
 function assignCultivators(
   context: AiConcernContext,
@@ -212,20 +213,20 @@ function assignCultivators(
   const load = new Map<string, number>();
   for (const { siteId } of workers)
     if (siteId) load.set(siteId, (load.get(siteId) ?? 0) + 1);
-  const dropoffGap = (site: KnownSite) =>
-    Math.min(
-      ...conservatories.map(({ worldPosition }) =>
-        distance(worldPosition, site.position),
-      ),
-    );
+  const dropoffs = conservatories.map(({ worldPosition }) => worldPosition);
   const open = served
     .filter(({ dormant }) => !dormant)
+    .map((site) => ({
+      site,
+      gap: nearestDistance(dropoffs, site.position),
+    }))
     .sort(
       (a, b) =>
-        b.reserve - a.reserve ||
-        dropoffGap(a) - dropoffGap(b) ||
-        compareIds(a.id, b.id),
-    );
+        b.site.reserve - a.site.reserve ||
+        a.gap - b.gap ||
+        compareIds(a.site.id, b.site.id),
+    )
+    .map(({ site }) => site);
   const openIds = new Set(open.map(({ id }) => id));
   const roomFor = (site: KnownSite) =>
     (load.get(site.id) ?? 0) < plan.workersPerSite;
@@ -234,10 +235,15 @@ function assignCultivators(
   )) {
     if (
       tending.has(worker.actorId) ||
-      (worker.siteId && openIds.has(worker.siteId))
+      (worker.siteId && openIds.has(worker.siteId) && !siteRouteBlocked(worker))
     )
       continue;
-    const target = open.find(roomFor);
+    const target = open.find(
+      (site) =>
+        site.id !== worker.siteId &&
+        roomFor(site) &&
+        context.view.canReachTile(worker.actorId, site.tile),
+    );
     if (
       !target ||
       !context.issue({
@@ -267,9 +273,7 @@ export const circleIncomeRestart: IncomeRestartReport = (context) => {
     economy.production.some(
       ({ definitionId }) => definitionId === cultivator.id,
     );
-  const earning =
-    ownBuildings(context, (definition) => !!definition.cultivationDropoff)
-      .length > 0;
+  const earning = ownBuildings(context, isConservatory).length > 0;
   return restartOf(conservatory, cultivator, { earning, staffed });
 };
 
@@ -306,16 +310,13 @@ export const circleExpansion = plannedConcern<ExpansionPlan>(
       positions: sites.map(({ tile }) => terrain.tileCenter(tile.x, tile.z)),
     }));
     type Grove = (typeof groves)[number];
-    const conservatories = ownBuildings(
-      context,
-      (definition) => !!definition.cultivationDropoff,
-    );
+    const conservatories = ownBuildings(context, isConservatory);
     // Each Conservatory belongs to its nearest grove, which it takes.
     const groveOf = (point: WorldPosition) =>
       [...groves].sort(
         (a, b) =>
-          groveGap(a.positions, point) - groveGap(b.positions, point) ||
-          compareIds(a.id, b.id),
+          nearestDistance(a.positions, point) -
+            nearestDistance(b.positions, point) || compareIds(a.id, b.id),
       )[0];
     const takenIds = new Set(
       conservatories.flatMap(
@@ -353,8 +354,8 @@ export const circleExpansion = plannedConcern<ExpansionPlan>(
         .filter((grove) => !taken(grove) && !contested(grove))
         .sort(
           (a, b) =>
-            groveGap(a.positions, home.worldPosition) -
-              groveGap(b.positions, home.worldPosition) ||
+            nearestDistance(a.positions, home.worldPosition) -
+              nearestDistance(b.positions, home.worldPosition) ||
             compareIds(a.id, b.id),
         )[0];
       if (target) held.push(target.id);
@@ -381,9 +382,11 @@ export const circleExpansion = plannedConcern<ExpansionPlan>(
   },
 );
 
-/** The distance from `point` to a grove's nearest site. */
-const groveGap = (positions: readonly WorldPosition[], point: WorldPosition) =>
-  Math.min(...positions.map((position) => distance(position, point)));
+/** The distance from `point` to the nearest of `positions`. */
+const nearestDistance = (
+  positions: readonly WorldPosition[],
+  point: WorldPosition,
+) => Math.min(...positions.map((position) => distance(position, point)));
 
 circleIncome.validateMemory = isPlacementMemory;
 circleExpansion.validateMemory = (memory) =>

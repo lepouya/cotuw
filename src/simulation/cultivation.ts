@@ -168,6 +168,11 @@ function startDelivery(worker: CultivatorState) {
   worker.phase = "returning";
 }
 
+/** Blocked on the way to the assigned site rather than to a drop-off. */
+export const siteRouteBlocked = (
+  worker: Pick<CultivatorState, "phase" | "dropoffId">,
+) => worker.phase === "blocked" && !worker.dropoffId;
+
 /** Includes assignment routes that could not start a movement order. */
 export function cultivationRouteBlocked(
   worker: Pick<CultivatorState, "phase" | "tendingBlocked">,
