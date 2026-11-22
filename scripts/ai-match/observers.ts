@@ -279,24 +279,23 @@ export function disruptionTracker(
           report.removed += 1;
         }
         report.removedByDefinition = Object.fromEntries(counts);
-      } else {
-        for (const definitionId of report.definitionIds)
-          if (
-            hasOwn(report.removedByDefinition, definitionId) &&
-            !hasOwn(report.restoredTicks, definitionId) &&
-            simulation.actors.some(
-              (actor) =>
-                actor.owner === report.owner &&
-                actor.definitionId === definitionId &&
-                !actor.construction &&
-                !targets.has(actor.id),
-            )
-          )
-            report.restoredTicks = {
-              ...report.restoredTicks,
-              [definitionId]: tick,
-            };
       }
+      for (const definitionId of report.definitionIds)
+        if (
+          hasOwn(report.removedByDefinition, definitionId) &&
+          !hasOwn(report.restoredTicks, definitionId) &&
+          simulation.actors.some(
+            (actor) =>
+              actor.owner === report.owner &&
+              actor.definitionId === definitionId &&
+              !actor.construction &&
+              !targets.has(actor.id),
+          )
+        )
+          report.restoredTicks = {
+            ...report.restoredTicks,
+            [definitionId]: tick,
+          };
     }
   };
   const results = (): DisruptionReport[] =>

@@ -78,7 +78,7 @@ test("activity keeps concern and operation IDs with separators distinct", () => 
   });
 });
 
-test("disruptions track prototype-named definitions and resume boundaries", () => {
+test.each([10, 12])("disruptions record a replacement at tick %i", (tick) => {
   const actor = createActor({
     id: "building",
     owner: "west",
@@ -101,15 +101,19 @@ test("disruptions track prototype-named definitions and resume boundaries", () =
   const tracker = disruptionTracker(simulation, [disruption]);
   tracker.apply();
   actors.length = 0;
-  tracker.observe(10);
-  expect(tracker.results()).toMatchObject([{ removed: 1, restoredTicks: {} }]);
+  if (tick > 10) {
+    tracker.observe(10);
+    expect(tracker.results()).toMatchObject([
+      { removed: 1, restoredTicks: {} },
+    ]);
+  }
   actors.push({ ...actor, id: "replacement" });
-  tracker.observe(12);
+  tracker.observe(tick);
   expect(tracker.results()).toMatchObject([
     {
       removed: 1,
       removedByDefinition: { ["__proto__"]: 1 },
-      restoredTicks: { ["__proto__"]: 12 },
+      restoredTicks: { ["__proto__"]: tick },
     },
   ]);
   expect(
