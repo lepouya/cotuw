@@ -1,7 +1,9 @@
 import { compareIds, healthOf, nearestTo } from "./actor";
 import {
   applyCultivationCommand,
+  clearTending,
   createCultivatorState,
+  cultivationRouteBlocked,
   interruptCultivation,
   updateCultivation,
   validateCultivation,
@@ -237,6 +239,19 @@ export function idleWorkerIds(
   return [...idle]
     .filter((id) => !assigned.has(id) && free(id))
     .sort(compareIds);
+}
+
+/** Own workers whose assigned route is blocked, including unstarted routes. */
+export function blockedWorkerIds(
+  economy: EconomyView | undefined,
+  actorById: (id: string) => ActorRenderState | undefined,
+): string[] {
+  return [
+    ...(economy?.harvesters ?? []).filter(({ phase }) => phase === "blocked"),
+    ...(economy?.cultivation?.workers ?? []).filter((worker) =>
+      cultivationRouteBlocked(worker, actorById(worker.actorId)?.movement),
+    ),
+  ].map(({ actorId }) => actorId);
 }
 
 export type EconomyReason =
@@ -487,7 +502,7 @@ export function removeEconomyActor(
     for (const worker of economy.cultivation.workers) {
       if (worker.tendingId === actorId) {
         interrupted.push(worker.actorId);
-        delete worker.tendingId;
+        clearTending(worker);
         worker.phase = "idle";
       }
       if (worker.dropoffId === actorId) {

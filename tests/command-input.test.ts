@@ -15,7 +15,10 @@ afterEach(() => {
 });
 
 function fixture(
-  options: Pick<CommandInputOptions, "service" | "sameTypeInView"> = {},
+  options: Pick<
+    CommandInputOptions,
+    "service" | "sameTypeInView" | "siteAt"
+  > = {},
 ) {
   const host = new EventTarget();
   const document = Object.assign(new EventTarget(), {
@@ -130,6 +133,22 @@ test("delayed movement uses only the surviving members of its selection", () => 
   input.select(undefined);
   move.run();
   expect(submitCommand).toHaveBeenCalledTimes(1);
+});
+
+test("site selection is replaced by actor selection and cleared by empty batches", () => {
+  const { input, click, menu } = fixture({ siteAt: () => "grove" });
+  input.select("relay");
+  click(undefined, 100);
+  expect(input.selectedSiteId).toBe("grove");
+  expect(input.selectedActorIds).toEqual([]);
+  input.selectMany([], true);
+  expect(input.selectedSiteId).toBe("grove");
+  input.selectMany([]);
+  expect(input.selectedSiteId).toBeUndefined();
+  menu()("select-site").run();
+  click("unit-1", 200);
+  expect(input.selectedSiteId).toBeUndefined();
+  expect(input.selectedActorIds).toEqual(["unit-1"]);
 });
 
 test("a selected sentry attacks without movement or queued mobile orders", () => {

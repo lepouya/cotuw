@@ -299,12 +299,18 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   common-to-rare yield ratio. These are initial data-driven tuning values.
   Sites show Healthy, Strained, or Dormant states; a dormant site remains
   Dormant throughout recovery until it reopens at 60%.
-- Selected sites show a reserve bar and percentage, current cultivation
-  efficiency, and their state. Dormant sites show that recovery reopens them
-  at 60%. Workers waiting at a dormant site show Waiting for site recovery
-  rather than Idle. A worked site entering dormancy produces one notification
-  per transition, without repeated reminders. Feedback follows normal
-  visibility rules; the common-to-rare yield ratio remains hidden.
+- Clicking a known cultivation site selects it when no selected unit can
+  receive a move order. Otherwise Cultivators gather and other selected
+  movers go there. Selected sites show a reserve bar and percentage,
+  cultivation efficiency, and state. Site summaries mark remembered values as
+  last seen, and dormant sites show the reserve needed to reopen. Workers
+  assigned to a dormant site can wait for recovery. A visible site entering
+  dormancy while the player's Cultivators are assigned to it produces one
+  notification per transition. The common-to-rare yield ratio remains hidden.
+- Cultivators waiting for recovery, unable to deliver, or on a blocked route
+  show distinct overhead badges. Growing buildings and their tending workers
+  name the same state: growing, untended, without an eligible headquarters,
+  tending route blocked, worker travelling, or waiting for capacity.
 - Cultivation sites have no fixed worker limit or aggregate output cap. Each
   active Cultivator contributes at the site's reserve-adjusted rate, and all
   cultivation draws from the same site reserve. Light use can be sustainable;
@@ -599,7 +605,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   The primary click's default comes first and is highlighted: Attack for
   detected hostiles with movers selected, Select and Add to or Remove from group
   for actors, Move with Attack Move for ground, and Clear selection when nothing
-  selected can move or commands wait for resuming. Actor targets end with
+  selected can move or commands wait for resuming, preceded there by Select
+  site on a known cultivation site. Actor targets end with
   Focus, and Follow for mobile actors. Move reads Gather on a
   Materials site for a selected Harvester and Collect on salvage; in a mixed
   group, Harvesters gather while the other units move there. An action, Escape,
@@ -683,14 +690,17 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   label to symbols. Speed changes only how many fixed ticks run per real second;
   missions start at 1×. Changing speed preserves fractional tick progress.
 - Alerts report attacks, losses, completed construction and training, units
-  whose routes become blocked, disconnected and reconnected buildings, and
-  objective results. They appear as brief non-modal toasts and stay in the
+  whose routes become blocked, disconnected and reconnected buildings,
+  objective results, and Circle cultivation changes: worked-site dormancy,
+  Cultivators that cannot deliver, and growth left untended or without an
+  eligible headquarters. They appear as brief non-modal toasts and stay in the
   alert history; entries with a location glide the camera there. Hits on the
   same kind of target, Harvester, building, or unit, form one attack until 15
-  simulated seconds pass without one. Attacks, losses, failures, and
-  disconnections are high priority, and Harvester attacks also pulse on the
-  minimap. Normal toasts yield space to active high-priority alerts. Alerts
-  derive from committed state and never pause simulation.
+  simulated seconds pass without one. Attacks, losses, failures,
+  disconnections, and blocked deliveries are high priority, and Harvester
+  attacks also pulse on the minimap. Normal toasts yield space to active
+  high-priority alerts. Alerts derive from committed state and never pause
+  simulation.
 - Scenario popups explain a mechanic the first time their trigger holds: while
   placing a building type, or once the player owns a completed actor type. A
   popup pauses single-player until dismissed and keeps an active placement.

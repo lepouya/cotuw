@@ -328,15 +328,15 @@ test("gift salvage hovers, rotates, targets its tile and disappears on collectio
   expect(animated.rotationQuaternion!.y).not.toBe(rotation);
   for (const mesh of gift.getChildMeshes()) {
     expect(mesh.isPickable).toBe(true);
-    expect(view.lootTileForMesh(mesh)).toEqual({ x: 5, z: 5 });
+    expect(view.targetTileForMesh(mesh)).toEqual({ x: 5, z: 5 });
   }
-  expect(view.lootTileForMesh(null)).toBeUndefined();
+  expect(view.targetTileForMesh(null)).toBeUndefined();
   economy.loot[0].collected = true;
   view.update(economy);
   expect(gift.isEnabled()).toBe(false);
   expect(gift.getChildMeshes().every((mesh) => !mesh.isEnabled())).toBe(true);
   for (const mesh of gift.getChildMeshes())
-    expect(view.lootTileForMesh(mesh)).toBeUndefined();
+    expect(view.targetTileForMesh(mesh)).toBeUndefined();
   view.dispose();
   mound.dispose();
   salvage.dispose();

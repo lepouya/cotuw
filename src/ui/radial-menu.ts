@@ -17,6 +17,7 @@ const ICONS: Record<ContextActionKind, string> = {
   move: "➜",
   "attack-move": "⚔➜",
   clear: "✕",
+  "select-site": "◎",
   focus: "⌖",
   follow: "⤳",
 };

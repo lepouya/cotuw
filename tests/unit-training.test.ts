@@ -109,6 +109,9 @@ function fixture(retiredIds: string[] = [], saved?: MissionState) {
         supportHub: "Command Center",
         refinery: "Refinery",
         harvester: "Harvester",
+        cultivator: "Cultivator",
+        dropoff: "Lifebloom Conservatory",
+        growthHeadquarters: "Heartgrove",
       }),
       selectedActorId: () => selected,
       unitDefinitionIds: () =>

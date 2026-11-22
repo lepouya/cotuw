@@ -58,6 +58,8 @@ export type CultivatorState = {
   rateProgress: number;
   siteId?: string;
   tendingId?: string;
+  /** The assigned growth has no reachable entrance. */
+  tendingBlocked?: true;
   dropoffId?: string;
   phase: (typeof CULTIVATOR_PHASES)[number];
 };
@@ -144,13 +146,30 @@ export function cultivationStatus(site: DeepReadonly<CultivationSite>) {
   if (site.dormant) return "Dormant";
   return site.reserve < site.slowBelow ? "Strained" : "Healthy";
 }
+export function clearTending(worker: CultivatorState) {
+  delete worker.tendingId;
+  delete worker.tendingBlocked;
+}
+
+/** Includes assignment routes that could not start a movement order. */
+export function cultivationRouteBlocked(
+  worker: Pick<CultivatorState, "phase" | "tendingBlocked">,
+  movement?: { readonly blocked?: boolean },
+) {
+  return (
+    worker.phase === "blocked" ||
+    (worker.phase === "tending" &&
+      (!!worker.tendingBlocked || !!movement?.blocked))
+  );
+}
+
 export function interruptCultivation(actor: Actor, economy?: EconomyState) {
   const worker = economy?.cultivation?.workers.find(
     (worker) => worker.actorId === actor.id,
   );
   if (!worker) return;
   delete worker.siteId;
-  delete worker.tendingId;
+  clearTending(worker);
   delete worker.dropoffId;
   worker.phase = "idle";
 }
@@ -193,7 +212,7 @@ export function applyCultivationCommand(
     worker.phase = worker.cargo ? "returning" : "travelling";
   } else if (command.kind === "return-cargo") {
     if (!worker.cargo) return "empty-cargo";
-    delete worker.tendingId;
+    clearTending(worker);
     delete worker.dropoffId;
     worker.phase = "returning";
   } else return "invalid-cultivator";
@@ -423,6 +442,8 @@ export function validateCultivation(
           tended.has(tending.id) ||
           definitions.get(tending.definitionId)?.growth?.workerDefinitionId !==
             actor.definitionId)) ||
+      (worker.tendingBlocked !== undefined &&
+        (worker.tendingBlocked !== true || !tending)) ||
       !!worker.tendingId !== (worker.phase === "tending")
     )
       return invalid();

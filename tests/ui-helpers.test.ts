@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { contentRoles } from "../src/ui/content-roles";
 import { createKeyedList } from "../src/ui/dom";
+import { BASE_CONTENT } from "./helpers/content";
 
 import type { ActorDefinition } from "../src/simulation/actor";
 
@@ -141,6 +142,9 @@ describe("contentRoles", () => {
       supportHub: "Depot",
       refinery: "Ore Mill",
       harvester: "Crawler",
+      cultivator: "cultivating worker",
+      dropoff: "drop-off building",
+      growthHeadquarters: "headquarters",
     });
   });
 
@@ -149,6 +153,9 @@ describe("contentRoles", () => {
       supportHub: "headquarters",
       refinery: "Refinery",
       harvester: "Harvester",
+      cultivator: "cultivating worker",
+      dropoff: "drop-off building",
+      growthHeadquarters: "headquarters",
     });
   });
 
@@ -191,6 +198,9 @@ describe("contentRoles", () => {
       supportHub: "hub",
       refinery: "mill-b",
       harvester: "worker-b",
+      cultivator: "cultivating worker",
+      dropoff: "drop-off building",
+      growthHeadquarters: "headquarters",
     });
     expect(
       contentRoles(definitions, names, { definitionId: "mill-b" }),
@@ -198,11 +208,33 @@ describe("contentRoles", () => {
       supportHub: "hub",
       refinery: "mill-b",
       harvester: "worker-b",
+      cultivator: "cultivating worker",
+      dropoff: "drop-off building",
+      growthHeadquarters: "headquarters",
     });
     expect(contentRoles(definitions, names, { faction: "circle" })).toEqual({
       supportHub: "headquarters",
       refinery: "Refinery",
       harvester: "Harvester",
+      cultivator: "cultivating worker",
+      dropoff: "drop-off building",
+      growthHeadquarters: "headquarters",
+    });
+  });
+
+  test("Circle roles name the cultivator, its drop-off, and growth headquarters", () => {
+    const names = new Map(
+      Object.entries(BASE_CONTENT.presentation).map(([id, { name }]) => [
+        id,
+        name ?? id,
+      ]),
+    );
+    expect(
+      contentRoles(BASE_CONTENT.actors, names, { faction: "circle" }),
+    ).toMatchObject({
+      cultivator: "Cultivator",
+      dropoff: "Lifebloom Conservatory",
+      growthHeadquarters: "Heartgrove",
     });
   });
 });

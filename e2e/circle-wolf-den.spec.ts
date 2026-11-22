@@ -1,12 +1,14 @@
 import { expect, test } from "./fixtures";
 import {
   activate,
+  advance,
   attachScreenshot,
   collectPageErrors,
   dismissExplanation,
   placeBuilding,
   pressPoint,
   terrainPoint,
+  withoutApp,
 } from "./page-helpers";
 import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
@@ -414,6 +416,116 @@ test(
         .screenshot({ path: testInfo.outputPath("circle-portraits.png") }),
       contentType: "image/png",
     });
+    expect(errors).toEqual([]);
+  },
+);
+
+test(
+  "Circle sites select for inspection and announce dormancy once",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    const errors = collectPageErrors(page, { console: true });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await withoutApp(page);
+    await page.goto("/");
+    await page.evaluate(async () => {
+      const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
+      const { level, placeBuildings } = await import("/e2e/missions.ts");
+      const { createNotifications } = await import("/src/ui/notifications.ts");
+      const { controlSessionClock, prototypeTerrainMap } =
+        await import("/e2e/harness.ts");
+      const notifications = createNotifications(
+        document.querySelector<HTMLElement>("#mission-alerts")!,
+      );
+      const mission = level("circle-wolf-den");
+      placeBuildings(mission, [
+        {
+          actorId: "test-conservatory",
+          definitionId: "circle-conservatory",
+          origin: { x: 16, z: 50 },
+        },
+      ]);
+      // Just above dormancy, so four workers drain it within seconds.
+      mission.state.economy!.cultivation!.sites[0]!.reserve = 10500;
+      const { view } = await startSidebarSession(mission, {
+        onAlerts: (alerts) => {
+          for (const alert of alerts) notifications.alert(alert, "");
+        },
+      });
+      controlSessionClock(view);
+      const map = prototypeTerrainMap();
+      view.focus(map.tileCenter(20, 50));
+    });
+    await advance(page, 1);
+    const canvas = page.locator("#game-canvas");
+    await expect(canvas).toHaveAttribute("data-models-ready", "true");
+    await pressPoint(page, await terrainPoint(page, 20, 50));
+    await expect(canvas).toHaveAttribute(
+      "data-selected-site",
+      "near-lifebloom",
+    );
+    await expect(page.locator("#selection-details")).toHaveText(
+      "Near Lifebloom",
+    );
+    await expect(page.locator("#site-reserve")).toBeVisible();
+    await expect(page.locator("#selection-info")).toContainText("% efficiency");
+
+    await page.evaluate(async () => {
+      const { createActor } = await import("/src/simulation/actor.ts");
+      const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+      const { view } = window.sessionHarness;
+      const map = prototypeTerrainMap();
+      for (const [index, z] of [49, 50, 51, 52].entries()) {
+        const actorId = `test-cultivator-${index}`;
+        view.simulation.spawnActor(
+          createActor({
+            id: actorId,
+            owner: "player",
+            definitionId: "circle-cultivator",
+            worldPosition: map.tileCenter(19, z),
+          }),
+        );
+        view.simulation.submitCommand(
+          { kind: "gather", actorId, siteId: "near-lifebloom" },
+          { owner: "player" },
+        );
+      }
+    });
+
+    const dormantAlerts = page
+      .locator("#alert-history li")
+      .filter({ hasText: "Near Lifebloom is dormant" });
+    await expect
+      .poll(async () => {
+        await advance(page, 1);
+        return page.locator("#selection-info").textContent();
+      })
+      .toContain("Recovery reopens it at 60%");
+    await expect(page.locator("#selection-info")).toContainText("Dormant");
+    await expect(dormantAlerts).toHaveCount(1);
+    await expect
+      .poll(async () => {
+        await advance(page, 1);
+        return page.evaluate(async () => {
+          const { gameScene } = await import("/e2e/harness.ts");
+          return gameScene().transformNodes.some(({ name }) =>
+            name.startsWith("worker-badge-waiting-"),
+          );
+        });
+      })
+      .toBe(true);
+    await advance(page, 10);
+    await expect(dormantAlerts).toHaveCount(1);
+
+    await page.evaluate(() =>
+      window.sessionHarness.view.selectActor("test-cultivator-0"),
+    );
+    await advance(page, 0.1);
+    await expect(canvas).toHaveAttribute("data-selected-site", "");
+    await expect(page.locator("#site-reserve")).toBeHidden();
+    await expect(page.locator("#harvester-details")).toContainText(
+      "Waiting for site recovery",
+    );
     expect(errors).toEqual([]);
   },
 );

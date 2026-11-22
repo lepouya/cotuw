@@ -2,6 +2,7 @@
 // Every mission-specific rule and look comes from the mission's content pack.
 import {
   collectsLoot,
+  blockedWorkerIds,
   economyWorkers,
   activeSites,
   economySites,
@@ -30,12 +31,18 @@ import {
   issuedByPlayer,
 } from "./simulation/command";
 import { createEconomyControls } from "./ui/economy-controls";
+import {
+  cultivationSiteDetails,
+  growthFeedback,
+  percent,
+} from "./ui/cultivation-feedback";
 import type { EconomyElements } from "./ui/economy-controls";
 import {
   createMaterialsSitesView,
   MATERIALS_COLOR,
 } from "./render/materials-sites";
 import { createHealthBarView } from "./render/health-bars";
+import { createWorkerBadgeView } from "./render/worker-badges";
 import { createCombatEffectsView } from "./render/combat-effects";
 import { createDamageEffectsView } from "./render/damage-effects";
 import { createRegenerationEffectsView } from "./render/regeneration-effects";
@@ -60,6 +67,7 @@ import { createSessionMap } from "./render/terrain-style";
 import {
   actorAnimationState,
   extractHealthAndDamageEffects,
+  extractWorkerBadges,
   extractServiceEffects,
   shotEnds,
 } from "./render/session-effects";
@@ -308,13 +316,16 @@ async function assembleGameSession(
   if (materialsView) own(materialsView);
   const explored = ({ x, z }: TileCoord) =>
     player.knowledge.fog?.isExplored(x, z) ?? true;
-  /** A gathering site the player knows under a world point. */
-  const siteAt = (point: WorldPosition) => {
+  const siteOn = <T extends { tile: TileCoord }>(
+    sites: readonly T[],
+    point: WorldPosition,
+  ) => {
     const { x, z } = map.tileAtWorldPosition(point.x, point.z);
-    return activeSites(player.economy()).find(
-      (site) => site.tile.x === x && site.tile.z === z,
-    );
+    return sites.find((site) => site.tile.x === x && site.tile.z === z);
   };
+  /** A gathering site the player knows under a world point. */
+  const siteAt = (point: WorldPosition) =>
+    siteOn(activeSites(player.economy()), point);
   const fogOverlay = createFogOverlay(
     view.scene,
     map,
@@ -374,6 +385,7 @@ async function assembleGameSession(
   own(queuedOrders);
   const healthBars = createHealthBarView(view.scene, map);
   own(healthBars);
+  const workerBadges = own(createWorkerBadgeView(view.scene, map));
   const combatEffects = createCombatEffectsView(
     view.scene,
     map,
@@ -519,7 +531,7 @@ async function assembleGameSession(
       return player.shownActor(id)?.id;
     },
     movementTargetForMesh: (mesh) => {
-      const tile = materialsView?.lootTileForMesh(mesh);
+      const tile = materialsView?.targetTileForMesh(mesh);
       return tile && map.tileCenter(tile.x, tile.z);
     },
     actorIdsInRect: (rect) => actorViews.actorIdsInRect(canvas, rect),
@@ -563,6 +575,14 @@ async function assembleGameSession(
       )
         return "Gather";
       return undefined;
+    },
+    siteAt: (target) =>
+      siteOn(player.economy()?.cultivation?.sites ?? [], target)?.id,
+    onSiteSelectionChanged: (siteId) => {
+      materialsView?.setSelectedSite(siteId);
+      minimap.refreshActors();
+      canvas.dataset.selectedSite = siteId ?? "";
+      controlsDirty = true;
     },
     onContextMenu: radial.show,
     focusActor: (actorId) => focusActors([actorId]),
@@ -662,6 +682,7 @@ async function assembleGameSession(
         worldPosition: map.tileCenter(site.tile.x, site.tile.z),
         tiles: [site.tile],
         color: [0.68, 0.4, 0.85] as Rgb,
+        selected: input.selectedSiteId === site.id,
       })) ?? []),
       ...(player
         .economy()
@@ -713,6 +734,9 @@ async function assembleGameSession(
   };
   const refreshControls = () => {
     const economy = player.economy();
+    const site =
+      input.selectedSiteId &&
+      economy?.cultivation?.sites.find(({ id }) => id === input.selectedSiteId);
     if (controls.remove) controls.remove.disabled = !removableActor();
     placement.update();
     network.refresh();
@@ -727,6 +751,9 @@ async function assembleGameSession(
       ownActors: player.actors().own,
       actorVersion: simulation.actorVersion,
       selectedActorIds: input.selectedActorIds,
+      selectedSite: site
+        ? cultivationSiteDetails(site, player.knowledge.seesTile(site.tile))
+        : undefined,
       boxMode: input.boxMode,
       additiveMode: input.additiveMode,
       queueMode: input.queueMode,
@@ -779,25 +806,42 @@ async function assembleGameSession(
   };
   const alertTracker = createAlertTracker({
     nameOf: (id) => names.get(id) ?? id,
+    roles: contentRoles(definitions, names, { faction: player.faction }),
   });
-  const observeAlerts = () =>
-    alertTracker.observe({
+  const observeAlerts = () => {
+    const economy = player.economy();
+    const { own: ownActors, ownById } = player.actors();
+    const cultivation = economy?.cultivation;
+    return alertTracker.observe({
       tick: simulation.completedTicks,
       tickSeconds: simulation.tickSeconds,
-      actors: player.actors().own,
+      actors: ownActors,
       attacks: simulation.attacks,
       wrecks: player.wrecks(),
       support: player.support(),
       objectives: simulation.objectives,
-      workerIds: economyWorkers(player.economy()).map(({ actorId }) => actorId),
-      sites: (player.economy()?.cultivation?.sites ?? []).map((site) => ({
-        id: site.id,
-        name: site.name,
-        dormant: site.dormant,
-        reopensAt: Math.round((site.recoverAt / site.capacity) * 100),
-        position: map.tileCenter(site.tile.x, site.tile.z),
-      })),
+      workerIds: economyWorkers(economy).map(({ actorId }) => actorId),
+      sites: cultivation?.sites
+        .filter(({ tile }) => player.knowledge.seesTile(tile))
+        .map((site) => ({
+          id: site.id,
+          name: site.name,
+          dormant: site.dormant,
+          reopensAt: percent(site.recoverAt, site.capacity),
+          position: map.tileCenter(site.tile.x, site.tile.z),
+        })),
+      cultivators: cultivation?.workers,
+      blockedWorkerIds: blockedWorkerIds(economy, (id) => ownById.get(id)),
+      growth:
+        cultivation &&
+        growthFeedback(
+          ownById,
+          cultivation.workers,
+          definitionsById,
+          mission.scenario.emergencyHeadquarters,
+        ),
     });
+  };
   const buildings = definitions.filter(
     (definition) =>
       definition.footprint && rosterIncludes(player.faction, definition),
@@ -929,6 +973,11 @@ async function assembleGameSession(
             const { x, z } = map.tileCenter(tile.x, tile.z);
             view.camera.glideToPoint(new Vector3(x, 0, z));
           },
+          selectSite: (siteId) => {
+            if (selectionUnlocked()) input.selectSite(siteId);
+          },
+          seesTile: player.knowledge.seesTile,
+          emergencyHeadquarters: mission.scenario.emergencyHeadquarters,
           economy: player.economy,
           offlineIds: player.offlineIds,
           positionForTile: (tile) => map.tileCenter(tile.x, tile.z),
@@ -1020,6 +1069,13 @@ async function assembleGameSession(
       },
     );
     healthBars.update(bars);
+    workerBadges.update(
+      extractWorkerBadges(
+        player.economy()?.cultivation?.workers ?? [],
+        player.actors().ownMobile,
+        drawn,
+      ),
+    );
     damageEffects.update(damaged, frameSeconds);
     regenerationEffects.update(regenerating, frameSeconds);
   };

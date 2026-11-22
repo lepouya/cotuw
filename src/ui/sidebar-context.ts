@@ -14,12 +14,15 @@ import type {
 import type { ActorPresentation } from "../content/presentation";
 import type { UnitTypeScope } from "../render/selection";
 
+import type { SiteSelection } from "./cultivation-feedback";
+
 export type SidebarState = {
   /** Own and currently detected actors only. */
   actors: readonly ObservedActor[];
   ownActors?: readonly ActorRenderState[];
   actorVersion: number;
   selectedActorIds: readonly string[];
+  selectedSite?: SiteSelection;
   boxMode?: boolean;
   additiveMode?: boolean;
   queueMode?: boolean;

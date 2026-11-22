@@ -24,6 +24,12 @@ export function contentRoles(
     : (definitions.find(
         ({ id }) => id === refinery?.refinery?.harvesterDefinitionId,
       ) ?? candidates.find(({ harvesting }) => harvesting));
+  const cultivator = subject?.cultivation
+    ? subject
+    : candidates.find(({ cultivation }) => cultivation);
+  const growthHeadquartersId = candidates.find(
+    ({ growth }) => growth && growth.workerDefinitionId === cultivator?.id,
+  )?.growth?.headquartersDefinitionId;
   const roleName = (
     definition: ActorDefinition | undefined,
     fallback: string,
@@ -38,6 +44,13 @@ export function contentRoles(
     ),
     refinery: roleName(refinery, "Refinery"),
     harvester: roleName(harvester, "Harvester"),
+    cultivator: roleName(cultivator, "cultivating worker"),
+    dropoff: roleName(
+      candidates.find(({ cultivationDropoff }) => cultivationDropoff),
+      "drop-off building",
+    ),
+    /** The headquarters that hosts the cultivator's growth. */
+    growthHeadquarters: names.get(growthHeadquartersId ?? "") || "headquarters",
   };
 }
 

@@ -1,9 +1,13 @@
+import { cultivationRouteBlocked } from "../simulation/cultivation";
 import {
-  cultivationEfficiency,
-  cultivationStatus,
-} from "../simulation/cultivation";
+  cultivationSiteDetails,
+  cultivationSiteSummary,
+  growthFeedback,
+  percent,
+} from "./cultivation-feedback";
 import {
   collectsLoot,
+  idleWorkerIds,
   lootAmount,
   lootResource,
   saleRefund,
@@ -148,6 +152,10 @@ export function createEconomyControls(
     enabled: () => boolean;
     queueMode?: () => boolean;
     focus: (tile: TileCoord) => void;
+    /** Selects a renewable site for inspection. */
+    selectSite?: (siteId: string) => void;
+    seesTile?: (tile: TileCoord) => boolean;
+    emergencyHeadquarters?: boolean;
     /**
      * The player's own workers, production, and balances, with sites and
      * salvage as the player last saw them.
@@ -193,10 +201,8 @@ export function createEconomyControls(
       faction: options.faction,
     });
   const materials = resourceName("materials");
-  const percent = (amount: number, total: number) =>
-    Math.round((amount / total) * 100);
   const siteSummary = (site: CultivationSite) =>
-    `${site.name} · ${cultivationStatus(site)} · ${percent(site.reserve, site.capacity)}% reserve · ${percent(cultivationEfficiency(site), 1)}% efficiency${site.dormant ? ` · Reopens at ${percent(site.recoverAt, site.capacity)}%` : ""}`;
+    `${site.name} · ${cultivationSiteSummary(cultivationSiteDetails(site, options.seesTile?.(site.tile) ?? true))}`;
   const actionList = (container: HTMLElement) =>
     createKeyedList<EconomyAction>(
       container,
@@ -252,29 +258,13 @@ export function createEconomyControls(
       const resourcePatches = patches(economy);
       const definition = actor && definitions.get(actor.definitionId);
       const roles = rolesFor(definition?.id);
-      const { harvester, refinery } = roles;
+      const { harvester, refinery, cultivator, dropoff } = roles;
+      const headquarters = roles.growthHeadquarters;
       const phases = harvesterPhases(materials, roles);
       const faction = definition?.faction ?? options.faction;
       const cultivatorDefinition = definition?.cultivation
         ? definition
         : definitionWith(({ cultivation }) => cultivation, faction);
-      const cultivator =
-        nameOf(cultivatorDefinition?.id) || "cultivating worker";
-      const dropoff =
-        nameOf(
-          definitionWith(
-            ({ cultivationDropoff }) => cultivationDropoff,
-            faction,
-          )?.id,
-        ) || "drop-off building";
-      const headquarters =
-        nameOf(
-          definitionWith(
-            ({ growth }) =>
-              growth && growth.workerDefinitionId === cultivatorDefinition?.id,
-            faction,
-          )?.growth?.headquartersDefinitionId,
-        ) || "headquarters";
       const worker =
         actor &&
         economy.harvesters.find((worker) => worker.actorId === actor.id);
@@ -283,6 +273,16 @@ export function createEconomyControls(
         (worker) => worker.actorId === actor?.id,
       );
       const cultivationSites = cultivation?.sites ?? [];
+      const cultivators = cultivation?.workers ?? [];
+      const idle = new Set(
+        idleWorkerIds(economy, (actorId) => actors.get(actorId)),
+      );
+      const growth = growthFeedback(
+        actors,
+        cultivators,
+        definitions,
+        options.emergencyHeadquarters,
+      );
       const enabled = options.enabled();
       const disconnected = options.offlineIds();
       const repairs = owned
@@ -307,6 +307,22 @@ export function createEconomyControls(
         if (!headquartersId)
           return `No ${headquartersFor(definitionId)} · Paused`;
         return undefined;
+      };
+      const growthLabels = (building: ActorRenderState) => {
+        const status = growth.get(building.id);
+        const host = headquartersFor(building.definitionId);
+        const definition = definitions.get(building.definitionId)?.growth;
+        const tender = nameOf(definition?.workerDefinitionId) || cultivator;
+        return {
+          growing: "Growing",
+          untended: "Untended · Paused",
+          unhosted: `No ${host} · Paused`,
+          "route-blocked": "Tending route blocked",
+          travelling: `${tender} travelling`,
+          waiting: building.headquartersId
+            ? `Waiting for ${host} capacity`
+            : "Waiting for emergency construction capacity",
+        }[status!];
       };
       const repairStatus = (building: ActorRenderState) => {
         if (building.repair!.active) return "Repairing";
@@ -377,14 +393,16 @@ export function createEconomyControls(
       }: Pick<CultivatorState, "phase" | "tendingId">) => {
         if (phase === "no-dropoff")
           return `Delivery blocked: no reachable ${dropoff}`;
+        if (phase === "idle" && actor && !idle.has(actor.id))
+          return actor.movement?.blocked
+            ? "Route blocked"
+            : "Orders in progress";
         if (phase !== "tending") return CULTIVATOR_PHASES[phase];
         const tending = actors.get(tendingId ?? "");
-        if (tending?.construction?.active) return "Tending growth";
-        if (!tending?.headquartersId)
-          return `Waiting for an operational ${headquarters}`;
-        if (actor?.movement?.blocked) return "Tending route blocked";
-        if (actor?.movement) return "Travelling to tend growth";
-        return `Waiting for ${headquarters} capacity`;
+        const state = tending && growth.get(tending.id);
+        if (state === "growing") return "Tending growth";
+        if (state === "travelling") return "Travelling to tend growth";
+        return state ? growthLabels(tending!) : "Tending growth";
       };
       if (cultivating) {
         setText(
@@ -501,19 +519,10 @@ export function createEconomyControls(
       }
       const construction = owned.filter((actor) => actor.construction);
       const constructionStatus = (building: ActorRenderState) => {
-        const growth = !!definitions.get(building.definitionId)?.growth;
-        if (building.construction?.active)
-          return growth ? "Growing" : "Building";
-        const tended = cultivation?.workers.some(
-          (worker) => worker.tendingId === building.id,
-        );
-        if (growth && !tended) return "Untended · Paused";
-        return (
-          unhosted(building) ??
-          (growth
-            ? "Worker travelling or waiting for infrastructure"
-            : "Queued")
-        );
+        if (definitions.get(building.definitionId)?.growth)
+          return growthLabels(building);
+        if (building.construction?.active) return "Building";
+        return unhosted(building) ?? "Queued";
       };
       lists.constructionQueue.update([
         ...construction.map((actor) => ({
@@ -549,7 +558,10 @@ export function createEconomyControls(
           key: `show-cultivation:${site.id}`,
           text: `Show ${siteSummary(site)}`,
           disabled: !enabled,
-          action: () => options.focus(site.tile),
+          action: () => {
+            options.selectSite?.(site.id);
+            options.focus(site.tile);
+          },
         })),
         ...resourcePatches.map(({ site, remaining }) => ({
           key: `focus:${site.id}`,
@@ -615,7 +627,6 @@ export function createEconomyControls(
         (worker) =>
           worker.phase === "idle" && !actors.get(worker.actorId)?.movement,
       );
-      const cultivators = cultivation?.workers ?? [];
       let status: string;
       const ownsCultivation = owned.some(
         (actor) => definitions.get(actor.definitionId)?.growth,
@@ -627,14 +638,29 @@ export function createEconomyControls(
             definition.faction === options.faction && definition.cultivation,
         );
       if (cultivators.length || ownsCultivation || playsCultivation) {
-        const hasPhase = (phase: string) =>
+        const hasPhase = (phase: CultivatorState["phase"]) =>
           cultivators.some((worker) => worker.phase === phase);
+        const untended = construction.find(
+          (building) => growth.get(building.id) === "untended",
+        );
+        const idleCultivator = cultivators.find(({ actorId }) =>
+          idle.has(actorId),
+        );
         if (hasPhase("no-dropoff"))
           status = `Delivery blocked: grow a reachable ${dropoff}. Cargo is retained.`;
+        else if (untended)
+          status = `${nameOf(untended.definitionId)} is untended and paused. Select a ${cultivator} and choose Tend to resume.`;
+        else if (
+          cultivators.some((worker) =>
+            cultivationRouteBlocked(
+              worker,
+              actors.get(worker.actorId)?.movement,
+            ),
+          )
+        )
+          status = `A ${cultivator} route is blocked. Clear the route or issue a new order.`;
         else if (hasPhase("waiting"))
           status = `${cultivator}s are waiting for site recovery. Rotate sites for faster income.`;
-        else if (hasPhase("blocked"))
-          status = `A ${cultivator} route is blocked. Clear the route or issue a new order.`;
         else if (cultivators.length === 0) {
           status = cultivatorDefinition
             ? `Select the ${headquarters} and train a ${cultivator} for ${costLabel(cultivatorDefinition)}.`
@@ -647,8 +673,12 @@ export function createEconomyControls(
           )
         )
           status = `Select a ${cultivator} and grow a ${dropoff}. Keep it nearby to tend growth, then choose Gather.`;
+        else if (idleCultivator)
+          status = idleCultivator.cargo
+            ? `Idle ${cultivator}: return its cargo or choose Gather on a site.`
+            : `Idle ${cultivator}: select it and choose Gather on a site.`;
         else
-          status = `One ${cultivator} per site is sustainable. Additional workers increase immediate income and can trigger dormancy. Rotate sites or wait for recovery.`;
+          status = `Light cultivation can be sustainable. More workers increase immediate income and can trigger dormancy. Rotate sites or wait for recovery.`;
       } else if (warning) {
         status =
           warning.phase === "depleted"

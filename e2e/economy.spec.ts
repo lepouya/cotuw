@@ -860,6 +860,197 @@ test("worker controls share delivery actions and tolerate missions without culti
   });
 });
 
+test("Circle growth and worker states stay distinct in queues and status", async ({
+  page,
+}) => {
+  await withoutApp(page);
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const { createSidebar } = await import("/src/ui/sidebar.ts");
+    const { createEconomyControls } =
+      await import("/src/ui/economy-controls.ts");
+    const { currentContentPack } = await import("/src/content/packs.ts");
+    const { economyForOwner } = await import("/src/simulation/economy.ts");
+    const { createCultivatorState } =
+      await import("/src/simulation/cultivation.ts");
+    const { createActor } = await import("/src/simulation/actor.ts");
+    const content = currentContentPack("base");
+    const root = document.querySelector<HTMLElement>("#game-sidebar")!;
+    const sidebar = createSidebar(root, {
+      definitions: content.actors,
+      presentations: new Map(Object.entries(content.presentation)),
+      playerOwner: "player",
+      playerFaction: "circle",
+      economy: true,
+      goals: [],
+      selectActor: () => {},
+    });
+    const names = new Map<string, string>(
+      Object.entries(content.presentation).map(([id, presentation]) => [
+        id,
+        presentation.name ?? id,
+      ]),
+    );
+    const placed = (id: string, definitionId: string) => ({
+      ...createActor({
+        id,
+        owner: "player",
+        definitionId,
+        worldPosition: { x: 0, z: 0 },
+      }),
+      tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 0 as const },
+    });
+    type Case = {
+      active?: boolean;
+      tended?: boolean;
+      hosted?: boolean;
+      movement?: "moving" | "blocked";
+      growing?: boolean;
+      emergency?: boolean;
+    };
+    const run = (options: Case) => {
+      const tender = createActor({
+        id: "c1",
+        owner: "player",
+        definitionId: "circle-cultivator",
+        worldPosition: { x: 0, z: 0 },
+      });
+      if (options.movement)
+        tender.movement = {
+          target: { x: 5, z: 5 },
+          ...(options.movement === "blocked" && { blocked: true }),
+        };
+      const hall = {
+        ...placed(
+          "hall",
+          options.emergency ? "circle-heartgrove" : "circle-musterhall",
+        ),
+        construction: {
+          completedTicks: 1,
+          totalTicks: 600,
+          paidCost: 100,
+          ...(options.active && { active: true }),
+        },
+        ...(options.hosted !== false && { headquartersId: "grove" }),
+      };
+      const actors: Actor[] = [
+        ...(options.emergency ? [] : [placed("grove", "circle-heartgrove")]),
+        placed("basin", "circle-conservatory"),
+        ...(options.growing === false ? [] : [hall]),
+        tender,
+      ];
+      const economy: EconomyState = {
+        stockpiles: [],
+        deposited: [],
+        sites: [],
+        loot: [],
+        harvesters: [],
+        production: [],
+        cultivation: {
+          sites: [],
+          workers: [
+            {
+              ...createCultivatorState("c1"),
+              ...(options.tended && {
+                phase: "tending" as const,
+                tendingId: "hall",
+              }),
+            },
+          ],
+        },
+      };
+      const controls = createEconomyControls(
+        sidebar.controls.economy!,
+        { tickSeconds: 1 / 60, submitCommand: () => 0 },
+        {
+          definitions: content.actors,
+          names,
+          owner: "player",
+          faction: "circle",
+          ownActors: () => actors,
+          selectedActorId: () => "c1",
+          emergencyHeadquarters: options.emergency,
+          enabled: () => true,
+          focus: () => {},
+          economy: () => economyForOwner(economy, "player", () => true),
+          offlineIds: () => new Set(),
+          positionForTile: () => ({ x: 0, z: 0 }),
+        },
+      );
+      controls.refresh();
+      const text = (selector: string) =>
+        root.querySelector(selector)?.textContent ?? "";
+      const state = {
+        queue: text("#construction-queue button").split(" · ")[1] ?? "",
+        worker: text("#harvester-details").split(" · ")[1] ?? "",
+        alert: text("#economy-alert"),
+      };
+      controls.dispose();
+      return state;
+    };
+    const states = {
+      growing: run({ tended: true, active: true }),
+      untended: run({}),
+      unhosted: run({ tended: true, hosted: false }),
+      blocked: run({ tended: true, movement: "blocked" }),
+      travelling: run({ tended: true, movement: "moving" }),
+      waiting: run({ tended: true }),
+      emergency: run({
+        tended: true,
+        hosted: false,
+        emergency: true,
+        movement: "moving",
+      }),
+      moving: run({ growing: false, movement: "moving" }),
+      idle: run({ growing: false }),
+    };
+    sidebar.dispose();
+    return states;
+  });
+  expect(result).toEqual({
+    growing: expect.objectContaining({
+      queue: "Growing",
+      worker: "Tending growth",
+    }),
+    untended: {
+      queue: "Untended",
+      worker: "Idle",
+      alert:
+        "Musterhall is untended and paused. Select a Cultivator and choose Tend to resume.",
+    },
+    unhosted: expect.objectContaining({
+      queue: "No Heartgrove",
+      worker: "No Heartgrove",
+    }),
+    blocked: {
+      queue: "Tending route blocked",
+      worker: "Tending route blocked",
+      alert:
+        "A Cultivator route is blocked. Clear the route or issue a new order.",
+    },
+    travelling: expect.objectContaining({
+      queue: "Cultivator travelling",
+      worker: "Travelling to tend growth",
+    }),
+    waiting: expect.objectContaining({
+      queue: "Waiting for Heartgrove capacity",
+      worker: "Waiting for Heartgrove capacity",
+    }),
+    emergency: expect.objectContaining({
+      queue: "Cultivator travelling",
+      worker: "Travelling to tend growth",
+    }),
+    moving: expect.objectContaining({
+      worker: "Orders in progress",
+      alert: expect.not.stringContaining("Idle"),
+    }),
+    idle: expect.objectContaining({
+      worker: "Idle",
+      alert: "Idle Cultivator: select it and choose Gather on a site.",
+    }),
+  });
+});
+
 test("Harvester training cancellation refunds and frees its slot", async ({
   page,
 }, testInfo) => {

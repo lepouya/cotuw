@@ -1,3 +1,4 @@
+import { cultivationRouteBlocked } from "../simulation/cultivation";
 import { Vector3 } from "@babylonjs/core";
 import { weaponReach } from "../simulation/combat";
 import { isTilePlacedActor } from "../simulation/placement";
@@ -9,7 +10,7 @@ import type { DamagedActor } from "./damage-effects";
 import type { HealthBar } from "./health-bars";
 import type { RegeneratingActor } from "./regeneration-effects";
 import type { ServiceEffect } from "./service-effects";
-import type { ActorDefinition } from "../simulation/actor";
+import type { ActorDefinition, ActorRenderState } from "../simulation/actor";
 import type { AttackEvent } from "../simulation/combat";
 import type { ObservedActor } from "../simulation/owner-view";
 import type { TilePlacedActorState } from "../simulation/placement";
@@ -17,6 +18,8 @@ import type { ActorPresentation } from "../content/presentation";
 import type { TerrainMap } from "../map";
 import type { ServiceActivity } from "../simulation/unit-support";
 import type { WorldPosition } from "../simulation/world";
+import type { CultivatorState } from "../simulation/cultivation";
+import type { WorkerBadge, WorkerBadgeKind } from "./worker-badges";
 
 /** Health bars sit this far above unit models and over buildings. */
 export const UNIT_BAR_CLEARANCE = 0.3;
@@ -237,6 +240,43 @@ export function extractServiceEffects(
         height:
           (appearances.get(target.definitionId)?.bounds.height ?? 1) +
           UNIT_BAR_CLEARANCE,
+      },
+    ];
+  });
+}
+
+/** Badges sit this far above a unit's health bar. */
+const BADGE_CLEARANCE = 0.45;
+
+/** Badges for own workers that keep an assignment they cannot work. */
+export function extractWorkerBadges(
+  workers: readonly Pick<
+    CultivatorState,
+    "actorId" | "phase" | "tendingBlocked"
+  >[],
+  actors: readonly ActorRenderState[],
+  {
+    appearances,
+    groundPositionOf,
+  }: Pick<EffectContext, "appearances" | "groundPositionOf">,
+): WorkerBadge[] {
+  const byId = new Map(actors.map((actor) => [actor.id, actor]));
+  return workers.flatMap((worker) => {
+    const { actorId, phase } = worker;
+    const actor = byId.get(actorId);
+    if (!actor) return [];
+    let kind: WorkerBadgeKind | undefined;
+    if (phase === "waiting") kind = "waiting";
+    else if (phase === "no-dropoff") kind = "undeliverable";
+    else if (cultivationRouteBlocked(worker, actor.movement)) kind = "blocked";
+    if (!kind) return [];
+    const height = appearances.get(actor.definitionId)?.bounds.height ?? 1;
+    return [
+      {
+        id: actorId,
+        kind,
+        worldPosition: groundPositionOf(actorId) ?? actor.worldPosition,
+        height: height + UNIT_BAR_CLEARANCE + BADGE_CLEARANCE,
       },
     ];
   });

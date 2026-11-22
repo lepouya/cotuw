@@ -19,6 +19,7 @@ import {
 import type { ObservedActor } from "../simulation/owner-view";
 import type { OwnerRelation } from "../simulation/ownership";
 import type { UnitTypeScope } from "../render/selection";
+import { cultivationSiteSummary } from "./cultivation-feedback";
 import type { SidebarContext, SidebarState } from "./sidebar-context";
 import "./sidebar-selection.css";
 
@@ -74,6 +75,13 @@ export function createSidebarSelection(
     "Nothing selected",
   );
   const selectionHealth = el("p", { id: "selection-health", hidden: true });
+  const siteReserve = el("meter", {
+    id: "site-reserve",
+    min: "0",
+    max: "100",
+    "aria-label": "Site reserve",
+    hidden: true,
+  }) as HTMLMeterElement;
   const networkStatus = el("p", {
     "data-network-status": true,
     class: "muted",
@@ -215,6 +223,7 @@ export function createSidebarSelection(
     selectionHeading,
     selectionDetails,
     selectionHealth,
+    siteReserve,
     networkStatus,
     selectionInfo,
     selectionTypes,
@@ -316,6 +325,22 @@ export function createSidebarSelection(
       removeBuilding.hidden = !selectedActors.some(
         (actor) => owns(actor) && isTilePlacedActor(actor),
       );
+      const site = state.selectedSite;
+      siteReserve.hidden = !site;
+      if (site) {
+        siteReserve.value = site.reservePercent;
+        siteReserve.low = site.dormantAt;
+        siteReserve.high = site.reopensAt;
+        siteReserve.optimum = 100;
+        siteReserve.setAttribute("aria-valuetext", `${site.reservePercent}%`);
+        selectionHealth.hidden = true;
+        typeRows.update([]);
+        openTraining.hidden = true;
+        selectionKey = "";
+        setText(selectionDetails, site.name);
+        setText(selectionInfo, cultivationSiteSummary(site));
+        return;
+      }
       const actor = inspectedActor(state);
       const definition = actor && definitionById.get(actor.definitionId);
       const maximum = definition?.health;

@@ -76,3 +76,21 @@ test("armed buildings attack hostiles but take no ground orders", () => {
   );
   expect(contextActionKinds({ ground: true }, sentry)).toEqual(["clear"]);
 });
+
+test("a known site is selected unless movers would gather there", () => {
+  const site = { ground: true, site: true };
+  expect(contextActionKinds(site, state([]))).toEqual(["select-site"]);
+  expect(contextActionKinds(site, state(["hall"]))).toEqual([
+    "select-site",
+    "clear",
+  ]);
+  expect(contextActionKinds(site, state(["unit-1"]))).toEqual([
+    "move",
+    "attack-move",
+  ]);
+  expect(contextActionKinds(site, state([], { additive: true }))).toEqual([]);
+  // Plain ground clears a selected site.
+  expect(
+    contextActionKinds({ ground: true }, state([], { siteSelected: true })),
+  ).toEqual(["clear"]);
+});

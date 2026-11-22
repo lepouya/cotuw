@@ -1,3 +1,4 @@
+import type { GrowthStatus } from "../src/ui/cultivation-feedback";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -56,9 +57,10 @@ const node = (actorId: string, owner: string, connected: boolean) => ({
   rootIds: connected ? ["root"] : [],
 });
 
-function tracker() {
+function tracker(roles?: Parameters<typeof createAlertTracker>[0]["roles"]) {
   const alerts = createAlertTracker({
     nameOf: (id) => id[0]!.toUpperCase() + id.slice(1),
+    roles,
   });
   let tick = 0;
   return (state: Partial<AlertObservation> = {}) =>
@@ -305,25 +307,159 @@ describe("mission alerts", () => {
     ]);
   });
 
-  test("announces a site only when an explored site falls dormant", () => {
+  test("announces dormancy once per transition, only for sites the player works", () => {
     const observe = tracker();
-    const site = (dormant: boolean) => ({
-      id: "grove",
-      name: "Near Lifebloom",
+    const site = (id: string, dormant: boolean) => ({
+      id,
+      name: id === "grove" ? "Near Lifebloom" : "Far Lifebloom",
       dormant,
       reopensAt: 60,
       position: { x: 3, z: 4 },
     });
+    const workers = [
+      { actorId: "c1", phase: "gathering" as const, siteId: "grove" },
+      { actorId: "c2", phase: "gathering" as const, siteId: "grove" },
+    ];
     observe({ sites: [] });
-    expect(observe({ sites: [site(true)] })).toEqual([]);
-    observe({ sites: [site(false)] });
-    expect(observe({ sites: [site(true)] })).toEqual([
+    // A first sighting of a dormant site is not a transition.
+    expect(
+      observe({ sites: [site("grove", true)], cultivators: workers }),
+    ).toEqual([]);
+    observe({ sites: [site("grove", false)], cultivators: workers });
+    expect(
+      observe({
+        sites: [site("grove", true), site("far", false)],
+        cultivators: workers,
+      }),
+    ).toEqual([
       {
         priority: "normal",
         text: "Near Lifebloom is dormant. Workers deliver cargo and wait for recovery to 60%.",
         position: { x: 3, z: 4 },
       },
     ]);
-    expect(observe({ sites: [site(true)] })).toEqual([]);
+    expect(
+      observe({ sites: [site("grove", true)], cultivators: workers }),
+    ).toEqual([]);
+    // A site only another owner works stays silent.
+    expect(
+      observe({
+        sites: [site("grove", true), site("far", true)],
+        cultivators: workers,
+      }),
+    ).toEqual([]);
+    observe({ sites: [site("grove", false)], cultivators: workers });
+    expect(
+      observe({ sites: [site("grove", true)], cultivators: workers }),
+    ).toHaveLength(1);
+  });
+
+  test("a loaded baseline raises no cultivation alerts", () => {
+    const observe = tracker();
+    const growth = actor("hall", "musterhall", {
+      construction: {
+        completedTicks: 1,
+        totalTicks: 10,
+        paidCost: 50,
+        queuedTick: 0,
+      },
+    });
+    expect(
+      observe({
+        actors: [growth, actor("c1", "cultivator")],
+        cultivators: [{ actorId: "c1", phase: "no-dropoff" }],
+        growth: new Map([["hall", "untended"]]),
+        sites: [
+          {
+            id: "grove",
+            name: "Near Lifebloom",
+            dormant: true,
+            reopensAt: 60,
+            position: { x: 0, z: 0 },
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  test("worker routes that block without a movement order alert once", () => {
+    const observe = tracker();
+    const workers = [actor("h1", "harvester"), actor("c1", "cultivator")];
+    observe({ actors: workers, blockedWorkerIds: [] });
+    expect(
+      observe({ actors: workers, blockedWorkerIds: ["h1", "c1"] }).map(
+        ({ text }) => text,
+      ),
+    ).toEqual(["2 units cannot reach the destination"]);
+    expect(
+      observe({ actors: workers, blockedWorkerIds: ["h1", "c1"] }),
+    ).toEqual([]);
+  });
+
+  test("reports blocked delivery, untended growth, and lost infrastructure on transition", () => {
+    const observe = tracker({
+      cultivator: "Cultivator",
+      dropoff: "Lifebloom Conservatory",
+      growthHeadquarters: "Heartgrove",
+    });
+    const construction = {
+      completedTicks: 1,
+      totalTicks: 10,
+      paidCost: 50,
+      queuedTick: 0,
+    };
+    const hall = (headquartersId?: string) =>
+      actor("hall", "musterhall", {
+        construction,
+        ...(headquartersId && { headquartersId }),
+      });
+    const worker = actor("c1", "cultivator");
+    const tender = actor("c2", "cultivator");
+    const state = (
+      phase: "gathering" | "no-dropoff",
+      tending: boolean,
+      headquartersId?: string,
+    ) => ({
+      actors: [hall(headquartersId), worker, ...(tending ? [tender] : [])],
+      cultivators: [
+        { actorId: "c1", phase },
+        ...(tending ? [{ actorId: "c2", phase: "tending" as const }] : []),
+      ],
+      growth: new Map<string, GrowthStatus>([
+        [
+          "hall",
+          !tending ? "untended" : headquartersId ? "growing" : "unhosted",
+        ],
+      ]),
+    });
+    observe(state("gathering", true, "grove"));
+    expect(
+      observe(state("no-dropoff", true, "grove")).map(({ text, priority }) => [
+        priority,
+        text,
+      ]),
+    ).toEqual([
+      [
+        "high",
+        "Cultivator cannot deliver cargo: no reachable Lifebloom Conservatory. Cargo is retained.",
+      ],
+    ]);
+    expect(observe(state("no-dropoff", true, "grove"))).toEqual([]);
+    expect(observe(state("gathering", true)).map(({ text }) => text)).toEqual([
+      "No Heartgrove for Musterhall. Growth paused until one is available.",
+    ]);
+    expect(observe(state("gathering", true))).toEqual([]);
+    expect(observe(state("gathering", false)).map(({ text }) => text)).toEqual([
+      "Musterhall untended. Growth paused; choose Tend with a Cultivator to resume.",
+    ]);
+    expect(observe(state("gathering", false))).toEqual([]);
+    // Finished or cancelled growth raises nothing.
+    observe(state("gathering", true, "grove"));
+    expect(
+      observe({
+        actors: [worker],
+        cultivators: [{ actorId: "c1", phase: "gathering" }],
+      }),
+    ).toEqual([]);
   });
 });

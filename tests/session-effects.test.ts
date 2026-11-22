@@ -4,6 +4,7 @@ import {
   actorAnimationState,
   extractHealthAndDamageEffects,
   extractServiceEffects,
+  extractWorkerBadges,
   shotEnds,
   UNIT_BAR_CLEARANCE,
 } from "../src/render/session-effects";
@@ -375,4 +376,47 @@ describe("shot and service placement", () => {
       },
     ]);
   });
+});
+
+test("worker badges mark waiting, undeliverable, and blocked Cultivators only", () => {
+  const worker = (id: string, blocked = false) => ({
+    ...createActor({
+      id,
+      owner: "player",
+      definitionId: "cultivator",
+      worldPosition: { x: 1, z: 2 },
+    }),
+    ...(blocked && { movement: { target: { x: 4, z: 4 }, blocked: true } }),
+  });
+  const badges = extractWorkerBadges(
+    [
+      { actorId: "waiting", phase: "waiting" },
+      { actorId: "stranded", phase: "no-dropoff" },
+      { actorId: "blocked", phase: "blocked" },
+      { actorId: "tending", phase: "tending", tendingBlocked: true },
+      { actorId: "gathering", phase: "gathering" },
+      { actorId: "moving", phase: "idle" },
+      { actorId: "hidden", phase: "waiting" },
+    ],
+    [
+      worker("waiting"),
+      worker("stranded"),
+      worker("blocked"),
+      worker("tending"),
+      worker("gathering"),
+      worker("moving", true),
+    ],
+    {
+      appearances: new Map(),
+      groundPositionOf: (id) => (id === "waiting" ? { x: 3, z: 3 } : undefined),
+    },
+  );
+  expect(
+    badges.map(({ id, kind, worldPosition }) => [id, kind, worldPosition]),
+  ).toEqual([
+    ["waiting", "waiting", { x: 3, z: 3 }],
+    ["stranded", "undeliverable", { x: 1, z: 2 }],
+    ["blocked", "blocked", { x: 1, z: 2 }],
+    ["tending", "blocked", { x: 1, z: 2 }],
+  ]);
 });

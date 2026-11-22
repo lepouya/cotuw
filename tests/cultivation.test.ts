@@ -19,6 +19,7 @@ import {
 import {
   createTilePlacedActor,
   adjacentTiles,
+  isTilePlacedActor,
   occupiedTilesFor,
 } from "../src/simulation/placement";
 import {
@@ -26,7 +27,7 @@ import {
   cultivationEfficiency,
 } from "../src/simulation/cultivation";
 import { TerrainGrid } from "../src/simulation/terrain";
-import { idleWorkerIds } from "../src/simulation/economy";
+import { blockedWorkerIds, idleWorkerIds } from "../src/simulation/economy";
 import { RESOURCE_SCALE } from "../src/simulation/resources";
 import { defineScenario } from "../src/simulation/scenario";
 
@@ -382,6 +383,50 @@ test("single-worker growth yields blocked slots without preempting active work",
   ).toBe(true);
   untilSeconds(sim, () => !sim.actorById("first")!.construction);
   expect(balance(sim, "lifebloom")).toBe(1700);
+});
+
+test("tending reports an unreachable entrance and resumes when it opens", () => {
+  const { simulation: sim, map } = fixture();
+  train(sim);
+  expect(place(sim).accepted).toBe(true);
+  const building = sim.actorById("conservatory")!;
+  const definition = definitions.find(
+    ({ id }) => id === building.definitionId,
+  )!;
+  if (!isTilePlacedActor(building)) throw new Error("Expected placed growth");
+  const entrances = adjacentTiles(map, occupiedTilesFor(building, definition));
+  const changeEntrances = (current: MissionSimulation, typeId: string) =>
+    command(
+      current,
+      {
+        kind: "terrain",
+        tiles: entrances.map((tile) => ({ ...tile, terrain: { typeId } })),
+      },
+      { script: true },
+    );
+  expect(changeEntrances(sim, "water").accepted).toBe(true);
+  untilSeconds(sim, () => workerOf(sim).tendingBlocked === true);
+  expect(workerOf(sim)).toMatchObject({
+    phase: "tending",
+    tendingId: "conservatory",
+    tendingBlocked: true,
+  });
+  expect(idleWorkerIds(sim.economy, sim.actorById)).toEqual([]);
+  expect(blockedWorkerIds(sim.economy, sim.actorById)).toEqual([
+    workerOf(sim).actorId,
+  ]);
+
+  const restored = fixture(savedState(scenario, sim)).simulation;
+  for (const current of [sim, restored]) {
+    expect(changeEntrances(current, "plain").accepted).toBe(true);
+    untilSeconds(
+      current,
+      () => !!current.actorById("conservatory")!.construction?.active,
+    );
+    expect(workerOf(current).tendingBlocked).toBeUndefined();
+    expect(blockedWorkerIds(current.economy, current.actorById)).toEqual([]);
+  }
+  expect(restored.snapshot()).toEqual(sim.snapshot());
 });
 
 test("completed buildings operate without a Heartgrove while growth waits for reassignment", () => {

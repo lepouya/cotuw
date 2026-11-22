@@ -16,6 +16,8 @@ import type { ModelAsset, ModelInstance } from "./glb-model";
 // Generated mound and salvage models share these colors.
 export const MATERIALS_COLOR = new Color3(0.3, 0.66, 0.75);
 export const SALVAGE_COLOR = new Color3(1, 0.72, 0.2);
+// Matches the actor selection rings.
+const SELECTION_COLOR = new Color3(1, 0.86, 0.44);
 
 type Marker = { root: TransformNode; model: ModelInstance };
 
@@ -56,14 +58,19 @@ export function createMaterialsSitesView(
     mesh.material = material;
     return staticInstance(root);
   };
-  const lootTiles = new WeakMap<AbstractMesh, TileCoord>();
+  const targetTiles = new WeakMap<AbstractMesh, TileCoord>();
+  const targetTileForMesh = (mesh: AbstractMesh | null) =>
+    mesh?.isEnabled() ? targetTiles.get(mesh) : undefined;
   const showSite = (site: Marker) => {
     for (const mesh of hierarchyMeshes(site.model.root))
       mesh.isPickable = false;
   };
+  const showTarget = (marker: Marker & { tile: TileCoord }) => {
+    for (const mesh of hierarchyMeshes(marker.model.root))
+      targetTiles.set(mesh, marker.tile);
+  };
   const showGift = (gift: Marker & { tile: TileCoord; phase: number }) => {
-    for (const mesh of hierarchyMeshes(gift.model.root))
-      lootTiles.set(mesh, gift.tile);
+    showTarget(gift);
     gift.model.pose(gift.phase);
   };
   const attach = <T extends Marker>(marker: T, show: (marker: T) => void) => {
@@ -110,6 +117,7 @@ export function createMaterialsSitesView(
       const name = `cultivation-${site.id}`;
       const marker = {
         root: rootAt(name, site.tile),
+        tile: site.tile,
         model: standIn(
           MeshBuilder.CreateSphere(
             `${name}-bloom`,
@@ -120,7 +128,7 @@ export function createMaterialsSitesView(
           0.4,
         ),
       };
-      attach(marker, showSite);
+      attach(marker, showTarget);
       return [site.id, marker] as const;
     }),
   );
@@ -146,17 +154,46 @@ export function createMaterialsSitesView(
       return [cache.id, marker] as const;
     }),
   );
+  const selectionMaterial = new StandardMaterial(
+    "cultivation-selection-material",
+    scene,
+  );
+  selectionMaterial.emissiveColor = SELECTION_COLOR;
+  selectionMaterial.disableLighting = true;
+  const selectionRing = MeshBuilder.CreateTorus(
+    "cultivation-selection-ring",
+    { diameter: map.tileSize * 0.95, thickness: 0.06, tessellation: 32 },
+    scene,
+  );
+  selectionRing.material = selectionMaterial;
+  selectionRing.isPickable = false;
+  selectionRing.setEnabled(false);
+  let selectedSiteId: string | undefined;
+  const placeSelection = () => {
+    const root = cultivation.get(selectedSiteId ?? "")?.root;
+    selectionRing.setEnabled(!!root?.isEnabled());
+    if (root)
+      selectionRing.position.set(
+        root.position.x,
+        root.position.y + 0.05,
+        root.position.z,
+      );
+  };
   const terrainObserver = map.onChangedObservable.add(() => {
     for (const { root } of [...sites.values(), ...cultivation.values()])
       root.position.y = groundAt(root);
     for (const gift of loot.values()) gift.ground = groundAt(gift.root);
+    placeSelection();
   });
   return {
-    setCultivation: (asset: ModelAsset) => swap(cultivation, asset, showSite),
+    setCultivation: (asset: ModelAsset) => swap(cultivation, asset, showTarget),
     setMound: (mound: ModelAsset) => swap(sites, mound, showSite),
     setSalvage: (salvage: ModelAsset) => swap(loot, salvage, showGift),
-    lootTileForMesh: (mesh: AbstractMesh | null) =>
-      mesh?.isEnabled() ? lootTiles.get(mesh) : undefined,
+    setSelectedSite: (siteId: string | undefined) => {
+      selectedSiteId = siteId;
+      placeSelection();
+    },
+    targetTileForMesh,
     /** Shows only the sites and loot that `economy` lists. */
     update: (economy: EconomyView) => {
       const listed = new Map(economy.sites.map((site) => [site.id, site]));
@@ -185,6 +222,7 @@ export function createMaterialsSitesView(
         economy.loot.filter((cache) => !cache.collected).map(({ id }) => id),
       );
       for (const [id, { root }] of loot) root.setEnabled(caches.has(id));
+      placeSelection();
     },
     animate: (seconds: number) => {
       for (const { root, model } of cultivation.values())
@@ -205,6 +243,8 @@ export function createMaterialsSitesView(
         model.dispose();
         root.dispose();
       }
+      selectionRing.dispose();
+      selectionMaterial.dispose();
       siteMaterial.dispose();
       giftMaterial.dispose();
     },

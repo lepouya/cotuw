@@ -25,6 +25,7 @@ export type ContextActionKind =
   | "move"
   | "attack-move"
   | "clear"
+  | "select-site"
   | "focus"
   | "follow";
 
@@ -44,9 +45,10 @@ export type ContextAction = {
  * first. An empty list means a primary click does nothing.
  */
 export function contextActionKinds(
-  target: { actorId?: string; ground: boolean },
+  target: { actorId?: string; ground: boolean; site?: boolean },
   state: {
     selectedIds: readonly string[];
+    siteSelected?: boolean;
     /** Selected actors that can move. */
     movers: readonly string[];
     /** Selected actors that take attack orders, including armed buildings. */
@@ -75,8 +77,13 @@ export function contextActionKinds(
       : ["select"];
   }
   if (!target.ground) return [];
-  if (state.canCommand === false || boxMode || movers.length === 0)
-    return selectedIds.length > 0 && !additive ? ["clear"] : [];
+  if (state.canCommand === false || boxMode || movers.length === 0) {
+    if (additive) return [];
+    const selected = selectedIds.length > 0 || !!state.siteSelected;
+    if (target.site)
+      return selected ? ["select-site", "clear"] : ["select-site"];
+    return selected ? ["clear"] : [];
+  }
   return ["move", "attack-move"];
 }
 
@@ -90,6 +97,7 @@ const CONTEXT_LABELS: Record<ContextActionKind, string> = {
   move: "Move",
   "attack-move": "Attack Move",
   clear: "Clear selection",
+  "select-site": "Select site",
   focus: "Focus",
   follow: "Follow",
 };
@@ -111,6 +119,9 @@ export type CommandInputOptions = {
   ) => void;
   /** Names a move to this point, such as Gather or Collect. */
   moveLabel?: (target: WorldPosition) => string | undefined;
+  /** The known resource site at this point, which can be selected. */
+  siteAt?: (target: WorldPosition) => string | undefined;
+  onSiteSelectionChanged?: (siteId: string | undefined) => void;
   /** Opens the radial menu for a secondary click; absent disables it. */
   onContextMenu?: (
     clientX: number,
@@ -156,6 +167,8 @@ export type CommandInputOptions = {
 export type CommandInput = {
   readonly selectedActorId: string | undefined;
   readonly selectedActorIds: readonly string[];
+  /** A selected resource site, exclusive with selected actors. */
+  readonly selectedSiteId: string | undefined;
   readonly boxMode: boolean;
   readonly additiveMode: boolean;
   /** Appends world commands to the selection's order queues, like Shift. */
@@ -165,6 +178,8 @@ export type CommandInput = {
   setQueueMode: (active: boolean) => void;
   select: (actorId: string | undefined, additive?: boolean) => void;
   selectMany: (actorIds: readonly string[], additive?: boolean) => void;
+  /** Selects a site in place of any actors. */
+  selectSite: (siteId: string) => void;
   retainSelection: (exists: (id: string) => boolean) => void;
   /** The actor under a viewport point, ignoring terrain. */
   actorIdAt: (clientX: number, clientY: number) => string | undefined;
@@ -201,6 +216,8 @@ export function createCommandInput(
     onGroundTarget,
     cancelGroundTarget,
     moveLabel = () => undefined,
+    siteAt = () => undefined,
+    onSiteSelectionChanged,
     onContextMenu,
     focusActor,
     canFollow = () => false,
@@ -270,13 +287,31 @@ export function createCommandInput(
   box.hidden = true;
   box.setAttribute("aria-hidden", "true");
   document.body.append(box);
-  const changed = () => onSelectionChanged?.(selection.ids);
+  let selectedSiteId: string | undefined;
+  const setSite = (id: string | undefined) => {
+    if (selectedSiteId === id) return;
+    selectedSiteId = id;
+    onSiteSelectionChanged?.(id);
+  };
+  const changed = () => {
+    if (selection.ids.length) setSite(undefined);
+    onSelectionChanged?.(selection.ids);
+  };
   const select = (id: string | undefined, additive = false) => {
     selection.select(id, additive);
+    if (!additive) setSite(undefined);
     changed();
+  };
+  const selectSite = (id: string) => {
+    if (selection.ids.length) {
+      selection.select(undefined);
+      changed();
+    }
+    setSite(id);
   };
   const selectMany = (ids: readonly string[], additive = false) => {
     selection.selectMany(ids, additive);
+    if (!additive) setSite(undefined);
     changed();
   };
   const pickAt = (
@@ -395,10 +430,12 @@ export function createCommandInput(
   ): ContextAction[] => {
     const movers = selection.ids.filter(canMove);
     const attackers = selection.ids.filter(canIssueAttack);
+    const siteId = !picked && target ? siteAt(target) : undefined;
     const kinds = contextActionKinds(
-      { actorId: picked, ground: !!target },
+      { actorId: picked, ground: !!target, site: !!siteId },
       {
         selectedIds: selection.ids,
+        siteSelected: !!selectedSiteId,
         movers,
         attackers,
         boxMode,
@@ -464,6 +501,7 @@ export function createCommandInput(
       move: () => order("move"),
       "attack-move": () => order("attack-move"),
       clear: () => choose(undefined, false),
+      "select-site": () => selectSite(siteId!),
       focus: () => focusActor?.(picked!),
       follow: () => followActor?.(picked!),
     };
@@ -492,7 +530,7 @@ export function createCommandInput(
   };
   const deselect = () => {
     if (!enabled()) return false;
-    const hadSelection = selection.ids.length > 0;
+    const hadSelection = selection.ids.length > 0 || !!selectedSiteId;
     const hadGesture = cancelGesture();
     if (hadSelection) select(undefined);
     return hadGesture || hadSelection;
@@ -503,6 +541,9 @@ export function createCommandInput(
     },
     get selectedActorIds() {
       return selection.ids;
+    },
+    get selectedSiteId() {
+      return selectedSiteId;
     },
     get boxMode() {
       return boxMode;
@@ -526,6 +567,7 @@ export function createCommandInput(
     },
     select,
     selectMany,
+    selectSite,
     retainSelection: (exists) => {
       if (selection.ids.some((id) => !exists(id))) {
         selection.retain(exists);

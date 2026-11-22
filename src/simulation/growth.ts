@@ -1,4 +1,5 @@
 import { nearestTo } from "./actor";
+import { clearTending } from "./cultivation";
 import {
   advanceWorkerRoute,
   routeTarget,
@@ -45,18 +46,20 @@ export function growthReady(
   economy: EconomyState,
   world: EconomyWorld,
 ) {
-  const tenderId = economy.cultivation?.workers.find(
+  const worker = economy.cultivation?.workers.find(
     (worker) => worker.tendingId === building.id,
-  )?.actorId;
-  const actor = world.actors.find(({ id }) => id === tenderId);
+  );
+  if (!worker) return false;
+  const actor = world.actors.find(({ id }) => id === worker.actorId);
   if (!actor) return false;
   const point =
     routeTarget(actor) ?? workerNavigation(world).entrance(actor, building);
-  return (
-    !!point &&
-    advanceWorkerRoute(actor, point, world, world.map.tileSize * 0.75) ===
-      "arrived"
-  );
+  const route = point
+    ? advanceWorkerRoute(actor, point, world, world.map.tileSize * 0.75)
+    : "blocked";
+  if (route === "blocked") worker.tendingBlocked = true;
+  else delete worker.tendingBlocked;
+  return route === "arrived";
 }
 /** Completed growth frees its tending worker. */
 export function releaseTender(economy: EconomyState, buildingId: string) {
@@ -64,7 +67,7 @@ export function releaseTender(economy: EconomyState, buildingId: string) {
     (worker) => worker.tendingId === buildingId,
   );
   if (!worker) return;
-  delete worker.tendingId;
+  clearTending(worker);
   worker.phase = "idle";
 }
 export function validateGrowthDefinitions(

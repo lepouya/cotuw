@@ -138,10 +138,8 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 - [x] **1.50** Cultivation acceptance against
   [economy rules](DESIGN.md#economy-and-construction), with shortest-walk
   delivery and content-pack site tuning.
-- [ ] **1.51** Complete feedback and guidance acceptance for cultivation and
-  construction. Verify site reserve/efficiency/recovery displays, one dormancy
-  notification per transition, and distinct states for idle, waiting, blocked
-  delivery/routes, untended growth, and unavailable infrastructure capacity.
+- [x] **1.51** Cultivation and growth feedback verified, including site
+  inspection, dormancy alerts, worker badges, and construction status.
 - [ ] **1.52** Add Healer and Artificer support, the Thornspire, Briar Ram,
   and Construct Nursery. Circle expansion uses existing structures. Verify
   target eligibility, counter relationships, recovery, production requirements,
