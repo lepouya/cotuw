@@ -136,6 +136,97 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
   );
 });
 
+forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
+  test(
+    "complete the Circle introduction through strain and site rotation",
+    { tag: WEBKIT },
+    async ({ page }, testInfo) => {
+      const errors = collectPageErrors(page, { console: true });
+      const mission = new MissionDriver(page, { touch });
+      const cultivate = async (index: number, site: string) => {
+        await mission.select("Cultivator", index);
+        await mission.press(`[data-economy-action="cultivate:${site}"]`);
+      };
+      await mission.opening({ faction: "circle" });
+      for (let i = 0; i < 3; i++)
+        await mission.press('[data-camera-action="tilt-up"]');
+      await mission.ground(9, 51);
+      await mission.press("#train-circle-cultivator");
+      await mission.advance(5);
+      await mission.select("Cultivator");
+      await mission.place("circle-conservatory", 16, 50, {
+        placement: "Tending growth",
+        completion: "Cultivating Lifebloom",
+      });
+      await cultivate(0, "near-lifebloom");
+      await mission.waitForStockpile(50);
+      await mission.ground(9, 51);
+      await mission.press("#train-circle-cultivator");
+      await mission.advance(5);
+      await cultivate(1, "near-lifebloom");
+      await mission.awaitExplanation("Resting the land", 120);
+      await cultivate(1, "south-lifebloom");
+
+      await mission.waitForStockpile(100);
+      await mission.select("Cultivator");
+      await mission.place("circle-musterhall", 12, 54, {
+        completion: "Gather your expedition",
+      });
+      await cultivate(0, "near-lifebloom");
+      // Use the side of the footprint clear of the Heartgrove canopy.
+      await mission.ground(13, 55);
+      for (let i = 0; i < 6; i++) {
+        await mission.waitForStockpile(35);
+        await mission.press("#train-circle-sentinel");
+      }
+      await mission.advance(20);
+      await expect(mission.rosterUnits("Sentinel")).toHaveCount(6);
+
+      await mission.selectAll("Sentinel");
+      await mission.focus(24, 42);
+      await mission.ground(24, 42);
+      await mission.advance(10);
+      await mission.focus(34, 36);
+      await mission.ground(34, 36);
+      await mission.advance(10);
+      await mission.focus(46, 32);
+      await mission.press("#attack-move");
+      await mission.ground(52, 32);
+      await mission.advance(25);
+      await mission.press("#tab-goals");
+      await expect(page.locator('[data-goal-id="lone-wolf"]')).toContainText(
+        "(1/1)",
+      );
+      await mission.selectAll("Sentinel");
+      for (const [x, z, seconds] of [
+        [57, 35, 8],
+        [70, 34, 10],
+        [77, 36, 13],
+      ] as const) {
+        await mission.focus(x, z);
+        await mission.ground(x, z);
+        await mission.advance(seconds);
+      }
+      await mission.focus(78, 29);
+      await mission.press("#attack-move");
+      await mission.ground(78, 21);
+      await mission.advance(40);
+      await expect(page.locator("#game-menu-title")).toHaveText("Victory");
+      const elapsedSeconds = await mission.elapsedSeconds();
+      expect(elapsedSeconds).toBeLessThan(10 * 60);
+      await testInfo.attach("playthrough", {
+        body: JSON.stringify({
+          elapsedSeconds,
+          strategy: "Two Cultivators rotated after strain, six Sentinels",
+        }),
+        contentType: "application/json",
+      });
+      await attachScreenshot(page, testInfo, `circle-victory-${name}`);
+      expect(errors).toEqual([]);
+    },
+  );
+});
+
 test(
   "Circle normal play grows a Musterhall that trains Sentinels and Wayfinders",
   { tag: WEBKIT },

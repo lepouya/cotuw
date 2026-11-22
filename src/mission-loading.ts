@@ -186,6 +186,7 @@ function prepareMission(file: MissionFile): LoadedMission {
   for (const goal of file.scenario.goals ?? [])
     requireActor("goal", goal.definitionId);
   for (const { trigger } of file.scenario.popups ?? []) {
+    if (trigger.kind === "site-strain") continue;
     const definition = requireActor("popup", trigger.definitionId);
     if (trigger.kind === "placement" && !definition.footprint)
       throw new RangeError("Placement popups require a building definition.");

@@ -47,7 +47,7 @@ export function createMissionSetup(
           focus: () => element("choose-arc"),
           title: "Set up your mission",
           description:
-            "Choose a difficulty, then a faction, for the wolf-den demo.",
+            "Choose a difficulty, then a faction's wolf-den introduction.",
         },
       },
     };

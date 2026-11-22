@@ -8,7 +8,7 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phase E is active. The Circle cultivation slice is playable, and cohort task
+Phase E is active. The Circle introduction is playable, and cohort task
 1.02 continues with 1.57.
 
 ### Using this checklist
@@ -126,7 +126,7 @@ Complete. The expanded ARC roster is playable with the
 
 ### E. Circle playable loop and introduction
 
-Extend the [playable Circle slice](DESIGN.md#circle-wolf-den-development-slice)
+Extend the [Circle introduction](DESIGN.md#circle-introduction)
 through its full M1 roster and AI build plan. Keep Lifebloom-only costs and
 producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 
@@ -146,9 +146,9 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 - [x] **1.53** [Circle presentation](DESIGN.md#m1-circle-presentation) covers
   the full roster, including growth, producer entrances, damage and
   destruction, service and weapon cues, faction feedback, and music.
-- [ ] **1.54** Finish the Circle introduction using the wolf-den slice.
-  Verify it teaches cultivation, dormancy, construction, and production before
-  skirmish play. Keep M0 available as ARC's introduction.
+- [x] **1.54** The [Circle introduction](DESIGN.md#circle-introduction)
+  guides cultivation, site strain and dormancy, construction, and production.
+  Headless, mouse, and phone playthroughs verify victory within ten minutes.
 - [ ] **1.55** Add the Circle AI build plan and operations for its economy,
   infrastructure, roster, and recovery. Exercise it through the shared harness.
   Recovery assumes income buildings train their own workers; have each
@@ -162,7 +162,7 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   development link. Verify RTS-familiar newcomers understand its differences,
   establish and sustain a base, and explain a useful cultivation decision.
   Refine cultivation rates, reserve capacity, cargo capacity, and dormancy
-  thresholds using the playable slice. Fix and retest recurring confusion
+  thresholds using the introduction. Fix and retest recurring confusion
   before full-match balancing.
   - Testers who still need the ARC skirmish follow the
     [ARC instructions](docs/playtest-instructions.md). Cover expansion and

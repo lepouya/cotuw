@@ -92,7 +92,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       await press("new-mission");
       await expect(page.locator("#choose-arc")).toBeFocused();
       await expect(page.locator("#choose-circle")).toContainText(
-        "Grow a living base",
+        "Circle introduction. Grow a living base",
       );
       await expect(page.locator("#choose-circle")).not.toContainText(
         /development|pending/i,

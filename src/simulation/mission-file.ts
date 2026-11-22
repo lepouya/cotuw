@@ -36,14 +36,23 @@ export type ScenarioBriefing = {
 
 /**
  * A dismissible explanation shown the first time its trigger holds: while the
- * player places a building of the definition, or owns a completed actor of it.
+ * player places a building of the definition, owns a completed actor of it,
+ * or sees a Strained or Dormant cultivation site assigned to their workers.
  */
 export type ScenarioPopup = {
   id: string;
   title: string;
   text: string;
-  trigger: { kind: "placement" | "actor"; definitionId: string };
+  trigger:
+    | { kind: "placement" | "actor"; definitionId: string }
+    | { kind: "site-strain" };
 };
+
+const isPopupTrigger = (trigger: unknown) =>
+  isRecord(trigger) &&
+  (trigger.kind === "site-strain" ||
+    ((trigger.kind === "placement" || trigger.kind === "actor") &&
+      isId(trigger.definitionId)));
 
 /** Ambient birds circling a world point; presentation only. */
 export type BirdFlock = {
@@ -305,13 +314,11 @@ export function parseMission(source: string, tickSeconds: number): MissionFile {
         ({ title, text, trigger }) =>
           typeof title !== "string" ||
           typeof text !== "string" ||
-          !isRecord(trigger) ||
-          !["placement", "actor"].includes(trigger.kind as string) ||
-          !isId(trigger.definitionId),
+          !isPopupTrigger(trigger),
       ))
   )
     throw new RangeError(
-      "Scenario popups need distinct IDs, text, and a placement or actor trigger.",
+      "Scenario popups need distinct IDs, text, and a placement, actor, or site-strain trigger.",
     );
   if (uiState !== undefined && !isRecord(uiState))
     throw new RangeError("Mission uiState must be an object.");

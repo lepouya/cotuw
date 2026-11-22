@@ -4,7 +4,7 @@ This is the living design source of truth. Keep entries concise; add detail only
 when it informs an implementation or content decision.
 
 The playable build contains the ARC M0 mission, construction sandbox, and
-Circle wolf-den cultivation slice. M1's two-faction skirmish is the active
+Circle introduction. M1's two-faction skirmish is the active
 development target; [TODO.md](TODO.md) owns task order and progress. Game-wide
 rules below include accepted systems that are not yet implemented. The
 mission sections describe the playable build.
@@ -320,7 +320,7 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   speed, consuming an equal amount of reserve, and carries 30 resource units.
   One Cultivator is sustainable; heavier simultaneous cultivation can drain
   the site. Dormant recovery from 10% to 60% takes 50 seconds. These values
-  are data-driven starting points to refine with the playable Circle slice.
+  are data-driven starting points to refine with the Circle introduction.
 - Cultivators retain their assigned site through dormancy. They deliver any
   partial cargo to a Conservatory, then wait at a reachable position near the
   site and resume cultivation automatically when it reopens. They do not seek
@@ -1752,7 +1752,7 @@ Its rules remain the acceptance baseline for that mission during M1 work.
 
 M1 targets a small single-player ARC-versus-Circle skirmish with a
 base-building AI opponent. Either faction is playable, with enough buildings
-and units to establish and sustain a base. The Circle slice includes its core
+and units to establish and sustain a base. Circle play includes its core
 roster and a distinct construction or cultivation mechanic.
 
 - M0's mission remains ARC's introduction. A short Circle introductory
@@ -1772,28 +1772,35 @@ roster and a distinct construction or cultivation mechanic.
 The [M1 checklist](TODO.md#milestone-1) owns implementation order and
 acceptance progress. The following sections define the selected scope.
 
-### Circle wolf-den development slice
+### Circle introduction
 
-- The playable slice uses the shared wolf-den map and six-wolf objectives.
-  It starts with a Heartgrove and 150 Lifebloom, without workers or troops.
-  Train a Cultivator, tend a Conservatory, cultivate, grow a Musterhall, and
-  scout/fight with Sentinels and Wayfinders. Normal costs, timings, tending,
-  infrastructure, fog, and dormancy rules apply.
+- The Circle introduction uses the shared wolf-den map and six-wolf
+  objectives. It starts with a Heartgrove and 150 Lifebloom, without workers
+  or troops. Train a Cultivator, tend a Conservatory, cultivate, grow a
+  Musterhall, fight with Sentinels, and scout with Wayfinders. Normal costs,
+  timings, tending, infrastructure, fog, and dormancy rules apply.
 - Two cultivation sites support staffing, rotation, travel, and recovery
   decisions. Circle preparation goals and contextual guides explain the loop.
   Two gifts beyond the lone wolf grant 25 Lifebloom each, collected once by
   mobile units and persisted in saves; they do not fund the opening.
+- Guides cover the opening, tending, cultivation, site strain, the army, and
+  first contact with Healers, Thornspires, and the Construct Nursery. The
+  strain guide appears once when a visible site assigned to one of the
+  player's Cultivators is Strained or Dormant. It explains slowing,
+  dormancy, automatic recovery, and rotating to the other site. Healers,
+  Thornspires, and the Nursery's Briar Rams and Artificers have no dedicated
+  goals.
+- Like M0, the introduction targets a successful run of about 5 to 10
+  minutes for RTS-familiar first-time players using only in-game guidance.
+  Gifts and site placement shape the pace.
 - Losing the starting Heartgrove ends this mission in defeat. Victory permits
   free play; restart restores the authored opening.
-- New mission offers ARC's introduction or this Circle slice, with independent
-  Easy/Normal/Hard choice defaulting to Normal. Development links also support
-  assembled skirmishes; normal-menu skirmish launch is pending.
+- New mission offers ARC's introduction or the Circle introduction, with
+  independent Easy/Normal/Hard choice defaulting to Normal. Development links
+  also support assembled skirmishes; normal-menu skirmish launch is pending.
 - Owners, economies, headquarters queues, command authority, visibility, and
-  persistence use the shared foundations. Healers, Thornspires, and the
-  Construct Nursery's Briar Rams and Artificers are available without
-  dedicated goals. Faction AI, full-roster presentation acceptance, and
-  introduction acceptance remain in
-  [TODO.md](TODO.md#e-circle-playable-loop-and-introduction).
+  persistence use the shared foundations. Faction AI and playtest acceptance
+  remain in [TODO.md](TODO.md#e-circle-playable-loop-and-introduction).
 - Wolves validate movement, scouting, combat readability, and basic durability.
   Structure counters, defense breaking, support, AI, and match pacing require
   focused encounters and full skirmishes rather than wolf-only acceptance.

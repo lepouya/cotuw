@@ -7,8 +7,8 @@ damaged world and encounters the elven Circle of Repose. Their struggle over
 its citadels and lost technology begins humanity's first contact and helps
 awaken the deathless Everwake, eventually requiring an uneasy alliance.
 
-The playable build contains ARC's M0 mission, a construction sandbox, and a
-Circle cultivation slice. M1 targets an ARC-versus-Circle skirmish with a
+The playable build contains ARC's M0 mission, a construction sandbox, and the
+Circle introduction. M1 targets an ARC-versus-Circle skirmish with a
 base-building AI opponent. Follow [TODO.md](TODO.md) for active tasks,
 dependencies, and progress.
 
@@ -16,7 +16,7 @@ dependencies, and progress.
 
 The title screen offers **New mission**, **Load**, **Options**, and **Exit**.
 New mission opens the wolf-den setup screen: choose Easy, Normal, or Hard, then
-ARC's base-building mission or the Circle's worker-tended cultivation slice.
+ARC's introduction or the Circle's worker-tended introduction.
 Options provides audio controls and keyboard layout and rebinding. Preferences
 persist on this device. Leaving a mission through **Main menu** returns to the
 title screen. Exit closes the desktop app; browsers show a close-tab message.
@@ -82,9 +82,9 @@ train forces, scout, defend, raid observed income, attack known bases, and
 rebuild after losses.
 Development AI links offer a diagnostics overlay; Backquote cycles AI owners,
 then hides it.
-Choose Circle in New mission or use `/?level=circle-wolf-den` for the
-[Circle cultivation slice](DESIGN.md#circle-wolf-den-development-slice), which
-in-game guides introduce. It uses the existing single-player control model.
+Choose Circle in New mission or use `/?level=circle-wolf-den` to play the
+[Circle introduction](DESIGN.md#circle-introduction). Follow the in-game
+guides to tend buildings, cultivate Lifebloom, and train an expedition.
 Musterhalls also train Healers for Circle personnel. Construct Nurseries grow
 Briar Rams, slow living constructs that batter buildings, and train
 Artificers to repair them. Thornspires are tough, shorter-range living

@@ -1,3 +1,5 @@
+import { workedSiteIds } from "../simulation/cultivation";
+
 import type { ActorRenderState } from "../simulation/actor";
 import type { CultivatorState } from "../simulation/cultivation";
 import type { GrowthStatus } from "./cultivation-feedback";
@@ -223,7 +225,7 @@ export function createAlertTracker({
       const previousPhases = new Map(
         before.cultivators?.map(({ actorId, phase }) => [actorId, phase]),
       );
-      const workedSites = new Set(cultivators.map(({ siteId }) => siteId));
+      const workedSites = workedSiteIds(cultivators);
       const dormantBefore = new Map(
         before.sites?.map(({ id, dormant }) => [id, dormant]),
       );

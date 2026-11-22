@@ -272,7 +272,7 @@ test.each([
     (file: any) => {
       file.scenario.popups = [popup("tick", "arc-trooper")];
     },
-    "placement or actor trigger",
+    "placement, actor, or site-strain trigger",
   ],
   [
     "unknown popup actor",

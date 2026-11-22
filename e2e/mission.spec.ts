@@ -109,7 +109,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await mission.ground(77, 36);
       await mission.advance(3);
 
-      await mission.selectTroopers();
+      await mission.selectAll("Trooper");
       await mission.focus(77, 35);
       await mission.ground(77, 35);
       await mission.advance(30);

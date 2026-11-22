@@ -1,4 +1,5 @@
 import { createCultivationSite } from "../../src/simulation/cultivation.ts";
+import { percent } from "../../src/ui/cultivation-feedback.ts";
 import { BASE_CONTENT, actorDefinition, costOf } from "./base-content.ts";
 import { createWolfDenScenario } from "./wolf-den.ts";
 
@@ -18,6 +19,8 @@ const sites = [
   ),
 ];
 const cargo = actorDefinition("circle-cultivator").cultivation!.capacity;
+const { slowBelow, dormantBelow, recoverAt, capacity } =
+  BASE_CONTENT.cultivationSite;
 
 export const CIRCLE_WOLF_DEN = createWolfDenScenario({
   id: "circle-wolf-den",
@@ -36,7 +39,7 @@ export const CIRCLE_WOLF_DEN = createWolfDenScenario({
     "wolf",
     "alpha-wolf",
   ],
-  name: "Circle wolf-den cultivation slice",
+  name: "Circle introduction",
   briefing: {
     label: "Circle of Repose · Cultivation",
     title: "Restore the grove, Guide",
@@ -85,14 +88,38 @@ export const CIRCLE_WOLF_DEN = createWolfDenScenario({
     {
       id: "circle-cultivation",
       title: "Cultivating Lifebloom",
-      text: `Select the Cultivator, then click Near Lifebloom or choose Gather. It carries ${cargo} Lifebloom to a Conservatory and repeats. One worker per site is sustainable. Extra workers drain the reserve; dormant sites recover automatically. Send workers to the other site to keep gathering.`,
+      text: `Select the Cultivator and choose Gather Near Lifebloom. It carries ${cargo} Lifebloom to a Conservatory and repeats. One worker per site is sustainable. Extra workers drain the reserve and can make a site go dormant until it recovers. Select a site to see its reserve.`,
       trigger: { kind: "actor", definitionId: "circle-conservatory" },
+    },
+    {
+      id: "circle-dormancy",
+      title: "Resting the land",
+      text: `A site your workers use is running low. Below ${percent(slowBelow, capacity)}% reserve, cultivation slows. At ${percent(dormantBelow, capacity)}% the site goes dormant. Workers deliver their cargo and wait until the site reopens at ${percent(recoverAt, capacity)}%. Assign a Cultivator to the other site to keep gathering while this one recovers.`,
+      trigger: { kind: "site-strain" },
     },
     {
       id: "circle-army",
       title: "Gather your expedition",
       text: "Train Sentinels at the Musterhall to fight. Wayfinders scout farther but cannot attack. Select your Sentinels, choose Attack Move, and click a destination. Follow the southern path to the lone wolf, then cross the ridge to the den. Gift boxes along the route grant Lifebloom when a unit walks over them.",
       trigger: { kind: "actor", definitionId: "circle-musterhall" },
+    },
+    {
+      id: "circle-healer",
+      title: "Healers",
+      text: "Idle Healers mend nearby wounded troops and workers. Select a Healer and click a wounded unit to heal it first. Healers cannot attack or mend Briar Rams; Artificers repair those.",
+      trigger: { kind: "actor", definitionId: "circle-healer" },
+    },
+    {
+      id: "circle-thornspire",
+      title: "Thornspires",
+      text: `A Thornspire is a tough living defense with short range and heavy shots (${costOf("circle-thornspire")} Lifebloom). A Cultivator tends it like any building; it fires at hostiles once fully grown.`,
+      trigger: { kind: "placement", definitionId: "circle-thornspire" },
+    },
+    {
+      id: "circle-nursery",
+      title: "Construct Nursery",
+      text: `The Nursery grows Briar Rams (${costOf("circle-briar-ram")} Lifebloom) and trains Artificers (${costOf("circle-artificer")} Lifebloom) in its own queue. Rams batter buildings but fare poorly against troops, so escort them with Sentinels. Artificers repair Rams.`,
+      trigger: { kind: "actor", definitionId: "circle-construct-nursery" },
     },
   ],
   playerFaction: "circle",

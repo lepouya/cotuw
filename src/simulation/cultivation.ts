@@ -146,6 +146,10 @@ export function cultivationStatus(site: DeepReadonly<CultivationSite>) {
   if (site.dormant) return "Dormant";
   return site.reserve < site.slowBelow ? "Strained" : "Healthy";
 }
+/** Sites with a Cultivator assigned, including workers waiting out dormancy. */
+export const workedSiteIds = (
+  workers: readonly Pick<CultivatorState, "siteId">[],
+) => new Set(workers.flatMap(({ siteId }) => siteId ?? []));
 export function clearTending(worker: CultivatorState) {
   delete worker.tendingId;
   delete worker.tendingBlocked;

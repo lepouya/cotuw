@@ -17,8 +17,8 @@ Use two check tiers:
 - `npm run check:full` for acceptance, releases, or an explicit request. It adds
   generated-asset checks, the Rust test harness, every browser flow in Chromium,
   and the `@webkit` browser flows in macOS WebKit, including phone/tablet
-  layouts and complete M0 playthroughs. Platform adapters have TypeScript
-  tests; the Rust harness currently has no tests.
+  layouts and complete M0 and Circle introduction playthroughs. Platform
+  adapters have TypeScript tests; the Rust harness currently has no tests.
 
 Reuse a passing check when the checked files have not changed. A full pass
 also satisfies the quick check; do not run both tiers on the same files.

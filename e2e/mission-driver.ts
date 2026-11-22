@@ -198,15 +198,18 @@ export class MissionDriver {
       "false",
     );
     await this.advance(8);
-    if (guides.completion) {
-      const guide = this.page.locator("#explanation");
-      await this.advanceUntil(() => guide.isVisible(), {
-        interval: 1,
-        limit: 30,
-        description: `the "${guides.completion}" guide to appear`,
-      });
-      await this.explanation(guides.completion);
-    }
+    if (guides.completion) await this.awaitExplanation(guides.completion);
+  }
+
+  /** Advances until a scenario popup appears, then dismisses it. */
+  async awaitExplanation(title: string, limit = 30) {
+    const guide = this.page.locator("#explanation");
+    await this.advanceUntil(() => guide.isVisible(), {
+      interval: 1,
+      limit,
+      description: `the "${title}" guide to appear`,
+    });
+    await this.explanation(title);
   }
 
   private async advanceUntil(
@@ -235,29 +238,28 @@ export class MissionDriver {
     );
   }
 
-  async select(name: string) {
-    await this.press("#tab-units");
-    await this.step(
-      this.page
-        .locator("#unit-roster button")
-        .filter({ hasText: name })
-        .first(),
-    );
+  rosterUnits(name: string) {
+    const roster = this.page.locator("#unit-roster");
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return roster.getByRole("button", {
+      name: new RegExp(`^${escapedName} · \\d+$`),
+    });
   }
 
-  async selectTroopers() {
-    await this.select("Trooper");
-    await this.press("#add-selection");
+  /** Selects the roster's unit of that name at `index`, in roster order. */
+  async select(name: string, index = 0) {
     await this.press("#tab-units");
-    const troopers = this.page
-      .locator("#unit-roster button")
-      .filter({ hasText: "Trooper" });
-    const count = await troopers.count();
-    for (let i = 1; i < count; i++) {
-      await this.step(troopers.nth(i));
-      await this.press("#tab-units");
-    }
-    await this.press("#add-selection");
+    await this.step(this.rosterUnits(name).nth(index));
+  }
+
+  async selectAll(name: string) {
+    await this.select(name);
+    await this.step(
+      this.page.getByRole("button", {
+        name: `Select every ${name} across the map`,
+        exact: true,
+      }),
+    );
   }
 
   async elapsedSeconds() {

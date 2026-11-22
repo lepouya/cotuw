@@ -790,23 +790,17 @@ async function assembleGameSession(
   };
   const popups = createPopupTracker(
     mission.scenario.popups ?? [],
+    {
+      ownActors: () => player.actors().own,
+      cultivation: () => player.economy()?.cultivation,
+      seesTile: player.knowledge.seesTile,
+    },
     mission.uiState,
   );
-  let raisedPopup: string | undefined;
   const raisePopup = () => {
-    if (halted()) return;
-    const popup = popups.due({
-      placing: placement.definitionId,
-      owns: (id) =>
-        player
-          .actors()
-          .own.some(
-            (actor) => actor.definitionId === id && !actor.construction,
-          ),
-    });
-    if (!popup || popup.id === raisedPopup) return;
-    raisedPopup = popup.id;
-    controls.onPopup?.(popup);
+    if (halted() || !controls.onPopup) return;
+    const popup = popups.next(placement.definitionId);
+    if (popup) controls.onPopup(popup);
   };
   const alertTracker = createAlertTracker({
     nameOf: (id) => names.get(id) ?? id,

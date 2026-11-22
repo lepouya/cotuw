@@ -77,7 +77,8 @@ can be read, edited by hand, and loaded again.
     `trigger`: `{ "kind": "placement", "definitionId": ... }` while placing
     that building, or `{ "kind": "actor", "definitionId": ... }` once the
     player owns a completed actor of it. Placement triggers require an actor
-    definition with a footprint.
+    definition with a footprint. `{ "kind": "site-strain" }` holds while a
+    visible cultivation site the player's workers use is Strained or Dormant.
   - `flocks` lists ambient birds, each with a world `center`, loop `radius`,
     `altitude` above the highest terrain under the loop, bird `count`, and
     `lapSeconds`. Radius, altitude, and lap time must be positive; count is a
