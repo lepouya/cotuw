@@ -1,6 +1,6 @@
 {
   "format": "cotuw-content",
-  "formatVersion": 3,
+  "formatVersion": 4,
   "id": "base",
   "version": 13,
   "name": "ARC, Circle of Repose, and wildlife",
@@ -864,6 +864,13 @@
       }
     }
   ],
+  "cultivationSite": {
+    "capacity": 100,
+    "regeneration": 1,
+    "slowBelow": 60,
+    "dormantBelow": 10,
+    "recoverAt": 60
+  },
   "movementProfiles": [
     {
       "id": "surface-ground",

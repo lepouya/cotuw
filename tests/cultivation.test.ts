@@ -6,6 +6,7 @@ import {
   advanceSeconds,
   balance,
   command,
+  deposited,
   exploredScenarioState,
   playerOwners,
   savedState,
@@ -26,6 +27,7 @@ import {
 } from "../src/simulation/cultivation";
 import { TerrainGrid } from "../src/simulation/terrain";
 import { idleWorkerIds } from "../src/simulation/economy";
+import { RESOURCE_SCALE } from "../src/simulation/resources";
 import { defineScenario } from "../src/simulation/scenario";
 
 import type {
@@ -63,8 +65,18 @@ const scenario = defineScenario({
   loot: [],
   cultivation: {
     sites: [
-      createCultivationSite("near", "Near Lifebloom", { x: 14, z: 6 }),
-      createCultivationSite("far", "Far Lifebloom", { x: 23, z: 6 }),
+      createCultivationSite(
+        "near",
+        "Near Lifebloom",
+        { x: 14, z: 6 },
+        BASE_CONTENT.cultivationSite,
+      ),
+      createCultivationSite(
+        "far",
+        "Far Lifebloom",
+        { x: 23, z: 6 },
+        BASE_CONTENT.cultivationSite,
+      ),
     ],
   },
 });
@@ -296,7 +308,12 @@ test("shared reserves enter dormancy deterministically, retain Gather and its qu
 });
 
 test("output curve has the agreed full, strained, and dormant values", () => {
-  const site = createCultivationSite("site", "Site", { x: 0, z: 0 });
+  const site = createCultivationSite(
+    "site",
+    "Site",
+    { x: 0, z: 0 },
+    BASE_CONTENT.cultivationSite,
+  );
   expect(cultivationEfficiency(site)).toBe(1);
   site.reserve = 60000;
   expect(cultivationEfficiency(site)).toBe(1);
@@ -751,3 +768,311 @@ test.each([false, true])(
     untilSeconds(sim, () => !sim.actorById("new-heart")!.construction, 30);
   },
 );
+
+const reserveOf = (sim: MissionSimulation, siteId = "near") =>
+  sim.economy!.cultivation!.sites.find(({ id }) => id === siteId)!;
+const workerOf = (sim: MissionSimulation, actorId = "worker") =>
+  sim.economy!.cultivation!.workers.find(
+    (worker) => worker.actorId === actorId,
+  )!;
+/** Resource thousandths a worker holds, including its fractional remainder. */
+const held = (sim: MissionSimulation, actorId = "worker") =>
+  workerOf(sim, actorId).cargo * RESOURCE_SCALE +
+  workerOf(sim, actorId).gatherProgress;
+function spawnDropoff(
+  sim: MissionSimulation,
+  map: TerrainGrid,
+  actorId: string,
+  origin: { x: number; z: number },
+) {
+  sim.spawnActor(
+    createTilePlacedActor(
+      map,
+      definitions.find(({ id }) => id === "circle-conservatory")!,
+      { actorId, origin },
+      "player",
+    ),
+  );
+}
+
+test("gathering slows with the reserve without changing what is drawn", () => {
+  const drawn = (initial: number) => {
+    const state = exploredScenarioState(scenario, definitions);
+    Object.assign(state.economy!.cultivation!.sites[0]!, {
+      reserve: initial,
+      regeneration: 0,
+    });
+    const { simulation: sim } = fixture(state);
+    train(sim);
+    command(sim, { kind: "gather", actorId: "worker", siteId: "near" });
+    untilSeconds(sim, () => workerOf(sim).phase === "gathering");
+    const reserve = reserveOf(sim).reserve;
+    const cargo = held(sim);
+    advanceSeconds(sim, 10);
+    // The worker holds exactly what the site lost.
+    expect(reserve - reserveOf(sim).reserve).toBe(held(sim) - cargo);
+    return held(sim) - cargo;
+  };
+  expect(drawn(100000)).toBe(10000);
+  // Efficiency falls from 75% at 35% reserve as the worker draws it down.
+  const strained = drawn(35000);
+  expect(strained).toBeGreaterThan(7000);
+  expect(strained).toBeLessThan(7500);
+});
+
+test("active regeneration sustains one worker while two drain the site", () => {
+  const lowest = (workers: string[]) => {
+    const state = exploredScenarioState(scenario, definitions);
+    setBalance(state, 500, "lifebloom");
+    const { simulation: sim } = fixture(state);
+    for (const id of workers) train(sim, id);
+    expect(place(sim, "conservatory", 10, 6, workers[0]).accepted).toBe(true);
+    untilSeconds(sim, () => !sim.actorById("conservatory")!.construction);
+    for (const id of workers)
+      command(sim, { kind: "gather", actorId: id, siteId: "near" });
+    let minimum = reserveOf(sim).reserve;
+    for (let tick = 0; tick < 1800; tick++) {
+      sim.tick();
+      minimum = Math.min(minimum, reserveOf(sim).reserve);
+    }
+    // Each worker delivers at least two full loads.
+    expect(deposited(sim, "lifebloom")).toBeGreaterThanOrEqual(
+      60 * workers.length,
+    );
+    return minimum;
+  };
+  expect(lowest(["worker"])).toBeGreaterThanOrEqual(99000);
+  expect(lowest(["a", "b"])).toBeLessThan(90000);
+});
+
+test("dormancy reopens after exactly 50 seconds and waiting workers resume", () => {
+  const state = exploredScenarioState(scenario, definitions);
+  state.economy!.cultivation!.sites[0]!.reserve = 10500;
+  setBalance(state, 500, "lifebloom");
+  const { simulation: sim } = fixture(state);
+  const ids = ["a", "b", "c", "d"];
+  for (const id of ids) train(sim, id);
+  expect(place(sim, "conservatory", 10, 6, "a").accepted).toBe(true);
+  untilSeconds(sim, () => !sim.actorById("conservatory")!.construction);
+  for (const id of ids)
+    command(sim, { kind: "gather", actorId: id, siteId: "near" });
+  untilSeconds(sim, () => reserveOf(sim).dormant);
+  expect(reserveOf(sim).reserve).toBe(10000);
+  let ticks = 0;
+  let waiting: string[] = [];
+  while (reserveOf(sim).dormant && ticks * sim.tickSeconds <= 50) {
+    waiting = ids.filter((id) => workerOf(sim, id).phase === "waiting");
+    sim.tick();
+    ticks++;
+  }
+  expect(reserveOf(sim).dormant).toBe(false);
+  expect(ticks * sim.tickSeconds).toBeCloseTo(50);
+  expect(waiting.length).toBeGreaterThan(0);
+  for (const id of ids)
+    expect(workerOf(sim, id)).toMatchObject({ siteId: "near" });
+  // Waiting workers resume on the tick the site reopens.
+  for (const id of waiting)
+    expect(workerOf(sim, id)).toMatchObject({ phase: "gathering" });
+});
+
+test("a site entering dormancy sends partial cargo home before waiting there", () => {
+  const { simulation: first, map } = opening();
+  command(first, { kind: "gather", actorId: "worker", siteId: "far" });
+  untilSeconds(first, () => workerOf(first).cargo >= 5);
+  const state = savedState(scenario, first);
+  Object.assign(state.economy!.cultivation!.sites[1]!, {
+    reserve: 10000,
+    dormant: true,
+  });
+  const sim = fixture(state).simulation;
+  const cargo = workerOf(sim).cargo;
+  sim.tick();
+  expect(workerOf(sim)).toMatchObject({ phase: "returning", siteId: "far" });
+  untilSeconds(sim, () => workerOf(sim).phase === "waiting");
+  expect(workerOf(sim).cargo).toBe(0);
+  expect(balance(sim, "lifebloom")).toBe(cargo);
+  const site = map.tileCenter(23, 6);
+  const { worldPosition } = sim.actorById("worker")!;
+  expect(
+    Math.hypot(worldPosition.x - site.x, worldPosition.z - site.z),
+  ).toBeLessThanOrEqual(0.75);
+});
+
+test.each(["stop", "construction"] as const)(
+  "a %s order keeps cargo without a delivery detour",
+  (order) => {
+    const state = exploredScenarioState(scenario, definitions);
+    setBalance(state, 1000, "lifebloom");
+    const { simulation: sim } = fixture(state);
+    train(sim);
+    expect(place(sim).accepted).toBe(true);
+    untilSeconds(sim, () => !sim.actorById("conservatory")!.construction);
+    command(sim, { kind: "gather", actorId: "worker", siteId: "far" });
+    untilSeconds(sim, () => workerOf(sim).cargo >= 5);
+    const cargo = workerOf(sim).cargo;
+    const funds = balance(sim, "lifebloom");
+    if (order === "stop") {
+      command(sim, { kind: "stop", actorId: "worker" });
+      expect(sim.actorById("worker")!.movement).toBeUndefined();
+    } else
+      expect(
+        place(sim, "muster", 25, 11, "worker", "circle-musterhall").accepted,
+      ).toBe(true);
+    expect(workerOf(sim).dropoffId).toBeUndefined();
+    advanceSeconds(sim, 20);
+    expect(workerOf(sim).cargo).toBe(cargo);
+    expect(balance(sim, "lifebloom")).toBe(
+      order === "stop" ? funds : funds - 100,
+    );
+    expect(sim.buildingActivity.some(({ kind }) => kind === "delivery")).toBe(
+      false,
+    );
+    if (order === "construction")
+      expect(sim.actorById("muster")!.construction).toBeUndefined();
+    expect(workerOf(sim).phase).toBe("idle");
+  },
+);
+
+test("delivery ignores another owner's nearer Conservatory", () => {
+  const state = exploredScenarioState(scenario, definitions);
+  state.owners.push({ id: "other", faction: "circle" });
+  const { simulation: first, map } = fixture(state);
+  train(first);
+  spawnDropoff(first, map, "mine", { x: 4, z: 12 });
+  spawnDropoff(first, map, "theirs", { x: 17, z: 9 });
+  const saved = savedState(scenario, first);
+  actorIn(saved, "theirs").owner = "other";
+  const sim = fixture(saved).simulation;
+  command(sim, { kind: "gather", actorId: "worker", siteId: "near" });
+  untilSeconds(sim, () => workerOf(sim).phase === "returning");
+  sim.tick();
+  expect(workerOf(sim).dropoffId).toBe("mine");
+  untilSeconds(sim, () => balance(sim, "lifebloom") >= 180);
+});
+
+test.each([
+  ["a river", "upstream"],
+  ["open ground", "across"],
+] as const)(
+  "delivery takes the shortest walk across %s",
+  (ground, expected) => {
+    const { simulation: sim, map } = fixture();
+    train(sim);
+    // The river leaves one ford at its east end.
+    if (ground === "a river")
+      expect(
+        command(
+          sim,
+          {
+            kind: "terrain",
+            tiles: Array.from({ length: 29 }, (_, x) =>
+              [10, 11].map((z) => ({ x, z, terrain: { typeId: "water" } })),
+            ).flat(),
+          },
+          { script: true },
+        ).accepted,
+      ).toBe(true);
+    // Across is nearer in a straight line.
+    spawnDropoff(sim, map, "across", { x: 13, z: 12 });
+    spawnDropoff(sim, map, "upstream", { x: 24, z: 3 });
+    command(sim, { kind: "gather", actorId: "worker", siteId: "near" });
+    untilSeconds(sim, () => workerOf(sim).phase === "returning");
+    expect(workerOf(sim).dropoffId).toBe(expected);
+    untilSeconds(sim, () => workerOf(sim).cargo === 0);
+    expect(
+      sim.buildingActivity.some(
+        (activity) =>
+          activity.buildingId === expected && activity.kind === "delivery",
+      ),
+    ).toBe(true);
+  },
+);
+
+test("simultaneous workers stop at the threshold in worker-ID order and continue identically", () => {
+  const state = exploredScenarioState(scenario, definitions);
+  setBalance(state, 500, "lifebloom");
+  const { simulation: first, map } = fixture(state);
+  const ids = ["a", "b", "c", "d"];
+  for (const id of ids) train(first, id);
+  for (const id of ids)
+    command(first, { kind: "gather", actorId: id, siteId: "near" });
+  untilSeconds(first, () =>
+    ids.every((id) => workerOf(first, id).phase === "gathering"),
+  );
+  const saved = savedState(scenario, first);
+  // Leaves less than one tick of draw for the four workers.
+  Object.assign(saved.economy!.cultivation!.sites[0]!, {
+    reserve: 10070,
+    regeneration: 0,
+  });
+  for (const worker of saved.economy!.cultivation!.workers) {
+    const actor = actorIn(saved, worker.actorId);
+    actor.worldPosition = map.tileCenter(14, 6);
+    delete actor.movement;
+    worker.cargo = 0;
+    worker.gatherProgress = 0;
+    worker.rateProgress = 0;
+    delete worker.cargoSources;
+  }
+  const reversed = structuredClone(saved);
+  reversed.economy!.cultivation!.workers.reverse();
+  const runs = [saved, reversed].map((state) => {
+    const sim = fixture(state).simulation;
+    const before = ids.map((id) => held(sim, id));
+    sim.tick();
+    expect(reserveOf(sim)).toMatchObject({ reserve: 10000, dormant: true });
+    return {
+      sim,
+      drawn: ids.map((id, index) => held(sim, id) - before[index]!),
+    };
+  });
+  const [firstRun, secondRun] = runs;
+  const { drawn } = firstRun!;
+  expect(secondRun!.drawn).toEqual(drawn);
+  // The lowest ID draws its full share before later workers.
+  expect(drawn).toEqual([50, 20, 0, 0]);
+  const restored = fixture(savedState(scenario, runs[0]!.sim)).simulation;
+  advanceSeconds(runs[0]!.sim, 20);
+  advanceSeconds(restored, 20);
+  expect(restored.snapshot()).toEqual(runs[0]!.sim.snapshot());
+});
+
+test("cultivation waits for a reachable site even inside its arrival radius", () => {
+  const { simulation: first, map } = fixture();
+  train(first);
+  const state = savedState(scenario, first);
+  const target = map.tileCenter(14, 6);
+  actorIn(state, "worker").worldPosition = { ...target, x: target.x - 0.6 };
+  const { simulation: sim } = fixture(state);
+  const changeSite = (typeId: string) =>
+    command(
+      sim,
+      { kind: "terrain", tiles: [{ x: 14, z: 6, terrain: { typeId } }] },
+      { script: true },
+    );
+  expect(changeSite("water").accepted).toBe(true);
+  expect(
+    command(sim, { kind: "gather", actorId: "worker", siteId: "near" })
+      .accepted,
+  ).toBe(true);
+  expect(workerOf(sim).phase).toBe("blocked");
+  expect(held(sim)).toBe(0);
+  expect(changeSite("plain").accepted).toBe(true);
+  expect(workerOf(sim).phase).toBe("gathering");
+  expect(held(sim)).toBeGreaterThan(0);
+});
+
+test("equal-cost deliveries choose the lower building ID", () => {
+  const { simulation: first, map } = fixture();
+  train(first);
+  spawnDropoff(first, map, "z-dropoff", { x: 13, z: 10 });
+  spawnDropoff(first, map, "a-dropoff", { x: 13, z: 1 });
+  const state = savedState(scenario, first);
+  // Both footprints offer a straight, three-tile walk to an entrance.
+  const worker = actorIn(state, "worker");
+  worker.worldPosition = map.tileCenter(14, 6);
+  const sim = fixture(state).simulation;
+  command(sim, { kind: "gather", actorId: "worker", siteId: "near" });
+  untilSeconds(sim, () => workerOf(sim).phase === "returning");
+  expect(workerOf(sim).dropoffId).toBe("a-dropoff");
+});

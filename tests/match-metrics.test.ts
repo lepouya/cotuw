@@ -146,8 +146,18 @@ const scenario = defineScenario({
   ],
   cultivation: {
     sites: [
-      createCultivationSite("bloom-near", "Home", { x: 14, z: 6 }),
-      createCultivationSite("bloom-far", "Outside", { x: 23, z: 6 }),
+      createCultivationSite(
+        "bloom-near",
+        "Home",
+        { x: 14, z: 6 },
+        BASE_CONTENT.cultivationSite,
+      ),
+      createCultivationSite(
+        "bloom-far",
+        "Outside",
+        { x: 23, z: 6 },
+        BASE_CONTENT.cultivationSite,
+      ),
     ],
   },
 });

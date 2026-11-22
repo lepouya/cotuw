@@ -1,5 +1,6 @@
 import { deepFreeze } from "../simulation/actor";
 import { validateAiProfile } from "../simulation/director";
+import { validateCultivationSiteTuning } from "../simulation/cultivation";
 import { validateMovementProfile } from "../simulation/navigation";
 import {
   hasOwn,
@@ -21,6 +22,7 @@ import { validateTerrainStyle } from "./terrain-style";
 import { validateTextureClip } from "./texture-clip";
 
 import type { ActorDefinition } from "../simulation/actor";
+import type { CultivationSiteTuning } from "../simulation/cultivation";
 import type { AiProfile } from "../simulation/director";
 import type { MovementProfile } from "../simulation/navigation";
 import type { AudioBindings, AudioContent } from "./audio";
@@ -34,7 +36,7 @@ import type { TerrainStyle } from "./terrain-style";
 import type { TextureClip } from "./texture-clip";
 
 const FORMAT = "cotuw-content";
-const CONTENT_FORMAT_VERSION = 3;
+const CONTENT_FORMAT_VERSION = 4;
 
 /** Names a content pack and the version whose rules a mission uses. */
 export type ContentReference = { id: string; version: number };
@@ -85,6 +87,8 @@ export type ContentPack = ContentReference & {
   /** Building definition IDs excluded from skirmish survival requirements. */
   skirmishExcludedBuildingIds?: readonly string[];
   movementProfiles: readonly MovementProfile[];
+  /** Tuning for cultivation sites that assembled maps create. */
+  cultivationSite: CultivationSiteTuning;
   /** Behavior that scenarios assign to AI-controlled owners. */
   aiProfiles?: readonly AiProfile[];
   presentation: Readonly<Record<string, ActorPresentation>>;
@@ -160,6 +164,11 @@ export function parseContentPack(source: string): ContentPack {
       "needs an id, version, actors, movementProfiles, presentation, terrain, and view",
     );
   for (const profile of pack.movementProfiles) validateMovementProfile(profile);
+  try {
+    validateCultivationSiteTuning(pack.cultivationSite);
+  } catch {
+    throw invalid("needs valid cultivationSite tuning");
+  }
   if (
     pack.aiProfiles !== undefined &&
     (!Array.isArray(pack.aiProfiles) ||

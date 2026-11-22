@@ -135,12 +135,9 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 - [x] **1.49** Circle placement, single-worker tending and replacement,
   infrastructure, and emergency Heartgrove recovery, with saved continuation
   and keyboard-free construction controls.
-- [ ] **1.50** Complete cultivation acceptance against
-  [economy rules](DESIGN.md#economy-and-construction). Verify reserve-adjusted
-  output, regeneration, dormancy/recovery, retained assignments, manual site
-  changes, nearest reachable owned delivery, cargo-preserving interruptions,
-  and queued orders waiting through dormancy. Cover simultaneous workers,
-  reserve overdraw, and deterministic transition ordering.
+- [x] **1.50** Cultivation acceptance against
+  [economy rules](DESIGN.md#economy-and-construction), with shortest-walk
+  delivery and content-pack site tuning.
 - [ ] **1.51** Complete feedback and guidance acceptance for cultivation and
   construction. Verify site reserve/efficiency/recovery displays, one dormancy
   notification per transition, and distinct states for idle, waiting, blocked

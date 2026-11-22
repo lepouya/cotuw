@@ -1,6 +1,6 @@
 import { depositCargo, gatherCargo, validCargoSources } from "./cargo";
 import type { CargoSource } from "./cargo";
-import { clearCombatOrders, compareIds, nearestTo } from "./actor";
+import { clearCombatOrders, compareIds } from "./actor";
 import { secondsToTicks } from "./clock";
 import { RESOURCE_SCALE } from "./resources";
 import { isCount, isPositive } from "./validation";
@@ -20,7 +20,11 @@ import type {
 import type { TileCoord } from "./grid";
 import type { WorldPosition } from "./world";
 
-const rateUnits = (rate: number) => Math.round(rate * RESOURCE_SCALE);
+/** Resource thousandths for a content amount or rate. */
+const toUnits = (amount: number) => Math.round(amount * RESOURCE_SCALE);
+/** Content values must convert exactly to nonnegative thousandths. */
+const exactUnits = (amount: number) =>
+  isCount(toUnits(amount)) && toUnits(amount) / RESOURCE_SCALE === amount;
 export type CultivationSite = {
   id: string;
   name: string;
@@ -70,25 +74,60 @@ export function createCultivatorState(actorId: string): CultivatorState {
     phase: "idle",
   };
 }
+/** Content tuning for new sites, in resource units and units per second. */
+export type CultivationSiteTuning = Pick<
+  CultivationSite,
+  "capacity" | "regeneration" | "slowBelow" | "dormantBelow" | "recoverAt"
+>;
+/** A full, open site with the given tuning. */
 export function createCultivationSite(
   id: string,
   name: string,
   tile: TileCoord,
+  tuning: Readonly<CultivationSiteTuning>,
 ): CultivationSite {
+  const capacity = toUnits(tuning.capacity);
   return {
     id,
     name,
-    tile,
-    capacity: 100000,
-    reserve: 100000,
-    regeneration: 1000,
+    tile: { ...tile },
+    capacity,
+    reserve: capacity,
+    regeneration: toUnits(tuning.regeneration),
     regenerationProgress: 0,
-    slowBelow: 60000,
-    dormantBelow: 10000,
-    recoverAt: 60000,
+    slowBelow: toUnits(tuning.slowBelow),
+    dormantBelow: toUnits(tuning.dormantBelow),
+    recoverAt: toUnits(tuning.recoverAt),
     dormant: false,
   };
 }
+function validSiteTuning(
+  tuning: Readonly<CultivationSiteTuning>,
+  validAmount: (amount: number) => boolean,
+) {
+  const { capacity, regeneration, slowBelow, dormantBelow, recoverAt } = tuning;
+  return (
+    [capacity, regeneration, slowBelow, dormantBelow, recoverAt].every(
+      validAmount,
+    ) &&
+    dormantBelow < slowBelow &&
+    slowBelow <= capacity &&
+    dormantBelow < recoverAt &&
+    recoverAt <= capacity
+  );
+}
+
+export function validateCultivationSiteTuning(
+  tuning: Readonly<CultivationSiteTuning>,
+) {
+  if (
+    !tuning ||
+    !validSiteTuning(tuning, exactUnits) ||
+    tuning.regeneration <= 0
+  )
+    throw new RangeError("Invalid cultivation site tuning.");
+}
+
 export function cultivationEfficiency(
   site: DeepReadonly<CultivationSite>,
 ): number {
@@ -169,10 +208,13 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
   const perSecond = secondsToTicks(1, tickSeconds);
   const navigation = workerNavigation(world);
   for (const site of state.sites) {
-    site.regenerationProgress += site.regeneration;
-    const regenerated = Math.floor(site.regenerationProgress / perSecond);
+    // Keep the per-tick remainder separate from the full regeneration rate.
+    site.regenerationProgress += site.regeneration % perSecond;
+    const regenerated =
+      Math.floor(site.regeneration / perSecond) +
+      Math.floor(site.regenerationProgress / perSecond);
     site.regenerationProgress %= perSecond;
-    site.reserve = Math.min(site.capacity, site.reserve + regenerated);
+    site.reserve += Math.min(site.capacity - site.reserve, regenerated);
     if (site.dormant && site.reserve >= site.recoverAt) site.dormant = false;
   }
   const route = (
@@ -185,6 +227,22 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     // A successful retry resumes the trip; returning sets its own phase.
     else if (worker.phase === "blocked") worker.phase = "travelling";
     return result === "arrived";
+  };
+  const dropoffsByOwner = new Map<string, Actor[]>();
+  const dropoffsFor = (owner: string) => {
+    let dropoffs = dropoffsByOwner.get(owner);
+    if (!dropoffs) {
+      dropoffs = actors
+        .filter(
+          (building) =>
+            building.owner === owner &&
+            !building.construction &&
+            definitions.get(building.definitionId)?.cultivationDropoff,
+        )
+        .sort((a, b) => compareIds(a.id, b.id));
+      dropoffsByOwner.set(owner, dropoffs);
+    }
+    return dropoffs;
   };
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
   for (const worker of [...state.workers].sort((a, b) =>
@@ -205,27 +263,10 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     ) {
       // An unblocked route keeps its drop-off without rescanning.
       const current = routeTarget(actor);
-      let destination =
+      const destination =
         worker.dropoffId && current
           ? { id: worker.dropoffId, point: current }
-          : undefined;
-      if (!destination) {
-        const candidates = actors
-          .filter(
-            (building) =>
-              !building.construction &&
-              definitions.get(building.definitionId)?.cultivationDropoff &&
-              building.owner === actor.owner,
-          )
-          .sort(nearestTo(actor.worldPosition));
-        for (const building of candidates) {
-          const point = navigation.entrance(actor, building);
-          if (point) {
-            destination = { id: building.id, point };
-            break;
-          }
-        }
-      }
+          : navigation.nearestEntrance(actor, dropoffsFor(actor.owner));
       if (!destination) {
         delete actor.movement;
         delete worker.dropoffId;
@@ -261,8 +302,7 @@ export function updateCultivation(economy: EconomyState, world: EconomyWorld) {
     }
     worker.phase = "gathering";
     worker.rateProgress +=
-      rateUnits(rate) *
-      Math.round(cultivationEfficiency(site) * RESOURCE_SCALE);
+      toUnits(rate) * Math.round(cultivationEfficiency(site) * RESOURCE_SCALE);
     const available = Math.floor(
       worker.rateProgress / (perSecond * RESOURCE_SCALE),
     );
@@ -295,11 +335,9 @@ export function validateCultivationDefinitions(
         !isCount(definition.cultivation.capacity) ||
         !definition.cultivation.capacity ||
         !isPositive(definition.cultivation.rate) ||
-        !isCount(rateUnits(definition.cultivation.rate) * RESOURCE_SCALE) ||
-        Math.abs(
-          definition.cultivation.rate * RESOURCE_SCALE -
-            rateUnits(definition.cultivation.rate),
-        ) > 1e-6)
+        !exactUnits(definition.cultivation.rate) ||
+        // Per-tick rate progress scales the rate again by efficiency.
+        !isCount(toUnits(definition.cultivation.rate) * RESOURCE_SCALE))
     )
       return invalid(definition);
     if (
@@ -332,22 +370,11 @@ export function validateCultivation(
   if (!Array.isArray(state.workers)) return invalid();
   for (const site of state.sites) {
     if (
-      ![
-        site.capacity,
-        site.reserve,
-        site.regeneration,
-        site.regenerationProgress,
-        site.slowBelow,
-        site.dormantBelow,
-        site.recoverAt,
-      ].every(isCount) ||
-      site.regenerationProgress >= secondsToTicks(1, tickSeconds) ||
-      !site.capacity ||
+      !validSiteTuning(site, isCount) ||
+      !isCount(site.reserve) ||
       site.reserve > site.capacity ||
-      site.dormantBelow >= site.slowBelow ||
-      site.slowBelow > site.capacity ||
-      site.recoverAt <= site.dormantBelow ||
-      site.recoverAt > site.capacity ||
+      !isCount(site.regenerationProgress) ||
+      site.regenerationProgress >= secondsToTicks(1, tickSeconds) ||
       typeof site.dormant !== "boolean" ||
       (site.dormant && site.reserve >= site.recoverAt) ||
       (!site.dormant && site.reserve < site.dormantBelow)

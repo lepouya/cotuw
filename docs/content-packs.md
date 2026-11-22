@@ -40,6 +40,11 @@ bundled packs through the same parser future mod packs will use.
   `pursuitRadius`, and `healthPerSecond`. Distances are world units; all values
   are positive, with range no greater than acquisition and acquisition no
   greater than pursuit. Workers and buildings cannot also be providers.
+- `cultivationSite` tunes cultivation sites that assembled maps create:
+  `capacity`, `slowBelow`, `dormantBelow`, and `recoverAt` in resource units,
+  and positive `regeneration` per second. Values use at most three decimal
+  places, `dormantBelow` < `slowBelow` <= `capacity`, and `dormantBelow` <
+  `recoverAt` <= `capacity`. Authored missions save each site's values.
 - Optional `factionNames` maps simulation faction IDs to nonempty display
   names for the sidebar heading. Unnamed factions use a generic heading.
 - Optional `skirmishExcludedBuildingIds` lists distinct building definition IDs,

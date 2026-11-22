@@ -503,7 +503,12 @@ test("growth previews and tending choose workers through known navigation only",
       edit: (state) => {
         const cultivation = state.economy!.cultivation!;
         cultivation.sites.push(
-          createCultivationSite("previous", "Previous job", { x: 6, z: 10 }),
+          createCultivationSite(
+            "previous",
+            "Previous job",
+            { x: 6, z: 10 },
+            BASE_CONTENT.cultivationSite,
+          ),
         );
         const worker = cultivation.workers.find(
           ({ actorId }) => actorId === "worker",

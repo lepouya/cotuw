@@ -13,6 +13,7 @@ import {
   findNavigationPath,
   forEachTileOnSegment,
   NavigationGrid,
+  nearestGoalTile,
   occupiedTile,
   routeEnd,
   segmentCost,
@@ -58,6 +59,29 @@ function expectTraversable(
 }
 
 describe("terrain traversal", () => {
+  test("nearest goal accounts for traversal costs and unreachable tiles", () => {
+    const map = new TerrainGrid({
+      width: 7,
+      height: 7,
+      tileSize: 1,
+      terrainTypeIds: ["plain", "rough", "water"],
+    });
+    map.setTerrain(3, 2, { typeId: "water" });
+    map.setTerrain(3, 4, { typeId: "rough" });
+    const grid = gridOf(map);
+    const from = center(map, 3, 3);
+    const goals = [
+      { x: 3, z: 2 },
+      { x: 3, z: 4 },
+      { x: 5, z: 3 },
+    ];
+    expect(nearestGoalTile(grid, from, goals)).toBe(1);
+    map.setTerrain(3, 5, { typeId: "rough" });
+    goals[1] = { x: 3, z: 5 };
+    expect(nearestGoalTile(grid, from, goals)).toBe(2);
+    expect(nearestGoalTile(grid, from, goals.slice(0, 1))).toBeUndefined();
+  });
+
   test("prefers cheaper terrain when the exact destination is on the leash boundary", () => {
     const map = new TerrainGrid({
       width: 8,

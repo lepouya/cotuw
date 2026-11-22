@@ -1,3 +1,4 @@
+import { BASE_CONTENT } from "./helpers/content";
 import { expect, test } from "vitest";
 
 import { contextualMoveCommands } from "../src/ui/contextual-move";
@@ -37,7 +38,12 @@ test.each([
       production: [],
       cultivation: {
         sites: [
-          createCultivationSite("lifebloom", "Lifebloom", { x: 2, z: 1 }),
+          createCultivationSite(
+            "lifebloom",
+            "Lifebloom",
+            { x: 2, z: 1 },
+            BASE_CONTENT.cultivationSite,
+          ),
         ],
         workers: [createCultivatorState("cultivator")],
       },

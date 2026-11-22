@@ -1,3 +1,4 @@
+import { BASE_CONTENT } from "./helpers/content";
 import { describe, expect, test } from "vitest";
 
 import { actorIn, advanceSeconds, savedState } from "./helpers/scenario";
@@ -153,7 +154,14 @@ describe("owner observations", () => {
       units: [unit("spotter", 4)],
       edit: (state: MissionState) => {
         state.economy!.cultivation = {
-          sites: [createCultivationSite("grove", "Grove", { x: 8, z: 10 })],
+          sites: [
+            createCultivationSite(
+              "grove",
+              "Grove",
+              { x: 8, z: 10 },
+              BASE_CONTENT.cultivationSite,
+            ),
+          ],
           workers: [],
         };
       },

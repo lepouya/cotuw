@@ -319,10 +319,11 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   partial cargo to a Conservatory, then wait at a reachable position near the
   site and resume cultivation automatically when it reopens. They do not seek
   another site automatically; changing sites requires a manual order.
-- For each delivery trip, Cultivators automatically choose the nearest
-  reachable Conservatory belonging to their owner. They have no fixed
-  Conservatory assignment. If none is reachable, they retain their cargo and
-  show a blocked-delivery warning.
+- For each delivery trip, Cultivators automatically choose the reachable
+  Conservatory belonging to their owner with the lowest terrain-adjusted
+  walking cost to an entrance, breaking ties by building ID. They have no
+  fixed Conservatory assignment. If none is reachable, they retain their
+  cargo and show a blocked-delivery warning.
 - Move, Stop, and construction orders interrupt cultivation immediately while
   preserving cargo, without a delivery detour. A new Gather order at another
   site delivers existing cargo before beginning cultivation there. Explicit

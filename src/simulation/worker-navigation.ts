@@ -1,4 +1,4 @@
-import { resolveNavigationDestination } from "./navigation";
+import { destinationRegion, nearestGoalTile, segmentCost } from "./navigation";
 import {
   adjacentTiles,
   occupiedTilesFor,
@@ -16,44 +16,50 @@ import type { WorldPosition } from "./world";
 export const routeTarget = (actor: Actor) =>
   actor.movement && !actor.movement.blocked ? actor.movement.target : undefined;
 
-/** Keeps a matching route, retries blocked routes, and stops on arrival. */
+type WorkerWorld = Pick<EconomyWorld, "definitions" | "behaviors" | "map">;
+
+function workerGrid(world: WorkerWorld, actor: Actor) {
+  const definition = world.definitions.get(actor.definitionId)!;
+  return world.behaviors
+    .get(definition.behaviorId)
+    ?.navigationGrid?.(actor, definition);
+}
+
+function reaches(grid: NavigationGrid, actor: Actor, point: WorldPosition) {
+  return !!destinationRegion(grid, actor.worldPosition, point)?.reachedTarget;
+}
+
+/**
+ * Keeps a matching route, retries blocked routes, and stops on arrival:
+ * within `arrivalDistance` with a passable straight line to the target.
+ */
 export function advanceWorkerRoute(
   actor: Actor,
   target: WorldPosition,
-  world: Pick<EconomyWorld, "definitions" | "behaviors" | "map" | "move">,
+  world: WorkerWorld & Pick<EconomyWorld, "move">,
   arrivalDistance: number,
 ): "arrived" | "travelling" | "blocked" {
-  if (distance(actor.worldPosition, target) <= arrivalDistance) {
+  const grid = workerGrid(world, actor);
+  if (
+    grid &&
+    distance(actor.worldPosition, target) <= arrivalDistance &&
+    segmentCost(grid, actor.worldPosition, target) !== undefined
+  ) {
     delete actor.movement;
     return "arrived";
   }
   const current = routeTarget(actor);
   if (current && distance(current, target) < 1e-6) return "travelling";
   delete actor.movement;
-  if (
-    !workerNavigation(world).reachable(actor, target) ||
-    !world.move(actor, target)
-  )
+  if (!grid || !reaches(grid, actor, target) || !world.move(actor, target))
     return "blocked";
   return "travelling";
 }
 
 /** Worker routes use the same navigation rules as explicit movement. */
-export function workerNavigation(
-  world: Pick<EconomyWorld, "definitions" | "behaviors" | "map">,
-) {
-  const gridFor = (actor: Actor) => {
-    const definition = world.definitions.get(actor.definitionId)!;
-    return world.behaviors
-      .get(definition.behaviorId)
-      ?.navigationGrid?.(actor, definition);
-  };
-  // Region lookups answer reachability without searching for a route.
-  const reaches = (grid: NavigationGrid, actor: Actor, point: WorldPosition) =>
-    !!resolveNavigationDestination(grid, actor.worldPosition, point)
-      ?.reachedTarget;
+export function workerNavigation(world: WorkerWorld) {
   const reachable = (actor: Actor, point: WorldPosition) => {
-    const grid = gridFor(actor);
+    const grid = workerGrid(world, actor);
     return !!grid && reaches(grid, actor, point);
   };
   const previews = new Map<string, NavigationGrid>();
@@ -87,7 +93,7 @@ export function workerNavigation(
       building,
       world.definitions.get(building.definitionId)!,
     );
-    const base = gridFor(actor);
+    const base = workerGrid(world, actor);
     if (!base) return undefined;
     const grid = base.occupancy.placementByOwnerId(building.id)
       ? base
@@ -103,5 +109,29 @@ export function workerNavigation(
       )
       .find(({ point }) => reaches(grid, actor, point))?.point;
   };
-  return { reachable, entrance };
+  /** The building with the shortest walk to an entrance; ties go to the earlier one. */
+  const nearestEntrance = (actor: Actor, buildings: readonly Actor[]) => {
+    const grid = workerGrid(world, actor);
+    if (!grid) return undefined;
+    const goals = buildings
+      .filter(isTilePlacedActor)
+      .flatMap((building) =>
+        adjacentTiles(
+          world.map,
+          occupiedTilesFor(
+            building,
+            world.definitions.get(building.definitionId)!,
+          ),
+        ).map((tile) => ({ building, tile })),
+      );
+    const index = nearestGoalTile(
+      grid,
+      actor.worldPosition,
+      goals.map(({ tile }) => tile),
+    );
+    if (index === undefined) return undefined;
+    const { building, tile } = goals[index]!;
+    return { id: building.id, point: world.map.tileCenter(tile.x, tile.z) };
+  };
+  return { reachable, entrance, nearestEntrance };
 }

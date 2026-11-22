@@ -32,6 +32,8 @@ type OpenTile = { index: number; score: number; estimate: number };
 const CORNER_TOLERANCE = 1e-9;
 /** Absorbs rounding when a shortcut costs the same as the tile route. */
 const SHORTCUT_TOLERANCE = 1e-9;
+/** Treats goal costs summed in different step orders as equal. */
+const GOAL_COST_TOLERANCE = 1e-9;
 const UNKNOWN_COST = Number.NaN;
 const BLOCKED_COST = -1;
 const UNLABELED = -2;
@@ -367,6 +369,42 @@ export function findNavigationPath(
   };
 }
 
+/**
+ * The index of the reachable goal with the lowest eight-way traversal cost.
+ * Equal costs prefer the earlier goal.
+ */
+export function nearestGoalTile(
+  grid: NavigationGrid,
+  from: WorldPosition,
+  goals: readonly TileCoord[],
+): number | undefined {
+  if (!goals.length) return undefined;
+  const { map } = grid;
+  const start = occupiedTile(grid, from);
+  const regions = reachableRegions(grid, start);
+  const ranks = new Map<number, number>();
+  goals.forEach(({ x, z }, rank) => {
+    if (!map.containsTile(x, z) || !regions.has(grid.regionAt(x, z))) return;
+    const index = map.tileIndex(x, z);
+    if (!ranks.has(index)) ranks.set(index, rank);
+  });
+  if (!ranks.size) return undefined;
+
+  let bestRank: number | undefined;
+  let bestCost = Number.POSITIVE_INFINITY;
+  exploreTiles(grid, start, {
+    stop: ({ index, score }) => {
+      if (score > bestCost * (1 + GOAL_COST_TOLERANCE)) return true;
+      const rank = ranks.get(index);
+      if (rank === undefined) return false;
+      bestCost = Math.min(bestCost, score);
+      bestRank = Math.min(bestRank ?? rank, rank);
+      return bestRank === 0;
+    },
+  });
+  return bestRank;
+}
+
 /** Tiles route searches expanded, which measures their cost. */
 export type RouteWork = { tiles: number };
 
@@ -459,19 +497,7 @@ export function resolveNavigationDestination(
     segmentCost(grid.unbounded(), from, target) !== undefined
   )
     return { start, end: start, reachedTarget: true, direct: true };
-  const startPassable = grid.costAt(start.x, start.z) !== undefined;
-  const regions = new Set<number>();
-  if (startPassable) {
-    regions.add(grid.regionAt(start.x, start.z));
-  } else {
-    // An actor standing on blocked terrain may step off it.
-    for (const neighbor of NEIGHBORS) {
-      const next = { x: start.x + neighbor.x, z: start.z + neighbor.z };
-      if (map.containsTile(next.x, next.z) && grid.canStep(start, next)) {
-        regions.add(grid.regionAt(next.x, next.z));
-      }
-    }
-  }
+  const regions = reachableRegions(grid, start);
   if (regions.size === 0) {
     return undefined;
   }
@@ -507,6 +533,18 @@ export function resolveNavigationDestination(
     ? goal
     : closestTileInRegions(grid, regions, start, goal);
   return { start, end, reachedTarget };
+}
+
+function reachableRegions(grid: NavigationGrid, start: TileCoord): Set<number> {
+  const region = grid.regionAt(start.x, start.z);
+  if (region !== BLOCKED_REGION) return new Set([region]);
+  // An actor standing on blocked terrain may step off it.
+  const regions = new Set<number>();
+  for (const neighbor of NEIGHBORS) {
+    const next = { x: start.x + neighbor.x, z: start.z + neighbor.z };
+    if (grid.canStep(start, next)) regions.add(grid.regionAt(next.x, next.z));
+  }
+  return regions;
 }
 
 /**
@@ -675,62 +713,79 @@ function searchTiles(
   work?: RouteWork,
 ): TileCoord[] {
   const { map } = grid;
-  const startIndex = map.tileIndex(start.x, start.z);
   const endIndex = map.tileIndex(end.x, end.z);
-  const scores = new Float64Array(map.width * map.height).fill(
-    Number.POSITIVE_INFINITY,
-  );
-  scores[startIndex] = 0;
   const parents = new Int32Array(map.width * map.height).fill(-1);
-  const closed = new Uint8Array(map.width * map.height);
-  const estimate = (tile: TileCoord) =>
-    octileDistance(tile, end) * map.tileSize * grid.minimumCost;
-  const open = new MinHeap();
-  open.push({ index: startIndex, score: 0, estimate: estimate(start) });
-
-  while (open.size > 0) {
-    const entry = open.pop()!;
-    const currentIndex = entry.index;
-    if (closed[currentIndex] || entry.score !== scores[currentIndex]) {
-      continue;
-    }
-    if (currentIndex === endIndex) {
-      break;
-    }
-    closed[currentIndex] = 1;
-    if (work) work.tiles += 1;
-    const current = tileForIndex(map, currentIndex);
-    const currentCost = grid.costAt(current.x, current.z);
-
-    for (const neighbor of NEIGHBORS) {
-      const next = { x: current.x + neighbor.x, z: current.z + neighbor.z };
-      if (!map.containsTile(next.x, next.z) || !grid.canStep(current, next)) {
-        continue;
-      }
-      const nextIndex = map.tileIndex(next.x, next.z);
-      if (closed[nextIndex]) {
-        continue;
-      }
-      const nextCost = grid.costAt(next.x, next.z)!;
-      // A center-to-center step spends half its length in each tile.
-      const stepCost =
-        currentCost === undefined ? nextCost : (currentCost + nextCost) / 2;
-      const score =
-        scores[currentIndex]! + neighbor.distance * map.tileSize * stepCost;
-      if (score >= scores[nextIndex]!) {
-        continue;
-      }
-      parents[nextIndex] = currentIndex;
-      scores[nextIndex] = score;
-      open.push({ index: nextIndex, score, estimate: score + estimate(next) });
-    }
-  }
+  exploreTiles(grid, start, {
+    estimate: (tile) =>
+      octileDistance(tile, end) * map.tileSize * grid.minimumCost,
+    stop: ({ index }) => index === endIndex,
+    parents,
+    ...(work && { work }),
+  });
 
   const reversed: TileCoord[] = [];
   for (let index = endIndex; index !== -1; index = parents[index]!) {
     reversed.push(tileForIndex(map, index));
   }
   return reversed.reverse();
+}
+
+/** A* with an estimate, or Dijkstra when only traversal cost is known. */
+function exploreTiles(
+  grid: NavigationGrid,
+  start: TileCoord,
+  {
+    estimate = () => 0,
+    stop,
+    parents,
+    work,
+  }: {
+    estimate?: (tile: TileCoord) => number;
+    stop: (entry: OpenTile) => boolean;
+    parents?: Int32Array;
+    work?: RouteWork;
+  },
+): void {
+  const { map } = grid;
+  const startIndex = map.tileIndex(start.x, start.z);
+  const scores = new Float64Array(map.width * map.height).fill(
+    Number.POSITIVE_INFINITY,
+  );
+  scores[startIndex] = 0;
+  const closed = new Uint8Array(map.width * map.height);
+  const open = new MinHeap();
+  open.push({ index: startIndex, score: 0, estimate: estimate(start) });
+
+  while (open.size > 0) {
+    const entry = open.pop()!;
+    const { index, score } = entry;
+    if (closed[index] || score !== scores[index]) continue;
+    if (stop(entry)) return;
+    closed[index] = 1;
+    if (work) work.tiles += 1;
+    const current = tileForIndex(map, index);
+    const currentCost = grid.costAt(current.x, current.z);
+
+    for (const neighbor of NEIGHBORS) {
+      const next = { x: current.x + neighbor.x, z: current.z + neighbor.z };
+      if (!grid.canStep(current, next)) continue;
+      const nextIndex = map.tileIndex(next.x, next.z);
+      if (closed[nextIndex]) continue;
+      const nextCost = grid.costAt(next.x, next.z)!;
+      // A center-to-center step spends half its length in each tile.
+      const stepCost =
+        currentCost === undefined ? nextCost : (currentCost + nextCost) / 2;
+      const nextScore = score + neighbor.distance * map.tileSize * stepCost;
+      if (nextScore >= scores[nextIndex]!) continue;
+      if (parents) parents[nextIndex] = index;
+      scores[nextIndex] = nextScore;
+      open.push({
+        index: nextIndex,
+        score: nextScore,
+        estimate: nextScore + estimate(next),
+      });
+    }
+  }
 }
 
 /**

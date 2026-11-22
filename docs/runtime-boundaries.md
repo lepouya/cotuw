@@ -141,7 +141,9 @@ These contracts describe where new behaviors, views, and services attach.
 - `simulation/worker-navigation.ts` resolves reachable building entrances and
   advances automatic routes for harvesting, cultivation, and tending. Callers
   choose arrival distance and work-specific blocked states. Reachability
-  reads cached navigation regions; only route starts search for a path.
+  reads cached navigation regions; only route starts and Cultivator delivery
+  choices search. A delivery choice searches outward from the worker for
+  the lowest-cost reachable entrance using the movement profile's tile costs.
   Placement tests a prospective footprint through a read-only occupancy
   adapter, preserving the published navigation state.
 - `simulation/resources.ts` maps each common resource to its price field and

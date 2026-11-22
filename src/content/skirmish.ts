@@ -74,15 +74,17 @@ export function createSkirmishMaterialsSites({
   );
 }
 
-export function createSkirmishCultivationSites({
-  resourceAreas,
-}: SkirmishMap = SKIRMISH_MAP): CultivationSite[] {
+export function createSkirmishCultivationSites(
+  { resourceAreas }: SkirmishMap = SKIRMISH_MAP,
+  tuning = currentContentPack("base").cultivationSite,
+): CultivationSite[] {
   return resourceAreas.flatMap((area) =>
     area.lifebloomTiles.map((tile, index) =>
       createCultivationSite(
         lifebloomSiteId(area, index),
         `${area.name} Lifebloom`,
-        { ...tile },
+        tile,
+        tuning,
       ),
     ),
   );
@@ -217,7 +219,12 @@ export function createSkirmishScenario(
       amount: opening.stockpile,
     })),
     sites: createSkirmishMaterialsSites(skirmishMap),
-    cultivation: { sites: createSkirmishCultivationSites(skirmishMap) },
+    cultivation: {
+      sites: createSkirmishCultivationSites(
+        skirmishMap,
+        content.cultivationSite,
+      ),
+    },
     loot: [],
   });
 }

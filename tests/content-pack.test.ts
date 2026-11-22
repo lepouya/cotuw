@@ -219,6 +219,18 @@ describe("content packs", () => {
     ).toThrow("unknown building details");
   });
 
+  test.each([
+    (tuning: any) => delete tuning.capacity,
+    (tuning: any) => (tuning.regeneration = 0),
+    (tuning: any) => (tuning.dormantBelow = tuning.slowBelow),
+    (tuning: any) => (tuning.recoverAt = tuning.capacity + 1),
+    (tuning: any) => (tuning.capacity = 100.0001),
+  ])("rejects invalid cultivation site tuning (%#)", (edit) => {
+    expect(withEdit((pack) => edit(pack.cultivationSite))).toThrow(
+      "needs valid cultivationSite tuning",
+    );
+  });
+
   test("the base pack presents every actor it defines", () => {
     for (const { id } of BASE_CONTENT.actors)
       expect(BASE_CONTENT.presentation[id]?.name, id).toBeTruthy();
@@ -226,7 +238,7 @@ describe("content packs", () => {
 
   test("reject unknown formats, built-ins, and tile types", () => {
     expect(withEdit((pack) => (pack.formatVersion = 1))).toThrow(
-      'format "cotuw-content" version 3',
+      'format "cotuw-content" version 4',
     );
     expect(
       withEdit(

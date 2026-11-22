@@ -1,11 +1,21 @@
 import { createCultivationSite } from "../../src/simulation/cultivation.ts";
-import { actorDefinition, costOf } from "./base-content.ts";
+import { BASE_CONTENT, actorDefinition, costOf } from "./base-content.ts";
 import { createWolfDenScenario } from "./wolf-den.ts";
 
 const LIFEBLOOM = 150;
 const sites = [
-  createCultivationSite("near-lifebloom", "Near Lifebloom", { x: 20, z: 50 }),
-  createCultivationSite("south-lifebloom", "South Lifebloom", { x: 22, z: 44 }),
+  createCultivationSite(
+    "near-lifebloom",
+    "Near Lifebloom",
+    { x: 20, z: 50 },
+    BASE_CONTENT.cultivationSite,
+  ),
+  createCultivationSite(
+    "south-lifebloom",
+    "South Lifebloom",
+    { x: 22, z: 44 },
+    BASE_CONTENT.cultivationSite,
+  ),
 ];
 const cargo = actorDefinition("circle-cultivator").cultivation!.capacity;
 
