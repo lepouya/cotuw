@@ -4,10 +4,8 @@ import { expect, test } from "vitest";
 import { testScene } from "./helpers/scene";
 import { TerrainMap } from "../src/map";
 import { createAmbientBirdsView } from "../src/render/ambient-birds";
-import {
-  createDamageEffectsView,
-  damageSeverity,
-} from "../src/render/damage-effects";
+import { createDamageEffectsView } from "../src/render/damage-effects";
+import { damageSeverity } from "../src/render/damage-stages";
 
 import type { Scene } from "@babylonjs/core";
 import type { ModelAsset } from "../src/render/glb-model";
@@ -117,6 +115,35 @@ test("wound drops fall toward the ground and hold still when motion is reduced",
   effects.update([damaged("critical", "biological")], 0.05);
   expect(heights()).toEqual(held);
   expect(scene.getTransformNodeByName("damage-target-fire")).toBeNull();
+  effects.dispose();
+});
+
+test("living damage sheds leaves and leaks light; critical damage adds wood fragments", () => {
+  const scene = testScene();
+  const requested = new Set<string>();
+  const effects = createDamageEffectsView(scene, (prop) => {
+    requested.add(prop);
+    return boxProp(scene);
+  });
+  const streams = () =>
+    new Set(
+      scene.transformNodes
+        .filter((node) => node.name.startsWith("damage-target-"))
+        .map((node) => node.name.split("-")[2]),
+    );
+  effects.update([damaged("moderate", "living")], 0.1);
+  expect(streams()).toEqual(new Set(["leaf", "leak"]));
+  effects.update([damaged("critical", "living")], 0.1);
+  expect(streams()).toEqual(new Set(["leaf", "fragment", "leak"]));
+  expect(requested.has("fire")).toBe(false);
+  // Leaks rise while leaves and fragments fall.
+  const heights = (prop: string) =>
+    shown(scene, `damage-target-${prop}`).map((node) => node.position.y);
+  const leaks = heights("leak");
+  const fragments = heights("fragment");
+  effects.update([damaged("critical", "living")], 0.05);
+  expect(Math.max(...heights("leak"))).toBeGreaterThan(Math.max(...leaks));
+  expect(Math.min(...heights("fragment"))).toBeLessThan(Math.min(...fragments));
   effects.dispose();
 });
 

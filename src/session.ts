@@ -416,7 +416,11 @@ async function assembleGameSession(
   own(birds);
   const wreckView = createWreckView(view.scene, map, {
     appearanceFor: (id) => appearances.get(id),
-    rubble: () => propAssets.get("rubble"),
+    // Packs without the named debris use their shared rubble.
+    rubble: ({ definitionId }) => {
+      const id = content.presentation[definitionId]?.building?.rubble;
+      return (id && propAssets.get(id)) ?? propAssets.get("rubble");
+    },
     reducedMotion,
     ownerMaterials,
     topHeightFor: ({ actorId, definitionId, tilePlacement }) =>

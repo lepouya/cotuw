@@ -65,6 +65,14 @@ export function hierarchyMeshes(root: TransformNode): AbstractMesh[] {
   ];
 }
 
+/** Strips the instance prefix before matching authored part names. */
+export function modelPartName(root: TransformNode, mesh: AbstractMesh): string {
+  const prefix = `${root.name}-`;
+  return mesh.name.startsWith(prefix)
+    ? mesh.name.slice(prefix.length)
+    : mesh.name;
+}
+
 /** Loads a GLB and checks it with `prepare`, releasing it if that throws. */
 export async function loadContainer<T>(
   scene: Scene,

@@ -22,6 +22,7 @@ import {
   stageGrowth,
 } from "./construction-stage";
 import { createMaterialCopies } from "./material-copies";
+import { actorDamage, createDamageStages } from "./damage-stages";
 import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
 
 import type { AbstractMesh, Scene } from "@babylonjs/core";
@@ -99,6 +100,8 @@ export type TilePlacedActorAppearanceCatalog = ReadonlyMap<
 /** A drawn building, whose owner colors its reserved model areas. */
 export type OwnedTilePlacedActor = TilePlacedActorState &
   Readonly<Pick<Actor, "owner">> & {
+    /** Selects authored damage stages; absent means full health. */
+    readonly health?: number;
     readonly combat?: Readonly<Pick<CombatState, "aimFacing">>;
     readonly repair?: Readonly<Pick<NonNullable<Actor["repair"]>, "active">>;
   };
@@ -385,6 +388,7 @@ export function createTilePlacedActorViewRegistry(
           if (scaffold) lifetime.own(scaffold);
         }
       }
+      const damage = createDamageStages(root);
       if (disconnected) {
         materials.edit(root.getChildMeshes(), "offline", (dimmed) => {
           if (dimmed instanceof StandardMaterial)
@@ -482,8 +486,19 @@ export function createTilePlacedActorViewRegistry(
       return {
         root,
         top,
-        update: ({ construction, combat, repair }: OwnedTilePlacedActor) => {
+        update: ({
+          construction,
+          combat,
+          repair,
+          health,
+        }: OwnedTilePlacedActor) => {
           details?.aim?.(combat?.aimFacing ?? facing);
+          // Growing layers would leave damage shapes floating, so wait.
+          damage.show(
+            !preview && !construction
+              ? actorDamage(health, definition.health)
+              : undefined,
+          );
           showRepair(repair);
           growing = construction?.active === true;
           if (!progress || !construction) return;
@@ -495,8 +510,10 @@ export function createTilePlacedActorViewRegistry(
           );
         },
         animate: (seconds: number, frameSeconds: number) => {
+          const reduced = reducedMotion();
+          damage.animate(seconds, reduced);
           details?.update(
-            !reducedMotion() && (active || (definition.growth && growing))
+            !reduced && (active || (definition.growth && growing))
               ? seconds
               : 0,
           );
@@ -508,7 +525,7 @@ export function createTilePlacedActorViewRegistry(
             return;
           }
           activity.seconds += frameSeconds;
-          if (reducedMotion()) activity.seconds = motion.seconds;
+          if (reduced) activity.seconds = motion.seconds;
           motion.pose(Math.min(activity.seconds, motion.seconds));
           if (activity.seconds >= motion.seconds) playing.delete(actor.id);
         },

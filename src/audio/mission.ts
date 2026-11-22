@@ -133,6 +133,9 @@ export function createMissionAudio(
         if (target) scene.emit("damage", target);
         if (attacker || target) combatUntil = seconds() + combatHoldSeconds;
       }
+      // Only actors seen alive last observation sound their destruction.
+      for (const [id, wreck] of remains)
+        if (previous.has(id)) scene.emit("destroyed", wreck);
       let trained = false;
       for (const activity of simulation.buildingActivity) {
         const building = shownById.get(activity.buildingId);
@@ -148,9 +151,9 @@ export function createMissionAudio(
         )
           continue;
         startTraining({ actorId: actor.id, producerId: activity.buildingId });
-        scene.emit("trained", emitterOf(actor));
         trained = true;
       }
+      if (trained) scene.emit("trained");
       const completed = simulation.objectives.some(
         (objective) =>
           objective.status === "complete" &&

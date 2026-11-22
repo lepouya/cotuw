@@ -434,8 +434,12 @@ test.each([
           (mesh) =>
             mesh.name.includes("growing") && mesh.name.includes("growth-"),
         ).length,
-        // The Thornspire's crown petals stay separate to open when it fires.
-      ).toBeLessThanOrEqual(id === "circle-thornspire" ? 10 : 8);
+        // Crown petals and entrance leaves stay separate to animate.
+      ).toBeLessThanOrEqual(
+        8 +
+          (id === "circle-thornspire" ? 2 : 0) +
+          (graphics.glb!.activities?.exit ? 3 : 0),
+      );
       for (const layer of ["roots", "ribs", "canopy"])
         expect(part(layer).length).toBeGreaterThan(0);
       expect(part("roots").every((mesh) => mesh.isEnabled())).toBe(true);
@@ -472,6 +476,145 @@ test.each([
     ).toBe(true);
   },
 );
+
+test.each([
+  "circle-heartgrove",
+  "circle-conservatory",
+  "circle-musterhall",
+  "circle-construct-nursery",
+  "circle-thornspire",
+])(
+  "%s shows authored damage stages by health and recedes on repair",
+  async (id) => {
+    const scene = testScene();
+    const map = new TerrainMap({ width: 12, height: 12, tileSize: 1 });
+    const definition = BASE_CONTENT.actors.find((actor) => actor.id === id)!;
+    const graphics = BASE_CONTENT.presentation[id]!.building!;
+    const model = await loadModelAsset(scene, {
+      ...graphics.glb!,
+      url: glbDataUrl(graphics.glb!.url),
+    });
+    let reduced = false;
+    const views = createTilePlacedActorViewRegistry(
+      scene,
+      map,
+      [definition],
+      new Map([
+        [id, { ...graphics, createDetails: modelBuildingDetails(model) }],
+      ]),
+      { reducedMotion: () => reduced },
+    );
+    const actor = createTilePlacedActor(
+      map,
+      definition,
+      { actorId: "hurt-damage-critical", origin: { x: 4, z: 4 } },
+      "player",
+    );
+    const prefix = `tile-placed-actor-${actor.id}-root-`;
+    const stage = (name: string) =>
+      scene.meshes.filter(
+        (mesh) =>
+          mesh.name.startsWith(prefix) &&
+          mesh.name.slice(prefix.length).includes(name),
+      );
+    const shown = (name: string) => stage(name).every((m) => m.isEnabled());
+    const hidden = (name: string) => stage(name).every((m) => !m.isEnabled());
+    const maximum = definition.health!;
+    const at = (fraction: number) => {
+      views.update([{ ...actor, health: maximum * fraction }]);
+      views.animate(1.37, 0.1);
+    };
+    at(1);
+    expect(stage("damage-moderate").length).toBeGreaterThan(0);
+    expect(stage("damage-critical-flicker").length).toBeGreaterThan(0);
+    expect(hidden("damage-moderate") && hidden("damage-critical")).toBe(true);
+    at(0.5);
+    expect(shown("damage-moderate") && hidden("damage-critical")).toBe(true);
+    at(0.2);
+    expect(shown("damage-moderate") && shown("damage-critical")).toBe(true);
+    const flicker = stage("damage-critical-flicker")[0]!;
+    const levels = new Set<number>();
+    for (let frame = 0; frame < 12; frame++) {
+      views.animate(frame * 0.05, 0.05);
+      levels.add(flicker.visibility);
+    }
+    expect(levels.size).toBeGreaterThan(1);
+    reduced = true;
+    views.animate(2, 0.05);
+    expect(flicker.visibility).toBe(1);
+    // Growing layers would leave broken shapes floating.
+    views.update([
+      {
+        ...actor,
+        health: maximum * 0.2,
+        construction: {
+          totalTicks: 90,
+          completedTicks: 80,
+          active: true,
+        },
+      },
+    ]);
+    expect(hidden("damage-moderate") && hidden("damage-critical")).toBe(true);
+    views.update([{ ...actor, health: maximum * 0.7 }]);
+    expect(hidden("damage-moderate") && hidden("damage-critical")).toBe(true);
+    views.dispose();
+  },
+);
+
+test.each([
+  "circle-heartgrove",
+  "circle-musterhall",
+  "circle-construct-nursery",
+])("%s parts its entrance once for each unit that leaves", async (id) => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 12, height: 12, tileSize: 1 });
+  const definition = BASE_CONTENT.actors.find((actor) => actor.id === id)!;
+  const graphics = BASE_CONTENT.presentation[id]!.building!;
+  const model = await loadModelAsset(scene, {
+    ...graphics.glb!,
+    url: glbDataUrl(graphics.glb!.url),
+  });
+  const views = createTilePlacedActorViewRegistry(
+    scene,
+    map,
+    [definition],
+    new Map([
+      [id, { ...graphics, createDetails: modelBuildingDetails(model) }],
+    ]),
+  );
+  const actor = createTilePlacedActor(
+    map,
+    definition,
+    { actorId: "door", origin: { x: 4, z: 4 } },
+    "player",
+  );
+  views.update([actor]);
+  const hinge = scene.transformNodes.find(
+    (node) => node.name.includes("door") && node.name.includes("hinge-1"),
+  )!;
+  const glow = scene.meshes.find(
+    (mesh) => mesh.name.includes("door") && mesh.name.endsWith("glow"),
+  )!;
+  const panel = hinge.getChildMeshes()[0]!;
+  const forwardPosition = () => {
+    panel.computeWorldMatrix(true);
+    const { x, z } = panel.getAbsolutePosition();
+    return x * Math.sin(actor.facing) + z * Math.cos(actor.facing);
+  };
+  const rest = hinge.rotationQuaternion!.clone();
+  const restPosition = forwardPosition();
+  // The rest pose leaves the entrance visibly open.
+  expect(Math.abs(rest.toEulerAngles().y)).toBeGreaterThan(0.3);
+  expect(glow.scaling.x).toBeLessThan(0.01);
+  views.play("door", "exit");
+  views.animate(0.6, 0.6);
+  expect(hinge.rotationQuaternion!.equalsWithEpsilon(rest, 1e-3)).toBe(false);
+  expect(forwardPosition()).toBeGreaterThan(restPosition);
+  expect(glow.scaling.x).toBeGreaterThan(0.3);
+  views.animate(1.5, 0.9);
+  expect(hinge.rotationQuaternion!.equalsWithEpsilon(rest, 1e-3)).toBe(true);
+  views.dispose();
+});
 
 test("the Thornspire crown follows committed aim and opens to fire", async () => {
   const scene = testScene();

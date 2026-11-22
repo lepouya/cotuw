@@ -86,7 +86,8 @@ bundled packs through the same parser future mod packs will use.
     thorned sprig). It selects the symbol shown on service orders and above
     actively serviced targets.
   - `damageEffect` is `"mechanical"` smoke and fire, `"biological"` drops, or
-    `"living"` falling leaves, shown at 60% health or below; absent shows none.
+    `"living"` falling leaves and violet leaks, adding wood fragments when
+    critical. Effects show at 60% health or below; absent shows none.
   - `regenerationEffect: true` shows the `regeneration` prop while a visible
     wolf is actively healing. Its idle clip freezes under reduced motion.
   - `model` is a GLB with clips under `glb`, or a built-in procedural model
@@ -106,7 +107,9 @@ bundled packs through the same parser future mod packs will use.
     built-in `details`, such as `"command-center"`, or a `glb` with `url`, an
     optional `idle` clip, optional `activities` that name a clip for `exit`,
     `delivery`, or each fired `attack`, and an optional `aimNode` yaw pivot.
-    A building cannot name both kinds of art.
+    A building cannot name both kinds of art. Optional `rubble` names the
+    debris prop it collapses into, `"rubble"` by default or
+    `"living-rubble"`.
 - Optional `audio` defines clips, cue variants, global event sequences, default
   object bindings, and exploration and combat music.
   `presentation[actorId].audio` assigns named events and state loops to one
@@ -114,10 +117,10 @@ bundled packs through the same parser future mod packs will use.
   the schema, supported mission events, and extension points. Audio bindings
   are validated even on unused presentation entries.
 - `props` names generated `foundation`, `scaffold`, `rubble`,
-  `materials-mound`, `cultivation-site`, `leaf`, `salvage`, `tracer`,
-  `rocket`, `rocket-impact`, `bolt`, `bite`, `strike`, `smoke`, `fire`,
-  `wound`,
-  `regeneration`, and `bird` GLBs with `url` and an optional `idle` clip.
+  `living-rubble`, `materials-mound`, `cultivation-site`, `leaf`,
+  `fragment`, `leak`, `salvage`, `tracer`, `rocket`, `rocket-impact`, `bolt`,
+  `bite`, `strike`, `smoke`, `fire`, `wound`, `regeneration`, and `bird` GLBs
+  with `url` and an optional `idle` clip.
 - `materialsStages` lists `{ above, scale }` in descending order. A remaining
   fraction strictly greater than `above` uses that scale. Cutoffs lie in
   `[0, 1)`, scales are positive and decrease, and the last cutoff is zero.

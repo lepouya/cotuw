@@ -282,3 +282,39 @@ test("regeneration survives asset loading, freezes, and cleans up on concealment
   expect(scene.getTransformNodeByName("regeneration-wolf")).toBeNull();
   asset.dispose();
 });
+
+test("the Briar Ram cracks, splits, and flickers with damage and keeps broken remains", async () => {
+  let reduced = false;
+  const { scene, first, step } = await load("circle-briar-ram", () => reduced);
+  const stage = (name: string) =>
+    scene.meshes.filter(
+      (mesh) => mesh.name.includes("first") && mesh.name.includes(name),
+    );
+  expect(stage("damage-moderate").length).toBeGreaterThan(0);
+  expect(stage("damage-critical-flicker").length).toBeGreaterThan(0);
+  const enabled = (name: string) => stage(name).map((m) => m.isEnabled());
+  step(0);
+  expect(enabled("damage-moderate")).not.toContain(true);
+  first.setAnimationState!({ damage: "moderate" });
+  expect(enabled("damage-moderate")).not.toContain(false);
+  expect(enabled("damage-critical")).not.toContain(true);
+  first.setAnimationState!({ damage: "critical" });
+  expect(enabled("damage-critical")).not.toContain(false);
+  const flicker = stage("damage-critical-flicker")[0]!;
+  const levels = new Set<number>();
+  for (let frame = 0; frame < 12; frame++) {
+    step(0.05);
+    levels.add(flicker.visibility);
+  }
+  expect(levels.size).toBeGreaterThan(1);
+  reduced = true;
+  step(0.05);
+  expect(flicker.visibility).toBe(1);
+  first.setAnimationState!({});
+  expect(enabled("damage-moderate")).not.toContain(true);
+  first.die!(2);
+  expect(enabled("damage-critical-split")).not.toContain(false);
+  expect(stage("fading-light")).toHaveLength(2);
+  expect(enabled("fading-light")).not.toContain(true);
+  expect(flicker.isEnabled()).toBe(false);
+});

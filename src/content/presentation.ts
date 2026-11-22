@@ -256,6 +256,10 @@ function validateFrameEffects(
       );
 }
 
+/** Debris props that destroyed buildings can collapse into. */
+export const RUBBLE_PROP_IDS = ["rubble", "living-rubble"] as const;
+export type RubblePropId = (typeof RUBBLE_PROP_IDS)[number];
+
 /** How an attacker's hits are drawn. */
 export const ATTACK_EFFECT_STYLES = [
   "tracer",
@@ -341,6 +345,8 @@ export type ActorPresentation = {
     /** A built-in set of articulated parts. */
     details?: BuiltinBuildingDetailId;
     glb?: ModelGraphics;
+    /** The debris prop it collapses into; defaults to `rubble`. */
+    rubble?: RubblePropId;
   };
 };
 
@@ -442,6 +448,11 @@ export function validateActorPresentation(
       throw invalid(
         `gives ${actor.id} unknown building details "${building.details}"`,
       );
+    if (
+      building.rubble !== undefined &&
+      !isOneOf(RUBBLE_PROP_IDS, building.rubble)
+    )
+      throw invalid(`gives ${actor.id} unknown rubble "${building.rubble}"`);
     if (building.glb !== undefined) {
       validateModelGraphics(building.glb);
       if (building.details !== undefined)

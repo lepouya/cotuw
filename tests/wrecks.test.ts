@@ -302,3 +302,50 @@ test("fallen units keep their owner's colors", () => {
   ownerMaterials.dispose();
   appearance.dispose();
 });
+
+test("living rubble is chosen per building and its light fades as it collapses", async () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 4, height: 4, tileSize: 1 });
+  const living = await loadModelAsset(scene, {
+    url: glbDataUrl("/assets/models/living-rubble.glb"),
+  });
+  let reduced = false;
+  const views = createWreckView(scene, map, {
+    appearanceFor: () => undefined,
+    tilesFor: () => [{ x: 0, z: 0 }],
+    rubble: (wreck) => (wreck.definitionId === "grove" ? living : undefined),
+    reducedMotion: () => reduced,
+  });
+  const wreck = { ...buildingWreck("grove"), definitionId: "grove" };
+  const lights = (id = "grove") =>
+    scene.meshes.filter(
+      (mesh) =>
+        mesh.name.includes(`wreck-${id}`) && mesh.name.includes("fading-light"),
+    );
+  updateWrecks(views, [wreck], 0, 0);
+  expect(lights().length).toBeGreaterThan(0);
+  expect(lights().every((mesh) => mesh.visibility === 1)).toBe(true);
+  updateWrecks(views, [wreck], 0, 0.8);
+  const dimming = lights()[0]!.visibility;
+  expect(dimming).toBeGreaterThan(0);
+  expect(dimming).toBeLessThan(1);
+  updateWrecks(views, [wreck], 0, 1);
+  expect(lights().every((mesh) => mesh.visibility === 0)).toBe(true);
+  // Other rubble keeps the shared fallback.
+  updateWrecks(views, [buildingWreck("depot")], 0, 0);
+  expect(
+    scene.meshes.some(
+      (mesh) => mesh.name.includes("wreck-depot") && !mesh.isDisposed(),
+    ),
+  ).toBe(true);
+  const quick = { ...wreck, actorId: "quick" };
+  reduced = true;
+  updateWrecks(views, [quick], 0, 0);
+  expect(lights("quick")).not.toHaveLength(0);
+  expect(lights("quick").map((mesh) => mesh.visibility)).toEqual([0]);
+  reduced = false;
+  updateWrecks(views, [quick], 0, 0.1);
+  expect(lights("quick").map((mesh) => mesh.visibility)).toEqual([0]);
+  views.dispose();
+  living.dispose();
+});

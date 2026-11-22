@@ -11,6 +11,7 @@ import {
 } from "../content/presentation";
 import type { ActorGraphics, ClipRoles } from "../content/presentation";
 import { createGaitState, stepGait } from "./actor-gait";
+import { createDamageStages } from "./damage-stages";
 import {
   clipChannels,
   clipSeconds,
@@ -138,6 +139,8 @@ function instantiate(
     groups;
   const indicators = (suffix: string) =>
     root.getChildMeshes().filter((node) => node.name.endsWith(suffix));
+  const damage = createDamageStages(root);
+  let damageSeconds = 0;
   const idleIndicators = indicators("idle-signal");
   const workIndicators = indicators("working-signal");
   for (const node of workIndicators) node.setEnabled(false);
@@ -184,6 +187,7 @@ function instantiate(
       aiming = !!state.aiming;
       running = !!state.running;
       workPaused = !!state.workPaused;
+      damage.show(state.damage);
       if (!work) return;
       const next = !!state.working;
       if (working === undefined) collector = next ? 1 : 0;
@@ -195,6 +199,8 @@ function instantiate(
       if (dead) return;
       stepGait(gait, motion, cycleDistance);
       const reduced = reducedMotion();
+      damageSeconds += motion.seconds;
+      damage.animate(damageSeconds, reduced);
       if (reduced) {
         idle.pause();
         idle.goToFrame(idle.from);
@@ -273,6 +279,7 @@ function instantiate(
         dead = true;
         for (const node of [...idleIndicators, ...workIndicators])
           node.setEnabled(false);
+        damage.settle();
         playing.clear();
         for (const group of [idle, ...posed]) {
           group.pause();

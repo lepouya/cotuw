@@ -32,7 +32,11 @@ without it remain silent. The parser validates references and playback policies.
   inherits, including definitions without their own bindings. A definition's
   entry for the same name replaces the default. An empty event sequence or a
   `null` loop binding silences the inherited entry. The base pack assigns
-  `damage` and `trained` here.
+  `damage` here.
+- `audio.factions` maps faction IDs to `{ events }`. The player's faction
+  replaces the global events it names for the whole mission; other events and
+  unknown factions use `audio.events`. The base pack gives Circle players
+  chimes for `command.accepted`, `command.invalid`, and `trained`.
 - `audio.music` names `default` and optional `combat` cues, plus `holdSeconds`
   of simulation time to retain combat music after visible combat or an attack
   on the player's actors. Music cues loop and have no spatial range.
@@ -89,10 +93,11 @@ registration in the [asset inventory](audio-assets.md).
   interface, reading actors, production, work, and remains through
   `viewOf(playerOwner)`. Add new gameplay event or state detection here, after
   a successful tick; simulation code never imports audio. Existing events are
-  `attack`, `attack.impact`, `damage`, `production.start`, `trained`, and
-  `activity.<kind>`. `attack.impact` uses the attacker's bindings at the
-  observed target's position; both participants must be visible or shown
-  remains.
+  `attack`, `attack.impact`, `damage`, `destroyed`, `production.start`, and
+  `activity.<kind>`. `destroyed` sounds from new remains of an actor shown alive
+  in the previous observation. Remains discovered later or restored by loading
+  stay silent. `attack.impact` uses the attacker's bindings at the observed
+  target's position. Both participants must be visible or shown remains.
   States are `moving`, `working`, `servicing`, `training`, `constructing`, and
   `idle`. `servicing` uses the owner view's active service activity shared with
   animation and target effects. Approaching, blocked, finished, and hidden
@@ -106,13 +111,13 @@ registration in the [asset inventory](audio-assets.md).
   committed worker set used by animation. A finished queue head waiting at a
   blocked exit has no `training` state. Committed building activity identifies
   the produced or delivering unit, so consumers share the same participant.
-- Global events are `command.accepted`, `command.invalid`, `alert`,
+- Global events are `command.accepted`, `command.invalid`, `trained`, `alert`,
   `objective.complete`, `victory`, `defeat`, and `draw`. The base pack binds
   `draw` to the defeat cue. Command batches produce one response; cue
   cooldowns group repeated combat feedback. Each tick plays the
   most specific player feedback: a mission result replaces objective and alert
-  cues, and an objective completion or owned unit's `trained` cue replaces
-  the alert for routine alerts. High-priority alerts still sound.
+  cues, and an objective or training completion replaces the alert for
+  routine alerts. High-priority alerts still sound.
 - World emitters are the actors and remains the owner view shows, so hidden
   objects never reach the scene. Objects that leave the view lose their voices,
   including scheduled sequence steps. Global alerts for the player's actors
@@ -130,10 +135,12 @@ registration in the [asset inventory](audio-assets.md).
   cancels voices, deferred steps, and ready subscriptions. The application
   mixer reuses decoded assets across mission loads and restarts.
 
-The initial bindings cover all approved cues. Harvesters loop their engine
-while moving and their machinery while gathering. Work uses a base gain of
-0.4 and an unselected multiplier of 0.15. Training starts when a job
-first advances, rather than when it enters the queue. Refinery delivery and
+Circle buildings and the Briar Ram take wooden impacts and sound their
+destruction. Healers and Artificers loop their own service patterns. Circle
+producers sound on `production.start` and `activity.exit`. Harvesters loop
+their engine while moving and their machinery while gathering. Work uses a
+base gain of 0.4 and an unselected multiplier of 0.15. The training start cue
+plays when a job first advances. Refinery delivery and
 unit-exit events schedule both doors to match their activity animations. Each
 deferred step acquires its voice and cooldown when due, so a sequence can reuse
 a cue without reserving future voices. World steps use the emitter's latest

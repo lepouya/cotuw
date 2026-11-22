@@ -24,6 +24,22 @@ The page also ships in the browser build.
   tones, and brief magical echoes for the Sentinel's living focus.
 - `living-hit`: leaf-like rustling, warm resonance, and a faint tonal tail
   for Circle personnel and wildlife impacts.
+- `thornspire-cast`: a deeper, slower version of the living focus with a
+  wooden onset and heavier body for Thornspire bolts.
+- `ram-strike-1` and `ram-strike-2`: weighty wooden knocks with low thumps
+  and cracking fibers for Briar Ram blows.
+- `living-structure-hit`: a hollow wooden knock and bark crackle for living
+  buildings and the Briar Ram.
+- `living-destroyed`: a burst of splitting wood over a fading low resonance.
+- `healer-service`: a quiet loop of overlapping bell-like fifths.
+- `artificer-service`: a loop of soft wooden taps, fiber creaks, and warm
+  swells. Both Circle service loops last four seconds and repeat seamlessly.
+- `circle-command-accepted`, `circle-command-invalid`, and
+  `circle-unit-trained`: brief bell-like chimes for Circle orders, rejected
+  actions, and readiness.
+- `circle-production-start`: a soft rustle, low pluck, and chime.
+- `circle-producer-exit`: a creak, leaf rustle, and brief violet tone as an
+  entrance parts.
 - `wolf-attack`: a synthesized growl and bite transient.
 - `damage-1` and `damage-2`: low impacts with different metallic resonances.
 - `alert`: a repeated descending two-note signal.
@@ -67,7 +83,7 @@ The page also ships in the browser build.
   audition HTML. Generator tests compare committed bytes with fresh output.
 - Files use uncompressed 16-bit little-endian PCM WAV at 32 kHz. Cues are mono
   for world positioning; music is stereo. The complete batch is about
-  26 MB, with no encoder or audio package dependency.
+  30 MB, with no encoder or audio package dependency.
 - Noise uses explicit seeds. Instruments combine sine oscillators, filtered
   noise, amplitude envelopes, and echoes. Changing a recipe or seed changes
   the committed output after regeneration.

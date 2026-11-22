@@ -36,6 +36,31 @@ export const SOUND_ASSETS = {
     peak: 0.3,
   },
   "living-hit": { seconds: 0.5, label: "Living impact" },
+  "thornspire-cast": { seconds: 1.1, label: "Thornspire heavy bolt" },
+  "ram-strike-1": { seconds: 0.75, label: "Briar Ram strike · variant 1" },
+  "ram-strike-2": { seconds: 0.75, label: "Briar Ram strike · variant 2" },
+  "living-structure-hit": { seconds: 0.5, label: "Living structure impact" },
+  "living-destroyed": { seconds: 2, label: "Living destruction" },
+  "healer-service": {
+    seconds: 4,
+    label: "Healer mending",
+    loop: true,
+    peak: 0.2,
+  },
+  "artificer-service": {
+    seconds: 4,
+    label: "Artificer shaping",
+    loop: true,
+    peak: 0.22,
+  },
+  "circle-command-accepted": { seconds: 0.4, label: "Circle order chime" },
+  "circle-command-invalid": { seconds: 0.5, label: "Circle invalid chime" },
+  "circle-unit-trained": { seconds: 1.6, label: "Circle readiness chime" },
+  "circle-production-start": {
+    seconds: 1,
+    label: "Circle production started",
+  },
+  "circle-producer-exit": { seconds: 0.9, label: "Living entrance parting" },
   "wolf-attack": { seconds: 0.75, label: "Wolf attack" },
   "damage-1": { seconds: 0.45, label: "Damage · variant 1" },
   "damage-2": { seconds: 0.45, label: "Damage · variant 2" },
@@ -409,6 +434,57 @@ function woodenBeat(target: Mix, start: number, level: number, seed: number) {
   noise(target, start, 0.09, level * 0.4, seed, 0.18);
 }
 
+/** Bell-like inharmonic partials for Circle chimes. */
+function chime(
+  target: Mix,
+  start: number,
+  midi: number,
+  seconds: number,
+  level: number,
+) {
+  const frequency = hz(midi);
+  voice(target, start, seconds, (t) => {
+    const envelope = Math.min(1, t / 0.004) * Math.min(1, (seconds - t) / 0.03);
+    return (
+      level *
+      envelope *
+      (Math.exp((-4 * t) / seconds) * sine(frequency, t) +
+        0.35 * Math.exp((-9 * t) / seconds) * sine(frequency * 2.76, t) +
+        0.12 * Math.exp((-16 * t) / seconds) * sine(frequency * 5.4, t))
+    );
+  });
+}
+
+/** Short fibrous crackles; denser counts sound like splitting wood. */
+function crackle(
+  target: Mix,
+  start: number,
+  seconds: number,
+  count: number,
+  level: number,
+  seed: number,
+) {
+  const next = random(seed);
+  for (let i = 0; i < count; i++) {
+    const at = start + ((next() + 1) / 2) * seconds;
+    noise(target, at, 0.03 + 0.03 * ((next() + 1) / 2), level, seed + i, 0.6);
+  }
+}
+
+/** A heavy wooden knock: a low body tone under a bright bark transient. */
+function woodKnock(target: Mix, level: number, pitch: number, seed: number) {
+  voice(target, 0, 0.5, (t) => {
+    const phase = TAU * (pitch * t + (pitch / 20) * (1 - Math.exp(-20 * t)));
+    return (
+      level *
+      Math.min(1, t / 0.003) *
+      Math.exp(-11 * t) *
+      (Math.sin(phase) + 0.4 * Math.sin(phase * 2.3))
+    );
+  });
+  noise(target, 0, 0.12, level * 0.9, seed, 0.35);
+}
+
 /** A rising or falling phrase over an optional sustained chord. */
 function phrase(
   target: Mix,
@@ -530,6 +606,120 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
         (0.25 * sine(174, t) + 0.12 * sine(348, t)),
     );
     note(target, 0.025, 83, 0.35, 0.08);
+  },
+  "thornspire-cast": (target) => {
+    // A deeper, slower bloom of the Sentinel's focus.
+    const frequency = hz(57);
+    woodenBeat(target, 0, 0.35, 950);
+    voice(target, 0, 0.95, (t) => {
+      const bloom = Math.min(1, t / 0.06) * Math.exp(-4.5 * t);
+      const phase = TAU * frequency * t + 4 * Math.exp(-10 * t);
+      return (
+        bloom *
+        (0.6 * Math.sin(phase) +
+          0.25 * Math.sin(phase * 1.5) +
+          0.12 * sine(frequency * 3.01, t))
+      );
+    });
+    thump(target, 0.02, 0.35);
+    note(target, 0.09, 76, 0.7, 0.12);
+    echo(target, 0.13, 0.25, 2);
+  },
+  "ram-strike-1": (target) => {
+    woodKnock(target, 0.9, 70, 960);
+    thump(target, 0, 0.6);
+    crackle(target, 0.02, 0.3, 9, 0.5, 961);
+  },
+  "ram-strike-2": (target) => {
+    woodKnock(target, 0.9, 62, 970);
+    thump(target, 0, 0.6);
+    crackle(target, 0.02, 0.35, 11, 0.45, 971);
+  },
+  "living-structure-hit": (target) => {
+    woodKnock(target, 0.55, 120, 980);
+    noise(target, 0.01, 0.3, 0.35, 981, 0.12);
+    crackle(target, 0.02, 0.15, 4, 0.25, 982);
+  },
+  "living-destroyed": (target) => {
+    crackle(target, 0, 0.7, 26, 0.55, 990);
+    woodKnock(target, 0.7, 55, 991);
+    // Fading low resonance as the building's light goes out.
+    voice(
+      target,
+      0.1,
+      1.85,
+      (t) =>
+        Math.min(1, t / 0.08) *
+        Math.exp(-2.2 * t) *
+        (0.4 * sine(hz(38), t) +
+          0.18 * sine(hz(45), t) +
+          0.06 * sine(hz(62), t) * Math.exp(-3 * t)),
+    );
+    noise(target, 0.3, 1.2, 0.18, 992, 0.1);
+  },
+  "healer-service": (target) => {
+    // Overlapping open fifths repeat every second; the period divides the loop.
+    for (let beat = 0; beat < 4; beat++) {
+      chime(target, beat, beat % 2 ? 81 : 76, 1.6, 0.12);
+      chime(target, beat + 0.5, 88, 1.2, 0.05);
+    }
+    voice(
+      target,
+      0,
+      4,
+      (t) => (0.6 + 0.4 * Math.cos(TAU * 0.25 * t)) * 0.06 * sine(hz(64), t),
+    );
+  },
+  "artificer-service": (target) => {
+    for (let beat = 0; beat < 8; beat++) {
+      woodenBeat(target, beat * 0.5, beat % 2 ? 0.12 : 0.2, 1000 + beat);
+      crackle(target, beat * 0.5 + 0.1, 0.2, 2, 0.08, 1010 + beat * 3);
+    }
+    for (const [start, midi] of [
+      [0, 69],
+      [2, 72],
+    ] as const)
+      voice(
+        target,
+        start,
+        2,
+        (t) =>
+          Math.sin((Math.PI * t) / 2) ** 2 *
+          (0.08 * sine(hz(midi), t) + 0.03 * sine(hz(midi + 7), t)),
+      );
+  },
+  "circle-command-accepted": (target) => {
+    chime(target, 0, 84, 0.3, 0.5);
+    chime(target, 0.06, 91, 0.32, 0.3);
+  },
+  "circle-command-invalid": (target) => {
+    woodenBeat(target, 0, 0.25, 1020);
+    chime(target, 0.02, 69, 0.4, 0.4);
+    chime(target, 0.12, 63, 0.36, 0.35);
+  },
+  "circle-unit-trained": (target) => {
+    [76, 81, 88].forEach((midi, index) =>
+      chime(target, index * 0.13, midi, 1.1, 0.35),
+    );
+    echo(target, 0.14, 0.22, 2);
+  },
+  "circle-production-start": (target) => {
+    noise(target, 0, 0.6, 0.2, 1030, 0.14);
+    pluck(target, 0.03, 62, 0.25, 0);
+    chime(target, 0.18, 74, 0.7, 0.2);
+  },
+  "circle-producer-exit": (target) => {
+    // Creaking arches and rustling leaves under a brief violet tone.
+    voice(target, 0, 0.5, (t) => {
+      const phase = TAU * (90 * t + 40 * t * t);
+      return (
+        Math.sin((Math.PI * t) / 0.5) ** 2 *
+        0.25 *
+        (Math.sin(phase) + 0.3 * Math.sin(phase * 3.1))
+      );
+    });
+    noise(target, 0.05, 0.55, 0.22, 1040, 0.18);
+    chime(target, 0.12, 79, 0.7, 0.18);
   },
   "wolf-attack": (target) => {
     voice(target, 0, 0.55, (t) => {

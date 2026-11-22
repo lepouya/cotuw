@@ -1943,10 +1943,17 @@ acceptance progress. The following sections define the selected scope.
   At 30% or below, show deeper splits, drooping foliage, more frequent
   fragments, and an unstable, flickering core. Broken shapes and falling
   material convey severity alongside light effects. These cues recede as
-  repair restores health.
+  repair restores health. Models supply the broken shapes as named
+  moderate and critical damage meshes selected by severity. Runtime emitters
+  add fragments and violet leaks. Critical damage meshes include flickering
+  lights.
 - Destroyed living buildings fold and collapse into broken wood and roots as
-  their light fades. The Briar Ram's legs buckle and its body settles into an
-  inert husk. Personnel retain biological hit reactions and fallen bodies.
+  their light fades, using Circle rubble selected per building. The Briar
+  Ram's legs buckle and its body settles into an inert husk. Personnel retain
+  biological hit reactions and fallen bodies.
+- Circle producers play an exit activity as each unit leaves: entrance arches
+  part with a brief violet pulse. Production start plays a soft rustle and
+  tone.
 - Circle sound effects combine wooden impacts, leaf-like rustling, and clear
   musical tones. Orders and readiness use brief, distinct chimes; cultivation
   and growth use soft rustling over a warm, gently pulsing tone.
@@ -1955,7 +1962,12 @@ acceptance progress. The following sections define the selected scope.
   Biological impacts use soft rustling and warm resonance. Briar Ram strikes
   use weighty wooden impacts and cracking fibers. Healing and construct repair
   use soft harmonic patterns distinct from weapon sounds. Destruction uses
-  splitting wood and fading low resonance.
+  splitting wood and fading low resonance on Circle buildings and the Briar
+  Ram; ARC destruction remains silent in M1. Living buildings and the Ram take
+  wooden impacts; personnel keep biological impacts.
+- The player's faction selects command and readiness feedback cues, as it
+  selects music. Circle feedback uses chimes; unmapped factions use the shared
+  cues.
 - Keep sounds brief and limit overlapping work loops so a busy base remains
   comfortable to hear. Voice acting remains deferred.
 - ARC and Circle share musical themes with faction arrangements. M1 adds one
@@ -1966,10 +1978,9 @@ acceptance progress. The following sections define the selected scope.
   cues in the mix.
 - The direction fits the offline GLB and WAV pipeline: seeded curved geometry
   and layered plates, humanoid and quadruped rigs, articulated clips, and
-  original synthesis and composition. Implementation extends presentation for
-  progress-selected growth forms, living damage and debris, and faction music
-  selection. The full roster has generated models; task 1.53 owns remaining
-  audio, music, and gameplay-scale validation.
+  original synthesis and composition. The full roster uses generated models
+  and audio, with progress-selected growth forms, living damage and debris,
+  and faction music selection.
 
 ### M1 resources and progression
 

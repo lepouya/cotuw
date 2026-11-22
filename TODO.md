@@ -143,13 +143,9 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
 - [x] **1.52** Healer and Artificer support, Thornspire defense, and Briar Ram
   siege combat verified. The Construct Nursery grows Rams and trains
   Artificers in one queue. Musterhalls train Healers.
-- [ ] **1.53** Complete full-roster presentation acceptance under
-  [Circle direction](DESIGN.md#m1-circle-presentation). Generated models,
-  growth layers, and effects cover the full roster from 1.52; add work/weapon
-  audio and faction music for the remaining roster. Verify silhouettes,
-  owner markings, entrances, weapons, interrupted growth, saved progress,
-  damage/repair, destruction, reduced motion, and mix readability at gameplay
-  scale. Rebuild assets reproducibly and verify pack bindings.
+- [x] **1.53** [Circle presentation](DESIGN.md#m1-circle-presentation) covers
+  the full roster, including growth, producer entrances, damage and
+  destruction, service and weapon cues, faction feedback, and music.
 - [ ] **1.54** Finish the Circle introduction using the wolf-den slice.
   Verify it teaches cultivation, dormancy, construction, and production before
   skirmish play. Keep M0 available as ARC's introduction.

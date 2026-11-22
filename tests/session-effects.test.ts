@@ -191,6 +191,31 @@ describe("actorAnimationState", () => {
     expect(state.aiming).toBe(true);
   });
 
+  test("reports damage severity from health for authored damage stages", () => {
+    const ram = createActor({
+      id: "ram",
+      definitionId: "ram",
+      owner: "player",
+      worldPosition: { x: 0, z: 0 },
+    });
+    const withRam = new Map([
+      ...definitions,
+      ["ram", { id: "ram", behaviorId: "idle", health: 100 }],
+    ]);
+    const at = (health: number | undefined) =>
+      actorAnimationState(
+        { ...ram, health },
+        new Set(),
+        withRam,
+        undefined,
+        map,
+      ).damage;
+    expect(at(undefined)).toBeUndefined();
+    expect(at(80)).toBeUndefined();
+    expect(at(60)).toBe("moderate");
+    expect(at(30)).toBe("critical");
+  });
+
   test("aiming is false when target is not visible or out of range", () => {
     const attacker = createActor({
       id: "trooper-1",

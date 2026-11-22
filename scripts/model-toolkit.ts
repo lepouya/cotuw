@@ -67,11 +67,13 @@ export function clip(
       .getDescendants(false)
       .filter((node): node is TransformNode => node instanceof TransformNode),
   ];
+  // An earlier clip stores rest rotations as quaternions, zeroing Euler ones.
   const rest = nodes.map((node) => ({
     position: node.position.clone(),
-    rotation: node.rotation.clone(),
+    rotation: node.rotationQuaternion?.toEulerAngles() ?? node.rotation.clone(),
     scaling: node.scaling.clone(),
   }));
+  for (const node of nodes) node.rotationQuaternion = null;
   const restore = () =>
     nodes.forEach((node, index) => {
       node.position.copyFrom(rest[index]!.position);

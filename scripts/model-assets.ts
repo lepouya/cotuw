@@ -35,7 +35,7 @@ import { createRefineryDetails } from "../src/render/refinery.ts";
 import { createRelayDetails } from "../src/render/relay.ts";
 import { createSentryDetails } from "../src/render/sentry.ts";
 import { createWolfParts } from "../src/render/wolf.ts";
-import { CIRCLE_MODELS } from "./circle-models.ts";
+import { CIRCLE_MODELS, livingDamageMaterials } from "./circle-models.ts";
 import { exportGlb, rigidSkin } from "./glb-export.ts";
 import { clip, merge, surface, unlit } from "./model-toolkit.ts";
 import { seededRandom } from "./sprite-sheet.ts";
@@ -182,7 +182,7 @@ function briarRam(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
   const armor = surface(scene, "ram-armor", [0.82, 0.74, 0.52]);
   const joints = surface(scene, "ram-joints", [0.22, 0.15, 0.1]);
-  const core = surface(scene, "ram-core", [0.58, 0.28, 0.88], 0.6);
+  const core = surface(scene, "ram-core-fading-light", [0.58, 0.28, 0.88], 0.6);
   const owner = surface(scene, "ram-owner", [0.48, 0.76, 0.59]);
   const blob = (
     id: string,
@@ -264,6 +264,120 @@ function briarRam(scene: Scene, name: string) {
     blob(`ram-foot-${index}`, [0.32, 0.14, 0.36], [0, -0.66, 0.03], armor, hip);
     return hip;
   });
+  // Stage-named materials skin each damage stage into its own mesh.
+  const { crack, leak, split, splinter, flicker } = livingDamageMaterials(
+    scene,
+    "ram",
+  );
+  const sliver = (
+    id: string,
+    size: [number, number, number],
+    position: [number, number, number],
+    rotation: [number, number, number],
+    material: StandardMaterial,
+    parent: TransformNode = root,
+  ) => {
+    const mesh = MeshBuilder.CreateBox(id, { size: 1 }, scene);
+    mesh.parent = parent;
+    mesh.position.set(...position);
+    mesh.scaling.set(...size);
+    mesh.rotation.set(...rotation);
+    mesh.material = material;
+    return mesh;
+  };
+  // Cracks cross the back plates and flanks.
+  for (const [i, [x, z, turn]] of (
+    [
+      [0.18, 0.4, 0.5],
+      [-0.22, 0.05, -0.4],
+      [0.08, -0.5, 0.2],
+    ] as const
+  ).entries())
+    sliver(
+      `ram-damage-moderate-crack-${i}`,
+      [0.05, 0.02, 0.36],
+      [x, 1.27, z],
+      [0, turn, 0],
+      crack,
+    );
+  for (const side of [-1, 1])
+    sliver(
+      `ram-damage-moderate-crack-flank-${side}`,
+      [0.02, 0.3, 0.05],
+      [side * 0.545, 0.9, 0.25 * side],
+      [side * 0.3, 0, 0],
+      crack,
+    );
+  sliver(
+    "ram-damage-moderate-crack-head",
+    [0.04, 0.02, 0.22],
+    [0.08, 0.22, 0.05],
+    [0, 0.4, 0],
+    crack,
+    head,
+  );
+  blob("ram-damage-moderate-leak-0", [0.1, 0.08, 0.1], [0.2, 1.24, 0.1], leak);
+  blob(
+    "ram-damage-moderate-leak-1",
+    [0.08, 0.1, 0.08],
+    [-0.5, 0.85, 0.2],
+    leak,
+  );
+  // Deeper splits open the plates and splinters jut from the breaks.
+  for (const [i, [x, z, turn]] of (
+    [
+      [-0.05, 0.25, 0.1],
+      [0.25, -0.25, -0.6],
+    ] as const
+  ).entries()) {
+    sliver(
+      `ram-damage-critical-split-${i}`,
+      [0.1, 0.04, 0.55],
+      [x, 1.28, z],
+      [0, turn, 0],
+      split,
+    );
+    for (const offset of [-1, 1]) {
+      const shard = MeshBuilder.CreateCylinder(
+        `ram-damage-critical-splinter-${i}-${offset}`,
+        { height: 0.26, diameterTop: 0, diameterBottom: 0.07, tessellation: 5 },
+        scene,
+      );
+      shard.parent = root;
+      shard.position.set(x + offset * 0.07, 1.36, z + offset * 0.12);
+      shard.rotation.set(offset * 0.5, turn, offset * 0.4);
+      shard.material = splinter;
+    }
+  }
+  sliver(
+    "ram-damage-critical-split-flank",
+    [0.03, 0.4, 0.1],
+    [0.55, 0.88, -0.3],
+    [0.2, 0, 0],
+    split,
+  );
+  blob(
+    "ram-damage-critical-flicker-0",
+    [0.16, 0.12, 0.12],
+    [0, 0.8, 0.72],
+    flicker,
+  );
+  blob(
+    "ram-damage-critical-flicker-1",
+    [0.12, 0.1, 0.12],
+    [0.05, 1.27, 0.25],
+    flicker,
+  );
+  // Body-level damage pieces share one joint per material.
+  for (const material of [crack, leak, split, splinter, flicker]) {
+    const parts = root
+      .getChildMeshes(true)
+      .filter(
+        (mesh): mesh is Mesh =>
+          mesh instanceof Mesh && mesh.material === material,
+      );
+    merge(root, material.name, parts, material);
+  }
   const headJoint = skin(root).get(head)!;
   const restHead = headJoint.position.clone();
   clip(root, "idle", 3, (seconds) => {
@@ -740,6 +854,100 @@ function rubble(scene: Scene, name: string) {
     merge(root, part, pieces[part], surface(scene, `rubble-${part}`, color));
 }
 
+/**
+ * Folded living architecture within the unit cube: snapped pale ribs, dark
+ * roots, fallen leaves, and violet light that fades as remains collapse.
+ */
+function livingRubble(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const random = seededRandom(0x11fe);
+  const pieces = {
+    wood: [] as Mesh[],
+    roots: [] as Mesh[],
+    leaves: [] as Mesh[],
+    "fading-light": [] as Mesh[],
+  };
+  const tube = (points: Vector3[], radius: number) =>
+    MeshBuilder.CreateTube(
+      `tube-${pieces.wood.length + pieces.roots.length}`,
+      { path: points, radius, tessellation: 6, cap: 3 },
+      scene,
+    );
+  // Ribs snap and fold inward, leaning against one another.
+  for (let index = 0; index < 7; index++) {
+    const angle = (index / 7) * Math.PI * 2 + random() * 0.4;
+    const reach = 0.25 + random() * 0.2;
+    const x = Math.cos(angle) * reach;
+    const z = Math.sin(angle) * reach;
+    pieces.wood.push(
+      tube(
+        [
+          new Vector3(x, -0.5, z),
+          new Vector3(x * 0.7, -0.5 + 0.35 + random() * 0.3, z * 0.7),
+          new Vector3(x * 0.1, -0.5 + 0.2 + random() * 0.2, z * 0.1),
+        ],
+        0.035 + random() * 0.02,
+      ),
+    );
+  }
+  for (let index = 0; index < 8; index++) {
+    const angle = random() * Math.PI * 2;
+    const x = Math.cos(angle) * 0.45;
+    const z = Math.sin(angle) * 0.45;
+    pieces.roots.push(
+      tube(
+        [
+          new Vector3(x, -0.5, z),
+          new Vector3(x * 0.6, -0.42, z * 0.6),
+          new Vector3(x * 0.2 + (random() - 0.5) * 0.2, -0.38, z * 0.2),
+        ],
+        0.03,
+      ),
+    );
+  }
+  for (let index = 0; index < 10; index++) {
+    const leaf = MeshBuilder.CreateSphere(
+      `leaf-${index}`,
+      { diameter: 1, segments: 5 },
+      scene,
+    );
+    leaf.scaling.set(0.16 + random() * 0.1, 0.06, 0.1 + random() * 0.08);
+    leaf.position.set(
+      (random() - 0.5) * 0.8,
+      -0.45 + random() * 0.2,
+      (random() - 0.5) * 0.8,
+    );
+    leaf.rotation.set((random() - 0.5) * 0.6, random() * Math.PI, 0);
+    pieces.leaves.push(leaf);
+  }
+  for (let index = 0; index < 4; index++) {
+    const ember = MeshBuilder.CreateSphere(
+      `ember-${index}`,
+      { diameter: 1, segments: 5 },
+      scene,
+    );
+    ember.scaling.setAll(0.07 + random() * 0.05);
+    ember.position.set(
+      (random() - 0.5) * 0.5,
+      -0.42 + random() * 0.15,
+      (random() - 0.5) * 0.5,
+    );
+    pieces["fading-light"].push(ember);
+  }
+  for (const [part, color, glow] of [
+    ["wood", [0.72, 0.62, 0.42], 0],
+    ["roots", [0.24, 0.16, 0.1], 0],
+    ["leaves", [0.2, 0.3, 0.16], 0],
+    ["fading-light", [0.6, 0.3, 0.92], 0.9],
+  ] as const)
+    merge(
+      root,
+      part,
+      pieces[part],
+      surface(scene, `living-rubble-${part}`, color, glow),
+    );
+}
+
 /** A ribboned gift box that bobs and turns. */
 function salvage(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
@@ -922,6 +1130,27 @@ function leaf(scene: Scene, name: string) {
   mesh.material = surface(scene, name, [0.24, 0.42, 0.19]);
 }
 
+/** A splintered chip of pale living wood shed by damaged constructs. */
+function fragment(scene: Scene, name: string) {
+  const mesh = MeshBuilder.CreatePolyhedron(
+    name,
+    { type: 2, sizeX: 0.12, sizeY: 0.05, sizeZ: 0.2 },
+    scene,
+  );
+  mesh.material = surface(scene, name, [0.82, 0.72, 0.5]);
+}
+
+/** A faint violet wisp of light leaking from a damaged living core. */
+function leak(scene: Scene, name: string) {
+  const mesh = MeshBuilder.CreateSphere(
+    name,
+    { diameter: 1, segments: 5 },
+    scene,
+  );
+  mesh.scaling.set(0.12, 0.22, 0.12);
+  mesh.material = unlit(scene, name, new Color3(0.68, 0.38, 1));
+}
+
 /** A falling drop for wounded biological actors. */
 function wound(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
@@ -1033,6 +1262,7 @@ const BUILDERS = {
   "materials-mound": materialsMound,
   salvage,
   rubble,
+  "living-rubble": livingRubble,
   foundation,
   scaffold,
   tracer,
@@ -1044,6 +1274,8 @@ const BUILDERS = {
   smoke,
   fire,
   leaf,
+  fragment,
+  leak,
   wound,
   bird,
   regeneration,

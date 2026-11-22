@@ -4,7 +4,7 @@ import { footprintContact, weaponReach } from "../simulation/combat";
 import { isTilePlacedActor } from "../simulation/placement";
 import { BUILDING_BAR_HEIGHT, healthBarOpacity } from "./health-bars";
 import { isContactEffect } from "./combat-effects";
-import { damageSeverity } from "./damage-effects";
+import { actorDamage, damageSeverity } from "./damage-stages";
 
 import type { ActorAppearance, ActorAnimationState } from "./actor";
 import type { DamagedActor } from "./damage-effects";
@@ -147,8 +147,10 @@ export function actorAnimationState(
   shownTarget: ObservedActor | undefined,
   map: TerrainMap,
 ): ActorAnimationState {
-  const weapon = definitions.get(actor.definitionId)?.weapon;
+  const definition = definitions.get(actor.definitionId);
+  const weapon = definition?.weapon;
   return {
+    damage: actorDamage(actor.health, definition?.health),
     working: gathering.has(actor.id),
     aiming:
       !!weapon &&

@@ -164,7 +164,8 @@ test(
     });
     await cultivate();
     await mission.waitForStockpile(55);
-    await mission.ground(12, 55);
+    // Use the side of the footprint clear of the Heartgrove canopy.
+    await mission.ground(13, 55);
     await expect(selected).toContainText("Musterhall");
     await expect(page.locator("#selection-info")).toHaveText(
       "Circle infantry production · Trains Sentinel, Wayfinder, and Healer.",

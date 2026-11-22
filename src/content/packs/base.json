@@ -1075,6 +1075,9 @@
               "cue": "living-hit"
             }
           ]
+        },
+        "loops": {
+          "servicing": "healer-service"
         }
       },
       "portrait": "circle-healer",
@@ -1116,6 +1119,9 @@
               "cue": "living-hit"
             }
           ]
+        },
+        "loops": {
+          "servicing": "artificer-service"
         }
       },
       "portrait": "circle-artificer",
@@ -1154,7 +1160,17 @@
         "events": {
           "damage": [
             {
-              "cue": "living-hit"
+              "cue": "living-structure-hit"
+            }
+          ],
+          "destroyed": [
+            {
+              "cue": "living-destroyed"
+            }
+          ],
+          "attack": [
+            {
+              "cue": "ram-strike"
             }
           ]
         }
@@ -1204,18 +1220,24 @@
           "activities": {
             "attack": "attack"
           }
-        }
+        },
+        "rubble": "living-rubble"
       },
       "audio": {
         "events": {
           "attack": [
             {
-              "cue": "circle-cast"
+              "cue": "thornspire-cast"
             }
           ],
           "damage": [
             {
-              "cue": "living-hit"
+              "cue": "living-structure-hit"
+            }
+          ],
+          "destroyed": [
+            {
+              "cue": "living-destroyed"
             }
           ]
         },
@@ -1239,14 +1261,33 @@
         "color": [0.38, 0.29, 0.18],
         "glb": {
           "url": "assets/models/circle-construct-nursery.glb",
-          "idle": "idle"
-        }
+          "idle": "idle",
+          "activities": {
+            "exit": "exit"
+          }
+        },
+        "rubble": "living-rubble"
       },
       "audio": {
         "events": {
           "damage": [
             {
-              "cue": "living-hit"
+              "cue": "living-structure-hit"
+            }
+          ],
+          "destroyed": [
+            {
+              "cue": "living-destroyed"
+            }
+          ],
+          "production.start": [
+            {
+              "cue": "circle-production-start"
+            }
+          ],
+          "activity.exit": [
+            {
+              "cue": "circle-producer-exit"
             }
           ]
         },
@@ -1749,15 +1790,34 @@
         "color": [0.38, 0.29, 0.18],
         "glb": {
           "url": "assets/models/circle-heartgrove.glb",
-          "idle": "idle"
-        }
+          "idle": "idle",
+          "activities": {
+            "exit": "exit"
+          }
+        },
+        "rubble": "living-rubble"
       },
       "damageEffect": "living",
       "audio": {
         "events": {
           "damage": [
             {
-              "cue": "living-hit"
+              "cue": "living-structure-hit"
+            }
+          ],
+          "destroyed": [
+            {
+              "cue": "living-destroyed"
+            }
+          ],
+          "production.start": [
+            {
+              "cue": "circle-production-start"
+            }
+          ],
+          "activity.exit": [
+            {
+              "cue": "circle-producer-exit"
             }
           ]
         },
@@ -1781,14 +1841,20 @@
         "glb": {
           "url": "assets/models/circle-conservatory.glb",
           "idle": "idle"
-        }
+        },
+        "rubble": "living-rubble"
       },
       "damageEffect": "living",
       "audio": {
         "events": {
           "damage": [
             {
-              "cue": "living-hit"
+              "cue": "living-structure-hit"
+            }
+          ],
+          "destroyed": [
+            {
+              "cue": "living-destroyed"
             }
           ]
         },
@@ -1811,15 +1877,34 @@
         "color": [0.38, 0.29, 0.18],
         "glb": {
           "url": "assets/models/circle-musterhall.glb",
-          "idle": "idle"
-        }
+          "idle": "idle",
+          "activities": {
+            "exit": "exit"
+          }
+        },
+        "rubble": "living-rubble"
       },
       "damageEffect": "living",
       "audio": {
         "events": {
           "damage": [
             {
-              "cue": "living-hit"
+              "cue": "living-structure-hit"
+            }
+          ],
+          "destroyed": [
+            {
+              "cue": "living-destroyed"
+            }
+          ],
+          "production.start": [
+            {
+              "cue": "circle-production-start"
+            }
+          ],
+          "activity.exit": [
+            {
+              "cue": "circle-producer-exit"
             }
           ]
         },
@@ -2329,6 +2414,15 @@
     },
     "leaf": {
       "url": "assets/models/leaf.glb"
+    },
+    "living-rubble": {
+      "url": "assets/models/living-rubble.glb"
+    },
+    "fragment": {
+      "url": "assets/models/fragment.glb"
+    },
+    "leak": {
+      "url": "assets/models/leak.glb"
     }
   },
   "materialsStages": [
@@ -2474,6 +2568,54 @@
       "circle-cultivation": {
         "url": "assets/audio/circle-cultivation.wav",
         "loop": true
+      },
+      "thornspire-cast": {
+        "url": "assets/audio/thornspire-cast.wav",
+        "loop": false
+      },
+      "ram-strike-1": {
+        "url": "assets/audio/ram-strike-1.wav",
+        "loop": false
+      },
+      "ram-strike-2": {
+        "url": "assets/audio/ram-strike-2.wav",
+        "loop": false
+      },
+      "living-structure-hit": {
+        "url": "assets/audio/living-structure-hit.wav",
+        "loop": false
+      },
+      "living-destroyed": {
+        "url": "assets/audio/living-destroyed.wav",
+        "loop": false
+      },
+      "healer-service": {
+        "url": "assets/audio/healer-service.wav",
+        "loop": true
+      },
+      "artificer-service": {
+        "url": "assets/audio/artificer-service.wav",
+        "loop": true
+      },
+      "circle-command-accepted": {
+        "url": "assets/audio/circle-command-accepted.wav",
+        "loop": false
+      },
+      "circle-command-invalid": {
+        "url": "assets/audio/circle-command-invalid.wav",
+        "loop": false
+      },
+      "circle-unit-trained": {
+        "url": "assets/audio/circle-unit-trained.wav",
+        "loop": false
+      },
+      "circle-production-start": {
+        "url": "assets/audio/circle-production-start.wav",
+        "loop": false
+      },
+      "circle-producer-exit": {
+        "url": "assets/audio/circle-producer-exit.wav",
+        "loop": false
       }
     },
     "cues": {
@@ -2686,6 +2828,93 @@
         "voices": 3,
         "priority": 0,
         "range": 35
+      },
+      "thornspire-cast": {
+        "clips": ["thornspire-cast"],
+        "gain": 0.55,
+        "cooldown": 0.1,
+        "voices": 4,
+        "priority": 2,
+        "range": 45
+      },
+      "ram-strike": {
+        "clips": ["ram-strike-1", "ram-strike-2"],
+        "gain": 0.6,
+        "cooldown": 0.1,
+        "voices": 4,
+        "priority": 3,
+        "range": 45
+      },
+      "living-structure-hit": {
+        "clips": ["living-structure-hit"],
+        "gain": 0.4,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 1,
+        "range": 45
+      },
+      "living-destroyed": {
+        "clips": ["living-destroyed"],
+        "gain": 0.65,
+        "cooldown": 0.2,
+        "voices": 3,
+        "priority": 4,
+        "range": 50
+      },
+      "healer-service": {
+        "clips": ["healer-service"],
+        "gain": 0.25,
+        "cooldown": 0,
+        "voices": 3,
+        "priority": 1,
+        "range": 30,
+        "unselectedGain": 0.3
+      },
+      "artificer-service": {
+        "clips": ["artificer-service"],
+        "gain": 0.28,
+        "cooldown": 0,
+        "voices": 3,
+        "priority": 1,
+        "range": 30,
+        "unselectedGain": 0.3
+      },
+      "circle-command-accepted": {
+        "clips": ["circle-command-accepted"],
+        "gain": 0.6,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "circle-command-invalid": {
+        "clips": ["circle-command-invalid"],
+        "gain": 0.65,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "circle-unit-trained": {
+        "clips": ["circle-unit-trained"],
+        "gain": 0.65,
+        "cooldown": 0.12,
+        "voices": 3,
+        "priority": 5
+      },
+      "circle-production-start": {
+        "clips": ["circle-production-start"],
+        "gain": 0.5,
+        "cooldown": 0.15,
+        "voices": 3,
+        "priority": 2,
+        "range": 45
+      },
+      "circle-producer-exit": {
+        "clips": ["circle-producer-exit"],
+        "gain": 0.5,
+        "cooldown": 0.15,
+        "voices": 3,
+        "priority": 2,
+        "range": 45
       }
     },
     "events": {
@@ -2702,6 +2931,11 @@
       "alert": [
         {
           "cue": "alert"
+        }
+      ],
+      "trained": [
+        {
+          "cue": "unit-trained"
         }
       ],
       "objective.complete": [
@@ -2731,12 +2965,28 @@
           {
             "cue": "damage"
           }
-        ],
-        "trained": [
-          {
-            "cue": "unit-trained"
-          }
         ]
+      }
+    },
+    "factions": {
+      "circle": {
+        "events": {
+          "command.accepted": [
+            {
+              "cue": "circle-command-accepted"
+            }
+          ],
+          "command.invalid": [
+            {
+              "cue": "circle-command-invalid"
+            }
+          ],
+          "trained": [
+            {
+              "cue": "circle-unit-trained"
+            }
+          ]
+        }
       }
     },
     "music": {

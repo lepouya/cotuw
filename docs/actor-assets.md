@@ -57,8 +57,23 @@ clips match their generators, and reject unregistered files in `public/assets`.
   holds still with a grey progress bar. Saved tick progress restores the layer.
   Static parts batch by layer and material, keeping the animated focus separate.
   Parts on animated pivots stay separate too: the Thornspire's crown is its
-  `aimNode`, and its petals open in the `attack` clip. Falling leaves show
-  damage.
+  `aimNode`, and its petals open in the `attack` clip. The Heartgrove,
+  Musterhall, and Nursery hinge two leaf panels at their entrances, resting
+  slightly apart; the `exit` clip swings them open while a violet glow swells
+  on the threshold. Owned structures add seeded `damage-moderate` cracks and
+  faint leaks along their ribs, and `damage-critical` splits, splinters,
+  wilted leaves, and `flicker` leaks; each stage merges by material.
+- Presentation shows `damage-moderate` meshes at 60% health or below and adds
+  `damage-critical` meshes at 30% or below, hiding both again as repair
+  restores health. Critical `flicker` meshes vary in brightness and hold
+  still under reduced motion. Buildings under construction hide both stages,
+  since unfinished layers would leave them floating. The Briar Ram uses the
+  same stages, one joint per stage material, and its remains keep the broken
+  shapes with the core and leaks extinguished. `living-rubble` replaces shared
+  rubble for Circle buildings with snapped ribs, roots, fallen leaves, and
+  violet `fading-light` embers that dim over 1.6 seconds of collapse, or at once
+  under reduced motion. Living damage effects add `leak` wisps and, when
+  critical, `fragment` wood chips to their falling leaves.
 - Building details and the wolf and Harvester parts in `src/render` supply both
   the built-in models and the export script, which receives named parts and
   adds rigging and clips. A building's details declare `loopSeconds`, the period
@@ -166,7 +181,9 @@ A generated model must keep:
   frame. Loading rejects a model that breaks this or lacks a named clip.
 
 Generated clips sample the exact duration endpoint, including durations
-between sample frames, so one-shots finish without a residual offset.
+between sample frames, so one-shots finish without a residual offset. Each
+clip samples from the authored rest pose, including rest rotations an earlier
+clip stored as quaternions.
 
 The runtime starts with stand-ins, then replaces them as their GLBs load. A
 failed asset keeps its stand-in. Remains refresh when a model loads. Sessions

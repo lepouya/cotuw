@@ -14,6 +14,7 @@ import {
 import { validateAudioBindings, validateAudioContent } from "./audio";
 import {
   ATTACK_EFFECT_STYLES,
+  RUBBLE_PROP_IDS,
   isRgb,
   validateActorPresentation,
   validateMaterialsStages,
@@ -59,7 +60,7 @@ export type ViewStyle = {
 const PROP_IDS = [
   "foundation",
   "scaffold",
-  "rubble",
+  ...RUBBLE_PROP_IDS,
   "materials-mound",
   "cultivation-site",
   "salvage",
@@ -70,6 +71,8 @@ const PROP_IDS = [
   "fire",
   "wound",
   "leaf",
+  "fragment",
+  "leak",
   "bird",
   "regeneration",
 ] as const;

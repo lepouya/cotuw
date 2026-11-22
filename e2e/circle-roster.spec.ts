@@ -14,10 +14,10 @@ import {
 import type { Page } from "@playwright/test";
 
 /** A Circle base with each producer, a Thornspire, and damaged troops. */
-async function opening(page: Page) {
+async function opening(page: Page, health: Record<string, number> = {}) {
   await withoutApp(page);
   await page.goto("/");
-  await page.evaluate(async () => {
+  await page.evaluate(async (health) => {
     const { startSidebarSession } = await import("/e2e/sidebar-session.ts");
     const { level, withScenario } = await import("/e2e/missions.ts");
     const { controlSessionClock } = await import("/e2e/harness.ts");
@@ -84,9 +84,11 @@ async function opening(page: Page) {
     const mission = withScenario(level(), scenario);
     mission.state.actors.find(({ id }) => id === "sentinel")!.health = 20;
     mission.state.actors.find(({ id }) => id === "ram")!.health = 100;
+    for (const [id, value] of Object.entries(health))
+      mission.state.actors.find((actor) => actor.id === id)!.health = value;
     const { view } = await startSidebarSession(mission);
     controlSessionClock(view);
-  });
+  }, health);
   await expectTerrainReady(page);
 }
 
@@ -266,5 +268,58 @@ test(`Thornspire aims its crown and fires on raiders ${WEBKIT}`, async ({
   ).toBeLessThan(100);
   expect(await crown()).not.toBeCloseTo(rest!);
   await page.screenshot({ path: info.outputPath("thornspire-fire.png") });
+  expect(errors).toEqual([]);
+});
+
+test(`living buildings and the Briar Ram show damage stages at gameplay scale ${WEBKIT}`, async ({
+  page,
+}, info) => {
+  const errors = collectPageErrors(page, { console: true });
+  // Moderate at 60% or less, critical at 30%; the opening's Ram is critical.
+  await opening(page, { heart: 1000, muster: 160 });
+  await expect(page.locator("#game-canvas")).toHaveAttribute(
+    "data-models-ready",
+    "true",
+  );
+  const stages = () =>
+    page.evaluate(() =>
+      Object.fromEntries(
+        ["heart", "muster", "ram"].map((id) => {
+          const meshes = window.sessionHarness.view.scene.meshes.filter(
+            (mesh) => mesh.name.includes(id) && mesh.name.includes("damage-"),
+          );
+          const shown = (stage: string) =>
+            meshes.some(
+              (mesh) => mesh.name.includes(stage) && mesh.isEnabled(),
+            );
+          return [id, [shown("damage-moderate"), shown("damage-critical")]];
+        }),
+      ),
+    );
+  await page.evaluate(() => {
+    const { view } = window.sessionHarness;
+    view.focus(view.simulation.actorById("muster")!.worldPosition);
+  });
+  await advance(page, 0.5);
+  expect(await stages()).toEqual({
+    heart: [true, false],
+    muster: [true, true],
+    ram: [true, true],
+  });
+  await page.screenshot({ path: info.outputPath("circle-damage.png") });
+  const flicker = () =>
+    page.evaluate(
+      () =>
+        window.sessionHarness.view.scene.meshes.find(
+          (mesh) =>
+            mesh.name.startsWith("actor-ram-") &&
+            mesh.name.includes("damage-critical-flicker"),
+        )?.visibility,
+    );
+  expect(await flicker()).toBeLessThan(1);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await advance(page, 0.1);
+  await expect.poll(flicker).toBe(1);
+  expect((await stages()).ram).toEqual([true, true]);
   expect(errors).toEqual([]);
 });

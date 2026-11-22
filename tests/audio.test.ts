@@ -234,11 +234,12 @@ test("preloading follows bindings and the selected arrangement, including all cu
       "assets/audio/circle-cast-1.wav",
       "assets/audio/circle-cast-2.wav",
       "assets/audio/wolf-attack.wav",
-      "assets/audio/command-invalid.wav",
+      "assets/audio/circle-command-invalid.wav",
       "assets/audio/damage-1.wav",
       "assets/audio/damage-2.wav",
     ]),
   );
+  expect(urls).not.toContain("assets/audio/command-invalid.wav");
   expect(
     urls.some((url) =>
       /harvester|refinery|rifle|unquiet-frontier|beneath-the-ridge/.test(url),
@@ -532,6 +533,14 @@ test.each([
     pack.audio.defaults.loops = { moving: "damage" };
   },
   (pack: any) => {
+    pack.audio.factions.circle.events["command.accepted"] = [
+      { cue: "circle-growth" },
+    ];
+  },
+  (pack: any) => {
+    pack.audio.factions.circle = { loops: {} };
+  },
+  (pack: any) => {
     pack.presentation["arc-materials-refinery"].audio.events[
       "activity.delivery"
     ][1].at = -1;
@@ -618,8 +627,8 @@ test("committed observations group commands, baseline loads, and queue starts", 
   expect(scene.emit).not.toHaveBeenCalled();
 });
 
-test("production completions use the committed exit participant", () => {
-  const { scene, calls } = setup();
+test("production completion uses the committed exit participant and player's faction", () => {
+  const { scene, calls } = setup("circle");
   const { simulation, view } = committed({
     actors: [building],
     economy: economy([{ actorId: "unit", producerId: "b", completedTicks: 1 }]),
@@ -635,11 +644,11 @@ test("production completions use the committed exit participant", () => {
   ];
   adapter.observe();
   expect(
-    calls.filter((call) => call.url.includes("unit-trained")),
+    calls.filter((call) => call.url.endsWith("/circle-unit-trained.wav")),
   ).toHaveLength(1);
   adapter.observe();
   expect(
-    calls.filter((call) => call.url.includes("unit-trained")),
+    calls.filter((call) => call.url.endsWith("/circle-unit-trained.wav")),
   ).toHaveLength(1);
 });
 
@@ -1034,7 +1043,7 @@ test("player readiness feedback survives a popup pause while world sound stops",
   const { scene, calls } = setup();
   const unit = emitter();
   scene.sync([unit]);
-  scene.emit("trained", unit);
+  scene.emit("trained");
   scene.setActive(false);
   scene.sync([]);
   const readiness = calls.find((call) => call.url.includes("unit-trained"))!;
@@ -1262,6 +1271,95 @@ test("specific player feedback replaces routine alerts in the same tick", () => 
   simulation.result = { kind: "victory" };
   adapter.observe([], [routine]);
   expect(played()).toEqual(["victory"]);
+});
+
+test("destruction sounds only for actors seen alive before their remains", () => {
+  const scene = sceneSpy();
+  const grove = {
+    ...placed,
+    id: "grove",
+    definitionId: "circle-heartgrove",
+    owner: "enemy",
+  };
+  const remains = (actorId: string) => ({
+    actorId,
+    definitionId: "circle-heartgrove",
+    owner: "enemy",
+    worldPosition: { x: 3, z: 4 },
+    facing: 0,
+    tick: 1,
+  });
+  const { simulation, view } = committed({ actors: [grove] });
+  const adapter = createMissionAudio(scene, simulation, view, 8);
+  simulation.actors = [];
+  simulation.wrecks = [remains("grove"), remains("old")];
+  adapter.observe();
+  const destroyed = vi
+    .mocked(scene.emit)
+    .mock.calls.filter(([name]) => name === "destroyed");
+  expect(destroyed).toEqual([
+    ["destroyed", expect.objectContaining({ id: "grove" })],
+  ]);
+  adapter.observe();
+  expect(
+    vi.mocked(scene.emit).mock.calls.filter(([name]) => name === "destroyed"),
+  ).toHaveLength(1);
+});
+
+test.each([
+  ["circle", "circle-command-accepted", "circle-command-invalid"],
+  ["arc", "command-accepted", "command-invalid"],
+])(
+  "%s player feedback selects its faction's command cues",
+  (faction, accepted, invalid) => {
+    const { scene, calls } = setup(faction);
+    scene.emit("command.accepted");
+    scene.emit("command.invalid");
+    scene.emit("alert");
+    expect(calls.map(({ url }) => url)).toEqual([
+      `assets/audio/${accepted}.wav`,
+      `assets/audio/${invalid}.wav`,
+      "assets/audio/alert.wav",
+    ]);
+    scene.dispose();
+  },
+);
+
+test("the full Circle roster binds its own weapon, impact, and service cues", () => {
+  const audio = (id: string) => BASE_CONTENT.presentation[id]!.audio!;
+  expect(audio("circle-thornspire").events!.attack).toEqual([
+    { cue: "thornspire-cast" },
+  ]);
+  expect(audio("circle-briar-ram").events!.attack).toEqual([
+    { cue: "ram-strike" },
+  ]);
+  expect(audio("circle-healer").loops!.servicing).toBe("healer-service");
+  expect(audio("circle-artificer").loops!.servicing).toBe("artificer-service");
+  for (const id of [
+    "circle-heartgrove",
+    "circle-conservatory",
+    "circle-musterhall",
+    "circle-construct-nursery",
+    "circle-thornspire",
+    "circle-briar-ram",
+  ]) {
+    expect(audio(id).events!.damage).toEqual([{ cue: "living-structure-hit" }]);
+    expect(audio(id).events!.destroyed).toEqual([{ cue: "living-destroyed" }]);
+  }
+  for (const id of [
+    "circle-heartgrove",
+    "circle-musterhall",
+    "circle-construct-nursery",
+  ]) {
+    expect(audio(id).events!["production.start"]).toEqual([
+      { cue: "circle-production-start" },
+    ]);
+    expect(audio(id).events!["activity.exit"]).toEqual([
+      { cue: "circle-producer-exit" },
+    ]);
+  }
+  for (const id of ["circle-sentinel", "circle-healer", "circle-cultivator"])
+    expect(audio(id).events!.damage).toEqual([{ cue: "living-hit" }]);
 });
 
 test("every mission result kind has a global audio binding", () => {

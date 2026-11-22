@@ -6,7 +6,7 @@ import {
 } from "@babylonjs/core";
 
 import { stableUnit } from "./actor";
-import { hierarchyMeshes, unitCubeInstance } from "./glb-model";
+import { hierarchyMeshes, modelPartName, unitCubeInstance } from "./glb-model";
 
 import type { Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
@@ -22,12 +22,14 @@ const DEBRIS_HEIGHT = 0.18;
 /** Used when the destroyed building's height is unavailable. */
 const FALLBACK_COLLAPSE_SCALE = 6;
 const COLLAPSE_SECONDS = 0.8;
+/** Rubble meshes named `fading-light` go dark over this many seconds. */
+const LIGHT_FADE_SECONDS = 1.6;
 
 export type WreckViewOptions = {
   appearanceFor: (definitionId: string) => ActorAppearance | undefined;
   /** Footprint tiles of building debris. */
   tilesFor: (wreck: Wreck) => readonly TileCoord[];
-  rubble?: () => ModelAsset | undefined;
+  rubble?: (wreck: Wreck) => ModelAsset | undefined;
   /** World height of the destroyed building's top, before collapse. */
   topHeightFor?: (wreck: Wreck) => number | undefined;
   /** Shows collapsed debris at once. */
@@ -60,6 +62,7 @@ export function createWreckView(
       seconds: number;
       dispose: () => void;
       meshes: AbstractMesh[];
+      lights: AbstractMesh[];
       rubbleModel: ModelAsset | undefined;
       topHeight: number | undefined;
       ground: () => void;
@@ -82,11 +85,11 @@ export function createWreckView(
     const root = new TransformNode(`wreck-${wreck.actorId}`, scene);
     let dispose = () => root.dispose();
     let animate: ((seconds: number) => void) | undefined;
+    const lights: AbstractMesh[] = [];
     const groundUpdates: (() => void)[] = [];
     if (wreck.tilePlacement) {
       const chunks: { dispose: () => void }[] = [];
       const settles: ((seconds: number) => void)[] = [];
-      let collapseTime = age;
       for (const tile of tilesFor(wreck)) {
         const center = map.tileCenter(tile.x, tile.z);
         const seed = stableUnit(`${wreck.actorId}-${tile.x}-${tile.z}`);
@@ -97,6 +100,13 @@ export function createWreckView(
           scene,
         );
         chunks.push(chunk);
+        lights.push(
+          ...chunk.root
+            .getChildMeshes()
+            .filter((mesh) =>
+              modelPartName(chunk.root, mesh).includes("fading-light"),
+            ),
+        );
         chunk.root.scaling.set(
           map.tileSize * (0.7 + seed * 0.3),
           DEBRIS_HEIGHT * (0.6 + seed),
@@ -132,11 +142,7 @@ export function createWreckView(
         groundUpdates.push(ground);
       }
       animate = (seconds) => {
-        collapseTime = Math.max(
-          collapseTime,
-          reducedMotion() ? COLLAPSE_SECONDS : seconds,
-        );
-        for (const settle of settles) settle(collapseTime);
+        for (const settle of settles) settle(seconds);
       };
       animate(age);
       dispose = () => {
@@ -184,6 +190,7 @@ export function createWreckView(
       seconds: age,
       dispose,
       meshes,
+      lights,
       animate,
       rubbleModel,
       topHeight,
@@ -211,30 +218,41 @@ export function createWreckView(
         view.dispose();
         views.delete(id);
       }
+      const reduced = reducedMotion();
       for (const wreck of wrecks) {
         let view = views.get(wreck.actorId);
+        // Once settled, a preference change leaves rubble dark and in place.
+        const minimum = wreck.tilePlacement && reduced ? LIGHT_FADE_SECONDS : 0;
+        const wreckAge = age(wreck);
         const appearance = wreck.tilePlacement
           ? undefined
           : appearanceFor(wreck.definitionId);
-        const rubbleModel = wreck.tilePlacement ? rubbleAsset?.() : undefined;
+        const rubbleModel = wreck.tilePlacement
+          ? rubbleAsset?.(wreck)
+          : undefined;
         if (
           !view ||
           view.appearance !== appearance ||
           view.rubbleModel !== rubbleModel
         ) {
-          const seconds = Math.max(age(wreck), view?.seconds ?? 0);
+          const seconds = Math.max(wreckAge, view?.seconds ?? 0, minimum);
           const topHeight = view?.topHeight ?? topHeightFor?.(wreck);
           view?.dispose();
           view = create(wreck, seconds, appearance, rubbleModel, topHeight);
           views.set(wreck.actorId, view);
         } else {
-          view.seconds += frameSeconds;
+          view.seconds = Math.max(view.seconds + frameSeconds, minimum);
           view.animate?.(view.seconds);
           if (terrainDirty) view.ground();
         }
         view.root.setEnabled(visible(wreck));
-        const opacity = Math.min(1, (lifeSeconds - age(wreck)) / FADE_SECONDS);
-        for (const mesh of view.meshes) mesh.visibility = Math.max(opacity, 0);
+        const opacity = Math.max(
+          0,
+          Math.min(1, (lifeSeconds - wreckAge) / FADE_SECONDS),
+        );
+        for (const mesh of view.meshes) mesh.visibility = opacity;
+        const light = Math.max(0, 1 - view.seconds / LIGHT_FADE_SECONDS);
+        for (const mesh of view.lights) mesh.visibility = opacity * light;
       }
       terrainDirty = false;
     },

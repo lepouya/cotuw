@@ -1,4 +1,8 @@
-import { AUDIO_VOICE_LIMIT, musicForFaction } from "../content/audio";
+import {
+  AUDIO_VOICE_LIMIT,
+  feedbackForFaction,
+  musicForFaction,
+} from "../content/audio";
 import type {
   AudioBindings,
   AudioContent,
@@ -79,11 +83,12 @@ export function createAudioScene(
   bindings: Readonly<Record<string, { audio?: AudioBindings }>>,
   mixer: AudioMixer,
   listener: () => Readonly<WorldPosition>,
-  musicFaction?: string,
+  /** The player's faction, which selects music and feedback cues. */
+  faction?: string,
 ) {
-  const music = musicForFaction(content, musicFaction);
+  const music = musicForFaction(content, faction);
   const cues = new Map(Object.entries(content?.cues ?? {}));
-  const global = resolve({ events: content?.events });
+  const global = resolve({ events: feedbackForFaction(content, faction) });
   const defaults = resolve(content?.defaults);
   const objects = new Map(
     Object.entries(bindings).map(([id, { audio }]) => [

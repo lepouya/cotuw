@@ -14,6 +14,7 @@ import type { ObservedActor } from "../simulation/owner-view";
 import type { ActorMotion } from "./actor-gait";
 import type { Rgb, ActorTrigger } from "../content/presentation";
 import type { OwnerMaterials } from "./owner-materials";
+import type { DamageSeverity } from "./damage-stages";
 import { hierarchyMeshes } from "./glb-model";
 
 // Keep the actor visibly above the terrain's thin visual-layer offsets.
@@ -42,6 +43,8 @@ export type ActorAnimationState = {
   aiming?: boolean;
   /** Pursuing, as a wolf chasing an intruder. */
   running?: boolean;
+  /** Selects authored damage stages, as on a living construct. */
+  damage?: DamageSeverity;
 };
 
 /** How one kind of actor looks. */

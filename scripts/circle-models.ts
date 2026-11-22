@@ -1,6 +1,13 @@
-import { Mesh, MeshBuilder, TransformNode, Vector3 } from "@babylonjs/core";
+import {
+  Mesh,
+  MeshBuilder,
+  Quaternion,
+  TransformNode,
+  Vector3,
+} from "@babylonjs/core";
 
 import { clip, merge, surface } from "./model-toolkit.ts";
+import { seededRandom } from "./sprite-sheet.ts";
 
 import type { Scene, StandardMaterial } from "@babylonjs/core";
 
@@ -8,6 +15,11 @@ type Vec3 = readonly [number, number, number];
 
 /** The Thornspire's crown opens and closes once per shot. */
 const FIRE_SECONDS = 0.4;
+/** Producer entrances part and close once per unit that leaves. */
+const EXIT_SECONDS = 1.2;
+/** Entrance leaves rest slightly apart so the opening stays readable. */
+const ENTRANCE_REST_ANGLE = 0.45;
+const ENTRANCE_OPEN_ANGLE = 1.35;
 
 type StructureRecipe = {
   halfWidth: number;
@@ -21,6 +33,8 @@ type StructureRecipe = {
   owned: boolean;
   /** Where the owner marker sits, when the default front face is open. */
   ownerAt?: Vec3;
+  /** A producer's front entrance, whose leaves part for each exit. */
+  entrance?: { z: number; width: number; height: number };
 };
 
 /** What a frame draws with. */
@@ -297,6 +311,7 @@ const CIRCLE_STRUCTURES = {
     frame: "tree",
     focusHeight: 2.1,
     owned: true,
+    entrance: { z: 1.12, width: 0.8, height: 1.05 },
   },
   "circle-conservatory": {
     halfWidth: 1.3,
@@ -314,6 +329,7 @@ const CIRCLE_STRUCTURES = {
     frame: "arches",
     focusHeight: 0.65,
     owned: true,
+    entrance: { z: 1.32, width: 1.2, height: 1.35 },
   },
   "circle-construct-nursery": {
     halfWidth: 1.3,
@@ -323,6 +339,7 @@ const CIRCLE_STRUCTURES = {
     focusHeight: 0.6,
     owned: true,
     ownerAt: [0, 1.75, 1.36],
+    entrance: { z: 1.34, width: 1.3, height: 1.35 },
   },
   "circle-thornspire": {
     halfWidth: 0.45,
@@ -344,6 +361,228 @@ const CIRCLE_STRUCTURES = {
 } satisfies Record<string, StructureRecipe>;
 type CircleStructureId = keyof typeof CIRCLE_STRUCTURES;
 
+/**
+ * Materials for living damage, named by stage so presentation can select
+ * them after merging or skinning.
+ */
+export function livingDamageMaterials(scene: Scene, prefix: string) {
+  const finish = (part: string, color: Vec3, glow = 0) =>
+    surface(scene, `${prefix}-${part}`, color, glow);
+  return {
+    crack: finish("damage-moderate-crack", [0.1, 0.06, 0.04]),
+    // Leaks go dark with the rest of a fallen construct's light.
+    leak: finish("damage-moderate-leak-fading-light", [0.62, 0.32, 0.95], 0.9),
+    split: finish("damage-critical-split", [0.06, 0.04, 0.03]),
+    splinter: finish("damage-critical-splinter", [0.9, 0.82, 0.6]),
+    wilted: finish("damage-critical-wilted", [0.36, 0.3, 0.14]),
+    flicker: finish("damage-critical-flicker", [0.7, 0.36, 1], 1),
+  };
+}
+
+type Rib = { points: readonly Vec3[]; radius: number };
+type Plate = { position: Vec3; size: Vec3 };
+
+/**
+ * Broken shapes for living damage. `damage-moderate` meshes crack plates and
+ * leak faint violet light; `damage-critical` meshes add deeper splits,
+ * splinters, drooping foliage, and a flickering leak. Presentation selects
+ * them by health.
+ */
+function addLivingDamage(
+  scene: Scene,
+  name: string,
+  root: TransformNode,
+  ribs: readonly Rib[],
+  plates: readonly Plate[],
+  seed: number,
+) {
+  const { crack, leak, split, splinter, wilted, flicker } =
+    livingDamageMaterials(scene, name);
+  const random = seededRandom(seed);
+  /** A point on a rib's surface, facing away from the building's axis. */
+  const onRib = () => {
+    const rib = ribs[Math.floor(random() * ribs.length)]!;
+    const segment = Math.floor(random() * (rib.points.length - 1));
+    const t = 0.2 + random() * 0.6;
+    const [a, b] = [rib.points[segment]!, rib.points[segment + 1]!];
+    const at = Vector3.Lerp(Vector3.FromArray(a), Vector3.FromArray(b), t);
+    const along = Vector3.FromArray(b).subtract(Vector3.FromArray(a));
+    let out = new Vector3(at.x, 0, at.z);
+    if (out.lengthSquared() < 0.01)
+      out = new Vector3(Math.cos(random() * 7), 0, Math.sin(random() * 7));
+    out.normalize();
+    return { at: at.add(out.scale(rib.radius * 0.9)), along, out, rib };
+  };
+  const part = (
+    id: string,
+    material: typeof crack,
+    position: Vector3,
+    size: Vec3,
+    along: Vector3,
+    out: Vector3,
+    shape: "box" | "cone" | "sphere" = "box",
+  ) => {
+    const mesh =
+      shape === "box"
+        ? MeshBuilder.CreateBox(`${name}-${id}`, { size: 1 }, scene)
+        : shape === "cone"
+          ? MeshBuilder.CreateCylinder(
+              `${name}-${id}`,
+              { height: 1, diameterTop: 0, diameterBottom: 1, tessellation: 5 },
+              scene,
+            )
+          : MeshBuilder.CreateSphere(
+              `${name}-${id}`,
+              { diameter: 1, segments: 5 },
+              scene,
+            );
+    mesh.parent = root;
+    mesh.material = material;
+    mesh.position.copyFrom(position);
+    mesh.scaling.set(...size);
+    // Local Y runs along the rib; local Z faces outward.
+    const up = along.normalizeToNew();
+    const side = Vector3.Cross(up, out).normalize();
+    const forward = Vector3.Cross(side, up).normalize();
+    mesh.rotationQuaternion = Quaternion.FromLookDirectionLH(forward, up);
+    return mesh;
+  };
+  for (let i = 0; i < 6; i++) {
+    const { at, along, out, rib } = onRib();
+    part(
+      `damage-moderate-crack-${i}`,
+      crack,
+      at,
+      [Math.min(rib.radius * 0.7, 0.12), Math.min(rib.radius * 5, 0.55), 0.05],
+      along,
+      out,
+    );
+  }
+  for (let i = 0; i < 3; i++) {
+    const { at, along, out } = onRib();
+    part(
+      `damage-moderate-leak-${i}`,
+      leak,
+      at,
+      [0.09, 0.14, 0.09],
+      along,
+      out,
+      "sphere",
+    );
+  }
+  for (let i = 0; i < 5; i++) {
+    const { at, along, out, rib } = onRib();
+    part(
+      `damage-critical-split-${i}`,
+      split,
+      at,
+      [Math.min(rib.radius * 1.3, 0.2), Math.min(rib.radius * 8, 0.85), 0.08],
+      along,
+      out,
+    );
+    part(
+      `damage-critical-splinter-${i}`,
+      splinter,
+      at.add(out.scale(0.08)),
+      [0.06, 0.32, 0.06],
+      out.add(along.normalizeToNew().scale(0.4)),
+      along,
+      "cone",
+    );
+  }
+  for (let i = 0; i < 2; i++) {
+    const { at, along, out } = onRib();
+    part(
+      `damage-critical-flicker-${i}`,
+      flicker,
+      at,
+      [0.13, 0.22, 0.13],
+      along,
+      out,
+      "sphere",
+    );
+  }
+  // Wilted leaves hang from the outer edge of canopy plates.
+  for (const [i, plate] of plates.entries()) {
+    if (i % 2) continue;
+    const [x, y, z] = plate.position;
+    let out = new Vector3(x, 0, z);
+    if (out.lengthSquared() < 0.01) out = new Vector3(0, 0, 1);
+    out.normalize();
+    const reach = Math.max(plate.size[0], plate.size[2]) * 0.45;
+    part(
+      `damage-critical-wilted-${i}`,
+      wilted,
+      new Vector3(x, y - plate.size[1] * 0.4, z).add(out.scale(reach)),
+      [plate.size[0] * 0.45, plate.size[1] * 1.6, 0.08],
+      new Vector3(0, 1, 0).add(out.scale(0.5)),
+      out,
+      "sphere",
+    );
+  }
+}
+
+/**
+ * Two leaf panels hinge at the sides of a producer's entrance and swing
+ * outward while a violet glow swells on the threshold.
+ */
+function addEntrance(
+  scene: Scene,
+  name: string,
+  root: TransformNode,
+  { z, width, height }: NonNullable<StructureRecipe["entrance"]>,
+  leaf: StandardMaterial,
+  core: StandardMaterial,
+) {
+  const hinges = ([-1, 1] as const).map((side) => {
+    const hinge = new TransformNode(`${name}-entrance-hinge-${side}`, scene);
+    hinge.parent = root;
+    hinge.position.set((side * width) / 2, 0, z);
+    hinge.rotation.y = side * ENTRANCE_REST_ANGLE;
+    const panel = MeshBuilder.CreateSphere(
+      `${name}-growth-canopy-entrance-${side}`,
+      { diameter: 1, segments: 6 },
+      scene,
+    );
+    panel.parent = hinge;
+    panel.material = leaf;
+    panel.position.set((-side * width) / 4, height / 2, 0);
+    panel.scaling.set(width / 2, height, 0.08);
+    return { hinge, side };
+  });
+  const glow = MeshBuilder.CreateSphere(
+    `${name}-growth-canopy-entrance-glow`,
+    { diameter: 1, segments: 8 },
+    scene,
+  );
+  glow.parent = root;
+  glow.material = core;
+  glow.position.set(0, height * 0.4, z);
+  const rest = 0.001;
+  glow.scaling.setAll(rest);
+  return () =>
+    clip(
+      root,
+      "exit",
+      EXIT_SECONDS,
+      (seconds) => {
+        const open = Math.sin((seconds / EXIT_SECONDS) * Math.PI);
+        for (const { hinge, side } of hinges)
+          hinge.rotation.y =
+            side *
+            (ENTRANCE_REST_ANGLE +
+              (ENTRANCE_OPEN_ANGLE - ENTRANCE_REST_ANGLE) * open);
+        const pulse = open ** 2;
+        glow.scaling.set(
+          rest + width * 0.55 * pulse,
+          rest + height * 0.7 * pulse,
+          rest + 0.12 * pulse,
+        );
+      },
+      false,
+    );
+}
+
 /** Named growth layers let presentation reveal living architecture in thirds. */
 function buildCircleStructure(scene: Scene, name: CircleStructureId) {
   const recipe: StructureRecipe = CIRCLE_STRUCTURES[name];
@@ -354,7 +593,10 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
   const bark = finish("roots", [0.28, 0.19, 0.12]);
   const leaf = finish("leaves", [0.12, 0.34, 0.22]);
   const core = finish("core", [0.58, 0.28, 0.88], 0.6);
+  const ribs: Rib[] = [];
+  const plates: Plate[] = [];
   const stem: FrameContext["stem"] = (id, points, radius, material = wood) => {
+    if (id.startsWith("growth-ribs")) ribs.push({ points, radius });
     const mesh = MeshBuilder.CreateTube(
       `${name}-${id}`,
       {
@@ -384,6 +626,8 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     mesh.material = material;
     mesh.position.set(...position);
     mesh.scaling.set(...size);
+    if (id.startsWith("growth-canopy") && material === leaf)
+      plates.push({ position, size });
     return mesh;
   };
   const { halfWidth, halfDepth, height } = recipe;
@@ -412,6 +656,9 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     stem,
     plate,
   });
+  const addExitClip =
+    recipe.entrance &&
+    addEntrance(scene, name, root, recipe.entrance, leaf, core);
   if (recipe.owned)
     plate(
       "growth-canopy-owner",
@@ -425,14 +672,30 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     [0.3, 0.45, 0.3],
     core,
   );
-  // Keep the animated focus separate; static parts batch by growth layer.
-  for (const layer of ["roots", "ribs", "canopy"]) {
+  if (recipe.owned)
+    addLivingDamage(
+      scene,
+      name,
+      root,
+      ribs,
+      plates,
+      [...name].reduce((sum, c) => Math.imul(sum, 31) + c.charCodeAt(0), 7),
+    );
+  // Keep the animated focus separate; static parts batch by layer.
+  for (const layer of [
+    "growth-roots",
+    "growth-ribs",
+    "growth-canopy",
+    "damage-moderate",
+    "damage-critical",
+  ]) {
     const groups = new Map<StandardMaterial, Mesh[]>();
     for (const mesh of root.getChildMeshes(true)) {
       if (
         !(mesh instanceof Mesh) ||
-        !mesh.name.includes(`growth-${layer}`) ||
-        mesh === pulse
+        !mesh.name.includes(layer) ||
+        mesh === pulse ||
+        mesh.name.endsWith("entrance-glow")
       )
         continue;
       const material = mesh.material as StandardMaterial;
@@ -441,7 +704,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
       groups.set(material, group);
     }
     for (const [material, parts] of groups)
-      merge(root, `${name}-growth-${layer}-${material.name}`, parts, material);
+      merge(root, `${name}-${layer}-${material.name}`, parts, material);
   }
   clip(
     root,
@@ -457,6 +720,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     false,
   );
   addFrameClips?.();
+  addExitClip?.();
 }
 
 export const CIRCLE_MODELS = Object.fromEntries(

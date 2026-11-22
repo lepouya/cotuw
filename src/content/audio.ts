@@ -45,20 +45,40 @@ export type AudioContent = {
   events: NonNullable<AudioBindings["events"]>;
   /** Object bindings that apply where a definition names no override. */
   defaults?: AudioBindings;
+  /** The player's faction replaces global events it names. */
+  factions?: Readonly<
+    Record<string, { events: NonNullable<AudioBindings["events"]> }>
+  >;
   music?: MusicArrangement & {
     holdSeconds: number;
     factions?: Readonly<Record<string, MusicArrangement>>;
   };
 };
 
+/** A faction's own entry, ignoring inherited object keys. */
+const factionEntry = <T>(
+  entries: Readonly<Record<string, T>> | undefined,
+  faction: string | undefined,
+): T | undefined =>
+  faction && entries && hasOwn(entries, faction) ? entries[faction] : undefined;
+
+/** Global events with the player's faction overrides applied. */
+export function feedbackForFaction(
+  audio: AudioContent | undefined,
+  faction?: string,
+): NonNullable<AudioBindings["events"]> {
+  return {
+    ...audio?.events,
+    ...factionEntry(audio?.factions, faction)?.events,
+  };
+}
+
 export function musicForFaction(
   audio: AudioContent | undefined,
   faction?: string,
 ): MusicArrangement | undefined {
   const music = audio?.music;
-  return faction && music?.factions && hasOwn(music.factions, faction)
-    ? music.factions[faction]
-    : music;
+  return factionEntry(music?.factions, faction) ?? music;
 }
 
 type Invalid = (problem: string) => Error;
@@ -115,6 +135,20 @@ export function validateAudioContent(
   validateAudioBindings({ events: audio.events }, audio, invalid, "events");
   if (audio.defaults !== undefined)
     validateAudioBindings(audio.defaults, audio, invalid, "defaults");
+  if (audio.factions !== undefined) {
+    if (!isRecord(audio.factions))
+      throw invalid("gives audio factions an invalid map");
+    for (const [id, faction] of Object.entries(audio.factions)) {
+      if (!isId(id) || !isRecord(faction) || !isRecord(faction.events))
+        throw invalid(`gives audio faction "${id}" no events`);
+      validateAudioBindings(
+        { events: faction.events },
+        audio,
+        invalid,
+        `faction "${id}" events`,
+      );
+    }
+  }
   const music = audio.music;
   const validArrangement = (value: unknown) =>
     isRecord(value) &&
