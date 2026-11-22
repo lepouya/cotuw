@@ -1,18 +1,17 @@
-# ARC playtest
+# Playtest
 
-Play Citadels of the Unquiet World as Anomaly Response Command (ARC): first
-its introduction if you are new to RTS games, then a skirmish against a
-computer opponent that builds its own base. This is an early RTS prototype.
-You do not need prior RTS experience.
+Play Citadels of the Unquiet World, an early real-time strategy (RTS)
+prototype. Each round names its faction: the Circle of Repose, which grows its
+base and cultivates renewable Lifebloom, or Anomaly Response Command (ARC),
+which builds and mines. You do not need prior RTS experience.
 
 ## Before playing
 
 - Play on your own using the in-game guidance.
 - Open the organizer's links in a current desktop browser. Record the build
   revision supplied with the links in each report.
-- Set aside about 75 minutes, or about 45 if you skip the introduction. A
-  skirmish aims for 15 to 25 minutes of game time; learning, pauses, and
-  feedback take longer. You may stop at any time.
+- Set aside about 75 minutes. A skirmish aims for 15 to 25 minutes of game
+  time; learning, pauses, and feedback take longer. You may stop at any time.
 - Complete one copy of `playtest-report.md` for each mission you attempt.
   Record your operating system, browser and version, input method, and prior
   RTS experience in each.
@@ -22,30 +21,58 @@ You do not need prior RTS experience.
   saves before closing it.
 - Keep notes as you play. The game's top bar shows elapsed game time; note it
   beside anything confusing, surprising, or broken.
+- To export a save, open the menu, choose **Save**, name the save, and choose
+  **Export file**. Export a save when a mission ends and whenever a bug occurs
+  and the menu is available. **Restart** in the menu replays the same mission.
 
-## Introduction
+## Circle of Repose
 
-Play this if you have no or occasional RTS experience; otherwise skip it.
+### Circle introduction
+
+Play this first, whatever your RTS experience.
 
 Open the supplied main link as given, without a `?level=` parameter. Choose
-**New mission**, keep **Normal** difficulty, then choose **Anomaly Response
-Command**. Play at your own pace.
+**New mission**, keep **Normal** difficulty, then choose **Circle of Repose**.
+Play at your own pace, then continue in free play or move on.
 
-## Skirmish
+You start with a Heartgrove and 150 Lifebloom. Cultivators grow buildings by
+tending them and gather Lifebloom from renewable sites. Watch what happens to
+a site's reserve as you change how many Cultivators use it. In your report,
+describe one cultivation decision you made and why.
 
-Open the supplied skirmish link as given. It starts you in the west base on
-Normal difficulty against an ARC opponent in the east. Both sides begin with
-a Command Center and enough Materials to build a Refinery and Harvester.
+### Circle skirmish
+
+Open the supplied Circle skirmish link as given. It starts you as the Circle
+in the west base on Normal difficulty against an ARC opponent in the east.
+Both sides begin with a headquarters and enough to fund their first worker
+and drop-off building.
 
 Build an economy, base, and army. Win by destroying all completed enemy
 Command Centers, Materials Refineries, Field Barracks, and Sentry Turrets.
-The opponent scouts, raids, attacks, and rebuilds what it loses. Try expanding
-to other deposits, defending, repairing, rebuilding after losses, and using
-support units. **Restart** in the menu replays the same match.
+The opponent scouts, raids, attacks, and rebuilds what it loses. Try
+spreading Cultivators across sites, growing Conservatories near other sites,
+defending with Thornspires, healing with Healers, and replacing a Cultivator
+when one tending a building is lost.
 
-Play until the match ends or you choose to stop. To export a save, open the
-menu, choose **Save**, name the save, and choose **Export file**. Export a
-save when the match ends and whenever a bug occurs and the menu is available.
+## Anomaly Response Command
+
+Play these when the organizer's links include an ARC round.
+
+### ARC introduction
+
+Play this if you have no or occasional RTS experience; otherwise skip it.
+Choose **New mission**, keep **Normal** difficulty, then choose **Anomaly
+Response Command**.
+
+### ARC skirmish
+
+Open the supplied ARC skirmish link as given. It starts you in the west base
+on Normal difficulty against an ARC opponent in the east. Both sides begin
+with a Command Center and enough Materials to build a Refinery and Harvester.
+
+Win by destroying all completed enemy Command Centers, Materials Refineries,
+Field Barracks, and Sentry Turrets. Try expanding to other deposits,
+defending, repairing, rebuilding after losses, and using support units.
 
 ## Afterwards
 
@@ -62,16 +89,18 @@ first.
 
 `site/` contains the production website. Asset URLs are relative, so serve its
 contents from any directory of an HTTPS static host. `docs/verification.md`
-covers publishing to GitHub Pages. Share the main and skirmish links, the
-revision in `build.json`, a participant code, the return address, and these
-instructions and the report template. Keep `build.json` alongside the
-original bundle so reports can identify the exact artifact. The JSON lists
-SHA-256 hashes and byte counts for every bundled file except itself.
+covers publishing to GitHub Pages. Share the main link, the skirmish links for
+the round, the revision in `build.json`, a participant code, the return
+address, and these instructions and the report template. Keep `build.json`
+alongside the original bundle so reports can identify the exact artifact. The
+JSON lists SHA-256 hashes and byte counts for every bundled file except
+itself.
 
-Append this query to the main link for the ARC skirmish.
+Append these queries to the main link for the skirmishes.
 
 ```text
-?skirmish=arc-arc&player=west&difficulty=normal&ai=east:arc-skirmish
+Circle: ?skirmish=circle-arc&player=west&difficulty=normal&ai=east:arc-skirmish
+ARC:    ?skirmish=arc-arc&player=west&difficulty=normal&ai=east:arc-skirmish
 ```
 
 For a local session, run this from the bundle directory with Python 3:

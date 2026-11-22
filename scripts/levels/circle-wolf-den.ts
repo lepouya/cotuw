@@ -88,7 +88,7 @@ export const CIRCLE_WOLF_DEN = createWolfDenScenario({
     {
       id: "circle-cultivation",
       title: "Cultivating Lifebloom",
-      text: `Select the Cultivator and choose Gather Near Lifebloom. It carries ${cargo} Lifebloom to a Conservatory and repeats. One worker per site is sustainable. Extra workers drain the reserve and can make a site go dormant until it recovers. Select a site to see its reserve.`,
+      text: `Select the Cultivator and choose Gather Near Lifebloom. It carries ${cargo} Lifebloom to a Conservatory and repeats. One worker per site is sustainable. Two or more workers strain a site, and crowding it further makes it go dormant until it recovers. Select a site to see its reserve.`,
       trigger: { kind: "actor", definitionId: "circle-conservatory" },
     },
     {

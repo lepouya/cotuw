@@ -160,12 +160,17 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   Cultivator phases that contradict their targets. `circle-continuation`
   resumes during raids, Musterhall growth, and Cultivator replacement.
 - [ ] **1.57** Playtest the Circle introduction and base loop with the 1.02
-  cohort. Add Circle tester instructions. Launch through the demo setup or a
-  development link. Verify RTS-familiar newcomers understand its differences,
+  cohort. Verify RTS-familiar newcomers understand its differences,
   establish and sustain a base, and explain a useful cultivation decision.
   Refine cultivation rates, reserve capacity, cargo capacity, and dormancy
   thresholds using the introduction. Fix and retest recurring confusion
   before full-match balancing.
+  - Done: [tester instructions](docs/playtest-instructions.md) require the
+    Circle introduction for every tester, followed by a Circle skirmish
+    against the ARC AI. `npm run cultivation:probe` measures introduction
+    staffing plans for tuning comparisons.
+  - Remaining: full acceptance and the bundle smoke test, the cohort round,
+    triage, tuning, and retests.
   - Testers who still need the ARC skirmish follow the
     [ARC instructions](docs/playtest-instructions.md). Cover expansion and
     Relay Stations, base layout, recovery after losses, Mechanics, control

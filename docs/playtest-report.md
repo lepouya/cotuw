@@ -36,20 +36,36 @@ observations use the game time shown in the top bar.
 - What did you expect to happen that did not happen?
 - If you stopped, when and why?
 - What drove your income, production, expansion, and combat choices?
-- For Circle, what did you change to sustain cultivation?
 - Would you try another mission? Why?
+
+## Circle
+
+Answer for Circle attempts; leave blank what you did not try.
+
+- How does playing the Circle differ from other RTS games or ARC?
+- Describe one cultivation decision you made, such as how many Cultivators
+  used a site or when you moved one. Why did you make it?
+- Did you notice a site become Strained or Dormant? What did you think it
+  meant, and what did you do?
+- Did income ever feel too slow, or did a site's recovery take too long?
+- Was tending a growing building clear? Did you ever replace a Cultivator,
+  and how did you find out it was needed?
+- Did you grow a Conservatory near another site? Did delivery distance
+  matter to you?
 
 ## Skirmish
 
 Answer for skirmish attempts; leave blank what you did not try.
 
-- Did you expand to another deposit? What helped or got in the way, such as
-  Relay Stations or support coverage?
+- Did you expand to another deposit or site? What helped or got in the way,
+  such as Relay Stations, support coverage, or Circle tending?
 - How did you lay out your base, and did placement ever block you?
-- How did you defend against raids and attacks? Were Sentry Turrets useful?
+- How did you defend against raids and attacks? Were Sentry Turrets or
+  Thornspires useful?
 - What did you lose, and how did you rebuild it?
 - Did repairs ever delay construction you wanted? When, and what did you do?
-- Did you use Medics, Mechanics, or Demolition Troopers? What did they add?
+- Did you use Medics, Mechanics, Demolition Troopers, Healers, Artificers,
+  or Briar Rams? What did they add?
 - Did you use control groups, shortcuts, idle-worker or select-matching
   controls? Which were hard to find or use?
 - How did the opponent's raids and attacks feel: too early, fair, too late,

@@ -207,6 +207,14 @@ audit problems, unrestored losses, and failed continuations fail the run; other
 cases still run. Continuation audits include both segments. Tests can drive
 `playMatch` with their own concerns and profiles.
 
+`npm run cultivation:probe -- [plan...] [--minutes <n>]` plays the Circle
+introduction's paid opening, then staffs its two sites by each plan in
+`scripts/cultivation-probe/staffing.ts`. It reports total Lifebloom delivered
+and each site's lowest reserve, Strained and Dormant time, and dormancy
+entries. The post-staffing window measures income rate, the share of worker
+time in each phase, and deliveries per worker minute. Compare runs before and
+after cultivation tuning.
+
 Development links that assign AI, such as
 `?skirmish=arc-arc&ai=east:arc-skirmish`, also enable the AI overlay in dev
 and playtest builds. Backquote cycles it through each AI owner's posture,
@@ -333,14 +341,15 @@ git push --force https://github.com/lepouya/cotuw.git gh-pages
 rm -rf .git
 ```
 
-Smoke-test the served production bundle from the title screen. Verify model
-and audio loading, the opening guide, one construction and training cycle,
-save/load, restart, and return to the title screen. Open the round's skirmish
-link and confirm that the AI builds its base. Complete one player construction
-and training cycle, export a save, and verify that restart keeps the slot,
-difficulty, and AI assignment. Before the first unobserved round, the
-organizer plays one complete skirmish on the bundle. Record browser and OS
-versions, build revision, URL, and results.
+Smoke-test the served production bundle from the title screen. For each of
+the round's introductions, verify model and audio loading, the opening guide,
+one construction and training cycle, save/load, restart, and return to the
+title screen. Open each of the round's skirmish links and confirm that the AI
+builds its base. Complete one player construction and training cycle, export
+a save, and verify that restart keeps the slot, difficulty, and AI
+assignment. Before the first unobserved round, the organizer plays each
+introduction and one complete skirmish per faction on the bundle. Record
+browser and OS versions, build revision, URL, and results.
 Automated checks alone do not establish this distribution check or human
 mission clarity.
 
