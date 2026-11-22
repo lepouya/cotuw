@@ -103,6 +103,6 @@ it helps reproduce the issue. Check attachments for personal information.
 - Attempt completed without external help: yes / no:
 - Main blocker or reason for abandonment:
 - Priority: blocks playtest / high / medium / low:
-- Actionable issue links and affected M1 tasks:
+- New or affected M1 tasks:
 - Disposition for other observations: fix / investigate / defer, with reason:
 - Follow-up check and acceptance criterion:

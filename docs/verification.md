@@ -355,8 +355,8 @@ mission clarity.
 
 For observed sessions, give help only on request or when the player is
 blocked, and record each intervention. Use participant codes. Keep contact
-details, reports, and saves outside the repository. Link actionable findings
-to issues and affected tasks, and record a disposition for other observations.
+details, reports, and saves outside the repository. Record actionable findings
+as tasks in TODO.md, and record a disposition for other observations.
 
 ## Human acceptance
 
@@ -386,5 +386,5 @@ to issues and affected tasks, and record a disposition for other observations.
   Compilation and browser WebKit checks do not verify packaged-app behavior.
 
 Include the revision, platform, build mode, input method, observed result, and
-reproduction details with actionable bug reports. Track work in issues and
+reproduction details with actionable bug reports. Track work in TODO.md and
 commit history rather than keeping dated acceptance logs in project docs.

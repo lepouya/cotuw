@@ -124,8 +124,8 @@ Optionally use code-simplifier on changed code while keeping the selected
 architecture fixed. Inspect the diff and rerun affected checks after edits.
 Finish when completion criteria and verification pass. Report results, risks,
 and deferred findings. Keep lasting contracts in their owning docs and pending
-work in TODO.md or issues. Remove completed reports, plans, and manifests;
-version control owns their history.
+work in TODO.md. Remove completed reports, plans, and manifests. Version
+control owns their history.
 
 ## Full-workflow request
 

@@ -8,8 +8,8 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phase E is active. The Circle introduction is playable, and cohort task
-1.02 continues with 1.57.
+Phase E is active. Circle follow-ups 1.72 to 1.75 and retest 1.77 continue
+cohort task 1.02.
 
 ### Using this checklist
 
@@ -25,8 +25,9 @@ Phase E is active. The Circle introduction is playable, and cohort task
   platform coverage, and human acceptance.
 - Keep completed tasks to a short outcome. Pending tasks retain dependencies,
   remaining work, and acceptance criteria; link rules instead of repeating them.
-- Keep findings and reproduction details in linked issues. Version control
-  owns delivery history; do not accumulate playtest or implementation logs.
+- Track findings as tasks here, with reproduction details only while they
+  inform pending work. Version control owns delivery history; do not
+  accumulate playtest or implementation logs.
 - Tasks that depend on an optional scope choice implement only the agreed
   content. Record a deliberate deferral beside the affected task.
 
@@ -36,9 +37,9 @@ Phase E is active. The Circle introduction is playable, and cohort task
   report template. See
   [playtest preparation](docs/verification.md#playtest-preparation).
 - [ ] **1.02** Complete playtesting with a cohort of five to eight RTS-familiar
-  and less experienced players through 1.57. Cover controls, clarity, pacing,
+  and less experienced players through 1.77. Cover controls, clarity, pacing,
   reliability, assistance, and abandonment. Turn findings into prioritized
-  issues for controls and onboarding. Follow
+  tasks for controls and onboarding. Follow
   [playtest preparation](docs/verification.md#playtest-preparation).
 - [x] **1.03** Circle construction and infrastructure rules.
 - [x] **1.04** Cultivation, dormancy, delivery, and recovery rules.
@@ -119,7 +120,7 @@ Complete. The expanded ARC roster is playable with the
 - [x] **1.45** Rebindable gameplay and production shortcuts.
 - [x] **1.46** ARC AI expansion, defense, repairs, and mixed forces.
 - [x] **1.47** ARC playtest feedback and local-defense follow-up.
-  Further coverage belongs to 1.57 and pacing to 1.63.
+  Carry any remaining ARC cohort coverage into 1.65. Tune pacing in 1.63.
 - [x] **1.58** M1 optional-system scope. See
   [resources and progression](DESIGN.md#m1-resources-and-progression).
 - [x] **1.71** Owner colors in models, remains, and minimap markers.
@@ -159,26 +160,67 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   work, a periodically reloaded base, and the introduction. Loading rejects
   Cultivator phases that contradict their targets. `circle-continuation`
   resumes during raids, Musterhall growth, and Cultivator replacement.
-- [ ] **1.57** Playtest the Circle introduction and base loop with the 1.02
-  cohort. Verify RTS-familiar newcomers understand its differences,
+- [x] **1.57** Cohort round of the Circle introduction and a Circle skirmish
+  against the ARC AI with three testers. Cultivation was understood, and units
+  and buildings behaved as expected. Findings continue in 1.72 to 1.77.
+- [ ] **1.72** Make Circle skirmish wins against the ARC AI achievable before
+  full-match pacing in 1.63. All three testers lost every Circle skirmish. In
+  the `cross-faction` set, ARC wins from both slots: Circle peaks at 3 to 6
+  army units against ARC's 9 to 12, trains 16 to 19 Cultivators, and reaches
+  military readiness 38 to 45 seconds later despite earning income first.
+  - Capture the Normal baseline from both slots after 1.74. Compare Musterhall
+    and defense timing, Cultivator exposure and replacement costs, and
+    Sentinel performance through ARC's first raid. Use the results to choose
+    cultivation, combat, or Circle AI changes. Cultivation levers include
+    rates, reserve and cargo capacity, and dormancy thresholds.
+  - Use `npm run cultivation:probe` to compare introduction staffing before
+    and after cultivation changes. Propose rule changes before tuning beyond
+    the locked infrastructure rules.
+  - Run both `cross-faction` cases. Both must complete without faults, with
+    at least one Circle win. Verify human play in 1.77.
+- [ ] **1.73** Fix camera framing near map edges. The camera's focal point is
+  clamped near explored ground, which reads as a diamond under the isometric
+  view. Record where a player expects to frame known ground but hits the
+  clamp. Check a map edge and an interior fog frontier. Compare these
+  prototypes in play using a development option.
+  - A border of at least four tiles on every map, filled with scenery such as
+    rough rock, mountains, or water. Units never enter it, but it follows
+    normal fog and exploration, so patrolling scouts reveal it and its fogged
+    edge fades out the map. It gives panning and zooming room without adding
+    playable ground. The wolf-den map has a three-tile out-of-bounds border,
+    and the skirmish map has at least four tiles.
+  - Clamp so explored ground stays within a central part of the viewport
+    instead of clamping the focal point.
+  - Scale the frontier margin with zoom and viewport aspect.
+  - Verify players can frame the target at different zooms on standard and
+    wide viewports while unexplored tiles stay concealed. Keep minimap, focus,
+    and Reset View consistent with the chosen rule. Record it in
+    [fog rules](DESIGN.md#fog-stealth-and-detection) and cover it in browser
+    specs.
+- [ ] **1.74** Halve mountain wall heights on the wolf den and skirmish maps
+  (`MOUNTAIN_HEIGHT` in `scripts/levels/prototype-terrain.ts` and the ridge
+  in `src/content/skirmish-map.ts`) so they stop hiding the view. Keep landmark
+  summit elevations and allow longer sightlines over walls. Regenerate
+  levels and check camera visibility in the introductions, skirmish, and
+  sandbox, which shares the wolf-den terrain. Verify walls still block
+  movement and placement, intended crossings stay open, and both
+  introductions and affected headless sets pass.
+- [ ] **1.75** Fix the Circle music, which testers heard as odd or out of
+  order. Listen to both tracks through their loop seams and listen in-game
+  as combat begins and ends. Check whether the shared echo, the combat
+  track's lower off-beat pluck, or the cue transition causes the report.
+  Fix the confirmed cause, regenerate any changed audio, and repeat the
+  listening checks.
+- [ ] **1.77** Retest 1.72 to 1.75 in the Circle introduction and skirmish
+  on a rebuilt, smoke-tested bundle. Follow the
+  [playtest procedure](docs/verification.md#playtest-preparation). Use returning
+  testers to check the fixes and recruit new players as needed for 1.02.
+  Verify RTS-familiar newcomers understand the Circle's differences,
   establish and sustain a base, and explain a useful cultivation decision.
-  Refine cultivation rates, reserve capacity, cargo capacity, and dormancy
-  thresholds using the introduction. Fix and retest recurring confusion
-  before full-match balancing.
-  - Done: [tester instructions](docs/playtest-instructions.md) require the
-    Circle introduction for every tester, followed by a Circle skirmish
-    against the ARC AI. `npm run cultivation:probe` measures introduction
-    staffing plans for tuning comparisons.
-  - Remaining: full acceptance and the bundle smoke test, the cohort round,
-    triage, tuning, and retests.
-  - Testers who still need the ARC skirmish follow the
-    [ARC instructions](docs/playtest-instructions.md). Cover expansion and
-    Relay Stations, base layout, recovery after losses, Mechanics, control
-    groups, shortcuts, and idle-worker controls. Check whether repair under
-    attack blocks rebuilding. Propose rule changes before tuning beyond the
-    locked infrastructure rules.
-  - A blocker reported by two or more testers is recurring. Fix it with
-    regression coverage and replay the affected paths on a rebuilt bundle.
+  Require at least one unassisted Circle win on Normal and record whether
+  other players hold or recover from the first ARC raid. Fix blockers
+  reported by two or more testers, add regression coverage, and replay the
+  affected paths on a rebuilt bundle.
 
 Phase gate: Circle play is a complete, understandable loop with a meaningful
 cultivation distinction, and its AI can sustain the same economy and roster.
@@ -244,6 +286,9 @@ challenge, pacing, and useful choices.
   run full skirmish playtests with both factions. Observe in-game onboarding,
   time to key milestones, assistance, confusion, and abandonment; ask what
   drove build, expansion, and combat choices.
+  - Carry forward any unfinished ARC cohort runs. Check expansion and Relay
+    Stations, layout, recovery and Mechanics, control groups, shortcuts, and
+    idle-worker controls. Check whether repair under attack blocks rebuilding.
 - [ ] **1.66** Verify that first-time ARC players, using M0 and in-game help,
   and RTS-familiar Circle players, after the Circle introduction, establish
   income, production, defense, and an expansion. Observe testers winning and
@@ -251,9 +296,15 @@ challenge, pacing, and useful choices.
   recovery. Verify that included combat and support roles are useful and no
   opening depends on developer knowledge. Revisit whether surviving defensive
   buildings support useful comebacks or mainly prolong cleanup.
-- [ ] **1.67** Triage external findings into actionable issues, incorporate
-  fixes, and retest affected paths. Resolve recurring progression blockers;
-  give remaining issues an explicit priority and disposition.
+- [ ] **1.67** Triage external findings into tasks, incorporate fixes, and
+  retest affected paths. Resolve recurring progression blockers; give
+  remaining findings an explicit priority and disposition.
+- [ ] **1.76** Improve model and graphics fidelity based on 1.57 feedback.
+  Before the integrated playtest, record the assets or scenes in scope in
+  [art direction](DESIGN.md#m1-circle-presentation) and defer the rest.
+  Finish the pass before fixed-revision verification in 1.69. Check visual
+  readability at gameplay zoom and repeat affected human and performance
+  checks for the changed scenes. Verify regenerated assets in 1.70.
 - [ ] **1.68** Complete regression coverage for actor ownership, resource
   isolation, command authority, information boundaries, recovery,
   cultivation, objectives, metrics, AI save/load, and clock-batching
@@ -271,7 +322,7 @@ challenge, pacing, and useful choices.
 
 Phase gate: both factions pass the agreed match, performance, persistence,
 platform, and human acceptance targets, with feedback incorporated and known
-issues dispositioned.
+findings dispositioned.
 
 ### Deferred scope
 

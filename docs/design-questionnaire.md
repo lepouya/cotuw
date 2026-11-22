@@ -1229,7 +1229,7 @@ yields or also by pressure on existing collection sites.
   requires a new Gather order. Dormancy keeps Gather active, so orders queued
   behind it continue waiting through recovery.
 - Tasks 1.50 and 1.51 implement cultivation and feedback, 1.56 verifies save
-  continuation, and 1.57 refines tuning through playable-slice testing.
+  continuation, and 1.72 tunes cultivation based on the 1.57 playtest.
 
 **Decision date:** 2026-10-22.
 

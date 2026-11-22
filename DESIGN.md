@@ -2316,7 +2316,7 @@ rules. M1 implementation choices and tuning belong to its tasks in TODO.md.
   Player-title usage, Circle leadership, and early Everwake address remain open.
 - **Economy:** resource transfer/trading, collection-site ownership, population
   or command caps, worker scouting value, combat-wreck salvage, and mixed-yield
-  balance. M1 cultivation tuning remains in 1.57.
+  balance. M1 cultivation tuning remains in 1.72.
 - **World:** campaign map scale/palettes, neutral systems, world-event cadence,
   escalation, and corruption's spread and counterplay.
 - **Presentation:** accessibility tuning, final art/audio, and concealment,
