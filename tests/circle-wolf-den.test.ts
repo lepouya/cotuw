@@ -18,7 +18,6 @@ import {
 import { createScenarioMap } from "../src/simulation/scenario";
 import { factionOf } from "../src/simulation/ownership";
 import { serializeMission } from "../src/simulation/mission-file";
-import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { cultivationStatus } from "../src/simulation/cultivation";
 
 import type { LoadedMission } from "../src/mission-loading";
@@ -32,7 +31,7 @@ const reload = (mission: LoadedMission, simulation: MissionSimulation) =>
       serializeMission(
         mission.scenario,
         simulation.snapshot(),
-        SIMULATION_TICK_SECONDS,
+        simulation.tickSeconds,
       ),
     ),
   );
@@ -41,10 +40,12 @@ const sentinelIds = Array.from(
   (_, index) => `starting-sentinel-${index + 1}`,
 );
 
-function circleOrders(sim: MissionSimulation) {
-  const until = (condition: () => boolean) => untilSeconds(sim, condition);
+/** Orders for the current run, which a save checkpoint may replace. */
+function circleOrders(current: () => MissionSimulation) {
+  const until = (condition: () => boolean) =>
+    untilSeconds(current(), condition);
   const order = (value: MissionCommand) =>
-    expect(command(sim, value)).toMatchObject({ accepted: true });
+    expect(command(current(), value)).toMatchObject({ accepted: true });
   const train = (actorId: string, producerId: string, definitionId: string) =>
     order({ kind: "train-unit", actorId, producerId, definitionId });
   const gather = (actorId: string, siteId: string) =>
@@ -62,11 +63,11 @@ function circleOrders(sim: MissionSimulation) {
       origin: { x, z },
       workerIds: ["worker"],
     });
-    until(() => sim.actorById(actorId)?.construction === undefined);
-    expect(sim.actorById(actorId)).toBeDefined();
+    until(() => current().actorById(actorId)?.construction === undefined);
+    expect(current().actorById(actorId)).toBeDefined();
   };
   train("worker", "starting-heartgrove", "circle-cultivator");
-  until(() => !!sim.actorById("worker"));
+  until(() => !!current().actorById("worker"));
   grow("conservatory", "circle-conservatory", 16, 50);
   return { until, order, train, grow, gather };
 }
@@ -178,7 +179,7 @@ test("a prepared Circle force clears both encounters and continues identically a
 
 test("the authored paid opening delivers Lifebloom, reveals the second site, and funds both infantry roles", () => {
   const sim = createSessionSimulation(opening());
-  const { until, train, grow, gather } = circleOrders(sim);
+  const { until, train, grow, gather } = circleOrders(() => sim);
   expect(balance(sim, "lifebloom")).toBe(0);
   gather("worker", "near-lifebloom");
   until(() => deposited(sim, "lifebloom") > 0);
@@ -203,11 +204,22 @@ test("the authored paid opening delivers Lifebloom, reveals the second site, and
   expect(sim.economy!.loot.every(({ collected }) => !collected)).toBe(true);
 });
 
-test("an authored introduction strains a site, rotates workers, and wins within ten minutes", () => {
+/**
+ * Plays the authored introduction. With `checkpoints`, it reloads from the
+ * mission file after site strain, Musterhall growth, and the first encounter.
+ */
+function playIntroduction(checkpoints: boolean) {
   const mission = opening();
   const map = createScenarioMap(missionTerrain(mission));
-  const sim = createSessionSimulation(mission);
-  const { until, order, train, grow, gather } = circleOrders(sim);
+  let sim = createSessionSimulation(mission);
+  const checkpoint = () => {
+    if (!checkpoints) return;
+    const restored = reload(mission, sim);
+    expect(restored.snapshot()).toEqual(sim.snapshot());
+    sim.dispose();
+    sim = restored;
+  };
+  const { until, order, train, grow, gather } = circleOrders(() => sim);
   const nearSite = () =>
     sim.economy!.cultivation!.sites.find(({ id }) => id === "near-lifebloom")!;
   gather("worker", "near-lifebloom");
@@ -216,9 +228,11 @@ test("an authored introduction strains a site, rotates workers, and wins within 
   until(() => !!sim.actorById("worker-2"));
   gather("worker-2", "near-lifebloom");
   until(() => cultivationStatus(nearSite()) === "Strained");
+  checkpoint();
   gather("worker-2", "south-lifebloom");
   until(() => balance(sim, "lifebloom") >= 100);
   grow("muster", "circle-musterhall", 12, 54);
+  checkpoint();
   gather("worker", "near-lifebloom");
   for (const id of sentinelIds) {
     until(() => balance(sim, "lifebloom") >= 35);
@@ -239,14 +253,24 @@ test("an authored introduction strains a site, rotates workers, and wins within 
   route("group-move", 34, 36, 10);
   route("group-attack-move", 52, 32, 25);
   expect(sim.objectives[1]!.status).toBe("complete");
+  checkpoint();
   route("group-move", 57, 35, 8);
   route("group-move", 70, 34, 10);
   route("group-move", 77, 36, 8);
   route("group-move", 77, 35, 5);
   route("group-attack-move", 78, 21, 40);
+  return sim;
+}
+
+test("an authored introduction strains a site, rotates workers, wins within ten minutes, and continues identically from saves", () => {
+  const sim = playIntroduction(false);
   expect(sim.result?.kind).toBe("victory");
   expect((sim.result!.tick + 1) * sim.tickSeconds).toBeLessThan(10 * 60);
-}, 30_000);
+  const resumed = playIntroduction(true);
+  expect(resumed.snapshot()).toEqual(sim.snapshot());
+  sim.dispose();
+  resumed.dispose();
+}, 60_000);
 
 test.each([
   ["circle-wayfinder", true],

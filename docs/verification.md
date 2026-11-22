@@ -177,7 +177,10 @@ resumes toward the same limit. The sets are:
 - `circle-mirror`, `circle-recovery`, and `circle-continuation`: the same
   checks for the Circle. Recovery cases remove west's Cultivators, its
   Conservatories, both together, its Musterhall and Construct Nursery, or its
-  Heartgrove at 6:00. Headquarters loss is accepted.
+  Heartgrove at 6:00. Headquarters loss is accepted. Circle continuation saves
+  the Normal mirror at 10:00 during raids and at 3:10 during Musterhall
+  growth. The Cultivator-loss case saves at 6:06 while west has a replacement
+  training and another travelling to work.
 - `cross-faction`: Normal ARC-versus-Circle matches with each faction in the
   west slot, which must complete without faults or audit problems.
 

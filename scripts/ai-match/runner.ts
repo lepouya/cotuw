@@ -48,6 +48,9 @@ import type {
 
 export const DEFAULT_CUTOFF_MINUTES = 30;
 
+const matchTicks = (minutes: number) =>
+  secondsToTicks(minutes * 60, SIMULATION_TICK_SECONDS);
+
 export type MatchCase = {
   readonly id: string;
   readonly choice: SkirmishChoice;
@@ -136,8 +139,9 @@ export const ARC_RECOVERY_CASES: readonly MatchCase[] = [
 ];
 
 const circleLoss = lossCase("circle-recovery", CIRCLE_MIRROR_CASES);
+const circleWorkerLoss = circleLoss("workers", ["circle-cultivator"]);
 export const CIRCLE_RECOVERY_CASES: readonly MatchCase[] = [
-  circleLoss("workers", ["circle-cultivator"]),
+  circleWorkerLoss,
   circleLoss("income", ["circle-conservatory"]),
   circleLoss("economy", ["circle-cultivator", "circle-conservatory"]),
   circleLoss("production", ["circle-musterhall", "circle-construct-nursery"]),
@@ -153,11 +157,22 @@ export const ARC_CONTINUATION_CASES: readonly MatchCase[] = [
     resumeAtMinutes: 10,
   },
 ];
+/** Saves across raids, Musterhall growth, and Cultivator replacement. */
 export const CIRCLE_CONTINUATION_CASES: readonly MatchCase[] = [
   {
     ...normalWest(CIRCLE_MIRROR_CASES),
     id: "circle-continuation",
     resumeAtMinutes: 10,
+  },
+  {
+    ...normalWest(CIRCLE_MIRROR_CASES),
+    id: "circle-continuation-opening",
+    resumeAtMinutes: 3 + 10 / 60,
+  },
+  {
+    ...circleWorkerLoss,
+    id: "circle-continuation-recovery",
+    resumeAtMinutes: 6 + 6 / 60,
   },
 ];
 
@@ -323,7 +338,7 @@ export function runMatch(
   const run = simulateMatch(id, mission, options);
   if (resumeAtMinutes === undefined) return preserveFailure(run);
   // A shorter command-line cutoff leaves the checkpoint unreached.
-  if (resumeAtMinutes >= (cutoffMinutes ?? DEFAULT_CUTOFF_MINUTES))
+  if (matchTicks(resumeAtMinutes) >= run.report.cutoffTicks)
     return preserveFailure({
       ...run,
       report: { ...run.report, continuation: "not reached" },
@@ -332,10 +347,18 @@ export function runMatch(
     ...options,
     cutoffMinutes: resumeAtMinutes,
   });
+  const auditBeforeLoad = [
+    ...run.report.audit,
+    ...segmentProblems("before save", saved.report),
+  ];
   if (saved.report.status !== "incomplete")
     return preserveFailure({
-      ...run,
-      report: { ...run.report, continuation: "not reached" },
+      state: saved.state,
+      report: {
+        ...run.report,
+        continuation: "not reached",
+        audit: auditBeforeLoad,
+      },
     });
   let resumed: SimulatedMatch;
   try {
@@ -353,29 +376,32 @@ export function runMatch(
       report: {
         ...run.report,
         continuation: "diverged",
-        audit: [
-          ...run.report.audit,
-          `save/load failed: ${errorMessage(error)}`,
-        ],
+        audit: [...auditBeforeLoad, `save/load failed: ${errorMessage(error)}`],
       },
     });
   }
-  const matched = resumed.state === run.state;
+  const matched =
+    resumed.state === run.state && resumed.report.status === run.report.status;
   return preserveFailure({
     state: matched ? run.state : saved.state,
     report: {
       ...run.report,
       continuation: matched ? "matched" : "diverged",
       audit: [
-        ...run.report.audit,
-        ...saved.report.audit.map((problem) => `before save: ${problem}`),
-        ...resumed.report.audit.map((problem) => `after load: ${problem}`),
+        ...auditBeforeLoad,
+        ...segmentProblems("after load", resumed.report),
       ],
     },
   });
 }
 
 type SimulatedMatch = { report: MatchReport; state: string };
+
+function segmentProblems(segment: string, report: MatchReport) {
+  const problems = report.audit.map((problem) => `${segment}: ${problem}`);
+  if (report.status === "faulted") problems.push(`${segment}: ${report.fault}`);
+  return problems;
+}
 
 const preserveFailure = ({ report, state }: SimulatedMatch): MatchRun => ({
   report,
@@ -386,8 +412,8 @@ const outcome = (
   result: SkirmishResult | undefined,
   fault: string | undefined,
 ): MatchOutcome => {
-  if (result) return { status: "completed", result };
-  return fault ? { status: "faulted", fault } : { status: "incomplete" };
+  if (fault !== undefined) return { status: "faulted", fault };
+  return result ? { status: "completed", result } : { status: "incomplete" };
 };
 
 /**
@@ -414,10 +440,7 @@ function simulateMatch(
   const { scenario } = mission;
   if (!scenario.skirmish)
     throw new RangeError(`Case ${caseId} is not a skirmish.`);
-  const cutoffTicks = secondsToTicks(
-    cutoffMinutes * 60,
-    SIMULATION_TICK_SECONDS,
-  );
+  const cutoffTicks = matchTicks(cutoffMinutes);
   if (!isPositive(cutoffMinutes) || !isCount(cutoffTicks))
     throw new RangeError("Match cutoff must be positive and fit safe ticks.");
   const simulation = createSessionSimulation(mission, undefined, aiConcerns);

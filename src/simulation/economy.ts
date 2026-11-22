@@ -1,10 +1,10 @@
 import { compareIds, healthOf, nearestTo } from "./actor";
 import {
   applyCultivationCommand,
-  clearTending,
   createCultivatorState,
   cultivationRouteBlocked,
   interruptCultivation,
+  removeCultivationActor,
   updateCultivation,
   validateCultivation,
   validateCultivationDefinitions,
@@ -493,25 +493,10 @@ export function removeEconomyActor(
   actorId: string,
   retire: (id: string) => void,
 ): string[] {
-  const interrupted: string[] = [];
   removeProducer(economy, actorId, retire);
-  if (economy.cultivation) {
-    economy.cultivation.workers = economy.cultivation.workers.filter(
-      (worker) => worker.actorId !== actorId,
-    );
-    for (const worker of economy.cultivation.workers) {
-      if (worker.tendingId === actorId) {
-        interrupted.push(worker.actorId);
-        clearTending(worker);
-        worker.phase = "idle";
-      }
-      if (worker.dropoffId === actorId) {
-        interrupted.push(worker.actorId);
-        delete worker.dropoffId;
-        worker.phase = "returning";
-      }
-    }
-  }
+  const interrupted = economy.cultivation
+    ? removeCultivationActor(economy.cultivation, actorId)
+    : [];
   interrupted.push(...removeHarvestingActor(economy, actorId));
   return interrupted;
 }

@@ -1,5 +1,5 @@
 import { nearestTo } from "./actor";
-import { clearTending } from "./cultivation";
+import { stopCultivation } from "./cultivation";
 import {
   advanceWorkerRoute,
   routeTarget,
@@ -66,9 +66,7 @@ export function releaseTender(economy: EconomyState, buildingId: string) {
   const worker = economy.cultivation?.workers.find(
     (worker) => worker.tendingId === buildingId,
   );
-  if (!worker) return;
-  clearTending(worker);
-  worker.phase = "idle";
+  if (worker) stopCultivation(worker);
 }
 export function validateGrowthDefinitions(
   definitions: ReadonlyMap<string, ActorDefinition>,

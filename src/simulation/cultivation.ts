@@ -38,16 +38,15 @@ export type CultivationSite = {
   recoverAt: number;
   dormant: boolean;
 };
-export const CULTIVATOR_PHASES = [
-  "idle",
-  "travelling",
-  "gathering",
-  "returning",
-  "waiting",
-  "blocked",
-  "no-dropoff",
-  "tending",
-] as const;
+export type CultivatorPhase =
+  | "idle"
+  | "travelling"
+  | "gathering"
+  | "returning"
+  | "waiting"
+  | "blocked"
+  | "no-dropoff"
+  | "tending";
 export type CultivatorState = {
   actorId: string;
   cargo: number;
@@ -61,7 +60,7 @@ export type CultivatorState = {
   /** The assigned growth has no reachable entrance. */
   tendingBlocked?: true;
   dropoffId?: string;
-  phase: (typeof CULTIVATOR_PHASES)[number];
+  phase: CultivatorPhase;
 };
 export type CultivationState = {
   sites: CultivationSite[];
@@ -150,9 +149,23 @@ export function cultivationStatus(site: DeepReadonly<CultivationSite>) {
 export const workedSiteIds = (
   workers: readonly Pick<CultivatorState, "siteId">[],
 ) => new Set(workers.flatMap(({ siteId }) => siteId ?? []));
-export function clearTending(worker: CultivatorState) {
+function clearTending(worker: CultivatorState) {
   delete worker.tendingId;
   delete worker.tendingBlocked;
+}
+
+/** Ends assigned work while leaving cargo on board. */
+export function stopCultivation(worker: CultivatorState) {
+  delete worker.siteId;
+  clearTending(worker);
+  delete worker.dropoffId;
+  worker.phase = "idle";
+}
+
+function startDelivery(worker: CultivatorState) {
+  clearTending(worker);
+  delete worker.dropoffId;
+  worker.phase = "returning";
 }
 
 /** Includes assignment routes that could not start a movement order. */
@@ -171,12 +184,28 @@ export function interruptCultivation(actor: Actor, economy?: EconomyState) {
   const worker = economy?.cultivation?.workers.find(
     (worker) => worker.actorId === actor.id,
   );
-  if (!worker) return;
-  delete worker.siteId;
-  clearTending(worker);
-  delete worker.dropoffId;
-  worker.phase = "idle";
+  if (worker) stopCultivation(worker);
 }
+
+/** Removes a worker or releases assignments to a lost building. */
+export function removeCultivationActor(
+  state: CultivationState,
+  actorId: string,
+) {
+  const interrupted: string[] = [];
+  state.workers = state.workers.filter((worker) => worker.actorId !== actorId);
+  for (const worker of state.workers) {
+    if (worker.tendingId === actorId) {
+      stopCultivation(worker);
+      interrupted.push(worker.actorId);
+    } else if (worker.dropoffId === actorId) {
+      startDelivery(worker);
+      interrupted.push(worker.actorId);
+    }
+  }
+  return interrupted;
+}
+
 export function applyCultivationCommand(
   command: EconomyCommand,
   economy: EconomyState,
@@ -205,20 +234,18 @@ export function applyCultivationCommand(
     );
     if (prior) return "tender-occupied";
     if (!reaches(actor, building)) return "unreachable-growth";
-    interruptCultivation(actor, economy);
+    stopCultivation(worker);
     worker.tendingId = building.id;
     worker.phase = "tending";
   } else if (command.kind === "gather") {
     if (!economy.cultivation!.sites.some((site) => site.id === command.siteId))
       return "missing-site";
-    interruptCultivation(actor, economy);
+    stopCultivation(worker);
     worker.siteId = command.siteId;
     worker.phase = worker.cargo ? "returning" : "travelling";
   } else if (command.kind === "return-cargo") {
     if (!worker.cargo) return "empty-cargo";
-    clearTending(worker);
-    delete worker.dropoffId;
-    worker.phase = "returning";
+    startDelivery(worker);
   } else return "invalid-cultivator";
   delete actor.movement;
   clearCombatOrders(actor);
@@ -372,6 +399,33 @@ export function validateCultivationDefinitions(
   }
 }
 
+function validAssignment({
+  phase,
+  siteId,
+  dropoffId,
+  tendingId,
+  cargo,
+}: CultivatorState) {
+  if ((tendingId !== undefined) !== (phase === "tending")) return false;
+  switch (phase) {
+    case "idle":
+    case "tending":
+      return siteId === undefined && dropoffId === undefined;
+    case "travelling":
+    case "gathering":
+    case "waiting":
+      return siteId !== undefined && dropoffId === undefined;
+    case "returning":
+      return cargo > 0;
+    case "no-dropoff":
+      return cargo > 0 && dropoffId === undefined;
+    case "blocked":
+      return dropoffId === undefined ? siteId !== undefined : cargo > 0;
+  }
+  // Unknown phases from a hand-edited file.
+  return false;
+}
+
 /** Site identity and tiles are validated with the other economy sites. */
 export function validateCultivation(
   economy: EconomyState,
@@ -430,11 +484,8 @@ export function validateCultivation(
       worker.gatherProgress >= RESOURCE_SCALE ||
       !isCount(worker.rateProgress) ||
       worker.rateProgress >= secondsToTicks(1, tickSeconds) * RESOURCE_SCALE ||
-      (!!worker.tendingId &&
-        (worker.siteId !== undefined || worker.dropoffId !== undefined)) ||
-      !CULTIVATOR_PHASES.includes(worker.phase) ||
-      (worker.siteId !== undefined &&
-        !state.sites.some(({ id }) => id === worker.siteId)) ||
+      !validAssignment(worker) ||
+      (worker.siteId !== undefined && !sourceIds.has(worker.siteId)) ||
       (worker.dropoffId !== undefined &&
         (!dropoff ||
           dropoff.construction !== undefined ||
@@ -447,8 +498,7 @@ export function validateCultivation(
           definitions.get(tending.definitionId)?.growth?.workerDefinitionId !==
             actor.definitionId)) ||
       (worker.tendingBlocked !== undefined &&
-        (worker.tendingBlocked !== true || !tending)) ||
-      !!worker.tendingId !== (worker.phase === "tending")
+        (worker.tendingBlocked !== true || !tending))
     )
       return invalid();
     workers.add(worker.actorId);

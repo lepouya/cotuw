@@ -205,6 +205,39 @@ test("a result before the checkpoint fails an unexercised continuation", () => {
   expect(preservedState).toBeDefined();
 });
 
+test.each([
+  [2, 89, "not reached", "before save"],
+  [3, 179, "diverged", "after load"],
+] as const)(
+  "a fault after the last committed tick of segment %i fails continuation",
+  (segment, finalTick, continuation, label) => {
+    const audit = observers.matchAudit;
+    let runs = 0;
+    const spy = vi.spyOn(observers, "matchAudit").mockImplementation((sim) => {
+      const observer = audit(sim);
+      if (++runs !== segment) return observer;
+      return {
+        ...observer,
+        observe(tick) {
+          if (tick === finalTick) throw new Error("observer failed");
+          observer.observe(tick);
+        },
+      };
+    });
+    try {
+      const { report, preservedState } = runMatch({
+        ...shortCase("arc-mirror-west-normal"),
+        resumeAtMinutes: SHORT / 2,
+      });
+      expect(report.continuation).toBe(continuation);
+      expect(report.audit).toContain(`${label}: observer failed`);
+      expect(loadMission(preservedState!).state.tick).toBe(90);
+    } finally {
+      spy.mockRestore();
+    }
+  },
+);
+
 test("a failed reload is reported without throwing away the checkpoint", () => {
   const parse = missionFiles.parseMission;
   const spy = vi
@@ -239,7 +272,7 @@ test.each([0, -1, NaN, Infinity])(
   },
 );
 
-test.each([SHORT, SHORT * 2])(
+test.each([SHORT - 0.0001, SHORT, SHORT * 2])(
   "a checkpoint at or past the cutoff is reported unreached: %s",
   (resumeAtMinutes) => {
     const { report, preservedState } = runMatch({

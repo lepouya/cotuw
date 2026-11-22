@@ -154,10 +154,11 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   through faction-reported restart prices. `circle-mirror`, `circle-recovery`,
   `circle-continuation`, and `cross-faction` headless sets pass; Normal Circle
   mirrors finish around 17 minutes.
-- [ ] **1.56** Verify Circle saves and deterministic continuation through
-  construction, tending assignments and worker replacement, cultivation,
-  dormancy, recovery, and support work. Preserve site reserves and dormancy
-  state, worker cargo, cultivation progress, assignments, and queued orders.
+- [x] **1.56** Circle saves continue deterministically from every Cultivator
+  phase, worker replacement, emergency regrowth, dormant recovery, support
+  work, a periodically reloaded base, and the introduction. Loading rejects
+  Cultivator phases that contradict their targets. `circle-continuation`
+  resumes during raids, Musterhall growth, and Cultivator replacement.
 - [ ] **1.57** Playtest the Circle introduction and base loop with the 1.02
   cohort. Add Circle tester instructions. Launch through the demo setup or a
   development link. Verify RTS-familiar newcomers understand its differences,

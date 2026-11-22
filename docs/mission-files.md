@@ -298,6 +298,11 @@ can be read, edited by hand, and loaded again.
   dormancy. Workers save integer cargo, fractional collection and rate
   remainders, site and delivery targets, the building they tend, and phase.
   At most one worker tends each building.
+- A Cultivator's phase must agree with its assignment. `idle` has no target;
+  `tending` names only a growth target. `travelling`, `gathering`, and
+  `waiting` name a site and no drop-off. `returning` and `no-dropoff` carry
+  whole cargo units, and `no-dropoff` has no drop-off target. `blocked` names
+  a site or a drop-off, and a blocked delivery carries whole cargo units.
 - Worker `cargoSources` records collection order as `{ "siteId", "amount" }`
   entries. Amounts use thousandths, including Cultivator fractional cargo.
   Deliveries consume whole resources from that sequence; any fractional
