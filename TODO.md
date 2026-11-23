@@ -152,32 +152,22 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   Headless, mouse, and phone playthroughs verify victory within ten minutes.
 - [x] **1.55** The [Circle AI plan](DESIGN.md#m1-circle-ai-plan) covers
   cultivation, tending, expansion, Thornspires, the full roster, and recovery
-  through faction-reported restart prices. `circle-mirror`, `circle-recovery`,
-  `circle-continuation`, and `cross-faction` headless sets pass; Normal Circle
-  mirrors finish around 17 minutes.
+  through faction-reported restart prices. Headless skirmish cases cover
+  Circle mirrors, recovery, continuation, and cross-faction matches.
 - [x] **1.56** Circle saves continue deterministically from every Cultivator
   phase, worker replacement, emergency regrowth, dormant recovery, support
   work, a periodically reloaded base, and the introduction. Loading rejects
   Cultivator phases that contradict their targets. `circle-continuation`
-  resumes during raids, Musterhall growth, and Cultivator replacement.
+  resumes during an assault, Musterhall growth, and Cultivator replacement.
 - [x] **1.57** Cohort round of the Circle introduction and a Circle skirmish
   against the ARC AI with three testers. Cultivation was understood, and units
   and buildings behaved as expected. Findings continue in 1.72 to 1.77.
-- [ ] **1.72** Make Circle skirmish wins against the ARC AI achievable before
-  full-match pacing in 1.63. All three testers lost every Circle skirmish. In
-  the Normal `cross-faction` baseline, ARC wins from both slots. Circle peaks
-  at 4 to 6 army units against ARC's 9 to 14, trains 18 to 19 Cultivators, and
-  reaches military readiness 38 to 45 seconds later despite earning income
-  first.
-  - Compare Musterhall and defense timing, Cultivator exposure and replacement
-    costs, and Sentinel performance through ARC's first raid. Use the results
-    to choose cultivation, combat, or Circle AI changes. Cultivation levers
-    include rates, reserve and cargo capacity, and dormancy thresholds.
-  - Use `npm run cultivation:probe` to compare introduction staffing before
-    and after cultivation changes. Propose rule changes before tuning beyond
-    the locked infrastructure rules.
-  - Run both `cross-faction` cases. Both must complete without faults, with
-    at least one Circle win. Verify human play in 1.77.
+- [x] **1.72** Circle skirmish wins against the ARC AI are achievable. The
+  Musterhall costs 75 Lifebloom, the Circle AI funds it after its first
+  Conservatory and Cultivator, and Sentinels deal 12 damage. From both
+  starts, the Circle AI rallies near home Lifebloom and wins the Normal
+  cross-faction cases. Every scripted `player:probe` opening wins from either
+  start. Human verification remains in 1.77.
 - [x] **1.73** Every map has a scenic out-of-bounds border, and the camera
   keeps explored ground within the central third of the view. Browser specs
   cover map edges, corners, and interior frontiers at several zooms on
@@ -240,6 +230,8 @@ and producer-based progression scope from 1.06.
     [15 to 25 minute target](DESIGN.md#m1-pacing-and-acceptance). Tune and
     verify post-raid income recovery and counterattack pressure after early
     Harvester losses.
+  - Compare Circle raid defense and income recovery from both starts during
+    full-match pacing tests.
 - [ ] **1.64** Measure the complete skirmish with AI at 200 mobile units and
   40 buildings across both owners on the M3 Pro/18 GB development Mac. Meet
   the tick-time and frame-rate budgets in production browser and packaged

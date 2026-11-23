@@ -1228,8 +1228,8 @@ yields or also by pressure on existing collection sites.
   existing cargo first. After an explicit interruption, resuming cultivation
   requires a new Gather order. Dormancy keeps Gather active, so orders queued
   behind it continue waiting through recovery.
-- Tasks 1.50 and 1.51 implement cultivation and feedback, 1.56 verifies save
-  continuation, and 1.72 tunes cultivation based on the 1.57 playtest.
+- Tasks 1.50 and 1.51 cover cultivation and feedback. Task 1.56 covers save
+  continuation. Task 1.72 uses cultivation staffing as a balance baseline.
 
 **Decision date:** 2026-10-22.
 

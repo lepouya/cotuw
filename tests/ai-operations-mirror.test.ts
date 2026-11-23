@@ -30,12 +30,12 @@ const OWNERS = ["west", "east"] as const;
 const seconds = (count: number) =>
   secondsToTicks(count, SIMULATION_TICK_SECONDS);
 const definitions = new Map(MIRROR.content.actors.map((d) => [d.id, d]));
-/** Both owners' first raids are advancing by then. */
-const RAIDS_SECONDS = 120;
 /** Seconds after the grace until shortly before west's first raid. */
 const LEAD_SECONDS = 105;
 /** West's first raid has launched this long after the lead. */
 const WEST_RAID_SECONDS = 10;
+/** Both owners' first raids are advancing this long after the lead. */
+const BOTH_RAIDS_SECONDS = 15;
 const operations = (sim: MissionSimulation | MissionState, owner = "west") =>
   operationsOf(sim.ai[owner]!.memory);
 
@@ -72,9 +72,9 @@ test("offense waits out the opening grace period", () => {
 });
 
 test("a raid sets out against observed enemy income after the grace", () => {
-  const sim = resumeMirror(structuredClone(graced));
+  const sim = resumeMirror(structuredClone(leading));
   try {
-    const results = runTicks(sim, seconds(RAIDS_SECONDS));
+    const results = runTicks(sim, seconds(BOTH_RAIDS_SECONDS));
     for (const owner of OWNERS) {
       expect(sim.ai[owner]!.posture).toBe("pressuring");
       const [raid] = operations(sim, owner);

@@ -238,7 +238,7 @@ describe("content packs", () => {
 
   test("reject unknown formats, built-ins, and tile types", () => {
     expect(withEdit((pack) => (pack.formatVersion = 1))).toThrow(
-      'format "cotuw-content" version 4',
+      'format "cotuw-content" version 5',
     );
     expect(
       withEdit(

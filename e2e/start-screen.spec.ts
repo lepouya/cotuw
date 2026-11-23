@@ -19,10 +19,13 @@ test("title controls work before the mission renderer loads", async ({
   page,
 }) => {
   let rendererRequests = 0;
-  await page.route("**/src/session.ts", (route) => {
-    rendererRequests++;
-    return route.abort();
-  });
+  await page.route(
+    (url) => url.pathname === "/src/session.ts",
+    (route) => {
+      rendererRequests++;
+      return route.abort();
+    },
+  );
   await page.goto("/");
   await expect(page.locator("#new-mission")).toBeFocused();
   await page.locator("#open-options").click();
@@ -279,6 +282,11 @@ test.describe("skirmish links", () => {
         await expect(page.locator("body")).toContainText(resource);
         await attachScreenshot(page, info, `skirmish-${faction}`);
         await page.locator("#tab-goals").click();
+        await expect(page.locator("#scenario-description")).toContainText(
+          faction === "circle"
+            ? "rally Sentinels near the workers"
+            : "Establish income and build an army",
+        );
         await expect(page.locator("#scenario-goals-note")).toHaveText(
           "An owner with no completed buildings is eliminated. Not counted: Relay Station.",
         );

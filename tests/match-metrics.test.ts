@@ -818,7 +818,7 @@ test("Circle paid growth and training use Lifebloom and the same milestone defin
     unitsProduced: 2,
     buildingsCompleted: 1,
     peakArmy: 1,
-    spent: { materials: 0, lifebloom: 185 },
+    spent: { materials: 0, lifebloom: 160 },
     milestones: {
       militaryReady: ready,
       firstCombatUnit: sim.completedTicks - 1,

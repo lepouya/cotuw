@@ -55,12 +55,12 @@ const resume = (state: MissionState) =>
 
 let simulation: MissionSimulation;
 const outcomes: CommandOutcome[] = [];
-/** The undisturbed base at seven minutes, with its first expansion. */
+/** The undisturbed base at eight minutes, with its first expansion. */
 let developed: MissionState;
 
 beforeAll(() => {
   simulation = createSessionSimulation(MIRROR, undefined, UNDISTURBED);
-  outcomes.push(...runTicks(simulation, minutes(7)));
+  outcomes.push(...runTicks(simulation, minutes(8)));
   developed = simulation.snapshot();
 }, 60_000);
 afterAll(() => simulation.dispose());
@@ -88,9 +88,9 @@ test("the Circle AI opens within the development windows", () => {
       (metrics) => metrics.owner === owner,
     )!;
     expect(milestones.firstIncome).toBeLessThanOrEqual(minutes(2));
-    expect(milestones.militaryReady).toBeLessThanOrEqual(minutes(4));
+    expect(milestones.militaryReady).toBeLessThanOrEqual(minutes(3));
     expect(milestones.firstCombatUnit).toBeLessThanOrEqual(minutes(5));
-    expect(milestones.firstExpansion).toBeLessThanOrEqual(minutes(7));
+    expect(milestones.firstExpansion).toBeLessThanOrEqual(minutes(8));
   }
 });
 
@@ -100,6 +100,31 @@ test("the Circle AI's commands stay valid", () => {
   expect(ai.filter(({ accepted }) => !accepted)).toEqual([]);
   for (const owner of OWNERS)
     expect(simulation.ai[owner]!.rejections).toEqual([]);
+});
+
+test("the first Musterhall rallies close to home Lifebloom", () => {
+  for (const owner of OWNERS) {
+    const rally = outcomes.find(
+      ({ issuer, command, accepted }) =>
+        issuer.owner === owner &&
+        accepted &&
+        command.kind === "set-rally-point" &&
+        ownedBy(simulation, owner, "circle-musterhall").some(
+          ({ id }) => id === command.actorId,
+        ),
+    )?.command;
+    expect(rally?.kind).toBe("set-rally-point");
+    if (rally?.kind !== "set-rally-point") continue;
+    const homeSites = MIRROR.scenario.skirmish!.startingResourceSites[owner]!;
+    const closest = Math.min(
+      ...simulation
+        .economy!.cultivation!.sites.filter(({ id }) => homeSites.includes(id))
+        .map(({ tile }) =>
+          distance(rally.target!, MAP.tileCenter(tile.x, tile.z)),
+        ),
+    );
+    expect(closest).toBeLessThanOrEqual(5 * MAP.tileSize);
+  }
 });
 
 test("Cultivators spread across served sites within the per-site cap", () => {

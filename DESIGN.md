@@ -1512,7 +1512,10 @@ recall rules apply unchanged.
   share trains elsewhere, so the Nursery's Rams are funded. Healers follow
   biological units. Artificers follow Rams.
 - The Musterhall comes before the Construct Nursery. Production ranks with
-  income ahead of expansion, so lost producers regrow first.
+  income ahead of expansion, so lost producers regrow first. The opening
+  funds the Musterhall after the first Conservatory and Cultivator.
+- Army producers rally near the home Lifebloom site so newly trained
+  Sentinels can intercept raids on Cultivators.
 - Each faction's income plan reports the price to restart income from its
   current state and whether that restart is underway. Recovery reserves and
   sells against that report.
@@ -1898,11 +1901,11 @@ acceptance progress. The following sections define the selected scope.
 - The Circle's **Briar Ram** is a tougher, slower living assault construct
   that approaches and batters structures. Sentinels protect its approach;
   committing it to an assault carries more risk than ranged bombardment.
-- The Circle's Heartgrove trains Cultivators. Its Musterhall trains Sentinels,
-  Wayfinders, and Healers. Its **Construct Nursery** grows Briar Rams and
-  trains Artificers through its own normal unit-production queue. Investing
-  in the Nursery opens the construct assault force without occupying the
-  Musterhall's queue and leaves room for future construct types.
+- The Circle's Heartgrove trains Cultivators. The 75-Lifebloom Musterhall
+  trains Sentinels, Wayfinders, and Healers. The **Construct Nursery** grows
+  Briar Rams and trains Artificers through its own unit-production queue.
+  Investing in the Nursery opens the construct assault force without
+  occupying the Musterhall's queue and leaves room for future construct types.
 - M1 includes Artificers to repair Briar Rams under the normal support
   rules. Healers restore biological units rather than living constructs.
 - Basic troops protect specialists and threaten exposed enemy specialists.
@@ -2330,7 +2333,7 @@ rules. M1 implementation choices and tuning belong to its tasks in TODO.md.
   Player-title usage, Circle leadership, and early Everwake address remain open.
 - **Economy:** resource transfer/trading, collection-site ownership, population
   or command caps, worker scouting value, combat-wreck salvage, and mixed-yield
-  balance. M1 cultivation tuning remains in 1.72.
+  balance.
 - **World:** campaign map scale/palettes, neutral systems, world-event cadence,
   escalation, and corruption's spread and counterplay.
 - **Presentation:** accessibility tuning, final art/audio, and concealment,

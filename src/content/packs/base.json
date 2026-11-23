@@ -1,8 +1,8 @@
 {
   "format": "cotuw-content",
-  "formatVersion": 4,
+  "formatVersion": 5,
   "id": "base",
-  "version": 15,
+  "version": 16,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -19,7 +19,7 @@
       "vision": {
         "radius": 8
       },
-      "lifebloomCost": 100,
+      "lifebloomCost": 75,
       "constructionSeconds": 8,
       "growth": {
         "workerDefinitionId": "circle-cultivator",
@@ -212,7 +212,7 @@
       "health": 150,
       "recoveryKind": "biological",
       "weapon": {
-        "damage": 10,
+        "damage": 12,
         "damageType": "arcane",
         "range": 4,
         "cooldownSeconds": 1
@@ -935,6 +935,7 @@
           },
           "forces": {
             "queued": 2,
+            "rallyTowardIncome": false,
             "rallyTiles": [5, 3],
             "mix": { "arc-trooper": 4, "arc-demolition-trooper": 1 },
             "defendedMix": { "arc-trooper": 2, "arc-demolition-trooper": 1 },
@@ -1110,7 +1111,8 @@
           },
           "forces": {
             "queued": 2,
-            "rallyTiles": [5, 3],
+            "rallyTowardIncome": true,
+            "rallyTiles": [5, 3, 2],
             "mix": { "circle-sentinel": 4, "circle-briar-ram": 1 },
             "defendedMix": { "circle-sentinel": 2, "circle-briar-ram": 1 },
             "support": { "circle-healer": 6, "circle-artificer": 2 },
@@ -1130,7 +1132,12 @@
             "forces": 0,
             "essential": true
           },
-          { "concern": "production", "budget": 2, "forces": 0 },
+          {
+            "concern": "production",
+            "budget": 4,
+            "forces": 0,
+            "essential": true
+          },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "forces", "budget": 1, "forces": 1 }
         ],
@@ -1152,7 +1159,7 @@
           { "concern": "circle-expansion", "budget": 2, "forces": 0 },
           { "concern": "income-defenses", "budget": 1, "forces": 0 },
           { "concern": "recovery", "budget": 2, "forces": 0 },
-          { "concern": "forces", "budget": 2, "forces": 0 },
+          { "concern": "forces", "budget": 4, "forces": 0 },
           { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "offense", "budget": 0, "forces": 8 }
         ],
@@ -1175,7 +1182,7 @@
           { "concern": "circle-expansion", "budget": 1, "forces": 0 },
           { "concern": "income-defenses", "budget": 1, "forces": 0 },
           { "concern": "recovery", "budget": 2, "forces": 0 },
-          { "concern": "forces", "budget": 2, "forces": 0 },
+          { "concern": "forces", "budget": 4, "forces": 0 },
           { "concern": "repair", "budget": 1, "forces": 0 }
         ],
         "defending": [
@@ -1193,7 +1200,7 @@
             "essential": true
           },
           { "concern": "recovery", "budget": 2, "forces": 0 },
-          { "concern": "forces", "budget": 3, "forces": 0 },
+          { "concern": "forces", "budget": 4, "forces": 0 },
           { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "offense", "budget": 0, "forces": 8 },

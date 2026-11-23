@@ -64,6 +64,10 @@ bundled packs through the same parser future mod packs will use.
   build-plan section, which that concern's `planSpec` validates. A profile
   supplies sections for exactly its listed concerns with a `planSpec`.
   Each concern's plan type documents its values.
+- A `forces` plan sets `rallyTowardIncome` to try rally positions offset from
+  the nearest known resource site toward headquarters. `rallyTiles` lists
+  the offsets in order. The fallback places rallies away from headquarters,
+  measured from the producer.
 - Relative asset `url` values resolve against the page. The bundled pack uses
   paths such as `assets/models/wolf.glb` to support hosting under a subpath.
 - `presentation` maps actor IDs to what the player sees:

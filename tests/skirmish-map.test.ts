@@ -500,6 +500,20 @@ test("the goals note names the buildings survival ignores", () => {
   );
 });
 
+test.each([
+  ["west", "arc"],
+  ["east", "circle"],
+] as const)("the %s briefing advises the %s player", (playerSlot, faction) => {
+  const scenario = createSkirmishScenario({
+    factions: { west: "arc", east: "circle" },
+    playerSlot,
+    difficulty: "normal",
+  });
+  expect(scenario.briefing?.description).toBe(
+    SKIRMISH_OPENINGS[faction].briefing,
+  );
+});
+
 test("skirmish links resolve matchups, sides, and difficulty", () => {
   expect(skirmishLink(new URLSearchParams("level=sandbox"))).toBeUndefined();
   expect(skirmishLink(new URLSearchParams("skirmish=arc-circle"))).toEqual({

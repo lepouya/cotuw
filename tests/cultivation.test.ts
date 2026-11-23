@@ -966,8 +966,11 @@ test.each(["stop", "construction"] as const)(
     expect(workerOf(sim).dropoffId).toBeUndefined();
     advanceSeconds(sim, 20);
     expect(workerOf(sim).cargo).toBe(cargo);
+    const musterhall = definitions.find(
+      ({ id }) => id === "circle-musterhall",
+    )!;
     expect(balance(sim, "lifebloom")).toBe(
-      order === "stop" ? funds : funds - 100,
+      order === "stop" ? funds : funds - musterhall.lifebloomCost!,
     );
     expect(sim.buildingActivity.some(({ kind }) => kind === "delivery")).toBe(
       false,

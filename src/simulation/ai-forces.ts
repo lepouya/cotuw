@@ -12,6 +12,7 @@ import {
   headquarters,
   idleProvider,
   knownDefenders,
+  sitesNear,
   stepToward,
   train,
   usableBuildings,
@@ -26,12 +27,15 @@ import { distance } from "./world";
 import type { ActorDefinition } from "./actor";
 import type { AiConcernContext } from "./director";
 import type { EconomyView } from "./economy";
+import type { WorldPosition } from "./world";
 
 type ForcesPlan = {
   /** Outstanding orders per producer, so funds stay available elsewhere. */
   readonly queued: number;
-  /** Tiles from a producer's center to its rally point, by preference. */
+  /** Rally offsets in tiles, by preference. */
   readonly rallyTiles: readonly number[];
+  /** Try the home resource site before rallying away from the headquarters. */
+  readonly rallyTowardIncome: boolean;
   /** Relative shares of trained army units, by definition ID. */
   readonly mix: Readonly<Record<string, number>>;
   /** The shares once enemy static defenses are known. */
@@ -109,15 +113,14 @@ function nextArmyUnit(
 }
 
 /**
- * Keeps each usable army producer training toward the profile's mix and
- * support ratios, keeps a valid rally point away from the headquarters, and
- * stations worker-servicing providers at income buildings. Any faction can
- * use it.
+ * Trains toward the profile's mix and support ratios, assigns rally points,
+ * and stations worker-servicing providers at income buildings.
  */
 export const trainForces = plannedConcern<ForcesPlan>(
   {
     queued: isPositiveCount,
     rallyTiles: listOf(isPositive),
+    rallyTowardIncome: (value) => typeof value === "boolean",
     mix: weightsOf(isPositive),
     defendedMix: weightsOf(isPositive),
     support: weightsOf(isPositiveCount),
@@ -128,7 +131,14 @@ export const trainForces = plannedConcern<ForcesPlan>(
     const { terrain } = context;
     const economy = context.view.economy();
     if (!economy || !terrain) return;
-    const home = headquarters(context);
+    const home = headquarters(context)?.worldPosition;
+    const site =
+      plan.rallyTowardIncome && home
+        ? sitesNear(context, home)[0]?.position
+        : undefined;
+    const incomeRallies = site
+      ? plan.rallyTiles.map((tiles) => stepToward(terrain, site, home, tiles))
+      : [];
     const producers = usableBuildings(context, armyProducer(context)).map(
       (building) => ({
         building,
@@ -150,20 +160,16 @@ export const trainForces = plannedConcern<ForcesPlan>(
       },
     );
     for (const { building: producer, trains } of producers) {
-      if (
-        !producer.rallyPoint ||
-        !context.view.evaluateRallyPoint(producer.id, producer.rallyPoint)
-      ) {
-        const target = plan.rallyTiles
-          .map((tiles) =>
-            stepToward(
-              terrain,
-              producer.worldPosition,
-              home?.worldPosition,
-              -tiles,
-            ),
-          )
-          .find((point) => context.view.evaluateRallyPoint(producer.id, point));
+      const validRally = (point: WorldPosition) =>
+        context.view.evaluateRallyPoint(producer.id, point);
+      if (!producer.rallyPoint || !validRally(producer.rallyPoint)) {
+        const target =
+          incomeRallies.find(validRally) ??
+          plan.rallyTiles
+            .map((tiles) =>
+              stepToward(terrain, producer.worldPosition, home, -tiles),
+            )
+            .find(validRally);
         if (target)
           context.issue({
             kind: "set-rally-point",

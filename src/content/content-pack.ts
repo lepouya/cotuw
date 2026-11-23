@@ -38,7 +38,7 @@ import type { TerrainStyle } from "./terrain-style";
 import type { TextureClip } from "./texture-clip";
 
 const FORMAT = "cotuw-content";
-const CONTENT_FORMAT_VERSION = 4;
+const CONTENT_FORMAT_VERSION = 5;
 
 /** Names a content pack and the version whose rules a mission uses. */
 export type ContentReference = { id: string; version: number };

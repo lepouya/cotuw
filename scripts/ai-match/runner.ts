@@ -157,7 +157,7 @@ export const ARC_CONTINUATION_CASES: readonly MatchCase[] = [
     resumeAtMinutes: 10,
   },
 ];
-/** Saves across raids, Musterhall growth, and Cultivator replacement. */
+/** Saves during a base assault, Musterhall growth, and worker replacement. */
 export const CIRCLE_CONTINUATION_CASES: readonly MatchCase[] = [
   {
     ...normalWest(CIRCLE_MIRROR_CASES),
@@ -167,7 +167,7 @@ export const CIRCLE_CONTINUATION_CASES: readonly MatchCase[] = [
   {
     ...normalWest(CIRCLE_MIRROR_CASES),
     id: "circle-continuation-opening",
-    resumeAtMinutes: 3 + 10 / 60,
+    resumeAtMinutes: 2.5,
   },
   {
     ...circleWorkerLoss,

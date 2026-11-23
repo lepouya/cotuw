@@ -29,6 +29,8 @@ type FactionOpening = {
   readonly resource: Resource;
   /** Pays for the first worker and drop-off building. */
   readonly stockpile: number;
+  /** The briefing's opening advice for a player of this faction. */
+  readonly briefing: string;
 };
 
 const SITE_MATERIALS = 1000;
@@ -41,6 +43,7 @@ export const SKIRMISH_OPENINGS = deepFreeze({
     dropoff: "arc-materials-refinery",
     resource: "materials",
     stockpile: 150,
+    briefing: "Establish income and build an army to destroy the rival base.",
   },
   circle: {
     headquarters: "circle-heartgrove",
@@ -48,6 +51,8 @@ export const SKIRMISH_OPENINGS = deepFreeze({
     dropoff: "circle-conservatory",
     resource: "lifebloom",
     stockpile: 150,
+    briefing:
+      "Train a Cultivator and grow a Conservatory to start gathering Lifebloom. Spread Cultivators across the home sites. Grow a Musterhall early and rally Sentinels near the workers to intercept raids, then destroy the rival base.",
   },
 } satisfies Record<SkirmishFaction, FactionOpening>);
 
@@ -198,7 +203,7 @@ export function createSkirmishScenario(
       label: "Skirmish",
       title: "Outlast your rival",
       description:
-        "Establish income and build an army to destroy the rival base.",
+        SKIRMISH_OPENINGS[factions[playerSlot] as SkirmishFaction].briefing,
       goalsHeading: "Win the skirmish",
       goalsNote:
         "An owner with no completed buildings is eliminated." +
