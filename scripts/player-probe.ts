@@ -22,5 +22,5 @@ for (const plan of plans)
       : "no result at cutoff";
     console.log(`${plan.id} ${start.id}: ${outcome}`);
     console.log(`  ${JSON.stringify(report)}`);
-    if (!report.result) process.exitCode = 1;
+    if (report.result?.kind !== "victory") process.exitCode = 1;
   }

@@ -221,8 +221,8 @@ Normal, from each slot. Every five seconds the script checks a fixed
 Cultivator, Musterhall, and Sentinel build order. `rush` attacks from 8:00.
 `economic` and `turtle` build more workers and a Thornspire before attacking.
 The probe reports the result, milestones, peak army, and Cultivator and
-Sentinel losses. A match without a result at 30:00 fails the run. Use the probe
-with `cross-faction` to check balance changes against these openings.
+Sentinel losses. Every opening must win from both slots by 30:00. Use the
+probe with `cross-faction` to check balance changes against these openings.
 
 Development links that assign AI, such as
 `?skirmish=arc-arc&ai=east:arc-skirmish`, also enable the AI overlay in dev
