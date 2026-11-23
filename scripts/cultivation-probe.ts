@@ -3,6 +3,7 @@
 import { fileURLToPath } from "node:url";
 import { runnerImport } from "vite";
 import { isPositive } from "../src/simulation/validation.ts";
+import { selectPlans } from "./select-plans.ts";
 
 const args = process.argv.slice(2);
 const minutesAt = args.indexOf("--minutes");
@@ -11,13 +12,7 @@ const { module } = await runnerImport<
   typeof import("./cultivation-probe/staffing.ts")
 >(fileURLToPath(new URL("cultivation-probe/staffing.ts", import.meta.url)));
 const { PLANS, runStaffing } = module;
-const plans = args.length
-  ? args.map((id) => PLANS.find((plan) => plan.id === id))
-  : PLANS;
-if (!isPositive(minutes) || plans.some((plan) => !plan))
-  throw new Error(
-    "Usage: npm run cultivation:probe -- [plan...] [--minutes <n>]\n" +
-      `Plans: ${PLANS.map(({ id }) => id).join(", ")}.`,
-  );
-for (const plan of plans)
-  console.log(JSON.stringify(runStaffing(plan!, minutes), null, 2));
+const usage = "Usage: npm run cultivation:probe -- [plan...] [--minutes <n>]";
+if (!isPositive(minutes)) throw new Error(usage);
+for (const plan of selectPlans(args, PLANS, usage))
+  console.log(JSON.stringify(runStaffing(plan, minutes), null, 2));

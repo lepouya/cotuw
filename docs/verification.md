@@ -215,6 +215,15 @@ entries. The post-staffing window measures income rate, the share of worker
 time in each phase, and deliveries per worker minute. Compare runs before and
 after cultivation tuning.
 
+`npm run player:probe -- [plan...]` plays scripted Circle openings from
+`scripts/player-probe/circle-player.ts` against the ARC skirmish AI on
+Normal, from each slot. Every five seconds the script checks a fixed
+Cultivator, Musterhall, and Sentinel build order. `rush` attacks from 8:00.
+`economic` and `turtle` build more workers and a Thornspire before attacking.
+The probe reports the result, milestones, peak army, and Cultivator and
+Sentinel losses. A match without a result at 30:00 fails the run. Use the probe
+with `cross-faction` to check balance changes against these openings.
+
 Development links that assign AI, such as
 `?skirmish=arc-arc&ai=east:arc-skirmish`, also enable the AI overlay in dev
 and playtest builds. Backquote cycles it through each AI owner's posture,
