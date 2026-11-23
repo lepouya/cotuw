@@ -36,7 +36,12 @@ export type AudioBindings = {
   loops?: Readonly<Record<string, string | null>>;
 };
 
-type MusicArrangement = { default: string; combat?: string };
+type MusicArrangement = {
+  default: string;
+  combat?: string;
+  /** The loops share a duration and musical timeline. */
+  synchronized?: boolean;
+};
 
 export type AudioContent = {
   clips: Readonly<Record<string, AudioClip>>;
@@ -152,6 +157,8 @@ export function validateAudioContent(
   const music = audio.music;
   const validArrangement = (value: unknown) =>
     isRecord(value) &&
+    (value.synchronized === undefined ||
+      typeof value.synchronized === "boolean") &&
     [value.default, value.combat ?? value.default].every(
       (id) =>
         isId(id) &&

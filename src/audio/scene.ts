@@ -9,7 +9,12 @@ import type {
   AudioCue,
   AudioStep,
 } from "../content/audio";
-import type { AudioBus, AudioMixer, AudioVoice } from "./mixer";
+import type {
+  AudioBus,
+  AudioMixer,
+  AudioPlayOptions,
+  AudioVoice,
+} from "./mixer";
 import type { WorldPosition } from "../simulation/world";
 import { compareIds } from "../simulation/actor";
 
@@ -17,6 +22,8 @@ const WORLD_LOOP_LIMIT = 12;
 const MAX_PAN = 0.8;
 const PENDING_STEP_LIMIT = AUDIO_VOICE_LIMIT * 4;
 const MAX_STEP_LATENESS_MS = 250;
+const MUSIC_KEY = "music";
+const MUSIC_CROSSFADE_SECONDS = 0.35;
 
 /** An object the listener may hear; hidden objects are not emitters. */
 export type AudioEmitter = {
@@ -36,6 +43,9 @@ type Playing = {
 };
 
 type Wanted = { cueId: string; emitter?: AudioEmitter; bus?: AudioBus };
+type StartOptions = Pick<AudioPlayOptions, "fadeSeconds" | "timelineStart"> & {
+  replacing?: Playing;
+};
 
 type Resolved = {
   events: ReadonlyMap<string, readonly AudioStep[]>;
@@ -103,6 +113,7 @@ export function createAudioScene(
   let active = true;
   let disposed = false;
   let musicCue = music?.default;
+  let musicTimeline: number | undefined;
   const playing: Playing[] = [];
   const pending = new Set<PendingStep>();
   const lastPlay = new Map<string, number>();
@@ -144,9 +155,11 @@ export function createAudioScene(
     for (let i = playing.length - 1; i >= 0; i--)
       if (playing[i]!.voice.ended) playing.splice(i, 1);
   };
+  /** Replacements stop only once their successor starts. */
   const start = (
     { cueId, emitter, bus = "sound" }: Wanted,
     loopKey?: string,
+    { replacing, ...timing }: StartOptions = {},
   ) => {
     const cue = cues.get(cueId);
     if (!content || !cue || disposed) return;
@@ -160,7 +173,7 @@ export function createAudioScene(
       return;
     if (playing.filter((item) => item.cueId === cueId).length >= cue.voices)
       return;
-    const full = playing.length >= AUDIO_VOICE_LIMIT;
+    const full = playing.length - (replacing ? 1 : 0) >= AUDIO_VOICE_LIMIT;
     // Loops stay; the scene restores them while their state remains.
     const victim = full
       ? lowestBelow(
@@ -181,10 +194,12 @@ export function createAudioScene(
         loop: clip.loop,
         gain,
         pan,
+        ...timing,
       });
       if (voice) break;
     }
     if (!voice) return;
+    replacing?.voice.stop(timing.fadeSeconds);
     victim?.voice.stop();
     prune();
     variants.set(cueId, variant);
@@ -196,6 +211,21 @@ export function createAudioScene(
       emitterId: world ? emitter?.id : undefined,
       loopKey,
     });
+    return voice;
+  };
+  /** Synchronized arrangements crossfade along one shared timeline. */
+  const updateMusic = () => {
+    const current = playing.find((item) => item.loopKey === MUSIC_KEY);
+    if (!musicCue || current?.cueId === musicCue) return;
+    const timeline =
+      music?.synchronized && musicTimeline !== undefined
+        ? { timelineStart: musicTimeline, fadeSeconds: MUSIC_CROSSFADE_SECONDS }
+        : {};
+    const voice = start({ cueId: musicCue, bus: "music" }, MUSIC_KEY, {
+      replacing: current,
+      ...timeline,
+    });
+    if (voice && music?.synchronized) musicTimeline ??= voice.startedAt;
   };
   const cancelStep = (step: PendingStep) => {
     clearTimeout(step.timer);
@@ -233,7 +263,6 @@ export function createAudioScene(
   /** Selected emitters receive loop slots first, then the nearest others. */
   const desiredLoops = () => {
     const desired = new Map<string, Wanted>();
-    if (musicCue) desired.set("music", { cueId: musicCue, bus: "music" });
     if (!active) return desired;
     const focus = listener();
     const looping = [...emitters.values()]
@@ -289,7 +318,9 @@ export function createAudioScene(
     for (const item of playing) {
       const emitter = item.emitterId ? emitters.get(item.emitterId) : undefined;
       if (
-        (item.loopKey && desired.get(item.loopKey)?.cueId !== item.cueId) ||
+        (item.loopKey &&
+          item.loopKey !== MUSIC_KEY &&
+          desired.get(item.loopKey)?.cueId !== item.cueId) ||
         (item.emitterId && (!active || !emitter))
       )
         item.voice.stop();
@@ -300,6 +331,7 @@ export function createAudioScene(
       }
     }
     prune();
+    updateMusic();
     for (const [key, wanted] of desired)
       if (!playing.some((item) => item.loopKey === key)) start(wanted, key);
   };

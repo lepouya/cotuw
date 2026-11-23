@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { expect, test } from "vitest";
 
 import {
@@ -8,6 +9,8 @@ import {
   soundLoops,
   soundPeak,
 } from "../scripts/audio-assets";
+import type { MusicId } from "../scripts/audio-assets";
+import { BASE_CONTENT } from "./helpers/content";
 
 const entries = [
   ...Object.entries(SOUND_ASSETS).map(([id, asset]) => ({
@@ -83,4 +86,22 @@ test("the audition page offers every asset without autoplay", () => {
   for (const id of Object.keys(MUSIC_ASSETS))
     expect(page).toContain(`src="${id}.wav"`);
   expect(page).not.toContain("autoplay");
+});
+
+test("synchronized music arrangements share one loop length", () => {
+  const { clips, cues, music } = BASE_CONTENT.audio!;
+  const arrangements = [music!, ...Object.values(music!.factions ?? {})];
+  const synchronized = arrangements.filter((item) => item.synchronized);
+  expect(synchronized).not.toHaveLength(0);
+  for (const { default: calm, combat = calm } of synchronized) {
+    const lengths = new Set(
+      [calm, combat].flatMap((cue) =>
+        cues[cue]!.clips.map(
+          (clip) =>
+            MUSIC_ASSETS[basename(clips[clip]!.url, ".wav") as MusicId].seconds,
+        ),
+      ),
+    );
+    expect(lengths.size).toBe(1);
+  }
 });

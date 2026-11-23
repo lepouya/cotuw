@@ -14,11 +14,15 @@ import { forEachProfile, MOUSE_AND_PHONE_PROFILES } from "./profiles";
 import { WEBKIT } from "./tags";
 import { MissionDriver } from "./mission-driver";
 
+import { MUSIC_ASSETS } from "../scripts/audio-assets";
 import type { AttackEvent } from "../src/simulation/combat";
+
+const CIRCLE_MUSIC_SECONDS = MUSIC_ASSETS["circle-frontier"].seconds;
 
 declare global {
   interface Window {
     expireCircleShowcase: () => boolean;
+    circleMusicStarts: { time: number; offset: number }[];
   }
 }
 
@@ -142,6 +146,20 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
     { tag: WEBKIT },
     async ({ page }, testInfo) => {
       const errors = collectPageErrors(page, { console: true });
+      await page.addInitScript((musicSeconds) => {
+        window.circleMusicStarts = [];
+        const start = AudioBufferSourceNode.prototype.start;
+        AudioBufferSourceNode.prototype.start = function (
+          ...args: Parameters<typeof start>
+        ) {
+          if (this.loop && this.buffer?.duration === musicSeconds)
+            window.circleMusicStarts.push({
+              time: args[0] ?? 0,
+              offset: args[1] ?? 0,
+            });
+          return start.apply(this, args);
+        };
+      }, CIRCLE_MUSIC_SECONDS);
       const mission = new MissionDriver(page, { touch });
       const cultivate = async (index: number, site: string) => {
         await mission.select("Cultivator", index);
@@ -197,6 +215,17 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       await expect(page.locator('[data-goal-id="lone-wolf"]')).toContainText(
         "(1/1)",
       );
+      const musicStarts = await page.evaluate(() => window.circleMusicStarts);
+      expect(musicStarts).toHaveLength(3);
+      const [exploration, combat, resumed] = musicStarts;
+      expect(exploration!.offset).toBe(0);
+      for (const transition of [combat!, resumed!]) {
+        expect(transition.offset).toBeGreaterThan(0);
+        expect(transition.offset).toBeCloseTo(
+          (transition.time - exploration!.time) % CIRCLE_MUSIC_SECONDS,
+          5,
+        );
+      }
       await mission.selectAll("Sentinel");
       for (const [x, z, seconds] of [
         [58, 36, 8],

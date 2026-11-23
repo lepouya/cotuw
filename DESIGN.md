@@ -2027,8 +2027,9 @@ acceptance progress. The following sections define the selected scope.
   Circle exploration loop and one combat loop using soft plucked tones, airy
   sustained notes, and wooden percussion. Exploration is spacious and
   contemplative; combat adds a stronger pulse and denser percussion. The
-  player's chosen faction selects the arrangement. Music stays below gameplay
-  cues in the mix.
+  player's chosen faction selects the arrangement. Circle music crossfades at
+  the same point in the phrase when combat begins or ends. Music stays below
+  gameplay cues in the mix.
 - The direction fits the offline GLB and WAV pipeline: seeded curved geometry
   and layered plates, humanoid and quadruped rigs, articulated clips, and
   original synthesis and composition. The full roster uses generated models

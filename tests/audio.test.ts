@@ -23,6 +23,7 @@ afterEach(() => {
 function device() {
   let now = 10;
   let ready = true;
+  const unloaded = new Set<string>();
   const listeners = new Set<() => void>();
   const calls: {
     url: string;
@@ -31,13 +32,14 @@ function device() {
   }[] = [];
   const mixer: AudioMixer = {
     now: () => now,
-    isLoaded: () => ready,
+    isLoaded: (url) => ready && !unloaded.has(url),
     preload: vi.fn(),
     play: (url, options) => {
       if (!ready) return;
       const call = { url, options, ended: false };
       calls.push(call);
       return {
+        startedAt: now,
         get ended() {
           return call.ended;
         },
@@ -66,6 +68,11 @@ function device() {
     },
     ready: (value: boolean) => {
       ready = value;
+      for (const listener of listeners) listener();
+    },
+    unload: (url: string) => unloaded.add(url),
+    load: (url: string) => {
+      unloaded.delete(url);
       for (const listener of listeners) listener();
     },
   };
@@ -488,6 +495,36 @@ test("music switches without leaving the previous track running", () => {
     "assets/audio/unquiet-frontier.wav",
   ]);
   expect(calls.every((call) => call.options.bus === "music")).toBe(true);
+  expect(calls.every((call) => call.options.timelineStart === undefined)).toBe(
+    true,
+  );
+});
+
+test("Circle music keeps its timeline when swapping to a late combat buffer and back", () => {
+  const { scene, calls, time, unload, load } = setup("circle");
+  const combat = "assets/audio/circle-ridge.wav";
+  const exploration = "assets/audio/circle-frontier.wav";
+  unload(combat);
+  scene.update();
+  time(30);
+  scene.setMusic(true);
+  expect(activeMusic(calls)).toEqual([exploration]);
+  time(33);
+  load(combat);
+  expect(activeMusic(calls)).toEqual([combat]);
+  time(65);
+  scene.setMusic(false);
+  expect(activeMusic(calls)).toEqual([exploration]);
+  expect(
+    calls.map(({ options: { timelineStart, fadeSeconds } }) => ({
+      timelineStart,
+      fadeSeconds,
+    })),
+  ).toEqual([
+    { timelineStart: undefined, fadeSeconds: undefined },
+    { timelineStart: 10, fadeSeconds: 0.35 },
+    { timelineStart: 10, fadeSeconds: 0.35 },
+  ]);
 });
 
 test.each([
@@ -514,6 +551,9 @@ test.each([
   },
   (pack: any) => {
     pack.audio.music.factions = { circle: { default: "rifle" } };
+  },
+  (pack: any) => {
+    pack.audio.music.factions.circle.synchronized = "true";
   },
   (pack: any) => {
     pack.audio.music.factions = { circle: null };

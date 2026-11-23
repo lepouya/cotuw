@@ -3194,7 +3194,8 @@
       "factions": {
         "circle": {
           "default": "circle-frontier",
-          "combat": "circle-ridge"
+          "combat": "circle-ridge",
+          "synchronized": true
         }
       }
     }

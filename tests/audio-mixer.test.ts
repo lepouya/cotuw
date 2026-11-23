@@ -149,7 +149,7 @@ test("audio stays lazy until a gesture, decodes once, and routes independent bus
     0.02,
   );
   const voice = mixer.play("engine", options)!;
-  expect(backend.sources[0]!.start).toHaveBeenCalledWith(7);
+  expect(backend.sources[0]!.start).toHaveBeenCalledWith(7, 0);
   expect(backend.sources[0]!.loop).toBe(true);
   expect(backend.gains[4]!.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
     1,
@@ -311,6 +311,31 @@ test("unchanged mixes preserve the fade and do not accumulate automation", async
   backend.context.currentTime = 9.04;
   voice.stop();
   expect(backend.gains[4]!.gain.cancelAndHoldAtTime).toHaveBeenCalledWith(9.04);
+  mixer.dispose();
+});
+
+test("synchronized loops wrap their start offset and crossfade", async () => {
+  const backend = device();
+  const mixer = await mixerWithEngine(backend);
+  const music = { ...options, bus: "music" as const };
+  const current = mixer.play("engine", music)!;
+  backend.context.currentTime = 12;
+  mixer.play("engine", {
+    ...music,
+    timelineStart: current.startedAt,
+    fadeSeconds: 0.35,
+  });
+  current.stop(0.35);
+  expect(backend.sources[1]!.start).toHaveBeenCalledWith(12, 1);
+  expect(backend.gains[6]!.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+    1,
+    12.35,
+  );
+  expect(backend.gains[4]!.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+    0,
+    12.35,
+  );
+  expect(backend.sources[0]!.stop).toHaveBeenCalledWith(12.35);
   mixer.dispose();
 });
 

@@ -43,6 +43,9 @@ without it remain silent. The parser validates references and playback policies.
   Optional `factions` maps faction IDs to `{ default, combat? }` arrangements.
   The player's faction selects its arrangement for the whole mission,
   including loaded saves; unknown factions use the default arrangement.
+  Set `synchronized: true` on an arrangement whose loops have the same
+  duration and musical timeline. Its cues crossfade at the current loop
+  position on the audio device clock. The Circle arrangement uses this mode.
 - Scenes preload the clips used by global and default bindings, the mission's
   actor definitions, and its selected music arrangement. All variants of a
   referenced cue are retained. Other arrangements and unrelated actor cues

@@ -7,16 +7,22 @@ export type AudioSettings = Record<
   { volume: number; muted: boolean }
 >;
 export type AudioStatus = "waiting" | "ready" | "blocked" | "unavailable";
-type AudioPlayOptions = {
+export type AudioPlayOptions = {
   bus: AudioBus;
   loop: boolean;
   gain: number;
   pan: number;
+  /** Loop fade-in length; loops default to a short click guard. */
+  fadeSeconds?: number;
+  /** Device time a looping timeline began; playback joins it in phase. */
+  timelineStart?: number;
 };
 export type AudioVoice = {
+  /** Start time on the device clock, independent of simulation speed. */
+  readonly startedAt: number;
   readonly ended: boolean;
   setMix: (gain: number, pan: number) => void;
-  stop: () => void;
+  stop: (fadeSeconds?: number) => void;
 };
 
 /** Playback boundary; missing or blocked playback returns no voice. */
@@ -209,7 +215,11 @@ export function createAudioMixer({
         gain.gain.setValueAtTime(options.gain, now);
         // Keep the fade independent of volume updates.
         fade.gain.setValueAtTime(options.loop ? 0 : 1, now);
-        if (options.loop) fade.gain.linearRampToValueAtTime(1, now + 0.08);
+        if (options.loop)
+          fade.gain.linearRampToValueAtTime(
+            1,
+            now + (options.fadeSeconds ?? 0.08),
+          );
         pan.pan.setValueAtTime(options.pan, now);
         source
           .connect(gain)
@@ -220,6 +230,7 @@ export function createAudioMixer({
         let mixedGain = options.gain;
         let mixedPan = options.pan;
         const voice: AudioVoice = {
+          startedAt: now,
           get ended() {
             return ended;
           },
@@ -238,13 +249,19 @@ export function createAudioMixer({
               failVoice();
             }
           },
-          stop: () => {
+          stop: (fadeSeconds) => {
             if (ended) return;
             ended = true;
             try {
-              holdGain(fade.gain, device.currentTime);
-              fade.gain.setTargetAtTime(0, device.currentTime, 0.01);
-              source.stop(device.currentTime + 0.06);
+              const at = device.currentTime;
+              holdGain(fade.gain, at);
+              if (fadeSeconds !== undefined) {
+                fade.gain.linearRampToValueAtTime(0, at + fadeSeconds);
+                source.stop(at + fadeSeconds);
+              } else {
+                fade.gain.setTargetAtTime(0, at, 0.01);
+                source.stop(at + 0.06);
+              }
             } catch {
               failVoice();
             }
@@ -269,7 +286,12 @@ export function createAudioMixer({
           publish("unavailable");
         };
         source.onended = release;
-        source.start(now);
+        source.start(
+          now,
+          options.timelineStart === undefined
+            ? 0
+            : (now - options.timelineStart) % buffer.duration,
+        );
         voices.set(voice, release);
         return voice;
       } catch {
