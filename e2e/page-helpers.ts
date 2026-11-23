@@ -126,6 +126,11 @@ export async function actorPoint(
       const { gameScene, Vector3, projectToCanvas } =
         await import("/e2e/harness.ts");
       const scene = gameScene();
+      // Projection uses the last rendered transform, but picking uses the
+      // camera's current one; render a frame so they agree after a move.
+      await new Promise((resolve) =>
+        scene.onAfterRenderObservable.addOnce(resolve),
+      );
       const mobile = scene.getTransformNodeByName(`actor-${id}-root`);
       const root =
         mobile ?? scene.getTransformNodeByName(`tile-placed-actor-${id}-root`);
