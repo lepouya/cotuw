@@ -11,9 +11,9 @@ export const SOUND_ASSETS = {
   "launcher-impact": { seconds: 0.7, label: "Heavy launcher impact" },
   "medical-service": {
     seconds: 4,
-    label: "Medic scanner",
+    label: "Medic airflow",
     loop: true,
-    peak: 0.2,
+    peak: 0.15,
   },
   "mechanical-service": {
     seconds: 4,
@@ -521,14 +521,20 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
     echo(target, 0.08, 0.17, 2);
   },
   "medical-service": (target) => {
-    voice(
-      target,
-      0,
-      4,
-      (t) =>
-        (0.65 + 0.35 * Math.cos(TAU * 0.5 * t)) *
-        (0.6 * sine(640, t) + 0.22 * sine(960, t) + 0.1 * sine(1280, t)),
-    );
+    const seconds = SOUND_ASSETS["medical-service"].seconds;
+    const next = random(319);
+    // Spread energy across the band and keep every partial periodic.
+    const partials = Array.from({ length: 128 }, (_, index) => ({
+      frequency: Math.round((290 + 6 * index + 3 * next()) * seconds) / seconds,
+      phase: next() * Math.PI,
+      gain: Math.sin((Math.PI * (index + 1)) / 129),
+    }));
+    voice(target, 0, seconds, (t) => {
+      let air = 0;
+      for (const { frequency, phase, gain } of partials)
+        air += gain * Math.sin(TAU * frequency * t + phase);
+      return air;
+    });
   },
   "mechanical-service": (target) => {
     voice(
@@ -641,8 +647,20 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
     crackle(target, 0.02, 0.15, 4, 0.25, 982);
   },
   "living-destroyed": (target) => {
-    crackle(target, 0, 0.7, 26, 0.55, 990);
-    woodKnock(target, 0.7, 55, 991);
+    woodKnock(target, 0.64, 55, 991);
+    for (const [start, duration, level, seed] of [
+      [0.045, 0.065, 0.52, 1035],
+      [0.14, 0.09, 0.42, 1130],
+      [0.29, 0.07, 0.31, 1280],
+      [0.44, 0.11, 0.24, 1430],
+      [0.57, 0.08, 0.14, 1560],
+    ] as const)
+      noise(target, start, duration, level, seed, 0.16);
+    voice(target, 0.09, 0.43, (t) => {
+      const phase = TAU * (82 * t + (120 / 8) * (1 - Math.exp(-8 * t)));
+      const envelope = Math.sin((Math.PI * t) / 0.43) ** 2;
+      return 0.27 * envelope * (Math.sin(phase) + 0.36 * Math.sin(2 * phase));
+    });
     // Fading low resonance as the building's light goes out.
     voice(
       target,
@@ -655,7 +673,6 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
           0.18 * sine(hz(45), t) +
           0.06 * sine(hz(62), t) * Math.exp(-3 * t)),
     );
-    noise(target, 0.3, 1.2, 0.18, 992, 0.1);
   },
   "healer-service": (target) => {
     // Overlapping open fifths repeat every second; the period divides the loop.
@@ -722,16 +739,39 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
     chime(target, 0.12, 79, 0.7, 0.18);
   },
   "wolf-attack": (target) => {
-    voice(target, 0, 0.55, (t) => {
-      const phase = TAU * (125 * t - 55 * t * t);
+    const breath = random(308);
+    let roughness = 0;
+    let phase = 0;
+    voice(target, 0, 0.45, (t) => {
+      roughness += 0.025 * (breath() - roughness);
+      const pitch = 80 + 56 * Math.exp(-((t - 0.14) ** 2) / 0.009);
+      phase += (TAU * (pitch + 60 * roughness)) / AUDIO_SAMPLE_RATE;
+      const swell = Math.min(1, t / 0.045) * Math.exp(-5 * t);
       return (
-        Math.sin((Math.PI * t) / 0.55) ** 2 *
-        (Math.sin(phase + 1.4 * Math.sin(phase * 0.5)) +
-          0.3 * Math.sin(phase * 2))
+        0.32 *
+        swell *
+        Math.min(1, (0.45 - t) / 0.1) *
+        (0.35 * Math.sin(phase) +
+          0.25 * Math.sin(2 * phase) +
+          0.26 * Math.sin(3 * phase) +
+          (0.18 + 0.35 * roughness) * Math.sin(5 * phase))
       );
     });
-    noise(target, 0.08, 0.55, 0.6, 309, 0.12);
-    noise(target, 0.38, 0.12, 0.8, 310, 0.45);
+    noise(target, 0.025, 0.38, 0.72, 309, 0.095);
+    // A dull jaw impact under the short bite.
+    voice(
+      target,
+      0.17,
+      0.12,
+      (t) =>
+        0.65 *
+        Math.min(1, t / 0.004) *
+        Math.exp(-43 * t) *
+        Math.min(1, (0.12 - t) / 0.02) *
+        (sine(145, t) + 0.25 * sine(320, t)),
+    );
+    noise(target, 0.165, 0.065, 0.7, 310, 0.23);
+    noise(target, 0.193, 0.09, 0.36, 311, 0.09);
   },
   "damage-1": (target) => damage(target, 1),
   "damage-2": (target) => damage(target, 2),

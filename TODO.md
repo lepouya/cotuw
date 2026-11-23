@@ -177,12 +177,9 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   landmark summits and open crossings. Walls block movement and construction.
   Verified longer sightlines, camera visibility, both introduction
   playthroughs, and all 28 headless skirmish cases.
-- [ ] **1.75** Fix the Circle music, which testers heard as odd or out of
-  order. Listen to both tracks through their loop seams and listen in-game
-  as combat begins and ends. Check whether the shared echo, the combat
-  track's lower off-beat pluck, or the cue transition causes the report.
-  Fix the confirmed cause, regenerate any changed audio, and repeat the
-  listening checks.
+- [x] **1.75** Circle music crossfades without restarting the phrase. Playback
+  verified in the introduction and skirmish. Music loops and revised Medic,
+  living destruction, and wolf attack cues passed listening review.
 - [ ] **1.77** Retest 1.72 to 1.75 in the Circle introduction and skirmish
   on a rebuilt, smoke-tested bundle. Follow the
   [playtest procedure](docs/verification.md#playtest-preparation). Use returning

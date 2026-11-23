@@ -16,7 +16,7 @@ The page also ships in the browser build.
   seeded noise and metallic overtones.
 - `launcher-launch` and `launcher-impact`: a low ignition whoosh and a brief
   bass-heavy impact, with independent positional playback and voice limits.
-- `medical-service`: a quiet periodic scanner tone during active healing.
+- `medical-service`: a soft, steady airflow during active healing.
 - `mechanical-service`: a soft motor bed with rhythmic tool chatter during
   active mechanical repair. Both support loops have seamless four-second
   periods and lower gains when their provider is unselected.
@@ -30,7 +30,8 @@ The page also ships in the browser build.
   and cracking fibers for Briar Ram blows.
 - `living-structure-hit`: a hollow wooden knock and bark crackle for living
   buildings and the Briar Ram.
-- `living-destroyed`: a burst of splitting wood over a fading low resonance.
+- `living-destroyed`: spaced wood splits and a falling creak over a fading
+  low resonance.
 - `healer-service`: a quiet loop of overlapping bell-like fifths.
 - `artificer-service`: a loop of soft wooden taps, fiber creaks, and warm
   swells. Both Circle service loops last four seconds and repeat seamlessly.
@@ -40,7 +41,7 @@ The page also ships in the browser build.
 - `circle-production-start`: a soft rustle, low pluck, and chime.
 - `circle-producer-exit`: a creak, leaf rustle, and brief violet tone as an
   entrance parts.
-- `wolf-attack`: a synthesized growl and bite transient.
+- `wolf-attack`: a breathy snarl with a short jaw impact.
 - `damage-1` and `damage-2`: low impacts with different metallic resonances.
 - `alert`: a repeated descending two-note signal.
 - `objective-complete`: a short ascending glass-note phrase.
