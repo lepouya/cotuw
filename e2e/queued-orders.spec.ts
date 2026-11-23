@@ -82,7 +82,7 @@ async function minimapTarget(page: Page) {
       map,
       canvas.clientWidth,
       canvas.clientHeight,
-    ).toMinimap(map.tileCenter(54, 49));
+    ).toMinimap(map.tileCenter(55, 50));
     return {
       x: bounds.left + canvas.clientLeft + point.x,
       y: bounds.top + canvas.clientTop + point.y,

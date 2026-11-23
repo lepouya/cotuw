@@ -163,14 +163,14 @@ describe("session map", () => {
     const map = createSessionMap(openingTerrain(), BASE_CONTENT.terrain);
     const ground = MOVEMENT_PROFILES[0]!;
 
-    expect(map.terrainAt(50, 32).typeId).toBe("path");
-    expect(map.terrainAt(50, 50).typeId).toBe("rough");
-    expect(map.terrainAt(42, 58).typeId).toBe("water");
-    expect(traversalCostAt(map, ground, 50, 32)).toBeLessThan(1);
-    expect(traversalCostAt(map, ground, 50, 50)).toBeGreaterThan(2);
-    expect(traversalCostAt(map, ground, 42, 58)).toBeUndefined();
-    expect(traversalCostAt(map, ground, 60, 20)).toBeUndefined();
-    expect(traversalCostAt(map, ground, 62, 32)).toBeDefined();
+    expect(map.terrainAt(51, 33).typeId).toBe("path");
+    expect(map.terrainAt(51, 51).typeId).toBe("rough");
+    expect(map.terrainAt(43, 59).typeId).toBe("water");
+    expect(traversalCostAt(map, ground, 51, 33)).toBeLessThan(1);
+    expect(traversalCostAt(map, ground, 51, 51)).toBeGreaterThan(2);
+    expect(traversalCostAt(map, ground, 43, 59)).toBeUndefined();
+    expect(traversalCostAt(map, ground, 61, 21)).toBeUndefined();
+    expect(traversalCostAt(map, ground, 63, 33)).toBeDefined();
   });
 });
 

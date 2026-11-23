@@ -28,7 +28,7 @@ async function nextFrame(page: Page) {
 }
 
 for (const { id, x, z } of [
-  { id: "sandbox", x: 67, z: 60 },
+  { id: "sandbox", x: 68, z: 61 },
   { id: "skirmish-map", x: 64, z: 48 },
 ]) {
   test(

@@ -110,7 +110,7 @@ test(
     await expect(page.locator("#notifications")).toContainText(
       "Quick save complete: Quicksave",
     );
-    await placeBuilding(page, "build-refinery", 12, 49, {
+    await placeBuilding(page, "build-refinery", 13, 50, {
       explanation: "Support Network",
     });
     await expect(materials(page)).toHaveText("50");
@@ -119,7 +119,7 @@ test(
     await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
     await expect(materials(page)).toHaveText("150");
     await page.locator("#resume-mission").click();
-    await placeBuilding(page, "build-refinery", 12, 49, {
+    await placeBuilding(page, "build-refinery", 13, 50, {
       explanation: "Support Network",
     });
     await expect(materials(page)).toHaveText("50");
@@ -199,7 +199,9 @@ test(
     const saved = JSON.parse(source);
     expect(saved.save.name).toBe("Sandbox base");
     expect(saved.scenario.id).toBe("sandbox");
-    expect(saved.state.terrain.tiles[0]).toMatch(/^#+$/);
+    const border = saved.state.terrain.tiles[0];
+    expect(border).toMatch(/^(.)\1+$/);
+    expect(saved.state.terrain.legend[border[0]].outOfBounds).toBe(true);
     await page.locator("#cancel-save").click();
     await importMission(page, source);
     await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
@@ -225,7 +227,7 @@ test("invalid scenario metadata leaves the current session intact", async ({
   await expect(materials(page)).toHaveText("150");
   await page.locator("#cancel-load").click();
   await page.locator("#resume-mission").click();
-  await placeBuilding(page, "build-refinery", 12, 49, {
+  await placeBuilding(page, "build-refinery", 13, 50, {
     explanation: "Support Network",
   });
   await expect(materials(page)).toHaveText("50");
@@ -250,7 +252,7 @@ test("opening and closing the menu during inspection preserves a way to resume",
     "true",
   );
   await page.locator("#pause-mission").click();
-  await placeBuilding(page, "build-barracks", 49, 39);
+  await placeBuilding(page, "build-barracks", 50, 40);
   await page.locator("#open-menu").click();
   await expect(page.locator("#resume-mission")).toHaveText("Resume");
 });
@@ -275,7 +277,7 @@ forEachProfile([PHONE_PROFILE], () => {
         page.getByText("Quick save complete: Quicksave").first(),
       ).toBeVisible();
       await mission.press("#resume-mission");
-      await mission.place("refinery", 12, 49, {
+      await mission.place("refinery", 13, 50, {
         placement: "Support Network",
       });
       await expect(materials(page)).toHaveText("50");

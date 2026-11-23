@@ -54,7 +54,7 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
   const canvas = page.locator("#game-canvas");
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
   await page.locator("#build-command-center").click();
-  const point = await terrainPoint(page, 55, 39);
+  const point = await terrainPoint(page, 56, 40);
   await page.mouse.move(point.x, point.y);
   await expect(canvas).toHaveAttribute("data-placement-status", "valid");
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "0");
@@ -121,14 +121,14 @@ test("rejects occupied terrain and units without changing the world, and cancels
 }) => {
   await ready(page);
   const canvas = page.locator("#game-canvas");
-  await placeBuilding(page, "build-command-center", 49, 39);
-  await placeBuilding(page, "build-barracks", 45, 39);
+  await placeBuilding(page, "build-command-center", 50, 40);
+  await placeBuilding(page, "build-barracks", 46, 40);
   await page.locator("#tab-units").click();
   await page.locator("#train-trooper").click();
   await expect(page.locator("#unit-roster button")).toHaveCount(1);
   await page.locator("#tab-buildings").click();
   await page.locator("#build-command-center").click();
-  const occupied = await terrainPoint(page, 49, 39);
+  const occupied = await terrainPoint(page, 50, 40);
   await page.mouse.move(occupied.x, occupied.y);
   await expect(canvas).toHaveAttribute(
     "data-placement-status",
@@ -168,7 +168,7 @@ test("selects a constructed building and freezes idle equipment when disabled", 
   page,
 }) => {
   await ready(page);
-  await placeBuilding(page, "build-command-center", 49, 39);
+  await placeBuilding(page, "build-command-center", 50, 40);
 
   const point = await page.evaluate(async () => {
     const { EngineStore, projectToCanvas } = await import("/e2e/harness.ts");
@@ -227,7 +227,7 @@ forEachProfile([PHONE_PROFILE], () => {
     async ({ page }) => {
       await ready(page);
       await page.locator("#build-command-center").tap();
-      const point = await terrainPoint(page, 55, 39);
+      const point = await terrainPoint(page, 56, 40);
       await page.touchscreen.tap(point.x, point.y);
       const canvas = page.locator("#game-canvas");
       await expect(canvas).toHaveAttribute("data-placement-status", "valid");
@@ -245,8 +245,8 @@ test("previews reject water, mountain walls, and the playable-map boundary", asy
   await ready(page);
   await page.locator("#build-command-center").click();
   for (const { x, z, reason } of [
-    { x: 42, z: 58, reason: "disallowed-terrain" },
-    { x: 62, z: 20, reason: "unbuildable-terrain" },
+    { x: 43, z: 59, reason: "disallowed-terrain" },
+    { x: 63, z: 21, reason: "unbuildable-terrain" },
     { x: 2, z: 5, reason: "out-of-bounds" },
   ]) {
     await page.evaluate(

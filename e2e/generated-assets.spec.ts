@@ -55,7 +55,7 @@ test("an active building preview refreshes when its generated model loads", asyn
       "true",
     );
     await page.locator("#build-command-center").click();
-    const point = await terrainPoint(page, 55, 39);
+    const point = await terrainPoint(page, 56, 40);
     await page.mouse.move(point.x, point.y);
     await expect(page.locator("#game-canvas")).toHaveAttribute(
       "data-placement-status",

@@ -131,7 +131,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
         id: "prototype-trooper",
         definitionId: "arc-trooper",
         owner: "player",
-        worldPosition: map.tileCenter(46, 40),
+        worldPosition: map.tileCenter(47, 41),
       }),
     );
     view.simulation.spawnActor(
@@ -139,7 +139,7 @@ test("clicking a selected actor issues terrain-aware movement", async ({
         id: "prototype-scout",
         definitionId: "arc-scout",
         owner: "player",
-        worldPosition: map.tileCenter(55, 45),
+        worldPosition: map.tileCenter(56, 46),
       }),
     );
     await frames(2);

@@ -8,13 +8,13 @@ const sites = [
   createCultivationSite(
     "near-lifebloom",
     "Near Lifebloom",
-    { x: 20, z: 50 },
+    { x: 21, z: 51 },
     BASE_CONTENT.cultivationSite,
   ),
   createCultivationSite(
     "south-lifebloom",
     "South Lifebloom",
-    { x: 22, z: 44 },
+    { x: 23, z: 45 },
     BASE_CONTENT.cultivationSite,
   ),
 ];

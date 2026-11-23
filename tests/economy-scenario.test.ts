@@ -129,7 +129,7 @@ describe("mission objectives", () => {
         id: "duelist",
         definitionId: "arc-trooper",
         owner: "player",
-        worldPosition: mapForOpening().tileCenter(43, 32),
+        worldPosition: mapForOpening().tileCenter(44, 33),
       }),
     );
     const simulation = fixture(state);
@@ -165,7 +165,7 @@ describe("mission objectives", () => {
     const command = {
       kind: "move" as const,
       actorId: "trooper-lone-wolf",
-      target: mapForOpening().tileCenter(40, 32),
+      target: mapForOpening().tileCenter(41, 33),
     };
     for (const sim of [simulation, restored]) {
       sim.submitCommand(command, { owner: sim.playerOwner });
@@ -347,13 +347,13 @@ describe("authored wolf encounters", () => {
       expect(
         distance(
           map.tileCenter(loot.tile.x, loot.tile.z),
-          map.tileCenter(46, 32),
+          map.tileCenter(47, 33),
         ),
       ).toBeLessThan(14);
       expect(
         findNavigationPath(
           grid,
-          map.tileCenter(46, 32),
+          map.tileCenter(47, 33),
           map.tileCenter(loot.tile.x, loot.tile.z),
         )?.reachedTarget,
       ).toBe(true);
@@ -367,8 +367,8 @@ describe("authored wolf encounters", () => {
 
   test("rough ground offers a faster detour and ridge routes reconnect", () => {
     const { map, grid } = openingGrid();
-    const from = map.tileCenter(35, 47);
-    const to = map.tileCenter(58, 47);
+    const from = map.tileCenter(36, 48);
+    const to = map.tileCenter(59, 48);
     const path = findNavigationPath(grid, from, to)!;
     expect(path.reachedTarget).toBe(true);
     let previous = from;
@@ -381,34 +381,34 @@ describe("authored wolf encounters", () => {
     }
     expect(length).toBeGreaterThan(distance(from, to));
     expect(cost).toBeLessThan(segmentCost(grid, from, to)!);
-    const crossingFrom = map.tileCenter(56, 34);
-    const crossingTo = map.tileCenter(70, 34);
+    const crossingFrom = map.tileCenter(57, 35);
+    const crossingTo = map.tileCenter(71, 35);
     expect(
       findNavigationPath(grid, crossingFrom, crossingTo)?.reachedTarget,
     ).toBe(true);
-    for (let z = 32; z <= 35; z++)
-      for (let x = 61; x <= 65; x++)
+    for (let z = 33; z <= 36; z++)
+      for (let x = 62; x <= 66; x++)
         map.setTerrain(x, z, { typeId: "path", surfacePassable: false });
     const detour = findNavigationPath(grid, crossingFrom, crossingTo)!;
     expect(detour.reachedTarget).toBe(true);
     expect(
-      detour.waypoints.some((point) => point.z >= map.tileCenter(62, 66).z),
+      detour.waypoints.some((point) => point.z >= map.tileCenter(63, 67).z),
     ).toBe(true);
   });
 
   test("landmark summits keep their elevations and the crossings stay open", () => {
     const { map, grid } = openingGrid();
     const summits = [
-      { x: 62, z: 42, height: 10.07 },
-      { x: 64, z: 44, height: 10.08 },
-      { x: 75, z: 27, height: 8.91 },
-      { x: 82, z: 27, height: 8.86 },
+      { x: 63, z: 43, height: 10.07 },
+      { x: 65, z: 45, height: 10.08 },
+      { x: 76, z: 28, height: 8.91 },
+      { x: 83, z: 28, height: 8.86 },
     ];
     for (const { x, z, height } of summits) {
       expect(map.heightAt(x, z)).toBe(Math.fround(height));
       expect(grid.costAt(x, z)).toBeUndefined();
     }
-    for (const z of [32, 68]) {
+    for (const z of [33, 69]) {
       const route = findNavigationPath(
         grid,
         map.tileCenter(56, z),
@@ -416,18 +416,18 @@ describe("authored wolf encounters", () => {
       );
       expect(route?.reachedTarget).toBe(true);
     }
-    expect(grid.costAt(78, 28)).toBeDefined();
-    expect(grid.costAt(75, 23)).toBeGreaterThan(grid.costAt(78, 23)!);
-    expect(grid.costAt(30, 44)).toBeDefined();
-    expect(map.slopeAt(30, 44)).toBeGreaterThan(0.1);
+    expect(grid.costAt(79, 29)).toBeDefined();
+    expect(grid.costAt(76, 24)).toBeGreaterThan(grid.costAt(79, 24)!);
+    expect(grid.costAt(31, 45)).toBeDefined();
+    expect(map.slopeAt(31, 45)).toBeGreaterThan(0.1);
   });
 
   test("the lowered ridge blocks movement and construction on its flat top", () => {
     const { map, grid } = openingGrid();
-    expect(map.heightAt(62, 52)).toBeCloseTo(3.14);
-    expect(map.slopeAt(62, 52)).toBeLessThan(0.75);
-    expect(grid.costAt(62, 52)).toBeUndefined();
-    expect(map.terrainAt(62, 52).surfaceBuildable).toBe(false);
+    expect(map.heightAt(63, 53)).toBeCloseTo(3.14);
+    expect(map.slopeAt(63, 53)).toBeLessThan(0.75);
+    expect(grid.costAt(63, 53)).toBeUndefined();
+    expect(map.terrainAt(63, 53).surfaceBuildable).toBe(false);
   });
 
   test("a scout can see across the northern ridge crossing at an angle", () => {
@@ -435,10 +435,10 @@ describe("authored wolf encounters", () => {
     const scout = definitions.find(({ id }) => id === "arc-scout")!;
     const tiles = visibleTiles(
       map,
-      map.tileCenter(54, 29),
+      map.tileCenter(55, 30),
       scout.vision!.radius,
     );
-    expect(tiles).toContain(34 * map.width + 67);
+    expect(tiles).toContain(35 * map.width + 68);
   });
 
   test("six wolves have passable homes and the den shares one territory", () => {
@@ -466,12 +466,12 @@ describe("authored wolf encounters", () => {
       );
       expect(grid.costAt(tile.x, tile.z)).toBeDefined();
       expect(
-        findNavigationPath(grid, map.tileCenter(15, 50), actor.worldPosition)
+        findNavigationPath(grid, map.tileCenter(16, 51), actor.worldPosition)
           ?.reachedTarget,
       ).toBe(true);
     }
     for (const actor of den) {
-      expect(actor.territory!.center).toEqual(map.tileCenter(78, 21));
+      expect(actor.territory!.center).toEqual(map.tileCenter(79, 22));
       expect(actor.territory!.radius).toBe(12);
     }
     expect(simulation.actorById("lone-wolf")!.territory!.encounterId).toBe(
@@ -484,12 +484,12 @@ describe("authored wolf encounters", () => {
 
   test("the three-tile entrance is the only ground route into the den", () => {
     const { map, grid } = openingGrid();
-    const from = map.tileCenter(46, 32);
-    const to = map.tileCenter(78, 21);
+    const from = map.tileCenter(47, 33);
+    const to = map.tileCenter(79, 22);
     expect(findNavigationPath(grid, from, to)?.reachedTarget).toBe(true);
-    for (let x = 77; x <= 79; x++) {
-      expect(grid.costAt(x, 28)).toBeDefined();
-      map.setTerrain(x, 28, { typeId: "plain", surfacePassable: false });
+    for (let x = 78; x <= 80; x++) {
+      expect(grid.costAt(x, 29)).toBeDefined();
+      map.setTerrain(x, 29, { typeId: "plain", surfacePassable: false });
     }
     expect(findNavigationPath(grid, from, to)?.reachedTarget).toBe(false);
   });
@@ -502,7 +502,7 @@ describe("authored wolf encounters", () => {
         id: "duelist",
         definitionId: "arc-trooper",
         owner: "player",
-        worldPosition: map.tileCenter(43, 32),
+        worldPosition: map.tileCenter(44, 33),
       }),
     );
     const simulation = fixture(state);
@@ -535,7 +535,7 @@ describe("authored wolf encounters", () => {
         id: "intruder",
         definitionId: "arc-trooper",
         owner: "player",
-        worldPosition: mapForOpening().tileCenter(78, 29),
+        worldPosition: mapForOpening().tileCenter(79, 30),
       }),
     );
     const simulation = fixture(state);

@@ -1,7 +1,9 @@
 // The rough M1 skirmish map.
 import { deepFreeze } from "../simulation/actor";
+import { MAP_BORDER_TILES, withScenicBorder } from "./map-border";
 import { mountainWallSurface } from "./mountain-wall";
 
+import type { BorderScenery } from "./map-border";
 import type { TerrainBounds, TileCoord } from "../simulation/grid";
 import type { TerrainGridOptions } from "../simulation/terrain";
 
@@ -155,19 +157,45 @@ function isRidgeCorner(x: number, z: number): boolean {
   );
 }
 
-export const SKIRMISH_TERRAIN = {
+/** Border tiles cut each corner along this sum of edge distances. */
+const CORNER_CUT = 20;
+
+function cutCornerDepth(x: number, z: number): number {
+  const edgeX = Math.min(x, SIZE - x);
+  const edgeZ = Math.min(z, SIZE - z);
+  return (CORNER_CUT - edgeX - edgeZ) / 2;
+}
+
+/** One lake near the south edge and its mirror near the north. */
+const LAKES = [
+  { x: 44, z: 18 },
+  { x: SIZE - 44, z: SIZE - 18 },
+];
+const LAKE_RADIUS = 6;
+/** How far along the border its water rim reaches from a lake's center. */
+const LAKE_RIM_REACH = 10;
+
+/** Water rims the border beside each lake; rock rises elsewhere. */
+function borderSceneryAt(x: number, z: number): BorderScenery {
+  const nearEdge = (lakeZ: number) =>
+    lakeZ < SIZE / 2 ? z < MAP_BORDER_TILES : z > SIZE - MAP_BORDER_TILES;
+  return LAKES.some(
+    (lake) => nearEdge(lake.z) && Math.abs(x - lake.x) < LAKE_RIM_REACH,
+  )
+    ? "water"
+    : "rock";
+}
+
+const skirmishGround = {
   width: SIZE,
   height: SIZE,
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
   createHeight: (x, z) => (isRidgeCorner(x, z) ? RIDGE_HEIGHT : 0),
   createTerrain: (x, z) => {
-    const edgeX = Math.min(x, SIZE - 1 - x);
-    const edgeZ = Math.min(z, SIZE - 1 - z);
-    const outOfBounds = edgeX < 4 || edgeZ < 4 || edgeX + edgeZ < 20;
-    const water =
-      Math.hypot(x + 0.5 - 44, z + 0.5 - 18) < 6 ||
-      Math.hypot(x + 0.5 - 76, z + 0.5 - 102) < 6;
+    const water = LAKES.some(
+      (lake) => Math.hypot(x + 0.5 - lake.x, z + 0.5 - lake.z) < LAKE_RADIUS,
+    );
     const horizontal =
       x >= 12 &&
       x <= 107 &&
@@ -185,11 +213,16 @@ export const SKIRMISH_TERRAIN = {
           : rough
             ? "rough"
             : "plain",
-      outOfBounds: outOfBounds || undefined,
       ...mountainWallSurface(isRidgeCorner, x, z),
     };
   },
 } as const satisfies TerrainGridOptions;
+
+export const SKIRMISH_TERRAIN = withScenicBorder(
+  skirmishGround,
+  borderSceneryAt,
+  cutCornerDepth,
+);
 
 export const SKIRMISH_MAP: SkirmishMap = {
   id: "skirmish",

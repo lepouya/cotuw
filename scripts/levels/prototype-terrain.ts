@@ -1,11 +1,16 @@
 // Procedural terrain the wolf-den levels and sandbox bake into their files.
+import {
+  MAP_BORDER_TILES,
+  withScenicBorder,
+} from "../../src/content/map-border.ts";
 import { mountainWallSurface } from "../../src/content/mountain-wall.ts";
 
 import type { TileCoord } from "../../src/simulation/grid.ts";
 import type { TerrainGridOptions } from "../../src/simulation/terrain.ts";
 
-const MAP_SIZE = 100;
-const WATER_CENTER = { x: 42, z: 58 };
+// Playable ground spans 94 tiles inside the border.
+const MAP_SIZE = 94 + 2 * MAP_BORDER_TILES;
+const WATER_CENTER = { x: 43, z: 59 };
 const WATER_RADIUS = 10;
 const MOUNTAIN_HEIGHT = 3;
 
@@ -21,36 +26,36 @@ type TerrainLandmark = {
 };
 
 const PATHS: readonly Area[] = [
-  { x: [8, 91], z: [31, 34] },
-  { x: [20, 91], z: [67, 70] },
-  { x: [82, 85], z: [32, 69] },
-  { x: [77, 79], z: [20, 32] },
+  { x: [9, 92], z: [32, 35] },
+  { x: [21, 92], z: [68, 71] },
+  { x: [83, 86], z: [33, 70] },
+  { x: [78, 80], z: [21, 33] },
 ];
 const ROUGH: readonly Area[] = [
-  { x: [40, 57], z: [45, 61] },
-  { x: [68, 86], z: [16, 25] },
+  { x: [41, 58], z: [46, 62] },
+  { x: [69, 87], z: [17, 26] },
 ];
 /** The ridge and the den walls that join it. */
 const MOUNTAINS: readonly Area[] = [
-  { x: [61, 65], z: [12, 88] },
-  { x: [65, 92], z: [12, 15] },
-  { x: [88, 92], z: [12, 29] },
-  { x: [65, 92], z: [26, 29] },
+  { x: [62, 66], z: [13, 89] },
+  { x: [66, 93], z: [13, 16] },
+  { x: [89, 93], z: [13, 30] },
+  { x: [66, 93], z: [27, 30] },
 ];
 /** Ridge crossings and the den's northern entrance. */
 const PASSES: readonly Area[] = [
-  { x: [61, 65], z: [32, 36] },
-  { x: [61, 65], z: [66, 72] },
-  // Heights are tile corners, so flat corners 77–80 open tiles 77–79.
-  { x: [77, 80], z: [26, 29] },
+  { x: [62, 66], z: [33, 37] },
+  { x: [62, 66], z: [67, 73] },
+  // Heights are tile corners, so flat corners 78–81 open tiles 78–80.
+  { x: [78, 81], z: [27, 30] },
 ];
 
 const LANDMARKS: readonly TerrainLandmark[] = [
   {
     // Split summit
     peaks: [
-      { x: 62, z: 42 },
-      { x: 64, z: 44 },
+      { x: 63, z: 43 },
+      { x: 65, z: 45 },
     ],
     summitHeight: 10,
     radius: 2,
@@ -58,8 +63,8 @@ const LANDMARKS: readonly TerrainLandmark[] = [
   {
     // Den teeth
     peaks: [
-      { x: 75, z: 27 },
-      { x: 82, z: 27 },
+      { x: 76, z: 28 },
+      { x: 83, z: 28 },
     ],
     summitHeight: 9,
     radius: 2,
@@ -92,15 +97,6 @@ function isWallCorner(x: number, z: number): boolean {
   return within(MOUNTAINS, x, z) && !within(PASSES, x, z);
 }
 
-function prototypeTerrainAt(x: number, z: number) {
-  const border = x < 3 || z < 3 || x >= MAP_SIZE - 3 || z >= MAP_SIZE - 3;
-  return {
-    typeId: prototypeTypeAt(x, z),
-    outOfBounds: border || undefined,
-    ...mountainWallSurface(isWallCorner, x, z),
-  };
-}
-
 function wallHeightAt(x: number, z: number): number {
   // Peaks rise only from walls, so they never narrow a pass.
   if (!isWallCorner(x, z)) return 0;
@@ -116,24 +112,37 @@ function wallHeightAt(x: number, z: number): number {
   return height;
 }
 
-/**
- * The den's mountain walls join the ridge and leave one northern entrance.
- * Heights keep two decimals so the level file stays readable.
- */
 function prototypeHeightAt(x: number, z: number): number {
-  const hillDistance = Math.hypot(x - 39, z - 47);
+  const hillDistance = Math.hypot(x - 40, z - 48);
   const hill = Math.max(0, 1 - hillDistance / 18) ** 2 * 3.5;
-  const rolling = Math.sin(x * 0.13) * 0.08 + Math.cos(z * 0.11) * 0.07;
-  // Adding 0 turns -0 into 0. The sign means nothing for terrain, but the
-  // level file writes it and it has differed across platforms.
-  return Math.round((hill + wallHeightAt(x, z) + rolling) * 100) / 100 + 0;
+  // Keep the rolling terrain aligned with the playable ground.
+  const rolling =
+    Math.sin((x - 1) * 0.13) * 0.08 + Math.cos((z - 1) * 0.11) * 0.07;
+  const height = hill + wallHeightAt(x, z) + rolling;
+  // Adding zero normalizes signed zero for level files.
+  return Math.round(height * 100) / 100 + 0;
 }
 
-export const PROTOTYPE_TERRAIN = {
+const prototypeGround = {
   width: MAP_SIZE,
   height: MAP_SIZE,
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
   createHeight: prototypeHeightAt,
-  createTerrain: prototypeTerrainAt,
-} as const satisfies TerrainGridOptions;
+  createTerrain: (x, z) => ({
+    typeId: prototypeTypeAt(x, z),
+    ...mountainWallSurface(isWallCorner, x, z),
+  }),
+} satisfies TerrainGridOptions;
+
+export const PROTOTYPE_TERRAIN = withScenicBorder(
+  prototypeGround,
+  () => "rock",
+);
+
+/** Mountains close the wolf den's north and east, near its landmark summits. */
+export const WOLF_DEN_TERRAIN = withScenicBorder(prototypeGround, (x, z) =>
+  x > MAP_SIZE - MAP_BORDER_TILES || z > MAP_SIZE - MAP_BORDER_TILES
+    ? "mountain"
+    : "rock",
+);

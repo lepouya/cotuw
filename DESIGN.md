@@ -881,6 +881,9 @@ build. TODO.md owns milestone delivery; current controls are described above.
 - The wolf-den and skirmish mountain walls rise three world units above their
   base terrain and block surface movement and building placement. The
   wolf-den landmarks have independently authored summit elevations.
+- Wolf-den borders rise into mountains on the north and east and into rock
+  elsewhere. Skirmish borders rise into rock, with water beside the lakes
+  nearest the north and south edges. The sandbox border is rising rock.
 - Terrain provides per-profile passability, slope limits, and movement costs.
   Routes minimize estimated travel time and recalculate when blockers change.
   - A tile's terrain type sets its cost or blocks it for each profile. A map
@@ -964,6 +967,10 @@ build. TODO.md owns milestone delivery; current controls are described above.
   heights, and invalid terrain flags before changing state.
 - The playable map uses an irregular mask within a rectangular data grid. Camera
   bounds follow explored terrain and do not expose the full map early.
+- Every map keeps at least four out-of-bounds tiles between playable ground
+  and the grid edge. Each map dresses its border as rising rock, mountains, or
+  water. The border follows normal fog and exploration, so scouts reveal it.
+  The border gives the camera more framing room.
 
 ### Special movement and transport
 

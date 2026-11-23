@@ -223,7 +223,7 @@ export async function trainTestUnits(
   touch = false,
 ) {
   await expectTerrainReady(page);
-  await placeBuilding(page, "build-barracks", 49, 39, { touch });
+  await placeBuilding(page, "build-barracks", 50, 40, { touch });
   await activate(page.locator("#tab-units"), touch);
   for (const [index, unit] of units.entries()) {
     const button = page.locator(`#train-${unit}`);

@@ -63,7 +63,7 @@ for (const kind of ["victory", "defeat", "draw"] as const)
           {
             actorId: "enemy",
             definitionId,
-            origin: { x: 12, z: 49 },
+            origin: { x: 13, z: 50 },
             owner: "rival",
           },
         ]);
@@ -180,14 +180,14 @@ test(
           actorId: "enemy",
           definitionId: "arc-command-center-prototype",
           owner: "rival",
-          origin: { x: 49, z: 39 },
+          origin: { x: 50, z: 40 },
         },
       ]);
       return missionSource(mission);
     });
     await importMission(page, source);
     await driver.press("#resume-mission");
-    await driver.place("refinery", 12, 49);
+    await driver.place("refinery", 13, 50);
     await driver.press("#train-harvester");
     await driver.advance(6);
     await driver.select("Harvester");
@@ -195,7 +195,7 @@ test(
       '#gather-sites [data-economy-action="gather:near-materials-1"]',
     );
     await driver.waitForStockpile(100);
-    await driver.place("barracks", 16, 54);
+    await driver.place("barracks", 17, 55);
     await driver.waitForStockpile(45);
     await driver.press("#train-scout");
     await driver.press("#train-trooper");

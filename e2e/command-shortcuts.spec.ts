@@ -53,7 +53,7 @@ test(
     await page.keyboard.press("Escape");
     await expect(canvas).toHaveAttribute("data-placement-active", "false");
     await page.keyboard.press("KeyW");
-    const point = await terrainPoint(page, 49, 39);
+    const point = await terrainPoint(page, 50, 40);
     await page.mouse.click(point.x, point.y);
     await expect(canvas).toHaveAttribute("data-placement-active", "false");
     await expect(page.locator("#tab-units")).toHaveAttribute(

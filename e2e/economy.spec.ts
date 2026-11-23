@@ -206,7 +206,7 @@ test("paused inspection allows selection but blocks orders and placement", async
   await expect(page.locator("#selection-details")).toHaveText("Trooper");
   await expect(page.locator("#stop-units")).toBeDisabled();
   await page.keyboard.press("s");
-  const point = await terrainPoint(page, 18, 52);
+  const point = await terrainPoint(page, 19, 53);
   await page.mouse.click(point.x, point.y);
   await page.locator("#build-barracks").dispatchEvent("click");
   expect(
@@ -305,7 +305,7 @@ test("scouting reveals the mountain den and its larger alpha", async ({
   await advance(page, 0.1);
   const revealed = await page.evaluate(() => {
     const { view } = window.sessionHarness;
-    view.camera.focusOnTile(78, 23);
+    view.camera.focusOnTile(79, 24);
     view.selectActor("den-alpha-wolf");
     view.scene.render();
     return view.simulation
@@ -362,12 +362,12 @@ test("construction order and training cards follow the selected building", async
       {
         actorId: "test-refinery",
         definitionId: "arc-materials-refinery",
-        origin: { x: 12, z: 49 },
+        origin: { x: 13, z: 50 },
       },
       {
         actorId: "test-barracks",
         definitionId: "arc-field-barracks",
-        origin: { x: 16, z: 54 },
+        origin: { x: 17, z: 55 },
       },
     ],
   });
@@ -428,7 +428,7 @@ test("fog keeps the camera near explored terrain", async ({ page }) => {
   await controlledOpening(page);
   const target = await page.evaluate(() => {
     const view = window.sessionHarness.view;
-    view.camera.focusOnTile(90, 90);
+    view.camera.focusOnTile(91, 91);
     const camera = view.scene.activeCamera as ArcRotateCamera;
     return { x: camera.target.x, z: camera.target.z };
   });
@@ -445,7 +445,7 @@ test("building timers disable production, and cancelling a blueprint fully refun
   page,
 }) => {
   await controlledOpening(page);
-  await place(page, "#build-refinery", 12, 49, false, false);
+  await place(page, "#build-refinery", 13, 50, false, false);
   await expect(page.locator("#train-harvester")).toBeDisabled();
   await expect(page.locator("#production-status")).toContainText(
     "finish construction",
@@ -474,7 +474,7 @@ test("spending the bootstrap funds shows a stalled-economy recovery hint", async
   page,
 }) => {
   await controlledOpening(page);
-  await place(page, "#build-barracks", 16, 54);
+  await place(page, "#build-barracks", 17, 55);
   await expect(page.locator("#materials-counter")).toHaveText("50");
   await expect(page.locator("#economy-alert")).toContainText("Economy stalled");
   await page.locator("#remove-building").click();
@@ -491,7 +491,7 @@ test.describe("hovering salvage", () => {
       page,
     }) => {
       await controlledOpening(page);
-      await place(page, "#build-barracks", 16, 54);
+      await place(page, "#build-barracks", 17, 55);
       await page.locator("#train-trooper").click();
       await advance(page, 5);
       await page.locator("#unit-roster button").click();
@@ -523,7 +523,7 @@ test.describe("hovering salvage", () => {
         const map = prototypeTerrainMap();
         const view = window.sessionHarness.view;
         view.engine.stopRenderLoop();
-        view.camera.focusOnTile(25, 52);
+        view.camera.focusOnTile(26, 53);
         const camera = view.scene.activeCamera as ArcRotateCamera;
         camera.beta = 1.2;
         camera.alpha = -Math.PI / 2;
@@ -541,12 +541,12 @@ test.describe("hovering salvage", () => {
         );
         return {
           ...point,
-          target: map.tileCenter(25, 52),
+          target: map.tileCenter(26, 53),
           terrainBehind: pickTerrainTile(view.scene, canvas, map, point),
         };
       });
       expect(point.terrainBehind).toBeTruthy();
-      expect(point.terrainBehind).not.toEqual({ x: 25, z: 52 });
+      expect(point.terrainBehind).not.toEqual({ x: 26, z: 53 });
       await pressPoint(page, point, touch);
       await advance(page, 0.1);
       const target = await page.evaluate(() => {
@@ -572,7 +572,7 @@ test("Harvester controls use matching Refineries and type-specific load timing",
   page,
 }) => {
   await controlledOpening(page);
-  await place(page, "#build-refinery", 12, 49);
+  await place(page, "#build-refinery", 13, 50);
   await page.locator("#train-harvester").click();
   await advance(page, 7);
   await page.evaluate(async () => {
@@ -1049,7 +1049,7 @@ test("Harvester training cancellation refunds and frees its slot", async ({
 }, testInfo) => {
   const errors = collectPageErrors(page);
   await controlledOpening(page);
-  await place(page, "#build-refinery", 12, 49);
+  await place(page, "#build-refinery", 13, 50);
   await expect(page.locator("#materials-counter")).toHaveText("50");
   await expect(page.locator("#train-harvester")).toBeEnabled();
   await action(page, "#train-harvester");
@@ -1080,7 +1080,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     { tag: WEBKIT },
     async ({ page }, testInfo) => {
       await controlledOpening(page, { materials: 500 });
-      await place(page, "#build-relay", 12, 49, touch);
+      await place(page, "#build-relay", 13, 50, touch);
       await page.evaluate(async () => {
         const { prototypeTerrainMap } = await import("/e2e/harness.ts");
         const { createActor } = await import("/src/simulation/actor.ts");
@@ -1090,13 +1090,13 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
             id: "expansion-scout",
             definitionId: "arc-scout",
             owner: "player",
-            worldPosition: prototypeTerrainMap().tileCenter(24, 52),
+            worldPosition: prototypeTerrainMap().tileCenter(25, 53),
           }),
         );
-        view.camera.focusOnTile(24, 49);
+        view.camera.focusOnTile(25, 50);
       });
       await advance(page, 0.1);
-      await place(page, "#build-sentry", 24, 49, touch);
+      await place(page, "#build-sentry", 25, 50, touch);
       const sentryId = await page.evaluate(async () => {
         const { prototypeTerrainMap } = await import("/e2e/harness.ts");
         const { createActor } = await import("/src/simulation/actor.ts");
@@ -1105,8 +1105,8 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
           ({ definitionId }) => definitionId === "arc-sentry-turret",
         )!;
         for (const [id, x, z] of [
-          ["near-raider", 27, 48],
-          ["priority-raider", 25, 53],
+          ["near-raider", 28, 49],
+          ["priority-raider", 26, 54],
         ] as const)
           simulation.spawnActor(
             createActor({
@@ -1198,10 +1198,10 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     page,
   }, testInfo) => {
     await controlledOpening(page);
-    await place(page, "#build-refinery", 12, 49, touch);
+    await place(page, "#build-refinery", 13, 50, touch);
     const panel = page.locator("#panel-selection");
     await action(page, '#panel-selection [data-rally-action="set"]', touch);
-    const occupied = await terrainPoint(page, 8, 50);
+    const occupied = await terrainPoint(page, 9, 51);
     await pressPoint(page, occupied, touch);
     await expect(panel.locator("[data-rally-status]")).toContainText(
       "passable ground",
@@ -1209,7 +1209,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ name, touch }) => {
     await action(page, '#panel-selection [data-rally-action="cancel"]', touch);
     await expect(panel.locator('[data-rally-action="cancel"]')).toBeHidden();
     await action(page, '#panel-selection [data-rally-action="set"]', touch);
-    const destination = await terrainPoint(page, 17, 52);
+    const destination = await terrainPoint(page, 18, 53);
     if (!touch) {
       const selected = await page
         .locator("#game-canvas")
@@ -1273,8 +1273,8 @@ test("selling a support bridge pauses production and rebuilding restores it", as
   page,
 }, testInfo) => {
   await controlledOpening(page, { materials: 500 });
-  await place(page, "#build-barracks", 16, 50);
-  await place(page, "#build-barracks", 22, 50);
+  await place(page, "#build-barracks", 17, 51);
+  await place(page, "#build-barracks", 23, 51);
   const [bridgeId, remoteId] = await page.evaluate(() =>
     window.sessionHarness.view.simulation.actors
       .filter((actor) => actor.definitionId === "arc-field-barracks")
@@ -1327,7 +1327,7 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     ),
   ).toBe(true);
   await attachScreenshot(page, testInfo, "disconnected-network");
-  await place(page, "#build-barracks", 16, 50);
+  await place(page, "#build-barracks", 17, 51);
   await advance(page, 5);
   await expect(page.locator("#unit-roster button")).toHaveCount(1);
   await expect(networkAlerts.first()).toHaveText("• 1 building reconnected");
@@ -1339,15 +1339,15 @@ test("selling a support bridge pauses production and rebuilding restores it", as
     const simulation = window.sessionHarness.view.simulation;
     const replacement = simulation.actors.find(
       (actor) =>
-        actor.tilePlacement?.origin.x === 16 &&
-        actor.tilePlacement.origin.z === 50,
+        actor.tilePlacement?.origin.x === 17 &&
+        actor.tilePlacement.origin.z === 51,
     )!;
     const backup = createTilePlacedActor(
       prototypeTerrainMap(),
       currentContentPack("base").actors.find(
         (definition) => definition.id === "arc-field-barracks",
       )!,
-      { actorId: "test-backup", origin: { x: 17, z: 52 } },
+      { actorId: "test-backup", origin: { x: 18, z: 53 } },
       "player",
     );
     const totalTicks = Math.round(8 / simulation.tickSeconds);
@@ -1391,7 +1391,7 @@ test("a Trooper defeats the lone wolf with health and combat feedback", async ({
       facing: Math.PI / 2,
       occupancyLayer: "surface",
     });
-    view.camera.focusOnTile(43, 32);
+    view.camera.focusOnTile(44, 33);
     return hidden;
   });
   expect(wolfHidden).toBe(true);
@@ -1458,7 +1458,7 @@ test("hostile buildings require detection and expose inspection without player c
       {
         actorId: "enemy-barracks",
         definitionId: "arc-field-barracks",
-        origin: { x: 12, z: 49 },
+        origin: { x: 13, z: 50 },
       },
     ],
   });
@@ -1580,7 +1580,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
         facing: 0,
         occupancyLayer: "surface",
       });
-      view.camera.focusOnTile(43, 32);
+      view.camera.focusOnTile(44, 33);
       view.selectActor("advance-trooper");
     });
     await advance(page, 0.1);
@@ -1600,7 +1600,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await expect(page.locator("#cancel-attack-move")).toBeHidden();
       await action(page, "#attack-move");
     }
-    const point = await terrainPoint(page, 52, 32);
+    const point = await terrainPoint(page, 53, 33);
     await pressPoint(page, point, profile.touch);
     const destination = await page.evaluate(async () => {
       const { prototypeTerrainMap } = await import("/e2e/harness.ts");
@@ -1615,7 +1615,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
         tile: prototypeTerrainMap().tileAtWorldPosition(target.x, target.z),
       };
     });
-    expect(destination.tile).toEqual({ x: 52, z: 32 });
+    expect(destination.tile).toEqual({ x: 53, z: 33 });
     await advance(page, 1);
     await expect(page.locator("#movement-status")).toContainText(
       "Attack Move order",

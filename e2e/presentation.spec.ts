@@ -33,7 +33,7 @@ async function openPresentation(
           {
             actorId: "blueprint",
             definitionId: "arc-field-barracks",
-            origin: { x: 16, z: 50 },
+            origin: { x: 17, z: 51 },
           },
         ]);
         const actor = (id: string) =>
@@ -80,7 +80,7 @@ async function openPresentation(
             {
               actorId: "present-refinery",
               definitionId: "arc-materials-refinery",
-              origin: { x: 12, z: 54 },
+              origin: { x: 13, z: 55 },
             },
           ]);
           mission.state.actors.push(
@@ -88,7 +88,7 @@ async function openPresentation(
               id: "present-worker",
               definitionId: "arc-harvester",
               owner: "player",
-              worldPosition: map.tileCenter(13, 56),
+              worldPosition: map.tileCenter(14, 57),
             }),
           );
           mission.state.economy!.harvesters.push({
@@ -191,7 +191,7 @@ test("a building placed and producing in one tick plays its generated exit clip"
         kind: "place-actor",
         actorId: "new-barracks",
         definitionId: "arc-field-barracks",
-        origin: { x: 12, z: 12 },
+        origin: { x: 13, z: 13 },
       },
       { owner: session.simulation.playerOwner },
     );
@@ -274,7 +274,7 @@ test("committed combat animates both survivors, aiming, and wolf pursuit", async
         worldPosition: { x: -9.5, z: -17.5 },
       }),
     );
-    session.camera.focusOnTile(43, 32);
+    session.camera.focusOnTile(44, 33);
   });
   await freezePresentationTime(page);
   const observed = await page.evaluate(() => {
@@ -309,7 +309,7 @@ test("loaded healing shows a frozen cue and removes it when the wolf becomes hid
 }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors = await openPresentation(page, "arc-economy-opening", "healing");
-  await page.evaluate(() => window.presentation.camera.focusOnTile(46, 32));
+  await page.evaluate(() => window.presentation.camera.focusOnTile(47, 33));
   await page.screenshot({ path: testInfo.outputPath("wolf-regeneration.png") });
   await freezePresentationTime(page);
   const observed = await page.evaluate(() => {

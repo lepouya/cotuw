@@ -125,7 +125,7 @@ describe("mission files", () => {
       edited((file) => {
         file.state.terrain.heights[0][0] = "high";
       }),
-    ).toThrow("101 height rows of 101 numbers");
+    ).toThrow("103 height rows of 103 numbers");
     expect(
       edited((file) => {
         delete file.state.terrain.navigationVersion;

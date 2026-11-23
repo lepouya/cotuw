@@ -45,7 +45,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
         "150 Lifebloom",
       );
       await expect(page.locator("#build-circle-conservatory")).toBeDisabled();
-      const heart = await terrainPoint(page, 9, 51);
+      const heart = await terrainPoint(page, 10, 52);
       await pressPoint(page, heart, touch);
       await expect(page.locator("#selection-details")).toContainText(
         "Heartgrove",
@@ -63,7 +63,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       await expect(roster.filter({ hasText: "Cultivator" })).toHaveCount(1);
       await activate(roster.filter({ hasText: "Cultivator" }), touch);
       await expect(page.locator("#harvester-details")).toContainText("Idle");
-      await placeBuilding(page, "build-circle-conservatory", 16, 50, {
+      await placeBuilding(page, "build-circle-conservatory", 17, 51, {
         explanation: "Tending growth",
         touch,
       });
@@ -150,17 +150,17 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       await mission.opening({ faction: "circle" });
       for (let i = 0; i < 3; i++)
         await mission.press('[data-camera-action="tilt-up"]');
-      await mission.ground(9, 51);
+      await mission.ground(10, 52);
       await mission.press("#train-circle-cultivator");
       await mission.advance(5);
       await mission.select("Cultivator");
-      await mission.place("circle-conservatory", 16, 50, {
+      await mission.place("circle-conservatory", 17, 51, {
         placement: "Tending growth",
         completion: "Cultivating Lifebloom",
       });
       await cultivate(0, "near-lifebloom");
       await mission.waitForStockpile(50);
-      await mission.ground(9, 51);
+      await mission.ground(10, 52);
       await mission.press("#train-circle-cultivator");
       await mission.advance(5);
       await cultivate(1, "near-lifebloom");
@@ -169,12 +169,12 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
 
       await mission.waitForStockpile(100);
       await mission.select("Cultivator");
-      await mission.place("circle-musterhall", 12, 54, {
+      await mission.place("circle-musterhall", 13, 55, {
         completion: "Gather your expedition",
       });
       await cultivate(0, "near-lifebloom");
       // Use the side of the footprint clear of the Heartgrove canopy.
-      await mission.ground(13, 55);
+      await mission.ground(14, 56);
       for (let i = 0; i < 6; i++) {
         await mission.waitForStockpile(35);
         await mission.press("#train-circle-sentinel");
@@ -183,15 +183,15 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       await expect(mission.rosterUnits("Sentinel")).toHaveCount(6);
 
       await mission.selectAll("Sentinel");
-      await mission.focus(24, 42);
-      await mission.ground(24, 42);
+      await mission.focus(25, 43);
+      await mission.ground(25, 43);
       await mission.advance(10);
-      await mission.focus(34, 36);
-      await mission.ground(34, 36);
+      await mission.focus(35, 37);
+      await mission.ground(35, 37);
       await mission.advance(10);
-      await mission.focus(46, 32);
+      await mission.focus(47, 33);
       await mission.press("#attack-move");
-      await mission.ground(52, 32);
+      await mission.ground(53, 33);
       await mission.advance(25);
       await mission.press("#tab-goals");
       await expect(page.locator('[data-goal-id="lone-wolf"]')).toContainText(
@@ -199,17 +199,17 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch, name }) => {
       );
       await mission.selectAll("Sentinel");
       for (const [x, z, seconds] of [
-        [57, 35, 8],
-        [70, 34, 10],
-        [77, 36, 13],
+        [58, 36, 8],
+        [71, 35, 10],
+        [78, 37, 13],
       ] as const) {
         await mission.focus(x, z);
         await mission.ground(x, z);
         await mission.advance(seconds);
       }
-      await mission.focus(78, 29);
+      await mission.focus(79, 30);
       await mission.press("#attack-move");
-      await mission.ground(78, 21);
+      await mission.ground(79, 22);
       await mission.advance(40);
       await expect(page.locator("#game-menu-title")).toHaveText("Victory");
       const elapsedSeconds = await mission.elapsedSeconds();
@@ -239,24 +239,24 @@ test(
       await mission.press('[data-economy-action="cultivate:near-lifebloom"]');
     };
     await mission.opening({ faction: "circle" });
-    await mission.ground(9, 51);
+    await mission.ground(10, 52);
     await expect(selected).toContainText("Heartgrove");
     await mission.press("#train-circle-cultivator");
     await mission.advance(5);
     await mission.select("Cultivator");
-    await mission.place("circle-conservatory", 16, 50, {
+    await mission.place("circle-conservatory", 17, 51, {
       placement: "Tending growth",
       completion: "Cultivating Lifebloom",
     });
     await cultivate();
     await mission.waitForStockpile(100);
-    await mission.place("circle-musterhall", 12, 54, {
+    await mission.place("circle-musterhall", 13, 55, {
       completion: "Gather your expedition",
     });
     await cultivate();
     await mission.waitForStockpile(55);
     // Use the side of the footprint clear of the Heartgrove canopy.
-    await mission.ground(13, 55);
+    await mission.ground(14, 56);
     await expect(selected).toContainText("Musterhall");
     await expect(page.locator("#selection-info")).toHaveText(
       "Circle infantry production · Trains Sentinel, Wayfinder, and Healer.",
@@ -288,7 +288,7 @@ test(
     const mission = new MissionDriver(page, { realTime: true });
     await mission.opening({ dismissGuide: false, faction: "circle" });
     await dismissExplanation(page, "Welcome, Guide");
-    await pressPoint(page, await terrainPoint(page, 9, 51));
+    await pressPoint(page, await terrainPoint(page, 10, 52));
     await page.locator("#train-circle-cultivator").click();
     await page.locator('[data-speed="4"]').click();
     const worker = page
@@ -307,7 +307,7 @@ test(
     await page.locator("#tab-buildings").click();
     await page.locator("#build-circle-conservatory").click();
     await dismissExplanation(page, "Tending growth");
-    const site = await terrainPoint(page, 16, 50);
+    const site = await terrainPoint(page, 17, 51);
     await page.mouse.move(site.x, site.y);
     const canvas = page.locator("#game-canvas");
     await expect(canvas).toHaveAttribute("data-placement-status", "valid");
@@ -534,7 +534,7 @@ test(
         {
           actorId: "test-conservatory",
           definitionId: "circle-conservatory",
-          origin: { x: 16, z: 50 },
+          origin: { x: 17, z: 51 },
         },
       ]);
       // Just above dormancy, so four workers drain it within seconds.
@@ -546,12 +546,12 @@ test(
       });
       controlSessionClock(view);
       const map = prototypeTerrainMap();
-      view.focus(map.tileCenter(20, 50));
+      view.focus(map.tileCenter(21, 51));
     });
     await advance(page, 1);
     const canvas = page.locator("#game-canvas");
     await expect(canvas).toHaveAttribute("data-models-ready", "true");
-    await pressPoint(page, await terrainPoint(page, 20, 50));
+    await pressPoint(page, await terrainPoint(page, 21, 51));
     await expect(canvas).toHaveAttribute(
       "data-selected-site",
       "near-lifebloom",
@@ -567,14 +567,14 @@ test(
       const { prototypeTerrainMap } = await import("/e2e/harness.ts");
       const { view } = window.sessionHarness;
       const map = prototypeTerrainMap();
-      for (const [index, z] of [49, 50, 51, 52].entries()) {
+      for (const [index, z] of [50, 51, 52, 53].entries()) {
         const actorId = `test-cultivator-${index}`;
         view.simulation.spawnActor(
           createActor({
             id: actorId,
             owner: "player",
             definitionId: "circle-cultivator",
-            worldPosition: map.tileCenter(19, z),
+            worldPosition: map.tileCenter(20, z),
           }),
         );
         view.simulation.submitCommand(

@@ -1,7 +1,7 @@
 import { TerrainGrid } from "../../src/simulation/terrain.ts";
 import { defineScenario } from "../../src/simulation/scenario.ts";
 import { BASE_CONTENT } from "./base-content.ts";
-import { PROTOTYPE_TERRAIN } from "./prototype-terrain.ts";
+import { WOLF_DEN_TERRAIN } from "./prototype-terrain.ts";
 
 import type {
   ScenarioDefinition,
@@ -35,14 +35,14 @@ type WolfDenOptions = Omit<
 };
 
 const DEN_WOLVES = [
-  { actorId: "den-wolf-1", definitionId: "wolf", tile: { x: 74, z: 21 } },
-  { actorId: "den-wolf-2", definitionId: "wolf", tile: { x: 82, z: 21 } },
-  { actorId: "den-wolf-3", definitionId: "wolf", tile: { x: 75, z: 24 } },
-  { actorId: "den-wolf-4", definitionId: "wolf", tile: { x: 81, z: 24 } },
+  { actorId: "den-wolf-1", definitionId: "wolf", tile: { x: 75, z: 22 } },
+  { actorId: "den-wolf-2", definitionId: "wolf", tile: { x: 83, z: 22 } },
+  { actorId: "den-wolf-3", definitionId: "wolf", tile: { x: 76, z: 25 } },
+  { actorId: "den-wolf-4", definitionId: "wolf", tile: { x: 82, z: 25 } },
   {
     actorId: "den-alpha-wolf",
     definitionId: "alpha-wolf",
-    tile: { x: 78, z: 19 },
+    tile: { x: 79, z: 20 },
   },
 ];
 
@@ -55,12 +55,12 @@ export function createWolfDenScenario({
   playerFaction,
   ...opening
 }: WolfDenOptions): ScenarioDefinition {
-  const map = new TerrainGrid(PROTOTYPE_TERRAIN);
+  const map = new TerrainGrid(WOLF_DEN_TERRAIN);
   const wolves: ScenarioUnit[] = [
     {
       actorId: "lone-wolf",
       definitionId: "wolf",
-      tile: { x: 46, z: 32 },
+      tile: { x: 47, z: 33 },
       facing: -Math.PI / 2,
       territory: { encounterId: "lone-wolf", radius: 14 },
     },
@@ -69,7 +69,7 @@ export function createWolfDenScenario({
       facing: Math.PI,
       territory: {
         encounterId: "wolf-den",
-        center: map.tileCenter(78, 21),
+        center: map.tileCenter(79, 22),
         radius: 12,
       },
     })),
@@ -88,12 +88,12 @@ export function createWolfDenScenario({
     tileSize: map.tileSize,
     terrainTypeIds: [...map.terrainTypeIds],
     terrain: map.terrainState(),
-    buildings: [{ ...headquarters, origin: { x: 8, z: 50 } }],
+    buildings: [{ ...headquarters, origin: { x: 9, z: 51 } }],
     units: wolves,
     // Circles the lake shore, visible early on.
     flocks: [
       {
-        center: map.tileCenter(30, 57),
+        center: map.tileCenter(31, 58),
         radius: 6,
         altitude: 5,
         count: 4,
@@ -120,8 +120,8 @@ export function createWolfDenScenario({
     loot: [
       ...opening.loot,
       ...[
-        { x: 54, z: 32 },
-        { x: 56, z: 34 },
+        { x: 55, z: 33 },
+        { x: 57, z: 35 },
       ].map(crossingLoot),
     ],
   });

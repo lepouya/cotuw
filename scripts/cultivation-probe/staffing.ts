@@ -175,7 +175,7 @@ function measureStaffing(
     kind: "place-actor",
     actorId: "conservatory",
     definitionId: "circle-conservatory",
-    origin: { x: 16, z: 50 },
+    origin: { x: 17, z: 51 },
     workerIds: [firstWorker],
   });
   run(() => sim.actorById("conservatory")?.construction === undefined);

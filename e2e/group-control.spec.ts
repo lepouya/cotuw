@@ -120,7 +120,7 @@ test(
     );
     // Routes must be inspected before the independently timed units arrive.
     await advanceSimulationTime(page, 0);
-    const point = await terrainPoint(page, 54, 45);
+    const point = await terrainPoint(page, 55, 46);
     await page.mouse.click(point.x, point.y);
     await advanceSimulationTime(page, 34);
     await expect(page.locator("#movement-status")).toHaveText(
@@ -200,7 +200,7 @@ forEachProfile([PHONE_PROFILE], (profile) => {
       await page.goto("/?level=sandbox");
       // Use the same on-screen production controls without secondary clicks.
       await page.locator("#build-barracks").tap();
-      const building = await terrainPoint(page, 49, 39);
+      const building = await terrainPoint(page, 50, 40);
       await page.touchscreen.tap(building.x, building.y);
       await page.locator("#confirm-building").tap();
       for (const unit of ["trooper", "scout", "trooper"])
@@ -224,7 +224,7 @@ forEachProfile([PHONE_PROFILE], (profile) => {
       expect(await cameraPose(page)).toEqual(before);
       await page.locator("#box-select").tap();
       // Keep the destination clear of the units' projected silhouettes.
-      const destination = await terrainPoint(page, 54, 49);
+      const destination = await terrainPoint(page, 55, 50);
       await page.touchscreen.tap(destination.x, destination.y);
       await expect(page.locator("#movement-status")).toHaveText(
         "3 move orders accepted.",

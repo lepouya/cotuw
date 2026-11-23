@@ -75,7 +75,7 @@ forEachProfile(PROFILES, (profile) => {
     { tag: WEBKIT },
     async ({ page }, info) => {
       await page.goto("/?level=sandbox");
-      await placeBuilding(page, "build-barracks", 55, 39, {
+      await placeBuilding(page, "build-barracks", 56, 40, {
         touch: profile.touch,
       });
       await activate(page.locator("#train-trooper"), profile.touch);
@@ -127,7 +127,7 @@ test("production pictures explain disabled cards and keep selection visible", as
   );
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toBeHidden();
-  await placeBuilding(page, "build-barracks", 55, 39);
+  await placeBuilding(page, "build-barracks", 56, 40);
   await expect(page.locator("#train-scout")).toBeEnabled();
   await page.locator("#pause-mission").click();
   await expect(page.locator("#train-scout")).toBeDisabled();
@@ -272,13 +272,13 @@ test(
     await expect(page.locator("#train-trooper")).toBeDisabled();
     await expect(page.locator("#unit-roster")).toContainText("No units yet");
 
-    await placeBuilding(page, "build-command-center", 49, 39);
+    await placeBuilding(page, "build-command-center", 50, 40);
     await expect(page.locator("#panel-selection")).toBeVisible();
     await expect(page.locator("#selection-details")).toHaveText(
       "Command Center · 2 × 2 · 0°",
     );
     // Selecting a production building opens its training options.
-    await placeBuilding(page, "build-barracks", 55, 39);
+    await placeBuilding(page, "build-barracks", 56, 40);
     await expect(page.locator("#panel-units")).toBeVisible();
     await expect(page.locator("#selection-details")).toHaveText(
       "Field Barracks · 3 × 2 · 0°",
@@ -309,7 +309,7 @@ test(
     ]);
     await page.locator("#tab-units").click();
     await expect(page.locator("#train-scout")).toBeDisabled();
-    const barracks = await terrainPoint(page, 55, 39);
+    const barracks = await terrainPoint(page, 56, 40);
     await page.mouse.click(barracks.x, barracks.y);
     await expect(page.locator("#panel-units")).toBeVisible();
     await expect(page.locator("#train-scout")).toBeEnabled();
@@ -339,7 +339,7 @@ test("blocked exits disable training until a unit moves away", async ({
 }) => {
   await page.goto("/?level=sandbox");
   await expectTerrainReady(page);
-  await placeBuilding(page, "build-barracks", 49, 39);
+  await placeBuilding(page, "build-barracks", 50, 40);
   for (let i = 0; i < 10; i++) {
     await page.locator("#train-trooper").click();
     await expect(page.locator("#unit-roster button")).toHaveCount(i + 1);
@@ -349,7 +349,7 @@ test("blocked exits disable training until a unit moves away", async ({
     "Exit blocked",
   );
   await page.locator("#unit-roster button").first().click();
-  const point = await terrainPoint(page, 51, 45);
+  const point = await terrainPoint(page, 52, 46);
   await page.mouse.click(point.x, point.y);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-move-status",
@@ -400,7 +400,7 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
       expect(placement.y).toBeGreaterThanOrEqual(
         selection.y + selection.height,
       );
-      const point = await terrainPoint(page, 55, 39);
+      const point = await terrainPoint(page, 56, 40);
       await page.touchscreen.tap(point.x, point.y);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-placement-status",
@@ -768,7 +768,7 @@ test("session controls skip unchanged frames and removal works without a sidebar
           definition,
           {
             actorId: "standalone-building",
-            origin: { x: 49, z: 39 },
+            origin: { x: 50, z: 40 },
           },
           "player",
         ),

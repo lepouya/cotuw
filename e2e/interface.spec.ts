@@ -83,7 +83,7 @@ test(
     await expect(canvas).toHaveAttribute("data-placement-active", "false");
     await expect(menu).toBeHidden();
 
-    await mission.ground(9, 51);
+    await mission.ground(10, 52);
     await expect(canvas).toHaveAttribute(
       "data-selected-actors",
       /starting-command-center/,
@@ -274,7 +274,7 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
     "data-placement-active",
     "true",
   );
-  await mission.ground(12, 49);
+  await mission.ground(13, 50);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-placement-active",
     "false",
@@ -314,7 +314,7 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   await expect(page.locator("#explanation")).toBeHidden();
 
   await mission.select("Harvester");
-  await rightClick(page, 17, 53);
+  await rightClick(page, 18, 54);
   const menu = page.locator(".radial-menu");
   await expect(menu.locator(".radial-default")).toContainText("Move");
   await expect(
@@ -339,7 +339,7 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
     /.+/,
   );
   await mission.press('[data-camera-action="pan"]');
-  await rightClick(page, 17, 53);
+  await rightClick(page, 18, 54);
   await expect(menu).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await expect(
@@ -354,17 +354,17 @@ test("the top bar, popups, alerts, and radial menu drive the opening with a mous
   await mission.press('[data-camera-action="pan"]');
 
   // Dismissing the menu on the world must consume the press.
-  await rightClick(page, 17, 53);
-  await mission.ground(16, 53);
+  await rightClick(page, 18, 54);
+  await mission.ground(17, 54);
   await expect(menu).toBeHidden();
   await expect(page.locator("#harvester-details")).toContainText("Idle");
 
   await mission.press("#pause-mission");
-  await rightClick(page, 17, 53);
+  await rightClick(page, 18, 54);
   await expect(menu.locator('[data-context-action="move"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
   await mission.press("#pause-mission");
-  await rightClick(page, 20, 50);
+  await rightClick(page, 21, 51);
   await expect(menu.locator(".radial-default")).toContainText("Gather");
   await attachScreenshot(page, testInfo, "radial-menu");
   await mission.press(".radial-menu .radial-default");
@@ -413,7 +413,7 @@ forEachProfile(TOUCH_PROFILES, (profile) => {
       await mission.press("#pause-mission");
       await mission.press("#objective-summary");
       await expect(page.locator("#panel-goals")).toBeVisible();
-      await mission.place("refinery", 12, 49, {
+      await mission.place("refinery", 13, 50, {
         placement: "Support Network",
       });
       await expect(page.locator("#notifications")).toContainText(

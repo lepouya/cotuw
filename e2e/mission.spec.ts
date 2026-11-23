@@ -25,7 +25,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
         "data-tile-placed-actor-count",
         "1",
       );
-      await mission.place("refinery", 12, 49, {
+      await mission.place("refinery", 13, 50, {
         placement: "Support Network",
       });
       await mission.press("#train-harvester");
@@ -36,7 +36,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
         '#gather-sites [data-economy-action="gather:near-materials-1"]',
       );
       await mission.waitForStockpile(100);
-      await mission.place("barracks", 16, 54, {
+      await mission.place("barracks", 17, 55, {
         completion: "Barracks & Training",
       });
       await mission.waitForStockpile(45);
@@ -46,11 +46,11 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await mission.explanation("Scouting & Combat");
 
       await mission.select("Scout");
-      await mission.focus(24, 42);
-      await mission.ground(24, 42);
+      await mission.focus(25, 43);
+      await mission.ground(25, 43);
       await mission.advance(5);
-      await mission.focus(34, 36);
-      await mission.ground(34, 36);
+      await mission.focus(35, 37);
+      await mission.ground(35, 37);
       await mission.advance(5);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-move-status",
@@ -58,12 +58,12 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       );
 
       await mission.select("Trooper");
-      await mission.focus(40, 34);
-      await mission.ground(40, 34);
+      await mission.focus(41, 35);
+      await mission.ground(41, 35);
       await mission.advance(15);
-      await mission.focus(46, 32);
+      await mission.focus(47, 33);
       await mission.press("#attack-move");
-      await mission.ground(52, 32);
+      await mission.ground(53, 33);
       await mission.advance(25);
       await mission.press("#tab-goals");
       await expect(page.locator('[data-goal-id="lone-wolf"]')).toContainText(
@@ -85,9 +85,9 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       }
       await attachScreenshot(page, testInfo, `crossing-${profile.name}`);
 
-      await mission.focus(16, 54);
+      await mission.focus(17, 55);
       await mission.press("#tab-units");
-      await mission.ground(16, 54);
+      await mission.ground(17, 55);
       await mission.waitForStockpile(125);
       const training = page.locator("#train-trooper");
       await training.scrollIntoViewIfNeeded();
@@ -99,23 +99,23 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
         page.locator("#unit-roster button").filter({ hasText: "Trooper" }),
       ).toHaveCount(6);
       await mission.select("Scout");
-      await mission.focus(57, 35);
-      await mission.ground(57, 35);
+      await mission.focus(58, 36);
+      await mission.ground(58, 36);
       await mission.advance(8);
-      await mission.focus(70, 34);
-      await mission.ground(70, 34);
+      await mission.focus(71, 35);
+      await mission.ground(71, 35);
       await mission.advance(5);
-      await mission.focus(77, 36);
-      await mission.ground(77, 36);
+      await mission.focus(78, 37);
+      await mission.ground(78, 37);
       await mission.advance(3);
 
       await mission.selectAll("Trooper");
-      await mission.focus(77, 35);
-      await mission.ground(77, 35);
+      await mission.focus(78, 36);
+      await mission.ground(78, 36);
       await mission.advance(30);
-      await mission.focus(78, 29);
+      await mission.focus(79, 30);
       await mission.press("#attack-move");
-      await mission.ground(78, 21);
+      await mission.ground(79, 22);
       await mission.advance(30);
       await expect(page.locator("#game-menu-title")).toHaveText("Victory");
       await expect(page.locator("#game-canvas")).toHaveAttribute(
@@ -138,22 +138,22 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
       await expect(
         page.locator("#mission-objectives .goal-complete"),
       ).toHaveCount(2);
-      await mission.focus(16, 54);
+      await mission.focus(17, 55);
       await mission.press("#tab-units");
-      await mission.ground(16, 54);
+      await mission.ground(17, 55);
       await mission.waitForStockpile(25);
       const units = await page.locator("#unit-roster button").count();
       await mission.press("#train-trooper");
       await mission.advance(4);
       await expect(page.locator("#unit-roster button")).toHaveCount(units + 1);
       await mission.waitForStockpile(125);
-      await mission.focus(15, 48);
+      await mission.focus(16, 49);
       const buildings = Number(
         await page
           .locator("#game-canvas")
           .getAttribute("data-tile-placed-actor-count"),
       );
-      await mission.place("barracks", 15, 48);
+      await mission.place("barracks", 16, 49);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-tile-placed-actor-count",
         String(buildings + 1),

@@ -114,15 +114,15 @@ export const ECONOMY_SCENARIO = createWolfDenScenario({
   stockpiles: [{ resource: "materials", owners: ["player"], amount: 150 }],
   sites: [
     ...patch("near-materials", "Near Materials", [
-      { x: 20, z: 50 },
-      { x: 21, z: 50 },
-      { x: 20, z: 51 },
       { x: 21, z: 51 },
+      { x: 22, z: 51 },
+      { x: 21, z: 52 },
+      { x: 22, z: 52 },
     ]),
     ...patch("south-materials", "South Materials", [
-      { x: 24, z: 42 },
-      { x: 25, z: 42 },
+      { x: 25, z: 43 },
+      { x: 26, z: 43 },
     ]),
   ],
-  loot: [salvage("salvage-1", "Materials salvage", { x: 25, z: 52 })],
+  loot: [salvage("salvage-1", "Materials salvage", { x: 26, z: 53 })],
 });
