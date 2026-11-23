@@ -10,9 +10,8 @@ import { BASE_CONTENT, MOVEMENT_PROFILES } from "./helpers/content";
 import { lootAmount } from "../src/simulation/economy";
 import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import { LEVEL_SOURCES } from "../src/content/levels";
-import { PROTOTYPE_LANDMARKS } from "../scripts/levels/prototype-terrain";
 import { createActor } from "../src/simulation/actor";
-import { personallyDetects } from "../src/simulation/vision";
+import { personallyDetects, visibleTiles } from "../src/simulation/vision";
 import { distance } from "../src/simulation/world";
 import {
   findNavigationPath,
@@ -397,19 +396,18 @@ describe("authored wolf encounters", () => {
     ).toBe(true);
   });
 
-  test("distinct mountain peaks leave both ridge crossings and the den entrance usable", () => {
+  test("landmark summits keep their elevations and the crossings stay open", () => {
     const { map, grid } = openingGrid();
-    for (const landmark of PROTOTYPE_LANDMARKS)
-      for (const peak of landmark.peaks) {
-        expect(map.heightAt(peak.x, peak.z), landmark.id).toBeGreaterThan(8);
-        expect(
-          findNavigationPath(
-            grid,
-            map.tileCenter(15, 50),
-            map.tileCenter(peak.x, peak.z),
-          )?.reachedTarget,
-        ).toBe(false);
-      }
+    const summits = [
+      { x: 62, z: 42, height: 10.07 },
+      { x: 64, z: 44, height: 10.08 },
+      { x: 75, z: 27, height: 8.91 },
+      { x: 82, z: 27, height: 8.86 },
+    ];
+    for (const { x, z, height } of summits) {
+      expect(map.heightAt(x, z)).toBe(Math.fround(height));
+      expect(grid.costAt(x, z)).toBeUndefined();
+    }
     for (const z of [32, 68]) {
       const route = findNavigationPath(
         grid,
@@ -422,6 +420,25 @@ describe("authored wolf encounters", () => {
     expect(grid.costAt(75, 23)).toBeGreaterThan(grid.costAt(78, 23)!);
     expect(grid.costAt(30, 44)).toBeDefined();
     expect(map.slopeAt(30, 44)).toBeGreaterThan(0.1);
+  });
+
+  test("the lowered ridge blocks movement and construction on its flat top", () => {
+    const { map, grid } = openingGrid();
+    expect(map.heightAt(62, 52)).toBeCloseTo(3.14);
+    expect(map.slopeAt(62, 52)).toBeLessThan(0.75);
+    expect(grid.costAt(62, 52)).toBeUndefined();
+    expect(map.terrainAt(62, 52).surfaceBuildable).toBe(false);
+  });
+
+  test("a scout can see across the northern ridge crossing at an angle", () => {
+    const map = mapForOpening();
+    const scout = definitions.find(({ id }) => id === "arc-scout")!;
+    const tiles = visibleTiles(
+      map,
+      map.tileCenter(54, 29),
+      scout.vision!.radius,
+    );
+    expect(tiles).toContain(34 * map.width + 67);
   });
 
   test("six wolves have passable homes and the den shares one territory", () => {

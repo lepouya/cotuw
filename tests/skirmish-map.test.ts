@@ -170,6 +170,15 @@ test.each(SKIRMISH_CROSSINGS)(
   },
 );
 
+test("the lowered ridge blocks movement and construction on its flat top", () => {
+  const grid = navigation();
+  const { map } = grid;
+  expect(map.heightAt(60, 40)).toBe(3);
+  expect(map.slopeAt(60, 40)).toBe(0);
+  expect(grid.costAt(60, 40)).toBeUndefined();
+  expect(map.terrainAt(60, 40).surfaceBuildable).toBe(false);
+});
+
 test.each(SKIRMISH_MAP.starts)(
   "$id has flat base space and reachable income and expansions",
   (start) => {

@@ -10,7 +10,10 @@ import { createScenarioMap } from "../src/simulation/scenario";
 import type { TerrainGrid } from "../src/simulation/terrain";
 import { createGameView } from "../src/render/game-view";
 import { createMinimap } from "../src/render/minimap";
-import { createTerrainMeshes } from "../src/render/terrain-mesh";
+import {
+  createTerrainMeshes,
+  isTerrainPickMesh,
+} from "../src/render/terrain-mesh";
 
 import type { ArcRotateCamera, Scene } from "@babylonjs/core";
 import type { TileType } from "../src/content/terrain-style";
@@ -54,6 +57,31 @@ export function prototypeTerrainMap(): TerrainGrid {
     });
   }
   return authoredTerrain;
+}
+
+export function terrainTileCenter(map: TerrainGrid, x: number, z: number) {
+  const point = map.tileCenter(x, z);
+  return new Vector3(
+    point.x,
+    map.heightAtWorldPosition(point.x, point.z),
+    point.z,
+  );
+}
+
+/** Picks a tile at a point in page CSS pixels. */
+export function pickTerrainTile(
+  scene: Scene,
+  canvas: HTMLCanvasElement,
+  map: TerrainGrid,
+  point: { x: number; y: number },
+) {
+  const bounds = canvas.getBoundingClientRect();
+  const picked = scene.pick(
+    point.x - bounds.left,
+    point.y - bounds.top,
+    isTerrainPickMesh,
+  )?.pickedPoint;
+  return picked && map.tileAtWorldPosition(picked.x, picked.z);
 }
 
 const TEST_VIEW_OPTIONS = {

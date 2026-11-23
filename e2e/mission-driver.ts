@@ -153,19 +153,10 @@ export class MissionDriver {
     expect(point.y).toBeGreaterThan(bounds.y);
     expect(point.y).toBeLessThan(bounds.y + bounds.height);
     const hit = await this.page.evaluate(async (point) => {
-      const { gameScene, prototypeTerrainMap } =
+      const { gameScene, pickTerrainTile, prototypeTerrainMap } =
         await import("/e2e/harness.ts");
-      const { isTerrainPickMesh } = await import("/src/render/terrain-mesh.ts");
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
-      const bounds = canvas.getBoundingClientRect();
-      const picked = gameScene().pick(
-        point.x - bounds.left,
-        point.y - bounds.top,
-        isTerrainPickMesh,
-      )?.pickedPoint;
-      return (
-        picked && prototypeTerrainMap().tileAtWorldPosition(picked.x, picked.z)
-      );
+      return pickTerrainTile(gameScene(), canvas, prototypeTerrainMap(), point);
     }, point);
     expect(
       hit,

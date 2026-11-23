@@ -1,8 +1,10 @@
 import { PNG } from "pngjs";
 import { expect, test } from "./fixtures";
+import { expectTerrainReady } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
+import type { ArcRotateCamera } from "@babylonjs/core";
 
 /** Summed channel distance separating terrain from antialiased clear color. */
 const CLEAR_COLOR_TOLERANCE = 40;
@@ -23,6 +25,42 @@ async function nextFrame(page: Page) {
     const { frames } = await import("/e2e/harness.ts");
     await frames(1);
   });
+}
+
+for (const { id, x, z } of [
+  { id: "sandbox", x: 67, z: 60 },
+  { id: "skirmish-map", x: 64, z: 48 },
+]) {
+  test(
+    `ground beyond the ridge is visible in ${id}`,
+    { tag: WEBKIT },
+    async ({ page }) => {
+      await page.goto(`/?level=${id}`);
+      await expectTerrainReady(page);
+      const canvas = page.locator("#game-canvas");
+      const hit = await canvas.evaluate(
+        async (canvas: HTMLCanvasElement, { id, x, z }) => {
+          const {
+            gameScene,
+            pickTerrainTile,
+            projectToCanvas,
+            terrainTileCenter,
+          } = await import("/e2e/harness.ts");
+          const { level, missionMap } = await import("/e2e/missions.ts");
+          const map = missionMap(level(id));
+          const ground = terrainTileCenter(map, x, z);
+          const scene = gameScene();
+          const camera = scene.activeCamera as ArcRotateCamera;
+          camera.setTarget(ground, false, false, true);
+          scene.render();
+          const point = projectToCanvas(scene, canvas, ground);
+          return pickTerrainTile(scene, canvas, map, point);
+        },
+        { id, x, z },
+      );
+      expect(hit).toEqual({ x, z });
+    },
+  );
 }
 
 test("the initial view starts close enough to read tile detail", async ({

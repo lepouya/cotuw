@@ -878,6 +878,9 @@ build. TODO.md owns milestone delivery; current controls are described above.
 - Terrain changes report affected tile bounds. Renderers batch those reports by
   frame and rebuild only affected chunks while preserving shared material and
   texture state.
+- The wolf-den and skirmish mountain walls rise three world units above their
+  base terrain and block surface movement and building placement. The
+  wolf-den landmarks have independently authored summit elevations.
 - Terrain provides per-profile passability, slope limits, and movement costs.
   Routes minimize estimated travel time and recalculate when blockers change.
   - A tile's terrain type sets its cost or blocks it for each profile. A map

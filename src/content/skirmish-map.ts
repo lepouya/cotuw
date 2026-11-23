@@ -1,5 +1,6 @@
 // The rough M1 skirmish map.
 import { deepFreeze } from "../simulation/actor";
+import { mountainWallSurface } from "./mountain-wall";
 
 import type { TerrainBounds, TileCoord } from "../simulation/grid";
 import type { TerrainGridOptions } from "../simulation/terrain";
@@ -47,6 +48,7 @@ export type RidgeCrossing = {
 };
 
 const SIZE = 120;
+const RIDGE_HEIGHT = 3;
 
 const mirror = ({ x, z }: TileCoord): TileCoord => ({
   x: SIZE - 1 - x,
@@ -145,17 +147,20 @@ export const SKIRMISH_CROSSINGS: readonly RidgeCrossing[] = deepFreeze([
   { id: "south", minZ: 86, maxZ: 97 },
 ]);
 
+function isRidgeCorner(x: number, z: number): boolean {
+  return (
+    x >= 58 &&
+    x <= 62 &&
+    !SKIRMISH_CROSSINGS.some(({ minZ, maxZ }) => z >= minZ && z <= maxZ + 1)
+  );
+}
+
 export const SKIRMISH_TERRAIN = {
   width: SIZE,
   height: SIZE,
   tileSize: 1,
   terrainTypeIds: ["plain", "path", "rough", "water"],
-  createHeight: (x, z) => {
-    const crossing = SKIRMISH_CROSSINGS.some(
-      ({ minZ, maxZ }) => z >= minZ && z <= maxZ + 1,
-    );
-    return x >= 58 && x <= 62 && !crossing ? 6 : 0;
-  },
+  createHeight: (x, z) => (isRidgeCorner(x, z) ? RIDGE_HEIGHT : 0),
   createTerrain: (x, z) => {
     const edgeX = Math.min(x, SIZE - 1 - x);
     const edgeZ = Math.min(z, SIZE - 1 - z);
@@ -181,6 +186,7 @@ export const SKIRMISH_TERRAIN = {
             ? "rough"
             : "plain",
       outOfBounds: outOfBounds || undefined,
+      ...mountainWallSurface(isRidgeCorner, x, z),
     };
   },
 } as const satisfies TerrainGridOptions;

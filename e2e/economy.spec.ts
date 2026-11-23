@@ -518,10 +518,8 @@ test.describe("hovering salvage", () => {
         page.locator('[data-economy-action="loot:salvage-1"]'),
       ).toContainText("Collect salvage");
       const point = await page.evaluate(async () => {
-        const { projectToCanvas, prototypeTerrainMap } =
+        const { pickTerrainTile, projectToCanvas, prototypeTerrainMap } =
           await import("/e2e/harness.ts");
-        const { isTerrainPickMesh } =
-          await import("/src/render/terrain-mesh.ts");
         const map = prototypeTerrainMap();
         const view = window.sessionHarness.view;
         view.engine.stopRenderLoop();
@@ -541,18 +539,13 @@ test.describe("hovering salvage", () => {
           canvas,
           gift.getAbsolutePosition(),
         );
-        const bounds = canvas.getBoundingClientRect();
-        const ground = view.scene.pick(
-          point.x - bounds.left,
-          point.y - bounds.top,
-          isTerrainPickMesh,
-        )!.pickedPoint!;
         return {
           ...point,
           target: map.tileCenter(25, 52),
-          terrainBehind: map.tileAtWorldPosition(ground.x, ground.z),
+          terrainBehind: pickTerrainTile(view.scene, canvas, map, point),
         };
       });
+      expect(point.terrainBehind).toBeTruthy();
       expect(point.terrainBehind).not.toEqual({ x: 25, z: 52 });
       await pressPoint(page, point, touch);
       await advance(page, 0.1);

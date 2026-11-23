@@ -165,14 +165,14 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   and buildings behaved as expected. Findings continue in 1.72 to 1.77.
 - [ ] **1.72** Make Circle skirmish wins against the ARC AI achievable before
   full-match pacing in 1.63. All three testers lost every Circle skirmish. In
-  the `cross-faction` set, ARC wins from both slots: Circle peaks at 3 to 6
-  army units against ARC's 9 to 12, trains 16 to 19 Cultivators, and reaches
-  military readiness 38 to 45 seconds later despite earning income first.
-  - Capture the Normal baseline from both slots after 1.74. Compare Musterhall
-    and defense timing, Cultivator exposure and replacement costs, and
-    Sentinel performance through ARC's first raid. Use the results to choose
-    cultivation, combat, or Circle AI changes. Cultivation levers include
-    rates, reserve and cargo capacity, and dormancy thresholds.
+  the Normal `cross-faction` baseline, ARC wins from both slots. Circle peaks
+  at 4 to 6 army units against ARC's 9 to 14, trains 18 to 19 Cultivators, and
+  reaches military readiness 38 to 45 seconds later despite earning income
+  first.
+  - Compare Musterhall and defense timing, Cultivator exposure and replacement
+    costs, and Sentinel performance through ARC's first raid. Use the results
+    to choose cultivation, combat, or Circle AI changes. Cultivation levers
+    include rates, reserve and cargo capacity, and dormancy thresholds.
   - Use `npm run cultivation:probe` to compare introduction staffing before
     and after cultivation changes. Propose rule changes before tuning beyond
     the locked infrastructure rules.
@@ -197,14 +197,10 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
     and Reset View consistent with the chosen rule. Record it in
     [fog rules](DESIGN.md#fog-stealth-and-detection) and cover it in browser
     specs.
-- [ ] **1.74** Halve mountain wall heights on the wolf den and skirmish maps
-  (`MOUNTAIN_HEIGHT` in `scripts/levels/prototype-terrain.ts` and the ridge
-  in `src/content/skirmish-map.ts`) so they stop hiding the view. Keep landmark
-  summit elevations and allow longer sightlines over walls. Regenerate
-  levels and check camera visibility in the introductions, skirmish, and
-  sandbox, which shares the wolf-den terrain. Verify walls still block
-  movement and placement, intended crossings stay open, and both
-  introductions and affected headless sets pass.
+- [x] **1.74** Halve wolf-den and skirmish wall heights while preserving
+  landmark summits and open crossings. Walls block movement and construction.
+  Verified longer sightlines, camera visibility, both introduction
+  playthroughs, and all 28 headless skirmish cases.
 - [ ] **1.75** Fix the Circle music, which testers heard as odd or out of
   order. Listen to both tracks through their loop seams and listen in-game
   as combat begins and ends. Check whether the shared echo, the combat

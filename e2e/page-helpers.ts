@@ -98,19 +98,17 @@ export async function holdRequests(page: Page, url: string) {
 export async function terrainPoint(page: Page, x: number, z: number) {
   return page.evaluate(
     async ({ x, z }) => {
-      const { gameScene, Vector3, projectToCanvas, prototypeTerrainMap } =
-        await import("/e2e/harness.ts");
-      const map = prototypeTerrainMap();
-      const point = map.tileCenter(x, z);
+      const {
+        gameScene,
+        terrainTileCenter,
+        projectToCanvas,
+        prototypeTerrainMap,
+      } = await import("/e2e/harness.ts");
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
       return projectToCanvas(
         gameScene(),
         canvas,
-        new Vector3(
-          point.x,
-          map.heightAtWorldPosition(point.x, point.z),
-          point.z,
-        ),
+        terrainTileCenter(prototypeTerrainMap(), x, z),
       );
     },
     { x, z },

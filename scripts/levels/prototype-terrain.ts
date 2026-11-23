@@ -1,20 +1,22 @@
 // Procedural terrain the wolf-den levels and sandbox bake into their files.
+import { mountainWallSurface } from "../../src/content/mountain-wall.ts";
+
 import type { TileCoord } from "../../src/simulation/grid.ts";
 import type { TerrainGridOptions } from "../../src/simulation/terrain.ts";
 
 const MAP_SIZE = 100;
 const WATER_CENTER = { x: 42, z: 58 };
 const WATER_RADIUS = 10;
-const MOUNTAIN_HEIGHT = 6;
+const MOUNTAIN_HEIGHT = 3;
 
 /** Inclusive tile ranges, or corner ranges for heights. */
 type Area = { x: readonly [number, number]; z: readonly [number, number] };
 
 /** Conical peaks that rise from mountain walls as navigation landmarks. */
 type TerrainLandmark = {
-  readonly id: string;
   readonly peaks: readonly Readonly<TileCoord>[];
-  readonly rise: number;
+  /** Peak height above the base terrain, independent of wall height. */
+  readonly summitHeight: number;
   readonly radius: number;
 };
 
@@ -43,23 +45,23 @@ const PASSES: readonly Area[] = [
   { x: [77, 80], z: [26, 29] },
 ];
 
-export const PROTOTYPE_LANDMARKS: readonly TerrainLandmark[] = [
+const LANDMARKS: readonly TerrainLandmark[] = [
   {
-    id: "split-summit",
+    // Split summit
     peaks: [
       { x: 62, z: 42 },
       { x: 64, z: 44 },
     ],
-    rise: 4,
+    summitHeight: 10,
     radius: 2,
   },
   {
-    id: "den-teeth",
+    // Den teeth
     peaks: [
       { x: 75, z: 27 },
       { x: 82, z: 27 },
     ],
-    rise: 3,
+    summitHeight: 9,
     radius: 2,
   },
 ];
@@ -86,21 +88,32 @@ function prototypeTypeAt(x: number, z: number): string {
   return "plain";
 }
 
-function prototypeTerrainAt(x: number, z: number) {
-  const border = x < 3 || z < 3 || x >= MAP_SIZE - 3 || z >= MAP_SIZE - 3;
-  return { typeId: prototypeTypeAt(x, z), outOfBounds: border || undefined };
+function isWallCorner(x: number, z: number): boolean {
+  return within(MOUNTAINS, x, z) && !within(PASSES, x, z);
 }
 
-function landmarkRiseAt(x: number, z: number): number {
-  let rise = 0;
-  for (const landmark of PROTOTYPE_LANDMARKS)
+function prototypeTerrainAt(x: number, z: number) {
+  const border = x < 3 || z < 3 || x >= MAP_SIZE - 3 || z >= MAP_SIZE - 3;
+  return {
+    typeId: prototypeTypeAt(x, z),
+    outOfBounds: border || undefined,
+    ...mountainWallSurface(isWallCorner, x, z),
+  };
+}
+
+function wallHeightAt(x: number, z: number): number {
+  // Peaks rise only from walls, so they never narrow a pass.
+  if (!isWallCorner(x, z)) return 0;
+  let height = MOUNTAIN_HEIGHT;
+  for (const landmark of LANDMARKS)
     for (const peak of landmark.peaks)
-      rise = Math.max(
-        rise,
-        landmark.rise *
-          (1 - Math.hypot(x - peak.x, z - peak.z) / landmark.radius),
+      height = Math.max(
+        height,
+        MOUNTAIN_HEIGHT +
+          (landmark.summitHeight - MOUNTAIN_HEIGHT) *
+            (1 - Math.hypot(x - peak.x, z - peak.z) / landmark.radius),
       );
-  return rise;
+  return height;
 }
 
 /**
@@ -110,14 +123,10 @@ function landmarkRiseAt(x: number, z: number): number {
 function prototypeHeightAt(x: number, z: number): number {
   const hillDistance = Math.hypot(x - 39, z - 47);
   const hill = Math.max(0, 1 - hillDistance / 18) ** 2 * 3.5;
-  const mountain = within(MOUNTAINS, x, z) && !within(PASSES, x, z);
-  const wall = mountain ? MOUNTAIN_HEIGHT : 0;
-  // Peaks rise only from walls, so they never narrow a pass.
-  const peak = mountain ? landmarkRiseAt(x, z) : 0;
   const rolling = Math.sin(x * 0.13) * 0.08 + Math.cos(z * 0.11) * 0.07;
   // Adding 0 turns -0 into 0. The sign means nothing for terrain, but the
   // level file writes it and it has differed across platforms.
-  return Math.round((hill + wall + peak + rolling) * 100) / 100 + 0;
+  return Math.round((hill + wallHeightAt(x, z) + rolling) * 100) / 100 + 0;
 }
 
 export const PROTOTYPE_TERRAIN = {

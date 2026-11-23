@@ -239,32 +239,25 @@ forEachProfile([PHONE_PROFILE], () => {
   );
 });
 
-test("previews reject water, cliffs, and the playable-map boundary", async ({
+test("previews reject water, mountain walls, and the playable-map boundary", async ({
   page,
 }) => {
   await ready(page);
   await page.locator("#build-command-center").click();
   for (const { x, z, reason } of [
     { x: 42, z: 58, reason: "disallowed-terrain" },
-    { x: 65, z: 20, reason: "excessive-slope" },
+    { x: 62, z: 20, reason: "unbuildable-terrain" },
     { x: 2, z: 5, reason: "out-of-bounds" },
   ]) {
     await page.evaluate(
       async ({ x, z }) => {
-        const { gameScene, Vector3, frames, prototypeTerrainMap } =
+        const { gameScene, frames, prototypeTerrainMap, terrainTileCenter } =
           await import("/e2e/harness.ts");
-        const map = prototypeTerrainMap();
-        const point = map.tileCenter(x, z);
         const scene = gameScene();
-        // View the cliff from its exposed side.
         const camera = scene.activeCamera as ArcRotateCamera;
         camera.alpha = -Math.PI / 4;
         camera.setTarget(
-          new Vector3(
-            point.x,
-            map.heightAtWorldPosition(point.x, point.z),
-            point.z,
-          ),
+          terrainTileCenter(prototypeTerrainMap(), x, z),
           false,
           false,
           true,
