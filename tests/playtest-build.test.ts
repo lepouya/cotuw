@@ -103,6 +103,12 @@ test("publishes a complete clean bundle with reproducible hashes without changin
   await mkdir(join(root, "dist"));
   await writeFile(join(root, "dist/keep.txt"), "Ordinary build\n");
   const manifest = await preparePlaytest(root);
+  expect(build).toHaveBeenCalledWith(
+    expect.objectContaining({
+      define: { "import.meta.env.COTUW_BENCHMARK": false },
+    }),
+  );
+  expect(manifest.formatVersion).toBe(2);
   expect(manifest.distributionReady).toBe(true);
   expect(manifest.revision).toBe(git("rev-parse", "HEAD"));
   expect(manifest.files.map(({ path }) => path)).toEqual([

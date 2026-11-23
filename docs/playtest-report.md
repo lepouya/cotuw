@@ -12,6 +12,7 @@ observations use the game time shown in the top bar.
 - Bundle `distributionReady` value, if available:
 - Play URL:
 - Mission: introduction / skirmish:
+- Attempt at this mission: first / retry:
 - Faction: ARC / Circle:
 - Start slot, for skirmishes:
 - Difficulty:
@@ -37,6 +38,15 @@ observations use the game time shown in the top bar.
 - If you stopped, when and why?
 - What drove your income, production, expansion, and combat choices?
 - Would you try another mission? Why?
+- If you played an earlier build, what felt better, worse, or no different?
+
+## Camera, map, and sound
+
+- Could you frame what you wanted near map edges and unexplored ground? Where
+  did the camera stop you?
+- Did mountains or walls hide units, buildings, or ground you wanted to see?
+- Did the music ever sound odd, out of order, or abrupt, such as when
+  fighting started or ended? Note the game time.
 
 ## Circle
 
@@ -68,6 +78,8 @@ Answer for skirmish attempts; leave blank what you did not try.
   or Briar Rams? What did they add?
 - Did you use control groups, shortcuts, idle-worker or select-matching
   controls? Which were hard to find or use?
+- When did the opponent first raid or attack you, and what did it hit? Did
+  you hold it off, or what did you lose and how long did rebuilding take?
 - How did the opponent's raids and attacks feel: too early, fair, too late,
   too strong, or too weak?
 

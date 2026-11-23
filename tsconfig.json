@@ -26,6 +26,7 @@
     "scripts",
     "vite.config.ts",
     "vitest.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.playtest.config.ts"
   ]
 }

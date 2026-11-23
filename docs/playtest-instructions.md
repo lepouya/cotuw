@@ -10,12 +10,15 @@ which builds and mines. You do not need prior RTS experience.
 - Play on your own using the in-game guidance.
 - Open the organizer's links in a current desktop browser. Record the build
   revision supplied with the links in each report.
-- Set aside about 75 minutes. A skirmish aims for 15 to 25 minutes of game
-  time; learning, pauses, and feedback take longer. You may stop at any time.
+- Set aside about 90 minutes, plus 30 for an optional ARC skirmish. A
+  skirmish aims for 15 to 25 minutes of game time; learning, pauses, and
+  feedback take longer. You may stop at any time.
 - Complete one copy of `playtest-report.md` for each mission you attempt.
   Record your operating system, browser and version, input method, and prior
   RTS experience in each.
-- If you have played another build, use a fresh browser profile or private
+- If you played an earlier build, several parts of Circle play and the camera
+  have changed since then. Play as you normally would, and note what feels
+  better, worse, or no different. Use a fresh browser profile or private
   window for this session. Save data and preferences are stored per browser
   origin. Private-window saves disappear when that window closes, so export
   saves before closing it.
@@ -49,18 +52,20 @@ and drop-off building.
 
 Build an economy, base, and army. Win by destroying all completed enemy
 Command Centers, Materials Refineries, Field Barracks, and Sentry Turrets.
-The opponent scouts, raids, attacks, and rebuilds what it loses. Try
-spreading Cultivators across sites, growing Conservatories near other sites,
-defending with Thornspires, healing with Healers, and replacing a Cultivator
-when one tending a building is lost.
+The opponent scouts, raids, attacks, and rebuilds what it loses.
+
+If you lose, play the Circle skirmish once more from the same link and fill in
+a separate report. Note what you changed in your second attempt.
 
 ## Anomaly Response Command
 
-Play these when the organizer's links include an ARC round.
+These are optional. If you have not played this game before and have time
+after the Circle skirmish, play the ARC skirmish.
 
 ### ARC introduction
 
-Play this if you have no or occasional RTS experience; otherwise skip it.
+Play this before the ARC skirmish if you have no or occasional RTS
+experience; otherwise skip it.
 Choose **New mission**, keep **Normal** difficulty, then choose **Anomaly
 Response Command**.
 

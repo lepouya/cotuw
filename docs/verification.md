@@ -350,17 +350,33 @@ git push --force https://github.com/lepouya/cotuw.git gh-pages
 rm -rf .git
 ```
 
-Smoke-test the served production bundle from the title screen. For each of
-the round's introductions, verify model and audio loading, the opening guide,
-one construction and training cycle, save/load, restart, and return to the
-title screen. Open each of the round's skirmish links and confirm that the AI
-builds its base. Complete one player construction and training cycle, export
-a save, and verify that restart keeps the slot, difficulty, and AI
-assignment. Before the first unobserved round, the organizer plays each
-introduction and one complete skirmish per faction on the bundle. Record
-browser and OS versions, build revision, URL, and results.
-Automated checks alone do not establish this distribution check or human
-mission clarity.
+Smoke-test the bundle before and after publishing.
+
+```sh
+npm run playtest:smoke
+COTUW_PLAYTEST_URL=https://lepouya.github.io/cotuw/ npm run playtest:smoke
+```
+
+The first run serves `playtest/site` under a local subpath; the second tests
+the hosted copy. Each checks the served site files against `build.json` once
+and requires `distributionReady: true`. In Chromium and, on macOS, WebKit,
+through the production UI, each introduction loads models and audio,
+shows its guide, completes one construction and training cycle, exports,
+saves, loads, restarts, and returns to the title screen. Each tester skirmish
+link shows the AI placing buildings, completes the player's first worker and
+drop-off, exports a save, and restarts with the same faction, difficulty,
+and AI. The smoke report is in `.checks/playtest-report/`.
+
+For an uncommitted local preview, run just the browser and file checks.
+
+```sh
+npm run playtest:smoke -- --grep-invert "ready for distribution"
+```
+
+Before the first unobserved round, the organizer plays each introduction and
+one complete skirmish per faction on the hosted bundle. Record browser and OS
+versions, build revision, URL, and results. Automated checks alone do not
+establish this distribution check or human mission clarity.
 
 For observed sessions, give help only on request or when the player is
 blocked, and record each intervention. Use participant codes. Keep contact

@@ -69,9 +69,10 @@ export async function preparePlaytest(
   const backup = join(stage, "previous");
   let keepBackup = false;
   try {
-    // A private output directory prevents interference with ordinary builds.
+    // Bundle normal gameplay even when the organizer runs benchmarks locally.
     await build({
       root,
+      define: { "import.meta.env.COTUW_BENCHMARK": false },
       build: { outDir: join(bundle, "site"), emptyOutDir: true },
     });
     await writeFile(join(bundle, "site/.nojekyll"), "");
@@ -96,8 +97,7 @@ export async function preparePlaytest(
       );
 
     const manifest = {
-      formatVersion: 1,
-      missionId: "arc-economy-opening",
+      formatVersion: 2,
       revision: before.revision,
       distributionReady,
       node: process.version,

@@ -190,6 +190,16 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
   other players hold or recover from the first ARC raid. Fix blockers
   reported by two or more testers, add regression coverage, and replay the
   affected paths on a rebuilt bundle.
+  - Done: [tester instructions](docs/playtest-instructions.md) ask for one
+    Normal retry after a loss, offer the ARC skirmish to new testers, and give
+    returning testers a neutral comparison hint. The
+    [report](docs/playtest-report.md) covers the first ARC raid, camera
+    framing, wall visibility, and music. `npm run playtest:smoke` checks the
+    local and hosted bundle. The local preview passed its file and browser
+    checks in Chromium and WebKit.
+  - Remaining: full acceptance on the fixed revision, the distribution build
+    and local smoke, Pages publication and hosted smoke, organizer
+    playthroughs, the cohort round, triage, fixes, and retests.
 
 Phase gate: Circle play is a complete, understandable loop with a meaningful
 cultivation distinction, and its AI can sustain the same economy and roster.

@@ -8,6 +8,8 @@ const testUrl = `http://127.0.0.1:${testPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Bundle smoke checks run against production builds through their own config.
+  testIgnore: "bundle/**",
   forbidOnly: !!process.env.CI,
   // Concurrent WebGL scenes compete with each other and the running game.
   workers: 1,
