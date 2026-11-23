@@ -178,25 +178,11 @@ producer-based availability. Normal-menu skirmish launch belongs to 1.60.
     the locked infrastructure rules.
   - Run both `cross-faction` cases. Both must complete without faults, with
     at least one Circle win. Verify human play in 1.77.
-- [ ] **1.73** Fix camera framing near map edges. The camera's focal point is
-  clamped near explored ground, which reads as a diamond under the isometric
-  view. Record where a player expects to frame known ground but hits the
-  clamp. Check a map edge and an interior fog frontier. Compare these
-  prototypes in play using a development option.
-  - A border of at least four tiles on every map, filled with scenery such as
-    rough rock, mountains, or water. Units never enter it, but it follows
-    normal fog and exploration, so patrolling scouts reveal it and its fogged
-    edge fades out the map. It gives panning and zooming room without adding
-    playable ground. The wolf-den map has a three-tile out-of-bounds border,
-    and the skirmish map has at least four tiles.
-  - Clamp so explored ground stays within a central part of the viewport
-    instead of clamping the focal point.
-  - Scale the frontier margin with zoom and viewport aspect.
-  - Verify players can frame the target at different zooms on standard and
-    wide viewports while unexplored tiles stay concealed. Keep minimap, focus,
-    and Reset View consistent with the chosen rule. Record it in
-    [fog rules](DESIGN.md#fog-stealth-and-detection) and cover it in browser
-    specs.
+- [x] **1.73** Every map has a scenic out-of-bounds border, and the camera
+  keeps explored ground within the central third of the view. Browser specs
+  cover map edges, corners, and interior frontiers at several zooms on
+  standard and wide viewports, with minimap, Focus, Reset View, and fog
+  concealment. Human play is retested in 1.77.
 - [x] **1.74** Halve wolf-den and skirmish wall heights while preserving
   landmark summits and open crossings. Walls block movement and construction.
   Verified longer sightlines, camera visibility, both introduction

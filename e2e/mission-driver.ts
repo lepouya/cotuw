@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import {
   activate,
   expectTerrainReady,
+  minimapPoint,
   pressPoint,
   terrainPoint,
 } from "./page-helpers";
@@ -125,23 +126,11 @@ export class MissionDriver {
   }
 
   async focus(x: number, z: number) {
-    const point = await this.page.evaluate(
-      async ({ x, z }) => {
-        const { prototypeTerrainMap } = await import("/e2e/harness.ts");
-        const { minimapProjection } = await import("/src/render/minimap.ts");
-        const map = prototypeTerrainMap();
-        const canvas = document.querySelector<HTMLCanvasElement>("#minimap")!;
-        const bounds = canvas.getBoundingClientRect();
-        const point = minimapProjection(
-          map,
-          bounds.width,
-          bounds.height,
-        ).toMinimap(map.tileCenter(x, z));
-        return { x: bounds.left + point.x, y: bounds.top + point.y };
-      },
-      { x, z },
+    await pressPoint(
+      this.page,
+      await minimapPoint(this.page, x, z),
+      this.touch,
     );
-    await pressPoint(this.page, point, this.touch);
     await this.advance(0.4);
   }
 

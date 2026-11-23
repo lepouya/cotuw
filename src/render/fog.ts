@@ -1,12 +1,5 @@
-import {
-  Color3,
-  Mesh,
-  StandardMaterial,
-  Vector3,
-  VertexData,
-} from "@babylonjs/core";
+import { Color3, Mesh, StandardMaterial, VertexData } from "@babylonjs/core";
 
-import { clampToBounds, distance } from "../simulation/world";
 import { aboveTerrainLayers } from "./terrain-mesh";
 
 import type { Scene } from "@babylonjs/core";
@@ -36,6 +29,8 @@ export function createFogOverlay(
   color: Color3,
 ): FogOverlay {
   const columns = map.width + 1;
+  const surfaceSize = columns * (map.height + 1);
+  const perimeter = perimeterCorners(map.width, map.height);
   const material = new StandardMaterial("fog-overlay", scene);
   material.diffuseColor = Color3.Black();
   material.specularColor = Color3.Black();
@@ -57,6 +52,18 @@ export function createFogOverlay(
         corner + columns,
       );
     }
+  // The raised sheet can leave a sliver of terrain exposed at oblique angles.
+  for (const [i, top] of perimeter.entries()) {
+    const next = (i + 1) % perimeter.length;
+    indices.push(
+      top,
+      surfaceSize + i,
+      perimeter[next],
+      perimeter[next],
+      surfaceSize + i,
+      surfaceSize + next,
+    );
+  }
   const positions = () => {
     const offset = aboveTerrainLayers(map, FOG_OFFSET);
     const result: number[] = [];
@@ -65,12 +72,24 @@ export function createFogOverlay(
         const point = map.cornerPoint(x, z, offset);
         result.push(point.x, point.y, point.z);
       }
+    for (const corner of perimeter) {
+      const x = corner % columns;
+      const z = Math.floor(corner / columns);
+      const point = map.cornerPoint(x, z);
+      result.push(point.x, point.y, point.z);
+    }
+    return result;
+  };
+  const colors = (fog: FogView | undefined) => {
+    const result = cornerColors(map, fog);
+    for (const corner of perimeter)
+      result.push(1, 1, 1, result[4 * corner + 3]);
     return result;
   };
   const vertexData = new VertexData();
   vertexData.positions = positions();
   vertexData.indices = indices;
-  vertexData.colors = cornerColors(map, undefined);
+  vertexData.colors = colors(undefined);
   vertexData.applyToMesh(mesh, true);
   mesh.material = material;
   mesh.hasVertexAlpha = true;
@@ -78,15 +97,16 @@ export function createFogOverlay(
   mesh.alphaIndex = FOG_ALPHA_INDEX;
 
   let version = -1;
-  const terrainObserver = map.onChangedObservable.add(() =>
-    mesh.updateVerticesData("position", positions()),
-  );
+  const terrainObserver = map.onChangedObservable.add(() => {
+    mesh.updateVerticesData("position", positions());
+    version = -1;
+  });
   return {
     update: (fog) => {
       mesh.setEnabled(!!fog);
       if (!fog || fog.version === version) return;
       version = fog.version;
-      mesh.updateVerticesData("color", cornerColors(map, fog));
+      mesh.updateVerticesData("color", colors(fog));
     },
     dispose: () => {
       map.onChangedObservable.remove(terrainObserver);
@@ -94,6 +114,16 @@ export function createFogOverlay(
       material.dispose();
     },
   };
+}
+
+function perimeterCorners(width: number, height: number): number[] {
+  const columns = width + 1;
+  const corners: number[] = [];
+  for (let x = 0; x < width; x++) corners.push(x);
+  for (let z = 0; z < height; z++) corners.push(z * columns + width);
+  for (let x = width; x > 0; x--) corners.push(height * columns + x);
+  for (let z = height; z > 0; z--) corners.push(z * columns);
+  return corners;
 }
 
 /** How much fog covers a tile: opaque, dimmed, or clear. */
@@ -111,49 +141,19 @@ export function cornerColors(
   for (let z = 0; z <= map.height; z += 1)
     for (let x = 0; x <= map.width; x += 1) {
       let alpha = 0;
-      // Runs on every fog change, so it visits neighbors without allocating.
-      if (fog)
+      if (fog) {
+        // Fade the outer edge of scenic terrain into the background.
+        let scenicEdge =
+          x === 0 || x === map.width || z === 0 || z === map.height;
         for (let tileZ = z - 1; tileZ <= z; tileZ += 1)
-          for (let tileX = x - 1; tileX <= x; tileX += 1)
-            if (map.containsTile(tileX, tileZ))
-              alpha = Math.max(alpha, fogAlpha(fog, tileX, tileZ));
+          for (let tileX = x - 1; tileX <= x; tileX += 1) {
+            if (!map.containsTile(tileX, tileZ)) continue;
+            alpha = Math.max(alpha, fogAlpha(fog, tileX, tileZ));
+            scenicEdge &&= map.terrainAt(tileX, tileZ).outOfBounds === true;
+          }
+        if (scenicEdge) alpha = 1;
+      }
       colors.push(1, 1, 1, alpha);
     }
   return colors;
-}
-
-/**
- * Keeps a camera focal point within `margin` world units of an explored tile
- * center, pulling it straight back towards the nearest one.
- */
-export function limitToExplored(
-  map: TerrainMap,
-  fog: FogView,
-  point: Vector3,
-  margin: number,
-): Vector3 {
-  const ground = clampToBounds(point, map.worldBounds);
-  const tile = map.tileAtWorldPosition(ground.x, ground.z);
-  const center = map.tileCenter(tile.x, tile.z);
-  if (fog.isExplored(tile.x, tile.z) && distance(point, center) <= margin)
-    return point;
-  let nearest: { x: number; z: number } | undefined;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  for (let z = 0; z < map.height; z += 1)
-    for (let x = 0; x < map.width; x += 1) {
-      if (!fog.isExplored(x, z)) continue;
-      const center = map.tileCenter(x, z);
-      const gap = distance(point, center);
-      if (gap < nearestDistance) {
-        nearest = center;
-        nearestDistance = gap;
-      }
-    }
-  if (!nearest || nearestDistance <= margin) return point;
-  const scale = margin / nearestDistance;
-  return new Vector3(
-    nearest.x + (point.x - nearest.x) * scale,
-    point.y,
-    nearest.z + (point.z - nearest.z) * scale,
-  );
 }

@@ -2,11 +2,8 @@ import { Vector3 } from "@babylonjs/core";
 import { describe, expect, test } from "vitest";
 
 import { TerrainMap } from "../src/map";
-import {
-  cornerColors,
-  EXPLORED_FOG_ALPHA,
-  limitToExplored,
-} from "../src/render/fog";
+import { exploredFrontier } from "../src/render/camera-frontier";
+import { cornerColors, EXPLORED_FOG_ALPHA } from "../src/render/fog";
 import { shadeFog } from "../src/render/minimap";
 
 import type { FogView } from "../src/simulation/vision";
@@ -42,45 +39,19 @@ describe("fog overlay", () => {
       cornerColors(map, fogView([])).filter((_, i) => i % 4 === 3),
     ).toEqual([1, 1, 1, 1, 1, 1]);
   });
-});
 
-describe("limitToExplored", () => {
-  const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
-  const fog = fogView(["2,2"]);
-  const center = map.tileCenter(2, 2);
-
-  test("keeps focal points within the margin", () => {
-    const point = new Vector3(center.x + 3, 0, center.z);
-    expect(limitToExplored(map, fog, point, 4)).toBe(point);
-  });
-
-  test("pulls distant focal points back to the frontier margin", () => {
-    const limited = limitToExplored(
-      map,
-      fog,
-      new Vector3(center.x + 8, 0, center.z + 6),
-      4,
-    );
-    expect(limited.x).toBeCloseTo(center.x + 3.2);
-    expect(limited.z).toBeCloseTo(center.z + 2.4);
-  });
-
-  test.each([
-    [0, 5, -100, 0.5],
-    [9, 5, 100, 0.5],
-    [5, 0, 0.5, -100],
-    [5, 9, 0.5, 100],
-  ])("limits panning past an explored edge tile (%i, %i)", (x, z, px, pz) => {
-    const center = map.tileCenter(x, z);
-    const limited = limitToExplored(
-      map,
-      fogView([`${x},${z}`]),
-      new Vector3(px, 0, pz),
-      4,
-    );
-    expect(Math.hypot(limited.x - center.x, limited.z - center.z)).toBeCloseTo(
-      4,
-    );
+  test("explored scenic border fades at the outer grid edge", () => {
+    const map = new TerrainMap({
+      width: 2,
+      height: 2,
+      tileSize: 1,
+      createTerrain: (x) => ({ typeId: "plain", outOfBounds: x === 0 }),
+    });
+    const fog = fogView([], ["0,0", "0,1", "1,0", "1,1"]);
+    const colors = cornerColors(map, fog);
+    expect(colors[(3 + 0) * 4 + 3]).toBe(1);
+    expect(colors[(3 + 1) * 4 + 3]).toBe(0);
+    expect(colors[(3 + 2) * 4 + 3]).toBe(0);
   });
 });
 
@@ -97,5 +68,75 @@ describe("shadeFog", () => {
     ]);
     shadeFog(map, terrain, shown, undefined, [0, 0, 0]);
     expect([...shown]).toEqual([...terrain]);
+  });
+});
+
+describe("exploredFrontier", () => {
+  const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
+  const fog = fogView(["2,2"]);
+  const center = map.tileCenter(2, 2);
+  // The central third reaches 2 units from the focal point, plus half a tile.
+  const view = { right: new Vector3(6, 0, 0), up: new Vector3(0, 0, 6) };
+  const near = (x: number, z: number) =>
+    new Vector3(center.x + x, 0, center.z + z);
+
+  test("keeps any focal point over explored ground", () => {
+    const tiny = { right: new Vector3(0.1, 0, 0), up: new Vector3(0, 0, 0.1) };
+    const point = near(0.4, -0.4);
+    expect(exploredFrontier(map, fog)(point, tiny)).toBe(point);
+  });
+
+  test("keeps explored ground within the central third", () => {
+    const point = near(2.4, -2.4);
+    expect(exploredFrontier(map, fog)(point, view)).toBe(point);
+  });
+
+  test("moves the least distance to bring explored ground back", () => {
+    const limited = exploredFrontier(map, fog)(near(8, 6), view);
+    expect(limited.x).toBeCloseTo(center.x + 2.5);
+    expect(limited.z).toBeCloseTo(center.z + 2.5);
+  });
+
+  test("measures along a turned view's axes", () => {
+    const turned = { right: new Vector3(3, 0, 3), up: new Vector3(-3, 0, 3) };
+    const limited = exploredFrontier(map, fog)(near(10, 0), turned);
+    const reach = 2.5;
+    expect(limited.x).toBeCloseTo(center.x + reach);
+    expect(limited.z).toBeCloseTo(center.z);
+  });
+
+  test("includes the corners of tiles at diagonal headings", () => {
+    const turned = { right: new Vector3(3, 0, 3), up: new Vector3(-3, 0, 3) };
+    const point = near(1.45, 1.45);
+    expect(exploredFrontier(map, fog)(point, turned)).toBe(point);
+  });
+
+  test("an existing frontier expands as the viewer explores", () => {
+    const explored = ["2,2"];
+    const growingFog = {
+      ...fogView(explored),
+      get exploredCount() {
+        return explored.length;
+      },
+    };
+    const limit = exploredFrontier(map, growingFog);
+    const point = near(4, 0);
+    expect(limit(point, view).x).toBeCloseTo(center.x + 2.5);
+    explored.push("6,2");
+    expect(limit(point, view)).toBe(point);
+  });
+
+  test.each([
+    [0, 5, -100, 0.5],
+    [9, 5, 100, 0.5],
+    [5, 0, 0.5, -100],
+    [5, 9, 0.5, 100],
+  ])("limits panning past an explored edge tile (%i, %i)", (x, z, px, pz) => {
+    const center = map.tileCenter(x, z);
+    const limit = exploredFrontier(map, fogView([`${x},${z}`]));
+    const limited = limit(new Vector3(px, 0, pz), view);
+    expect(
+      Math.max(Math.abs(limited.x - center.x), Math.abs(limited.z - center.z)),
+    ).toBeCloseTo(2.5);
   });
 });

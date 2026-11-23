@@ -8,9 +8,9 @@ import {
   projectOntoPlane,
 } from "../src/render/camera";
 import { TerrainMap } from "../src/map";
-import { limitToExplored } from "../src/render/fog";
+import { exploredFrontier } from "../src/render/camera-frontier";
 
-import type { OrthographicFrame } from "../src/render/camera";
+import type { OrthographicFrame, ViewExtent } from "../src/render/camera";
 
 const fixtures: { dispose: () => void }[] = [];
 afterEach(() => {
@@ -359,6 +359,19 @@ describe("camera views", () => {
     expect(fixture.navigation.cancelFocus()).toBe(true);
   });
 
+  test("developer framing bypasses the frontier until navigation", () => {
+    const fixture = navigationFixture();
+    const limit = new Vector3(12, 0, 7);
+    fixture.navigation.setFocusLimit(() => limit);
+    expect(fixture.target()).toEqual(limit);
+    fixture.navigation.fitToMap();
+    fixture.frame(50);
+    expect(fixture.target()).toEqual(Vector3.Zero());
+    fixture.navigation.zoomBy(0.8);
+    fixture.frame(50);
+    expect(fixture.target()).toEqual(limit);
+  });
+
   test("rapid repeated rotation keeps its direction across a full turn", () => {
     const fixture = navigationFixture();
     fixture.navigation.setPreset("grid");
@@ -509,22 +522,57 @@ test("camera glides stay within the explored frontier on every frame", () => {
     isExplored: (x: number, z: number) => (x === 10 || x === 90) && z === 5,
     isVisible: () => false,
   };
-  camera.setFocusLimit((point) => limitToExplored(map, fog, point, 4));
+  let extent: ViewExtent | undefined;
+  const limit = exploredFrontier(map, fog);
+  camera.setFocusLimit((point, view) => {
+    extent = view;
+    return limit(point, view);
+  });
   const from = map.tileCenter(10, 5);
   const to = map.tileCenter(90, 5);
   camera.focusOnPoint(new Vector3(from.x, 0, from.z));
+  camera.zoomBy(0.25);
   camera.glideToPoint(new Vector3(to.x, 0, to.z));
   scene.getEngine().getDeltaTime = () => 30;
   for (let frame = 0; frame < 11; frame += 1) {
     scene.onBeforeRenderObservable.notifyObservers(scene);
     const target = (scene.activeCamera as ArcRotateCamera).target;
-    const distance = Math.min(
-      Math.hypot(target.x - from.x, target.z - from.z),
-      Math.hypot(target.x - to.x, target.z - to.z),
-    );
-    expect(distance).toBeLessThanOrEqual(4 + 1e-9);
+    const limited = exploredFrontier(map, fog)(target, extent!);
+    expect(limited.subtract(target).length()).toBeLessThan(1e-6);
   }
   expect((scene.activeCamera as ArcRotateCamera).target.x).toBeCloseTo(to.x);
+});
+
+test("zooming in pulls the view back toward explored ground", () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 100, height: 10, tileSize: 1 });
+  const canvas = Object.assign(new EventTarget(), {
+    clientWidth: 800,
+    clientHeight: 600,
+  });
+  const camera = createStrategyCamera(scene, canvas as HTMLCanvasElement, map);
+  const fog = {
+    version: 0,
+    exploredCount: 1,
+    isExplored: (x: number, z: number) => x === 50 && z === 5,
+    isVisible: () => false,
+  };
+  let extent: ViewExtent | undefined;
+  const limit = exploredFrontier(map, fog);
+  camera.setFocusLimit((point, view) => {
+    extent = view;
+    return limit(point, view);
+  });
+  const explored = map.tileCenter(50, 5);
+  camera.zoomBy(10);
+  camera.focusOnPoint(new Vector3(explored.x + 8, 0, explored.z));
+  const target = () => (scene.activeCamera as ArcRotateCamera).target;
+  expect(target().x).toBeCloseTo(explored.x + 8);
+  camera.zoomBy(0.1);
+  scene.onBeforeRenderObservable.notifyObservers(scene);
+  expect(target().x).toBeLessThan(explored.x + 7);
+  const limited = exploredFrontier(map, fog)(target(), extent!);
+  expect(limited.subtract(target()).length()).toBeLessThan(1e-6);
 });
 
 const topDown: OrthographicFrame = {

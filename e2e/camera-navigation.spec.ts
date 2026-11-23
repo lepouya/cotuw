@@ -1,6 +1,16 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
-import { openWithTrooper, terrainPoint, touchDrag } from "./page-helpers";
+import {
+  actorPoint,
+  expectTerrainReady,
+  importMission,
+  minimapPoint,
+  openOpening,
+  openWithTrooper,
+  pressPoint,
+  terrainPoint,
+  touchDrag,
+} from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 import type { ArcRotateCamera } from "@babylonjs/core";
@@ -387,6 +397,136 @@ test("view presets ease between headings and keep the focal point", async ({
   expect(reset.zoom).toBe(start.zoom);
   await expect(grid).toHaveAttribute("aria-pressed", "false");
 });
+
+test(
+  "the explored frontier keeps framing through minimap navigation, zoom, and Reset View",
+  { tag: WEBKIT },
+  async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 800, height: 600 });
+    await openOpening(page);
+
+    const source = await page.evaluate(async () => {
+      const { level, missionMap, missionSource } =
+        await import("/e2e/missions.ts");
+      const mission = level();
+      const { width, height } = missionMap(mission);
+      // Remember a scout's trip to the north-west border.
+      const explored = Array.from({ length: height }, (_, z) =>
+        z >= height - 12
+          ? "1".repeat(12) + "0".repeat(width - 12)
+          : "0".repeat(width),
+      ).join("");
+      mission.state.fog = { explored: { player: explored } };
+      return missionSource(mission);
+    });
+    await importMission(page, source);
+    await expect(page.locator("#game-menu-title")).toHaveText("Mission loaded");
+    await page.locator("#resume-mission").click();
+    await expectTerrainReady(page);
+    await openViews(page);
+    await page.getByRole("button", { name: "Top-down" }).click();
+
+    const navigate = async (x: number, z: number) =>
+      pressPoint(page, await minimapPoint(page, x, z));
+
+    const framing = () =>
+      page.evaluate(async () => {
+        const { gameScene, prototypeTerrainMap, projectToCanvas, Vector3 } =
+          await import("/e2e/harness.ts");
+        const scene = gameScene();
+        const camera = scene.activeCamera as ArcRotateCamera;
+        const map = prototypeTerrainMap();
+        const edge = map.worldBounds.minX + 12 * map.tileSize;
+        const canvas =
+          document.querySelector<HTMLCanvasElement>("#game-canvas")!;
+        const { left, width, top, height } = canvas.getBoundingClientRect();
+        const point = projectToCanvas(
+          scene,
+          canvas,
+          new Vector3(edge, 0, camera.target.z),
+        );
+        return {
+          alpha: camera.alpha,
+          aspect: camera.orthoRight! / camera.orthoTop!,
+          x: camera.target.x,
+          z: camera.target.z,
+          reach: edge + camera.orthoRight! / 3,
+          central: Math.max(
+            Math.abs((point.x - left) / width - 0.5),
+            Math.abs((point.y - top) / height - 0.5),
+          ),
+        };
+      });
+
+    await navigate(1, 96);
+    await expect.poll(async () => (await framing()).x).toBeLessThan(-48);
+    await navigate(1, 100);
+    await expect.poll(async () => (await framing()).z).toBeGreaterThan(48);
+
+    const frontierError = async () => {
+      const frame = await framing();
+      return Math.abs(frame.x - frame.reach);
+    };
+    for (const width of [800, 1600]) {
+      await page.setViewportSize({ width, height: 600 });
+      // Wait for the camera to apply the resized canvas before navigating.
+      await expect
+        .poll(async () => (await framing()).aspect)
+        .toBeGreaterThan(width === 800 ? 1 : 2);
+      await navigate(60, 96);
+      await expect.poll(frontierError).toBeLessThan(0.1);
+      const zoomedOut = (await framing()).x;
+      await page.getByRole("button", { name: "Zoom camera in" }).click();
+      await expect.poll(frontierError).toBeLessThan(0.1);
+      expect((await framing()).x).toBeLessThan(zoomedOut - 0.5);
+    }
+
+    await openViews(page);
+    await page.getByRole("button", { name: "Reset camera view" }).click();
+    await expect
+      .poll(async () => (await framing()).alpha)
+      .toBeCloseTo((-5 * Math.PI) / 8);
+    await expect.poll(async () => (await framing()).central).toBeLessThan(0.18);
+
+    const fog = await page.evaluate(async () => {
+      const { gameScene, prototypeTerrainMap } =
+        await import("/e2e/harness.ts");
+      const { width } = prototypeTerrainMap();
+      const colors = gameScene()
+        .getMeshByName("fog-overlay")!
+        .getVerticesData("color")!;
+      const alpha = (x: number, z: number) =>
+        colors[4 * (z * (width + 1) + x) + 3];
+      return {
+        remembered: alpha(5, 96),
+        hidden: alpha(60, 96),
+        edge: alpha(0, 96),
+      };
+    });
+    expect(fog.remembered).toBeCloseTo(0.55);
+    expect(fog.hidden).toBe(1);
+    expect(fog.edge).toBe(1);
+
+    await navigate(12, 52);
+    await expect
+      .poll(async () => Math.abs((await framing()).z - 1.5))
+      .toBeLessThan(1);
+    const headquarters = await actorPoint(
+      page,
+      "starting-command-center",
+      [1.5, 1, 0.5, 0],
+    );
+    expect(headquarters.clear).toBe(true);
+    await pressPoint(page, headquarters);
+    await expect(page.locator("#game-canvas")).toHaveAttribute(
+      "data-selected-actors",
+      '["starting-command-center"]',
+    );
+    await page.locator("#focus-selection").click();
+    await expect.poll(async () => (await framing()).x).toBeCloseTo(-41);
+  },
+);
 
 test("Follow tracks a moving unit until a pan, and Escape ends it before clearing selection", async ({
   page,

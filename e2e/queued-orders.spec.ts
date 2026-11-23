@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import { forEachProfile, PHONE_PROFILE } from "./profiles";
-import { activate, openWithTrooper } from "./page-helpers";
+import { activate, minimapPoint, openWithTrooper } from "./page-helpers";
 import { WEBKIT } from "./tags";
 
 import type { Page } from "@playwright/test";
@@ -71,31 +71,12 @@ async function preview(page: Page) {
   });
 }
 
-async function minimapTarget(page: Page) {
-  return page.evaluate(async () => {
-    const { prototypeTerrainMap } = await import("/e2e/harness.ts");
-    const { minimapProjection } = await import("/src/render/minimap.ts");
-    const map = prototypeTerrainMap();
-    const canvas = document.querySelector<HTMLCanvasElement>("#minimap")!;
-    const bounds = canvas.getBoundingClientRect();
-    const point = minimapProjection(
-      map,
-      canvas.clientWidth,
-      canvas.clientHeight,
-    ).toMinimap(map.tileCenter(55, 50));
-    return {
-      x: bounds.left + canvas.clientLeft + point.x,
-      y: bounds.top + canvas.clientTop + point.y,
-    };
-  });
-}
-
 test(
   "A starts Attack Move and Shift queues minimap destinations",
   { tag: WEBKIT },
   async ({ page }) => {
     await opening(page);
-    const target = await minimapTarget(page);
+    const target = await minimapPoint(page, 55, 50);
     await page.keyboard.press("KeyA");
     await page.keyboard.down("Shift");
     await page.mouse.click(target.x, target.y);
@@ -184,7 +165,7 @@ forEachProfile([PHONE_PROFILE], () => {
     page,
   }) => {
     await opening(page, true);
-    const target = await minimapTarget(page);
+    const target = await minimapPoint(page, 55, 50);
     await page.locator("#queue-orders").tap();
     await page.locator("#attack-move").tap();
     await page.touchscreen.tap(target.x, target.y);

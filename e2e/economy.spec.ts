@@ -432,8 +432,8 @@ test("fog keeps the camera near explored terrain", async ({ page }) => {
     const camera = view.scene.activeCamera as ArcRotateCamera;
     return { x: camera.target.x, z: camera.target.z };
   });
-  // The Command Center sees about 14 tiles east of the west map edge.
-  expect(target.x).toBeLessThan(-20);
+  // The Command Center sees to about x = -27; the central third adds about 8.
+  expect(target.x).toBeLessThan(-15);
   expect(target.z).toBeLessThan(25);
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-explored-tiles",

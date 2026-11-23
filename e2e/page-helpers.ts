@@ -123,18 +123,24 @@ export async function actorPoint(
 ) {
   return page.evaluate(
     async ({ id, heights }) => {
-      const { Vector3, projectToCanvas } = await import("/e2e/harness.ts");
-      const { view } = window.sessionHarness;
-      const root = view.scene.getTransformNodeByName(`actor-${id}-root`)!;
+      const { gameScene, Vector3, projectToCanvas } =
+        await import("/e2e/harness.ts");
+      const scene = gameScene();
+      const mobile = scene.getTransformNodeByName(`actor-${id}-root`);
+      const root =
+        mobile ?? scene.getTransformNodeByName(`tile-placed-actor-${id}-root`);
+      if (!root) throw new Error(`No rendered actor for ${id}`);
+      const origin = root.getAbsolutePosition().clone();
+      if (!mobile) {
+        const { min, max } = root.getHierarchyBoundingVectors();
+        origin.set((min.x + max.x) / 2, min.y, (min.z + max.z) / 2);
+      }
       const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
       const bounds = canvas.getBoundingClientRect();
       for (const height of heights) {
-        const point = root.getAbsolutePosition().add(new Vector3(0, height, 0));
-        const screen = projectToCanvas(view.scene, canvas, point);
-        const pick = view.scene.pick(
-          screen.x - bounds.left,
-          screen.y - bounds.top,
-        );
+        const point = origin.add(new Vector3(0, height, 0));
+        const screen = projectToCanvas(scene, canvas, point);
+        const pick = scene.pick(screen.x - bounds.left, screen.y - bounds.top);
         if (pick?.pickedMesh?.isDescendantOf(root))
           return {
             ...screen,
@@ -251,6 +257,29 @@ export async function openWithTrooper(page: Page, touch = false) {
   await expect(page.locator("#game-canvas")).toHaveAttribute(
     "data-selected-actors",
     '["trained-unit-1"]',
+  );
+}
+
+/** Projects a tile from the shared ARC/Circle introduction and sandbox grid. */
+export async function minimapPoint(page: Page, x: number, z: number) {
+  return page.evaluate(
+    async ({ x, z }) => {
+      const { prototypeTerrainMap } = await import("/e2e/harness.ts");
+      const { minimapProjection } = await import("/src/render/minimap.ts");
+      const map = prototypeTerrainMap();
+      const canvas = document.querySelector<HTMLCanvasElement>("#minimap")!;
+      const bounds = canvas.getBoundingClientRect();
+      const point = minimapProjection(
+        map,
+        canvas.clientWidth,
+        canvas.clientHeight,
+      ).toMinimap(map.tileCenter(x, z));
+      return {
+        x: bounds.left + canvas.clientLeft + point.x,
+        y: bounds.top + canvas.clientTop + point.y,
+      };
+    },
+    { x, z },
   );
 }
 

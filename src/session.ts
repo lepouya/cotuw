@@ -21,7 +21,8 @@ import { serializeMission } from "./simulation/mission-file";
 import type { SaveInfo } from "./simulation/mission-file";
 import { rosterIncludes } from "./simulation/ownership";
 import { createSupportNetworkView } from "./render/support-network";
-import { createFogOverlay, limitToExplored } from "./render/fog";
+import { createFogOverlay } from "./render/fog";
+import { exploredFrontier } from "./render/camera-frontier";
 import { contentRoles } from "./ui/content-roles";
 import { createNetworkControls } from "./ui/network-controls";
 import type { NetworkControls } from "./ui/network-controls";
@@ -137,8 +138,6 @@ const SALVAGE_MINIMAP_COLOR: Rgb = [0.88, 0.65, 0.2];
 const SIMULATION_PUMP_MILLISECONDS = 4;
 /** Bounds each pump's work while retaining longer stalls. */
 const MAX_CATCH_UP_SECONDS = 5;
-/** How far past explored tile centers the camera may look, in world units. */
-const CAMERA_FRONTIER_MARGIN = 4;
 /** The trigger a building activity plays on the actor taking part. */
 const ACTIVITY_TRIGGERS: Partial<Record<BuildingActivityKind, ActorTrigger>> = {
   delivery: "unload",
@@ -333,10 +332,7 @@ async function assembleGameSession(
   );
   own(fogOverlay);
   const fog = player.knowledge.fog;
-  if (fog)
-    view.camera.setFocusLimit((point) =>
-      limitToExplored(map, fog, point, CAMERA_FRONTIER_MARGIN),
-    );
+  if (fog) view.camera.setFocusLimit(exploredFrontier(map, fog));
   const definitionsById = new Map(
     definitions.map((definition) => [definition.id, definition]),
   );

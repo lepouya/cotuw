@@ -52,12 +52,24 @@ const PAN_KEYS: ReadonlyMap<string, readonly [number, number]> = new Map([
   ["ArrowRight", [1, 0]],
 ]);
 
+/**
+ * Ground offsets from the focal point to the middle of the viewport's right
+ * and top edges.
+ */
+export type ViewExtent = Readonly<{ right: Vector3; up: Vector3 }>;
+/**
+ * Returns the allowed focal point nearest `point`. The camera passes the same
+ * `view` object until its heading, pitch, or zoom changes, so limits may cache
+ * work per view.
+ */
+export type FocusLimit = (point: Vector3, view: ViewExtent) => Vector3;
+
 /** Isometric faces a diagonal, Grid a cardinal direction, Top-down north. */
 export type CameraPreset = "isometric" | "top-down" | "grid";
 
 export type StrategyCamera = {
   readonly focusPoint: Readonly<{ x: number; z: number }>;
-  /** Restores the starting pitch and heading, keeping focus and zoom. */
+  /** Restores the starting pitch and heading at the current zoom. */
   resetView: () => void;
   /** Absent after a reset or a manual rotation or tilt. */
   readonly preset: CameraPreset | undefined;
@@ -81,11 +93,14 @@ export type StrategyCamera = {
   rotateView: (direction: 1 | -1) => void;
   tiltView: (radians: number) => void;
   zoomBy: (factor: number) => void;
-  /** Constrains every new focal point, such as to explored terrain. */
-  setFocusLimit: (limit: (point: Vector3) => Vector3) => void;
+  /**
+   * Constrains the focal point, such as to explored terrain. It also applies
+   * each frame, so zoom, turns, and resizing respect it.
+   */
+  setFocusLimit: (limit: FocusLimit) => void;
   /** Decides whether a one-finger touch press pans the view. */
   setTouchPanFilter: (canPan: (event: PointerEvent) => boolean) => void;
-  /** Developer framing of the whole grid; ignores the focus limit. */
+  /** Developer framing of the whole grid until the next navigation input. */
   fitToMap: () => void;
   /** Centers the view on a tile without changing the zoom. */
   focusOnTile: (x: number, z: number) => void;
@@ -178,19 +193,63 @@ export function createStrategyCamera(
     onViewChangedObservable.notifyObservers();
     return true;
   };
-  let limitFocus = (point: Vector3) => point;
+  let focusLimit: FocusLimit | undefined;
+  let framingWholeGrid = false;
+  let groundView:
+    | {
+        alpha: number;
+        beta: number;
+        width: number;
+        height: number;
+        extent: ViewExtent;
+      }
+    | undefined;
+  const viewExtent = () => {
+    const { alpha, beta } = camera;
+    const width = camera.orthoRight ?? 0;
+    const height = camera.orthoTop ?? 0;
+    if (
+      !groundView ||
+      groundView.alpha !== alpha ||
+      groundView.beta !== beta ||
+      groundView.width !== width ||
+      groundView.height !== height
+    ) {
+      camera.getViewMatrix();
+      const { right, up, forward } = orthographicFrameOf(camera);
+      const project = (axis: Vector3, span: number) =>
+        axis.subtract(forward.scale(axis.y / forward.y)).scale(span);
+      groundView = {
+        alpha,
+        beta,
+        width,
+        height,
+        extent: { right: project(right, width), up: project(up, height) },
+      };
+    }
+    return groundView.extent;
+  };
+  const limitFocus = (point: Vector3) =>
+    framingWholeGrid ? point : (focusLimit?.(point, viewExtent()) ?? point);
+  const keepFocusLimited = () => {
+    const limited = limitFocus(camera.target);
+    if (!limited.equalsWithEpsilon(camera.target, 1e-6)) retarget(limited);
+  };
   // Babylon would otherwise re-derive alpha, beta and radius from the
   // unchanged position and tilt the fixed isometric view.
   const retarget = (target: Vector3) =>
     camera.setTarget(target, false, false, true);
   // Every deliberate move replaces a glide or Follow instead of fighting it.
   const moveTo = (target: Vector3) => {
+    framingWholeGrid = false;
     glide = undefined;
     stopFollowing();
     retarget(limitFocus(target));
   };
   const fitToMap = () => {
+    framingWholeGrid = true;
     glide = undefined;
+    turn = undefined;
     stopFollowing();
     retarget(Vector3.Zero());
     setDistance(cameraDistanceForMap(map));
@@ -213,6 +272,7 @@ export function createStrategyCamera(
   const aim = (): Heading =>
     turn?.to ?? { alpha: camera.alpha, beta: camera.beta };
   const turnTo = (to: Heading, shortest = true) => {
+    framingWholeGrid = false;
     const from = { alpha: camera.alpha, beta: camera.beta };
     // Take the short way round, landing exactly on the requested heading.
     const fullTurns = shortest
@@ -259,15 +319,18 @@ export function createStrategyCamera(
     focusOnPoint(map.worldPoint(x + 0.5, z + 0.5, 0));
   };
   const glideToPoint = (point: Vector3) => {
+    framingWholeGrid = false;
     if (reducedMotion()) return focusOnPoint(point);
     stopFollowing();
     glide = {
       from: camera.target.clone(),
+      // Ease onto the frontier rather than stopping short at it.
       to: limitFocus(groundPoint(point)),
       elapsed: 0,
     };
   };
   const follow = (target: () => Vector3 | undefined) => {
+    framingWholeGrid = false;
     glide = undefined;
     followTarget = target;
     onViewChangedObservable.notifyObservers();
@@ -275,18 +338,6 @@ export function createStrategyCamera(
   const advanceTransitions = () => {
     const seconds = scene.getEngine().getDeltaTime() / 1000;
     const immediate = reducedMotion();
-    if (glide) {
-      glide.elapsed += seconds;
-      const progress = immediate
-        ? 1
-        : Math.min(glide.elapsed / TRANSITION_SECONDS, 1);
-      retarget(
-        limitFocus(
-          Vector3.Lerp(glide.from, glide.to, easeInOutCubic(progress)),
-        ),
-      );
-      if (progress === 1) glide = undefined;
-    }
     if (turn) {
       turn.elapsed += seconds;
       const progress = immediate
@@ -300,6 +351,18 @@ export function createStrategyCamera(
         Object.assign(camera, to);
         turn = undefined;
       }
+    }
+    if (glide) {
+      glide.elapsed += seconds;
+      const progress = immediate
+        ? 1
+        : Math.min(glide.elapsed / TRANSITION_SECONDS, 1);
+      retarget(
+        limitFocus(
+          Vector3.Lerp(glide.from, glide.to, easeInOutCubic(progress)),
+        ),
+      );
+      if (progress === 1) glide = undefined;
     }
     if (followTarget) {
       const point = followTarget();
@@ -315,6 +378,7 @@ export function createStrategyCamera(
   };
   /** Manual rotation and tilt leave any preset and interrupt its turn. */
   const turnManually = () => {
+    framingWholeGrid = false;
     turn = undefined;
     setPresetState(undefined);
   };
@@ -338,19 +402,6 @@ export function createStrategyCamera(
     if (panMode === active) return;
     panMode = active;
     panChanged();
-  };
-  const pointAt = (x: number, y: number) => {
-    // Refreshes the camera position after alpha, beta or target changes.
-    camera.getViewMatrix();
-    const bounds = canvas.getBoundingClientRect();
-    return projectOntoPlane(
-      orthographicFrameOf(camera),
-      ((x - bounds.left - bounds.width / 2) * viewHeight) /
-        Math.max(bounds.height, 1),
-      ((bounds.height / 2 - y + bounds.top) * viewHeight) /
-        Math.max(bounds.height, 1),
-      0,
-    );
   };
   const pointer = createPointerGesture(canvas, {
     enabled: () => worldInputAvailable(canvas.ownerDocument),
@@ -385,8 +436,11 @@ export function createStrategyCamera(
   });
   /** Moves the view as far as the ground under a screen offset travels. */
   const panPixels = (x: number, y: number) => {
-    const from = pointAt(0, 0);
-    moveTo(camera.target.add(pointAt(x, y).subtract(from)));
+    const { right, up } = viewExtent();
+    const bounds = canvas.getBoundingClientRect();
+    const horizontal = right.scale((2 * x) / Math.max(bounds.width, 1));
+    const vertical = up.scale((-2 * y) / Math.max(bounds.height, 1));
+    moveTo(camera.target.add(horizontal).add(vertical));
   };
   const panView = (horizontal: number, vertical: number) => {
     const step = canvas.getBoundingClientRect().height * PAN_VIEW_FRACTION;
@@ -404,16 +458,17 @@ export function createStrategyCamera(
       height,
     );
 
+  const zoomBy = (factor: number) => {
+    framingWholeGrid = false;
+    setViewHeight(viewHeight * factor);
+  };
   const zoom = (event: WheelEvent) => {
     if (!worldInputAvailable(canvas.ownerDocument)) return;
     event.preventDefault();
     const scale = wheelPixelScale(event, canvas.clientHeight);
     if (panMode && !event.ctrlKey)
       panPixels(event.deltaX * scale, event.deltaY * scale);
-    else
-      setViewHeight(
-        viewHeight * Math.exp(event.deltaY * scale * ZOOM_SENSITIVITY),
-      );
+    else zoomBy(Math.exp(event.deltaY * scale * ZOOM_SENSITIVITY));
   };
   const document = canvas.ownerDocument;
   const host = document?.defaultView;
@@ -508,6 +563,7 @@ export function createStrategyCamera(
   scene.onBeforeRenderObservable.add(syncToCanvas);
   scene.onBeforeRenderObservable.add(advanceNavigation);
   scene.onBeforeRenderObservable.add(advanceTransitions);
+  scene.onBeforeRenderObservable.add(keepFocusLimited);
   frameStart();
 
   return {
@@ -545,9 +601,9 @@ export function createStrategyCamera(
       turnManually();
       setBeta(beta + radians, beta);
     },
-    zoomBy: (factor) => setViewHeight(viewHeight * factor),
+    zoomBy,
     setFocusLimit: (limit) => {
-      limitFocus = limit;
+      focusLimit = limit;
       moveTo(camera.target.clone());
     },
     setTouchPanFilter: (canPan) => {

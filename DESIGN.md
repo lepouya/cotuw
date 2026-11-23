@@ -640,7 +640,8 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   presets. Isometric faces the nearest diagonal and Grid the nearest cardinal
   direction at the default pitch, breaking ties toward Rotate right. Top-down
   looks straight down with north up. Reset View restores the default pitch and
-  heading. Presets keep the focal point and zoom.
+  heading. Presets keep the zoom and retain the focal point where the
+  [fog rules](#fog-stealth-and-detection) allow it.
 - A View button beside the camera cluster opens the presets and closes after
   one is chosen, an outside press, or moving focus elsewhere. Escape closes
   this popup before acting on the world selection. Rotate left and right turn
@@ -970,6 +971,7 @@ build. TODO.md owns milestone delivery; current controls are described above.
 - Every map keeps at least four out-of-bounds tiles between playable ground
   and the grid edge. Each map dresses its border as rising rock, mountains, or
   water. The border follows normal fog and exploration, so scouts reveal it.
+  With fog enabled, the outer edge of the scenery fades into the background.
   The border gives the camera more framing room.
 
 ### Special movement and transport
@@ -1187,9 +1189,11 @@ These systems are outside M1.
 - Unexplored terrain is covered in the background color on the main view and
   minimap; explored terrain outside current vision is dimmed. Fog edges soften
   inward, so known ground never reveals unexplored tiles.
-- The camera's focal point stays within four world units of an explored tile
-  center; panning, focus, minimap navigation, and Reset View clamp to that
-  frontier. Zooming out still shows only darkness beyond explored terrain.
+- Some explored tile must stay within the central third of the view, measured
+  along the screen's axes on the ground plane. Panning, focus, Follow,
+  minimap navigation, zoom, rotation, Reset View, and resizing move the view
+  the least distance that restores this. Zooming out still shows only
+  darkness beyond explored terrain.
 - Move orders may enter unexplored terrain. Building footprints and rally
   points must be explored.
 - Every owner keeps its own explored terrain and a saved memory of what it
