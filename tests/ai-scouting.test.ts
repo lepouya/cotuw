@@ -135,7 +135,8 @@ test("a damaged scout retreats home and avoids the area", () => {
   const state = structuredClone(scouted);
   const { scoutId } = memoryOf(state);
   const scout = state.actors.find(({ id }) => id === scoutId)!;
-  scout.health = 30;
+  // Halving keeps this new damage whatever the opening already dealt.
+  scout.health = Math.floor((scout.health ?? 60) / 2);
   const hitAt = { ...scout.worldPosition };
   const sim = resumeForRound(state);
   try {

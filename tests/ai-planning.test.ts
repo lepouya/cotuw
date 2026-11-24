@@ -10,6 +10,7 @@ import {
   sitesNear,
   tendGrowth,
 } from "../src/simulation/ai-planning";
+import { occupiedTilesFor } from "../src/simulation/placement";
 import { TerrainGrid } from "../src/simulation/terrain";
 
 import type { PlacementMemory } from "../src/simulation/ai-planning";
@@ -30,13 +31,14 @@ const terrain = new TerrainGrid({
 function context(
   funds: number,
   accepts: (placement: ActorPlacement) => boolean = () => true,
+  own: readonly object[] = [],
 ) {
   const checked: ActorPlacement[] = [];
   const stub = {
     definitions,
     funds: () => funds,
     view: {
-      actors: () => ({ placed: [] }),
+      actors: () => ({ placed: [], own }),
       knowledge: { sites: [] },
       evaluatePlacement: (placement: ActorPlacement) => {
         checked.push(placement);
@@ -71,9 +73,38 @@ test.each([
   const { stub, checked } = context(1000);
   const origin = findPlacement(stub, terrain, BARRACKS, anchor, "placement");
   expect(origin).toBeDefined();
-  for (const { origin: tried } of checked)
-    for (const { x, z } of BARRACKS.footprint!.occupiedTiles)
-      expect(terrain.containsTile(tried.x + x, tried.z + z)).toBe(true);
+  for (const { actorId: id, definitionId, origin, quarterTurns = 0 } of checked)
+    for (const { x, z } of occupiedTilesFor(
+      { id, definitionId, tilePlacement: { origin, quarterTurns } },
+      BARRACKS,
+    ))
+      expect(terrain.containsTile(x, z)).toBe(true);
+});
+
+test("placement turns with the owner's headquarters", () => {
+  const headquarters = {
+    id: "hq",
+    definitionId: "arc-command-center-prototype",
+    tilePlacement: { origin: { x: 0, z: 0 }, quarterTurns: 2 },
+  };
+  const placements = (own: readonly object[]) => {
+    const { stub, checked } = context(1000, () => false, own);
+    findPlacement(stub, terrain, BARRACKS, { x: 0, z: 0 }, "placement");
+    return checked;
+  };
+  const straight = placements([]);
+  const turned = placements([headquarters]);
+  expect(turned.map(({ quarterTurns }) => quarterTurns)).toEqual(
+    straight.map(() => 2),
+  );
+  // The turned search visits each straight candidate's half-turned origin.
+  const center = straight[0]!.origin;
+  expect(turned.map(({ origin }) => origin)).toEqual(
+    straight.map(({ origin }) => ({
+      x: 2 * center.x - origin.x,
+      z: 2 * center.z - origin.z,
+    })),
+  );
 });
 
 test("placement gives up when no candidate is accepted", () => {

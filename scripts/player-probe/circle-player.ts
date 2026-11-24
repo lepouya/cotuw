@@ -8,6 +8,7 @@ import {
   missionTerrain,
 } from "../../src/mission-loading";
 import { isSkirmishResult } from "../../src/simulation/mission-result";
+import { rotateOffset } from "../../src/simulation/grid";
 import { createScenarioMap } from "../../src/simulation/scenario";
 import { costAmount } from "../../src/simulation/resources";
 import { secondsToTicks } from "../../src/simulation/clock";
@@ -153,6 +154,11 @@ export function runPlayer(plan: Plan, start: SkirmishStart): PlayerReport {
     };
     const train = (actorId: string, producerId: string, definitionId: string) =>
       step({ kind: "train-unit", actorId, producerId, definitionId });
+    // A turned start turns its search and rounding, keeping slots fair.
+    const addOffset = (origin: TileCoord, offset: TileCoord) => {
+      const { x, z } = rotateOffset(offset, start.quarterTurns);
+      return { x: origin.x + x, z: origin.z + z };
+    };
     const placed = new Set<string>();
     const grow = (
       actorId: string,
@@ -166,7 +172,8 @@ export function runPlayer(plan: Plan, start: SkirmishStart): PlayerReport {
           kind: "place-actor",
           actorId,
           definitionId,
-          origin: { x: origin.x + dx, z: origin.z + dz },
+          origin: addOffset(origin, { x: dx, z: dz }),
+          quarterTurns: start.quarterTurns,
           workerIds: [workerId],
         };
         if (view.evaluatePlacement(command).accepted) {
@@ -191,11 +198,16 @@ export function runPlayer(plan: Plan, start: SkirmishStart): PlayerReport {
       siteId: homeSites[site - 1]!.id,
     }));
     const [firstSite, secondSite] = homeSites;
-    // Between the two home sites.
-    const rally = {
-      x: Math.floor((firstSite!.tile.x + secondSite!.tile.x) / 2),
-      z: Math.floor((firstSite!.tile.z + secondSite!.tile.z) / 2),
-    };
+    // Between the two home sites, rounded the same way relative to the start.
+    const [a, b] = [firstSite!.tile, secondSite!.tile];
+    const half = rotateOffset(
+      { x: b.x - a.x, z: b.z - a.z },
+      (4 - start.quarterTurns) % 4,
+    );
+    const rally = addOffset(a, {
+      x: Math.floor(half.x / 2),
+      z: Math.floor(half.z / 2),
+    });
     const musterhallOrigin = {
       x: dropoffOrigin.x,
       z: dropoffOrigin.z - 5 * Math.sign(firstSite!.tile.z - dropoffOrigin.z),

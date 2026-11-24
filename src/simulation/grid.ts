@@ -15,6 +15,25 @@ export function isTileCoord(value: unknown): value is TileCoord {
   return Number.isSafeInteger(x) && Number.isSafeInteger(z);
 }
 
+/** Turns clockwise so +Z becomes +X after one quarter turn. */
+export function rotateOffset(
+  { x, z }: TileCoord,
+  quarterTurns: number,
+): TileCoord {
+  switch (quarterTurns) {
+    case 0:
+      return { x, z };
+    case 1:
+      return { x: z, z: -x };
+    case 2:
+      return { x: -x, z: -z };
+    case 3:
+      return { x: -z, z: x };
+    default:
+      throw new RangeError(`Invalid footprint rotation: ${quarterTurns}.`);
+  }
+}
+
 export function containsGridPoint(
   x: number,
   z: number,

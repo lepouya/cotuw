@@ -294,7 +294,7 @@ test.each(["place-actor", "train-unit"] as const)(
   },
 );
 
-test("rounds wait their interval and owners plan on separate ticks", () => {
+test("rounds wait their interval and owners plan on the same ticks", () => {
   const ticks: Record<string, number[]> = { west: [], east: [] };
   const aiProfile = profile([allocation("recorder")]);
   const sim = fixture(
@@ -310,7 +310,7 @@ test("rounds wait their interval and owners plan on separate ticks", () => {
     },
   );
   advanceTicks(sim, 2 * ROUND + 2);
-  expect(ticks).toEqual({ west: [0, 10, 20], east: [1, 11, 21] });
+  expect(ticks).toEqual({ west: [0, 10, 20], east: [0, 10, 20] });
 });
 
 test("budgets split resources by weight and keep each concern's savings", () => {

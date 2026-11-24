@@ -1,5 +1,5 @@
 import { isValidFootprint } from "./occupancy";
-import { isTileCoord, tileBounds, tileKey } from "./grid";
+import { isTileCoord, rotateOffset, tileBounds, tileKey } from "./grid";
 import { withinBounds } from "./world";
 import { isNonnegative } from "./validation";
 
@@ -287,20 +287,4 @@ export function tilePlacedPose(
     },
     facing: actor.tilePlacement.quarterTurns * (Math.PI / 2),
   };
-}
-
-/** Turns clockwise like `facing`, so +Z becomes +X after one quarter turn. */
-function rotateOffset({ x, z }: TileCoord, quarterTurns: number): TileCoord {
-  switch (quarterTurns) {
-    case 0:
-      return { x, z };
-    case 1:
-      return { x: z, z: -x };
-    case 2:
-      return { x: -x, z: -z };
-    case 3:
-      return { x: -z, z: x };
-    default:
-      throw new RangeError(`Invalid footprint rotation: ${quarterTurns}.`);
-  }
 }

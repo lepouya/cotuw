@@ -1,7 +1,7 @@
 // Faction-neutral reading and ordering helpers for director concerns.
 import { compareIds, isWorkerDefinition, trainsArmy } from "./actor";
 import { secondsToTicks } from "./clock";
-import { tileKey } from "./grid";
+import { rotateOffset, tileKey } from "./grid";
 import { rosterIncludes } from "./ownership";
 import { occupiedTilesFor } from "./placement";
 import { costAmount, costResource } from "./resources";
@@ -250,6 +250,16 @@ function reservedTiles(context: AiConcernContext) {
   return reserved;
 }
 
+/**
+ * The turn of the owner's headquarters, or else its earliest building. New
+ * buildings and their candidate order share it, so owners on rotated starts
+ * place identically relative to their base.
+ */
+function baseQuarterTurns(context: AiConcernContext) {
+  const base = headquarters(context) ?? ownBuildings(context, () => true)[0];
+  return base?.tilePlacement.quarterTurns ?? 0;
+}
+
 type PlacementSearch = {
   /** Prefer sites nearest this point within the search around the anchor. */
   toward?: WorldPosition;
@@ -275,37 +285,42 @@ export function findPlacement(
   const point = clampToBounds(anchor, terrain.worldBounds);
   const center = terrain.tileAtWorldPosition(point.x, point.z);
   const reserved = reservedTiles(context);
-  let offsets = PLACEMENT_OFFSETS;
+  const quarterTurns = baseQuarterTurns(context);
+  const originFor = (offset: TileCoord) => {
+    const { x, z } = rotateOffset(offset, quarterTurns);
+    return { x: center.x + x, z: center.z + z };
+  };
+  const origins = PLACEMENT_OFFSETS.map(originFor);
   if (toward) {
     const goal = terrain.tileAtWorldPosition(toward.x, toward.z);
-    const gap = ({ x, z }: TileCoord) =>
-      (center.x + x - goal.x) ** 2 + (center.z + z - goal.z) ** 2;
-    offsets = [...offsets].sort((a, b) => gap(a) - gap(b));
+    const gap = ({ x, z }: TileCoord) => (x - goal.x) ** 2 + (z - goal.z) ** 2;
+    origins.sort((a, b) => gap(a) - gap(b));
   }
-  for (const offset of offsets) {
-    const origin = { x: center.x + offset.x, z: center.z + offset.z };
-    const tiles = definition.footprint!.occupiedTiles.map(({ x, z }) => ({
-      x: origin.x + x,
-      z: origin.z + z,
-    }));
+  const offsets = definition.footprint!.occupiedTiles.map((offset) =>
+    rotateOffset(offset, quarterTurns),
+  );
+  for (const origin of origins) {
     if (
-      tiles.some(
-        (tile) =>
-          !terrain.containsTile(tile.x, tile.z) || reserved.has(tileKey(tile)),
-      )
+      offsets.some(({ x, z }) => {
+        const tile = { x: origin.x + x, z: origin.z + z };
+        return (
+          !terrain.containsTile(tile.x, tile.z) || reserved.has(tileKey(tile))
+        );
+      })
     )
       continue;
     const evaluation = context.view.evaluatePlacement({
       actorId,
       definitionId: definition.id,
       origin,
+      quarterTurns,
       ...(workerIds && { workerIds: [...workerIds] }),
     });
     if (
       evaluation.accepted &&
       (!accepts || accepts(evaluation.actor.worldPosition))
     )
-      return { origin, workerId: evaluation.workerId };
+      return { origin, quarterTurns, workerId: evaluation.workerId };
   }
 }
 
@@ -405,13 +420,14 @@ export function place(
       { ...search, workerIds },
     );
     if (!placement) continue;
-    const { origin, workerId } = placement;
+    const { origin, quarterTurns, workerId } = placement;
     if (
       context.issue({
         kind: "place-actor",
         actorId,
         definitionId: definition.id,
         origin,
+        ...(quarterTurns && { quarterTurns }),
         ...(workerId && { workerIds: [workerId] }),
       })
     )

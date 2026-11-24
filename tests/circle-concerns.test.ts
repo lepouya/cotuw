@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
 
 import { ROUND_TICKS, runTicks } from "./helpers/ai-mirror";
+import { setBalance } from "./helpers/scenario";
 import { CIRCLE_MIRROR_CASES } from "../scripts/ai-match/runner";
 import {
   assembleSkirmish,
@@ -378,4 +379,39 @@ test("the Circle restart price covers only what income lacks", () => {
     reserve: full,
     needed: full,
   });
+});
+
+test("Cultivators without a Conservatory regrow income before producers", () => {
+  const state = structuredClone(developed);
+  setBalance(state, 100, "lifebloom", "west");
+  const sim = resume(state);
+  try {
+    remove(
+      sim,
+      sim.actors
+        .filter(
+          ({ owner, definitionId }) =>
+            owner === "west" &&
+            [
+              "circle-conservatory",
+              "circle-musterhall",
+              "circle-construct-nursery",
+            ].includes(definitionId),
+        )
+        .map(({ id }) => id),
+    );
+    expect(workersOf(sim, "west").length).toBeGreaterThan(0);
+    const placed: string[] = [];
+    for (let tick = 0; tick < minutes(1) && !placed.length; tick++)
+      for (const { command, issuer, accepted } of sim.tick())
+        if (
+          accepted &&
+          issuer.owner === "west" &&
+          command.kind === "place-actor"
+        )
+          placed.push(command.definitionId);
+    expect(placed).toEqual(["circle-conservatory"]);
+  } finally {
+    sim.dispose();
+  }
 });

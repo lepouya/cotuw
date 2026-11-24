@@ -32,6 +32,7 @@ import {
   NavigationGrid,
 } from "../src/simulation/navigation";
 import { OccupancyGrid } from "../src/simulation/occupancy";
+import { occupiedTilesFor } from "../src/simulation/placement";
 import { TerrainGrid } from "../src/simulation/terrain";
 
 import type {
@@ -125,22 +126,26 @@ test("start slots mirror each other's base and opening footprints", () => {
   const footprint = (
     definitionId: string,
     origin: TileCoord,
+    { quarterTurns }: SkirmishStart,
     place = (tile: TileCoord) => tile,
   ) =>
-    definitions
-      .get(definitionId)!
-      .footprint!.occupiedTiles.map(({ x, z }) =>
-        tileKey(place({ x: origin.x + x, z: origin.z + z })),
-      )
+    occupiedTilesFor(
+      { id: "building", definitionId, tilePlacement: { origin, quarterTurns } },
+      definitions.get(definitionId)!,
+    )
+      .map((tile) => tileKey(place(tile)))
       .sort();
   const flip = (tile: TileCoord) => mirrored(map, tile);
+  expect([west.quarterTurns, east.quarterTurns]).toEqual([0, 2]);
   for (const faction of ["arc", "circle"] as const) {
     const { headquarters, dropoff } = SKIRMISH_OPENINGS[faction];
-    expect(footprint(headquarters, east.headquartersOrigins[faction])).toEqual(
-      footprint(headquarters, west.headquartersOrigins[faction], flip),
+    expect(
+      footprint(headquarters, east.headquartersOrigins[faction], east),
+    ).toEqual(
+      footprint(headquarters, west.headquartersOrigins[faction], west, flip),
     );
-    expect(footprint(dropoff, east.dropoffOrigins[faction])).toEqual(
-      footprint(dropoff, west.dropoffOrigins[faction], flip),
+    expect(footprint(dropoff, east.dropoffOrigins[faction], east)).toEqual(
+      footprint(dropoff, west.dropoffOrigins[faction], west, flip),
     );
   }
   const { minX, maxX, minZ, maxZ } = west.baseArea;
@@ -236,6 +241,7 @@ test.each(SKIRMISH_MAP.starts)(
         actorId: "refinery",
         definitionId: dropoff,
         origin: start.dropoffOrigins.arc,
+        quarterTurns: start.quarterTurns,
       },
       { owner: simulation.playerOwner },
     );
@@ -298,6 +304,7 @@ test.each(SKIRMISH_MAP.starts)(
         actorId: "conservatory",
         definitionId: dropoff,
         origin: start.dropoffOrigins.circle,
+        quarterTurns: start.quarterTurns,
         workerIds: ["cultivator"],
       },
       { owner: simulation.playerOwner },

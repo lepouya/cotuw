@@ -1,5 +1,9 @@
 // Faction-neutral army producers, built once income exists.
-import { countByDefinition, isWorkerDefinition } from "./actor";
+import {
+  countByDefinition,
+  isIncomeBuilding,
+  isWorkerDefinition,
+} from "./actor";
 import {
   armyProducer,
   headquarters,
@@ -53,12 +57,14 @@ export const production = plannedConcern<ProductionPlan>(
       ? plan.essentialProducers
       : plan.producers;
     const workers = economyWorkers(economy).length;
+    // Workers earn only with a drop-off building, finished or under way.
     const hasIncome =
-      workers > 0 ||
-      economy.production.some((job) => {
-        const unit = context.definitions.get(job.definitionId);
-        return !!unit && isWorkerDefinition(unit);
-      });
+      ownBuildings(context, isIncomeBuilding).length > 0 &&
+      (workers > 0 ||
+        economy.production.some((job) => {
+          const unit = context.definitions.get(job.definitionId);
+          return !!unit && isWorkerDefinition(unit);
+        }));
     // Further producers wait for income, so savings go to growing it.
     const wanted = workers < plan.fullProductionWorkers ? 1 : planned;
     if (producers.length >= wanted) {

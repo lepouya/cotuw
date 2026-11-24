@@ -216,6 +216,7 @@ export function createSkirmishScenario(
       actorId: `${start.id}-headquarters`,
       definitionId: opening.headquarters,
       origin: start.headquartersOrigins[faction],
+      quarterTurns: start.quarterTurns,
       owner: start.id,
     })),
     stockpiles: slots.map(({ start, opening }) => ({

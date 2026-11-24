@@ -361,14 +361,14 @@ const planOf = ({ tuning: { plans } }: AiProfile, concern: string) =>
 
 const NO_PLAN = Object.freeze({});
 
-/** Offsets each owner's first round, so owners plan on separate ticks. */
+/** All owners begin planning on the same tick. */
 export const createAiState = (owners: readonly { owner: string }[]): AiState =>
   Object.fromEntries(
-    owners.map(({ owner }, index): [string, OwnerAiState] => [
+    owners.map(({ owner }): [string, OwnerAiState] => [
       owner,
       {
         posture: "establishing",
-        nextRoundTick: index,
+        nextRoundTick: 0,
         nextActorNumber: 1,
         budgets: {},
         claims: {},

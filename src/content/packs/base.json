@@ -2,7 +2,7 @@
   "format": "cotuw-content",
   "formatVersion": 5,
   "id": "base",
-  "version": 16,
+  "version": 17,
   "name": "ARC, Circle of Repose, and wildlife",
   "factionNames": {
     "arc": "Anomaly Response Command",
@@ -887,7 +887,7 @@
         "offense": {
           "graceSeconds": 240,
           "raid": { "minUnits": 4, "maxUnits": 6, "odds": 2 },
-          "attack": { "units": 8, "odds": 1.25 },
+          "attack": { "units": 12, "odds": 1.25 },
           "defendedTiles": 14,
           "raidRedirectTiles": 16,
           "avoidSeconds": 120,
@@ -1062,7 +1062,7 @@
         "offense": {
           "graceSeconds": 240,
           "raid": { "minUnits": 4, "maxUnits": 6, "odds": 2 },
-          "attack": { "units": 8, "odds": 1.25 },
+          "attack": { "units": 12, "odds": 1.25 },
           "defendedTiles": 14,
           "raidRedirectTiles": 16,
           "avoidSeconds": 120,
@@ -1159,7 +1159,7 @@
           { "concern": "circle-expansion", "budget": 2, "forces": 0 },
           { "concern": "income-defenses", "budget": 1, "forces": 0 },
           { "concern": "recovery", "budget": 2, "forces": 0 },
-          { "concern": "forces", "budget": 4, "forces": 0 },
+          { "concern": "forces", "budget": 3, "forces": 0 },
           { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "offense", "budget": 0, "forces": 8 }
         ],
@@ -1182,7 +1182,7 @@
           { "concern": "circle-expansion", "budget": 1, "forces": 0 },
           { "concern": "income-defenses", "budget": 1, "forces": 0 },
           { "concern": "recovery", "budget": 2, "forces": 0 },
-          { "concern": "forces", "budget": 4, "forces": 0 },
+          { "concern": "forces", "budget": 3, "forces": 0 },
           { "concern": "repair", "budget": 1, "forces": 0 }
         ],
         "defending": [
@@ -1200,7 +1200,7 @@
             "essential": true
           },
           { "concern": "recovery", "budget": 2, "forces": 0 },
-          { "concern": "forces", "budget": 4, "forces": 0 },
+          { "concern": "forces", "budget": 3, "forces": 0 },
           { "concern": "repair", "budget": 1, "forces": 0 },
           { "concern": "scouting", "budget": 1, "forces": 1 },
           { "concern": "offense", "budget": 0, "forces": 8 },

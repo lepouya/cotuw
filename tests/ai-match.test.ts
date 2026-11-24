@@ -496,7 +496,7 @@ test("reports count posture time and operations seen during the run", () => {
   });
   const [west, east] = report.owners;
   expect(west!.postureTicks).toEqual({ establishing: report.ticks });
-  // Each owner's rounds start on its own tick: west at 0, east at 1.
+  // Both owners' rounds start on tick 0.
   const round = 60;
   expect(west!.operations).toEqual({
     raid: {
@@ -512,7 +512,7 @@ test("reports count posture time and operations seen during the run", () => {
       ended: { disbanded: 1 },
     },
   });
-  expect(east!.operations?.raid?.firstLaunchTick).toBe(1);
+  expect(east!.operations?.raid?.firstLaunchTick).toBe(0);
 });
 
 test("a case ends at its result, with the concerns supplied", () => {

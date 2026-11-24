@@ -1327,6 +1327,11 @@ The following concealment and sensor rules are outside M1:
   owners and faction types to slots and supplies faction-specific starting
   assets, resources, and AI profiles. Terrain, routes, and expansion sites stay
   the same across assignments. Both assignments are available for verification.
+- The two starts are point-mirrored: the east start, its starting buildings,
+  and its expansion sites are the west turned a half turn about the map
+  center. AI owners turn new buildings and their placement search with their
+  headquarters, and every AI owner plans on the same ticks, so mirrored owners
+  make identical opening decisions.
 - Both M1 skirmish owners begin at the same simulation tick with one
   operational headquarters: an ARC Command Center or Circle Heartgrove. Each
   receives enough starting resources to establish income through normal play.
@@ -2174,6 +2179,9 @@ acceptance progress. The following sections define the selected scope.
   these windows do not force waiting. Disruption can delay development, and
   factions may reach different parts of the windows. Preserve exact milestone
   ticks for analysis while using whole-minute targets for reporting.
+- Pacing tuning toward the target adjusts AI behavior, such as assault
+  thresholds, home reserves, and regrouping after failed attacks, rather
+  than economy rates, costs, or building durability.
 - In normal, undisrupted play, target a first small raid against an observed
   opportunity around minutes 4 to 6 and a first substantial base assault around
   minutes 8 to 12. Use normally produced forces and observed targets. Losses,

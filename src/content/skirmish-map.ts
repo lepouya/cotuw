@@ -24,6 +24,8 @@ export type SkirmishStart = {
   >;
   /** Income from this area is not an expansion. */
   readonly startingResourceAreaId: string;
+  /** Turns the start's buildings, whose origins assume this rotation. */
+  readonly quarterTurns: number;
 };
 
 export type ResourceArea = {
@@ -63,23 +65,39 @@ const patch = (x: number, z: number): TileCoord[] => [
   { x: x + 1, z: z + 1 },
 ];
 
+const WEST_START: SkirmishStart = {
+  id: "west",
+  baseArea: { minX: 8, maxX: 35, minZ: 44, maxZ: 75 },
+  headquartersOrigins: { arc: { x: 16, z: 59 }, circle: { x: 15, z: 58 } },
+  dropoffOrigins: { arc: { x: 22, z: 59 }, circle: { x: 22, z: 59 } },
+  startingResourceAreaId: "west-home",
+  quarterTurns: 0,
+};
+const mirrorOrigins = <K extends string>(
+  origins: Readonly<Record<K, Readonly<TileCoord>>>,
+) =>
+  Object.fromEntries(
+    Object.entries<Readonly<TileCoord>>(origins).map(([faction, origin]) => [
+      faction,
+      mirror(origin),
+    ]),
+  ) as Record<K, TileCoord>;
+
+/** East is west turned a half turn about the map center, buildings included. */
 const SKIRMISH_STARTS: SkirmishMap["starts"] = deepFreeze([
-  {
-    id: "west",
-    baseArea: { minX: 8, maxX: 35, minZ: 44, maxZ: 75 },
-    headquartersOrigins: { arc: { x: 16, z: 59 }, circle: { x: 15, z: 58 } },
-    dropoffOrigins: { arc: { x: 22, z: 59 }, circle: { x: 22, z: 59 } },
-    startingResourceAreaId: "west-home",
-  },
+  WEST_START,
   {
     id: "east",
-    baseArea: { minX: 84, maxX: 111, minZ: 44, maxZ: 75 },
-    headquartersOrigins: {
-      arc: { x: 102, z: 59 },
-      circle: { x: 102, z: 59 },
+    baseArea: {
+      minX: SIZE - 1 - WEST_START.baseArea.maxX,
+      maxX: SIZE - 1 - WEST_START.baseArea.minX,
+      minZ: SIZE - 1 - WEST_START.baseArea.maxZ,
+      maxZ: SIZE - 1 - WEST_START.baseArea.minZ,
     },
-    dropoffOrigins: { arc: { x: 95, z: 59 }, circle: { x: 95, z: 59 } },
+    headquartersOrigins: mirrorOrigins(WEST_START.headquartersOrigins),
+    dropoffOrigins: mirrorOrigins(WEST_START.dropoffOrigins),
     startingResourceAreaId: "east-home",
+    quarterTurns: 2,
   },
 ]);
 
