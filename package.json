@@ -15,6 +15,7 @@
     "tauri": "tauri",
     "levels": "node --no-experimental-webstorage scripts/generate-levels.ts",
     "benchmark": "node --no-experimental-webstorage scripts/benchmark.ts",
+    "benchmark:packaged": "node --no-experimental-webstorage scripts/benchmark-packaged.ts",
     "cultivation:probe": "node --no-experimental-webstorage scripts/cultivation-probe.ts",
     "ai:match": "node --no-experimental-webstorage scripts/ai-match.ts",
     "player:probe": "node --no-experimental-webstorage scripts/player-probe.ts",

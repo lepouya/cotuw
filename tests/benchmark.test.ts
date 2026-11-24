@@ -2,19 +2,29 @@ import { expect, test } from "vitest";
 
 import { advanceTicks } from "./helpers/scenario";
 import {
-  BENCHMARK_AI_CONCERNS,
   createBenchmarkMission,
+  frameResult,
+  frameResultProblems,
+  HELD_UNITS,
   probeOptions,
+  scriptedSeconds,
+  SCRIPT_SECONDS,
   WORKLOADS,
 } from "../scripts/benchmark/workload";
-import { attachBenchmarkProbe } from "../src/benchmark-probe";
+import {
+  attachBenchmarkProbe,
+  BENCHMARK_AI_CONCERNS,
+  BENCHMARK_SCENARIO_ID,
+} from "../src/benchmark-probe";
 import { createSessionSimulation, loadMission } from "../src/mission-loading";
+import { SIMULATION_TICK_SECONDS } from "../src/simulation/clock";
 import {
   summarizeTimes,
   summarizePopulation,
 } from "../scripts/benchmark/metrics";
 
 import type { Workload } from "../scripts/benchmark/workload";
+import type { PopulationSample } from "../src/benchmark-probe";
 import type { MissionSimulation } from "../src/simulation/mission";
 
 test.each(Object.keys(WORKLOADS) as Workload[])(
@@ -76,8 +86,8 @@ test(
         const units = simulation.actors.filter(
           (actor) => actor.owner === owner && !actor.tilePlacement,
         );
-        expect(units.length).toBeLessThanOrEqual(share);
-        expect(units.length).toBeGreaterThan(share * 0.85);
+        expect(units.length).toBeLessThanOrEqual(share * HELD_UNITS.max);
+        expect(units.length).toBeGreaterThan(share * HELD_UNITS.min);
         expect(simulation.ai[owner]!.nextRoundTick).toBeGreaterThan(0);
         expect(simulation.ai[owner]!.posture).not.toBe("establishing");
         expect(simulation.ai[owner]!.claims[`${owner}-scout-0`]).toBe(
@@ -100,6 +110,21 @@ const westTrooper = (simulation: MissionSimulation) =>
   simulation.actors.find(
     (actor) => actor.owner === "west" && actor.definitionId === "arc-trooper",
   )!.id;
+
+test("benchmark scenes name the scenario benchmark builds recognize", () => {
+  for (const ai of [false, true]) {
+    const mission = loadMission(createBenchmarkMission("normal", { ai }));
+    expect(mission.scenario.id).toBe(BENCHMARK_SCENARIO_ID);
+    const lastOrder = Math.max(
+      ...mission.state.commands.map(({ tick }) => tick),
+    );
+    // Scripted orders run through measurement, after the AI scene's opening.
+    expect(lastOrder * SIMULATION_TICK_SECONDS).toBeLessThanOrEqual(
+      scriptedSeconds({ ai }),
+    );
+  }
+  expect(scriptedSeconds({ ai: true })).toBeGreaterThan(SCRIPT_SECONDS);
+});
 
 test("the benchmark probe owns worker and scout replacements too", () => {
   const simulation = createSessionSimulation(
@@ -158,8 +183,8 @@ test(
     // Only orders to scouts lost in combat may fail.
     expect(rejected.filter((reason) => !reason.startsWith("move"))).toEqual([]);
     for (const sample of population.slice(1)) {
-      expect(sample.units).toBeGreaterThanOrEqual(units * 0.85);
-      expect(sample.units).toBeLessThanOrEqual(units);
+      expect(sample.units).toBeGreaterThanOrEqual(units * HELD_UNITS.min);
+      expect(sample.units).toBeLessThanOrEqual(units * HELD_UNITS.max);
     }
   },
 );
@@ -236,4 +261,29 @@ test("benchmark reports reject empty runs and use nearest-rank percentiles", () 
     buildingsMin: 40,
     buildingsMax: 40,
   });
+});
+
+test("rendered benchmarks reject a sample below the workload's unit floor", () => {
+  const { units, buildings } = WORKLOADS.normal;
+  const sample: PopulationSample = { tick: 300, units, buildings };
+  const measured = {
+    frames: [16, 17],
+    record: {
+      ticks: [2, 3],
+      population: [{ ...sample, tick: 0 }, sample],
+      rejected: [],
+      attacks: 1,
+      gatheredMaterials: 1,
+      deliveredMaterials: 1,
+    },
+    simulationSeconds: 70,
+    elapsed: 60_000,
+    renderer: "test",
+    buffer: "1920x1080",
+  };
+  const problems = () =>
+    frameResultProblems(frameResult("test", "normal", 1, measured));
+  expect(problems()).toEqual([]);
+  sample.units = units * HELD_UNITS.min - 1;
+  expect(problems()).toEqual(["did not hold the target population"]);
 });

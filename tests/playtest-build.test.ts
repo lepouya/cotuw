@@ -105,7 +105,10 @@ test("publishes a complete clean bundle with reproducible hashes without changin
   const manifest = await preparePlaytest(root);
   expect(build).toHaveBeenCalledWith(
     expect.objectContaining({
-      define: { "import.meta.env.COTUW_BENCHMARK": false },
+      define: {
+        "import.meta.env.COTUW_BENCHMARK": false,
+        "import.meta.env.COTUW_BENCHMARK_SERVER": JSON.stringify(""),
+      },
     }),
   );
   expect(manifest.formatVersion).toBe(2);

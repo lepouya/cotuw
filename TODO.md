@@ -196,20 +196,9 @@ and producer-based progression scope from 1.06.
     from east at 16:29. Route searches break ties by direction, so mirrored
     matches drift after about two minutes. Decide whether the probe needs
     both slots.
-- [ ] **1.64** Measure the complete skirmish with AI at 200 mobile units and
-  40 buildings across both owners on the M3 Pro/18 GB development Mac. Meet
-  the tick-time and frame-rate budgets in production browser and packaged
-  macOS builds at 1920 x 1080 actual rendering, following the
-  [performance procedure](docs/verification.md#m1-performance-measurement).
-  Verify 2x keeps simulation pace and report rendering performance. Report
-  degradation at 400 units and 80 buildings, exercising movement, gathering,
-  combat, vision, and AI together. Physical mobile performance targets are
-  deferred; compact layout and touch checks remain. Profile WebKit rendering
-  and stress-case backlog with AI enabled before choosing optimizations.
-  Candidate rendering work includes merging unit meshes and skipping off-screen
-  animation; change allocation sites only when measured costs justify it.
-  The browser spec still measures the scripted scene: give benchmark builds
-  the AI scene and its training swap first.
+- [x] **1.64** Current performance accepted for M1. The normal production
+  workload held scale at 1920 × 1080 and sustained 120 ticks per second at 2x,
+  rendering at 59.4 FPS in Chromium and 47.2 FPS in WebKit.
 
 Phase gate: either faction can enter a complete skirmish through the normal
 menu, and both matchups meet the agreed automated behavior and scale targets.

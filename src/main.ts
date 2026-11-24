@@ -102,3 +102,8 @@ void app.initialize({
   level: link.get("level") ?? undefined,
   skirmish: skirmishLink(link),
 });
+// Packaged benchmark builds take their cases from the host script.
+if (import.meta.env.COTUW_BENCHMARK && import.meta.env.COTUW_BENCHMARK_SERVER)
+  void import("./benchmark-runner").then(({ runBenchmarkCase }) =>
+    runBenchmarkCase(import.meta.env.COTUW_BENCHMARK_SERVER, app, canvas),
+  );

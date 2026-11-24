@@ -72,7 +72,10 @@ export async function preparePlaytest(
     // Bundle normal gameplay even when the organizer runs benchmarks locally.
     await build({
       root,
-      define: { "import.meta.env.COTUW_BENCHMARK": false },
+      define: {
+        "import.meta.env.COTUW_BENCHMARK": false,
+        "import.meta.env.COTUW_BENCHMARK_SERVER": JSON.stringify(""),
+      },
       build: { outDir: join(bundle, "site"), emptyOutDir: true },
     });
     await writeFile(join(bundle, "site/.nojekyll"), "");

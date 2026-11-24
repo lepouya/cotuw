@@ -532,6 +532,8 @@ export function createApplication({
     cancelLoad,
     listSaves: () => requireServices().library.list(),
     removeSave: (id: string) => requireServices().library.remove(id),
+    /** Starts a mission file's text, as importing it would. */
+    loadSource: (source: string) => loadFrom(async () => source),
     load: (id?: string) => {
       const { platform, library } = requireServices();
       return loadFrom(() =>

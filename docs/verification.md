@@ -254,9 +254,12 @@ planned M1 acceptance checks; current M0 browser checks do not establish them.
 
 `npm run benchmark -- [normal|stress] [--no-ai]` runs an ARC mirror headlessly
 and reports tick-time percentiles, rejected orders, and population samples.
-Scenes start at the named scale, and a probe orders replacements for combat
-losses. Replacements count toward the target while they train; reports give
-the actual fielded population throughout measurement.
+Scenes start at the named scale with combat units, Harvesters, scouts, Medics,
+and Mechanics. A probe orders Troopers to replace losses. Queued replacements
+count toward the target, and each owner orders one more for every unit it lost
+within the last training time, so the fielded population averages near the
+target and can run up to 10% over it after a lull in combat. Reports give the fielded population throughout
+measurement.
 
 - By default both owners play the `arc-skirmish` profile with the probe
   handling training and authored buildings setting the scale. The AI directs
@@ -264,7 +267,7 @@ the actual fielded population throughout measurement.
   active alongside AI orders. The scene is played a
   minute past the profile's opening grace, saved, and loaded before measuring.
   A run without measured combat, a full measurement window, the target
-  building count, or at least 85% of its target units fails. The report adds
+  building count, or 85% to 110% of its target units fails. The report adds
   each AI's posture time, operations, issued and refused commands, and the
   [match audit](#m1-headless-acceptance).
 - `--no-ai` measures the scripted scene instead, where orders to scouts lost
@@ -280,16 +283,39 @@ COTUW_BENCHMARK=1 npx playwright test e2e/benchmark.spec.ts --repeat-each=3
 ```
 
 Each case prints and saves its results as `.checks/benchmark-*.json`, including
-the game's WebGL renderer, so a software fallback is visible. Cases check scene
-integrity; judge the budgets from the reported timings and population. A
-sustained `ticksPerSecond` below 60 times the speed means the simulation is
-falling behind. Only builds made with `COTUW_BENCHMARK` set expose the session
-the collector needs, so run this spec alone. Playwright's WebKit stands in for
-the packaged app until 1.64 measures it directly.
+the game's WebGL renderer, so a software fallback is visible. Cases require
+the target building count and 85% to 110% of target units in each population
+sample. Judge the budgets from the reported timings. A positive
+`tickShortfall` reports how many ticks the run fell behind during measurement.
+Only builds made with `COTUW_BENCHMARK` set expose the hooks the collector
+needs, so run this spec alone.
+
+`npm run benchmark:packaged` measures the packaged macOS app the same way,
+three times per workload and speed. It builds a release app with
+`COTUW_BENCHMARK` and `COTUW_BENCHMARK_SERVER` set, a separate app name and
+bundle identifier, a fixed 16:9 canvas scaled to a 1920 x 1080 buffer, and a
+policy that lets the page reach the script. The script serves each case to
+the app, which loads it, measures, posts the result, and reloads. Reports in
+`.checks/benchmark-macos-app-*.json` include the macOS version. Keep the
+window uncovered, since hidden windows throttle frames.
 `npm run benchmark -- normal --write <file>` writes the AI scene's saved
 mission for loading by hand, or with `--no-ai` the scripted tick-0 scene.
-Without the probe, neither replaces losses, and the hand-loaded AI trains with
-its full profile. The browser spec measures the scripted scene until 1.64.
+Without the probe, neither replaces losses. The browser spec measures the AI
+scene. Benchmark builds give missions with the benchmark scenario ID the same
+training and placement block the headless run uses, so the probe alone holds
+the scale; other builds play a hand-loaded scene with the full profile.
+
+To attribute frame time, profile the same AI scene by rendering phase:
+
+```sh
+COTUW_BENCHMARK=1 COTUW_PROFILE=1 npx playwright test e2e/render-profile.spec.ts
+```
+
+`COTUW_PROFILE_VARIANTS` adds comma-separated variants to compare with
+`baseline`: `no-shadows`, `no-animation`, `no-skeletons`, `no-particles`, and
+`half-resolution`. Each case saves `.checks/profile-<browser>-<variant>.json`
+with CPU timings for the engine frame, scene render, active-mesh selection,
+draw, animation, and render targets, plus mesh counts by name prefix.
 
 ## Mission flow
 

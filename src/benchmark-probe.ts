@@ -2,9 +2,37 @@
 // Only the headless runner and COTUW_BENCHMARK builds use it.
 import { PRODUCTION_QUEUE_LIMIT } from "./simulation/production";
 import { compareIds } from "./simulation/actor";
+import { BUILT_IN_AI_CONCERNS } from "./simulation/ai-concerns";
 
 import type { CommandOutcome } from "./simulation/command";
+import type { AiConcern, AiConcernContext } from "./simulation/director";
 import type { MissionSimulation } from "./simulation/mission";
+
+/** Benchmark builds give missions with this scenario ID the benchmark AI. */
+export const BENCHMARK_SCENARIO_ID = "benchmark";
+
+/**
+ * The probe alone trains replacements, and the AI places no buildings, so
+ * neither recruitment nor expansion moves the scene off its scale. Other
+ * concern commands still run.
+ */
+export const BENCHMARK_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map<
+  string,
+  AiConcern
+>(
+  [...BUILT_IN_AI_CONCERNS].map(([id, concern]) => [
+    id,
+    Object.assign((context: AiConcernContext) => {
+      concern({
+        ...context,
+        issue: (command) =>
+          command.kind !== "train-unit" &&
+          command.kind !== "place-actor" &&
+          context.issue(command),
+      });
+    }, concern),
+  ]),
+);
 
 export type BenchmarkScale = { units: number; buildings: number };
 
@@ -16,8 +44,14 @@ export type PopulationSample = {
 
 export type BenchmarkProbeOptions = {
   scale: BenchmarkScale;
+  /** Caps fielded and queued units together. */
+  maxUnits: number;
   /** Each owner trains this unit at these producers to replace losses. */
-  reinforcement: { definitionId: string; producerDefinitionId: string };
+  reinforcement: {
+    definitionId: string;
+    producerDefinitionId: string;
+    trainingTicks: number;
+  };
   sampleTicks: number;
   /** A monotonic millisecond clock. */
   now: () => number;
@@ -42,12 +76,13 @@ export type BenchmarkProbe = {
 
 /**
  * Observes every tick. After each one, each owner orders replacements until
- * its units and queued training reach its share of the target. The orders
- * depend only on simulation state, so runs stay reproducible.
+ * its units and queued training reach its share of the target, plus its
+ * losses within one training time. The orders depend only on simulation
+ * state, so runs stay reproducible.
  */
 export function attachBenchmarkProbe(
   simulation: MissionSimulation,
-  { scale, reinforcement, sampleTicks, now }: BenchmarkProbeOptions,
+  { scale, maxUnits, reinforcement, sampleTicks, now }: BenchmarkProbeOptions,
 ): BenchmarkProbe {
   // Each owner with producers holds an equal share of the units.
   const owners = [
@@ -61,6 +96,7 @@ export function attachBenchmarkProbe(
     ),
   ].sort(compareIds);
   const share = scale.units / owners.length;
+  const ceiling = Math.floor(maxUnits / owners.length);
   const delivered = () =>
     (simulation.economy?.deposited ?? []).reduce(
       (total, { amount }) => total + amount,
@@ -83,23 +119,38 @@ export function attachBenchmarkProbe(
   let startDelivered = 0;
   let startRemaining = 0;
 
-  const sample = () => {
+  const populationSample = (): PopulationSample => {
     const buildings = simulation.actors.filter(
       (actor) => actor.tilePlacement,
     ).length;
-    record.population.push({
+    return {
       tick: simulation.completedTicks,
       units: simulation.actors.length - buildings,
       buildings,
-    });
+    };
   };
+
+  // Each owner's fielded units after the last tick, and the ticks it lost
+  // units on, so training keeps pace with losses.
+  const fielded = new Map(owners.map((owner) => [owner, new Set<string>()]));
+  const losses = new Map(owners.map((owner) => [owner, [] as number[]]));
 
   const reinforce = () => {
     const queued = new Map<string, number>();
     for (const { producerId } of simulation.economy?.production ?? [])
       queued.set(producerId, (queued.get(producerId) ?? 0) + 1);
+    const tick = simulation.completedTicks;
     for (const owner of owners) {
       const owned = simulation.actors.filter((actor) => actor.owner === owner);
+      const units = new Set(
+        owned.filter((actor) => !actor.tilePlacement).map(({ id }) => id),
+      );
+      const lost = losses.get(owner)!;
+      for (const id of fielded.get(owner)!) if (!units.has(id)) lost.push(tick);
+      fielded.set(owner, units);
+      // Recent losses predict those during the next training time.
+      while (lost.length && lost[0]! <= tick - reinforcement.trainingTicks)
+        lost.shift();
       const producers = owned
         .filter(
           (actor) =>
@@ -113,7 +164,7 @@ export function attachBenchmarkProbe(
         0,
       );
       let deficit =
-        share - owned.filter((actor) => !actor.tilePlacement).length - training;
+        Math.min(share + lost.length, ceiling) - units.size - training;
       while (deficit > 0) {
         // The shortest queue, then the lowest ID, keeps the choice stable.
         const producerId = producers.reduce<string | undefined>(
@@ -153,11 +204,12 @@ export function attachBenchmarkProbe(
       if (measuring) {
         record.ticks.push(now() - started);
         record.attacks += simulation.attacks.length;
-        if (record.ticks.length % sampleTicks === 0) sample();
+        if (record.ticks.length % sampleTicks === 0)
+          record.population.push(populationSample());
       }
       for (const outcome of outcomes)
         if (!outcome.accepted) record.rejected.push(rejection(outcome));
-      reinforce();
+      if (!simulation.result) reinforce();
     },
   });
 
@@ -166,13 +218,21 @@ export function attachBenchmarkProbe(
       measuring = true;
       startDelivered = delivered();
       startRemaining = remaining();
-      sample();
+      record.population.push(populationSample());
     },
-    record: () => ({
-      ...record,
-      gatheredMaterials: startRemaining - remaining(),
-      deliveredMaterials: delivered() - startDelivered,
-    }),
+    record: () => {
+      const population = record.population;
+      return {
+        ...record,
+        population:
+          measuring &&
+          population[population.length - 1]?.tick !== simulation.completedTicks
+            ? [...population, populationSample()]
+            : [...population],
+        gatheredMaterials: startRemaining - remaining(),
+        deliveredMaterials: delivered() - startDelivered,
+      };
+    },
     detach,
   };
 }

@@ -8,6 +8,10 @@ export default defineConfig({
   base: "./",
   define: {
     "import.meta.env.COTUW_BENCHMARK": !!process.env.COTUW_BENCHMARK,
+    // The host that serves packaged benchmark cases; empty elsewhere.
+    "import.meta.env.COTUW_BENCHMARK_SERVER": JSON.stringify(
+      process.env.COTUW_BENCHMARK_SERVER ?? "",
+    ),
   },
   // Keep Rust build errors visible during `tauri dev`.
   clearScreen: false,

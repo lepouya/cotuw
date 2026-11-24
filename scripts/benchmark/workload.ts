@@ -1,5 +1,5 @@
 // A scripted two-owner mission for the M1 benchmark workloads.
-import { contentPack } from "../../src/content/packs.ts";
+import { contentPack, currentContentPack } from "../../src/content/packs.ts";
 import {
   createSkirmishScenario,
   SKIRMISH_OPENINGS,
@@ -12,15 +12,22 @@ import {
   createSessionSimulation,
   loadMission,
 } from "../../src/mission-loading.ts";
-import { BUILT_IN_AI_CONCERNS } from "../../src/simulation/ai-concerns.ts";
-import { SIMULATION_TICK_SECONDS } from "../../src/simulation/clock.ts";
+import {
+  secondsToTicks,
+  SIMULATION_TICK_SECONDS,
+} from "../../src/simulation/clock.ts";
+import { tileKey } from "../../src/simulation/grid.ts";
 import { serializeMission } from "../../src/simulation/mission-file.ts";
 import {
   createScenarioMap,
   createScenarioState,
   defineScenario,
 } from "../../src/simulation/scenario.ts";
-import { attachBenchmarkProbe } from "../../src/benchmark-probe.ts";
+import {
+  attachBenchmarkProbe,
+  BENCHMARK_AI_CONCERNS,
+  BENCHMARK_SCENARIO_ID,
+} from "../../src/benchmark-probe.ts";
 import { activityTracker, matchAudit } from "../ai-match/observers.ts";
 import {
   BENCHMARK_TIMING,
@@ -28,7 +35,11 @@ import {
   summarizeTimes,
 } from "./metrics.ts";
 
-import type { BenchmarkRecord } from "../../src/benchmark-probe.ts";
+import type {
+  BenchmarkRecord,
+  BenchmarkScale,
+} from "../../src/benchmark-probe.ts";
+import type { FrameMeasurement } from "../../src/benchmark-frames.ts";
 import type {
   MissionCommand,
   ScheduledCommand,
@@ -36,10 +47,6 @@ import type {
 import type { ActorDefinition } from "../../src/simulation/actor.ts";
 import type { TileCoord } from "../../src/simulation/grid.ts";
 import type { ScenarioUnit } from "../../src/simulation/scenario.ts";
-import type {
-  AiConcern,
-  AiConcernContext,
-} from "../../src/simulation/director.ts";
 import type { MissionSimulation } from "../../src/simulation/mission.ts";
 
 export const WORKLOADS = {
@@ -47,10 +54,29 @@ export const WORKLOADS = {
   stress: { units: 400, buildings: 80 },
 } as const;
 export type Workload = keyof typeof WORKLOADS;
+/**
+ * Fielded units a held scene keeps, as shares of its target. Units already in
+ * training finish after a lull in combat, so the scene can run over.
+ */
+export const HELD_UNITS = { min: 0.85, max: 1.1 } as const;
 
 const { warmupSeconds, measureSeconds, sampleSeconds } = BENCHMARK_TIMING;
 const ticksIn = (seconds: number) =>
   Math.round(seconds / SIMULATION_TICK_SECONDS);
+
+const holdsPopulation = (
+  {
+    unitsMin,
+    unitsMax,
+    buildingsMin,
+    buildingsMax,
+  }: ReturnType<typeof summarizePopulation>,
+  { units, buildings }: BenchmarkScale,
+) =>
+  unitsMin >= units * HELD_UNITS.min &&
+  unitsMax <= units * HELD_UNITS.max &&
+  buildingsMin === buildings &&
+  buildingsMax === buildings;
 
 // Allow setup time before the browser starts its warm-up and 2x measurement.
 export const SCRIPT_SECONDS = 2 * (warmupSeconds + measureSeconds) + 30;
@@ -64,6 +90,8 @@ const REINFORCEMENT = {
   producerDefinitionId: "arc-field-barracks",
 } as const;
 const SCOUT_SHARE = 0.1;
+// Support units add service load and keep most shuttlers out of the fight.
+const SUPPORT_SHARE = 0.3;
 // A small front keeps combat active without emptying most of the scene.
 const FIGHTER_SHARE = 0.1;
 // Each refinery serves one Harvester.
@@ -77,28 +105,15 @@ const RALLY_TICK = ticksIn(15);
 const AI_PROFILE_ID = "arc-skirmish";
 /** Play past the opening grace by this much before measuring the AI. */
 const AI_ENGAGED_SECONDS = 60;
-/**
- * The probe alone trains replacements, and the AI places no buildings, so
- * neither recruitment nor expansion moves the scene off its scale. Other
- * concern commands still run.
- */
-export const BENCHMARK_AI_CONCERNS: ReadonlyMap<string, AiConcern> = new Map<
-  string,
-  AiConcern
->(
-  [...BUILT_IN_AI_CONCERNS].map(([id, concern]) => [
-    id,
-    Object.assign((context: AiConcernContext) => {
-      concern({
-        ...context,
-        issue: (command) =>
-          command.kind !== "train-unit" &&
-          command.kind !== "place-actor" &&
-          context.issue(command),
-      });
-    }, concern),
-  ]),
-);
+
+/** When the AI scene's measured play starts: a minute past the grace. */
+const engagedSeconds = () =>
+  currentContentPack("base").aiProfiles!.find(({ id }) => id === AI_PROFILE_ID)!
+    .tuning.offense.graceSeconds + AI_ENGAGED_SECONDS;
+
+/** Simulation seconds the scene's scripted orders cover from tick 0. */
+export const scriptedSeconds = ({ ai = false }: BenchmarkOptions = {}) =>
+  (ai ? engagedSeconds() : 0) + SCRIPT_SECONDS;
 
 export type BenchmarkOptions = {
   /** Both owners' AI runs alongside the scripted load. */
@@ -129,7 +144,6 @@ const footprintTiles = (
   return tiles;
 };
 
-const tileKey = ({ x, z }: TileCoord) => `${x},${z}`;
 const crossingCenter = (id: string): TileCoord => {
   const crossing = SKIRMISH_CROSSINGS.find((each) => each.id === id)!;
   return { x: LAST >> 1, z: (crossing.minZ + crossing.maxZ) >> 1 };
@@ -222,11 +236,7 @@ export function createBenchmarkMission(
   });
   const content = contentPack(base.content!);
   const definitions = content.actors;
-  const openingSeconds = ai
-    ? content.aiProfiles!.find(({ id }) => id === AI_PROFILE_ID)!.tuning.offense
-        .graceSeconds + AI_ENGAGED_SECONDS
-    : 0;
-  const scriptSeconds = openingSeconds + SCRIPT_SECONDS;
+  const scriptSeconds = scriptedSeconds({ ai });
   const definition = (id: string) =>
     definitions.find((each) => each.id === id)!;
   const refinery = definition("arc-materials-refinery");
@@ -278,10 +288,14 @@ export function createBenchmarkMission(
     });
     const harvesters = refineries;
     const scouts = Math.round(tiles.units.length * SCOUT_SHARE);
+    const supportStart =
+      tiles.units.length - Math.round(tiles.units.length * SUPPORT_SHARE);
     const unitIds = tiles.units.map((tile, index) => {
       let role = "trooper";
       if (index < scouts) role = "scout";
       else if (index < scouts + harvesters) role = "harvester";
+      else if (index >= supportStart)
+        role = index % 2 === 0 ? "medic" : "mechanic";
       const actorId = `${owner}-${role}-${index}`;
       authoredUnits.push({
         actorId,
@@ -311,12 +325,12 @@ export function createBenchmarkMission(
       });
     });
 
-    const troopers = unitIds.slice(scouts + harvesters);
+    const troopers = unitIds.slice(scouts + harvesters, supportStart);
     const fighters = troopers.slice(
       0,
       Math.max(1, Math.round(troopers.length * FIGHTER_SHARE)),
     );
-    const shuttlers = troopers.slice(fighters.length);
+    const shuttlers = unitIds.slice(scouts + harvesters + fighters.length);
     schedule(1, owner, {
       kind: "group-attack-move",
       actorIds: fighters,
@@ -346,6 +360,7 @@ export function createBenchmarkMission(
 
   const scenario = defineScenario({
     ...base,
+    id: BENCHMARK_SCENARIO_ID,
     name: `Benchmark ${workload}`,
     savePolicy: undefined,
     ...(ai && {
@@ -371,7 +386,16 @@ export function createBenchmarkMission(
 /** Serializable probe options; each caller supplies its own clock. */
 export const probeOptions = (workload: Workload) => ({
   scale: WORKLOADS[workload],
-  reinforcement: REINFORCEMENT,
+  maxUnits: Math.floor(WORKLOADS[workload].units * HELD_UNITS.max),
+  reinforcement: {
+    ...REINFORCEMENT,
+    trainingTicks: secondsToTicks(
+      currentContentPack("base").actors.find(
+        ({ id }) => id === REINFORCEMENT.definitionId,
+      )!.trainingSeconds,
+      SIMULATION_TICK_SECONDS,
+    ),
+  },
   sampleTicks: ticksIn(sampleSeconds),
 });
 
@@ -398,20 +422,13 @@ function playHeld(
  */
 export function createEngagedAiMission(workload: Workload): string {
   const mission = loadMission(createBenchmarkMission(workload, { ai: true }));
-  const profile = mission.content.aiProfiles!.find(
-    ({ id }) => id === AI_PROFILE_ID,
-  )!;
   const simulation = createSessionSimulation(
     mission,
     undefined,
     BENCHMARK_AI_CONCERNS,
   );
   try {
-    playHeld(
-      simulation,
-      workload,
-      ticksIn(profile.tuning.offense.graceSeconds + AI_ENGAGED_SECONDS),
-    );
+    playHeld(simulation, workload, ticksIn(engagedSeconds()));
     return serializeMission(
       mission.scenario,
       simulation.snapshot(),
@@ -453,19 +470,11 @@ export function measureWorkload(
     const record = probe.record();
     if (ai && !record.attacks)
       throw new Error("The AI benchmark must include combat while measuring.");
-    if (
-      ai &&
-      (record.ticks.length !== ticksIn(measureSeconds) ||
-        record.population.some(
-          ({ units, buildings }) =>
-            units < WORKLOADS[workload].units * 0.85 ||
-            units > WORKLOADS[workload].units ||
-            buildings !== WORKLOADS[workload].buildings,
-        ))
-    )
+    const summary = summarizeRecord(workload, record);
+    if (ai && !holdsPopulation(summary.population, WORKLOADS[workload]))
       throw new Error("The AI benchmark did not hold its measured scale.");
     return {
-      ...summarizeRecord(workload, record),
+      ...summary,
       ...(ai && {
         ai: {
           owners: Object.fromEntries(
@@ -498,4 +507,48 @@ export function summarizeRecord(workload: Workload, record: BenchmarkRecord) {
       deliveredMaterials: record.deliveredMaterials,
     },
   };
+}
+
+/** One rendered run's report; `runtime` names the browser or packaged app. */
+export function frameResult(
+  runtime: string,
+  workload: Workload,
+  speed: number,
+  measured: FrameMeasurement,
+) {
+  const seconds = measured.elapsed / 1_000;
+  return {
+    runtime,
+    speed,
+    renderer: measured.renderer,
+    buffer: measured.buffer,
+    elapsedSeconds: seconds,
+    fps: measured.frames.length / seconds,
+    frames: summarizeTimes(measured.frames),
+    framesWithin20ms:
+      measured.frames.filter((time) => time <= 20).length /
+      measured.frames.length,
+    ...summarizeRecord(workload, measured.record),
+    scriptExhausted: measured.simulationSeconds > scriptedSeconds({ ai: true }),
+    ticksPerSecond: measured.record.ticks.length / seconds,
+    tickShortfall:
+      (seconds * speed) / SIMULATION_TICK_SECONDS -
+      measured.record.ticks.length,
+  };
+}
+
+/** Why a rendered run cannot stand as a measurement; empty when it can. */
+export function frameResultProblems(result: ReturnType<typeof frameResult>) {
+  return [
+    result.buffer !== "1920x1080" && `rendered ${result.buffer}`,
+    result.scriptExhausted && "outlasted its load script",
+    result.elapsedSeconds < measureSeconds &&
+      "ended before the full measurement window",
+    !holdsPopulation(result.population, result.targetPopulation) &&
+      "did not hold the target population",
+    result.activity.attacks === 0 && "had no combat",
+    result.activity.gatheredMaterials === 0 && "gathered nothing",
+    result.rejected.some((kind) => kind !== "move") &&
+      `rejected ${result.rejected.join(", ")}`,
+  ].filter((problem) => problem !== false);
 }

@@ -9,9 +9,16 @@ import {
   workersForSite,
 } from "./simulation/economy";
 import { factionResource } from "./simulation/resources";
-import { attachBenchmarkProbe } from "./benchmark-probe";
+import {
+  attachBenchmarkProbe,
+  BENCHMARK_AI_CONCERNS,
+  BENCHMARK_SCENARIO_ID,
+} from "./benchmark-probe";
+import { measureFrames } from "./benchmark-frames";
 import { resourceBalances } from "./simulation/stockpiles";
 import { createSessionSimulation, missionTerrain } from "./mission-loading";
+import type { BenchmarkProbe, BenchmarkProbeOptions } from "./benchmark-probe";
+import type { BenchmarkTiming, FrameMeasurement } from "./benchmark-frames";
 import type { LoadedMission } from "./mission-loading";
 import { createAttackMoveControls } from "./ui/attack-move-controls";
 import type { AttackMoveControls } from "./ui/attack-move-controls";
@@ -54,6 +61,7 @@ import { createFrameEffectsView } from "./render/frame-effects";
 import { WRECK_SECONDS, wreckTiles } from "./simulation/combat";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
 import { Color3, Vector3 } from "@babylonjs/core";
+import type { Scene } from "@babylonjs/core";
 import { TerrainMap } from "./map";
 import { createCommandInput } from "./render/command-input";
 import { createGameView } from "./render/game-view";
@@ -216,7 +224,18 @@ export type GameSessionControls = BuildingPlacementControls &
 declare global {
   /** Available only in COTUW_BENCHMARK builds. */
   var cotuwBenchmark:
-    | { session: GameSession; attachProbe: typeof attachBenchmarkProbe }
+    | {
+        prepare: (
+          speed: number,
+          options: Omit<BenchmarkProbeOptions, "now">,
+        ) => BenchmarkProbe;
+        measure: (
+          probe: BenchmarkProbe,
+          timing: BenchmarkTiming,
+        ) => Promise<FrameMeasurement>;
+        /** For frame-phase profiling. */
+        scene: Scene;
+      }
     | undefined;
 }
 
@@ -278,7 +297,15 @@ async function assembleGameSession(
     clips: content.clips,
     reducedMotion,
   });
-  const simulation = createSessionSimulation(mission, map);
+  const simulation = createSessionSimulation(
+    mission,
+    map,
+    // The benchmark AI scene holds its scale while the probe trains.
+    import.meta.env.COTUW_BENCHMARK &&
+      mission.scenario.id === BENCHMARK_SCENARIO_ID
+      ? BENCHMARK_AI_CONCERNS
+      : undefined,
+  );
   own(simulation);
   const presentationOf = (id: string) => content.presentation[id];
   const names = new Map(
@@ -1489,11 +1516,23 @@ async function assembleGameSession(
   try {
     if (import.meta.env.COTUW_BENCHMARK) {
       globalThis.cotuwBenchmark = {
-        session,
-        attachProbe: attachBenchmarkProbe,
+        prepare: (speed, options) => {
+          const probe = attachBenchmarkProbe(simulation, {
+            ...options,
+            now: () => performance.now(),
+          });
+          lifetime.defer(probe.detach);
+          session.setSpeed(speed);
+          session.focus(map.worldPoint(map.width / 2, map.height / 2, 0));
+          return probe;
+        },
+        measure: (probe, timing) =>
+          measureFrames(probe, simulation, canvas, timing),
+        scene: view.scene,
       };
+      const benchmark = globalThis.cotuwBenchmark;
       lifetime.defer(() => {
-        if (globalThis.cotuwBenchmark?.session === session)
+        if (globalThis.cotuwBenchmark === benchmark)
           globalThis.cotuwBenchmark = undefined;
       });
     }
