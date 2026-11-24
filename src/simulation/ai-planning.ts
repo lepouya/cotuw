@@ -251,7 +251,7 @@ function reservedTiles(context: AiConcernContext) {
 }
 
 /**
- * The turn of the owner's headquarters, or else its earliest building. New
+ * The turn of the owner's headquarters, or its first building by ID. New
  * buildings and their candidate order share it, so owners on rotated starts
  * place identically relative to their base.
  */

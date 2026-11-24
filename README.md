@@ -7,10 +7,9 @@ damaged world and encounters the elven Circle of Repose. Their struggle over
 its citadels and lost technology begins humanity's first contact and helps
 awaken the deathless Everwake, eventually requiring an uneasy alliance.
 
-The playable build contains ARC's M0 mission, a construction sandbox, and the
-Circle introduction. M1 targets an ARC-versus-Circle skirmish with a
-base-building AI opponent. Follow [TODO.md](TODO.md) for active tasks,
-dependencies, and progress.
+The playable build contains both factions' introductions, a construction
+sandbox, and ARC-versus-Circle skirmishes with a base-building AI opponent.
+Follow [TODO.md](TODO.md) for active tasks, dependencies, and progress.
 
 ## Play the prototype
 

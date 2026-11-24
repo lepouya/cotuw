@@ -171,11 +171,9 @@ and producer-based progression scope from 1.06.
     routes, landmarks, and defensible starts.
 - [x] **1.60** Mission setup launches either faction's introduction or
   skirmish at the selected difficulty. Restart preserves the skirmish setup.
-- [ ] **1.61** Verify [result rules](DESIGN.md#m1-skirmish-results) in
-  complete matches. Cover same-tick draws, frozen inspection, named/quick
-  saves, loaded results, and restart preserving launch choices. Verify a result
-  on an autosave boundary preserves the pre-result Autosave. Reuse the phase B
-  result and persistence implementation.
+- [x] **1.61** [Result rules](DESIGN.md#m1-skirmish-results) hold in complete
+  matches, frozen inspection, named and quick saves, loaded results, restart,
+  and the pre-result Autosave.
 - [x] **1.62** The [match summary](DESIGN.md#m1-match-summary) presents both
   owners' milestones, totals, peaks, and histories after the result. Headless
   reports retain both histories and share the results panel's Overview.

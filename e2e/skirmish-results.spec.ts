@@ -1,11 +1,6 @@
 import { expect, test } from "./fixtures";
 import { MissionDriver } from "./mission-driver";
-import {
-  activate,
-  importMission,
-  openOpening,
-  quickSave,
-} from "./page-helpers";
+import { activate, importMission, quickSave } from "./page-helpers";
 import { forEachProfile, MOUSE_PROFILE, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
 import { cssColor } from "../src/color";
@@ -25,7 +20,7 @@ for (const kind of ["victory", "defeat", "draw"] as const)
         `owner-based ${kind} freezes play and survives save/load`,
         { tag: WEBKIT },
         async ({ page }) => {
-          await openOpening(page, touch);
+          await page.goto("/");
           const checkpoint = await page.evaluate(async (kind) => {
             const { level, placeBuildings, missionSource, simulateMission } =
               await import("/e2e/missions.ts");
@@ -195,8 +190,22 @@ for (const kind of ["victory", "defeat", "draw"] as const)
           await page.locator("#inspect-loaded-mission").click();
           await page.locator("#open-menu").click();
           await expect(page.locator("#game-menu-title")).toHaveText(title);
-          await page.keyboard.press("Escape");
+          // A named save of the finished match loads the same frozen result.
+          await page.locator("#save-mission").click();
+          await page.locator("#save-name").fill(`Finished ${kind}`);
+          await page.locator("#confirm-save").click();
+          await expect(page.locator("#save-mission")).toBeVisible();
+          await page.locator("#load-mission").click();
+          await page
+            .locator("#save-entries li", { hasText: `Finished ${kind}` })
+            .getByRole("button", { name: "Load" })
+            .click();
+          await expect(page.locator("#game-menu-title")).toHaveText(title);
+          await expect(summary).toBeVisible();
+          await expect(page.locator("#resume-mission")).toBeHidden();
+          await page.locator("#inspect-loaded-mission").click();
           await expect(page.locator("#game-menu")).not.toBeVisible();
+          await expect(page.locator("#pause-mission")).toBeDisabled();
         },
       );
     },

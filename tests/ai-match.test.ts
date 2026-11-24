@@ -8,6 +8,7 @@ import {
   passed,
   playMatch,
   runMatch,
+  skirmishCases,
 } from "../scripts/ai-match/runner";
 import * as observers from "../scripts/ai-match/observers";
 import { skirmishChoiceError } from "../src/content/skirmish";
@@ -25,6 +26,7 @@ import { DIFFICULTIES } from "../src/simulation/mission-setup";
 import { createScenarioMap } from "../src/simulation/scenario";
 
 import type { MatchCase, MatchRun } from "../scripts/ai-match/runner";
+import type { SkirmishFaction } from "../src/content/skirmish-map";
 import type { AiConcern } from "../src/simulation/director";
 
 /** Drops counters observed only during this segment of the match. */
@@ -57,6 +59,18 @@ const SHORT = 0.05;
 const shortCase = (id: string): MatchCase => ({
   ...ARC_MIRROR_CASES.find((matchCase) => matchCase.id === id)!,
   cutoffMinutes: SHORT,
+});
+
+test("case sets need a standard AI faction in every slot", () => {
+  expect(() => skirmishCases("arc-only", { west: "arc" })).toThrow(
+    "Slot east needs a faction with a standard AI.",
+  );
+  expect(() =>
+    skirmishCases("arc-wildlife", {
+      west: "arc",
+      east: "wildlife" as SkirmishFaction,
+    }),
+  ).toThrow("Slot east needs a faction with a standard AI.");
 });
 
 test("mirror cases cover both player slots at every difficulty", () => {
