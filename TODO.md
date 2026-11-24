@@ -8,8 +8,7 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phase F is complete. Phase G is next. Remaining cohort coverage for 1.02
-carries into 1.65.
+Phase G is active. Remaining cohort coverage for 1.02 carries into 1.65.
 
 ### Using this checklist
 
@@ -182,15 +181,26 @@ are accepted for Phase F.
 
 ### G. External feedback and milestone acceptance
 
-Use a distributable build and complete the feedback loop on a fixed revision.
+Complete the visual polish pass before building the external playtest bundle.
 Automated matches establish correctness; human play establishes clarity,
 challenge, pacing, and useful choices.
 
-- [ ] **1.65** Distribute the integrated build through the agreed channel and
-  run full skirmish playtests with both factions. Observe in-game onboarding,
-  time to key milestones, assistance, confusion, and abandonment; ask what
-  drove build, expansion, and combat choices. Revisit skirmish pacing with
-  this feedback.
+- [ ] **1.76** Polish models, textures, and scene presentation before 1.65.
+  Work through the [visual asset review](docs/visual-asset-review.md), which
+  orders assets by first encounter and frequency of use.
+  Review both faction starts and a representative battle at gameplay zoom.
+  Use the 1.57 feedback and the scene review to record the scoped assets and
+  scenes in the [ARC](DESIGN.md#m1-arc-presentation) and
+  [Circle](DESIGN.md#m1-circle-presentation) art direction. Verify that the
+  factions look distinct and that unit roles, owner colors, resource
+  sites, and buildable ground are clear in play. Review the introductions
+  where they share changed assets, run affected asset and browser checks,
+  and recheck normal-scale performance before building the cohort bundle.
+- [ ] **1.65** After 1.76, distribute the integrated build through the agreed
+  channel and run full skirmish playtests with both factions. Observe in-game
+  onboarding, time to key milestones, assistance, confusion, and abandonment;
+  ask what drove build, expansion, and combat choices. Revisit skirmish pacing
+  with this feedback.
   - Complete any remaining cohort coverage for 1.02. In ARC runs, check
     expansion and Relay Stations, layout, recovery and Mechanics, control
     groups, shortcuts, and idle-worker controls. Check whether repair under
@@ -205,12 +215,6 @@ challenge, pacing, and useful choices.
 - [ ] **1.67** Triage external findings into tasks, incorporate fixes, and
   retest affected paths. Resolve recurring progression blockers; give
   remaining findings an explicit priority and disposition.
-- [ ] **1.76** Improve model and graphics fidelity based on 1.57 feedback.
-  Before the integrated playtest, record the assets or scenes in scope in
-  [art direction](DESIGN.md#m1-circle-presentation) and defer the rest.
-  Finish the pass before fixed-revision verification in 1.69. Check visual
-  readability at gameplay zoom and repeat affected human and performance
-  checks for the changed scenes. Verify regenerated assets in 1.70.
 - [ ] **1.68** Complete regression coverage for actor ownership, resource
   isolation, command authority, information boundaries, recovery,
   cultivation, objectives, metrics, AI save/load, and clock-batching
