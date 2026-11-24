@@ -1949,6 +1949,13 @@ acceptance progress. The following sections define the selected scope.
 - Resource costs follow the common-resource scope below. Combat statistics
   and costs are refined through playable matches.
 
+### M1 ARC presentation
+
+- The Command Center is a low armored communications post with a raised
+  entrance, angled side armor, and a rotating roof array. Owner markings
+  sit on the roof, entrance canopy, side armor, and array tips so the
+  building reads from several camera angles.
+
 ### M1 Circle presentation
 
 - Use sculpted living architecture: deliberately grown arches, curved

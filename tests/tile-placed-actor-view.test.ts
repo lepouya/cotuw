@@ -449,10 +449,10 @@ test("offline buildings dim locally, stop machinery, and restore shared material
   const materialCount = scene.materials.length;
   views.update(actors, new Set(["building-0"]));
   const offline = scene.getMeshByName(
-    "tile-placed-actor-building-0-root-front-windows",
+    "tile-placed-actor-building-0-root-front-window-0",
   )!;
   const live = scene.getMeshByName(
-    "tile-placed-actor-building-1-root-front-windows",
+    "tile-placed-actor-building-1-root-front-window-0",
   )!;
   expect(offline.material).not.toBe(live.material);
   expect(
