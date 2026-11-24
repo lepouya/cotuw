@@ -35,7 +35,8 @@ which builds and mines. You do not need prior RTS experience.
 Play this first, whatever your RTS experience.
 
 Open the supplied main link as given, without a `?level=` parameter. Choose
-**New mission**, keep **Normal** difficulty, then choose **Circle of Repose**.
+**New mission**, select **Introduction**, **Circle of Repose**, and
+**Normal**, then choose **Start**.
 Play at your own pace, then continue in free play or move on.
 
 You start with a Heartgrove and 150 Lifebloom. Cultivators grow buildings by
@@ -66,8 +67,8 @@ after the Circle skirmish, play the ARC skirmish.
 
 Play this before the ARC skirmish if you have no or occasional RTS
 experience; otherwise skip it.
-Choose **New mission**, keep **Normal** difficulty, then choose **Anomaly
-Response Command**.
+Choose **New mission**, select **Introduction**, **Anomaly Response Command**,
+and **Normal**, then choose **Start**.
 
 ### ARC skirmish
 

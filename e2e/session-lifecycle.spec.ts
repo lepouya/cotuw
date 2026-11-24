@@ -53,7 +53,7 @@ test(
     );
     await page.goto("/");
     await page.locator("#new-mission").click();
-    await page.locator("#choose-arc").click();
+    await page.locator("#start-mission").click();
     await expect(page.locator("#new-mission")).toBeVisible();
     await expect(page.locator("#new-mission")).toBeEnabled();
     await expect(page.locator("#game-menu-status")).toContainText(
@@ -131,7 +131,7 @@ for (const action of ["exit-mission", "restart-mission"]) {
     );
     expect(await engineCount(page)).toBe(0);
     await page.locator("#new-mission").click();
-    await page.locator("#choose-arc").click();
+    await page.locator("#start-mission").click();
     await expect(page.locator("#explanation-title")).toHaveText(
       "Welcome, Commander",
     );

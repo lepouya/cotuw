@@ -1,6 +1,8 @@
 // Plays headless AI-versus-AI skirmish cases and reports their outcomes.
+import { STANDARD_AI_PROFILES } from "../../src/content/skirmish.ts";
 import { SKIRMISH_MAP } from "../../src/content/skirmish-map.ts";
 import { errorMessage } from "../../src/errors.ts";
+import { summarizeMatch, summaryLines } from "../../src/match-summary.ts";
 import { formatElapsed } from "../../src/format-time.ts";
 import {
   assembleSkirmish,
@@ -39,6 +41,7 @@ import type {
   OwnerMetrics,
 } from "../../src/simulation/match-metrics.ts";
 import type { Difficulty } from "../../src/simulation/mission-setup.ts";
+import type { MissionSimulation } from "../../src/simulation/mission.ts";
 import type { SkirmishResult } from "../../src/simulation/skirmish.ts";
 import type {
   Disruption,
@@ -64,12 +67,6 @@ export type MatchCase = {
   readonly resumeAtMinutes?: number;
 };
 
-/** The profile each faction's AI uses in baseline cases. */
-const STANDARD_PROFILES: Partial<Record<SkirmishFaction, string>> = {
-  arc: "arc-skirmish",
-  circle: "circle-skirmish",
-};
-
 /**
  * Every slot under its faction's standard AI, with each slot standing in for
  * the player at each difficulty. The player slot decides enemy scaling.
@@ -80,10 +77,10 @@ export function skirmishCases(
 ): MatchCase[] {
   const slots = SKIRMISH_MAP.starts.map(({ id }) => id);
   const ai = slots.map((owner) => {
-    const profileId = STANDARD_PROFILES[factions[owner]!];
-    if (!profileId)
-      throw new RangeError(`Faction ${factions[owner]} has no standard AI.`);
-    return { owner, profileId };
+    const faction = factions[owner];
+    if (!faction || !hasOwn(STANDARD_AI_PROFILES, faction))
+      throw new RangeError(`Slot ${owner} needs a faction with a standard AI.`);
+    return { owner, profileId: STANDARD_AI_PROFILES[faction] };
   });
   return slots.flatMap((playerSlot) =>
     DIFFICULTY_IDS.map((difficulty) => ({
@@ -176,11 +173,18 @@ export const CIRCLE_CONTINUATION_CASES: readonly MatchCase[] = [
   },
 ];
 
-/** Normal ARC-versus-Circle matches from each slot, checked for completion. */
-export const CROSS_FACTION_CASES: readonly MatchCase[] = [
-  normalWest(skirmishCases("arc-circle", { west: "arc", east: "circle" })),
-  normalWest(skirmishCases("circle-arc", { west: "circle", east: "arc" })),
-];
+/**
+ * The 12-case ARC-versus-Circle baseline: either player faction from either
+ * start at each difficulty. Easy and Hard also verify save/load continuation.
+ */
+export const BASELINE_CASES: readonly MatchCase[] = [
+  ...skirmishCases("arc-circle", { west: "arc", east: "circle" }),
+  ...skirmishCases("circle-arc", { west: "circle", east: "arc" }),
+].map((matchCase) =>
+  matchCase.choice.difficulty === "normal"
+    ? matchCase
+    : { ...matchCase, resumeAtMinutes: 6 },
+);
 
 /** Named case sets the command line runs; every set by default. */
 export const CASE_SETS: ReadonlyMap<string, readonly MatchCase[]> = new Map([
@@ -190,10 +194,10 @@ export const CASE_SETS: ReadonlyMap<string, readonly MatchCase[]> = new Map([
   ["circle-mirror", CIRCLE_MIRROR_CASES],
   ["circle-recovery", CIRCLE_RECOVERY_CASES],
   ["circle-continuation", CIRCLE_CONTINUATION_CASES],
-  ["cross-faction", CROSS_FACTION_CASES],
+  ["baseline", BASELINE_CASES],
 ]);
 
-export type OwnerReport = Omit<OwnerMetrics, "history"> & {
+export type OwnerReport = OwnerMetrics & {
   faction?: string;
   profileId?: string;
   /** The latest history sample; the final one when the match has a result. */
@@ -214,6 +218,8 @@ export type MatchReport = {
   ticks: number;
   seconds: number;
   owners: OwnerReport[];
+  /** The player-facing match summary as text. */
+  summary: string[];
   /** AI bookkeeping faults; any fails the case. */
   audit: string[];
   disruptions?: DisruptionReport[];
@@ -362,14 +368,7 @@ export function runMatch(
     });
   let resumed: SimulatedMatch;
   try {
-    resumed = simulateMatch(
-      id,
-      {
-        ...mission,
-        ...parseMission(saved.state, SIMULATION_TICK_SECONDS),
-      },
-      options,
-    );
+    resumed = simulateMatch(id, reopenMatch(mission, saved.state), options);
   } catch (error) {
     return preserveFailure({
       state: saved.state,
@@ -396,6 +395,14 @@ export function runMatch(
 }
 
 type SimulatedMatch = { report: MatchReport; state: string };
+
+const reopenMatch = (
+  mission: LoadedMission,
+  source: string,
+): LoadedMission => ({
+  ...mission,
+  ...parseMission(source, SIMULATION_TICK_SECONDS),
+});
 
 function segmentProblems(segment: string, report: MatchReport) {
   const problems = report.audit.map((problem) => `${segment}: ${problem}`);
@@ -484,25 +491,74 @@ function simulateMatch(
       cutoffTicks,
       ticks: state.tick,
       seconds: state.tick * simulation.tickSeconds,
-      owners: (state.metrics?.owners ?? []).map(
-        ({ owner, history, ...totals }): OwnerReport => ({
-          owner,
+      owners: (state.metrics?.owners ?? []).map((metrics): OwnerReport => {
+        const { owner, history } = metrics;
+        return {
+          ...metrics,
           faction: factions.get(owner),
           profileId: profiles.get(owner),
-          ...totals,
           latest: history[history.length - 1],
           ai: state.ai[owner] && aiDiagnostics(state.ai[owner]!),
           ...activity.report(owner),
-        }),
-      ),
+        };
+      }),
+      summary: state.metrics
+        ? summaryLines(
+            summarizeMatch(
+              state.metrics,
+              scenario.skirmish.owners.map((owner) => ({
+                owner,
+                label: `${owner} (${factions.get(owner)})`,
+              })),
+              simulation.tickSeconds,
+            ),
+          )
+        : [],
       audit: audit.problems(),
       ...(disruptions.length && { disruptions: losses.results() }),
     };
-    return {
-      report,
-      state: serializeMission(scenario, state, simulation.tickSeconds),
-    };
+    const serialized = serializeMission(
+      scenario,
+      state,
+      simulation.tickSeconds,
+    );
+    if (result) {
+      const problem = finishedSaveProblem(
+        mission,
+        serialized,
+        simulation,
+        aiConcerns,
+      );
+      if (problem) report.audit.push(problem);
+    }
+    return { report, state: serialized };
   } finally {
     simulation.dispose();
+  }
+}
+
+/** A finished save must load with its result and final summary intact. */
+function finishedSaveProblem(
+  mission: LoadedMission,
+  source: string,
+  completed: MissionSimulation,
+  aiConcerns: MatchOptions["aiConcerns"],
+) {
+  try {
+    const loaded = createSessionSimulation(
+      reopenMatch(mission, source),
+      undefined,
+      aiConcerns,
+    );
+    try {
+      if (JSON.stringify(loaded.result) !== JSON.stringify(completed.result))
+        return "finished save loaded a different result";
+      if (JSON.stringify(loaded.metrics) !== JSON.stringify(completed.metrics))
+        return "finished save loaded different match metrics";
+    } finally {
+      loaded.dispose();
+    }
+  } catch (error) {
+    return `finished save failed to load: ${errorMessage(error)}`;
   }
 }

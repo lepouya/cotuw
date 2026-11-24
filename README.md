@@ -15,8 +15,9 @@ dependencies, and progress.
 ## Play the prototype
 
 The title screen offers **New mission**, **Load**, **Options**, and **Exit**.
-New mission opens the wolf-den setup screen: choose Easy, Normal, or Hard, then
-ARC's introduction or the Circle's worker-tended introduction.
+New mission lets you choose Introduction or Skirmish, ARC or Circle, and Easy,
+Normal, or Hard. Introductions take you through each faction's wolf-den
+mission. Skirmish pits you against the other faction's AI from either start.
 Options provides audio controls and keyboard layout and rebinding. Preferences
 persist on this device. Leaving a mission through **Main menu** returns to the
 title screen. Exit closes the desktop app; browsers show a close-tab message.

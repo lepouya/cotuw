@@ -181,12 +181,16 @@ resumes toward the same limit. The sets are:
   the Normal mirror at 10:00 during a base assault and at 2:30 during Musterhall
   growth. The Cultivator-loss case saves at 6:06 while west has a replacement
   training and another travelling to work.
-- `cross-faction`: Normal ARC-versus-Circle matches with each faction in the
-  west slot, which must complete without faults or audit problems.
+- `baseline`: the 12 ARC-versus-Circle cases, with either player faction
+  from either start at Easy, Normal, and Hard under standard profiles. Each
+  must complete by the 30:00 cutoff without faults or audit problems. Easy
+  and Hard cases also save at 6:00 and require an identical resumed match.
+  Normal cases establish [pacing](../DESIGN.md#m1-pacing-and-acceptance).
 
 Reports in `.checks/ai-matches/<case>.json` give the revision, wall-clock and
 simulation time, status, result, effective scaling, and each owner's
-milestones, totals, latest sample, and AI diagnostics. Each AI owner also
+milestones, totals, sample history, and AI diagnostics, plus the player-facing
+Overview as text lines. Each AI owner also
 reports ticks per posture, accepted commands by kind and purchased definition,
 refused commands by kind and reason, and operations by kind:
 launches, first launch and advance ticks, and ends by outcome, including
@@ -222,7 +226,7 @@ Cultivator, Musterhall, and Sentinel build order. `rush` attacks from 8:00.
 `economic` and `turtle` build more workers and a Thornspire before attacking.
 The probe reports the result, milestones, peak army, and Cultivator and
 Sentinel losses. Every opening must win from both slots by 30:00. Use the
-probe with `cross-faction` to check balance changes against these openings.
+probe with `baseline` to check balance changes against these openings.
 
 Development links that assign AI, such as
 `?skirmish=arc-arc&ai=east:arc-skirmish`, also enable the AI overlay in dev

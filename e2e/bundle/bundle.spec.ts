@@ -229,6 +229,7 @@ for (const faction of FACTIONS) {
     const music = page.waitForResponse(`**/assets/audio/${faction.music}`);
     await page.locator("#new-mission").click();
     await page.locator(`#choose-${faction.id}`).click();
+    await page.locator("#start-mission").click();
     await expect(page.locator("#explanation")).toBeVisible();
     await awaitReady(page);
     await expectAudio(page, music);

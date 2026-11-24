@@ -27,7 +27,7 @@ const dialogs = createDialogs(byId("game-dialogs"), {
   focusWorld: () => canvas.focus({ preventScroll: true }),
   notify: notifications.message,
   cancelLoad: () => app.cancelLoad(),
-  start: (faction, difficulty) => app.startFaction(faction, difficulty),
+  start: (choice) => app.startMission(choice),
   restart: () => app.restart(),
   exitToTitle: () => app.returnToTitle(),
   showTitle: () => app.showTitle(),

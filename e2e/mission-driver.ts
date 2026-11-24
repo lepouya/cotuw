@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import {
   activate,
   expectTerrainReady,
+  launchIntroduction,
   minimapPoint,
   pressPoint,
   terrainPoint,
@@ -63,8 +64,7 @@ export class MissionDriver {
     faction = "arc",
   }: { dismissGuide?: boolean; faction?: "arc" | "circle" } = {}) {
     await this.goto("/");
-    await activate(this.page.locator("#new-mission"), this.touch);
-    await activate(this.page.locator(`#choose-${faction}`), this.touch);
+    await launchIntroduction(this.page, faction, this.touch);
     await expectTerrainReady(this.page);
     if (dismissGuide)
       await this.explanation(

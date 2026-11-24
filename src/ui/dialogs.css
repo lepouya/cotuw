@@ -12,6 +12,11 @@
 #explanation {
   max-width: min(24rem, 90vw);
 }
+
+#game-menu.result-menu {
+  width: min(44rem, 94vw);
+  max-width: 94vw;
+}
 #explanation p:not(.eyebrow) {
   line-height: 1.5;
 }

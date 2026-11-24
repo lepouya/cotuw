@@ -40,6 +40,23 @@ observations use the game time shown in the top bar.
 - Would you try another mission? Why?
 - If you played an earlier build, what felt better, worse, or no different?
 
+## Skirmish summary
+
+For skirmishes, copy the results panel's Overview for your column. Its
+milestones follow the [match summary](../DESIGN.md#m1-match-summary)
+definitions; write Not reached as shown.
+
+- First income:
+- Military production ready:
+- First combat unit:
+- First expansion income:
+- First engagement:
+- First base attack:
+- Resources gathered and spent:
+- Units produced and lost:
+- Buildings completed and lost:
+- Peak army size:
+
 ## Camera, map, and sound
 
 - Could you frame what you wanted near map edges and unexplored ground? Where

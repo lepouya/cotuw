@@ -1,5 +1,6 @@
 import { Vector3 } from "@babylonjs/core";
 
+import { cssColor } from "../color";
 import { cornerAlpha, layerSlot } from "../map";
 import { DEFAULT_ACTOR_COLOR } from "./actor";
 import { watchCanvasSize } from "./canvas-size";
@@ -621,8 +622,4 @@ function samePoints(a: ScreenPoint[], b: ScreenPoint[]): boolean {
     a.length === b.length &&
     a.every((point, index) => point.x === b[index].x && point.y === b[index].y)
   );
-}
-
-function cssColor([red, green, blue]: Rgb): string {
-  return `rgb(${red * 255} ${green * 255} ${blue * 255})`;
 }

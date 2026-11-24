@@ -105,6 +105,36 @@ export type SkirmishChoice = {
   readonly ai?: readonly AiAssignment[];
 };
 
+/** The AI profile each faction's opponent and headless stand-ins use. */
+export const STANDARD_AI_PROFILES = deepFreeze({
+  arc: "arc-skirmish",
+  circle: "circle-skirmish",
+} satisfies Record<SkirmishFaction, string>);
+
+/**
+ * The menu matchup: the player's faction at a random start slot against the
+ * other faction under its standard AI. `random` returns a value in [0, 1).
+ */
+export function menuSkirmish(
+  faction: SkirmishFaction,
+  difficulty: Difficulty,
+  random: () => number,
+  { starts }: SkirmishMap = SKIRMISH_MAP,
+): SkirmishChoice {
+  // M1 offers one matchup per faction: the first other faction.
+  const rival = (Object.keys(SKIRMISH_OPENINGS) as SkirmishFaction[]).find(
+    (other) => other !== faction,
+  )!;
+  const [first, second] = starts;
+  const [player, opponent] = random() < 0.5 ? [first, second] : [second, first];
+  return {
+    factions: { [player.id]: faction, [opponent.id]: rival },
+    playerSlot: player.id,
+    difficulty,
+    ai: [{ owner: opponent.id, profileId: STANDARD_AI_PROFILES[rival] }],
+  };
+}
+
 const isFaction = (faction: string): faction is SkirmishFaction =>
   hasOwn(SKIRMISH_OPENINGS, faction);
 

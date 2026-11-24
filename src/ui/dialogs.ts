@@ -4,16 +4,17 @@ import type { KeyboardPreferences } from "./keyboard-preferences";
 import { errorMessage } from "../errors";
 import { createAudioControls } from "./audio-controls";
 import { mountFeature } from "./dom";
+import { createMatchSummary } from "./match-summary";
 import { createMissionSetup } from "./mission-setup";
 import { createSavePanel } from "./save-panel";
 import markup from "./dialogs.html?raw";
 import "./dialogs.css";
 
-import type { Difficulty } from "../simulation/mission-setup";
+import type { MatchSummary } from "../match-summary";
 import type { ScenarioPopup } from "../simulation/mission-file";
 import type { AudioControlDevice } from "./audio-controls";
 import type { FeatureScope } from "./dom";
-import type { SetupFaction } from "./mission-setup";
+import type { MissionChoice } from "./mission-setup";
 import type { SaveOperations } from "./save-panel";
 
 export type MenuMode = "home" | "menu" | "loaded" | "result" | "quit";
@@ -23,6 +24,8 @@ export type MenuView = {
   description: string;
   continueLabel?: string;
   canInspect?: boolean;
+  /** A finished skirmish's summary, shown above the menu actions. */
+  summary?: MatchSummary;
   mission?: { saveName: string; canSave: boolean; canRestart: boolean };
 };
 
@@ -41,7 +44,7 @@ type DialogOptions = SaveOperations & {
   focusWorld: () => void;
   notify: (message: string) => void;
   cancelLoad: () => void;
-  start: (faction: SetupFaction, difficulty: Difficulty) => void;
+  start: (choice: MissionChoice) => void;
   restart: () => void;
   /** Releases the mission, then shows the title screen. */
   exitToTitle: () => Promise<void>;
@@ -117,6 +120,7 @@ function bindDialogs(
       back,
     }),
   );
+  const summary = lifetime.own(createMatchSummary(element("menu-summary")));
   const setupPanel = lifetime.own(
     createMissionSetup(element("setup-panel"), {
       start: options.start,
@@ -135,7 +139,10 @@ function bindDialogs(
   > = {
     actions: {
       content: actions,
-      focus: () => actions.querySelector("button:not([hidden]):not(:disabled)"),
+      focus: () =>
+        view?.summary
+          ? summary.selectedTab()
+          : actions.querySelector("button:not([hidden]):not(:disabled)"),
     },
     ...savePanel.panels,
     ...setupPanel.panels,
@@ -225,6 +232,7 @@ function bindDialogs(
     description.textContent =
       panels[next].description ?? view?.description ?? "";
     description.hidden = !description.textContent;
+    summary.content.hidden = next !== "actions" || !view?.summary;
     syncAvailability();
     focusPanel();
   };
@@ -364,6 +372,7 @@ function bindDialogs(
     resumeOnClose = guideBlocked = false;
     menuMission = undefined;
     view = undefined;
+    summary.show(undefined);
     opener = undefined;
     explanation.close();
     dialog.close();
@@ -408,6 +417,8 @@ function bindDialogs(
       resume.classList.toggle("primary-action", !!next.continueLabel);
       version.hidden = !!next.mission;
       dialog.classList.toggle("title-menu", !next.mission);
+      dialog.classList.toggle("result-menu", !!next.summary);
+      summary.show(next.summary);
       if (!dialog.open) dialog.showModal();
       showPanel("actions");
     },

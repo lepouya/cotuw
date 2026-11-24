@@ -1,6 +1,8 @@
 import type { KeyboardBindings } from "./ui/keyboard-preferences";
-import { factionName } from "./content/content-pack";
+import { cssColor } from "./color";
+import { factionName, ownerColors } from "./content/content-pack";
 import { LEVEL_SOURCES } from "./content/levels";
+import { menuSkirmish } from "./content/skirmish";
 import { errorMessage } from "./errors";
 import { formatElapsed } from "./format-time";
 import {
@@ -10,11 +12,12 @@ import {
   missionIncompatibility,
   missionRestart,
 } from "./mission-loading";
+import { summarizeMatch } from "./match-summary";
 import { createPlatform } from "./platform";
 import { createSaveRules } from "./save-policy";
 import { createSaveLibrary, saveCompleteMessage } from "./saves";
 import { SIMULATION_TICK_SECONDS } from "./simulation/clock";
-import { missionEnded } from "./simulation/mission-result";
+import { isSkirmishResult, missionEnded } from "./simulation/mission-result";
 import { DIFFICULTIES } from "./simulation/mission-setup";
 import { factionOf } from "./simulation/ownership";
 import { presentResult } from "./ui/mission-result";
@@ -31,13 +34,13 @@ import type { Difficulty } from "./simulation/mission-setup";
 import type { MissionResult } from "./simulation/mission-result";
 import type { CameraControls } from "./ui/camera-controls";
 import type { createDialogs, MenuMode, MenuView } from "./ui/dialogs";
-import type { SetupFaction } from "./ui/mission-setup";
+import type { MissionChoice } from "./ui/mission-setup";
 import type { createNotifications } from "./ui/notifications";
 import type { createTopBar } from "./ui/top-bar";
 
 type MenuText = Pick<
   MenuView,
-  "title" | "description" | "continueLabel" | "canInspect"
+  "title" | "description" | "continueLabel" | "canInspect" | "summary"
 >;
 
 /** Text for menus without a result; a continue label offers continuing play. */
@@ -51,8 +54,7 @@ const MENU_VIEWS: Record<Exclude<MenuMode, "result">, MenuText> = {
   },
   home: {
     title: "Citadels of the Unquiet World",
-    description:
-      "Choose your expedition, explore the frontier, and clear the wolves from the mountain den.",
+    description: "Lead ARC or the Circle of Repose on the frontier.",
   },
   quit: {
     title: "Thanks for playing",
@@ -60,7 +62,7 @@ const MENU_VIEWS: Record<Exclude<MenuMode, "result">, MenuText> = {
   },
 };
 
-const FACTION_LEVELS: Record<SetupFaction, string> = {
+const FACTION_LEVELS: Record<MissionChoice["faction"], string> = {
   arc: "arc-economy-opening",
   circle: "circle-wolf-den",
 };
@@ -202,7 +204,31 @@ export function createApplication({
       description: `${description} ${missionSummary()}.`,
       continueLabel,
       canInspect,
+      summary: isSkirmishResult(result) ? matchSummary() : undefined,
     });
+  }
+
+  /** The finished skirmish's summary, with the player's column first. */
+  function matchSummary() {
+    const simulation = session?.simulation;
+    const metrics = simulation?.metrics;
+    const rules = mission?.scenario.skirmish;
+    if (!metrics || !rules || !mission) return;
+    const player = simulation.playerOwner;
+    const opponent = rules.owners.find((owner) => owner !== player)!;
+    const colors = ownerColors(simulation.owners, mission.content.view);
+    return summarizeMatch(
+      metrics,
+      [
+        { owner: player, label: "You", color: cssColor(colors.get(player)!) },
+        {
+          owner: opponent,
+          label: "Opponent",
+          color: cssColor(colors.get(opponent)!),
+        },
+      ],
+      simulation.tickSeconds,
+    );
   }
 
   function openMenu() {
@@ -478,7 +504,11 @@ export function createApplication({
     ready: () => !!services,
     /** The same handle throughout a mission. */
     session: () => session,
-    startFaction: (faction: SetupFaction, difficulty: Difficulty) => {
+    startMission: ({ mode, faction, difficulty }: MissionChoice) => {
+      if (mode === "skirmish") {
+        startSkirmish(menuSkirmish(faction, difficulty, Math.random));
+        return;
+      }
       const level = FACTION_LEVELS[faction];
       // A level file loaded earlier must not replace the chosen introduction.
       levels.set(level, LEVEL_SOURCES.get(level)!);

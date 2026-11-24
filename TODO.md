@@ -8,7 +8,7 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phase E is complete. Phase F is next. Any remaining cohort coverage for 1.02
+Phase F is in progress. Any remaining cohort coverage for 1.02
 carries into 1.65.
 
 ### Using this checklist
@@ -30,6 +30,9 @@ carries into 1.65.
   accumulate playtest or implementation logs.
 - Tasks that depend on an optional scope choice implement only the agreed
   content. Record a deliberate deferral beside the affected task.
+- The game version is `0.<milestone>.<phase>`, numbering phases from A as 1.
+  Set it when a phase starts in `package.json`, `package-lock.json`, and
+  `src-tauri/Cargo.toml` with its `Cargo.lock` entry.
 
 ### A. Baseline and design decisions
 
@@ -162,34 +165,39 @@ and producer-based progression scope from 1.06.
 
 - [ ] **1.59** Finish the map with viable routes, expansion opportunities,
   scouting landmarks, and defensible starts for both player assignments.
-  Verify both factions' paid first income and restart from either slot. East
-  wins both Normal ARC mirror cases. Check whether the map or AI tie-breaking
-  gives east the advantage.
-- [ ] **1.60** Extend the demo setup screen to offer the complete Circle
-  introduction and skirmish launch. Preserve independent ARC/Circle and
-  Easy/Normal/Hard choices and access to ARC's introduction.
+  Verify both factions' paid first income and restart from either slot.
+  - Mirror openings now match move for move for about two minutes, and Easy
+    and Hard results follow the player slot. Remaining: map review for
+    routes, landmarks, and defensible starts.
+- [x] **1.60** Mission setup launches either faction's introduction or
+  skirmish at the selected difficulty. Restart preserves the skirmish setup.
 - [ ] **1.61** Verify [result rules](DESIGN.md#m1-skirmish-results) in
   complete matches. Cover same-tick draws, frozen inspection, named/quick
   saves, loaded results, and restart preserving launch choices. Verify a result
   on an autosave boundary preserves the pre-result Autosave. Reuse the phase B
   result and persistence implementation.
-- [ ] **1.62** Present the [match summary](DESIGN.md#m1-match-summary) in the
-  results panel and headless reports. Include exact milestones, totals, peaks,
-  and comparison histories for both owners. Keep opponent histories hidden
-  during play and use the same definitions in playtest reports. Add a
-  `MenuView` field and a panel in `ui/dialogs.ts`.
+- [x] **1.62** The [match summary](DESIGN.md#m1-match-summary) presents both
+  owners' milestones, totals, peaks, and histories after the result. Headless
+  reports retain both histories and share the results panel's Overview.
 - [ ] **1.63** Run the agreed headless profile/start-slot set for ARC versus
   Circle and Circle versus ARC: both player factions, both start positions,
   and Easy, Normal, and Hard, totaling 12 baseline cases. Use standard faction
   profiles. Tune pacing on Normal; verify scaling, results, and save/load on
   Easy and Hard. Require results by the 30-minute simulation cutoff; preserve
   unfinished cases for diagnosis. Test recovery and disruption separately.
-  - Normal ARC mirrors and cross-faction development cases finish below the
-    [15 to 25 minute target](DESIGN.md#m1-pacing-and-acceptance). Tune and
-    verify post-raid income recovery and counterattack pressure after early
-    Harvester losses.
-  - Compare Circle raid defense and income recovery from both starts during
-    full-match pacing tests.
+  - The `baseline` set completes with matching Easy and Hard continuations.
+    With 12-unit attacks and Circle force budgets of 3, each faction wins one
+    Normal cross-faction match, at 15:02 and 16:29. Normal mirrors finish at
+    15:09 for ARC and 13:17 for the Circle. Remaining: bring the Circle mirror
+    into the target and the first assaults, now at 10 to 13 minutes, toward 8
+    to 12.
+  - ARC opens on one Harvester for over four minutes. AI budgets cannot add a
+    second Refinery without pushing the Barracks and scout past 3:40, outside
+    the military window, so the ARC opening is unchanged.
+  - The `player:probe` `turtle` opening wins from west at 15:40 and loses
+    from east at 16:29. Route searches break ties by direction, so mirrored
+    matches drift after about two minutes. Decide whether the probe needs
+    both slots.
 - [ ] **1.64** Measure the complete skirmish with AI at 200 mobile units and
   40 buildings across both owners on the M3 Pro/18 GB development Mac. Meet
   the tick-time and frame-rate budgets in production browser and packaged

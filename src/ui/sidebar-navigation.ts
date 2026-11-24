@@ -1,14 +1,7 @@
 import { bindShortcutHint } from "./shortcut-hint";
 import { createButton, createElement as el } from "./dom";
+import { bindTabNavigation } from "./tab-navigation";
 import type { SidebarContext } from "./sidebar-context";
-
-/** Moves focus within the tab list, given the current index and tab count. */
-const TAB_MOVES = new Map<string, (index: number, count: number) => number>([
-  ["ArrowRight", (index, count) => (index + 1) % count],
-  ["ArrowLeft", (index, count) => (index + count - 1) % count],
-  ["Home", () => 0],
-  ["End", (_index, count) => count - 1],
-]);
 
 type SidebarPanels = {
   buildings: HTMLElement;
@@ -84,18 +77,11 @@ export function createSidebarNavigation(
       ),
     { signal },
   );
-  tabList.addEventListener(
-    "keydown",
-    (event) => {
-      const index = tabs.findIndex(({ button }) => button === event.target);
-      const move = TAB_MOVES.get(event.key);
-      if (index < 0 || !move) return;
-      event.preventDefault();
-      const next = tabs[move(index, tabs.length)]!;
-      show(next.panel);
-      next.button.focus();
-    },
-    { signal },
+  bindTabNavigation(
+    tabList,
+    tabs.map(({ button }) => button),
+    (index) => show(tabs[index]!.panel),
+    signal,
   );
   return {
     header: el(

@@ -1846,9 +1846,12 @@ acceptance progress. The following sections define the selected scope.
   Gifts and site placement shape the pace.
 - Losing the starting Heartgrove ends this mission in defeat. Victory permits
   free play; restart restores the authored opening.
-- New mission offers ARC's introduction or the Circle introduction, with
-  independent Easy/Normal/Hard choice defaulting to Normal. Development links
-  also support assembled skirmishes; normal-menu skirmish launch is pending.
+- New mission offers independent Mission (Introduction or Skirmish), Faction
+  (ARC or Circle), and Easy/Normal/Hard choices, defaulting to Introduction
+  and Normal. A skirmish places the player's faction against the other
+  faction under its standard AI profile. Launch picks the player's start slot
+  at random and records it in the launch choices, so restart keeps it.
+  Development links also assemble mirrors and chosen slots.
 - Owners, economies, headquarters queues, command authority, visibility, and
   persistence use the shared foundations. Faction AI and playtest acceptance
   remain in [TODO.md](TODO.md#e-circle-playable-loop-and-introduction).
@@ -2105,9 +2108,11 @@ acceptance progress. The following sections define the selected scope.
   under normal placement rules. Completion restores normal infrastructure
   operation. This exception applies to the M1 skirmish.
 - Victory, defeat, and draw end the M1 skirmish at its result tick and show
-  the match summary. The battlefield remains frozen for camera and selection
-  inspection. Offer Save, Restart, Load, and Main menu, without post-match free
-  play. Named saves and Quicksave remain available for every outcome.
+  the match summary in a tabbed results panel. Overview lists milestones,
+  totals, and peaks for both owners. Graphs compares their histories. The
+  battlefield remains frozen for camera and selection inspection. Offer Save,
+  Restart, Load, and Main menu, without post-match free play. Named saves and
+  Quicksave remain available for every outcome.
   The result and summary remain fixed. Loading a finished skirmish preserves
   that result; restarting begins a fresh match with the same setup.
 - M1 skirmishes autosave at match start and every five simulation minutes

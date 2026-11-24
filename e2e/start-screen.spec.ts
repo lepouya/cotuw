@@ -33,9 +33,9 @@ test("title controls work before the mission renderer loads", async ({
   await page.locator("#cancel-options").click();
   expect(rendererRequests).toBe(0);
   await page.locator("#new-mission").click();
-  await expect(page.locator("#choose-arc")).toBeFocused();
+  await expect(page.locator("#mission-introduction")).toBeFocused();
   expect(rendererRequests).toBe(0);
-  await page.locator("#choose-arc").click();
+  await page.locator("#start-mission").click();
   await expect(page.locator("#game-menu-status")).toContainText(
     "The mission could not start.",
   );
@@ -93,7 +93,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       expect(models).toEqual([]);
 
       await press("new-mission");
-      await expect(page.locator("#choose-arc")).toBeFocused();
+      await expect(page.locator("#mission-introduction")).toBeFocused();
       await expect(page.locator("#choose-circle")).toContainText(
         "Circle introduction. Grow a living base",
       );
@@ -104,7 +104,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       await press("cancel-mission-setup");
       await expect(page.locator("#new-mission")).toBeFocused();
       await press("new-mission");
-      await press("choose-arc");
+      await press("start-mission");
       await dismissExplanation(page, "Welcome, Commander", profile.touch);
       await expect(page.locator("#game-canvas")).toHaveAttribute(
         "data-models-ready",
@@ -172,7 +172,7 @@ test(
     await page.locator("#open-menu").click();
     await page.locator("#exit-mission").click();
     await page.locator("#new-mission").click();
-    await page.locator("#choose-arc").click();
+    await page.locator("#start-mission").click();
     await dismissExplanation(page, "Welcome, Commander");
     await expect(page.locator("#materials-counter")).toHaveText("150");
   },
@@ -203,12 +203,19 @@ test(
     await expect(page.locator("#game-menu")).toBeVisible();
     await expect(page.locator(".game-shell")).toBeHidden();
     await page.keyboard.press("Enter");
-    await expect(page.locator("#choose-arc")).toBeFocused();
+    await expect(page.locator("#mission-introduction")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.locator("#new-mission")).toBeFocused();
     await page.keyboard.press("Enter");
-    await page.keyboard.press(tab);
+    for (let step = 0; step < 3; step++) await page.keyboard.press(tab);
     await expect(page.locator("#choose-circle")).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#choose-circle")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    for (let step = 0; step < 4; step++) await page.keyboard.press(tab);
+    await expect(page.locator("#start-mission")).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#explanation-title")).toHaveText(
       "Welcome, Guide",
@@ -240,11 +247,43 @@ test(
       await width(".faction-choices"),
     );
     await page.locator("#choose-circle").click();
+    await page.locator("#start-mission").click();
     await dismissExplanation(page, "Welcome, Guide");
     await expect(page.locator("#game-canvas")).toHaveAttribute(
       "data-difficulty",
       "hard",
     );
+    expect(errors).toEqual([]);
+  },
+);
+
+test(
+  "the setup screen launches a skirmish against the other faction",
+  { tag: WEBKIT },
+  async ({ page }, info) => {
+    const errors = collectPageErrors(page, { console: true });
+    await page.goto("/");
+    await page.locator("#new-mission").click();
+    await page.locator("#mission-skirmish").click();
+    await expect(page.locator("#choose-circle")).toContainText(
+      "against an ARC base",
+    );
+    await page.locator("#choose-circle").click();
+    await page.locator("#difficulty-easy").click();
+    await attachScreenshot(page, info, "skirmish-setup");
+    await page.locator("#start-mission").click();
+    const canvas = page.locator("#game-canvas");
+    await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+    await expect(canvas).toHaveAttribute("data-difficulty", "easy");
+    await expect(page.locator("body")).toContainText("Lifebloom");
+    await page.locator("#tab-goals").click();
+    await expect(page.locator("#scenario-description")).toContainText(
+      "rally Sentinels near the workers",
+    );
+    await page.keyboard.press("Escape");
+    await page.locator("#restart-mission").click();
+    await expect(canvas).toHaveAttribute("data-terrain-ready", "true");
+    await expect(canvas).toHaveAttribute("data-difficulty", "easy");
     expect(errors).toEqual([]);
   },
 );

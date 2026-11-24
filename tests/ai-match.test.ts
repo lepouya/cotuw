@@ -4,11 +4,10 @@ import {
   ARC_MIRROR_CASES,
   CASE_SETS,
   CIRCLE_MIRROR_CASES,
-  CROSS_FACTION_CASES,
+  BASELINE_CASES,
   passed,
   playMatch,
   runMatch,
-  skirmishCases,
 } from "../scripts/ai-match/runner";
 import * as observers from "../scripts/ai-match/observers";
 import { skirmishChoiceError } from "../src/content/skirmish";
@@ -26,7 +25,6 @@ import { DIFFICULTIES } from "../src/simulation/mission-setup";
 import { createScenarioMap } from "../src/simulation/scenario";
 
 import type { MatchCase, MatchRun } from "../scripts/ai-match/runner";
-import type { SkirmishFaction } from "../src/content/skirmish-map";
 import type { AiConcern } from "../src/simulation/director";
 
 /** Drops counters observed only during this segment of the match. */
@@ -75,23 +73,27 @@ test("mirror cases cover both player slots at every difficulty", () => {
   );
   for (const { choice } of [...CASE_SETS.values()].flat())
     expect(skirmishChoiceError(choice)).toBeUndefined();
-  expect(CROSS_FACTION_CASES.map(({ choice }) => choice.factions)).toEqual([
-    { west: "arc", east: "circle" },
-    { west: "circle", east: "arc" },
-  ]);
+  expect(BASELINE_CASES).toHaveLength(12);
+  expect(
+    new Set(
+      BASELINE_CASES.map(({ choice }) =>
+        [
+          choice.factions[choice.playerSlot],
+          choice.playerSlot,
+          choice.difficulty,
+        ].join(),
+      ),
+    ).size,
+  ).toBe(12);
+  expect(BASELINE_CASES.map(({ resumeAtMinutes }) => resumeAtMinutes)).toEqual(
+    BASELINE_CASES.map(({ choice }) =>
+      choice.difficulty === "normal" ? undefined : 6,
+    ),
+  );
   const ids = [...CASE_SETS.values()].flatMap((cases) =>
     cases.map(({ id }) => id),
   );
   expect(new Set(ids).size).toBe(ids.length);
-});
-
-test("case sets need a standard AI profile for every faction", () => {
-  expect(() =>
-    skirmishCases("arc-wildlife", {
-      west: "arc",
-      east: "wildlife" as SkirmishFaction,
-    }),
-  ).toThrow("Faction wildlife has no standard AI.");
 });
 
 test("an unfinished case stops at the cutoff with its state and diagnostics", () => {
@@ -551,7 +553,11 @@ test("a case ends at its result, with the concerns supplied", () => {
     "arc-skirmish",
     undefined,
   ]);
-  expect(report.owners[0]!.latest?.tick).toBe(report.result.tick);
+  for (const { latest, history } of report.owners) {
+    expect(history[0]?.tick).toBe(0);
+    expect(latest?.tick).toBe(report.result.tick);
+    expect(history[history.length - 1]).toEqual(latest);
+  }
   expect(preservedState).toBeUndefined();
 });
 

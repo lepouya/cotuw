@@ -1,7 +1,14 @@
 import { expect, test } from "./fixtures";
 import { MissionDriver } from "./mission-driver";
-import { importMission, openOpening, quickSave } from "./page-helpers";
+import {
+  activate,
+  importMission,
+  openOpening,
+  quickSave,
+} from "./page-helpers";
+import { forEachProfile, MOUSE_PROFILE, PHONE_PROFILE } from "./profiles";
 import { WEBKIT } from "./tags";
+import { cssColor } from "../src/color";
 
 import type { Page } from "@playwright/test";
 
@@ -11,135 +18,187 @@ const storedQuicksave = (page: Page) =>
   );
 
 for (const kind of ["victory", "defeat", "draw"] as const)
-  test(
-    `owner-based ${kind} freezes play and survives save/load`,
-    { tag: WEBKIT },
-    async ({ page }) => {
-      await openOpening(page);
-      const checkpoint = await page.evaluate(async (kind) => {
-        const { level, placeBuildings, missionSource, simulateMission } =
-          await import("/e2e/missions.ts");
-        const { createActor } = await import("/src/simulation/actor.ts");
-        const mission = level();
-        const definitionId = "arc-command-center-prototype";
-        mission.scenario = {
-          ...mission.scenario,
-          objectives: [],
-          popups: [],
-          skirmish: {
-            owners: ["player", "rival"],
-            startingResourceSites: { player: [], rival: [] },
-            qualifyingDefinitionIds: [definitionId],
-          },
-        };
-        let { state } = mission;
-        state.actors = state.actors.filter(
-          (actor) => actor.id === "starting-command-center",
-        );
-        const home = state.actors[0];
-        state.actors.push(
-          createActor({
-            id: "observer",
-            definitionId: "arc-scout",
-            owner: "player",
-            worldPosition: {
-              x: home.worldPosition.x - 2,
-              z: home.worldPosition.z,
-            },
-          }),
-        );
-        state.objectives = [];
-        state.owners.push({ id: "rival", faction: "arc" });
-        state.relationships.push({
-          owners: ["player", "rival"],
-          relationship: "hostile",
-        });
-        state.economy!.stockpiles.push({
-          resource: "materials",
-          owners: ["rival"],
-          amount: 150,
-        });
-        placeBuildings(mission, [
-          {
-            actorId: "enemy",
-            definitionId,
-            origin: { x: 13, z: 50 },
-            owner: "rival",
-          },
-        ]);
-        const simulation = simulateMission(mission);
-        for (let tick = 0; tick < 17_999; tick++) simulation.tick();
-        state = simulation.snapshot() as typeof state;
-        simulation.dispose();
-        const source = missionSource(mission, state, {
-          name: "Before result",
-          savedAt: new Date().toISOString(),
-        });
-        localStorage.setItem("cotuw.save.autosave", source);
-        if (kind !== "victory")
-          state.commands.push({
-            tick: state.tick,
-            issuer: { owner: "player" },
-            command: { kind: "sell-actor", actorId: "starting-command-center" },
+  forEachProfile(
+    [kind === "victory" ? PHONE_PROFILE : MOUSE_PROFILE],
+    ({ touch }) => {
+      test(
+        `owner-based ${kind} freezes play and survives save/load`,
+        { tag: WEBKIT },
+        async ({ page }) => {
+          await openOpening(page, touch);
+          const checkpoint = await page.evaluate(async (kind) => {
+            const { level, placeBuildings, missionSource, simulateMission } =
+              await import("/e2e/missions.ts");
+            const { createActor } = await import("/src/simulation/actor.ts");
+            const mission = level();
+            const definitionId = "arc-command-center-prototype";
+            mission.scenario = {
+              ...mission.scenario,
+              objectives: [],
+              popups: [],
+              skirmish: {
+                owners: ["player", "rival"],
+                startingResourceSites: { player: [], rival: [] },
+                qualifyingDefinitionIds: [definitionId],
+              },
+            };
+            let { state } = mission;
+            state.actors = state.actors.filter(
+              (actor) => actor.id === "starting-command-center",
+            );
+            const home = state.actors[0];
+            state.actors.push(
+              createActor({
+                id: "observer",
+                definitionId: "arc-scout",
+                owner: "player",
+                worldPosition: {
+                  x: home.worldPosition.x - 2,
+                  z: home.worldPosition.z,
+                },
+              }),
+            );
+            state.objectives = [];
+            state.owners.unshift({ id: "rival", faction: "arc" });
+            state.relationships.push({
+              owners: ["player", "rival"],
+              relationship: "hostile",
+            });
+            state.economy!.stockpiles.push({
+              resource: "materials",
+              owners: ["rival"],
+              amount: 150,
+            });
+            placeBuildings(mission, [
+              {
+                actorId: "enemy",
+                definitionId,
+                origin: { x: 13, z: 50 },
+                owner: "rival",
+              },
+            ]);
+            const simulation = simulateMission(mission);
+            for (let tick = 0; tick < 17_999; tick++) simulation.tick();
+            state = simulation.snapshot() as typeof state;
+            simulation.dispose();
+            const source = missionSource(mission, state, {
+              name: "Before result",
+              savedAt: new Date().toISOString(),
+            });
+            localStorage.setItem("cotuw.save.autosave", source);
+            if (kind !== "victory")
+              state.commands.push({
+                tick: state.tick,
+                issuer: { owner: "player" },
+                command: {
+                  kind: "sell-actor",
+                  actorId: "starting-command-center",
+                },
+              });
+            if (kind !== "defeat")
+              state.commands.push({
+                tick: state.tick,
+                issuer: { owner: "rival" },
+                command: { kind: "sell-actor", actorId: "enemy" },
+              });
+            return {
+              source: missionSource(mission, state, {
+                name: "At result",
+                savedAt: new Date().toISOString(),
+              }),
+              previous: source,
+            };
+          }, kind);
+          await importMission(page, checkpoint.source);
+          await expect(page.locator("#game-menu-title")).toHaveText(
+            "Mission loaded",
+          );
+          await expect(page.locator("#match-summary")).toBeHidden();
+          await page.locator("#resume-mission").click();
+          const title = kind[0].toUpperCase() + kind.slice(1);
+          await expect(page.locator("#game-menu-title")).toHaveText(title);
+          await expect(page.locator("#game-menu-description")).toContainText(
+            "frozen for inspection",
+          );
+          const summary = page.locator("#match-summary");
+          await expect(summary).toBeVisible();
+          await expect(summary.locator("caption").first()).toHaveText(
+            "Milestones",
+          );
+          await expect(summary.locator("thead th").nth(1)).toHaveText("You");
+          await expect(
+            summary.locator("tr", { hasText: "First engagement" }),
+          ).toContainText("Not reached");
+          const overview = page.locator("#summary-tab-overview");
+          const graphs = page.locator("#summary-tab-graphs");
+          await expect(overview).toBeFocused();
+          if (touch) await activate(graphs, touch);
+          else {
+            await page.keyboard.press("ArrowRight");
+            await expect(graphs).toBeFocused();
+          }
+          await expect(graphs).toHaveAttribute("aria-selected", "true");
+          await expect(page.locator("#summary-overview")).toBeHidden();
+          await expect(summary.locator(".summary-chart")).toHaveCount(4);
+          await expect(summary.locator(".summary-chart polyline")).toHaveCount(
+            8,
+          );
+          await expect(
+            summary.locator(".summary-chart polyline").first(),
+          ).toHaveAttribute("stroke", cssColor([0.92, 0.18, 0.15]));
+          await expect(summary.locator(".summary-chart").first()).toContainText(
+            "5:00",
+          );
+          expect(
+            await summary.evaluate(
+              (section) => section.scrollWidth <= section.clientWidth,
+            ),
+          ).toBe(true);
+          await activate(overview, touch);
+          await expect(page.locator("#resume-mission")).toBeHidden();
+          await expect(page.locator("#save-mission")).toBeEnabled();
+          await expect(page.locator("#quicksave-mission")).toBeEnabled();
+          await page.locator("#inspect-loaded-mission").click();
+          await expect(page.locator("#game-menu")).not.toBeVisible();
+          await expect(page.locator("#pause-mission")).toBeDisabled();
+          await expect(page.locator("[data-speed]").first()).toBeDisabled();
+          await expect(page.locator("#placement-status")).toContainText(
+            "Match ended",
+          );
+          await page.locator("#tab-units").click();
+          const observer = page.locator('button[data-actor-id="observer"]');
+          await expect(observer).toBeEnabled();
+          await observer.click();
+          await expect(observer).toHaveAttribute("aria-pressed", "true");
+          await quickSave(page);
+          const saved = await storedQuicksave(page);
+          expect(saved.state.tick).toBe(18_000);
+          expect(saved.state.skirmishResult).toMatchObject({
+            kind,
+            tick: 17_999,
           });
-        if (kind !== "defeat")
-          state.commands.push({
-            tick: state.tick,
-            issuer: { owner: "rival" },
-            command: { kind: "sell-actor", actorId: "enemy" },
-          });
-        return {
-          source: missionSource(mission, state, {
-            name: "At result",
-            savedAt: new Date().toISOString(),
-          }),
-          previous: source,
-        };
-      }, kind);
-      await importMission(page, checkpoint.source);
-      await expect(page.locator("#game-menu-title")).toHaveText(
-        "Mission loaded",
+          for (const owner of saved.state.metrics.owners) {
+            expect(owner.history).toHaveLength(61);
+            expect(owner.history[60].tick).toBe(17_999);
+          }
+          expect(
+            await page.evaluate(() =>
+              localStorage.getItem("cotuw.save.autosave"),
+            ),
+          ).toBe(checkpoint.previous);
+          await page.keyboard.press("F9");
+          await expect(page.locator("#game-menu-title")).toHaveText(title);
+          await expect(summary.locator("caption").first()).toHaveText(
+            "Milestones",
+          );
+          await expect(page.locator("#resume-mission")).toBeHidden();
+          await page.locator("#inspect-loaded-mission").click();
+          await page.locator("#open-menu").click();
+          await expect(page.locator("#game-menu-title")).toHaveText(title);
+          await page.keyboard.press("Escape");
+          await expect(page.locator("#game-menu")).not.toBeVisible();
+        },
       );
-      await page.locator("#resume-mission").click();
-      const title = kind[0].toUpperCase() + kind.slice(1);
-      await expect(page.locator("#game-menu-title")).toHaveText(title);
-      await expect(page.locator("#game-menu-description")).toContainText(
-        "frozen for inspection",
-      );
-      await expect(page.locator("#resume-mission")).toBeHidden();
-      await expect(page.locator("#save-mission")).toBeEnabled();
-      await expect(page.locator("#quicksave-mission")).toBeEnabled();
-      await page.locator("#inspect-loaded-mission").click();
-      await expect(page.locator("#game-menu")).not.toBeVisible();
-      await expect(page.locator("#pause-mission")).toBeDisabled();
-      await expect(page.locator("[data-speed]").first()).toBeDisabled();
-      await expect(page.locator("#placement-status")).toContainText(
-        "Match ended",
-      );
-      await page.locator("#tab-units").click();
-      const observer = page.locator('button[data-actor-id="observer"]');
-      await expect(observer).toBeEnabled();
-      await observer.click();
-      await expect(observer).toHaveAttribute("aria-pressed", "true");
-      await quickSave(page);
-      const saved = await storedQuicksave(page);
-      expect(saved.state.tick).toBe(18_000);
-      expect(saved.state.skirmishResult).toMatchObject({ kind, tick: 17_999 });
-      for (const owner of saved.state.metrics.owners) {
-        expect(owner.history).toHaveLength(61);
-        expect(owner.history[60].tick).toBe(17_999);
-      }
-      expect(
-        await page.evaluate(() => localStorage.getItem("cotuw.save.autosave")),
-      ).toBe(checkpoint.previous);
-      await page.keyboard.press("F9");
-      await expect(page.locator("#game-menu-title")).toHaveText(title);
-      await expect(page.locator("#resume-mission")).toBeHidden();
-      await page.locator("#inspect-loaded-mission").click();
-      await page.locator("#open-menu").click();
-      await expect(page.locator("#game-menu-title")).toHaveText(title);
-      await page.keyboard.press("Escape");
-      await expect(page.locator("#game-menu")).not.toBeVisible();
     },
   );
 

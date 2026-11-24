@@ -181,10 +181,21 @@ export async function dismissExplanation(
   await expect(page.locator("#explanation")).toBeHidden();
 }
 
+/** Launches a faction's introduction from the title menu. */
+export async function launchIntroduction(
+  page: Page,
+  faction: "arc" | "circle",
+  touch: boolean,
+) {
+  await activate(page.locator("#new-mission"), touch);
+  await activate(page.locator("#mission-introduction"), touch);
+  await activate(page.locator(`#choose-${faction}`), touch);
+  await activate(page.locator("#start-mission"), touch);
+}
+
 /** Chooses the ARC opening from the start menu and acknowledges its guide. */
 export async function startOpening(page: Page, touch = false) {
-  await activate(page.locator("#new-mission"), touch);
-  await activate(page.locator("#choose-arc"), touch);
+  await launchIntroduction(page, "arc", touch);
   await dismissExplanation(page, "Welcome, Commander", touch);
 }
 

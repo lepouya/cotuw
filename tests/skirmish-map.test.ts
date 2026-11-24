@@ -7,6 +7,7 @@ import {
   createSkirmishScenario,
   createSkirmishCultivationSites,
   createSkirmishMaterialsSites,
+  menuSkirmish,
   skirmishLink,
 } from "../src/content/skirmish";
 import {
@@ -588,4 +589,19 @@ test.each([
 ])("the AI link %s is rejected", (query, message) => {
   const choice = skirmishLink(new URLSearchParams(query))!;
   expect(() => assembleSkirmish(choice)).toThrow(message);
+});
+
+test("menu skirmishes pick either start slot against the other faction", () => {
+  expect(menuSkirmish("arc", "easy", () => 0)).toEqual({
+    factions: { west: "arc", east: "circle" },
+    playerSlot: "west",
+    difficulty: "easy",
+    ai: [{ owner: "east", profileId: "circle-skirmish" }],
+  });
+  expect(menuSkirmish("circle", "normal", () => 0.99)).toEqual({
+    factions: { west: "arc", east: "circle" },
+    playerSlot: "east",
+    difficulty: "normal",
+    ai: [{ owner: "west", profileId: "arc-skirmish" }],
+  });
 });

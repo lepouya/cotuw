@@ -1,0 +1,40 @@
+<section id="match-summary" hidden aria-label="Match summary">
+  <div
+    id="summary-tabs"
+    class="summary-tabs"
+    role="tablist"
+    aria-label="Match summary"
+  >
+    <button
+      id="summary-tab-overview"
+      type="button"
+      role="tab"
+      aria-controls="summary-overview"
+    >
+      Overview
+    </button>
+    <button
+      id="summary-tab-graphs"
+      type="button"
+      role="tab"
+      aria-controls="summary-graphs"
+    >
+      Graphs
+    </button>
+  </div>
+  <div
+    id="summary-overview"
+    role="tabpanel"
+    aria-labelledby="summary-tab-overview"
+    tabindex="0"
+  ></div>
+  <div
+    id="summary-graphs"
+    role="tabpanel"
+    aria-labelledby="summary-tab-graphs"
+    tabindex="0"
+  >
+    <ul id="summary-legend" class="summary-legend"></ul>
+    <div id="summary-charts" class="summary-charts"></div>
+  </div>
+</section>

@@ -241,7 +241,11 @@ const savedId = (files: Map<string, string>, name: string) =>
 
 test("restarting keeps the chosen introduction difficulty", async () => {
   const { app } = await application();
-  app.startFaction("circle", "hard");
+  app.startMission({
+    mode: "introduction",
+    faction: "circle",
+    difficulty: "hard",
+  });
   await vi.waitFor(() => expect(launched().id).toBe("circle-wolf-den"));
   expect(launched().setup).toMatchObject({
     difficulty: "hard",
@@ -249,6 +253,27 @@ test("restarting keeps the chosen introduction difficulty", async () => {
   });
   await restarted(app);
   expect(launched().setup?.difficulty).toBe("hard");
+});
+
+test("menu skirmishes face the other faction's AI and restart at the same slot", async () => {
+  const { app } = await application();
+  app.startMission({ mode: "skirmish", faction: "circle", difficulty: "hard" });
+  await vi.waitFor(() => expect(launched().id).toBe("skirmish"));
+  const first = await vi.waitFor(() => {
+    const mission = vi.mocked(createGameSession).mock.lastCall![2].mission;
+    return { scenario: mission.scenario, player: mission.state.playerOwner };
+  });
+  const factions = first.scenario.setup!.factions!;
+  const rival = Object.keys(factions).find((slot) => slot !== first.player)!;
+  expect(factions[first.player]).toBe("circle");
+  expect(factions[rival]).toBe("arc");
+  expect(first.scenario.ai).toEqual([
+    { owner: rival, profileId: "arc-skirmish" },
+  ]);
+  expect(first.scenario.setup?.difficulty).toBe("hard");
+  const mission = await restarted(app);
+  expect(mission.state.playerOwner).toBe(first.player);
+  expect(mission.scenario.ai).toEqual(first.scenario.ai);
 });
 
 test("skirmishes restart from their setup, including after a load", async () => {
@@ -404,7 +429,11 @@ const shownDescription = (ui: ApplicationOptions["dialogs"]) =>
 
 test("pause, loaded, and result menus name the difficulty", async () => {
   const { app, ui, files } = await application();
-  app.startFaction("circle", "hard");
+  app.startMission({
+    mode: "introduction",
+    faction: "circle",
+    difficulty: "hard",
+  });
   await vi.waitFor(() => expect(launched().setup?.difficulty).toBe("hard"));
   await vi.waitFor(() => expect(app.session()?.simulation).toBeDefined());
   app.openMenu();

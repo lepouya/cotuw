@@ -1,22 +1,29 @@
 <section id="mission-setup" hidden aria-label="Set up your mission">
-  <fieldset id="difficulty-choices" class="setup-choices difficulty-choices">
-    <legend>Difficulty</legend>
+  <fieldset class="setup-choices mode-choices">
+    <legend>Mission</legend>
+    <button id="mission-introduction" class="setup-choice" type="button">
+      <strong>Introduction</strong>
+    </button>
+    <button id="mission-skirmish" class="setup-choice" type="button">
+      <strong>Skirmish</strong>
+    </button>
   </fieldset>
-  <div class="setup-choices faction-choices">
+  <fieldset class="setup-choices faction-choices">
+    <legend>Faction</legend>
     <button id="choose-arc" class="setup-choice" type="button">
       <strong>Anomaly Response Command</strong>
-      <span
-        >ARC introduction. Establish a base, gather Materials, and train a force
-        to clear the wolf den.</span
-      >
+      <span id="choose-arc-description"></span>
     </button>
     <button id="choose-circle" class="setup-choice" type="button">
       <strong>Circle of Repose</strong>
-      <span
-        >Circle introduction. Grow a living base, cultivate Lifebloom, and raise
-        an army.</span
-      >
+      <span id="choose-circle-description"></span>
     </button>
+  </fieldset>
+  <fieldset id="difficulty-choices" class="setup-choices difficulty-choices">
+    <legend>Difficulty</legend>
+  </fieldset>
+  <div class="setup-actions">
+    <button id="start-mission" type="button">Start</button>
+    <button id="cancel-mission-setup" type="button">Back</button>
   </div>
-  <button id="cancel-mission-setup" type="button">Back</button>
 </section>
