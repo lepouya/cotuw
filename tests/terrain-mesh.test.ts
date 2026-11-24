@@ -5,6 +5,7 @@ import { testScene } from "./helpers/scene";
 import { cornerAlpha, TerrainMap } from "../src/map";
 import {
   chunksForBounds,
+  TERRAIN_CHUNK_SIZE as C,
   CLIP_PHASE_GROUPS,
   createTerrainMeshes,
 } from "../src/render/terrain-mesh";
@@ -193,7 +194,7 @@ describe("createTerrainMeshes", () => {
   test("height edits refresh slope fading on both sides of a chunk boundary", () => {
     const scene = testScene();
     const map = new TerrainMap({
-      width: 33,
+      width: C + 1,
       height: 1,
       tileSize: 1,
       createLayers: () => [
@@ -212,16 +213,16 @@ describe("createTerrainMeshes", () => {
       return mesh.getVerticesData("color")!.filter((_, i) => i % 4 === 3);
     };
     expect(alphas(0).every((a) => a === 1)).toBe(true);
-    map.setHeight(33, 0, 4);
-    map.setHeight(33, 1, 4);
-    map.notifyChange(map.tilesAroundCorner(33, 0));
+    map.setHeight(C + 1, 0, 4);
+    map.setHeight(C + 1, 1, 4);
+    map.notifyChange(map.tilesAroundCorner(C + 1, 0));
     scene.onBeforeRenderObservable.notifyObservers(scene);
     expect(alphas(0).slice(-2)).toEqual([0, 0]);
     // A tile left fully clear draws nothing.
     expect(scene.getMeshByName("terrain-1-0-layer-0-tile-grass")).toBeNull();
-    map.setHeight(33, 0, 0);
-    map.setHeight(33, 1, 0);
-    map.notifyChange(map.tilesAroundCorner(33, 0));
+    map.setHeight(C + 1, 0, 0);
+    map.setHeight(C + 1, 1, 0);
+    map.notifyChange(map.tilesAroundCorner(C + 1, 0));
     scene.onBeforeRenderObservable.notifyObservers(scene);
     expect(alphas(0).every((a) => a === 1)).toBe(true);
     expect(alphas(1)).toEqual([1, 1, 1, 1]);
@@ -300,7 +301,9 @@ describe("createTerrainMeshes", () => {
 });
 
 describe("chunksForBounds", () => {
-  const map = new TerrainMap({ width: 100, height: 100, tileSize: 1 });
+  // Three full chunks and a partial fourth per axis.
+  const size = 3 * C + 4;
+  const map = new TerrainMap({ width: size, height: size, tileSize: 1 });
 
   test("dirties one chunk for an edit well inside it", () => {
     expect(
@@ -309,18 +312,18 @@ describe("chunksForBounds", () => {
   });
 
   test("dirties the neighbor an edit's feathering reaches across", () => {
-    // Tile 31 is the last of chunk 0, and its corner alpha reads tile 32.
+    // The last tile of chunk 0 has corner alpha that reads the next chunk.
     expect(
-      chunksForBounds(map, { minX: 31, minZ: 10, maxX: 31, maxZ: 10 }),
+      chunksForBounds(map, { minX: C - 1, minZ: 10, maxX: C - 1, maxZ: 10 }),
     ).toEqual(["0,0", "1,0"]);
     expect(
-      chunksForBounds(map, { minX: 32, minZ: 10, maxX: 32, maxZ: 10 }),
+      chunksForBounds(map, { minX: C, minZ: 10, maxX: C, maxZ: 10 }),
     ).toEqual(["0,0", "1,0"]);
   });
 
   test("dirties all four chunks meeting at a chunk corner", () => {
     expect(
-      chunksForBounds(map, { minX: 32, minZ: 32, maxX: 32, maxZ: 32 }),
+      chunksForBounds(map, { minX: C, minZ: C, maxX: C, maxZ: C }),
     ).toEqual(["0,0", "1,0", "0,1", "1,1"]);
   });
 
@@ -328,8 +331,9 @@ describe("chunksForBounds", () => {
     expect(
       chunksForBounds(map, { minX: 0, minZ: 0, maxX: 0, maxZ: 0 }),
     ).toEqual(["0,0"]);
+    const last = size - 1;
     expect(
-      chunksForBounds(map, { minX: 99, minZ: 99, maxX: 99, maxZ: 99 }),
+      chunksForBounds(map, { minX: last, minZ: last, maxX: last, maxZ: last }),
     ).toEqual(["3,3"]);
   });
 
@@ -337,11 +341,10 @@ describe("chunksForBounds", () => {
     const keys = chunksForBounds(map, {
       minX: 0,
       minZ: 0,
-      maxX: 99,
-      maxZ: 99,
+      maxX: size - 1,
+      maxZ: size - 1,
     });
 
-    // 100 tiles at 32 per chunk is four chunks per axis, the last one partial.
     expect(keys).toHaveLength(16);
     expect(new Set(keys).size).toBe(16);
   });

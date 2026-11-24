@@ -9,6 +9,7 @@ import {
   selectInSession,
   withoutApp,
 } from "./page-helpers";
+import type { Matrix, Vector3 as Point } from "@babylonjs/core";
 import type { Page } from "@playwright/test";
 
 async function repairBadge(page: Page, id: string) {
@@ -21,27 +22,31 @@ async function repairBadge(page: Page, id: string) {
       scene.getEngine().getRenderWidth(),
       scene.getEngine().getRenderHeight(),
     );
+    const project = (points: readonly Point[], world: Matrix) =>
+      points.map(
+        (point) =>
+          Vector3.Project(point, world, scene.getTransformMatrix(), viewport).y,
+      );
     const screenY = (name: string) => {
       const mesh = scene.getMeshByName(name)!;
-      return mesh
-        .getBoundingInfo()
-        .boundingBox.vectors.map(
-          (point) =>
-            Vector3.Project(
-              point,
-              mesh.getWorldMatrix(),
-              scene.getTransformMatrix(),
-              viewport,
-            ).y,
-        );
+      return project(
+        mesh.getBoundingInfo().boundingBox.vectors,
+        mesh.getWorldMatrix(),
+      );
     };
+    // Every bar frame is an instance of one shared unit square.
+    const frames = scene.getMeshByName("health-bar-frames")!;
+    const frame: Matrix = frames.metadata.frameFor(id);
+    const corners = [-0.5, 0.5].flatMap((x) =>
+      [-0.5, 0.5].map((y) => new Vector3(x, y, 0)),
+    );
     return {
       visible:
         wrench.isEnabled() && wrench.isVisible && wrench.getTotalVertices() > 0,
       paused: scene.getMeshByName(`repair-badge-${id}-pause-1`)!.isEnabled(),
       clearsHealthBar:
         Math.max(...screenY(`repair-badge-${id}-background`)) <
-        Math.min(...screenY(`health-bar-${id}-frame`)),
+        Math.min(...project(corners, frame)),
     };
   }, id);
 }

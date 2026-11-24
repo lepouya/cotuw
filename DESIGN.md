@@ -1067,6 +1067,9 @@ These systems are outside M1.
   from its first frame. Remains play the death clip once from destruction and
   hold its last frame, so remains older than the clip, as after loading, show
   that frame. Without a death clip, remains lie on their side.
+  Remains stay 60 simulation seconds, and building debris holds its footprint
+  that long. Fallen units leave view after 30 seconds. When more than 25
+  fallen units would show, older ones fade out early over five seconds.
   The Harvester lowers its collector into the work loop when gathering starts
   and stows it when gathering ends. Reversing a transition keeps its current
   collector position. Loading settles into the current work or idle pose.

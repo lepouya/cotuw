@@ -1,27 +1,37 @@
 import {
   Color3,
-  Mesh as BabylonMesh,
   MeshBuilder,
   StandardMaterial,
   TransformNode,
 } from "@babylonjs/core";
 
-import type { Material, Mesh, Scene } from "@babylonjs/core";
+import type { Material, Scene } from "@babylonjs/core";
 
-const BAR_HEIGHT = 0.12;
-const BORDER = 0.03;
-const DIVIDER_WIDTH = 0.025;
+export const BAR_HEIGHT = 0.12;
+export const BORDER = 0.03;
 /** Draws over terrain, fog, and models so bars stay readable. */
-const RENDERING_GROUP = 1;
+export const BAR_RENDERING_GROUP = 1;
 
 export type ScreenBar = {
   /** Faces the camera; position it in world space. */
   root: TransformNode;
-  meshes: readonly Mesh[];
   /** Fills from the left, from 0 to 1. */
   setFill: (fraction: number, material: Material) => void;
-  dispose: () => void;
 };
+
+/**
+ * A fill's clamped fraction, its scale across a bar `width` wide, and its
+ * center's offset, so it grows from the bar's left edge.
+ */
+export function fillSpan(fraction: number, width: number) {
+  const clamped = Math.min(Math.max(fraction, 0), 1);
+  return {
+    fraction: clamped,
+    // Zero-width geometry would degenerate.
+    scale: Math.max(clamped, 1e-3),
+    x: ((clamped - 1) * width) / 2,
+  };
+}
 
 /** An unlit flat color for bar fills and frames. */
 export function createBarMaterial(
@@ -39,7 +49,7 @@ export function createBarMaterial(
 
 /**
  * A camera-facing framed bar, so every status bar lines up on screen whatever
- * the camera angle. Dividers split it into equal segments.
+ * the camera angle.
  */
 export function createScreenBar(
   scene: Scene,
@@ -47,14 +57,13 @@ export function createScreenBar(
   {
     width,
     frame,
-    segments = 1,
   }: {
     width: number;
     frame: Material;
-    segments?: number;
   },
 ): ScreenBar {
   const root = new TransformNode(name, scene);
+  root.billboardMode = TransformNode.BILLBOARDMODE_ALL;
   const plane = (part: string, planeWidth: number, height: number) => {
     const mesh = MeshBuilder.CreatePlane(
       `${name}-${part}`,
@@ -62,7 +71,7 @@ export function createScreenBar(
       scene,
     );
     mesh.isPickable = false;
-    mesh.renderingGroupId = RENDERING_GROUP;
+    mesh.renderingGroupId = BAR_RENDERING_GROUP;
     mesh.parent = root;
     return mesh;
   };
@@ -77,35 +86,13 @@ export function createScreenBar(
   fill.alphaIndex = 1;
   // Slightly towards the camera, which billboards face along -Z.
   fill.position.z = -0.001;
-  const parts: Mesh[] = [];
-  for (let index = 1; index < segments; index += 1) {
-    const divider = plane(`divider-${index}`, DIVIDER_WIDTH, BAR_HEIGHT);
-    divider.position.set((index / segments - 0.5) * width, 0, -0.002);
-    parts.push(divider);
-  }
-  const meshes = [background, fill];
-  // Keep backgrounds behind fills and dividers while fading.
-  if (parts.length) {
-    const dividers = BabylonMesh.MergeMeshes(parts, true)!;
-    dividers.name = `${name}-dividers`;
-    dividers.material = frame;
-    dividers.isPickable = false;
-    dividers.renderingGroupId = RENDERING_GROUP;
-    dividers.parent = root;
-    dividers.alphaIndex = 2;
-    meshes.push(dividers);
-  }
-  // Merge in local space before billboarding bakes in the camera rotation.
-  root.billboardMode = TransformNode.BILLBOARDMODE_ALL;
   return {
     root,
-    meshes,
     setFill: (fraction, material) => {
-      const clamped = Math.min(Math.max(fraction, 0), 1);
-      fill.scaling.x = Math.max(clamped, 1e-3);
-      fill.position.x = ((clamped - 1) * width) / 2;
+      const span = fillSpan(fraction, width);
+      fill.scaling.x = span.scale;
+      fill.position.x = span.x;
       fill.material = material;
     },
-    dispose: () => root.dispose(),
   };
 }

@@ -30,6 +30,8 @@ const updateWrecks = (
     () => true,
     frameSeconds,
   );
+/** When the test death clip reports its remains at rest. */
+const SETTLE_SECONDS = 2;
 const buildingWreck = (actorId: string): Wreck => ({
   actorId,
   definitionId: "building",
@@ -50,7 +52,12 @@ describe("remains", () => {
       bounds: { radius: 0.5, height: 1 },
       instantiate: (name) => ({
         root: new TransformNode(name, scene),
-        die: die ? (seconds) => deaths.push(seconds) : undefined,
+        die: die
+          ? (seconds) => {
+              deaths.push(seconds);
+              return seconds >= SETTLE_SECONDS;
+            }
+          : undefined,
         freeze: () => tilted.push(name),
         dispose: () => {},
       }),
@@ -72,9 +79,22 @@ describe("remains", () => {
       facing: 0,
       tick: 0,
     });
-    const update = (list: Wreck[], age: number, frameSeconds: number) =>
-      updateWrecks(wrecks, list, age, frameSeconds);
-    return { deaths, tilted, update, wreck, appearances, appearance };
+    const update = (
+      list: Wreck[],
+      age: number,
+      frameSeconds: number,
+      visible = true,
+    ) =>
+      wrecks.update(
+        list,
+        () => age,
+        60,
+        () => visible,
+        frameSeconds,
+      );
+    const root = (actorId: string) =>
+      scene.getTransformNodeByName(`wreck-${actorId}`);
+    return { deaths, tilted, update, wreck, appearances, appearance, root };
   }
 
   test("play the death clip from destruction in real time", () => {
@@ -91,9 +111,18 @@ describe("remains", () => {
   test("start loaded remains at their age", () => {
     const { deaths, update, wreck } = setup();
 
-    update([wreck("a", "trooper")], 30, 0.016);
+    update([wreck("a", "trooper")], 20, 0.016);
 
-    expect(deaths).toEqual([30]);
+    expect(deaths).toEqual([20]);
+  });
+
+  test("start hidden remains at their current age when they become visible", () => {
+    const { deaths, update, wreck, root } = setup();
+    const fallen = [wreck("a", "trooper")];
+    update(fallen, 0, 0, false);
+    expect(root("a")).toBeNull();
+    update(fallen, 3, 3);
+    expect(deaths).toEqual([3]);
   });
 
   test("refresh loaded appearances without restarting a death clip", () => {
@@ -104,6 +133,57 @@ describe("remains", () => {
     appearances.set("trooper", appearance(true));
     update(fallen, 0, 0);
     expect(deaths).toEqual([0, 0.5, 0.5]);
+  });
+
+  test("fallen units clear after 30 seconds while building debris stays", () => {
+    const { update, wreck, root } = setup();
+    const fallen = [wreck("a", "trooper"), buildingWreck("b")];
+    update(fallen, 10, 0);
+    expect(root("a")).not.toBeNull();
+    update(fallen, 30, 20);
+    expect(root("a")).toBeNull();
+    expect(root("b")).not.toBeNull();
+    // A cleared unit is not drawn again while the simulation keeps it.
+    update(fallen, 31, 1);
+    expect(root("a")).toBeNull();
+  });
+
+  test("the newest 25 fallen units show and older ones fade out early", () => {
+    const { update, wreck, root } = setup();
+    const fallen = Array.from({ length: 26 }, (_, index) => ({
+      ...wreck(`u${String(index).padStart(2, "0")}`, "trooper"),
+      tick: index,
+    }));
+    update(fallen.slice(0, 25), 1, 0);
+    update(fallen, 1, 0);
+    expect(root("u00")).not.toBeNull();
+    expect(root("u25")).not.toBeNull();
+    update(fallen, 1, 6);
+    expect(root("u00")).toBeNull();
+    expect(root("u01")).not.toBeNull();
+  });
+
+  test("fallen units crowded out before showing stay hidden", () => {
+    const { update, wreck, root } = setup();
+    const fallen = Array.from({ length: 26 }, (_, index) => ({
+      ...wreck(`u${String(index).padStart(2, "0")}`, "trooper"),
+      tick: index,
+    }));
+    update(fallen, 1, 0);
+    expect(root("u00")).toBeNull();
+    // A freed slot does not bring it in late.
+    update(fallen.slice(0, 25), 1, 0);
+    expect(root("u00")).toBeNull();
+  });
+
+  test("settled remains freeze their transforms", () => {
+    const { update, wreck, root } = setup();
+    const fallen = [wreck("a", "trooper")];
+    update(fallen, 0, 0);
+    update(fallen, 0, 1);
+    expect(root("a")!.isWorldMatrixFrozen).toBe(false);
+    update(fallen, 0, SETTLE_SECONDS);
+    expect(root("a")!.isWorldMatrixFrozen).toBe(true);
   });
 
   test("lay models without a death clip on their side", () => {
@@ -166,7 +246,10 @@ describe("remains", () => {
       bounds: { radius: 0.5, height: 1 },
       instantiate: (name) => ({
         root: MeshBuilder.CreateBox(name, {}, scene),
-        die: (age) => deaths.push(age),
+        die: (age) => {
+          deaths.push(age);
+          return false;
+        },
         dispose: () => {},
       }),
       dispose: () => {},

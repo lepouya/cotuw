@@ -276,26 +276,29 @@ function instantiate(
     die:
       death &&
       ((seconds) => {
-        dead = true;
-        for (const node of [...idleIndicators, ...workIndicators])
-          node.setEnabled(false);
-        damage.settle();
-        playing.clear();
-        for (const group of [idle, ...posed]) {
-          group.pause();
-          group.weight = 0;
+        // Let Babylon apply the final weighted pose before freezing transforms.
+        if (deathProgress === 1) return true;
+        if (!dead) {
+          dead = true;
+          for (const node of [...idleIndicators, ...workIndicators])
+            node.setEnabled(false);
+          damage.settle();
+          playing.clear();
+          for (const group of [idle, ...posed]) {
+            group.pause();
+            group.weight = 0;
+          }
+          death.weight = 1;
+          idle.stop();
         }
-        death.weight = 1;
-        // A preference change must not stand fallen remains back up.
         const progress = Math.max(
           deathProgress,
           reducedMotion() ? 1 : Math.min(seconds / clipSeconds(death), 1),
         );
-        if (progress === deathProgress && progress === 1) return;
         deathProgress = progress;
         seek(death, deathProgress);
-        idle.stop();
         release();
+        return false;
       }),
     freeze: () => {
       for (const group of [idle, ...posed]) group.pause();

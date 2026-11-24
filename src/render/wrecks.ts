@@ -5,7 +5,9 @@ import {
   TransformNode,
 } from "@babylonjs/core";
 
+import { compareIds } from "../simulation/actor";
 import { stableUnit } from "./actor";
+import { changeFrozen, setTransformsFrozen } from "./frozen-transforms";
 import { hierarchyMeshes, modelPartName, unitCubeInstance } from "./glb-model";
 
 import type { Scene } from "@babylonjs/core";
@@ -18,12 +20,18 @@ import type { OwnerMaterials } from "./owner-materials";
 
 /** Remains fade out over this many seconds before they clear. */
 const FADE_SECONDS = 5;
+const fade = (remaining: number) =>
+  Math.max(0, Math.min(1, remaining / FADE_SECONDS));
 const DEBRIS_HEIGHT = 0.18;
 /** Used when the destroyed building's height is unavailable. */
 const FALLBACK_COLLAPSE_SCALE = 6;
 const COLLAPSE_SECONDS = 0.8;
 /** Rubble meshes named `fading-light` go dark over this many seconds. */
 const LIGHT_FADE_SECONDS = 1.6;
+/** Fallen units clear from view this long after destruction. */
+const UNIT_REMAINS_SECONDS = 30;
+/** Keeps this many fallen units before fading older ones early. */
+const MAX_UNIT_REMAINS = 25;
 
 export type WreckViewOptions = {
   appearanceFor: (definitionId: string) => ActorAppearance | undefined;
@@ -66,10 +74,17 @@ export function createWreckView(
       rubbleModel: ModelAsset | undefined;
       topHeight: number | undefined;
       ground: () => void;
-      /** Advances the death clip by real seconds. */
-      animate?: (seconds: number) => void;
+      /** Advances the remains by real seconds; true once at rest. */
+      animate?: (seconds: number) => boolean;
+      /** Frozen transforms skip per-frame world matrix updates. */
+      settled: boolean;
+      /** When the remains began fading out early to make room. */
+      evictedAt?: number;
     }
   >();
+  /** Fallen units already faded from view while the simulation keeps them. */
+  const cleared = new Set<string>();
+
   let terrainDirty = false;
   const terrainObserver = map.onChangedObservable.add(() => {
     terrainDirty = true;
@@ -84,7 +99,7 @@ export function createWreckView(
   ) => {
     const root = new TransformNode(`wreck-${wreck.actorId}`, scene);
     let dispose = () => root.dispose();
-    let animate: ((seconds: number) => void) | undefined;
+    let animate: ((seconds: number) => boolean) | undefined;
     const lights: AbstractMesh[] = [];
     const groundUpdates: (() => void)[] = [];
     if (wreck.tilePlacement) {
@@ -143,6 +158,7 @@ export function createWreckView(
       }
       animate = (seconds) => {
         for (const settle of settles) settle(seconds);
+        return seconds >= COLLAPSE_SECONDS;
       };
       animate(age);
       dispose = () => {
@@ -175,6 +191,7 @@ export function createWreckView(
           tilt.position.y = appearance.bounds.radius * 0.4;
           instance.root.parent = tilt;
           instance.freeze?.();
+          animate = () => true;
         }
         dispose = () => {
           instance.dispose();
@@ -194,11 +211,32 @@ export function createWreckView(
       animate,
       rubbleModel,
       topHeight,
+      settled: false,
       ground: () => {
         for (const update of groundUpdates) update();
       },
     };
   };
+  /** The visible fallen units that keep showing, newest first. */
+  const shownUnits = (
+    wrecks: readonly Wreck[],
+    age: (wreck: Wreck) => number,
+    life: number,
+    visible: ReadonlySet<string>,
+  ) =>
+    new Set(
+      wrecks
+        .filter(
+          (wreck) =>
+            !wreck.tilePlacement &&
+            visible.has(wreck.actorId) &&
+            views.get(wreck.actorId)?.evictedAt === undefined &&
+            age(wreck) < life,
+        )
+        .sort((a, b) => b.tick - a.tick || compareIds(a.actorId, b.actorId))
+        .slice(0, MAX_UNIT_REMAINS)
+        .map(({ actorId }) => actorId),
+    );
   return {
     /**
      * `age` is seconds since destruction, `lifeSeconds` how long remains
@@ -218,15 +256,35 @@ export function createWreckView(
         view.dispose();
         views.delete(id);
       }
+      for (const id of cleared) if (!present.has(id)) cleared.delete(id);
+      const unitLife = Math.min(lifeSeconds, UNIT_REMAINS_SECONDS);
+      const visibleIds = new Set<string>();
+      for (const wreck of wrecks)
+        if (!cleared.has(wreck.actorId) && visible(wreck))
+          visibleIds.add(wreck.actorId);
+      const shown = shownUnits(wrecks, age, unitLife, visibleIds);
       const reduced = reducedMotion();
       for (const wreck of wrecks) {
+        if (cleared.has(wreck.actorId)) continue;
         let view = views.get(wreck.actorId);
+        const unit = !wreck.tilePlacement;
+        const wreckAge = age(wreck);
+        const life = unit ? unitLife : lifeSeconds;
+        const shows = visibleIds.has(wreck.actorId);
+        // Remains past their time, or crowded out before they were drawn,
+        // never appear, even once a slot frees.
+        if (
+          !view &&
+          unit &&
+          (wreckAge >= life || (shows && !shown.has(wreck.actorId)))
+        ) {
+          cleared.add(wreck.actorId);
+          continue;
+        }
+        if (!view && unit && !shows) continue;
         // Once settled, a preference change leaves rubble dark and in place.
         const minimum = wreck.tilePlacement && reduced ? LIGHT_FADE_SECONDS : 0;
-        const wreckAge = age(wreck);
-        const appearance = wreck.tilePlacement
-          ? undefined
-          : appearanceFor(wreck.definitionId);
+        const appearance = unit ? appearanceFor(wreck.definitionId) : undefined;
         const rubbleModel = wreck.tilePlacement
           ? rubbleAsset?.(wreck)
           : undefined;
@@ -237,19 +295,41 @@ export function createWreckView(
         ) {
           const seconds = Math.max(wreckAge, view?.seconds ?? 0, minimum);
           const topHeight = view?.topHeight ?? topHeightFor?.(wreck);
+          const evictedAt = view?.evictedAt;
           view?.dispose();
           view = create(wreck, seconds, appearance, rubbleModel, topHeight);
+          view.evictedAt = evictedAt;
           views.set(wreck.actorId, view);
         } else {
           view.seconds = Math.max(view.seconds + frameSeconds, minimum);
-          view.animate?.(view.seconds);
-          if (terrainDirty) view.ground();
+          if (!view.settled && view.animate?.(view.seconds)) {
+            view.settled = true;
+            setTransformsFrozen(view.root, true);
+          }
+          if (terrainDirty && view.settled)
+            changeFrozen(view.root, view.ground);
+          else if (terrainDirty) view.ground();
         }
-        view.root.setEnabled(visible(wreck));
-        const opacity = Math.max(
-          0,
-          Math.min(1, (lifeSeconds - wreckAge) / FADE_SECONDS),
+        if (
+          unit &&
+          shows &&
+          view.evictedAt === undefined &&
+          !shown.has(wreck.actorId)
+        )
+          view.evictedAt = view.seconds;
+        const opacity = Math.min(
+          fade(life - wreckAge),
+          view.evictedAt === undefined
+            ? 1
+            : fade(FADE_SECONDS - (view.seconds - view.evictedAt)),
         );
+        if (unit && opacity <= 0) {
+          view.dispose();
+          views.delete(wreck.actorId);
+          cleared.add(wreck.actorId);
+          continue;
+        }
+        view.root.setEnabled(shows);
         for (const mesh of view.meshes) mesh.visibility = opacity;
         const light = Math.max(0, 1 - view.seconds / LIGHT_FADE_SECONDS);
         for (const mesh of view.lights) mesh.visibility = opacity * light;

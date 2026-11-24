@@ -20,7 +20,8 @@ import type { TileGraphics, TileType } from "../content/terrain-style";
 import type { TerrainBounds, TerrainMap, TileLayer } from "../map";
 import type { AbstractMesh } from "@babylonjs/core";
 
-const CHUNK_SIZE = 32;
+/** Tiles per chunk side; fewer, larger chunks cut per-mesh draw cost. */
+export const TERRAIN_CHUNK_SIZE = 64;
 /** Clip lags round to this many shares of a cycle, each with one material. */
 export const CLIP_PHASE_GROUPS = 8;
 const TERRAIN_LAYER_OFFSET = 0.012;
@@ -180,10 +181,10 @@ export function createTerrainMeshes(
 
   const rebuildChunk = (chunkX: number, chunkZ: number) => {
     const chunkKey = `${chunkX},${chunkZ}`;
-    const minX = chunkX * CHUNK_SIZE;
-    const minZ = chunkZ * CHUNK_SIZE;
-    const maxX = Math.min(minX + CHUNK_SIZE, map.width);
-    const maxZ = Math.min(minZ + CHUNK_SIZE, map.height);
+    const minX = chunkX * TERRAIN_CHUNK_SIZE;
+    const minZ = chunkZ * TERRAIN_CHUNK_SIZE;
+    const maxX = Math.min(minX + TERRAIN_CHUNK_SIZE, map.width);
+    const maxZ = Math.min(minZ + TERRAIN_CHUNK_SIZE, map.height);
     const groups = new Map<number, Map<string, LayerGroup>>();
 
     for (let z = minZ; z < maxZ; z += 1) {
@@ -370,10 +371,14 @@ export function chunksForBounds(
   map: TerrainMap,
   { minX, minZ, maxX, maxZ }: TerrainBounds,
 ): string[] {
-  const minChunkX = Math.floor(Math.max(0, minX - 1) / CHUNK_SIZE);
-  const minChunkZ = Math.floor(Math.max(0, minZ - 1) / CHUNK_SIZE);
-  const maxChunkX = Math.floor(Math.min(map.width - 1, maxX + 1) / CHUNK_SIZE);
-  const maxChunkZ = Math.floor(Math.min(map.height - 1, maxZ + 1) / CHUNK_SIZE);
+  const minChunkX = Math.floor(Math.max(0, minX - 1) / TERRAIN_CHUNK_SIZE);
+  const minChunkZ = Math.floor(Math.max(0, minZ - 1) / TERRAIN_CHUNK_SIZE);
+  const maxChunkX = Math.floor(
+    Math.min(map.width - 1, maxX + 1) / TERRAIN_CHUNK_SIZE,
+  );
+  const maxChunkZ = Math.floor(
+    Math.min(map.height - 1, maxZ + 1) / TERRAIN_CHUNK_SIZE,
+  );
   const keys: string[] = [];
 
   for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
@@ -460,6 +465,8 @@ function createLayerMesh(
   // Layers overlap at almost the same depth, so blend order must follow the
   // stack rather than Babylon's distance sort.
   mesh.alphaIndex = layerIndex;
+  // Chunks never move; edits rebuild them.
+  mesh.freezeWorldMatrix();
   return mesh;
 }
 

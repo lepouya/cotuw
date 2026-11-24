@@ -68,8 +68,11 @@ export type ActorInstance = {
   setAnimationState?: (state: Readonly<ActorAnimationState>) => void;
   /** Plays the actor's response to a trigger. */
   play?: (trigger: ActorTrigger) => void;
-  /** Poses remains `seconds` after destruction; replaces animate. */
-  die?: (seconds: number) => void;
+  /**
+   * Poses remains `seconds` after destruction; replaces animate. True once
+   * the remains are at rest and later calls change nothing.
+   */
+  die?: (seconds: number) => boolean;
   /** Stops any playing clips, as for remains. */
   freeze?: () => void;
   dispose: () => void;

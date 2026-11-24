@@ -5,6 +5,7 @@ import {
   TransformNode,
 } from "@babylonjs/core";
 import { stableUnit } from "./actor";
+import { changeFrozen, setTransformsFrozen } from "./frozen-transforms";
 import { hierarchyMeshes, staticInstance } from "./glb-model";
 import { DEFAULT_MATERIALS_STAGES } from "../content/presentation";
 import type { MaterialsStage } from "../content/presentation";
@@ -64,6 +65,8 @@ export function createMaterialsSitesView(
   const showSite = (site: Marker) => {
     for (const mesh of hierarchyMeshes(site.model.root))
       mesh.isPickable = false;
+    // Deposits move only for terrain edits and depletion stages.
+    setTransformsFrozen(site.root, true);
   };
   const showTarget = (marker: Marker & { tile: TileCoord }) => {
     for (const mesh of hierarchyMeshes(marker.model.root))
@@ -180,7 +183,9 @@ export function createMaterialsSitesView(
       );
   };
   const terrainObserver = map.onChangedObservable.add(() => {
-    for (const { root } of [...sites.values(), ...cultivation.values()])
+    for (const { root } of sites.values())
+      changeFrozen(root, () => (root.position.y = groundAt(root)));
+    for (const { root } of cultivation.values())
       root.position.y = groundAt(root);
     for (const gift of loot.values()) gift.ground = groundAt(gift.root);
     placeSelection();
@@ -202,8 +207,9 @@ export function createMaterialsSitesView(
         root.setEnabled(!!site && site.remainingMaterials > 0);
         if (!site) continue;
         const fraction = site.remainingMaterials / site.initialMaterials;
-        const stage = stages.find(({ above }) => fraction > above);
-        root.scaling.setAll(stage?.scale ?? 0);
+        const scale = stages.find(({ above }) => fraction > above)?.scale ?? 0;
+        if (root.scaling.x === scale) continue;
+        changeFrozen(root, () => root.scaling.setAll(scale));
       }
       const growing = new Map(
         (economy.cultivation?.sites ?? []).map((site) => [site.id, site]),
