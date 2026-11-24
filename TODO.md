@@ -8,7 +8,7 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phase F is in progress. Any remaining cohort coverage for 1.02
+Phase F is complete. Phase G is next. Remaining cohort coverage for 1.02
 carries into 1.65.
 
 ### Using this checklist
@@ -124,7 +124,7 @@ Complete. The expanded ARC roster is playable with the
 - [x] **1.45** Rebindable gameplay and production shortcuts.
 - [x] **1.46** ARC AI expansion, defense, repairs, and mixed forces.
 - [x] **1.47** ARC playtest feedback and local-defense follow-up.
-  Carry any remaining ARC cohort coverage into 1.65. Tune pacing in 1.63.
+  Carry any remaining ARC cohort coverage into 1.65.
 - [x] **1.58** M1 optional-system scope. See
   [resources and progression](DESIGN.md#m1-resources-and-progression).
 - [x] **1.71** Owner colors in models, remains, and minimap markers.
@@ -133,7 +133,7 @@ Complete. The expanded ARC roster is playable with the
 
 Complete. The [Circle introduction](DESIGN.md#circle-introduction) teaches
 cultivation, and the [Circle AI plan](DESIGN.md#m1-circle-ai-plan) sustains
-the same economy and roster. Normal-menu skirmish launch belongs to 1.60.
+the same economy and roster.
 
 - [x] **1.48** Circle core roster and paid opening.
 - [x] **1.49** Placement, tending, infrastructure, and Heartgrove recovery.
@@ -160,48 +160,25 @@ the same economy and roster. Normal-menu skirmish launch belongs to 1.60.
 
 ### F. Complete skirmish integration
 
-Build on both playable loops and the shared opponent using the common-resource
-and producer-based progression scope from 1.06.
+Complete. Either faction can play a full skirmish against the other faction's
+AI through the normal menu. Headless pacing and normal-scale performance
+are accepted for Phase F.
 
-- [ ] **1.59** Finish the map with viable routes, expansion opportunities,
-  scouting landmarks, and defensible starts for both player assignments.
-  Verify both factions' paid first income and restart from either slot.
-  - Mirror openings now match move for move for about two minutes, and Easy
-    and Hard results follow the player slot. Remaining: map review for
-    routes, landmarks, and defensible starts.
-- [x] **1.60** Mission setup launches either faction's introduction or
-  skirmish at the selected difficulty. Restart preserves the skirmish setup.
-- [x] **1.61** [Result rules](DESIGN.md#m1-skirmish-results) hold in complete
-  matches, frozen inspection, named and quick saves, loaded results, restart,
-  and the pre-result Autosave.
-- [x] **1.62** The [match summary](DESIGN.md#m1-match-summary) presents both
-  owners' milestones, totals, peaks, and histories after the result. Headless
-  reports retain both histories and share the results panel's Overview.
-- [ ] **1.63** Run the agreed headless profile/start-slot set for ARC versus
-  Circle and Circle versus ARC: both player factions, both start positions,
-  and Easy, Normal, and Hard, totaling 12 baseline cases. Use standard faction
-  profiles. Tune pacing on Normal; verify scaling, results, and save/load on
-  Easy and Hard. Require results by the 30-minute simulation cutoff; preserve
-  unfinished cases for diagnosis. Test recovery and disruption separately.
-  - The `baseline` set completes with matching Easy and Hard continuations.
-    With 12-unit attacks and Circle force budgets of 3, each faction wins one
-    Normal cross-faction match, at 15:02 and 16:29. Normal mirrors finish at
-    15:09 for ARC and 13:17 for the Circle. Remaining: bring the Circle mirror
-    into the target and the first assaults, now at 10 to 13 minutes, toward 8
-    to 12.
-  - ARC opens on one Harvester for over four minutes. AI budgets cannot add a
-    second Refinery without pushing the Barracks and scout past 3:40, outside
-    the military window, so the ARC opening is unchanged.
-  - The `player:probe` `turtle` opening wins from west at 15:40 and loses
-    from east at 16:29. Route searches break ties by direction, so mirrored
-    matches drift after about two minutes. Decide whether the probe needs
-    both slots.
-- [x] **1.64** Current performance accepted for M1. The normal production
-  workload held scale at 1920 × 1080 and sustained 120 ticks per second at 2x,
-  rendering at 59.4 FPS in Chromium and 47.2 FPS in WebKit.
-
-Phase gate: either faction can enter a complete skirmish through the normal
-menu, and both matchups meet the agreed automated behavior and scale targets.
+- [x] **1.59** Mirrored skirmish map with viable routes, expansions, scouting
+  landmarks, and defensible starts for both player assignments.
+- [x] **1.60** Menu launch for either faction's introduction or skirmish at
+  the selected difficulty, with skirmish setup preserved on restart.
+- [x] **1.61** [Skirmish results](DESIGN.md#m1-skirmish-results) verified
+  through frozen inspection, save/load, restart, and pre-result Autosave.
+- [x] **1.62** [Match summary](DESIGN.md#m1-match-summary) for both owners,
+  with a shared Overview in the results panel and headless reports.
+- [x] **1.63** All 12 baseline cases completed with deterministic Easy and
+  Hard continuations. Phase F accepted a one-slot win for the scripted
+  `turtle` opening. See
+  [headless checks](docs/verification.md#m1-headless-acceptance).
+- [x] **1.64** Normal-scale performance accepted, sustaining 120 simulation
+  ticks per second at 2× in Chromium and WebKit at 1920 × 1080. See
+  [performance measurement](docs/verification.md#m1-performance-measurement).
 
 ### G. External feedback and milestone acceptance
 
@@ -212,7 +189,8 @@ challenge, pacing, and useful choices.
 - [ ] **1.65** Distribute the integrated build through the agreed channel and
   run full skirmish playtests with both factions. Observe in-game onboarding,
   time to key milestones, assistance, confusion, and abandonment; ask what
-  drove build, expansion, and combat choices.
+  drove build, expansion, and combat choices. Revisit skirmish pacing with
+  this feedback.
   - Complete any remaining cohort coverage for 1.02. In ARC runs, check
     expansion and Relay Stations, layout, recovery and Mechanics, control
     groups, shortcuts, and idle-worker controls. Check whether repair under
