@@ -8,8 +8,8 @@ choices about income, production, expansion, protection, and recovery.
 
 [DESIGN.md](DESIGN.md#milestone-1-planning-direction) owns the agreed rules
 and open design decisions. This checklist owns delivery and acceptance.
-Phase E is active. Circle follow-ups 1.72 to 1.75 and retest 1.77 continue
-cohort task 1.02.
+Phase E is complete. Phase F is next. Any remaining cohort coverage for 1.02
+carries into 1.65.
 
 ### Using this checklist
 
@@ -36,10 +36,11 @@ cohort task 1.02.
 - [x] **1.01** Reproducible browser playtest bundle, tester instructions, and
   report template. See
   [playtest preparation](docs/verification.md#playtest-preparation).
-- [ ] **1.02** Complete playtesting with a cohort of five to eight RTS-familiar
-  and less experienced players through 1.77. Cover controls, clarity, pacing,
-  reliability, assistance, and abandonment. Turn findings into prioritized
-  tasks for controls and onboarding. Follow
+- [ ] **1.02** Complete and confirm coverage of five to eight RTS-familiar
+  and less experienced players across the ARC and Circle playtests. Use 1.65
+  for remaining coverage of controls, clarity, pacing, reliability,
+  assistance, and abandonment. Turn findings into prioritized controls and
+  onboarding tasks. Follow
   [playtest preparation](docs/verification.md#playtest-preparation).
 - [x] **1.03** Circle construction and infrastructure rules.
 - [x] **1.04** Cultivation, dormancy, delivery, and recovery rules.
@@ -127,82 +128,32 @@ Complete. The expanded ARC roster is playable with the
 
 ### E. Circle playable loop and introduction
 
-Extend the [Circle introduction](DESIGN.md#circle-introduction)
-through its full M1 roster and AI build plan. Keep Lifebloom-only costs and
-producer-based availability. Normal-menu skirmish launch belongs to 1.60.
+Complete. The [Circle introduction](DESIGN.md#circle-introduction) teaches
+cultivation, and the [Circle AI plan](DESIGN.md#m1-circle-ai-plan) sustains
+the same economy and roster. Normal-menu skirmish launch belongs to 1.60.
 
-- [x] **1.48** Circle core roster and paid opening verified through cultivation,
-  Musterhall training, and Wayfinder scouting.
-- [x] **1.49** Circle placement, single-worker tending and replacement,
-  infrastructure, and emergency Heartgrove recovery, with saved continuation
-  and keyboard-free construction controls.
-- [x] **1.50** Cultivation acceptance against
-  [economy rules](DESIGN.md#economy-and-construction), with shortest-walk
-  delivery and content-pack site tuning.
-- [x] **1.51** Cultivation and growth feedback verified, including site
-  inspection, dormancy alerts, worker badges, and construction status.
+- [x] **1.48** Circle core roster and paid opening.
+- [x] **1.49** Placement, tending, infrastructure, and Heartgrove recovery.
+- [x] **1.50** Cultivation, shortest-walk delivery, and site tuning.
+- [x] **1.51** Cultivation, dormancy, and growth feedback.
 - [x] **1.52** Healer and Artificer support, Thornspire defense, and Briar Ram
-  siege combat verified. The Construct Nursery grows Rams and trains
-  Artificers in one queue. Musterhalls train Healers.
-- [x] **1.53** [Circle presentation](DESIGN.md#m1-circle-presentation) covers
-  the full roster, including growth, producer entrances, damage and
-  destruction, service and weapon cues, faction feedback, and music.
-- [x] **1.54** The [Circle introduction](DESIGN.md#circle-introduction)
-  guides cultivation, site strain and dormancy, construction, and production.
-  Headless, mouse, and phone playthroughs verify victory within ten minutes.
-- [x] **1.55** The [Circle AI plan](DESIGN.md#m1-circle-ai-plan) covers
-  cultivation, tending, expansion, Thornspires, the full roster, and recovery
-  through faction-reported restart prices. Headless skirmish cases cover
-  Circle mirrors, recovery, continuation, and cross-faction matches.
-- [x] **1.56** Circle saves continue deterministically from every Cultivator
-  phase, worker replacement, emergency regrowth, dormant recovery, support
-  work, a periodically reloaded base, and the introduction. Loading rejects
-  Cultivator phases that contradict their targets. `circle-continuation`
-  resumes during an assault, Musterhall growth, and Cultivator replacement.
-- [x] **1.57** Cohort round of the Circle introduction and a Circle skirmish
-  against the ARC AI with three testers. Cultivation was understood, and units
-  and buildings behaved as expected. Findings continue in 1.72 to 1.77.
-- [x] **1.72** Circle skirmish wins against the ARC AI are achievable. The
-  Musterhall costs 75 Lifebloom, the Circle AI funds it after its first
-  Conservatory and Cultivator, and Sentinels deal 12 damage. From both
-  starts, the Circle AI rallies near home Lifebloom and wins the Normal
-  cross-faction cases. Every scripted `player:probe` opening wins from either
-  start. Human verification remains in 1.77.
-- [x] **1.73** Every map has a scenic out-of-bounds border, and the camera
-  keeps explored ground within the central third of the view. Browser specs
-  cover map edges, corners, and interior frontiers at several zooms on
-  standard and wide viewports, with minimap, Focus, Reset View, and fog
-  concealment. Human play is retested in 1.77.
-- [x] **1.74** Halve wolf-den and skirmish wall heights while preserving
-  landmark summits and open crossings. Walls block movement and construction.
-  Verified longer sightlines, camera visibility, both introduction
-  playthroughs, and all 28 headless skirmish cases.
-- [x] **1.75** Circle music crossfades without restarting the phrase. Playback
-  verified in the introduction and skirmish. Music loops and revised Medic,
-  living destruction, and wolf attack cues passed listening review.
-- [ ] **1.77** Retest 1.72 to 1.75 in the Circle introduction and skirmish
-  on a rebuilt, smoke-tested bundle. Follow the
-  [playtest procedure](docs/verification.md#playtest-preparation). Use returning
-  testers to check the fixes and recruit new players as needed for 1.02.
-  Verify RTS-familiar newcomers understand the Circle's differences,
-  establish and sustain a base, and explain a useful cultivation decision.
-  Require at least one unassisted Circle win on Normal and record whether
-  other players hold or recover from the first ARC raid. Fix blockers
-  reported by two or more testers, add regression coverage, and replay the
-  affected paths on a rebuilt bundle.
-  - Done: [tester instructions](docs/playtest-instructions.md) ask for one
-    Normal retry after a loss, offer the ARC skirmish to new testers, and give
-    returning testers a neutral comparison hint. The
-    [report](docs/playtest-report.md) covers the first ARC raid, camera
-    framing, wall visibility, and music. `npm run playtest:smoke` checks the
-    local and hosted bundle. The local preview passed its file and browser
-    checks in Chromium and WebKit.
-  - Remaining: full acceptance on the fixed revision, the distribution build
-    and local smoke, Pages publication and hosted smoke, organizer
-    playthroughs, the cohort round, triage, fixes, and retests.
-
-Phase gate: Circle play is a complete, understandable loop with a meaningful
-cultivation distinction, and its AI can sustain the same economy and roster.
+  siege combat.
+- [x] **1.53** [Circle presentation](DESIGN.md#m1-circle-presentation) for the
+  full roster, including growth, combat effects, faction cues, and music.
+- [x] **1.54** Circle introduction verified headless, with mouse, and on phone.
+- [x] **1.55** Circle AI for cultivation, expansion, defense, and recovery.
+- [x] **1.56** Deterministic Circle saves through cultivation, growth, support,
+  recovery, and the introduction.
+- [x] **1.57** Initial cohort playtest of the Circle introduction and skirmish.
+- [x] **1.72** Circle opening balance and scripted wins from both starts.
+- [x] **1.73** Scenic map borders and camera framing for explored terrain.
+- [x] **1.74** Lower walls and longer sightlines with landmarks and crossings
+  preserved.
+- [x] **1.75** Phase-aligned Circle music crossfades and revised Medic,
+  living destruction, and wolf attack cues.
+- [x] **1.77** Circle introduction and skirmish retest complete. Player feedback
+  confirmed the follow-up fixes. Three returning testers won unassisted on
+  Normal in 12 to 15 minutes, including one who recovered after the first raid.
 
 ### F. Complete skirmish integration
 
@@ -267,9 +218,10 @@ challenge, pacing, and useful choices.
   run full skirmish playtests with both factions. Observe in-game onboarding,
   time to key milestones, assistance, confusion, and abandonment; ask what
   drove build, expansion, and combat choices.
-  - Carry forward any unfinished ARC cohort runs. Check expansion and Relay
-    Stations, layout, recovery and Mechanics, control groups, shortcuts, and
-    idle-worker controls. Check whether repair under attack blocks rebuilding.
+  - Complete any remaining cohort coverage for 1.02. In ARC runs, check
+    expansion and Relay Stations, layout, recovery and Mechanics, control
+    groups, shortcuts, and idle-worker controls. Check whether repair under
+    attack blocks rebuilding.
 - [ ] **1.66** Verify that first-time ARC players, using M0 and in-game help,
   and RTS-familiar Circle players, after the Circle introduction, establish
   income, production, defense, and an expansion. Observe testers winning and
