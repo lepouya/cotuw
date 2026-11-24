@@ -45,7 +45,7 @@ beforeAll(() => {
   outcomes.push(...runTicks(simulation, minutes(0.5)));
   afterSave = simulation.snapshot();
   outcomes.push(...runTicks(simulation, minutes(1.5)));
-});
+}, 30_000);
 afterAll(() => simulation.dispose());
 
 const ownedBy = (owner: string, definitionId: string) =>

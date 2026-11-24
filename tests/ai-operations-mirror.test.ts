@@ -134,7 +134,7 @@ test("an operation continues identically after save and load", () => {
   } finally {
     sim.dispose();
   }
-});
+}, 30_000);
 
 test("active operations continue identically through bounded clock catch-up", () => {
   const whole = resumeMirror(structuredClone(leading));

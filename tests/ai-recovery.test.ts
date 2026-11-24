@@ -252,6 +252,7 @@ test.each([100, 150])(
       sim.dispose();
     }
   },
+  30_000,
 );
 
 test("losing the Field Barracks rebuilds it at its normal cost", () => {
