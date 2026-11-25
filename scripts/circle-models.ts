@@ -50,8 +50,6 @@ type StructureRecipe = {
   height: number;
   frame: keyof typeof FRAMES;
   focusHeight: number;
-  /** A glowing pool for buildings that receive cultivated Lifebloom. */
-  basin?: boolean;
   /** Owned buildings carry a marker; neutral resource sites do not. */
   owned: boolean;
   ownerMarks?: readonly Vec3[];
@@ -195,17 +193,99 @@ const FRAMES = {
       ).rotation.y = angle + 0.24;
     }
   },
+  /** A low bower leaves the Lifebloom basin open at the front. */
+  basin: ({ name, scene, root, wood, stem, plate }: FrameContext) => {
+    const foot = MeshBuilder.CreateCylinder(
+      `${name}-growth-roots-basin-foot`,
+      {
+        height: 0.3,
+        diameterTop: 1.72,
+        diameterBottom: 1.27,
+        tessellation: 20,
+      },
+      scene,
+    );
+    foot.parent = root;
+    foot.position.set(0, 0.22, 0.12);
+    foot.scaling.z = 0.67;
+    foot.material = wood;
+    const rim = MeshBuilder.CreateTorus(
+      `${name}-growth-roots-basin-rim`,
+      { diameter: 1.75, thickness: 0.15, tessellation: 24 },
+      scene,
+    );
+    rim.parent = root;
+    rim.position.set(0, 0.39, 0.12);
+    rim.scaling.z = 0.67;
+    rim.material = wood;
+    const sap = surface(scene, `${name}-sap`, [0.4, 0.2, 0.72], 0.32);
+    plate("growth-ribs-pool", [0, 0.34, 0.12], [1.75, 0.13, 1.17], sap);
+    stem(
+      "growth-ribs-rear-arch",
+      [
+        [-1.12, 0, -0.51],
+        [-0.95, 0.75, -0.68],
+        [-0.52, 1.29, -0.73],
+        [0, 1.42, -0.71],
+        [0.52, 1.29, -0.73],
+        [0.95, 0.75, -0.68],
+        [1.12, 0, -0.51],
+      ],
+      0.12,
+    );
+    for (const side of [-1, 1]) {
+      stem(
+        `growth-ribs-bower-${side}`,
+        [
+          [side * 1.18, 0, 0.49],
+          [side * 1.03, 0.58, 0.34],
+          [side * 0.88, 0.9, 0.18],
+          [side * 0.76, 1.16, -0.24],
+          [side * 0.39, 1.32, -0.63],
+        ],
+        0.13,
+      );
+      stem(
+        `growth-roots-apron-${side}`,
+        [
+          [side * 0.86, 0, 0.77],
+          [side * 0.68, 0.12, 0.64],
+          [side * 0.43, 0.26, 0.54],
+        ],
+        0.095,
+      );
+      plate(
+        `growth-canopy-wing-${side}`,
+        [side * 0.84, 1.17, -0.25],
+        [0.56, 0.3, 0.99],
+        undefined,
+        "blade",
+      ).rotation.y = side * 0.86;
+      plate(
+        `growth-canopy-rear-leaf-${side}`,
+        [side * 0.35, 1.39, -0.65],
+        [0.57, 0.36, 0.84],
+        undefined,
+        "blade",
+      ).rotation.y = side * 2.1;
+      plate(
+        `growth-canopy-layered-wing-${side}`,
+        [side * 0.96, 1.01, -0.47],
+        [0.45, 0.27, 0.78],
+        undefined,
+        "blade",
+      ).rotation.y = side * 1.8;
+      plate(
+        `growth-canopy-root-leaf-${side}`,
+        [side * 1.02, 0.18, 0.16],
+        [0.35, 0.23, 0.7],
+        undefined,
+        "blade",
+      ).rotation.y = side * 0.56;
+    }
+  },
   /** A hall of arched ribs under leaf roofing. */
-  arches: ({
-    name,
-    scene,
-    root,
-    recipe,
-    wood,
-    core,
-    stem,
-    plate,
-  }: FrameContext) => {
+  arches: ({ recipe, stem, plate }: FrameContext) => {
     const { halfWidth, halfDepth, height } = recipe;
     for (let i = 0; i < 4; i++) {
       const z = -halfDepth + (i * halfDepth * 2) / 3;
@@ -228,17 +308,6 @@ const FRAMES = {
         );
         roof.rotation.z = side * -0.38;
       }
-    }
-    if (recipe.basin) {
-      const basin = MeshBuilder.CreateTorus(
-        `${name}-growth-roots-basin`,
-        { diameter: 1.4, thickness: 0.18, tessellation: 20 },
-        scene,
-      );
-      basin.parent = root;
-      basin.position.y = 0.25;
-      basin.material = wood;
-      plate("growth-ribs-pool", [0, 0.2, 0], [1.2, 0.14, 1.2], core);
     }
   },
   /** A thorn-plated column under an opening crown that aims its shots. */
@@ -415,10 +484,13 @@ const CIRCLE_STRUCTURES = {
     halfWidth: 1.3,
     halfDepth: 0.8,
     height: 1.5,
-    frame: "arches",
-    focusHeight: 0.65,
-    basin: true,
+    frame: "basin",
+    focusHeight: 0.54,
     owned: true,
+    ownerMarks: [
+      [-0.93, 0.85, 0.29],
+      [0.93, 0.85, 0.29],
+    ],
   },
   "circle-musterhall": {
     halfWidth: 0.85,

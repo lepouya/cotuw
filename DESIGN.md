@@ -1975,8 +1975,9 @@ acceptance progress. The following sections define the selected scope.
   pointed leaves. Curved roots frame an open hall beneath the crown. Violet
   lights flank the entrance, and owner markings sit on the front and side
   arches.
-- The Lifebloom Conservatory has a low, wide leaf canopy over a visible
-  collection basin, with easy access for returning Cultivators.
+- The Lifebloom Conservatory has a low bower of pointed leaves and pale ribs.
+  Its open front exposes the violet collection basin, and the side ribs
+  carry owner markings.
 - The Musterhall is elongated, with a vaulted roof of curved wooden ribs and
   a broad infantry entrance.
 - The Construct Nursery is a rounded cradle enclosed by protective arches,
