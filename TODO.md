@@ -204,6 +204,8 @@ challenge, pacing, and useful choices.
     standard wolf and alpha. Recovery model passes cover ARC building
     rubble, Circle living rubble, and neutral salvage. Resource model passes
     cover Materials depletion and Lifebloom reserve, dormancy, and recovery.
+    The ARC foundation and scaffold pass covers rotated placement, all
+    three stages, and paused work alongside Circle growth at gameplay zoom.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

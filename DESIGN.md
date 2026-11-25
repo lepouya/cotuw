@@ -1966,6 +1966,10 @@ acceptance progress. The following sections define the selected scope.
 - The Field Barracks has low, armored dormitory wings with banded windows.
   A raised owner-marked entrance separates them. Its doors slide into the
   wings when troops deploy, and pale lights mark the threshold.
+- ARC foundations use pale beveled slabs over dark footings. Their joints
+  trace the tile grid across footprints. Construction scaffolds leave the
+  building visible between slate rails and diagonal braces. Amber collars
+  and rail ends mark the frame corners at gameplay zoom.
 - The Relay Station has a low equipment cabinet and a braced mast with
   two angled receiver panels that sweep together. Owner markings run along
   the cabinet rails and outer panel edges. A pale cyan console lamp pulses

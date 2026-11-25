@@ -238,7 +238,9 @@ tracers, bite marks, smoke, fire, wound drops, regeneration, and birds by URL,
 with an optional idle clip. The salvage case batches its shell, frame, and
 amber lights by material. Its root carries the hover and rotation clip.
 Fire plays its flicker, regeneration its pulse, and birds their wing beat.
-The scaffold is a unit cube that construction stages scale around the
+Each foundation tile uses one beveled slab mesh with vertex colors for the
+deck, shoulders, and footing. The scaffold's rails, braces, and amber fittings
+batch by material within a unit cube. Construction stages scale it around the
 footprint. Materials mounds batch their two ore tones and rock bed by
 material. The bed sits on the ground plane, so each depletion stage shrinks
 the mound toward the terrain without changing navigation.

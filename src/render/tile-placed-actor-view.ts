@@ -329,7 +329,6 @@ export function createTilePlacedActorViewRegistry(
         );
         foundations.push(foundation);
         const column = foundation.root;
-        for (const mesh of column.getChildMeshes()) mesh.material = body;
         column.scaling.set(maxX - minX, roof - low.y, maxZ - minZ);
         column.parent = root;
         column.position.set(

@@ -1,6 +1,7 @@
 import {
   Bone,
   Color3,
+  Color4,
   Matrix,
   Mesh,
   MeshBuilder,
@@ -923,12 +924,46 @@ function strike(scene: Scene, name: string) {
   }
 }
 
-/** A unit cube that placement scales to fit. */
+/** A terrain-seated slab module with a sloped shoulder and recessed joints. */
 function foundation(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const mesh = MeshBuilder.CreateBox(name, { size: 1 }, scene);
+  const square = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ];
+  const vertex = [
+    ...square.map(([x, z]) => [x! * 0.5, -0.5, z! * 0.5]),
+    ...square.map(([x, z]) => [x! * 0.5, 0.08, z! * 0.5]),
+    ...square.map(([x, z]) => [x! * 0.45, 0.5, z! * 0.45]),
+  ];
+  const face = [
+    [0, 1, 2, 3],
+    [11, 10, 9, 8],
+  ];
+  const footing = new Color4(0.23, 0.28, 0.3, 1);
+  const shoulder = new Color4(0.43, 0.48, 0.47, 1);
+  const deck = new Color4(0.59, 0.63, 0.59, 1);
+  const faceColors = [footing, deck];
+  for (const [offset, color] of [
+    [0, footing],
+    [4, shoulder],
+  ] as const) {
+    for (let i = 0; i < square.length; i++) {
+      const a = offset + i;
+      const b = offset + ((i + 1) % square.length);
+      face.push([b, a, a + 4, b + 4]);
+      faceColors.push(color);
+    }
+  }
+  const mesh = MeshBuilder.CreatePolyhedron(
+    name,
+    { custom: { vertex, face }, faceColors },
+    scene,
+  );
   mesh.parent = root;
-  mesh.material = surface(scene, name, [0.35, 0.42, 0.46]);
+  mesh.material = surface(scene, name, Color3.White());
 }
 
 /** An exposed vein of tilted ore blades in a low, fractured rock bed. */
@@ -1324,64 +1359,78 @@ function salvage(scene: Scene, name: string) {
   );
 }
 
-/** A unit-cube lattice of posts, rails, and braces around a blueprint. */
+/** An open braced frame sized to the blueprint's footprint and stage height. */
 function scaffold(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const thickness = 0.03;
-  const poles: Mesh[] = [];
-  const braces: Mesh[] = [];
-  /** A bar along x, rolled by `tilt` and then turned by `yaw`. */
-  const bar = (
-    parts: Mesh[],
-    length: number,
+  const frame: Mesh[] = [];
+  const fittings: Mesh[] = [];
+  const safety: Mesh[] = [];
+  const beam = (
+    batch: Mesh[],
+    [width, height, depth]: readonly [number, number, number],
     [x, y, z]: readonly [number, number, number],
-    tilt: number,
-    yaw: number,
+    tilt = 0,
+    yaw = 0,
   ) => {
     const mesh = MeshBuilder.CreateBox(
-      `bar-${parts.length}`,
-      { width: length, height: thickness, depth: thickness },
+      `beam-${batch.length}`,
+      { width, height, depth },
       scene,
     );
     mesh.position.set(x, y, z);
     mesh.rotation.set(0, yaw, tilt);
-    parts.push(mesh);
+    batch.push(mesh);
   };
-  const edges = [-0.5, 0, 0.5];
-  // Posts at the corners and edge midpoints; rails at three levels.
-  for (const x of edges)
-    for (const z of edges) if (x || z) bar(poles, 1, [x, 0, z], Math.PI / 2, 0);
-  for (const y of edges)
-    for (const side of [-0.5, 0.5]) {
-      bar(poles, 1, [0, y, side], 0, 0);
-      bar(poles, 1, [side, y, 0], 0, Math.PI / 2);
+  const edge = 0.445;
+  const sides = [-edge, edge];
+  for (const x of sides)
+    for (const z of sides) {
+      beam(frame, [0.055, 0.94, 0.055], [x, 0, z]);
+      beam(fittings, [0.11, 0.1, 0.11], [x, -0.45, z]);
+      beam(safety, [0.091, 0.17, 0.091], [x, 0.415, z]);
     }
-  // One brace per bay on each side, leaning alternately.
-  const diagonal = Math.hypot(0.5, 0.5);
-  for (const yaw of [0, Math.PI / 2])
-    for (const side of [-0.5, 0.5])
-      for (const [index, along] of [-0.25, 0.25].entries()) {
-        const lean = ((index ? -1 : 1) * Math.PI) / 4;
-        const y = -0.25 + index * 0.5;
-        bar(
-          braces,
-          diagonal,
-          yaw ? [side, y, along] : [along, y, side],
-          lean,
+
+  const lower = -0.36;
+  const upper = 0.41;
+  const span = upper - lower;
+  const diagonal = Math.hypot(edge, span);
+  const lean = Math.atan2(span, edge);
+  for (const yaw of [0, Math.PI / 2]) {
+    for (const side of sides) {
+      const at = (along: number, y: number): [number, number, number] =>
+        yaw ? [side, y, -along] : [along, y, side];
+      beam(frame, [2 * edge, 0.075, 0.05], at(0, lower), 0, yaw);
+      beam(frame, [2 * edge, 0.09, 0.055], at(0, upper), 0, yaw);
+      beam(frame, [0.035, span, 0.035], at(0, (lower + upper) / 2));
+      for (const sign of [-1, 1]) {
+        beam(
+          fittings,
+          [diagonal, 0.035, 0.026],
+          at((sign * edge) / 2, (lower + upper) / 2),
+          sign * lean,
           yaw,
         );
+        beam(safety, [0.14, 0.075, 0.065], at(sign * 0.352, upper), 0, yaw);
       }
+    }
+  }
   merge(
     root,
-    "poles",
-    poles,
-    surface(scene, "scaffold-poles", [0.86, 0.62, 0.16]),
+    "frame",
+    frame,
+    surface(scene, "scaffold-frame", [0.17, 0.24, 0.27]),
   );
   merge(
     root,
-    "braces",
-    braces,
-    surface(scene, "scaffold-braces", [0.32, 0.33, 0.34]),
+    "fittings",
+    fittings,
+    surface(scene, "scaffold-fittings", [0.35, 0.43, 0.45]),
+  );
+  merge(
+    root,
+    "safety",
+    safety,
+    surface(scene, "scaffold-safety", [0.9, 0.59, 0.19]),
   );
 }
 
