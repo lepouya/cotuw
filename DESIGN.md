@@ -1969,6 +1969,10 @@ acceptance progress. The following sections define the selected scope.
 - The Field Barracks has low, armored dormitory wings with banded windows.
   A raised owner-marked entrance separates them. Its doors slide into the
   wings when troops deploy, and pale lights mark the threshold.
+- The Relay Station has a low equipment cabinet and a braced mast with
+  two angled receiver panels that sweep together. Owner markings run along
+  the cabinet rails and outer panel edges. A pale cyan console lamp pulses
+  below the mast.
 - Troopers wear faceted copper-brown armor over charcoal fatigues, with a
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.

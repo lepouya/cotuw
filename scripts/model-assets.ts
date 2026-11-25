@@ -1358,7 +1358,7 @@ const BUILDERS = {
   "command-center": building(createCommandCenterDetails),
   barracks: building(createBarracksDetails, { batchStatic: true }),
   refinery: building(createRefineryDetails, { batchStatic: true }),
-  relay: building(createRelayDetails),
+  relay: building(createRelayDetails, { batchStatic: true }),
   sentry: building(createSentryDetails),
   harvester,
   wolf,

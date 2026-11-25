@@ -88,10 +88,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   keeps descendants of animated parts attached to their moving parents.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
-- Relay Stations sweep an antenna and pulse a signal lamp. Sentry Turrets
-  retain a separate yaw pivot for committed aim, with recoil and twin muzzle
-  flashes per shot. Their generated GLBs use owner markings; procedural
-  details remain available for content that selects them.
+- Relay Stations sweep paired receiver panels and pulse a console lamp.
+  Sentry Turrets retain a separate yaw pivot for committed aim, with recoil
+  and twin muzzle flashes per shot. Their generated GLBs use owner markings;
+  procedural details remain available for content that selects them.
 - A material named `owner` or ending in `-owner` marks the owner-color area.
   Sessions give each owner a shared copy in its
   [owner color](content-packs.md), so keep those parts in their own mesh

@@ -245,7 +245,7 @@ test.each(["wolf", "alpha-wolf", "arc-harvester"])(
   },
 );
 
-test.each(["command-center", "barracks", "refinery", "salvage"])(
+test.each(["command-center", "barracks", "refinery", "relay", "salvage"])(
   "%s loads its generated idle clip with independent instances",
   async (kind) => {
     const scene = testScene();
