@@ -21,6 +21,29 @@ const EXIT_SECONDS = 1.2;
 const ENTRANCE_REST_ANGLE = 0.45;
 const ENTRANCE_OPEN_ANGLE = 1.35;
 
+/** Folded, pointed leaf with a raised midrib and a solid underside. */
+const LEAF_BLADE = {
+  vertex: [
+    [0, 0, -0.5],
+    [-0.34, 0.02, -0.27],
+    [-0.5, 0, 0.04],
+    [-0.28, 0.12, 0.31],
+    [0, 0.32, 0.5],
+    [0.28, 0.12, 0.31],
+    [0.5, 0, 0.04],
+    [0.34, 0.02, -0.27],
+    [0, 0.5, 0.02],
+    [0, -0.24, 0.02],
+  ],
+  face: Array.from({ length: 8 }, (_, edge) => {
+    const next = (edge + 1) % 8;
+    return [
+      [edge, next, 8],
+      [next, edge, 9],
+    ];
+  }).flat(),
+};
+
 type StructureRecipe = {
   halfWidth: number;
   halfDepth: number;
@@ -31,8 +54,7 @@ type StructureRecipe = {
   basin?: boolean;
   /** Owned buildings carry a marker; neutral resource sites do not. */
   owned: boolean;
-  /** Where the owner marker sits, when the default front face is open. */
-  ownerAt?: Vec3;
+  ownerMarks?: readonly Vec3[];
   /** A producer's front entrance, whose leaves part for each exit. */
   entrance?: { z: number; width: number; height: number };
 };
@@ -56,50 +78,121 @@ type FrameContext = {
     position: Vec3,
     size: Vec3,
     material?: StandardMaterial,
+    shape?: "blade",
   ) => Mesh;
 };
 
 /** Frames build each structure's ribs and canopy above the shared roots. */
 const FRAMES = {
-  /** A central trunk with arched ribs and a raised canopy. */
-  tree: ({ stem, plate }: FrameContext) => {
+  /** Plaited roots leave an open hall beneath the layered crown. */
+  tree: ({ stem, plate, core }: FrameContext) => {
     stem(
       "growth-ribs-trunk",
       [
-        [0, 0, 0],
-        [0.18, 1.2, -0.05],
-        [-0.1, 2.3, 0],
-        [0, 3.3, 0],
+        [0.07, 0, -0.36],
+        [0.18, 0.85, -0.41],
+        [-0.1, 1.76, -0.36],
+        [-0.14, 2.52, -0.2],
+        [0.03, 3.27, -0.04],
       ],
-      0.3,
+      0.23,
     );
-    for (let i = 0; i < 6; i++) {
-      const angle = (i * Math.PI) / 3;
-      const x = Math.cos(angle);
-      const z = Math.sin(angle);
+    stem(
+      "growth-ribs-entry-arch",
+      [
+        [-0.71, 0, 1.12],
+        [-0.64, 0.74, 1.08],
+        [-0.37, 1.37, 1.04],
+        [0, 1.61, 1.01],
+        [0.37, 1.37, 1.04],
+        [0.64, 0.74, 1.08],
+        [0.71, 0, 1.12],
+      ],
+      0.13,
+    );
+    for (const side of [-1, 1]) {
       stem(
-        `growth-ribs-arch-${i}`,
+        `growth-ribs-side-arch-${side}`,
         [
-          [x * 1.1, 0, z * 1.1],
-          [x * 0.75, 0.9, z * 0.75],
-          [0.05, 1.6, 0],
+          [side * 1.19, 0, 0.53],
+          [side * 1.04, 0.53, 0.38],
+          [side * 0.82, 1.18, 0.19],
+          [side * 0.51, 1.72, -0.1],
+          [side * 0.08, 2.07, -0.34],
         ],
-        0.12,
+        0.15,
       );
+      stem(
+        `growth-ribs-rear-root-${side}`,
+        [
+          [side * 0.79, 0, -1.15],
+          [side * 0.63, 0.44, -0.94],
+          [side * 0.47, 0.94, -0.72],
+          [side * 0.12, 1.59, -0.37],
+        ],
+        0.17,
+      );
+      stem(
+        `growth-ribs-arch-brace-${side}`,
+        [
+          [side * 0.38, 1.38, 1.04],
+          [side * 0.44, 1.63, 0.69],
+          [side * 0.34, 1.85, 0.23],
+          [side * 0.12, 2.11, -0.34],
+        ],
+        0.095,
+      );
+      plate(
+        `growth-canopy-entrance-lamp-${side}`,
+        [side * 0.55, 0.89, 1.15],
+        [0.12, 0.24, 0.12],
+        core,
+      );
+      plate(
+        `growth-roots-front-frond-${side}`,
+        [side * 0.92, 0.15, 0.87],
+        [0.36, 0.27, 0.8],
+        undefined,
+        "blade",
+      ).rotation.y = side * 0.48;
+      plate(
+        `growth-roots-rear-frond-${side}`,
+        [side * 0.89, 0.12, -0.8],
+        [0.42, 0.23, 0.87],
+        undefined,
+        "blade",
+      ).rotation.y = Math.PI - side * 0.78;
+    }
+
+    const crownHeights = [3.21, 3.09, 3.37, 3.23, 3.44, 3.31];
+    for (const [i, y] of crownHeights.entries()) {
+      const angle = Math.PI / 12 + (i * Math.PI) / 3;
+      const x = Math.sin(angle);
+      const z = Math.cos(angle);
       stem(
         `growth-ribs-branch-${i}`,
         [
-          [0, 1.8, 0],
-          [x * 0.8, 2.7, z * 0.8],
-          [x * 1.1, 3.2, z * 1.1],
+          [-0.08, 2.14, -0.25],
+          [x * 0.41, y - 0.69, z * 0.41],
+          [x * 0.74, y - 0.23, z * 0.74],
+          [x * 1.13, y - 0.08, z * 1.13],
         ],
-        0.13,
+        0.115,
       );
       plate(
-        `growth-canopy-${i}`,
-        [x * 0.7, 3.25 + (i % 2) * 0.3, z * 0.7],
-        [1.25, 0.7, 1.1],
-      );
+        `growth-canopy-outer-blade-${i}`,
+        [x * 0.86, y, z * 0.86],
+        [0.86, 0.37, 1.24],
+        undefined,
+        "blade",
+      ).rotation.y = angle;
+      plate(
+        `growth-canopy-inner-blade-${i}`,
+        [x * 0.41, y + 0.22, z * 0.41],
+        [0.67, 0.32, 1.07],
+        undefined,
+        "blade",
+      ).rotation.y = angle + 0.24;
     }
   },
   /** A hall of arched ribs under leaf roofing. */
@@ -309,8 +402,13 @@ const CIRCLE_STRUCTURES = {
     halfDepth: 1.3,
     height: 4,
     frame: "tree",
-    focusHeight: 2.1,
+    focusHeight: 2.26,
     owned: true,
+    ownerMarks: [
+      [0, 1.55, 1.16],
+      [-0.87, 1.18, 0.2],
+      [0.87, 1.18, 0.2],
+    ],
     entrance: { z: 1.12, width: 0.8, height: 1.05 },
   },
   "circle-conservatory": {
@@ -338,7 +436,7 @@ const CIRCLE_STRUCTURES = {
     frame: "cradle",
     focusHeight: 0.6,
     owned: true,
-    ownerAt: [0, 1.75, 1.36],
+    ownerMarks: [[0, 1.75, 1.36]],
     entrance: { z: 1.34, width: 1.3, height: 1.35 },
   },
   "circle-thornspire": {
@@ -348,7 +446,7 @@ const CIRCLE_STRUCTURES = {
     frame: "spire",
     focusHeight: 1.1,
     owned: true,
-    ownerAt: [0, 0.9, 0.27],
+    ownerMarks: [[0, 0.9, 0.27]],
   },
   "cultivation-site": {
     halfWidth: 0.65,
@@ -591,7 +689,10 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     surface(scene, `${name}-${part}`, color, glow);
   const wood = finish("wood", [0.82, 0.74, 0.52]);
   const bark = finish("roots", [0.28, 0.19, 0.12]);
-  const leaf = finish("leaves", [0.12, 0.34, 0.22]);
+  const leaf = finish(
+    "leaves",
+    recipe.frame === "tree" ? [0.19, 0.45, 0.26] : [0.12, 0.34, 0.22],
+  );
   const core = finish("core", [0.58, 0.28, 0.88], 0.6);
   const ribs: Rib[] = [];
   const plates: Plate[] = [];
@@ -616,12 +717,17 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     position,
     size,
     material = leaf,
+    shape,
   ) => {
-    const mesh = MeshBuilder.CreateSphere(
-      `${name}-${id}`,
-      { diameter: 1, segments: 6 },
-      scene,
-    );
+    const meshName = `${name}-${id}`;
+    const mesh =
+      shape === "blade"
+        ? MeshBuilder.CreatePolyhedron(meshName, { custom: LEAF_BLADE }, scene)
+        : MeshBuilder.CreateSphere(
+            meshName,
+            { diameter: 1, segments: 6 },
+            scene,
+          );
     mesh.parent = root;
     mesh.material = material;
     mesh.position.set(...position);
@@ -659,13 +765,12 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
   const addExitClip =
     recipe.entrance &&
     addEntrance(scene, name, root, recipe.entrance, leaf, core);
-  if (recipe.owned)
-    plate(
-      "growth-canopy-owner",
-      recipe.ownerAt ?? [0, height * 0.62, halfDepth * 0.85],
-      [0.35, 0.3, 0.12],
-      finish("owner", [0.48, 0.76, 0.59]),
-    );
+  if (recipe.owned) {
+    const owner = finish("owner", [0.48, 0.76, 0.59]);
+    const marks = recipe.ownerMarks ?? [[0, height * 0.62, halfDepth * 0.85]];
+    for (const [index, position] of marks.entries())
+      plate(`growth-canopy-owner-${index}`, position, [0.35, 0.3, 0.12], owner);
+  }
   const pulse = plate(
     "growth-canopy-focus",
     [0, recipe.focusHeight, 0],

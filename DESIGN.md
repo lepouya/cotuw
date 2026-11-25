@@ -1965,8 +1965,10 @@ acceptance progress. The following sections define the selected scope.
 - Use warm, pale living wood for structural ribs, darker roots and joints,
   deep green foliage, and restrained violet light for magical activity.
   Reserve clear areas for owner colors, separate from faction materials.
-- The Heartgrove has a tall, branching central trunk supporting a broad crown,
-  with open arches between its roots.
+- The Heartgrove has a pale branching trunk and a broad crown of overlapping
+  pointed leaves. Curved roots frame an open hall beneath the crown. Violet
+  lights flank the entrance, and owner markings sit on the front and side
+  arches.
 - The Lifebloom Conservatory has a low, wide leaf canopy over a visible
   collection basin, with easy access for returning Cultivators.
 - The Musterhall is elongated, with a vaulted roof of curved wooden ribs and
