@@ -63,7 +63,7 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
     transparent: true,
     pickable: false,
   });
-  expect((await buildingPreview(page))!.entranceOffset[2]).toBeCloseTo(0.68);
+  expect((await buildingPreview(page))!.entranceOffset[2]).toBeCloseTo(0.665);
   await page.locator("#rotate-building").click();
   await expect(canvas).toHaveAttribute("data-placement-rotation", "1");
   expect(await buildingPreview(page)).toMatchObject({
@@ -71,7 +71,7 @@ test("previews, rotates, places, selects, and removes a Command Center", async (
     transparent: true,
     pickable: false,
   });
-  expect((await buildingPreview(page))!.entranceOffset[0]).toBeCloseTo(0.68);
+  expect((await buildingPreview(page))!.entranceOffset[0]).toBeCloseTo(0.665);
   await page.mouse.click(point.x, point.y);
   await expect(canvas).toHaveAttribute("data-tile-placed-actor-count", "1");
   await expect(canvas).toHaveAttribute("data-placement-active", "false");
