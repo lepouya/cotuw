@@ -1583,6 +1583,7 @@
     "arc-trooper": {
       "name": "Trooper",
       "description": "Line infantry",
+      "portrait": "arc-trooper",
       "train": {
         "id": "train-trooper",
         "label": "Train Trooper"

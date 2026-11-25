@@ -1,4 +1,4 @@
-// Builds the placeholder infantry GLBs. The asset tests rebuild them to check
+// Builds the infantry GLBs. The asset tests rebuild them to check
 // the committed files are current.
 import {
   Animation,
@@ -26,7 +26,7 @@ type Joint = { name: string; parent?: string; offset: Vec3 };
 type Part = {
   name: string;
   joint: string;
-  shape: "box" | "sphere" | "cylinder" | "torus" | "leaf";
+  shape: "box" | "sphere" | "cylinder" | "torus" | "leaf" | "shell";
   size: Vec3;
   position: Vec3;
   finish: Finish;
@@ -40,9 +40,16 @@ const DARK: Vec3 = [0.09, 0.13, 0.15];
 const METAL: Vec3 = [0.62, 0.68, 0.7];
 
 /** Resting arms: shoulder pitch and outward spread, mirrored on the right. */
-type Stance = { pitch: number; spread: number; forearm: number; swing: number };
+type Stance = {
+  pitch: number;
+  spread: number;
+  forearm: number;
+  swing: number;
+  ready?: Readonly<Record<string, Vec3>>;
+};
+type JointPose = { joints: string[]; pose: Pose };
 /** An additive layer that starts and ends at neutral for continuous blending. */
-type Attack = { clip: string; frames: number; joints: string[]; pose: Pose };
+type Attack = JointPose & { clip: string; frames: number; aim?: JointPose };
 type InfantryRecipe = {
   scale: number;
   palette: Record<Exclude<Finish, "dark" | "metal">, Vec3>;
@@ -99,30 +106,240 @@ const ARC_HEAD: Part[] = [
 ];
 const ARC_RIFLE: Part[] = [
   part(
-    "rifle-body",
+    "rifle-stock",
     "spine",
     "box",
-    [0.17, 0.16, 0.65],
-    [0.12, 1.12, 0.41],
+    [0.13, 0.17, 0.3],
+    [0.12, 1.15, 0.08],
     "dark",
+  ),
+  part(
+    "rifle-receiver",
+    "spine",
+    "shell",
+    [0.24, 0.46, 0.21],
+    [0.12, 1.16, 0.39],
+    "metal",
+    Math.PI / 2,
+  ),
+  part(
+    "rifle-shroud",
+    "spine",
+    "shell",
+    [0.2, 0.35, 0.19],
+    [0.12, 1.16, 0.72],
+    "dark",
+    Math.PI / 2,
   ),
   part(
     "rifle-barrel",
     "spine",
     "cylinder",
-    [0.055, 0.42, 0.055],
-    [0.12, 1.15, 0.88],
+    [0.085, 0.3, 0.085],
+    [0.12, 1.16, 0.98],
+    "metal",
+    Math.PI / 2,
+  ),
+  part(
+    "rifle-tip",
+    "spine",
+    "cylinder",
+    [0.115, 0.11, 0.115],
+    [0.12, 1.16, 1.09],
     "dark",
     Math.PI / 2,
+  ),
+  part(
+    "rifle-grip",
+    "spine",
+    "box",
+    [0.1, 0.23, 0.1],
+    [0.12, 1.04, 0.25],
+    "dark",
+    0.25,
+  ),
+  part(
+    "rifle-rail",
+    "spine",
+    "box",
+    [0.065, 0.045, 0.46],
+    [0.12, 1.25, 0.44],
+    "dark",
   ),
   part(
     "rifle-sight",
     "spine",
     "box",
-    [0.08, 0.07, 0.16],
-    [0.12, 1.24, 0.36],
+    [0.075, 0.065, 0.13],
+    [0.12, 1.28, 0.36],
+    "visor",
+  ),
+];
+
+const TROOPER_ARMOR: Part[] = [
+  part("waist", "pelvis", "shell", [0.5, 0.23, 0.33], [0, 0.91, 0], "dark"),
+  part("suit", "spine", "shell", [0.67, 0.48, 0.44], [0, 1.29, 0], "cloth"),
+  part(
+    "chest-carapace",
+    "spine",
+    "shell",
+    [0.61, 0.35, 0.43],
+    [0, 1.35, 0.11],
+    "armor",
+    Math.PI,
+  ),
+  part(
+    "chest-mark",
+    "spine",
+    "box",
+    [0.14, 0.09, 0.03],
+    [0, 1.42, 0.317],
     "owner",
   ),
+  part("pack", "spine", "shell", [0.48, 0.41, 0.28], [0, 1.31, -0.25], "armor"),
+  part(
+    "pack-vent",
+    "spine",
+    "box",
+    [0.26, 0.24, 0.05],
+    [0, 1.31, -0.385],
+    "dark",
+  ),
+  part(
+    "pack-mark",
+    "spine",
+    "box",
+    [0.24, 0.07, 0.04],
+    [0, 1.49, -0.36],
+    "owner",
+  ),
+  part("collar", "spine", "cylinder", [0.34, 0.14, 0.34], [0, 1.54, 0], "dark"),
+  part(
+    "helmet-shell",
+    "head",
+    "shell",
+    [0.48, 0.23, 0.5],
+    [0, 1.78, -0.015],
+    "armor",
+  ),
+  part(
+    "helmet-jaw",
+    "head",
+    "shell",
+    [0.45, 0.23, 0.47],
+    [0, 1.63, 0.015],
+    "dark",
+    Math.PI,
+  ),
+  part(
+    "visor-housing",
+    "head",
+    "shell",
+    [0.42, 0.16, 0.095],
+    [0, 1.719, 0.219],
+    "dark",
+    Math.PI / 2,
+  ),
+  part(
+    "visor-band",
+    "head",
+    "box",
+    [0.36, 0.078, 0.05],
+    [0, 1.72, 0.257],
+    "visor",
+  ),
+  part(
+    "helmet-stripe",
+    "head",
+    "box",
+    [0.13, 0.035, 0.28],
+    [0, 1.893, -0.018],
+    "owner",
+  ),
+  ...mirrored((side, sign) => [
+    part(
+      `${side}-ear-guard`,
+      "head",
+      "shell",
+      [0.12, 0.16, 0.19],
+      [sign * 0.199, 1.68, -0.04],
+      "armor",
+    ),
+    part(
+      `${side}-upper-arm`,
+      `${side}-arm`,
+      "shell",
+      [0.18, 0.31, 0.19],
+      [sign * 0.37, 1.21, 0.04],
+      "cloth",
+    ),
+    part(
+      `${side}-shoulder-cap`,
+      `${side}-arm`,
+      "shell",
+      [0.31, 0.21, 0.36],
+      [sign * 0.39, 1.365, 0],
+      "armor",
+    ),
+    part(
+      `${side}-shoulder-mark`,
+      `${side}-arm`,
+      "shell",
+      [0.2, 0.065, 0.27],
+      [sign * 0.4, 1.466, 0],
+      "owner",
+    ),
+    part(
+      `${side}-gauntlet`,
+      `${side}-forearm`,
+      "shell",
+      [0.21, 0.26, 0.23],
+      [sign * 0.39, 0.97, 0.12],
+      "armor",
+      Math.PI,
+    ),
+    part(
+      `${side}-glove`,
+      `${side}-forearm`,
+      "shell",
+      [0.16, 0.14, 0.17],
+      [sign * 0.4, 0.81, 0.16],
+      "dark",
+    ),
+    part(
+      `${side}-thigh`,
+      `${side}-leg`,
+      "shell",
+      [0.27, 0.42, 0.26],
+      [sign * 0.17, 0.65, 0],
+      "cloth",
+    ),
+    part(
+      `${side}-knee-cap`,
+      `${side}-shin`,
+      "shell",
+      [0.24, 0.22, 0.14],
+      [sign * 0.17, 0.45, 0.12],
+      "armor",
+    ),
+    part(
+      `${side}-greave`,
+      `${side}-shin`,
+      "shell",
+      [0.25, 0.34, 0.24],
+      [sign * 0.17, 0.26, 0.01],
+      "armor",
+      Math.PI,
+    ),
+    part(
+      `${side}-boot`,
+      `${side}-shin`,
+      "shell",
+      [0.25, 0.18, 0.38],
+      [sign * 0.17, 0.1, 0.07],
+      "dark",
+    ),
+  ]),
 ];
 
 const DEMOLITION_GEAR: Part[] = [
@@ -975,7 +1192,16 @@ const recoil = (
       : [(pitch / 2) * kick, 0, 0];
   },
 });
-const RIFLE_FIRE = recoil("fire", 8, 0.12);
+const RIFLE_FIRE: Attack = {
+  ...recoil("fire", 8, 0.12),
+  aim: {
+    joints: ["spine", "head"],
+    pose: (joint, phase) => {
+      const amount = phase / (Math.PI * 2);
+      return [amount * (joint === "head" ? 0.14 : 0.035), 0, 0];
+    },
+  },
+};
 const LAUNCHER_FIRE = recoil("launch", 20, 0.2, 0.06);
 // Both arms push the focus forward and draw it back.
 const FOCUS_CHANNEL: Attack = {
@@ -1053,15 +1279,24 @@ const INFANTRY_RECIPES = {
   "arc-trooper": {
     scale: 1,
     palette: {
-      armor: [0.68, 0.34, 0.17],
-      cloth: [0.16, 0.21, 0.23],
+      armor: [0.72, 0.43, 0.23],
+      cloth: [0.24, 0.29, 0.32],
       owner: [0.97, 0.71, 0.26],
       visor: [0.19, 0.72, 0.79],
       skin: ARC_SKIN,
     },
-    parts: arcParts({ gear: ARC_RIFLE }),
+    parts: [...TROOPER_ARMOR, ...ARC_RIFLE],
     stride: 1,
-    stance: ARMS_AT_SIDES,
+    stance: {
+      ...ARMS_AT_SIDES,
+      swing: 0,
+      ready: {
+        "left-arm": [-0.78, 0.84, 0.04],
+        "left-forearm": [-0.28, 0, 0],
+        "right-arm": [0.24, -0.8, -0.19],
+        "right-forearm": [-1.5, 0, 0],
+      },
+    },
     attack: RIFLE_FIRE,
   },
   "arc-demolition-trooper": {
@@ -1286,6 +1521,8 @@ function buildInfantry(
     );
   };
   const neutral = (joint: string): Vec3 => {
+    const ready = stance.ready?.[joint];
+    if (ready) return ready;
     if (joint.endsWith("forearm")) return [stance.forearm, 0, 0];
     if (joint === "left-arm") return [stance.pitch, 0, -stance.spread];
     if (joint === "right-arm") return [stance.pitch, 0, stance.spread];
@@ -1318,9 +1555,11 @@ function buildInfantry(
       case "right-shin":
         return [-Math.max(0, -stride) * 0.52, 0, 0];
       case "left-arm":
-        return [stance.pitch - stride * stance.swing, 0, -stance.spread];
-      case "right-arm":
-        return [stance.pitch + stride * stance.swing, 0, stance.spread];
+      case "right-arm": {
+        const [pitch, yaw, roll] = neutral(joint);
+        const direction = joint === "left-arm" ? -1 : 1;
+        return [pitch + direction * stride * stance.swing, yaw, roll];
+      }
       case "spine":
         return [0, 0, Math.sin(phase * 2) * 0.035];
       default:
@@ -1362,13 +1601,20 @@ function buildInfantry(
     clip(
       "aim",
       10,
-      (joint, phase) => {
-        const amount = phase / (Math.PI * 2);
-        if (joint.endsWith("forearm")) return [-0.65 * amount, 0, 0];
-        if (joint.endsWith("arm")) return [-0.25 * amount, 0, 0];
-        return [-0.08 * amount, 0, 0];
-      },
-      ["spine", "left-arm", "right-arm", "left-forearm", "right-forearm"],
+      attack.aim?.pose ??
+        ((joint, phase) => {
+          const amount = phase / (Math.PI * 2);
+          if (joint.endsWith("forearm")) return [-0.65 * amount, 0, 0];
+          if (joint.endsWith("arm")) return [-0.25 * amount, 0, 0];
+          return [-0.08 * amount, 0, 0];
+        }),
+      attack.aim?.joints ?? [
+        "spine",
+        "left-arm",
+        "right-arm",
+        "left-forearm",
+        "right-forearm",
+      ],
     );
   // Knees buckle, then the body falls back faster and faster and lies still.
   const fallen = (phase: number) => (phase / (Math.PI * 2)) ** 2;
@@ -1386,9 +1632,21 @@ function buildInfantry(
         return [0.6 * buckle, 0, 0];
       // Held arms relax as the body falls.
       case "left-arm":
-        return [stance.pitch * (1 - fall), 0, -stance.spread - 0.5 * fall];
-      case "right-arm":
-        return [stance.pitch * (1 - fall), 0, stance.spread + 0.5 * fall];
+      case "right-arm": {
+        const [pitch, yaw, roll] = neutral(joint);
+        const direction = joint === "left-arm" ? -1 : 1;
+        const spread = direction * (stance.spread + 0.5);
+        return [
+          pitch * (1 - fall),
+          yaw * (1 - fall),
+          roll + (spread - roll) * fall,
+        ];
+      }
+      case "left-forearm":
+      case "right-forearm": {
+        const ready = stance.ready?.[joint];
+        return ready ? [ready[0] * (1 - fall), 0, 0] : neutral(joint);
+      }
       case "head":
         return [-0.2 * fall, 0, 0];
       default:
@@ -1439,6 +1697,12 @@ const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
       scene,
     ),
   leaf: leafMesh,
+  shell: (scene, name) =>
+    MeshBuilder.CreateCylinder(
+      name,
+      { height: 1, diameterTop: 0.75, diameterBottom: 1, tessellation: 8 },
+      scene,
+    ).convertToFlatShadedMesh(),
 };
 
 /** One part's vertices in the rest pose, colored per vertex. */

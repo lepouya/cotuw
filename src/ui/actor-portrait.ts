@@ -83,6 +83,24 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path stroke="#a5b7ad" stroke-width="9" d="M66 33 99 22M73 42 106 31"/>
     <path stroke="#182c30" stroke-width="5" d="m97 23 7-2m0 11 7-2"/>
     <path fill="#f0bd65" d="m37 32 9 5v5l-9-5Z"/>`,
+  "arc-trooper": `
+    <ellipse fill="#152b31" cx="59" cy="73" rx="32" ry="5"/>
+    <path stroke="#303a43" stroke-width="13" d="m50 48-5 22m20-22 11 22"/>
+    <path fill="#ad713a" d="m43 55 12 1-3 13-11-1Zm23 0 11-2 6 14-12 2Z"/>
+    <path fill="#253039" d="M38 67H52V74H35ZM70 67H83L88 74H71Z"/>
+    <path fill="#253039" d="M35 30 44 24 73 27 79 52 44 55Z"/>
+    <path fill="#ae7036" d="m47 27 26 2-2 14-24 3-7-9Z"/>
+    <path fill="#b7793d" d="m32 29 9-5 9 5-3 11-12-2Zm38 0 9-4 9 6-1 10-14-1Z"/>
+    <path fill="#6e9ad1" d="m33 29 8-4 8 4-4 4h-9Zm39 1 7-4 8 6-4 3-9-1Z"/>
+    <path fill="#ce9350" d="M45 11 52 5 66 3 76 8 79 16 74 24 46 23Z"/>
+    <path fill="#25343c" d="M46 15 78 13 77 24 68 29 51 26Z"/>
+    <path fill="#71d8de" d="m52 17 24-2-1 5-20 3Z"/>
+    <path fill="#7ca5d6" d="m53 6 13-3 5 3-13 4Z"/>
+    <path stroke="#b77b3f" stroke-width="8" d="m37 39 13 8 12-5m22-3-9 11-10-2"/>
+    <path fill="#26343c" d="m46 39 13-3 5 2 25-8 5 9-23 8-2 6-9 2-4-8-10 1Z"/>
+    <path fill="#849596" d="m56 38 32-11 12-2 2 5-12 4-31 10Z"/>
+    <path fill="#26343c" d="m98 24 9-3 3 8-9 3Z"/>
+    <path fill="#71d8de" d="m64 34 7-2 1 3-7 2Z"/>`,
   "arc-medic": infantry(
     "#dfeada",
     `

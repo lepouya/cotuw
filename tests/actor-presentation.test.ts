@@ -152,16 +152,21 @@ test("unloading tips the hopper once, independently, and reduced motion cancels 
 
 test("Trooper aim holds between shots and clears when its target is lost", async () => {
   const { first, step, node } = await load("arc-trooper");
+  const pitch = () => node("spine").rotationQuaternion!.x;
+  step(0.1);
+  const ready = pitch();
   first.setAnimationState!({ aiming: true });
   step(0.1);
-  const held = node("left-forearm").rotationQuaternion!.x;
-  expect(held).toBeLessThan(-0.1);
+  const held = pitch();
+  expect(held).toBeGreaterThan(ready);
   first.play!("attack");
   step(0.1);
-  expect(node("left-forearm").rotationQuaternion!.x).toBeCloseTo(held);
+  expect(pitch()).toBeLessThan(held);
+  step(0.5);
+  expect(pitch()).toBeCloseTo(held);
   first.setAnimationState!({ aiming: false });
   step(0.5);
-  expect(node("left-forearm").rotationQuaternion!.x).toBeCloseTo(0);
+  expect(pitch()).toBeCloseTo(ready);
 });
 
 test.each(["wolf", "alpha-wolf"])(

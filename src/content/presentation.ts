@@ -41,6 +41,7 @@ const PORTRAIT_IDS = [
   "arc-field-barracks",
   "arc-relay-station",
   "arc-sentry-turret",
+  "arc-trooper",
   "arc-medic",
   "arc-mechanic",
   "arc-demolition-trooper",
