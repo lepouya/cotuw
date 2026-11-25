@@ -1086,6 +1086,9 @@ These systems are outside M1.
 
 ## Building and ambient presentation
 
+- Neutral salvage appears as a hovering, rotating recovery case with a
+  faceted shell, dark carry handles, and amber locator lights on its lid and
+  sides. The lights distinguish it from resource deposits and building rubble.
 - Building presentation follows committed simulation state and real time,
   never changes simulation state, and saves nothing. Building activities are
   committed per-tick events: `exit` when a produced unit leaves its producer,

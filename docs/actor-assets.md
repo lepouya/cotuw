@@ -235,7 +235,8 @@ The aim node's name must be unique within its model.
 
 The pack's `props` names foundations, scaffolds, rubble, mounds, salvage,
 tracers, bite marks, smoke, fire, wound drops, regeneration, and birds by URL,
-with an optional idle clip. Salvage plays its exported hover and rotation
-clip, fire its flicker, regeneration its pulse, and birds their wing beat. The
-scaffold is a unit cube that construction stages scale around the footprint.
-Mounds shrink in depletion stages without changing navigation.
+with an optional idle clip. The salvage case batches its shell, frame, and
+amber lights by material. Its root carries the hover and rotation clip.
+Fire plays its flicker, regeneration its pulse, and birds their wing beat.
+The scaffold is a unit cube that construction stages scale around the
+footprint. Mounds shrink in depletion stages without changing navigation.

@@ -1231,41 +1231,93 @@ function livingRubble(scene: Scene, name: string) {
     );
 }
 
-/** A ribboned gift box that bobs and turns. */
+/** A neutral recovery case with reinforced ends and an amber locator. */
 function salvage(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const gold = surface(scene, "salvage-box", SALVAGE_COLOR, 0.25);
-  const ribbon = surface(scene, "salvage-ribbon", [0.8, 0.13, 0.24]);
-  for (const [part, size, y, material] of [
-    ["box", [0.65, 0.55, 0.65], 0, gold],
-    ["lid", [0.72, 0.12, 0.72], 0.3, gold],
-    ["ribbon-x", [0.13, 0.69, 0.735], 0.035, ribbon],
-    ["ribbon-z", [0.735, 0.69, 0.13], 0.035, ribbon],
-  ] as const) {
+  const pieces = {
+    shell: [] as Mesh[],
+    frame: [] as Mesh[],
+    lamp: [] as Mesh[],
+  };
+  const box = (
+    part: keyof typeof pieces,
+    [x, y, z]: readonly [number, number, number],
+    [width, height, depth]: readonly [number, number, number],
+  ) => {
     const mesh = MeshBuilder.CreateBox(
-      part,
-      { width: size[0], height: size[1], depth: size[2] },
+      `${part}-${pieces[part].length}`,
+      { width, height, depth },
       scene,
     );
-    mesh.parent = root;
-    mesh.position.y = y;
-    mesh.material = material;
-  }
+    mesh.position.set(x, y, z);
+    pieces[part].push(mesh);
+  };
+  const outline = [
+    [-0.34, -0.3],
+    [0.34, -0.3],
+    [0.46, -0.18],
+    [0.46, 0.18],
+    [0.34, 0.3],
+    [-0.34, 0.3],
+    [-0.46, 0.18],
+    [-0.46, -0.18],
+  ] as const;
+  const vertex = [
+    ...outline.map(([x, z]) => [x * 0.9, -0.23, z * 0.9]),
+    ...outline.map(([x, z]) => [x, 0.13, z]),
+    ...outline.map(([x, z]) => [x * 0.83, 0.24, z * 0.83]),
+  ];
+  const face = [
+    [0, 1, 2, 3, 4, 5, 6, 7],
+    [23, 22, 21, 20, 19, 18, 17, 16],
+  ];
+  for (const offset of [0, 8])
+    for (let i = 0; i < outline.length; i++) {
+      const a = offset + i;
+      const b = offset + ((i + 1) % outline.length);
+      face.push([b, a, a + 8, b + 8]);
+    }
+  pieces.shell.push(
+    MeshBuilder.CreatePolyhedron("case", { custom: { vertex, face } }, scene),
+  );
+  box("frame", [0, 0.248, 0], [0.47, 0.06, 0.35]);
+  box("lamp", [0, 0.283, 0], [0.37, 0.025, 0.18]);
   for (const side of [-1, 1]) {
-    const bow = MeshBuilder.CreateTorus(
-      `bow-${side}`,
-      { diameter: 0.24, thickness: 0.055, tessellation: 12 },
-      scene,
-    );
-    bow.parent = root;
-    bow.position.set(side * 0.12, 0.43, 0);
-    bow.rotation.z = (side * Math.PI) / 4;
-    bow.material = ribbon;
+    box("frame", [side * 0.32, -0.232, 0], [0.15, 0.085, 0.49]);
+    box("frame", [side * 0.535, 0.02, 0], [0.065, 0.09, 0.29]);
+    for (const z of [-0.11, 0.11])
+      box("frame", [side * 0.475, 0.02, z], [0.13, 0.09, 0.07]);
+    box("frame", [0, 0.05, side * 0.285], [0.43, 0.13, 0.064]);
+    box("lamp", [0, 0.05, side * 0.322], [0.33, 0.061, 0.018]);
   }
-  clip(root, "idle", 8, (seconds) => {
-    root.position.y = Math.sin((seconds * Math.PI) / 2) * 0.12;
-    root.rotation.y = (seconds * Math.PI) / 4;
-  });
+  merge(
+    root,
+    "shell",
+    pieces.shell,
+    surface(scene, "salvage-shell", [0.49, 0.5, 0.46]),
+  );
+  merge(
+    root,
+    "frame",
+    pieces.frame,
+    surface(scene, "salvage-frame", [0.19, 0.23, 0.23]),
+  );
+  merge(
+    root,
+    "lamp",
+    pieces.lamp,
+    surface(scene, "salvage-lamp", SALVAGE_COLOR, 0.55),
+  );
+  clip(
+    root,
+    "idle",
+    8,
+    (seconds) => {
+      root.position.y = Math.sin((seconds * Math.PI) / 2) * 0.12;
+      root.rotation.y = (seconds * Math.PI) / 4;
+    },
+    false,
+  );
 }
 
 /** A unit-cube lattice of posts, rails, and braces around a blueprint. */
