@@ -931,73 +931,77 @@ function foundation(scene: Scene, name: string) {
   mesh.material = surface(scene, name, [0.35, 0.42, 0.46]);
 }
 
-/** A tall crystal ringed by shorter ones leaning outward, on a stony bed. */
+/** An exposed vein of tilted ore blades in a low, fractured rock bed. */
 function materialsMound(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  // Every part rests on the ground plane, so depletion shrinks toward it.
-  const random = seededRandom(0x3a7e);
-  const shards = Array.from({ length: 7 }, (_, index) => {
-    const center = index === 0;
-    const height = center ? 0.85 : 0.3 + random() * 0.28;
-    const width = center ? 0.22 : 0.1 + random() * 0.07;
-    const tip = width * 1.1;
-    const parts = [
-      MeshBuilder.CreateCylinder(
-        "prism",
-        { height: height - tip, diameter: width, tessellation: 6 },
-        scene,
-      ),
-      MeshBuilder.CreateCylinder(
-        "tip",
-        { height: tip, diameterTop: 0, diameterBottom: width, tessellation: 6 },
-        scene,
-      ),
-    ];
-    parts[0]!.position.y = (height - tip) / 2;
-    parts[1]!.position.y = height - tip / 2;
-    const shard = Mesh.MergeMeshes(parts, true)!;
-    const angle = (index / 6) * Math.PI * 2 + random() * 0.6;
-    const ring = center ? 0 : 0.16 + random() * 0.12;
-    const lean = center ? 0.05 : 0.25 + random() * 0.2;
-    shard.position.set(
-      Math.sin(angle) * ring,
-      (width / 2) * Math.sin(lean),
-      Math.cos(angle) * ring,
-    );
-    // Yaw applies after pitch, so the top leans toward the heading.
-    shard.rotation.set(lean, angle, 0);
-    return shard;
-  });
-  const stones = Array.from({ length: 6 }, (_, index) => {
-    const angle = (index / 6) * Math.PI * 2 + random();
-    const ring = 0.2 + random() * 0.15;
-    const size = 0.07 + random() * 0.05;
-    // Babylon's dodecahedron spans ±1 vertically per unit size.
-    const stone = MeshBuilder.CreatePolyhedron(
-      `bed-${index}`,
-      { type: 2, sizeX: size, sizeY: size / 2, sizeZ: size },
+  const ore = { faces: [] as Mesh[], edges: [] as Mesh[] };
+  const outline = [
+    [-0.52, -0.33],
+    [-0.22, -0.53],
+    [0.48, -0.35],
+    [0.56, 0.21],
+    [0.23, 0.51],
+    [-0.47, 0.32],
+  ] as const;
+  const shoulders = [0.73, 0.87, 0.8, 0.57, 0.49, 0.62];
+  const vertex = [
+    ...outline.map(([x, z]) => [x, 0, z]),
+    ...outline.map(([x, z], i) => [x * 0.82 + 0.12, shoulders[i]!, z * 0.72]),
+    [0.04, 1, -0.11],
+  ];
+  const face = [[0, 1, 2, 3, 4, 5]];
+  for (let i = 0; i < outline.length; i++) {
+    const next = (i + 1) % outline.length;
+    face.push([next, i, i + 6, next + 6], [next + 6, i + 6, 12]);
+  }
+  for (const [part, x, z, width, height, depth, lean, yaw] of [
+    ["faces", -0.1, 0.02, 0.33, 0.83, 0.27, 0.28, 0.5],
+    ["edges", 0.13, -0.05, 0.28, 0.68, 0.23, 0.43, 0.62],
+    ["faces", 0.21, 0.14, 0.2, 0.46, 0.18, 0.45, 0.8],
+    ["edges", -0.21, 0.16, 0.19, 0.36, 0.18, 0.45, -1.5],
+    ["faces", -0.22, -0.13, 0.18, 0.33, 0.17, 0.34, -2],
+    ["edges", 0.06, 0.25, 0.13, 0.25, 0.14, 0.63, 1.1],
+  ] as const) {
+    const blade = MeshBuilder.CreatePolyhedron(
+      "blade",
+      { custom: { vertex, face }, sizeX: width, sizeY: height, sizeZ: depth },
       scene,
     );
-    stone.position.set(
-      Math.sin(angle) * ring,
-      size / 2,
-      Math.cos(angle) * ring,
+    blade.position.set(x, 0.06, z);
+    blade.rotation.set(lean, yaw, 0);
+    ore[part].push(blade);
+  }
+  const bed = (
+    [
+      [-0.15, 0, 0.25, 0.13, 0.23, 0.3],
+      [0.15, 0.05, 0.24, 0.16, 0.24, -0.55],
+      [-0.02, -0.23, 0.25, 0.12, 0.14, 0.52],
+      [-0.19, 0.22, 0.16, 0.08, 0.11, -0.38],
+      [0.19, 0.25, 0.15, 0.1, 0.1, 0.2],
+    ] as const
+  ).map(([x, z, width, height, depth, yaw]) => {
+    const stone = MeshBuilder.CreatePolyhedron(
+      "stone",
+      { type: 2, sizeX: width, sizeY: height, sizeZ: depth },
+      scene,
     );
-    stone.rotation.y = random() * Math.PI;
+    stone.position.set(x, height, z);
+    stone.rotation.y = yaw;
     return stone;
   });
   merge(
     root,
-    "crystal",
-    shards,
-    surface(scene, "materials", MATERIALS_COLOR, 0.25),
+    "ore",
+    ore.faces,
+    surface(scene, "materials", MATERIALS_COLOR, 0.24),
   );
   merge(
     root,
-    "bed",
-    stones,
-    surface(scene, "materials-bed", [0.27, 0.25, 0.23]),
+    "ore-bright",
+    ore.edges,
+    surface(scene, "materials-bright", [0.42, 0.75, 0.79], 0.27),
   );
+  merge(root, "bed", bed, surface(scene, "materials-bed", [0.34, 0.31, 0.25]));
 }
 
 /** Fractured ARC panels and framing, sized to fit a rotated footprint tile. */

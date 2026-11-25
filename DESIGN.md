@@ -1657,8 +1657,9 @@ recall rules apply unchanged.
   Show its flag only while the producer is selected.
 - Resource sites and uncollected loot reserve placement; depletion releases
   resource tiles. Markers use four descending nonempty scales, choosing the
-  smaller stage at an exact cutoff and disappearing at depletion. Loot uses
-  animated gift boxes, pays on contact without delivery, and disappears once.
+  smaller stage at an exact cutoff and disappearing at depletion. Materials
+  deposits show tilted blue ore blades emerging from a fractured rock bed.
+  Salvage hovers above its tile and pays on contact without delivery.
 - Costs, timings, footprints, support/vision radii, and actor statistics live
   in the [base content pack](src/content/packs/base.json). The authored
   [wolf-den level](scripts/levels/wolf-den.ts) owns terrain and encounter

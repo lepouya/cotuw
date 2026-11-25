@@ -239,4 +239,6 @@ with an optional idle clip. The salvage case batches its shell, frame, and
 amber lights by material. Its root carries the hover and rotation clip.
 Fire plays its flicker, regeneration its pulse, and birds their wing beat.
 The scaffold is a unit cube that construction stages scale around the
-footprint. Mounds shrink in depletion stages without changing navigation.
+footprint. Materials mounds batch their two ore tones and rock bed by
+material. The bed sits on the ground plane, so each depletion stage shrinks
+the mound toward the terrain without changing navigation.
