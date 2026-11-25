@@ -2031,7 +2031,11 @@ acceptance progress. The following sections define the selected scope.
 - Cultivators wear short olive mantles and pale harness straps. They carry
   a ribbed seed pod on their backs and a forked growth tool with a violet
   focus between its tines.
-- Healers have flowing mantles and open-handed casting poses.
+- Healers wear long, split pale mantles over jade tunics with owner
+  markings on the front stoles, sash, and back folds. The mantle tails
+  sway while moving. Healers are unarmed and lift open palms with violet
+  inlays when healing. The production portrait shows the same garb and
+  gesture.
 - Artificers wear fitted work gear with prominent tool harnesses for tending
   constructs.
 - Active Healer service shows a leaf cue at the target and Artificer service a

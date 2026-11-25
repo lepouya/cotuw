@@ -314,6 +314,23 @@ test("ARC support uses distinct unarmed geometry within its selection bounds", a
   expect(bodies[1]).not.toEqual(bodies[2]);
 });
 
+test("the Healer's idle mantle and hands fit its selection bounds", async () => {
+  const scene = testScene();
+  const model = BASE_CONTENT.presentation["circle-healer"]!.model!;
+  if (!("glb" in model)) throw new Error("Expected generated infantry");
+  const asset = await loadSkinnedActorAppearance(scene, {
+    ...model.glb,
+    url: glbDataUrl(model.glb.url),
+  });
+  const instance = asset.instantiate("healer", 0);
+  scene.animate();
+  const { radius, height } = posedExtent(instance.root.getChildMeshes());
+  expect(radius).toBeLessThanOrEqual(model.glb.bounds.radius);
+  expect(height).toBeLessThanOrEqual(model.glb.bounds.height);
+  instance.dispose();
+  asset.dispose();
+});
+
 test("Demolition infantry carries a distinct launcher within Trooper selection bounds", async () => {
   const scene = testScene();
   const models = ["arc-trooper", "arc-demolition-trooper"].map((id) => {

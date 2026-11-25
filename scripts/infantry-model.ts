@@ -29,11 +29,13 @@ type Part = {
   shape:
     | "box"
     | "sphere"
+    | "hand"
     | "cylinder"
     | "torus"
     | "leaf"
     | "shell"
     | "leaf-plate"
+    | "mantle-fold"
     | "focus-bough";
   size: Vec3;
   position: Vec3;
@@ -64,6 +66,8 @@ type InfantryRecipe = {
   parts: readonly Part[];
   stride: number;
   stance: Stance;
+  joints?: readonly Joint[];
+  walkPose?: WorkPose;
   work?: keyof typeof WORK_POSES;
   /** Armed roles also get an aim layer. */
   attack?: Attack;
@@ -1398,41 +1402,130 @@ const WAYFINDER_GEAR: Part[] = [
 ];
 
 const HEALER_GEAR: Part[] = [
-  part("stole", "spine", "leaf", [0.36, 0.7, 0.1], [0, 1.2, 0.2], "owner"),
-  part(
-    "mantle-hem",
-    "spine",
-    "leaf",
-    [0.95, 0.5, 0.36],
-    [0, 0.72, -0.3],
-    "cloth",
-  ),
   part(
     "heart-seed",
     "spine",
-    "leaf",
-    [0.1, 0.16, 0.08],
-    [0, 1.42, 0.24],
+    "leaf-plate",
+    [0.105, 0.15, 0.08],
+    [0, 1.37, 0.219],
     "visor",
   ),
   ...mirrored((side, sign): Part[] => [
-    {
-      ...part(
-        `${side}-shoulder-drape`,
-        `${side}-arm`,
-        "leaf",
-        [0.3, 0.42, 0.26],
-        [sign * 0.33, 1.38, 0],
-        "cloth",
+    part(
+      `${side}-mantle-collar`,
+      "spine",
+      "mantle-fold",
+      [0.31, 0.48, 0.21],
+      [sign * 0.19, 1.38, -0.012],
+      "armor",
+      -0.46,
+      sign * 0.47,
+    ),
+    part(
+      `${side}-stole`,
+      "spine",
+      "mantle-fold",
+      [0.13, 0.53, 0.12],
+      [sign * 0.145, 1.22, 0.18],
+      "owner",
+      -0.085,
+      -sign * 0.22,
+    ),
+    part(
+      `${side}-mantle-lining`,
+      `${side}-mantle`,
+      "mantle-fold",
+      [0.39, 1.13, 0.2],
+      [sign * 0.272, 0.902, -0.255],
+      "cloth",
+      0.22,
+      sign * 0.24,
+    ),
+    part(
+      `${side}-mantle-fold`,
+      `${side}-mantle`,
+      "mantle-fold",
+      [0.34, 1.09, 0.19],
+      [sign * 0.235, 0.953, -0.304],
+      "armor",
+      0.23,
+      sign * 0.22,
+    ),
+    part(
+      `${side}-mantle-mark`,
+      `${side}-mantle`,
+      "mantle-fold",
+      [0.123, 0.77, 0.085],
+      [sign * 0.255, 0.998, -0.386],
+      "owner",
+      0.23,
+      sign * 0.22,
+    ),
+    part(
+      `${side}-split-skirt`,
+      `${side}-leg`,
+      "mantle-fold",
+      [0.3, 0.8, 0.15],
+      [sign * 0.156, 0.646, 0.145],
+      "armor",
+      -0.1,
+      sign * 0.11,
+    ),
+    part(
+      `${side}-sleeve-flare`,
+      `${side}-forearm`,
+      "mantle-fold",
+      [0.225, 0.32, 0.21],
+      [sign * 0.377, 0.994, 0.1],
+      "cloth",
+      0.1,
+      sign * 0.14,
+    ),
+    part(
+      `${side}-cuff`,
+      `${side}-forearm`,
+      "shell",
+      [0.157, 0.098, 0.157],
+      [sign * 0.386, 0.9, 0.145],
+      "armor",
+      -0.13,
+    ),
+    part(
+      `${side}-palm`,
+      `${side}-forearm`,
+      "hand",
+      [0.113, 0.147, 0.068],
+      [sign * 0.395, 0.813, 0.157],
+      "skin",
+    ),
+    ...[-1, 0, 1].map((finger) =>
+      part(
+        `${side}-fingers-${finger}`,
+        `${side}-forearm`,
+        "hand",
+        [0.032, 0.104 - 0.012 * Math.abs(finger), 0.037],
+        [sign * (0.395 + finger * 0.039), 0.727, 0.167],
+        "skin",
+        -0.12,
+        sign * finger * 0.16,
       ),
-      tiltZ: -sign * 0.5,
-    },
+    ),
+    part(
+      `${side}-thumb`,
+      `${side}-forearm`,
+      "hand",
+      [0.043, 0.091, 0.041],
+      [sign * 0.333, 0.794, 0.166],
+      "skin",
+      -0.07,
+      -sign * 0.6,
+    ),
     part(
       `${side}-palm-glow`,
       `${side}-forearm`,
-      "leaf",
-      [0.1, 0.17, 0.08],
-      [sign * 0.4, 0.76, 0.25],
+      "leaf-plate",
+      [0.054, 0.083, 0.027],
+      [sign * 0.393, 0.81, 0.194],
       "visor",
     ),
   ]),
@@ -1631,13 +1724,18 @@ const WORK_POSES = {
     if (joint.endsWith("forearm")) return [-0.6 - pulse * 0.2, 0, 0];
     if (joint.endsWith("arm")) return [-0.4 + pulse * 0.12, 0, 0];
   },
-  // Open palms raised toward the patient.
   cast: (joint, phase) => {
-    const pulse = Math.sin(phase);
-    if (joint === "spine") return [-0.04 + pulse * 0.02, 0, 0];
-    if (joint === "left-arm") return [-0.95 + pulse * 0.08, 0, -0.28];
-    if (joint === "right-arm") return [-0.95 + pulse * 0.08, 0, 0.28];
-    if (joint.endsWith("forearm")) return [-0.3 - pulse * 0.06, 0, 0];
+    const lift = (1 - Math.cos(phase)) / 2;
+    if (joint === "spine") return [0.045 - lift * 0.075, 0, 0];
+    if (joint === "head") return [0.075 - lift * 0.14, 0, 0];
+    const side = joint.startsWith("left-") ? -1 : 1;
+    // Raise the palms together and open the elbows at the top of the reach.
+    if (joint.endsWith("-arm"))
+      return [-0.73 - lift * 0.56, 0, side * (0.54 + lift * 0.14)];
+    if (joint.endsWith("-forearm"))
+      return [-0.62 - lift * 0.1, side * 0.12, -side * 0.14];
+    if (joint.endsWith("-mantle"))
+      return [0.045 + lift * 0.12, 0, side * lift * 0.045];
   },
   // A forward lean shaping the construct with the awl.
   mend: (joint, phase) => {
@@ -1768,13 +1866,32 @@ const INFANTRY_RECIPES = {
     work: "cast",
     scale: 0.96,
     palette: {
-      armor: [0.8, 0.77, 0.6],
-      cloth: [0.62, 0.78, 0.7],
+      armor: [0.83, 0.9, 0.75],
+      cloth: [0.25, 0.48, 0.43],
       ...CIRCLE_TRIM,
     },
-    parts: [...elvenParts([0.9, 1.3, 0.34]), ...HEALER_GEAR],
+    parts: [
+      ...elvenParts([0.7, 0.9, 0.2]).filter(
+        ({ name }) =>
+          name !== "mantle" && !/-(hand|sleeve|tabard|tabard-trim)$/.test(name),
+      ),
+      ...HEALER_GEAR,
+    ],
+    joints: mirrored((side, sign): Joint[] => [
+      {
+        name: `${side}-mantle`,
+        parent: "spine",
+        offset: [sign * 0.156, 0.36, -0.18],
+      },
+    ]),
+    walkPose: (joint, phase) => {
+      if (joint.endsWith("-mantle")) {
+        const side = joint.startsWith("left-") ? -1 : 1;
+        return [0.11 + side * Math.sin(phase - 0.6) * 0.09, 0, side * 0.06];
+      }
+    },
     stride: 0.75,
-    stance: ARMS_AT_SIDES,
+    stance: { pitch: -0.07, spread: 0.145, forearm: -0.16, swing: 0.23 },
   },
   "circle-artificer": {
     work: "mend",
@@ -1828,7 +1945,10 @@ function buildInfantry(
   root.scaling.setAll(recipe.scale);
   const skeleton = new Skeleton(`${name}-rig`, `${name}-rig`, scene);
   const bones = new Map<string, Bone>();
-  for (const { name: label, parent, offset } of JOINTS) {
+  for (const { name: label, parent, offset } of [
+    ...JOINTS,
+    ...(recipe.joints ?? []),
+  ]) {
     const parentBone = parent ? bones.get(parent)! : null;
     const joint = new TransformNode(label, scene);
     joint.parent = parentBone?.getTransformNode() ?? root;
@@ -1966,7 +2086,7 @@ function buildInfantry(
       case "spine":
         return [0, 0, Math.sin(phase * 2) * 0.035];
       default:
-        return neutral(joint);
+        return recipe.walkPose?.(joint, phase) ?? neutral(joint);
     }
   });
   // Lowest with the legs apart, highest as they pass.
@@ -2087,6 +2207,8 @@ const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
   box: (scene, name) => MeshBuilder.CreateBox(name, { size: 1 }, scene),
   sphere: (scene, name) =>
     MeshBuilder.CreateSphere(name, { diameter: 1, segments: 10 }, scene),
+  hand: (scene, name) =>
+    MeshBuilder.CreateSphere(name, { diameter: 1, segments: 4 }, scene),
   cylinder: (scene, name) =>
     MeshBuilder.CreateCylinder(
       name,
@@ -2102,6 +2224,8 @@ const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
   leaf: leafMesh,
   "leaf-plate": (scene, name) =>
     MeshBuilder.CreatePolyhedron(name, { custom: LEAF_PLATE }, scene),
+  "mantle-fold": (scene, name) =>
+    MeshBuilder.CreatePolyhedron(name, { custom: MANTLE_FOLD }, scene),
   "focus-bough": focusBough,
   shell: (scene, name) =>
     MeshBuilder.CreateCylinder(
@@ -2132,6 +2256,23 @@ const LEAF_PLATE = {
       [next, edge, 9],
     ];
   }).flat(),
+};
+
+// A broad shoulder seam and a tapered hem share the raised fold.
+const MANTLE_FOLD = {
+  vertex: [
+    [0, 0.5, -0.06],
+    [-0.37, 0.45, 0],
+    [-0.5, 0.04, 0.17],
+    [-0.39, -0.31, 0.03],
+    [0, -0.5, -0.18],
+    [0.39, -0.31, 0.03],
+    [0.5, 0.04, 0.17],
+    [0.37, 0.45, 0],
+    [0, 0.06, 0.46],
+    [0, -0.02, -0.37],
+  ],
+  face: LEAF_PLATE.face,
 };
 
 function focusBough(scene: Scene, name: string): Mesh {

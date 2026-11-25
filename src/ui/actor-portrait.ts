@@ -247,14 +247,28 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#bd8aee" d="m26 6-4 7 5 7 4-5Z"/>
     <path fill="#d6bd96" d="m38 44-5 3 2 6 6-3Z"/>`,
   ),
-  "circle-healer": elf(
-    "#6f9c8c",
-    `
-    <path fill="#8fc2ae" d="M40 30Q26 48 28 70L44 70 47 36ZM80 30Q94 48 92 70L76 70 73 36Z"/>
-    <path fill="none" stroke="#dbbd97" stroke-width="5" stroke-linecap="round" d="M44 40 30 34M76 40 90 34"/>
-    <path fill="#b9f28c" d="M26 33Q19 23 27 17Q34 25 26 33ZM94 33Q101 23 93 17Q86 25 94 33Z"/>
-    <path fill="#d7b3ed" d="m60 41 5 6-5 7-5-7Z"/>`,
-  ),
+  "circle-healer": `
+    <ellipse fill="#142c29" cx="60" cy="73" rx="37" ry="5"/>
+    <path fill="#345f52" d="M48 25Q36 26 34 44L21 73Q46 71 58 46Q68 69 98 73L87 44Q84 28 72 25Z"/>
+    <path fill="#a6c2a5" d="M47 27Q37 29 34 46L25 70Q43 68 55 45ZM72 27Q83 29 85 46L94 70Q77 68 65 45Z"/>
+    <path fill="#86adc8" d="M40 37 44 36Q39 55 30 63ZM80 37 76 36Q81 55 90 63Z"/>
+    <path fill="#283b38" d="M47 57H57L55 74H44ZM63 57H73L76 74H65Z"/>
+    <path fill="#3c7062" d="M45 29 60 24 75 29 71 49 76 65 61 60 44 65 49 48Z"/>
+    <path fill="#c8d7b6" d="M47 49 59 50 56 69 43 67ZM61 50 73 49 77 67 64 69Z"/>
+    <path fill="#78a7cb" d="M48 46Q60 49 72 46L73 50Q60 54 47 50Z"/>
+    <path fill="none" stroke="#447264" stroke-width="8" stroke-linecap="round"
+      d="m46 34-9 12-12-6m49-6 9 12 12-6"/>
+    <path fill="#c9dcbf" d="m26 36 8 4-4 7-8-5Zm68 0-8 4 4 7 8-5Z"/>
+    <path fill="#dbbd97" d="m24 36-4-6-2 1 1 4-7-5-2 2 6 7 7 3 4-4Zm72 0 4-6 2 1-1 4 7-5 2 2-6 7-7 3-4-4Z"/>
+    <path fill="#bc87eb" d="m19 35 3 2-2 3-3-2Zm82 0 2 3-3 2-2-3Z"/>
+    <path fill="#dae7c8" d="M48 26Q41 27 38 34L45 38 55 30ZM72 26Q79 27 82 34L75 38 65 30Z"/>
+    <path fill="#83add0" d="m49 31 6 1 1 16-7-2Zm22 0-6 1-1 16 7-2Z"/>
+    <path fill="#b77ce8" d="m60 32 4 5-4 6-4-6Z"/>
+    <path fill="#293d37" d="M45 14Q60 0 75 14L74 29 66 33 50 29Z"/>
+    <path fill="#c8a77f" d="m49 16-14-6 12 15Zm22 0 14-6-12 15Z"/>
+    <path fill="#dbbd97" d="M49 14Q60 8 71 14L69 24 60 31 51 24Z"/>
+    <path fill="none" stroke="#d8debc" stroke-width="2.5" d="M48 14Q60 18 72 14"/>
+    <path fill="#ba81e6" d="m60 14 3 3-3 4-3-4Z"/>`,
   "circle-artificer": elf(
     "#5b4a33",
     `
