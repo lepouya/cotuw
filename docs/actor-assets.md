@@ -52,7 +52,7 @@ clips match their generators, and reject unregistered files in `public/assets`.
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
   Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle
-  with an open front arch, Thornspire column, and renewable bloom markers. Each
+  with an open front arch, Thornspire ribs and crown, and renewable blooms. Each
   ID has one recipe naming its size, frame, and focus height. Owned
   buildings carry an owner marking; neutral sites do not. Named `growth-roots`,
   `growth-ribs`, and `growth-canopy` meshes define three construction layers

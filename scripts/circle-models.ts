@@ -69,6 +69,7 @@ type FrameContext = {
   root: TransformNode;
   recipe: StructureRecipe;
   wood: StandardMaterial;
+  leaf: StandardMaterial;
   core: StandardMaterial;
   stem: (
     id: string,
@@ -358,39 +359,52 @@ const FRAMES = {
       );
     }
   },
-  /** A thorn-plated column under an opening crown that aims its shots. */
+  /** Three curved ribs support a thorn crown that opens to cast. */
   spire: ({
     name,
     scene,
     root,
     recipe,
     wood,
+    leaf,
     core,
     stem,
     plate,
   }: FrameContext) => {
     const { height } = recipe;
-    stem(
-      "growth-ribs-column",
-      [
-        [0, 0, 0],
-        [0.06, height * 0.4, 0.03],
-        [-0.04, height * 0.75, 0],
-        [0, height * 0.82, 0],
-      ],
-      0.24,
-    );
-    for (let i = 0; i < 8; i++) {
-      const angle = (i * Math.PI) / 4 + (i % 2) * 0.35;
-      const y = 0.45 + (i % 4) * 0.38;
-      const thorn = plate(
-        `growth-canopy-thorn-${i}`,
-        [Math.cos(angle) * 0.3, y, Math.sin(angle) * 0.3],
-        [0.16, 0.55, 0.16],
-        wood,
+    for (let i = 0; i < 3; i++) {
+      const angle = (i * Math.PI * 2) / 3;
+      const point = (radius: number, y: number, sweep = 0): Vec3 => [
+        Math.sin(angle + sweep) * radius,
+        y,
+        Math.cos(angle + sweep) * radius,
+      ];
+      stem(
+        `growth-ribs-arch-${i}`,
+        [
+          point(0.38, 0.14),
+          point(0.29, 0.55, 0.13),
+          point(0.28, 1.03, 0.46),
+          point(0.32, 1.48, 0.77),
+          point(0.21, 1.86, 0.9),
+          point(0.06, height * 0.82, 0.96),
+        ],
+        0.105,
       );
-      // Plates lean out and up from the column like grown thorns.
-      thorn.rotation.set(Math.sin(angle) * 0.7, 0, -Math.cos(angle) * 0.7);
+      plate(
+        `growth-canopy-upper-thorn-${i}`,
+        point(0.32, 1.58, 0.74),
+        [0.32, 0.2, 0.72],
+        leaf,
+        "blade",
+      ).rotation.set(-1.02, angle + 0.74, 0);
+      plate(
+        `growth-canopy-lower-thorn-${i}`,
+        point(0.27, 0.55, 0.22),
+        [0.24, 0.16, 0.55],
+        leaf,
+        "blade",
+      ).rotation.set(-0.95, angle + 0.22, 0);
     }
     // The crown turns with the weapon; its petals open to fire.
     const crown = new TransformNode(`${name}-crown`, scene);
@@ -402,26 +416,26 @@ const FRAMES = {
       pivot.parent = crown;
       pivot.rotation.y = (i * Math.PI) / 2;
       petals.push(pivot);
-      const petal = MeshBuilder.CreateSphere(
+      const petal = MeshBuilder.CreatePolyhedron(
         `${name}-growth-canopy-crown-${i}`,
-        { diameter: 1, segments: 6 },
+        { custom: LEAF_BLADE },
         scene,
       );
       petal.parent = pivot;
-      petal.material = wood;
-      petal.position.set(0, 0.22, 0.17);
-      petal.scaling.set(0.22, 0.5, 0.1);
-      petal.rotation.x = 0.35;
+      petal.material = i % 2 ? leaf : wood;
+      petal.position.set(0, 0.225, 0.205);
+      petal.scaling.set(0.245, 0.18, 0.59);
+      petal.rotation.x = -1.28;
     }
-    const focus = MeshBuilder.CreateSphere(
+    const focus = MeshBuilder.CreatePolyhedron(
       `${name}-growth-canopy-crown-core`,
-      { diameter: 1, segments: 8 },
+      { type: 1, size: 0.2 },
       scene,
     );
     focus.parent = crown;
     focus.material = core;
     focus.position.y = 0.2;
-    focus.scaling.set(0.26, 0.32, 0.26);
+    focus.scaling.set(0.76, 1.08, 0.76);
     return () =>
       clip(
         root,
@@ -429,7 +443,12 @@ const FRAMES = {
         FIRE_SECONDS,
         (seconds) => {
           const open = Math.sin((seconds / FIRE_SECONDS) * Math.PI);
-          for (const petal of petals) petal.rotation.x = open * 0.6;
+          for (const petal of petals) petal.rotation.x = open * 0.93;
+          focus.scaling.set(
+            0.76 + open * 0.2,
+            1.08 + open * 0.26,
+            0.76 + open * 0.2,
+          );
         },
         false,
       );
@@ -571,7 +590,11 @@ const CIRCLE_STRUCTURES = {
     frame: "spire",
     focusHeight: 1.1,
     owned: true,
-    ownerMarks: [[0, 0.9, 0.27]],
+    ownerMarks: [
+      [0.12, 1.05, 0.29],
+      [0.2, 1.05, -0.23],
+      [-0.27, 1.05, -0.07],
+    ],
   },
   "cultivation-site": {
     halfWidth: 0.65,
@@ -891,6 +914,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     root,
     recipe,
     wood,
+    leaf,
     core,
     stem,
     plate,

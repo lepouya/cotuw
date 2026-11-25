@@ -2005,8 +2005,9 @@ acceptance progress. The following sections define the selected scope.
   and violet lights flank the threshold.
 - The Construct Nursery is a rounded cradle enclosed by protective arches,
   with an opening large enough for a Briar Ram.
-- The Thornspire is a narrow, sturdy column with thorn-like plates around a
-  violet focus. Its crown opens briefly to fire a heavy magical bolt.
+- The Thornspire has three curved ribs, pointed green plates, and a violet
+  focus between the ribs. Owner markings sit on each rib. Its four crown
+  leaves open around the casting focus to fire a heavy magical bolt.
 - Personnel have slender elven proportions, visible pointed ears, exposed
   faces, long tunics, flowing mantles, and circlets. Grown leaf-shaped armor
   and curved artifacts share the buildings' style. Clothing, equipment, and

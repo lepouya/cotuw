@@ -241,12 +241,17 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#9a63d1" d="M56 44Q62 40 66 45 62 50 57 49Z"/>
     <path fill="#76abd1" d="M34 46H52V50H34Z"/>`,
   "circle-thornspire": `${GROVE_GROUND}
-    <path fill="#2e2015" d="M42 70Q50 60 52 66L68 66Q70 60 78 70Z"/>
-    <path fill="#cbbd90" d="M52 68 54 24H66L68 68Z"/>
-    <path fill="#a7996c" d="M54 60 42 52 54 50ZM66 52 79 44 66 42ZM54 42 44 34 55 33ZM66 34 76 26 66 26Z"/>
-    <path fill="#245a3e" d="M50 26 60 6 70 26 60 22Z"/>
-    <path fill="#be8bf0" d="M56 22Q60 12 64 22 60 30 56 22Z"/>
-    <path fill="#76abd1" d="M55 55H65V60H55Z"/>`,
+    <path fill="#4c3a25" d="M36 69 50 60 66 60 84 69 77 73 58 69 42 73Z"/>
+    <path fill="none" stroke="#938662" stroke-width="5" stroke-linecap="round"
+      d="M52 67C56 53 65 45 64 34S60 25 60 23"/>
+    <path fill="#aa79de" d="m59 40 6 9-6 8-5-8Z"/>
+    <path fill="none" stroke="#cdbd90" stroke-width="6" stroke-linecap="round"
+      d="M46 68C49 58 49 48 47 40S49 28 59 24M75 68C69 62 72 53 74 46S69 29 62 24"/>
+    <path fill="#356d49" d="M48 52Q39 49 40 43L38 37Q49 42 48 52ZM72 46Q79 39 83 38L80 46 72 52ZM49 39Q42 36 43 27L49 31ZM70 38Q68 28 77 24L75 32Z"/>
+    <path fill="#76abd1" d="m46 51 5-1v7l-5 2Zm24-3 5-1-2 7-5 1Z"/>
+    <path fill="#cdbd90" d="M60 28Q49 25 46 11Q55 13 59 22Q63 15 72 11Q70 24 60 28Z"/>
+    <path fill="#32704b" d="M60 27Q50 24 52 15L56 18 60 25Q63 17 68 15Q70 23 60 27Z"/>
+    <path fill="#c99af1" d="m60 9 6 8-6 8-6-8Z"/>`,
   "circle-construct-nursery": `${GROVE_GROUND}
     <path fill="#204b37" d="M14 54Q20 16 60 14Q100 16 106 54Z"/>
     <path fill="none" stroke="#bdb28b" stroke-width="6" stroke-linecap="round"
