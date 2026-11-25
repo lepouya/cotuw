@@ -2012,6 +2012,10 @@ acceptance progress. The following sections define the selected scope.
 - The Lifebloom Conservatory has a low bower of pointed leaves and pale ribs.
   Its open front exposes the violet collection basin, and the side ribs
   carry owner markings.
+- Neutral cultivation sites have three lavender rosettes on curved stems
+  above a low fan of pointed leaves. The tallest bloom has a pulsing violet
+  center. The clump shrinks as its reserve falls, and dormant sites appear
+  smaller until they reopen.
 - The Musterhall has an elongated vault of pale ribs and overlapping pointed
   leaves. A raised arch carries owner markings over the infantry entrance,
   and violet lights flank the threshold.

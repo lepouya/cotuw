@@ -50,6 +50,7 @@ type StructureRecipe = {
   height: number;
   frame: keyof typeof FRAMES;
   focusHeight: number;
+  focusScale?: Vec3;
   /** Owned buildings carry a marker; neutral resource sites do not. */
   owned: boolean;
   ownerMarks?: readonly Vec3[];
@@ -582,28 +583,65 @@ const FRAMES = {
       "blade",
     ).rotation.set(0.7, Math.PI, 0);
   },
-  /** A ring of flowering stems. */
-  bloom: ({ stem, plate, core }: FrameContext) => {
-    for (let i = 0; i < 7; i++) {
-      const angle = (i * Math.PI * 2) / 7;
-      const x = Math.cos(angle) * 0.45;
-      const z = Math.sin(angle) * 0.45;
+  /** A flowering clump with a tall open rosette and two younger blooms. */
+  bloom: ({ name, scene, stem, plate, leaf, core }: FrameContext) => {
+    const petals = surface(scene, `${name}-petals`, [0.63, 0.43, 0.74], 0.12);
+    const foliage = surface(scene, `${name}-foliage`, [0.23, 0.43, 0.27]);
+    for (const [index, [x, y, z, size, turn]] of (
+      [
+        [0, 0.55, 0, 0.34, 0.24],
+        [-0.27, 0.37, 0.14, 0.22, 0.85],
+        [0.24, 0.43, -0.17, 0.24, 0.48],
+      ] as const
+    ).entries()) {
       stem(
-        `growth-ribs-stem-${i}`,
+        `growth-ribs-stem-${index}`,
         [
-          [x, 0, z],
-          [x * 0.8, 0.3, z * 0.8],
-          [x, 0.7, z],
+          [x * 0.38, 0.08, z * 0.38 - 0.05],
+          [x * 0.75, y * 0.52, z * 0.68],
+          [x, y, z],
         ],
-        0.045,
+        size * 0.15,
+        leaf,
       );
-      plate(`growth-canopy-leaf-${i}`, [x, 0.35, z], [0.5, 0.12, 0.22]);
+      for (let petal = 0; petal < 5; petal++) {
+        const angle = (petal * Math.PI * 2) / 5 + turn;
+        plate(
+          `growth-canopy-petal-${index}-${petal}`,
+          [
+            x + Math.sin(angle) * size * 0.42,
+            y,
+            z + Math.cos(angle) * size * 0.42,
+          ],
+          [size * 0.75, size * 0.17, size],
+          petals,
+          "blade",
+        ).rotation.set(-0.64, angle, 0);
+      }
+      if (index > 0)
+        plate(
+          `growth-canopy-bud-${index}`,
+          [x, y + size * 0.18, z],
+          [size * 0.58, size * 0.65, size * 0.58],
+          core,
+        );
+    }
+    for (const [index, [angle, radius, y, width, length]] of (
+      [
+        [0.08, 0.2, 0.21, 0.33, 0.59],
+        [1.54, 0.19, 0.23, 0.28, 0.52],
+        [2.63, 0.17, 0.21, 0.32, 0.52],
+        [3.56, 0.18, 0.22, 0.34, 0.56],
+        [4.91, 0.19, 0.24, 0.29, 0.55],
+      ] as const
+    ).entries()) {
       plate(
-        `growth-canopy-flower-${i}`,
-        [x, 0.65, z],
-        [0.23, 0.18, 0.23],
-        core,
-      );
+        `growth-canopy-leaf-${index}`,
+        [Math.sin(angle) * radius, y, Math.cos(angle) * radius],
+        [width, 0.13, length],
+        foliage,
+        "blade",
+      ).rotation.set(-0.2, angle, 0.12);
     }
   },
 };
@@ -684,11 +722,12 @@ const CIRCLE_STRUCTURES = {
     ],
   },
   "cultivation-site": {
-    halfWidth: 0.65,
-    halfDepth: 0.65,
+    halfWidth: 0.36,
+    halfDepth: 0.38,
     height: 0.7,
     frame: "bloom",
-    focusHeight: 0.5,
+    focusHeight: 0.62,
+    focusScale: [0.26, 0.23, 0.26],
     owned: false,
   },
 } satisfies Record<string, StructureRecipe>;
@@ -1022,10 +1061,11 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     for (const [index, position] of marks.entries())
       plate(`growth-canopy-owner-${index}`, position, [0.35, 0.3, 0.12], owner);
   }
+  const focusScale = recipe.focusScale ?? [0.3, 0.45, 0.3];
   const pulse = plate(
     "growth-canopy-focus",
     [0, recipe.focusHeight, 0],
-    [0.3, 0.45, 0.3],
+    focusScale,
     core,
   );
   if (recipe.owned)
@@ -1068,9 +1108,9 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     2,
     (seconds) => {
       pulse.scaling.set(
-        0.3,
-        0.45 * (1 + Math.sin(seconds * Math.PI) * 0.12),
-        0.3,
+        focusScale[0],
+        focusScale[1] * (1 + Math.sin(seconds * Math.PI) * 0.12),
+        focusScale[2],
       );
     },
     false,

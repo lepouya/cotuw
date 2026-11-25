@@ -202,8 +202,8 @@ challenge, pacing, and useful choices.
     Sentry Turret, Thornspire, Medic, Mechanic, Demolition Trooper, Healer,
     Artificer, Construct Nursery, and Briar Ram. The wolf pass covers the
     standard wolf and alpha. Recovery model passes cover ARC building
-    rubble, Circle living rubble, and neutral salvage. The Materials mound
-    pass covers full and depleted deposits along a Harvester route.
+    rubble, Circle living rubble, and neutral salvage. Resource model passes
+    cover Materials depletion and Lifebloom reserve, dormancy, and recovery.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

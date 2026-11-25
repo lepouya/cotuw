@@ -54,8 +54,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
   Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle,
   Thornspire ribs and crown, and renewable blooms. Each ID has one recipe
-  naming its size, frame, and focus height. Owned
-  buildings carry an owner marking; neutral sites do not. Named `growth-roots`,
+  naming its size, frame, and focus placement. Owned buildings carry an
+  owner marking; neutral sites do not. Named `growth-roots`,
   `growth-ribs`, and `growth-canopy` meshes define three construction layers
   without scaffolding. Active growth pulses; untended or capacity-blocked work
   holds still with a grey progress bar. Saved tick progress restores the layer.
@@ -242,3 +242,5 @@ The scaffold is a unit cube that construction stages scale around the
 footprint. Materials mounds batch their two ore tones and rock bed by
 material. The bed sits on the ground plane, so each depletion stage shrinks
 the mound toward the terrain without changing navigation.
+Cultivation sites batch stems, leaves, and petals around a separate pulsing
+focus. Reserve and dormancy set the scale of the whole clump.
