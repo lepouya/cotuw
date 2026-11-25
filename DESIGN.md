@@ -1955,6 +1955,9 @@ acceptance progress. The following sections define the selected scope.
   entrance, angled side armor, and a rotating roof array. Owner markings
   sit on the roof, entrance canopy, side armor, and array tips so the
   building reads from several camera angles.
+- The Materials Refinery has a recessed loading bay with a roll-up door and
+  amber approach markings. An owner-marked silo and a roof-mounted fan and
+  press distinguish the processing hall from the Command Center.
 
 ### M1 Circle presentation
 

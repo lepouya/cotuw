@@ -513,11 +513,37 @@ function harvester(scene: Scene, name: string) {
   });
 }
 
-/**
- * A building's articulated parts, with one loop of their motion as idle and a
- * clip named for each activity.
- */
-function building(factory: TilePlacedActorDetailsFactory) {
+/** Meshes under animated pivots must keep their local transforms. */
+function batchStaticBuildingParts(root: TransformNode) {
+  const moving = new Set(
+    root
+      .getScene()
+      .animationGroups.flatMap((group) =>
+        group.targetedAnimations.flatMap(({ target }) =>
+          target instanceof TransformNode
+            ? [target, ...target.getDescendants(false)]
+            : [],
+        ),
+      ),
+  );
+  const byMaterial = new Map<StandardMaterial, Mesh[]>();
+  for (const mesh of root.getChildMeshes()) {
+    if (!(mesh instanceof Mesh) || moving.has(mesh)) continue;
+    if (!(mesh.material instanceof StandardMaterial)) continue;
+    const parts = byMaterial.get(mesh.material) ?? [];
+    parts.push(mesh);
+    byMaterial.set(mesh.material, parts);
+  }
+  for (const [material, parts] of byMaterial)
+    if (parts.length > 1)
+      merge(root, `${root.name}-static-${material.name}`, parts, material);
+}
+
+/** Exports a building's idle loop and a clip for each activity. */
+function building(
+  factory: TilePlacedActorDetailsFactory,
+  { batchStatic = false }: { batchStatic?: boolean } = {},
+) {
   return (scene: Scene, name: string) => {
     const root = new TransformNode(name, scene);
     const materials = new Map<string, StandardMaterial>();
@@ -539,6 +565,7 @@ function building(factory: TilePlacedActorDetailsFactory) {
     clip(root, "idle", details.loopSeconds, details.update, false);
     for (const [kind, motion] of Object.entries(details.activities ?? {}))
       clip(root, kind, motion.seconds, motion.pose, false);
+    if (batchStatic) batchStaticBuildingParts(root);
   };
 }
 
@@ -1253,7 +1280,7 @@ const BUILDERS = {
   ...CIRCLE_MODELS,
   "command-center": building(createCommandCenterDetails),
   barracks: building(createBarracksDetails),
-  refinery: building(createRefineryDetails),
+  refinery: building(createRefineryDetails, { batchStatic: true }),
   relay: building(createRelayDetails),
   sentry: building(createSentryDetails),
   harvester,

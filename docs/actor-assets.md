@@ -81,7 +81,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   one-shot motions become clips named for each activity or `attack`. The base
   pack loads the resulting GLBs during gameplay. The script also imports
   runtime colors, such as `MATERIALS_COLOR`, so generated models match the
-  stand-ins.
+  stand-ins. The Refinery exporter batches static meshes by material and
+  keeps descendants of animated parts attached to their moving parents.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
 - Relay Stations sweep an antenna and pulse a signal lamp. Sentry Turrets
