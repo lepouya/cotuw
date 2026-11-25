@@ -1981,8 +1981,9 @@ acceptance progress. The following sections define the selected scope.
 - The Lifebloom Conservatory has a low bower of pointed leaves and pale ribs.
   Its open front exposes the violet collection basin, and the side ribs
   carry owner markings.
-- The Musterhall is elongated, with a vaulted roof of curved wooden ribs and
-  a broad infantry entrance.
+- The Musterhall has an elongated vault of pale ribs and overlapping pointed
+  leaves. A raised arch carries owner markings over the infantry entrance,
+  and violet lights flank the threshold.
 - The Construct Nursery is a rounded cradle enclosed by protective arches,
   with an opening large enough for a Briar Ram.
 - The Thornspire is a narrow, sturdy column with thorn-like plates around a

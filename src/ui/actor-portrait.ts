@@ -209,12 +209,17 @@ const PORTRAITS: Record<PortraitId, string> = {
     <ellipse fill="#9162bb" cx="60" cy="59" rx="23" ry="7"/>
     <path fill="#d7b3ed" d="m58 41 5 5-3 8-5-5Z"/>`,
   "circle-musterhall": `${GROVE_GROUND}
-    <path fill="#204b37" d="M19 51 38 18Q50 6 64 18L102 38 95 62 62 66Z"/>
-    <path fill="#39704c" d="M39 18Q50 7 64 18L102 38 76 40Z"/>
-    <path fill="none" stroke="#bdb28b" stroke-width="5"
-      d="M20 61 32 31Q40 15 49 29L62 65M39 64 50 35Q59 19 68 33L81 67M62 65 73 39Q82 25 92 39L102 59"/>
-    <path fill="#102e28" d="M76 67V51Q85 32 93 48V63Z"/>
-    <path stroke="#83aed0" stroke-width="3" d="M85 39V50"/>`,
+    <path fill="#183c31" d="M16 56 24 36 46 16 86 22 103 39 106 63 69 71Z"/>
+    <path fill="#27573e" d="M15 42Q18 24 46 15L88 20 74 32 62 53Q43 44 15 42Z"/>
+    <path fill="#4a7f51"
+      d="M17 42Q22 23 47 15Q37 28 34 45ZM31 44Q36 25 61 17Q52 29 48 48ZM46 47Q53 26 75 19Q67 31 63 52Z"/>
+    <path fill="none" stroke="#aa9a73" stroke-width="3"
+      d="M18 42 16 59 69 71M35 45 32 63M50 49 47 67"/>
+    <path fill="#173329" stroke="#d4c79f" stroke-width="5" stroke-linejoin="round"
+      d="M68 70Q70 41 86 23Q102 38 106 63"/>
+    <path fill="#3b7049" d="M72 67Q73 50 80 45Q84 56 80 67ZM93 64Q88 52 94 43Q102 51 103 62Z"/>
+    <path fill="#a983de" d="m71 55 4 3-2 7-4-3Zm30-5 4 3 1 6-4-2Z"/>
+    <path fill="#83aed0" d="m83 32 7-2 2 5-7 3Z"/>`,
   refinery: `${FOUNDATION}
     <path fill="#8ea4a0" d="M70 14 82 10 94 14 94 38 82 44 70 38Z"/>
     <path fill="#527477" d="M70 14 82 19 94 14 82 10Z"/>

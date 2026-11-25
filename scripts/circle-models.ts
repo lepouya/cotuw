@@ -54,7 +54,12 @@ type StructureRecipe = {
   owned: boolean;
   ownerMarks?: readonly Vec3[];
   /** A producer's front entrance, whose leaves part for each exit. */
-  entrance?: { z: number; width: number; height: number };
+  entrance?: {
+    z: number;
+    width: number;
+    height: number;
+    bladePanels?: boolean;
+  };
 };
 
 /** What a frame draws with. */
@@ -284,30 +289,73 @@ const FRAMES = {
       ).rotation.y = side * 0.56;
     }
   },
-  /** A hall of arched ribs under leaf roofing. */
-  arches: ({ recipe, stem, plate }: FrameContext) => {
-    const { halfWidth, halfDepth, height } = recipe;
-    for (let i = 0; i < 4; i++) {
-      const z = -halfDepth + (i * halfDepth * 2) / 3;
+  /** An elongated vault with a raised arch over the deployment entrance. */
+  hall: ({ stem, plate, core }: FrameContext) => {
+    for (const [i, z] of [-1.1, -0.37, 0.4, 1.22].entries()) {
+      const peak = i === 3 ? 2.22 : 1.98;
       stem(
         `growth-ribs-arch-${i}`,
         [
-          [-halfWidth, 0, z],
-          [-halfWidth * 0.9, height * 0.55, z],
-          [0, height, z],
-          [halfWidth * 0.9, height * 0.55, z],
-          [halfWidth, 0, z],
+          [-0.86, 0, z],
+          [-0.75, 0.84, z],
+          [-0.58, 1.43, z],
+          [-0.36, peak - 0.32, z],
+          [0, peak, z],
+          [0.36, peak - 0.32, z],
+          [0.58, 1.43, z],
+          [0.75, 0.84, z],
+          [0.86, 0, z],
         ],
-        0.1,
+        i === 3 ? 0.13 : 0.09,
       );
-      for (const side of [-1, 1]) {
+    }
+    stem(
+      "growth-ribs-ridge",
+      [
+        [0, 1.83, -1.27],
+        [0, 1.98, -0.78],
+        [0, 2.02, 0.42],
+        [0, 2.22, 1.22],
+      ],
+      0.095,
+    );
+    for (const side of [-1, 1]) {
+      stem(
+        `growth-ribs-eave-${side}`,
+        [
+          [side * 0.62, 1.14, -1.18],
+          [side * 0.71, 1.24, -0.64],
+          [side * 0.72, 1.26, 0.51],
+          [side * 0.58, 1.43, 1.22],
+        ],
+        0.085,
+      );
+      stem(
+        `growth-roots-sill-${side}`,
+        [
+          [side * 0.79, 0, -1.29],
+          [side * 0.82, 0.13, -0.72],
+          [side * 0.84, 0.11, 0.59],
+          [side * 0.78, 0, 1.35],
+        ],
+        0.13,
+      );
+      for (const [i, z] of [-0.89, -0.32, 0.25, 0.81].entries()) {
         const roof = plate(
-          `growth-canopy-${i}-${side}`,
-          [side * halfWidth * 0.52, height * 0.84, z],
-          [halfWidth * 1.1, 0.18, halfDepth * 0.85],
+          `growth-canopy-roof-blade-${i}-${side}`,
+          [side * 0.35, i === 3 ? 1.88 : 1.77, z],
+          [0.94, 0.42, 1.19],
+          undefined,
+          "blade",
         );
-        roof.rotation.z = side * -0.38;
+        roof.rotation.set(-0.12, side * 0.24, side * -0.67);
       }
+      plate(
+        `growth-canopy-threshold-light-${side}`,
+        [side * 0.74, 0.72, 1.32],
+        [0.13, 0.26, 0.16],
+        core,
+      );
     }
   },
   /** A thorn-plated column under an opening crown that aims its shots. */
@@ -496,10 +544,15 @@ const CIRCLE_STRUCTURES = {
     halfWidth: 0.85,
     halfDepth: 1.3,
     height: 2.1,
-    frame: "arches",
+    frame: "hall",
     focusHeight: 0.65,
     owned: true,
-    entrance: { z: 1.32, width: 1.2, height: 1.35 },
+    ownerMarks: [
+      [0, 1.99, 1.33],
+      [-0.76, 1.27, 0.37],
+      [0.76, 1.27, 0.37],
+    ],
+    entrance: { z: 1.32, width: 1.2, height: 1.35, bladePanels: true },
   },
   "circle-construct-nursery": {
     halfWidth: 1.3,
@@ -700,7 +753,7 @@ function addEntrance(
   scene: Scene,
   name: string,
   root: TransformNode,
-  { z, width, height }: NonNullable<StructureRecipe["entrance"]>,
+  { z, width, height, bladePanels }: NonNullable<StructureRecipe["entrance"]>,
   leaf: StandardMaterial,
   core: StandardMaterial,
 ) {
@@ -709,15 +762,23 @@ function addEntrance(
     hinge.parent = root;
     hinge.position.set((side * width) / 2, 0, z);
     hinge.rotation.y = side * ENTRANCE_REST_ANGLE;
-    const panel = MeshBuilder.CreateSphere(
-      `${name}-growth-canopy-entrance-${side}`,
-      { diameter: 1, segments: 6 },
-      scene,
-    );
+    const panelName = `${name}-growth-canopy-entrance-${side}`;
+    const panel = bladePanels
+      ? MeshBuilder.CreatePolyhedron(panelName, { custom: LEAF_BLADE }, scene)
+      : MeshBuilder.CreateSphere(
+          panelName,
+          { diameter: 1, segments: 6 },
+          scene,
+        );
     panel.parent = hinge;
     panel.material = leaf;
     panel.position.set((-side * width) / 4, height / 2, 0);
-    panel.scaling.set(width / 2, height, 0.08);
+    if (bladePanels) {
+      panel.rotation.x = Math.PI / -2;
+      panel.scaling.set(width / 2, 0.19, height);
+    } else {
+      panel.scaling.set(width / 2, height, 0.08);
+    }
     return { hinge, side };
   });
   const glow = MeshBuilder.CreateSphere(
