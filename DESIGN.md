@@ -1906,10 +1906,8 @@ acceptance progress. The following sections define the selected scope.
   production queue with Troopers, Scouts, and Demolition Troopers. Surviving
   Harvesters can recover from raid damage through Mechanic support; buildings
   use their separate paid Repair action.
-- Medics wear pale armor with teal medical markings and square medical
-  packs. Mechanics wear ochre work armor and hard hats, with twin service
-  tanks and an open-ended wrench. Role equipment and silhouettes distinguish
-  both from Scouts, independently of their shared owner-color markings.
+- Mechanics wear ochre work armor and hard hats, with twin service tanks and
+  an open-ended wrench.
 - Active Medic and Mechanic service uses role-specific tool gestures with
   subtle effects on the target. Healing and mechanical repair have distinct
   cues. Approaching or blocked providers show no active work effect. Reduced
@@ -1983,6 +1981,10 @@ acceptance progress. The following sections define the selected scope.
   cyan optics and an antenna on the radio pack. Owner markings sit on the
   helmet, shoulder tabs, and pack. They are unarmed and swing their arms
   freely while moving.
+- Medics wear pale faceted armor over dark teal fatigues. Teal medical
+  crosses mark the chest, field pack, and carry case. Owner markings sit on
+  the helmet, shoulders, and pack. They raise a wrist scanner to treat
+  wounded personnel.
 
 ### M1 Circle presentation
 

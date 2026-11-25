@@ -234,7 +234,7 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, ({ touch }) => {
     }
     await expect(page.locator("#train-scout .actor-portrait")).toHaveAttribute(
       "data-portrait",
-      "unarmed",
+      "arc-scout",
     );
     await activate(page.locator("#train-medic"), touch);
     await advance(page, 0.1);

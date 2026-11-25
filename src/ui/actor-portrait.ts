@@ -133,18 +133,29 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#78a3d8" d="m54 8 10-2 5 3-10 3Z"/>
     <path fill="#a1b0ae" d="m55 17 7-1 4 4-2 6-7 1-4-4Zm14-1 7-1 4 4-2 6-7 1-4-4Z"/>
     <path fill="#77dfcc" d="m57 19 5-1 2 3-2 3-4 1-3-3Zm14-1 5-1 2 3-2 3-4 1-3-3Z"/>`,
-  "arc-medic": infantry(
-    "#dfeada",
-    `
-    <path fill="#f0f4e7" d="M46 13Q60 0 74 13V16H46Z"/>
-    <path fill="#6d9ad2" d="M57 5H64V16H57Z"/>
-    <path fill="#2d795f" d="M56 31H64V36H70V43H64V49H56V43H50V36H56Z"/>
-    <path fill="#293f3a" d="M25 43H40V50H36V47H29V50H25Z"/>
-    <rect fill="#e6efdf" x="22" y="49" width="22" height="21" rx="2"/>
-    <path fill="#2d795f" d="M30 53H36V57H40V63H36V67H30V63H26V57H30Z"/>
-    <path fill="#a9c8b6" d="M81 38 94 41 91 51 79 48Z"/>
-    <path fill="#74e5b7" d="M84 40 91 42 89 46 82 44Z"/>`,
-  ),
+  "arc-medic": `
+    <ellipse fill="#152b31" cx="60" cy="73" rx="31" ry="5"/>
+    <path stroke="#2d5047" stroke-width="12" d="m51 49-5 21m19-21 8 21"/>
+    <path fill="#b9d0bc" d="m43 54 11 2-3 12-10-2Zm24 2 10-2 3 12-10 2Z"/>
+    <path fill="#26363a" d="m41 67 11 1-1 6H37Zm29 1 10-1 5 7H71Z"/>
+    <path fill="#344a48" d="m30 25 10-5 12 4 2 26-11 4-13-7Z"/>
+    <path fill="#a4beaa" d="m29 29 10-4 6 3v22l-6 2-10-6Z"/>
+    <path fill="#78a3d8" d="m31 26 9-4 5 2-9 4Z"/>
+    <path fill="#34584e" d="m43 29 14-6 18 5 5 18-9 9-24-1-7-10Z"/>
+    <path fill="#dce9db" d="m49 30 22-2 5 5-4 13-20 2-6-6Z"/>
+    <path fill="#2e6a5b" d="m57 32 6-1 1 4 6-1 1 5-6 1v4l-6 1-1-4-6 1-1-5 6-1Z"/>
+    <path stroke="#bdd4c1" stroke-width="9" d="m42 36-8 13m42-14 8 12"/>
+    <path fill="#78a3d8" d="m36 32 7-4 6 4-4 4-9 1Zm33-4 7-2 7 4 1 5-10-1Z"/>
+    <path fill="#2b4241" d="m27 42 12 1 5 6-4 8-13-3Z"/>
+    <path fill="#83e5cf" d="m30 44 9 2-2 6-7-1Z"/>
+    <path stroke="#293d3d" stroke-width="4" d="M83 53v-5h8v5"/>
+    <path fill="#a7c3b0" d="m76 53 8-5 14 3 3 15-7 6-17-5Z"/>
+    <path fill="#e1ebd9" d="m80 53 14-2 4 4v11l-5 4-13-4Z"/>
+    <path fill="#2e6a5b" d="m86 54 4 1v4l4 1v4l-4-1v4l-4-1v-4l-4-1v-4l4 1Z"/>
+    <path fill="#dce9da" d="M45 13 51 6 64 3 75 8 78 15 73 23 47 23Z"/>
+    <path fill="#293d3d" d="m46 15 31-2-1 11-8 5-17-3Z"/>
+    <path fill="#83e5cf" d="m51 17 23-2-1 5-20 3Z"/>
+    <path fill="#78a3d8" d="m53 6 11-3 6 3-13 4Z"/>`,
   "arc-mechanic": infantry(
     "#d88e2b",
     `

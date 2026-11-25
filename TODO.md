@@ -199,8 +199,8 @@ challenge, pacing, and useful choices.
   - First model passes cover the Command Center, Heartgrove, Materials
     Refinery, Harvester, Lifebloom Conservatory, Cultivator, Field Barracks,
     Musterhall, Trooper, Sentinel, Scout, Wayfinder, Relay Station,
-    Sentry Turret, and Thornspire. The wolf pass covers the standard wolf
-    and alpha.
+    Sentry Turret, Thornspire, and Medic. The wolf pass covers the standard
+    wolf and alpha.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
