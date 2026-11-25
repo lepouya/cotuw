@@ -2006,8 +2006,10 @@ acceptance progress. The following sections define the selected scope.
   starts at the focus. Bolts have twisting violet strands, branching sparks,
   and a brief living pulse. Reduced motion holds their shape while the
   effect fades.
-- Wayfinders have light hooded mantles, tunics, and a slim wayfinding stave,
-  with compact silhouettes suited to speed. They remain unarmed.
+- Wayfinders wear light green hooded mantles with pale leaf clasps. The hood
+  frames the face and leaves the ears visible. They carry a slender living
+  wood stave with a violet waystone in one hand and swing the other arm
+  while moving. The mantle and sash carry owner markings. They are unarmed.
 - Cultivators wear short olive mantles and pale harness straps. They carry
   a ribbed seed pod on their backs and a forked growth tool with a violet
   focus between its tines.

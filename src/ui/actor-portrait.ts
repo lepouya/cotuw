@@ -190,12 +190,18 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#dbb3f6" d="m60 41 4 7-4 4-3-5Z"/>`,
   ),
   "circle-wayfinder": elf(
-    "#205e46",
+    "#49866f",
     `
-    <path fill="#1c4939" d="M43 18Q47 -1 63 3Q80 4 79 29L70 26 71 13Q59 7 49 17L51 29 42 31Z"/>
-    <path fill="none" stroke="#cbbb90" stroke-width="4" d="M84 70 87 20Q96 12 89 5"/>
-    <path fill="#aa7edd" d="m88 8 4 5-5 7-3-5Z"/>
-    <path fill="#6b9980" d="m44 36 12 4-7 24-9-5Z"/>`,
+    <path fill="#3f765f" d="M43 19Q43 7 59 2Q72 3 79 16L77 33 69 28 72 17Q60 10 49 18L51 28 43 33Z"/>
+    <path fill="#6a9d80" d="M43 18Q48 7 59 2Q72 3 79 16L72 17Q60 10 49 18Z"/>
+    <path fill="#60a28a" d="M46 28 58 36 52 47 36 40ZM73 28 62 36 68 47 83 39Z"/>
+    <path fill="#d8c297" d="m50 34 6 4-4 7-4-5Zm20 0 2 6-4 5-4-7Z"/>
+    <path fill="#84afd0" d="M47 47Q60 52 73 47L74 51Q60 56 46 51Z"/>
+    <path fill="none" stroke="#d2c096" stroke-width="4" stroke-linecap="round"
+      d="M39 72 31 20Q28 13 26 8"/>
+    <path fill="#ab9872" d="m34 23 2-8-7-10-4 7 2 8Z"/>
+    <path fill="#bd8aee" d="m26 6-4 7 5 7 4-5Z"/>
+    <path fill="#d6bd96" d="m38 44-5 3 2 6 6-3Z"/>`,
   ),
   "circle-healer": elf(
     "#6f9c8c",

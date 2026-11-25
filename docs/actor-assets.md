@@ -17,9 +17,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   the shoulders, chest, and helmet ridge. Demolition Troopers use charcoal
   armor, amber visors, a shoulder launcher, and paired rocket tubes, with a
   slower launch recoil clip. Sentinels wear layered leaf armor and channel
-  violet focus artifacts; Wayfinders wear light hoods and carry wayfinding
-  staves. Healers wear long flowing mantles, an owner stole, and glowing palms,
-  raising open hands in `cast`. Artificers wear fitted work gear, a tool
+  violet focus artifacts; Wayfinders wear light hoods and carry a waystone
+  stave that follows the right hand. Healers wear long flowing mantles, an
+  owner stole, and glowing palms, raising open hands in `cast`. Artificers
+  wear fitted work gear, a tool
   harness, belt pouches, and a back frame, leaning in to shape a construct with
   an awl in `mend`. Each asset ID has one recipe owning its scale, palette,
   geometry, gait, arm stance, and optional attack layer; only armed recipes
