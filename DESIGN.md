@@ -1738,7 +1738,12 @@ recall rules apply unchanged.
   flash a red target marker.
 - Combat values and wolf timers are data-driven in the base content pack.
   On Normal, one Trooper must defeat one normal wolf, a Scout must not, and
-  the five-wolf den requires multiple Troopers. Alpha wolves use 125% scale.
+  the five-wolf den requires multiple Troopers.
+- Wolves have a dark saddle, pale cheek and throat ruff, pointed ears, and a
+  low brush tail. The legs flex through a diagonal trot and a longer gallop
+  in pursuit. The jaw opens during a bite, the head and tail recoil on a hit,
+  and the legs fold as the wolf falls onto its side. The alpha uses the
+  same model and clips at 125% scale.
 - The ARC introduction protects its authored starting Command Center.
   Destruction records defeat, applies all simultaneous hits, then stops
   movement and economy. Economic stalls and other losses do not declare defeat.

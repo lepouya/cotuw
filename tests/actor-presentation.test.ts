@@ -170,20 +170,22 @@ test("Trooper aim holds between shots and clears when its target is lost", async
 });
 
 test.each(["wolf", "alpha-wolf"])(
-  "%s runs in a bound and leans through turns",
+  "%s staggers its gallop, trots in diagonal pairs, and leans through turns",
   async (id) => {
     const { first, step, node } = await load(id);
+    const pitch = (leg: number) =>
+      node(`wolf-leg-${leg}`).rotationQuaternion!.x;
     first.setAnimationState!({ running: true });
     step(0.1, 0.2, 0.1);
     expect(node("wolf").position.y).toBeGreaterThan(0.01);
     const lean = node("wolf").rotationQuaternion!.z;
     expect(Math.abs(lean)).toBeGreaterThan(0.005);
-    expect(node("wolf-leg-0").rotationQuaternion!.x).toBeCloseTo(
-      node("wolf-leg-1").rotationQuaternion!.x,
-    );
+    expect(Math.abs(pitch(0) - pitch(1))).toBeGreaterThan(0.01);
     first.setAnimationState!({ running: false });
     step(0.1, 0.2, -0.2);
     expect(node("wolf").position.y).toBeCloseTo(0);
+    expect(pitch(0)).toBeCloseTo(pitch(3));
+    expect(pitch(0)).toBeCloseTo(-pitch(1));
     expect(Math.sign(node("wolf").rotationQuaternion!.z)).toBe(
       -Math.sign(lean),
     );

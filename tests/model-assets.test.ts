@@ -192,7 +192,12 @@ test.each(["wolf", "alpha-wolf", "arc-harvester"])(
       first.animate!({ distance: 0, seconds: 0.1, turn: 0 });
       scene.animate();
       const head = scene.getTransformNodeByName("first-wolf-head-joint")!;
+      const jaw = scene.getTransformNodeByName("first-wolf-jaw")!;
       expect(head.rotationQuaternion!.x).toBeLessThan(-0.1);
+      expect(jaw.rotationQuaternion!.x).toBeGreaterThan(0.15);
+      first.animate!({ distance: 0, seconds: 0.4, turn: 0 });
+      scene.animate();
+      expect(jaw.rotationQuaternion!.x).toBeCloseTo(0);
     } else {
       first.setAnimationState!({ working: true });
       second.setAnimationState!({ working: false });

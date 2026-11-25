@@ -44,10 +44,10 @@ import type { Scene } from "@babylonjs/core";
 import type { TilePlacedActorDetailsFactory } from "../src/render/tile-placed-actor-view.ts";
 
 /**
- * Rigid weights preserve the part hierarchy while exporting a real skin. Joints
- * replace the parts, so this returns each part's joint.
+ * Rigid weights preserve the part hierarchy while exporting a real skin.
+ * Bind static pieces to their parent when every moving pivot is a node.
  */
-function skin(root: TransformNode) {
+function skin(root: TransformNode, { bindToParent = false } = {}) {
   const scene = root.getScene();
   const parts = root
     .getChildMeshes()
@@ -60,7 +60,13 @@ function skin(root: TransformNode) {
     data.transform(part.computeWorldMatrix(true));
     return data;
   });
+  const body = bindToParent
+    ? new TransformNode(`${root.name}-body-joint`, scene)
+    : undefined;
+  if (body) body.parent = root;
   const joints = parts.map((part) => {
+    if (body)
+      return part.parent === root ? body : (part.parent as TransformNode);
     const joint = new TransformNode(`${part.name}-joint`, scene);
     joint.parent = part.parent;
     joint.position.copyFrom(part.position);
@@ -105,27 +111,36 @@ function skin(root: TransformNode) {
 }
 
 function wolf(scene: Scene, name: string) {
-  const parts = createWolfParts(scene, name);
-  const { root, legs: hips } = parts;
-  const head = skin(root).get(parts.head)!;
+  const { root, head, jaw, tail, limbs } = createWolfParts(scene, name);
+  skin(root, { bindToParent: true });
   clip(root, "idle", 2, (seconds) => {
-    head.rotation.x = -0.15 + Math.sin(seconds * Math.PI) * 0.025;
+    const breath = Math.sin(seconds * Math.PI);
+    head.rotation.x = -0.15 + breath * 0.025;
+    tail.rotation.y = breath * 0.075;
   });
   clip(root, "walk", 1, (seconds) => {
-    hips.forEach((hip, index) => {
-      hip.rotation.x =
-        Math.sin(
-          seconds * Math.PI * 2 + (index === 0 || index === 3 ? 0 : Math.PI),
-        ) * 0.55;
+    const phase = seconds * Math.PI * 2;
+    limbs.forEach(({ hip, knee }, index) => {
+      const stride = Math.sin(
+        phase + (index === 0 || index === 3 ? 0 : Math.PI),
+      );
+      hip.rotation.x = stride * 0.49;
+      knee.rotation.x = Math.max(0, -stride) * (index < 2 ? 0.42 : -0.38);
     });
+    tail.rotation.y = Math.sin(phase) * 0.13;
   });
   clip(root, "run", 1, (seconds) => {
     const phase = seconds * Math.PI * 2;
-    hips.forEach((hip, index) => {
-      hip.rotation.x = Math.sin(phase + (index < 2 ? 0 : Math.PI)) * 0.85;
+    limbs.forEach(({ hip, knee }, index) => {
+      const stride = Math.sin(
+        phase + (index < 2 ? 0 : Math.PI) + (index % 2) * 0.64,
+      );
+      hip.rotation.x = stride * 0.76;
+      knee.rotation.x = Math.max(0, -stride) * (index < 2 ? 0.7 : -0.64);
     });
-    root.position.y = (1 - Math.cos(phase * 2)) * 0.035;
-    head.rotation.x = -0.15 - Math.sin(phase) * 0.08;
+    root.position.y = (1 - Math.cos(phase * 2)) * 0.025;
+    head.rotation.x = -0.15 - Math.sin(phase) * 0.09;
+    tail.rotation.x = -0.18 + Math.sin(phase) * 0.12;
   });
   for (const [turn, sign] of [
     ["turn-left", -1],
@@ -139,6 +154,7 @@ function wolf(scene: Scene, name: string) {
         const amount = seconds / 0.3;
         root.rotation.z = -sign * amount * 0.12;
         head.rotation.y = sign * amount * 0.18;
+        tail.rotation.y = -sign * amount * 0.2;
       },
       false,
     );
@@ -150,6 +166,7 @@ function wolf(scene: Scene, name: string) {
       const flinch = Math.sin((seconds / 0.35) * Math.PI);
       head.rotation.x = -0.15 + flinch * 0.3;
       root.rotation.z = flinch * 0.12;
+      tail.rotation.x = flinch * 0.33;
     },
     false,
   );
@@ -159,17 +176,22 @@ function wolf(scene: Scene, name: string) {
     0.4,
     (seconds) => {
       const lunge = Math.sin((seconds / 0.4) * Math.PI);
-      head.rotation.x = -0.15 - lunge * 0.45;
+      head.rotation.x = -0.15 - lunge * 0.36;
       root.position.z = lunge * 0.18;
+      jaw.rotation.x = Math.sin((seconds / 0.4) ** 0.65 * Math.PI) * 0.58;
     },
     false,
   );
   clip(root, "death", 0.8, (seconds) => {
     const fall = (seconds / 0.8) ** 2;
+    const buckle = Math.sin((seconds / 0.8) * Math.PI);
     root.rotation.z = (fall * Math.PI) / 2;
-    root.position.y = fall * 0.18;
-    hips.forEach((hip) => {
-      hip.rotation.x = -fall * 0.3;
+    root.position.y = fall * 0.202 - buckle * 0.05;
+    head.rotation.x = -0.15 + fall * 0.24;
+    tail.rotation.y = -fall * 0.46;
+    limbs.forEach(({ hip, knee }, index) => {
+      hip.rotation.x = fall * (index < 2 ? -0.42 : 0.31);
+      knee.rotation.x = (fall + buckle * 0.3) * (index < 2 ? 0.5 : -0.61);
     });
   });
 }

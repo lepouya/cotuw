@@ -37,9 +37,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   the shared work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, Barracks, Relay, and Sentry meshes with idle machinery and activity
-  or firing clips; a skinned wolf with idle, walk, run, turn, bite, hit, and
-  death; a skinned Briar Ram with pale overlapping plates, dark joints, a
-  sheltered violet core, owner flank bands, and a thorn-framed head, using idle,
+  or firing clips; a skinned wolf with articulated legs, jaw, and tail, using
+  idle, walk, run, turn, bite, hit, and death; a skinned Briar Ram with pale
+  overlapping plates, dark joints, a sheltered violet core, owner flank bands,
+  and a thorn-framed head, using idle,
   a planted diagonal walk, turn, a lunging `strike`, hit, and a buckling death
   that settles into a husk; a rigid Harvester with idle, transit, deploy,
   harvest, stow, unload, hit, and death; crystal resource mounds; animated
