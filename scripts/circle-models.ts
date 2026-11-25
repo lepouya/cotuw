@@ -59,6 +59,7 @@ type StructureRecipe = {
     width: number;
     height: number;
     bladePanels?: boolean;
+    panelWidth?: number;
   };
 };
 
@@ -69,6 +70,7 @@ type FrameContext = {
   root: TransformNode;
   recipe: StructureRecipe;
   wood: StandardMaterial;
+  bark: StandardMaterial;
   leaf: StandardMaterial;
   core: StandardMaterial;
   stem: (
@@ -453,58 +455,132 @@ const FRAMES = {
         false,
       );
   },
-  /** A rounded cradle of protective arches, open at the front for constructs. */
-  cradle: ({
-    name,
-    scene,
-    root,
-    recipe,
-    wood,
-    core,
-    stem,
-    plate,
-  }: FrameContext) => {
-    const { halfWidth, halfDepth, height } = recipe;
-    for (let i = 0; i < 7; i++) {
-      // Arches ring the bed except for the front quarter.
-      const angle = (Math.PI * 3) / 4 + (i * Math.PI * 1.5) / 6;
-      const x = Math.cos(angle);
-      const z = Math.sin(angle);
+  /** Layered wings cradle the seed bed around a wide deployment lane. */
+  cradle: ({ recipe, bark, wood, core, stem, plate }: FrameContext) => {
+    const { height, entrance } = recipe;
+    const { z: front } = entrance!;
+    const arches = [
+      { z: -0.99, drop: 0.48, width: 0.98 },
+      { z: -0.28, drop: 0.27, width: 1.19 },
+      { z: 0.53, drop: 0.31, width: 1.24 },
+      { z: front, drop: 0.1, width: 1.08 },
+    ];
+    for (const [index, { z, drop, width }] of arches.entries()) {
+      const mouth = z === front;
+      const peak = height - drop;
       stem(
-        `growth-ribs-arch-${i}`,
+        `growth-ribs-arch-${index}`,
         [
-          [x * halfWidth, 0, z * halfDepth],
-          [x * halfWidth * 0.92, height * 0.55, z * halfDepth * 0.92],
-          [x * 0.4, height, z * 0.4],
+          [-width, 0, z],
+          [-width, 0.87, z],
+          [-width * 0.85, 1.37, z],
+          [-width * 0.57, peak - 0.22, z],
+          [-width * 0.27, peak - 0.04, z],
+          [0, peak, z],
+          [width * 0.27, peak - 0.04, z],
+          [width * 0.57, peak - 0.22, z],
+          [width * 0.85, 1.37, z],
+          [width, 0.87, z],
+          [width, 0, z],
         ],
-        0.11,
+        mouth ? 0.135 : 0.095,
+      );
+    }
+    plate("growth-roots-seed-bed", [0, 0.13, -0.34], [1.53, 0.22, 1.5], bark);
+    for (const side of [-1, 1]) {
+      stem(
+        `growth-roots-bed-rim-${side}`,
+        [
+          [0, 0.19, -1.07],
+          [side * 0.54, 0.22, -1.02],
+          [side * 0.78, 0.24, -0.69],
+          [side * 0.8, 0.22, -0.25],
+          [side * 0.65, 0.19, 0.22],
+          [side * 0.4, 0.12, 0.53],
+        ],
+        0.085,
+      );
+      stem(
+        `growth-roots-sill-${side}`,
+        [
+          [side * 0.96, 0.12, -1.06],
+          [side * 1.21, 0.18, -0.48],
+          [side * 1.18, 0.18, 0.29],
+          [side * 1.13, 0.13, 0.88],
+          [side * 1.24, 0.03, 1.35],
+        ],
+        0.103,
+        bark,
+      );
+      stem(
+        `growth-ribs-shoulder-${side}`,
+        [
+          [side * 0.95, 0.28, -1.12],
+          [side * 1.02, 0.9, -0.72],
+          [side * 1.06, 1.1, -0.08],
+          [side * 0.97, 1.19, 0.58],
+          [side * 0.88, 1.44, front],
+        ],
+        0.105,
+      );
+      for (const [index, z] of [-0.85, -0.29, 0.28, 0.81].entries()) {
+        const sweep = side * (1.32 + index * 0.16);
+        const taper = index === 0 ? 0.13 : 0;
+        plate(
+          `growth-canopy-wing-${side}-${index}`,
+          [side * (0.68 - taper), 1.55 + index * 0.028 - taper, z],
+          [0.76, 0.36, 1.29],
+          undefined,
+          "blade",
+        ).rotation.set(0.47, sweep, 0);
+        plate(
+          `growth-canopy-fold-${side}-${index}`,
+          [side * (1.05 - taper), 1.14 + index * 0.045, z - 0.06],
+          [0.58, 0.23, 0.73],
+          undefined,
+          "blade",
+        ).rotation.set(0.69, sweep + side * 0.13, 0);
+      }
+      plate(
+        `growth-canopy-threshold-lamp-${side}`,
+        [side * 1.1, 0.56, front + 0.115],
+        [0.12, 0.24, 0.13],
+        core,
       );
       plate(
-        `growth-canopy-${i}`,
-        [x * halfWidth * 0.62, height * 0.82, z * halfDepth * 0.62],
-        [0.85, 0.22, 0.6],
-      ).rotation.y = -angle;
+        `growth-roots-seed-cradle-${side}`,
+        [side * 0.28, 0.24, 0],
+        [0.31, 0.34, 0.86],
+        wood,
+        "blade",
+      ).rotation.set(0, side * 0.45, -side * 0.65);
     }
     stem(
-      "growth-ribs-entrance",
+      "growth-ribs-rear-brace",
       [
-        [-0.8, 0, halfDepth],
-        [-0.75, 1.3, halfDepth],
-        [0, 1.75, halfDepth],
-        [0.75, 1.3, halfDepth],
-        [0.8, 0, halfDepth],
+        [-0.98, 0.32, -0.99],
+        [-0.71, 0.55, -1.13],
+        [0, 0.64, -1.18],
+        [0.71, 0.55, -1.13],
+        [0.98, 0.32, -0.99],
       ],
-      0.12,
+      0.103,
+      bark,
     );
-    const bed = MeshBuilder.CreateTorus(
-      `${name}-growth-roots-bed`,
-      { diameter: 1.9, thickness: 0.22, tessellation: 24 },
-      scene,
-    );
-    bed.parent = root;
-    bed.position.y = 0.15;
-    bed.material = wood;
-    plate("growth-ribs-pool", [0, 0.14, 0], [1.6, 0.1, 1.6], core);
+    plate(
+      "growth-canopy-rear-cap",
+      [0, 1.48, -0.91],
+      [1.28, 0.35, 0.89],
+      undefined,
+      "blade",
+    ).rotation.set(0.46, Math.PI, 0);
+    plate(
+      "growth-canopy-rear-fold",
+      [0, 1.17, -1.08],
+      [0.9, 0.27, 0.71],
+      undefined,
+      "blade",
+    ).rotation.set(0.7, Math.PI, 0);
   },
   /** A ring of flowering stems. */
   bloom: ({ stem, plate, core }: FrameContext) => {
@@ -578,10 +654,21 @@ const CIRCLE_STRUCTURES = {
     halfDepth: 1.3,
     height: 2.2,
     frame: "cradle",
-    focusHeight: 0.6,
+    focusHeight: 0.42,
     owned: true,
-    ownerMarks: [[0, 1.75, 1.36]],
-    entrance: { z: 1.34, width: 1.3, height: 1.35 },
+    ownerMarks: [
+      [0, 2.07, 1.35],
+      [-1.11, 1.17, 0.42],
+      [1.11, 1.17, 0.42],
+      [0, 1.72, -1.075],
+    ],
+    entrance: {
+      z: 1.22,
+      width: 2.12,
+      height: 1.35,
+      bladePanels: true,
+      panelWidth: 0.58,
+    },
   },
   "circle-thornspire": {
     halfWidth: 0.45,
@@ -776,7 +863,13 @@ function addEntrance(
   scene: Scene,
   name: string,
   root: TransformNode,
-  { z, width, height, bladePanels }: NonNullable<StructureRecipe["entrance"]>,
+  {
+    z,
+    width,
+    height,
+    bladePanels,
+    panelWidth = width / 2,
+  }: NonNullable<StructureRecipe["entrance"]>,
   leaf: StandardMaterial,
   core: StandardMaterial,
 ) {
@@ -795,12 +888,12 @@ function addEntrance(
         );
     panel.parent = hinge;
     panel.material = leaf;
-    panel.position.set((-side * width) / 4, height / 2, 0);
+    panel.position.set((-side * panelWidth) / 2, height / 2, 0);
     if (bladePanels) {
       panel.rotation.x = Math.PI / -2;
-      panel.scaling.set(width / 2, 0.19, height);
+      panel.scaling.set(panelWidth, 0.19, height);
     } else {
-      panel.scaling.set(width / 2, height, 0.08);
+      panel.scaling.set(panelWidth, height, 0.08);
     }
     return { hinge, side };
   });
@@ -914,6 +1007,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     root,
     recipe,
     wood,
+    bark,
     leaf,
     core,
     stem,

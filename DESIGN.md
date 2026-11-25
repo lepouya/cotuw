@@ -2008,8 +2008,11 @@ acceptance progress. The following sections define the selected scope.
 - The Musterhall has an elongated vault of pale ribs and overlapping pointed
   leaves. A raised arch carries owner markings over the infantry entrance,
   and violet lights flank the threshold.
-- The Construct Nursery is a rounded cradle enclosed by protective arches,
-  with an opening large enough for a Briar Ram.
+- The Construct Nursery has a recessed seed bed under curved wooden ribs
+  and layered leaf wings. Owner markings sit above the entrance, on both
+  sides, and on the rear arch. Leaf gates swing outward and violet light
+  swells at the wide threshold when a construct deploys. The building
+  portrait shows the open cradle and its paired wings.
 - The Thornspire has three curved ribs, pointed green plates, and a violet
   focus between the ribs. Owner markings sit on each rib. Its four crown
   leaves open around the casting focus to fire a heavy magical bolt.

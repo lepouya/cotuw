@@ -35,6 +35,44 @@ function posedExtent(meshes: readonly AbstractMesh[]) {
   return { radius, height };
 }
 
+test("the Construct Nursery opens its gate wide enough for a Briar Ram", async () => {
+  const scene = testScene();
+  const graphics =
+    BASE_CONTENT.presentation["circle-construct-nursery"]!.building!.glb!;
+  const asset = await loadModelAsset(scene, {
+    ...graphics,
+    url: glbDataUrl(graphics.url),
+  });
+  const nursery = asset.instantiate("nursery");
+  const exit = nursery.activities!.exit!;
+  const panels = nursery.root
+    .getChildMeshes()
+    .filter(({ name }) => /-growth-canopy-entrance--?1$/.test(name));
+  expect(panels).toHaveLength(2);
+  const opening = (seconds: number) => {
+    exit.pose(seconds);
+    scene.animate();
+    const [left, right] = panels
+      .map((panel) => {
+        panel.computeWorldMatrix(true);
+        return panel.getBoundingInfo().boundingBox;
+      })
+      .sort((a, b) => a.centerWorld.x - b.centerWorld.x);
+    return right!.minimumWorld.x - left!.maximumWorld.x;
+  };
+  const radius = BASE_CONTENT.actors.find(({ id }) => id === "circle-briar-ram")
+    ?.movement?.radius;
+  if (radius === undefined)
+    throw new Error("Expected a Briar Ram movement radius");
+  const resting = opening(0);
+  expect(resting).toBeGreaterThan(0);
+  const deployed = opening(exit.seconds / 2);
+  expect(deployed).toBeGreaterThan(resting);
+  expect(deployed).toBeGreaterThan(2 * radius);
+  nursery.dispose();
+  asset.dispose();
+});
+
 test("generated Turrets keep instance aiming independent of idle and firing", async () => {
   const scene = testScene();
   const graphics =

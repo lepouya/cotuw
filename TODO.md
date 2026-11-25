@@ -200,7 +200,8 @@ challenge, pacing, and useful choices.
     Refinery, Harvester, Lifebloom Conservatory, Cultivator, Field Barracks,
     Musterhall, Trooper, Sentinel, Scout, Wayfinder, Relay Station,
     Sentry Turret, Thornspire, Medic, Mechanic, Demolition Trooper, Healer,
-    and Artificer. The wolf pass covers the standard wolf and alpha.
+    Artificer, and Construct Nursery. The wolf pass covers the standard wolf
+    and alpha.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

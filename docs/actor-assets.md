@@ -51,9 +51,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
-  Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle
-  with an open front arch, Thornspire ribs and crown, and renewable blooms. Each
-  ID has one recipe naming its size, frame, and focus height. Owned
+  Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle,
+  Thornspire ribs and crown, and renewable blooms. Each ID has one recipe
+  naming its size, frame, and focus height. Owned
   buildings carry an owner marking; neutral sites do not. Named `growth-roots`,
   `growth-ribs`, and `growth-canopy` meshes define three construction layers
   without scaffolding. Active growth pulses; untended or capacity-blocked work
@@ -63,7 +63,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   `aimNode`, and its petals open in the `attack` clip. The Heartgrove,
   Musterhall, and Nursery hinge two leaf panels at their entrances, resting
   slightly apart; the `exit` clip swings them open while a violet glow swells
-  on the threshold. Owned structures add seeded `damage-moderate` cracks and
+  on the threshold. The Nursery uses narrower blades to leave a gap between
+  the resting gates. Owned structures add seeded `damage-moderate` cracks and
   faint leaks along their ribs, and `damage-critical` splits, splinters,
   wilted leaves, and `flicker` leaks; each stage merges by material.
 - Presentation shows `damage-moderate` meshes at 60% health or below and adds

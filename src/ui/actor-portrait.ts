@@ -315,13 +315,22 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#32704b" d="M60 27Q50 24 52 15L56 18 60 25Q63 17 68 15Q70 23 60 27Z"/>
     <path fill="#c99af1" d="m60 9 6 8-6 8-6-8Z"/>`,
   "circle-construct-nursery": `${GROVE_GROUND}
-    <path fill="#204b37" d="M14 54Q20 16 60 14Q100 16 106 54Z"/>
-    <path fill="none" stroke="#bdb28b" stroke-width="6" stroke-linecap="round"
-      d="M16 66Q16 22 60 18Q104 22 104 66M30 67Q32 34 60 32Q88 34 90 67"/>
-    <path fill="#102e28" d="M44 68Q44 44 60 42Q76 44 76 68Z"/>
-    <ellipse fill="#c7b78c" cx="60" cy="66" rx="20" ry="5"/>
-    <path fill="#9a63d1" d="m60 48 5 6-5 7-5-7Z"/>
-    <path stroke="#76abd1" stroke-width="3" d="M24 40 30 44M96 40 90 44"/>`,
+    <path fill="#513e2d" d="M17 63 28 48 75 43 106 56 101 67 53 75Z"/>
+    <path fill="#293c30" d="M20 61Q17 27 52 19Q86 15 101 34L105 57 62 67Z"/>
+    <path fill="none" stroke="#a59671" stroke-width="4" stroke-linecap="round"
+      d="M22 61Q18 27 52 20Q79 15 92 38M30 64Q29 31 65 24Q94 22 100 44"/>
+    <path fill="#3a5842" d="M48 22Q25 19 14 42L37 43Q37 31 48 22ZM60 19Q89 14 106 31L85 39Q78 23 60 19Z"/>
+    <path fill="#28583f" d="M44 27Q17 26 9 48L31 47Q34 36 44 27ZM70 24Q99 20 114 38L91 47Q86 30 70 24Z"/>
+    <path fill="#4a7c53" d="M37 32Q13 35 9 48L31 47ZM85 27Q105 28 114 38L91 47Z"/>
+    <path fill="#172e28" d="M32 64Q31 35 64 29Q99 30 101 61L68 70Z"/>
+    <ellipse fill="#514334" cx="68" cy="59" rx="20" ry="6"/>
+    <path fill="none" stroke="#ad9b73" stroke-width="2.5" d="M49 62Q51 55 69 54Q85 54 87 60"/>
+    <path fill="#b786e2" d="m68 47 5 6-5 6-4-5Z"/>
+    <path fill="none" stroke="#d7c89d" stroke-width="5" stroke-linecap="round"
+      d="M32 65Q30 36 64 29Q99 28 102 61"/>
+    <path fill="#377552" d="M35 64Q31 51 42 45Q47 57 40 65ZM94 62Q86 55 91 45Q100 47 100 60Z"/>
+    <path fill="#81abd0" d="m59 27 10-1 3 5-10 2ZM24 37l7-3-1 5-6 3Zm76-3 6 1 2 4-7 1Z"/>
+    <path fill="#bf91e5" d="m31 54 3 3-2 5-3-3Zm70-4 3 2 1 5-3-2Z"/>`,
   "circle-heartgrove": `${GROVE_GROUND}
     <path fill="none" stroke="#b9ab7d" stroke-width="9" stroke-linecap="round"
       d="M60 65 60 23M30 68Q35 37 60 46Q84 38 92 68M60 46 36 25M60 39 84 18"/>
