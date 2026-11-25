@@ -1906,8 +1906,6 @@ acceptance progress. The following sections define the selected scope.
   production queue with Troopers, Scouts, and Demolition Troopers. Surviving
   Harvesters can recover from raid damage through Mechanic support; buildings
   use their separate paid Repair action.
-- Mechanics wear ochre work armor and hard hats, with twin service tanks and
-  an open-ended wrench.
 - Active Medic and Mechanic service uses role-specific tool gestures with
   subtle effects on the target. Healing and mechanical repair have distinct
   cues. Approaching or blocked providers show no active work effect. Reduced
@@ -1985,6 +1983,9 @@ acceptance progress. The following sections define the selected scope.
   crosses mark the chest, field pack, and carry case. Owner markings sit on
   the helmet, shoulders, and pack. They raise a wrist scanner to treat
   wounded personnel.
+- Mechanics wear ochre work armor, braced tool harnesses, and brimmed hard
+  hats with amber lamps. Twin service tanks flank the pack's owner mark.
+  They work an open-ended wrench to repair mobile machines.
 
 ### M1 Circle presentation
 

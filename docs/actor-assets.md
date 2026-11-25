@@ -28,9 +28,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
   role equipment; weapons are opt-in. The shared exporter does not infer
   factions from role names. Scouts carry paired optics and a radio pack.
   Medics wear pale armor with teal medical markings, armored field packs,
-  wrist scanners, and carry cases. Mechanics wear ochre work armor and hard
-  hats, with twin service tanks, tool pouches, and an open-ended wrench. Both keep
-  separate owner markings and unarmed animation clips. Medics use a scanner
+  wrist scanners, and carry cases. Mechanics wear ochre work armor, lamp-fitted
+  hard hats, and tool harnesses with paired service tanks. Both keep separate
+  owner markings and unarmed animation clips. Medics use a scanner
   gesture in `treat`; Mechanics turn their wrench in `repair`. These full-pose
   work loops run only during active service. Cultivators carry a ribbed seed
   pod and a forked growth tool. Their full-pose cultivation loop blends through

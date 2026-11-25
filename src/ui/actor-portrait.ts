@@ -156,21 +156,31 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#293d3d" d="m46 15 31-2-1 11-8 5-17-3Z"/>
     <path fill="#83e5cf" d="m51 17 23-2-1 5-20 3Z"/>
     <path fill="#78a3d8" d="m53 6 11-3 6 3-13 4Z"/>`,
-  "arc-mechanic": infantry(
-    "#d88e2b",
-    `
-    <rect fill="#6e8185" x="29" y="24" width="12" height="28" rx="5"/>
-    <path fill="#e3a649" d="M29 26H41V32H29Z"/>
-    <path fill="#dc982f" d="M43 17Q44 3 60 3Q77 3 78 17Z"/>
-    <path fill="#f2b84d" d="M40 16H81V22H40Z"/>
-    <path fill="#6d9ad2" d="M57 5H64V16H57Z"/>
-    <rect fill="#ffedb4" x="56" y="17" width="9" height="6"/>
-    <path fill="#38484a" d="M45 45H74V54H45Z"/>
-    <path fill="#9fafae" d="M47 29H52V44H47ZM68 29H73V44H68Z"/>
-    <path stroke="#afc3c5" stroke-width="7" stroke-linecap="round" d="M88 65 98 29"/>
-    <path fill="#c4d4d2" d="M91 32 88 24 91 14 96 12 96 23 101 24 105 14 110 17 109 28 102 34Z"/>
-    <path stroke="#33474b" stroke-width="8" d="M89 61 92 50"/>`,
-  ),
+  "arc-mechanic": `
+    <ellipse fill="#152b31" cx="61" cy="73" rx="31" ry="5"/>
+    <path stroke="#3e4b4b" stroke-width="13" d="m51 48-5 22m20-22 10 22"/>
+    <path fill="#d8963d" d="m43 55 11 2-2 12-11-1Zm24 2 10-2 4 13-10 1Z"/>
+    <path fill="#263638" d="m41 66 11 1v7H37Zm30 1 9-1 6 8H72Z"/>
+    <path fill="#273c3e" d="m32 26 12-9 12 2 3 28-16 6-11-11Z"/>
+    <path fill="#95a8a8" d="m30 19 9-4 5 4v26l-6 3-7-4Zm16-3 8-3 6 3v21l-7 4-7-3Z"/>
+    <path fill="#e5ae51" d="m30 16 9-3 5 4v6l-6 3-8-3Zm16-2 8-3 6 3v6l-7 3-7-3Z"/>
+    <path fill="#34474a" d="m31 39 7 3 6-3v5l-6 4-7-3Z"/>
+    <path fill="#789fd5" d="m41 31 7-3v5l-7 4Z"/>
+    <path fill="#44504d" d="m43 28 19-5 16 7 3 16-12 8-23-1-8-8Z"/>
+    <path fill="#df9d41" d="m48 30 24-1 6 5-5 12-24 2-4-6Z"/>
+    <path stroke="#354849" stroke-width="5" d="m49 28 5 20m15-20 3 18"/>
+    <path fill="#aab7b4" d="m51 39 5-1 1 4-5 1Zm17-2 6-1 1 4-6 1Z"/>
+    <path fill="#364849" d="m39 47 9-2 4 3-1 8-11 1Zm32 1 9-3 6 4-2 8-12 1Z"/>
+    <path stroke="#d59a46" stroke-width="9" d="m42 37-6 12m41-13 8 12-2 5"/>
+    <path fill="#78a3d8" d="m36 32 7-3 6 4-5 3-9 1Zm35-3 7-2 6 4-2 4-10-1Z"/>
+    <path fill="#edb34e" d="M43 14 48 6 59 2 71 5 76 12 76 17 43 20Z"/>
+    <path fill="#789fd5" d="m52 5 8-3 6 2-9 4Z"/>
+    <path fill="#35494a" d="m47 18 27-3-1 11-9 4-13-3Z"/>
+    <path fill="#f1be65" d="m40 17 33-5 8 3-2 6-35 3-4-3Z"/>
+    <path fill="#3c4b46" d="m60 12 13-2 3 7-14 3Z"/>
+    <path fill="#ffebaa" d="m63 13 9-1 1 4-9 2Z"/>
+    <path fill="#a7b7b5" d="m29 53 7-19-5-7 2-10 6-1-2 9 6 3 6-8 4 3-5 11-6 2-7 19Z"/>
+    <path fill="#334648" d="m31 44 7 2-3 9-7-2Z"/>`,
   "arc-demolition-trooper": infantry(
     "#4a5763",
     `
