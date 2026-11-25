@@ -2049,11 +2049,12 @@ acceptance progress. The following sections define the selected scope.
   palms; Artificers lean in to shape the construct. Reduced motion holds the
   cue still.
 - The Briar Ram is a heavy quadruped with a low, broad body, four thick
-  root-like legs, overlapping pale wood armor, and a reinforced head framed
-  by curved thorns. Dark flexible joints and a partially sheltered violet
-  core share the faction palette. It walks with deliberate steps, plants its
-  feet, and delivers a short, forceful head strike at melee range. Each blow
-  shows a brief splintering burst at the target.
+  bent root legs, and pale overlapping wood plates edged in green. Curved
+  thorns frame its low brow, and violet light shows through gaps beneath the
+  shoulders. Owner markings sit on the brow, shoulder plates, and rear shell.
+  It walks with a diagonal gait and lunges with its head at melee range. Each
+  blow shows a brief splintering burst at the target. The production portrait
+  shows the layered shell and curved thorns.
 - Circle construction has three stages, each covering one third of progress:
   roots establish and the central structure emerges; ribs and arches rise;
   then armor plates, leaves, and canopy elements unfold into the mature form.

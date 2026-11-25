@@ -35,7 +35,11 @@ import { createRefineryDetails } from "../src/render/refinery.ts";
 import { createRelayDetails } from "../src/render/relay.ts";
 import { createSentryDetails } from "../src/render/sentry.ts";
 import { createWolfParts } from "../src/render/wolf.ts";
-import { CIRCLE_MODELS, livingDamageMaterials } from "./circle-models.ts";
+import {
+  CIRCLE_MODELS,
+  LEAF_BLADE,
+  livingDamageMaterials,
+} from "./circle-models.ts";
 import { exportGlb, rigidSkin } from "./glb-export.ts";
 import { clip, merge, surface, unlit } from "./model-toolkit.ts";
 import { seededRandom } from "./sprite-sheet.ts";
@@ -45,9 +49,9 @@ import type { TilePlacedActorDetailsFactory } from "../src/render/tile-placed-ac
 
 /**
  * Rigid weights preserve the part hierarchy while exporting a real skin.
- * Bind static pieces to their parent when every moving pivot is a node.
+ * Static pieces share the body bone and moving pieces bind to their pivots.
  */
-function skin(root: TransformNode, { bindToParent = false } = {}) {
+function skin(root: TransformNode) {
   const scene = root.getScene();
   const parts = root
     .getChildMeshes()
@@ -60,21 +64,11 @@ function skin(root: TransformNode, { bindToParent = false } = {}) {
     data.transform(part.computeWorldMatrix(true));
     return data;
   });
-  const body = bindToParent
-    ? new TransformNode(`${root.name}-body-joint`, scene)
-    : undefined;
-  if (body) body.parent = root;
-  const joints = parts.map((part) => {
-    if (body)
-      return part.parent === root ? body : (part.parent as TransformNode);
-    const joint = new TransformNode(`${part.name}-joint`, scene);
-    joint.parent = part.parent;
-    joint.position.copyFrom(part.position);
-    joint.rotation.copyFrom(part.rotation);
-    joint.scaling.copyFrom(part.scaling);
-    for (const child of part.getChildren()) child.parent = joint;
-    return joint;
-  });
+  const body = new TransformNode(`${root.name}-body-joint`, scene);
+  body.parent = root;
+  const joints = parts.map((part) =>
+    part.parent === root ? body : (part.parent as TransformNode),
+  );
   const skeleton = new Skeleton(`${root.name}-rig`, `${root.name}-rig`, scene);
   const bones = new Map<TransformNode, Bone>();
   const add = (node: TransformNode): Bone | null => {
@@ -107,12 +101,11 @@ function skin(root: TransformNode, { bindToParent = false } = {}) {
       root,
     );
   for (const part of parts) part.dispose(false, false);
-  return new Map(parts.map((part, index) => [part, joints[index]!]));
 }
 
 function wolf(scene: Scene, name: string) {
   const { root, head, jaw, tail, limbs } = createWolfParts(scene, name);
-  skin(root, { bindToParent: true });
+  skin(root);
   clip(root, "idle", 2, (seconds) => {
     const breath = Math.sin(seconds * Math.PI);
     head.rotation.x = -0.15 + breath * 0.025;
@@ -202,20 +195,22 @@ function wolf(scene: Scene, name: string) {
  */
 function briarRam(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const armor = surface(scene, "ram-armor", [0.82, 0.74, 0.52]);
-  const joints = surface(scene, "ram-joints", [0.22, 0.15, 0.1]);
+  const armor = surface(scene, "ram-armor", [0.95, 0.85, 0.65]);
+  const bark = surface(scene, "ram-bark", [0.43, 0.32, 0.2]);
+  const joints = surface(scene, "ram-joints", [0.3, 0.24, 0.16]);
+  const foliage = surface(scene, "ram-foliage", [0.19, 0.39, 0.25]);
   const core = surface(scene, "ram-core-fading-light", [0.58, 0.28, 0.88], 0.6);
   const owner = surface(scene, "ram-owner", [0.48, 0.76, 0.59]);
-  const blob = (
+  const plate = (
     id: string,
-    size: [number, number, number],
-    position: [number, number, number],
+    size: readonly [number, number, number],
+    position: readonly [number, number, number],
     material: StandardMaterial,
     parent: TransformNode = root,
   ) => {
-    const mesh = MeshBuilder.CreateSphere(
+    const mesh = MeshBuilder.CreatePolyhedron(
       id,
-      { diameter: 1, segments: 8 },
+      { custom: LEAF_BLADE },
       scene,
     );
     mesh.parent = parent;
@@ -224,66 +219,161 @@ function briarRam(scene: Scene, name: string) {
     mesh.material = material;
     return mesh;
   };
-  blob("ram-body", [0.95, 0.62, 1.45], [0, 0.85, 0], joints);
-  blob("ram-core", [0.34, 0.28, 0.2], [0, 0.72, 0.62], core);
-  // Overlapping back plates, front plates lapping over rear ones.
-  for (let i = 0; i < 4; i++) {
-    const plate = blob(
-      `ram-plate-${i}`,
-      [1.05 - i * 0.05, 0.28, 0.5],
-      [0, 1.13 - Math.abs(i - 1.5) * 0.03, 0.48 - i * 0.32],
-      armor,
+  const branch = (
+    id: string,
+    points: readonly (readonly [number, number, number])[],
+    radii: readonly number[],
+    material: StandardMaterial,
+    parent: TransformNode = root,
+  ) => {
+    const mesh = MeshBuilder.CreateTube(
+      id,
+      {
+        path: points.map((point) => Vector3.FromArray(point)),
+        radiusFunction: (index) => radii[index]!,
+        tessellation: 6,
+        cap: Mesh.CAP_ALL,
+      },
+      scene,
     );
-    plate.rotation.x = -0.18;
+    mesh.parent = parent;
+    mesh.material = material;
+  };
+  plate("ram-body", [1.06, 0.65, 1.48], [0, 0.77, -0.03], joints);
+  plate("ram-core", [0.49, 0.22, 0.46], [0, 0.75, 0.38], core).rotation.x =
+    -0.65;
+  // Pale plates overlap toward the tail. Dark leaf edges frame the seams.
+  for (const [index, [width, y, z]] of [
+    [0.88, 0.99, -0.46],
+    [1.05, 1.07, -0.18],
+    [1.21, 1.09, 0.14],
+    [1.12, 1.05, 0.39],
+  ].entries()) {
+    plate(
+      `ram-seam-${index}`,
+      [width!, 0.23, 0.6],
+      [0, y!, z! - 0.07],
+      foliage,
+    );
+    plate(`ram-plate-${index}`, [width!, 0.28, 0.59], [0, y!, z!], armor);
   }
   for (const side of [-1, 1]) {
-    blob(
+    plate(
       `ram-flank-${side}`,
-      [0.14, 0.42, 1.1],
-      [side * 0.47, 0.88, -0.02],
+      [0.39, 0.17, 1.02],
+      [side * 0.43, 0.86, -0.03],
+      bark,
+    ).rotation.z = -side * 1.14;
+    plate(
+      `ram-shoulder-${side}`,
+      [0.37, 0.15, 0.69],
+      [side * 0.42, 0.91, 0.28],
       armor,
-    );
-    const band = MeshBuilder.CreateBox(
-      `ram-band-${side}`,
-      { width: 0.04, height: 0.16, depth: 0.7 },
-      scene,
-    );
-    band.parent = root;
-    band.position.set(side * 0.55, 0.92, 0);
-    band.material = owner;
+    ).rotation.set(-0.24, -side * 0.09, -side * 0.95);
+    plate(
+      `ram-shoulder-mark-${side}`,
+      [0.24, 0.055, 0.46],
+      [side * 0.501, 0.978, 0.3],
+      owner,
+    ).rotation.set(-0.24, -side * 0.09, -side * 0.95);
+    plate(
+      `ram-rear-mark-${side}`,
+      [0.25, 0.07, 0.46],
+      [side * 0.269, 1.05, -0.54],
+      owner,
+    ).rotation.set(-0.34, side * 0.27, -side * 0.4);
   }
-  const head = blob("ram-head", [0.5, 0.42, 0.5], [0, 0.92, 0.82], armor);
-  blob("ram-brow", [0.56, 0.2, 0.32], [0, 0.26, 0.18], armor, head);
-  blob("ram-muzzle", [0.32, 0.26, 0.3], [0, -0.1, 0.32], joints, head);
+  const head = new TransformNode("ram-head", scene);
+  head.parent = root;
+  head.position.set(0, 0.78, 0.56);
+  plate("ram-skull", [0.57, 0.43, 0.59], [0, 0.02, 0.18], joints, head);
+  plate(
+    "ram-brow",
+    [0.65, 0.22, 0.55],
+    [0, 0.13, 0.16],
+    armor,
+    head,
+  ).rotation.x = 0.42;
+  plate(
+    "ram-muzzle",
+    [0.46, 0.24, 0.35],
+    [0, -0.08, 0.36],
+    bark,
+    head,
+  ).rotation.y = Math.PI;
+  plate(
+    "ram-brow-mark",
+    [0.24, 0.06, 0.29],
+    [0, 0.255, 0.15],
+    owner,
+    head,
+  ).rotation.x = 0.42;
   for (const side of [-1, 1]) {
-    const thorn = MeshBuilder.CreateCylinder(
+    branch(
       `ram-thorn-${side}`,
-      { height: 0.42, diameterTop: 0, diameterBottom: 0.1, tessellation: 6 },
-      scene,
+      [
+        [side * 0.2, -0.03, 0.22],
+        [side * 0.35, 0.02, 0.29],
+        [side * 0.41, 0.1, 0.43],
+        [side * 0.37, 0.22, 0.55],
+        [side * 0.29, 0.35, 0.58],
+      ],
+      [0.116, 0.106, 0.078, 0.044, 0.001],
+      armor,
+      head,
     );
-    thorn.parent = head;
-    thorn.position.set(side * 0.24, 0.26, 0.1);
-    thorn.rotation.set(0.7, 0, -side * 0.55);
-    thorn.material = joints;
+    plate(
+      `ram-eye-${side}`,
+      [0.062, 0.06, 0.13],
+      [side * 0.212, 0.09, 0.297],
+      core,
+      head,
+    ).rotation.y = side * 0.38;
   }
+  for (const side of [-1, 1])
+    plate(
+      `ram-core-vent-${side}`,
+      [0.135, 0.2, 0.34],
+      [side * 0.43, 0.75, 0.29],
+      core,
+    ).rotation.set(-0.18, -side * 0.22, -side * 0.46);
   const hips = [
-    [-0.36, 0.45],
-    [0.36, 0.45],
-    [-0.36, -0.45],
-    [0.36, -0.45],
+    [-0.36, 0.4],
+    [0.36, 0.4],
+    [-0.32, -0.48],
+    [0.32, -0.48],
   ].map(([x, z], index) => {
     const hip = new TransformNode(`ram-leg-${index}`, scene);
     hip.parent = root;
     hip.position.set(x!, 0.72, z!);
-    const leg = MeshBuilder.CreateCylinder(
-      `ram-leg-${index}-mesh`,
-      { height: 0.66, diameterTop: 0.3, diameterBottom: 0.22, tessellation: 7 },
-      scene,
+    const side = Math.sign(x!);
+    const front = Math.sign(z!);
+    branch(
+      `ram-root-${index}`,
+      [
+        [0, 0.08, 0],
+        [side * 0.07, -0.21, front * 0.07],
+        [side * 0.045, -0.47, -0.09],
+        [side * 0.065, -0.65, -0.025],
+      ],
+      [0.18, 0.151, 0.105, 0.118],
+      joints,
+      hip,
     );
-    leg.parent = hip;
-    leg.position.y = -0.33;
-    leg.material = joints;
-    blob(`ram-foot-${index}`, [0.32, 0.14, 0.36], [0, -0.66, 0.03], armor, hip);
+    plate(
+      `ram-shin-${index}`,
+      [0.29, 0.18, 0.38],
+      [side * 0.075, -0.32, front * 0.05 + 0.08],
+      bark,
+      hip,
+    ).rotation.x = -1.42;
+    plate(
+      `ram-foot-${index}`,
+      [0.33, 0.21, 0.39],
+      [side * 0.063, -0.66, 0.033],
+      armor,
+      hip,
+    ).rotation.y = side * 0.13;
     return hip;
   });
   // Stage-named materials skin each damage stage into its own mesh.
@@ -308,65 +398,74 @@ function briarRam(scene: Scene, name: string) {
     return mesh;
   };
   // Cracks cross the back plates and flanks.
-  for (const [i, [x, z, turn]] of (
+  for (const [i, [x, y, z]] of (
     [
-      [0.18, 0.4, 0.5],
-      [-0.22, 0.05, -0.4],
-      [0.08, -0.5, 0.2],
+      [0.22, 1.22, 0.15],
+      [-0.17, 1.2, -0.16],
+      [0.08, 1.136, -0.45],
     ] as const
   ).entries())
-    sliver(
+    branch(
       `ram-damage-moderate-crack-${i}`,
-      [0.05, 0.02, 0.36],
-      [x, 1.27, z],
-      [0, turn, 0],
+      [
+        [x - 0.12, y - 0.022, z - 0.15],
+        [x - 0.06, y, z - 0.04],
+        [x + 0.01, y - 0.02, z - 0.015],
+        [x + 0.11, y - 0.042, z + 0.13],
+      ],
+      [0.01, 0.023, 0.025, 0.009],
       crack,
     );
   for (const side of [-1, 1])
     sliver(
       `ram-damage-moderate-crack-flank-${side}`,
-      [0.02, 0.3, 0.05],
-      [side * 0.545, 0.9, 0.25 * side],
-      [side * 0.3, 0, 0],
+      [0.035, 0.22, 0.055],
+      [side * 0.503, 0.89, -0.18],
+      [side * 0.36, 0, -side * 0.44],
       crack,
     );
   sliver(
     "ram-damage-moderate-crack-head",
     [0.04, 0.02, 0.22],
-    [0.08, 0.22, 0.05],
-    [0, 0.4, 0],
+    [0.126, 0.22, 0.21],
+    [0.37, 0.42, 0],
     crack,
     head,
   );
-  blob("ram-damage-moderate-leak-0", [0.1, 0.08, 0.1], [0.2, 1.24, 0.1], leak);
-  blob(
+  plate(
+    "ram-damage-moderate-leak-0",
+    [0.1, 0.07, 0.13],
+    [0.17, 1.216, 0.12],
+    leak,
+  );
+  plate(
     "ram-damage-moderate-leak-1",
-    [0.08, 0.1, 0.08],
-    [-0.5, 0.85, 0.2],
+    [0.08, 0.16, 0.11],
+    [-0.49, 0.82, -0.18],
     leak,
   );
   // Deeper splits open the plates and splinters jut from the breaks.
-  for (const [i, [x, z, turn]] of (
+  for (const [i, [x, y, z, turn]] of (
     [
-      [-0.05, 0.25, 0.1],
-      [0.25, -0.25, -0.6],
+      [-0.02, 1.223, 0.33, 0.62],
+      [0.14, 1.182, -0.23, -0.62],
     ] as const
   ).entries()) {
     sliver(
       `ram-damage-critical-split-${i}`,
-      [0.1, 0.04, 0.55],
-      [x, 1.28, z],
-      [0, turn, 0],
+      [0.083, 0.026, 0.37],
+      [x, y, z],
+      [0.16, turn, 0],
       split,
     );
     for (const offset of [-1, 1]) {
       const shard = MeshBuilder.CreateCylinder(
         `ram-damage-critical-splinter-${i}-${offset}`,
-        { height: 0.26, diameterTop: 0, diameterBottom: 0.07, tessellation: 5 },
+        { height: 0.22, diameterTop: 0, diameterBottom: 0.09, tessellation: 5 },
         scene,
       );
       shard.parent = root;
-      shard.position.set(x + offset * 0.07, 1.36, z + offset * 0.12);
+      shard.position.set(x + offset * 0.065, y + 0.055, z + offset * 0.05);
       shard.rotation.set(offset * 0.5, turn, offset * 0.4);
       shard.material = splinter;
     }
@@ -374,36 +473,26 @@ function briarRam(scene: Scene, name: string) {
   sliver(
     "ram-damage-critical-split-flank",
     [0.03, 0.4, 0.1],
-    [0.55, 0.88, -0.3],
-    [0.2, 0, 0],
+    [0.51, 0.89, -0.16],
+    [0.44, 0, -0.3],
     split,
   );
-  blob(
+  plate(
     "ram-damage-critical-flicker-0",
     [0.16, 0.12, 0.12],
-    [0, 0.8, 0.72],
+    [0.39, 0.77, 0.39],
     flicker,
   );
-  blob(
+  plate(
     "ram-damage-critical-flicker-1",
     [0.12, 0.1, 0.12],
-    [0.05, 1.27, 0.25],
+    [-0.01, 1.235, 0.34],
     flicker,
   );
-  // Body-level damage pieces share one joint per material.
-  for (const material of [crack, leak, split, splinter, flicker]) {
-    const parts = root
-      .getChildMeshes(true)
-      .filter(
-        (mesh): mesh is Mesh =>
-          mesh instanceof Mesh && mesh.material === material,
-      );
-    merge(root, material.name, parts, material);
-  }
-  const headJoint = skin(root).get(head)!;
-  const restHead = headJoint.position.clone();
+  skin(root);
+  const restHead = head.position.clone();
   clip(root, "idle", 3, (seconds) => {
-    headJoint.rotation.x = Math.sin((seconds / 3) * Math.PI * 2) * 0.03;
+    head.rotation.x = Math.sin((seconds / 3) * Math.PI * 2) * 0.03;
   });
   // Diagonal pairs step together with deliberate, planted feet.
   clip(root, "walk", 1.4, (seconds) => {
@@ -413,7 +502,7 @@ function briarRam(scene: Scene, name: string) {
         Math.sin(phase + (index === 0 || index === 3 ? 0 : Math.PI)) * 0.38;
     });
     root.position.y = (1 - Math.cos(phase * 2)) * 0.02;
-    headJoint.rotation.x = Math.sin(phase * 2) * 0.03;
+    head.rotation.x = Math.sin(phase * 2) * 0.03;
   });
   for (const [turn, sign] of [
     ["turn-left", -1],
@@ -426,7 +515,7 @@ function briarRam(scene: Scene, name: string) {
       (seconds) => {
         const amount = seconds / 0.4;
         root.rotation.z = -sign * amount * 0.06;
-        headJoint.rotation.y = sign * amount * 0.15;
+        head.rotation.y = sign * amount * 0.15;
       },
       false,
     );
@@ -436,7 +525,7 @@ function briarRam(scene: Scene, name: string) {
     0.4,
     (seconds) => {
       const flinch = Math.sin((seconds / 0.4) * Math.PI);
-      headJoint.rotation.x = -flinch * 0.15;
+      head.rotation.x = -flinch * 0.15;
       root.rotation.z = flinch * 0.05;
     },
     false,
@@ -450,8 +539,9 @@ function briarRam(scene: Scene, name: string) {
       const t = seconds / 0.6;
       const travel = t < 0.2 ? t / 0.2 : (1 - t) / 0.8;
       const blow = travel ** 2;
-      headJoint.rotation.x = blow * 0.15;
-      headJoint.position.z = restHead.z + blow * 0.28;
+      head.rotation.x = blow * 0.19;
+      head.position.z = restHead.z + blow * 0.23;
+      head.position.y = restHead.y - blow * 0.05;
       root.position.z = blow * 0.12;
     },
     false,
@@ -464,7 +554,7 @@ function briarRam(scene: Scene, name: string) {
     });
     root.position.y = -fall * 0.42;
     root.rotation.z = fall * 0.18;
-    headJoint.rotation.x = fall * 0.4;
+    head.rotation.x = fall * 0.4;
   });
 }
 

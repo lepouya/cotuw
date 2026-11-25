@@ -14,10 +14,11 @@ import {
 import type { AbstractMesh, PBRMaterial } from "@babylonjs/core";
 import type { Rgb } from "../src/content/presentation";
 
-/** Horizontal radius and height reached by the meshes' current pose. */
+/** Ground-plane radius, width, and height reached by the current pose. */
 function posedExtent(meshes: readonly AbstractMesh[]) {
   let radius = 0;
   let height = 0;
+  let halfWidth = 0;
   for (const mesh of meshes) {
     const matrix = mesh.computeWorldMatrix(true);
     mesh.skeleton?.prepare(true);
@@ -30,9 +31,10 @@ function posedExtent(meshes: readonly AbstractMesh[]) {
       );
       radius = Math.max(radius, Math.hypot(point.x, point.z));
       height = Math.max(height, point.y);
+      halfWidth = Math.max(halfWidth, Math.abs(point.x));
     }
   }
-  return { radius, height };
+  return { radius, height, width: halfWidth * 2 };
 }
 
 test("the Construct Nursery opens its gate wide enough for a Briar Ram", async () => {
@@ -69,6 +71,18 @@ test("the Construct Nursery opens its gate wide enough for a Briar Ram", async (
   const deployed = opening(exit.seconds / 2);
   expect(deployed).toBeGreaterThan(resting);
   expect(deployed).toBeGreaterThan(2 * radius);
+  const model = BASE_CONTENT.presentation["circle-briar-ram"]!.model!;
+  if (!("glb" in model)) throw new Error("Expected a generated Briar Ram");
+  const appearance = await loadSkinnedActorAppearance(scene, {
+    ...model.glb,
+    url: glbDataUrl(model.glb.url),
+  });
+  const ram = appearance.instantiate("ram", 0);
+  scene.animate();
+  const { width } = posedExtent(ram.root.getChildMeshes());
+  expect(deployed).toBeGreaterThan(width);
+  ram.dispose();
+  appearance.dispose();
   nursery.dispose();
   asset.dispose();
 });

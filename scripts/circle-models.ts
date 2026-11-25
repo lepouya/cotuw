@@ -22,7 +22,7 @@ const ENTRANCE_REST_ANGLE = 0.45;
 const ENTRANCE_OPEN_ANGLE = 1.35;
 
 /** Folded, pointed leaf with a raised midrib and a solid underside. */
-const LEAF_BLADE = {
+export const LEAF_BLADE = {
   vertex: [
     [0, 0, -0.5],
     [-0.34, 0.02, -0.27],

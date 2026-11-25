@@ -295,13 +295,23 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="none" stroke="#d1b682" stroke-width="2.5" d="M46 14Q57 18 70 14"/>
     <path fill="#ba81e6" d="m57 14 3 3-3 4-3-4Z"/>`,
   "circle-briar-ram": `${GROVE_GROUND}
-    <path stroke="#3a2a1b" stroke-width="9" stroke-linecap="round" d="M30 50 28 68M46 52 46 69M74 52 76 69M88 50 92 67"/>
-    <path fill="#d4c79c" d="M20 44Q22 26 50 25Q80 22 92 36L96 52 22 54Z"/>
-    <path fill="#b7a879" d="M28 31 46 27 44 40 26 42ZM50 26 70 25 68 38 49 39ZM72 27 89 34 86 44 71 41Z"/>
-    <path fill="#c9bb8c" d="M90 34Q104 31 110 44L104 56 92 54Z"/>
-    <path fill="none" stroke="#5c3f26" stroke-width="4" stroke-linecap="round" d="M96 32Q94 18 104 15M104 35Q108 22 116 23"/>
-    <path fill="#9a63d1" d="M56 44Q62 40 66 45 62 50 57 49Z"/>
-    <path fill="#76abd1" d="M34 46H52V50H34Z"/>`,
+    <path fill="#493623" d="M33 47 24 57l1 12h10l-1-10 11-9Zm40 3-2 11 4 9h9l-4-10 5-11Z"/>
+    <path fill="#59452d" d="M24 45 21 59l-5 12h12l2-11 10-10Zm40 2-8 12 3 13h13l-4-13 7-12Z"/>
+    <path fill="#c6ac7d" d="m18 66 11 1-2 7H14Zm40 1 11-1 6 8H60Zm18-1 6-1 5 6H76Z"/>
+    <path fill="#57442b" d="m19 42 35-14 32 10 16 15-15 8-25-7-27 1Z"/>
+    <path fill="#31543c" d="m15 38 19-14 31-3 23 10 7 13-26 8-32-1Z"/>
+    <path fill="#ad966c" d="m15 38 15-11 17-4-10 16-17 8Z"/>
+    <path fill="#d0b889" d="m28 44 18-19 17-4-8 22-9 7Z"/>
+    <path fill="#e2c99a" d="m45 46 18-25 16 5-4 18-15 10Z"/>
+    <path fill="#c9ae80" d="m63 48 16-22 12 8 4 10-15 6-9 5Z"/>
+    <path fill="#80a6cb" d="m16 40 9-7 8 1-7 8-8 3Zm50 10 8-10 11 2-5 8-10 4Z"/>
+    <path fill="#b67de6" d="m78 53 6-3 8 8-8 2Z"/>
+    <path fill="#533d29" d="m88 44 13-2 9 9-5 11-13-3-8-8Z"/>
+    <path fill="#d5bc8e" d="m83 47 11-10 13 6 3 8-12 5-10-4Z"/>
+    <path fill="#82a9cf" d="m91 43 5-4 7 4-6 5Z"/>
+    <path fill="#bb84e5" d="m96 54 4-2 4 2-4 3Z"/>
+    <path fill="#b79d70" d="M103 49Q116 42 114 32Q119 36 118 43Q115 51 109 55Z"/>
+    <path fill="#e1c698" d="M95 56Q108 55 111 44Q113 58 103 64Q96 66 91 62Z"/>`,
   "circle-thornspire": `${GROVE_GROUND}
     <path fill="#4c3a25" d="M36 69 50 60 66 60 84 69 77 73 58 69 42 73Z"/>
     <path fill="none" stroke="#938662" stroke-width="5" stroke-linecap="round"

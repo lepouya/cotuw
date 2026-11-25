@@ -38,13 +38,14 @@ clips match their generators, and reject unregistered files in `public/assets`.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, Barracks, Relay, and Sentry meshes with idle machinery and activity
   or firing clips; a skinned wolf with articulated legs, jaw, and tail, using
-  idle, walk, run, turn, bite, hit, and death; a skinned Briar Ram with pale
-  overlapping plates, dark joints, a sheltered violet core, owner flank bands,
-  and a thorn-framed head, using idle,
-  a planted diagonal walk, turn, a lunging `strike`, hit, and a buckling death
-  that settles into a husk; a rigid Harvester with idle, transit, deploy,
-  harvest, stow, unload, hit, and death; crystal resource mounds; animated
-  salvage; foundations; construction scaffolds; debris rubble; tracers; pulsing
+  idle, walk, run, turn, bite, hit, and death; a skinned Briar Ram with
+  overlapping wood and leaf plates, thick root legs, a violet core, and a
+  thorn-framed head. Owner markings sit on the brow, shoulders, and rear.
+  The Ram uses idle, a diagonal walk, turn, a lunging `strike`, hit, and a
+  buckling death that settles into a husk. A rigid Harvester uses idle,
+  transit, deploy, harvest, stow, unload, hit, and death. The script also
+  exports crystal resource mounds, animated salvage, foundations,
+  construction scaffolds, debris rubble, tracers, pulsing
   violet focus strands and sparks; bite marks; splintered strike bursts; smoke
   puffs; flickering fire; wound drops; a pulsing regeneration halo; and a bird
   with a wing-beat clip. The alpha wolf scales the generated wolf asset.
@@ -72,9 +73,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
   restores health. Critical `flicker` meshes vary in brightness and hold
   still under reduced motion. Buildings under construction hide both stages,
   since unfinished layers would leave them floating. The Briar Ram uses the
-  same stages, one joint per stage material, and its remains keep the broken
-  shapes with the core and leaks extinguished. `living-rubble` replaces shared
-  rubble for Circle buildings with snapped ribs, roots, fallen leaves, and
+  same stages with a separate skin mesh for each damage material. Its remains
+  keep the broken shapes with the core and leaks extinguished. `living-rubble`
+  gives Circle buildings snapped ribs, roots, fallen leaves, and
   violet `fading-light` embers that dim over 1.6 seconds of collapse, or at once
   under reduced motion. Living damage effects add `leak` wisps and, when
   critical, `fragment` wood chips to their falling leaves.
