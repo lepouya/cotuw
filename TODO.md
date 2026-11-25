@@ -197,7 +197,7 @@ challenge, pacing, and useful choices.
   where they share changed assets, run affected asset and browser checks,
   and recheck normal-scale performance before building the cohort bundle.
   - First model passes cover the Command Center, Heartgrove, Materials
-    Refinery, Harvester, Lifebloom Conservatory, and Cultivator.
+    Refinery, Harvester, Lifebloom Conservatory, Cultivator, and Field Barracks.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

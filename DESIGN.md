@@ -1961,6 +1961,9 @@ acceptance progress. The following sections define the selected scope.
 - The Harvester has wide guarded treads, a glazed cab with owner markings on
   the roof and track guards, and a front collector. Its open rear hopper tips
   to discharge cargo at the Refinery.
+- The Field Barracks has low, armored dormitory wings with banded windows.
+  A raised owner-marked entrance separates them. Its doors slide into the
+  wings when troops deploy, and pale lights mark the threshold.
 
 ### M1 Circle presentation
 

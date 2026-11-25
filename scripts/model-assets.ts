@@ -1334,7 +1334,7 @@ function bird(scene: Scene, name: string) {
 const BUILDERS = {
   ...CIRCLE_MODELS,
   "command-center": building(createCommandCenterDetails),
-  barracks: building(createBarracksDetails),
+  barracks: building(createBarracksDetails, { batchStatic: true }),
   refinery: building(createRefineryDetails, { batchStatic: true }),
   relay: building(createRelayDetails),
   sentry: building(createSentryDetails),

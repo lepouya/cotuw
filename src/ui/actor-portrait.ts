@@ -47,14 +47,22 @@ const elf = (mantle: string, gear: string) => `
 
 /** Small original illustrations drawn in a 120 × 80 view box. */
 const PORTRAITS: Record<PortraitId, string> = {
-  "arc-field-barracks": `${FOUNDATION}
-    <path fill="#182c30" d="M65 46 94 34 94 55 65 67Z"/>
-    <path fill="#8fa29b" d="M63 43 96 30 96 35 63 49Z"/>
-    <path stroke="#527075" stroke-width="2" d="M69 47 91 38M69 52 91 43M69 57 91 48"/>
-    <path fill="#6d9ad2" d="m30 32 18 7v7l-18-7Z"/>
-    <path stroke="#b9cac0" stroke-width="3" d="M30 23 44 29M39 19 53 25"/>
-    <path stroke="#adbdb5" stroke-width="3" d="M88 26V5"/>
-    <path fill="#6d9ad2" d="M90 5 108 9 90 15Z"/>`,
+  "arc-field-barracks": `
+    <path fill="#233433" d="M11 57 29 37H108L112 64 92 72H11Z"/>
+    <path fill="#636b4f" d="M15 43H96V65H15Z"/>
+    <path fill="#485442" d="m96 43 14-16v20L96 65Z"/>
+    <path fill="#969c7d" d="m15 43 17-17h78L96 43Z"/>
+    <path fill="#727c64" d="M42 35 59 18H81L64 35Z"/>
+    <path fill="#6d9ad2" d="m49 34 16-16h7L56 34Z"/>
+    <path fill="#354646" d="M42 35H66V65H42Z"/>
+    <path fill="#6d9ad2" d="M40 34H68V41H40Z"/>
+    <path stroke="#fcf0bb" stroke-width="2" d="M45 43V50M63 43V50"/>
+    <path fill="#9ba38b" d="M48 45H60V64H48Z"/>
+    <path stroke="#45594e" stroke-width="2" d="M54 45V64"/>
+    <path fill="#30484b" d="M20 47H38V54H20ZM70 47H91V54H70Z"/>
+    <path stroke="#8cb0a6" stroke-width="2" d="M23 50H35M73 50H88"/>
+    <path fill="#516355" d="m29 35 4-5h11l-4 5Z"/>
+    <ellipse fill="#516355" cx="88" cy="32" rx="7" ry="4"/>`,
   "arc-relay-station": `
     <path fill="#233e42" d="m18 61 43-13 60 10-46 19Z"/>
     <path fill="#58727e" d="m28 46 41-13 23 9-39 15Z"/>

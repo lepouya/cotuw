@@ -194,21 +194,23 @@ test("a unit exit opens the Barracks doors once, and a blueprint ignores it", ()
     totalTicks: 90,
   };
   views.update([actor]);
+  const closed = leaf(scene).position.x;
   views.play(actor.id, "exit");
   views.animate(0, 1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
 
   delete actor.construction;
   views.update([actor]);
   views.play(actor.id, "exit");
   views.animate(0, 1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.58);
+  const open = leaf(scene).position.x;
+  expect(open).toBeGreaterThan(closed);
   // The Barracks has no delivery motion, so its doors keep moving.
   views.play(actor.id, "delivery");
   views.animate(0, 0);
-  expect(leaf(scene).position.x).toBeCloseTo(0.58);
+  expect(leaf(scene).position.x).toBeCloseTo(open);
   views.animate(0, 2);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
   views.dispose();
 });
 
@@ -216,15 +218,16 @@ test("reduced motion skips activities and settles one in progress at rest", () =
   let reduced = false;
   const { scene, views, actor } = setup(() => reduced);
   views.update([actor]);
+  const closed = leaf(scene).position.x;
   views.play(actor.id, "exit");
   views.animate(0, 1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.58);
+  expect(leaf(scene).position.x).toBeGreaterThan(closed);
   reduced = true;
   views.animate(0, 0.1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
   views.play(actor.id, "exit");
   views.animate(0, 1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
   views.dispose();
 });
 
@@ -250,39 +253,45 @@ test("reduced motion restores building idle motion to rest", () => {
 test("terrain rebuilds retain activity time; disconnection and removal clear it", () => {
   const { scene, map, views, actor } = setup();
   views.update([actor]);
+  const closed = leaf(scene).position.x;
   views.play(actor.id, "exit");
   views.animate(0, 1);
   const previous = leaf(scene);
+  const open = previous.position.x;
+  expect(open).toBeGreaterThan(closed);
   map.setHeight(4, 4, 0.1);
   views.animate(0);
   expect(previous.isDisposed()).toBe(true);
-  expect(leaf(scene).position.x).toBeCloseTo(0.58);
+  expect(leaf(scene).position.x).toBeCloseTo(open);
   views.animate(0, 1.4);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
 
   views.play(actor.id, "exit");
   views.animate(0, 1);
   views.update([actor], new Set([actor.id]));
   views.animate(0, 1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
   views.update([actor], new Set());
   views.animate(0, 1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
 
   views.play(actor.id, "exit");
   views.animate(0, 1);
   views.update([]);
   views.update([actor]);
   views.animate(0, 0.1);
-  expect(leaf(scene).position.x).toBeCloseTo(0.2);
+  expect(leaf(scene).position.x).toBeCloseTo(closed);
   views.dispose();
 });
 
 test("a loaded model retains the stand-in's activity progress and settles at rest", async () => {
   const { scene, views, appearances, actor } = setup();
   views.update([actor]);
+  const closed = leaf(scene).position.x;
   views.play(actor.id, "exit");
   views.animate(0, 1);
+  const open = leaf(scene).position.x;
+  expect(open).toBeGreaterThan(closed);
   const graphics = BASE_CONTENT.presentation[barracks.id]!.building!.glb!;
   const asset = await loadModelAsset(scene, {
     ...graphics,
@@ -297,9 +306,9 @@ test("a loaded model retains the stand-in's activity progress and settles at res
   const door = scene.getMeshByName(
     "tile-placed-actor-barracks-root-model-barracks-entrance-leaf-1",
   )!;
-  expect(Math.abs(door.position.x)).toBeCloseTo(0.58);
+  expect(Math.abs(door.position.x)).toBeCloseTo(open);
   views.animate(0, 1.4);
-  expect(Math.abs(door.position.x)).toBeCloseTo(0.2);
+  expect(Math.abs(door.position.x)).toBeCloseTo(closed);
   views.dispose();
   asset.dispose();
 });
