@@ -52,6 +52,11 @@ test("generated Turrets keep instance aiming independent of idle and firing", as
   const carriage = first.root
     .getDescendants()
     .find((node) => node.name === "first-sentry-carriage") as TransformNode;
+  const flashes = [-0.3, 0.3].map((side) =>
+    carriage
+      .getChildMeshes()
+      .find((mesh) => mesh.name === `first-sentry-flash-${side}`)!,
+  );
   first.aim!(Math.PI / 2);
   first.pose(0.7);
   first.activities!.attack!.pose(0.08);
@@ -59,6 +64,7 @@ test("generated Turrets keep instance aiming independent of idle and firing", as
   yaw().computeWorldMatrix(true);
   expect(yaw().getDirection(Vector3.Forward()).normalize().x).toBeCloseTo(1);
   expect(carriage.position.z).toBeLessThan(-0.05);
+  for (const flash of flashes) expect(flash.scaling.x).toBeGreaterThan(0.5);
   const other = second.root
     .getDescendants()
     .find((node) => node.name === "second-sentry-carriage") as TransformNode;
@@ -66,6 +72,7 @@ test("generated Turrets keep instance aiming independent of idle and firing", as
   first.activities!.attack!.pose(first.activities!.attack!.seconds);
   scene.animate();
   expect(carriage.position.z).toBeCloseTo(0);
+  for (const flash of flashes) expect(flash.scaling.x).toBeLessThan(0.01);
   const root = new TransformNode("placed", scene);
   const details = modelBuildingDetails(asset)(
     root,

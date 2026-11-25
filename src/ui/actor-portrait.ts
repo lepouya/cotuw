@@ -79,16 +79,21 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#739fd4" d="m30 6 5 2v18l-4-1ZM85 6l6-2v20l-5 2Z"/>
     <path fill="#aab8ad" d="M56 24H65V34H56Z"/>`,
   "arc-sentry-turret": `
-    <ellipse fill="#233e42" cx="59" cy="65" rx="42" ry="12"/>
-    <path fill="#405b50" d="M32 49H86V62Q59 80 32 62Z"/>
-    <ellipse fill="#7c9483" cx="59" cy="49" rx="27" ry="10"/>
-    <path stroke="#6d9ad2" stroke-width="7" d="M44 49H76"/>
-    <path fill="#415647" d="M32 26 60 16 82 26 55 40Z"/>
-    <path fill="#2c4039" d="M32 26 55 40v16L32 43Z"/>
-    <path fill="#607565" d="M55 40 82 26v17L55 56Z"/>
-    <path stroke="#a5b7ad" stroke-width="9" d="M66 33 99 22M73 42 106 31"/>
-    <path stroke="#182c30" stroke-width="5" d="m97 23 7-2m0 11 7-2"/>
-    <path fill="#f0bd65" d="m37 32 9 5v5l-9-5Z"/>`,
+    <path fill="#233e42" d="m15 56 47-17 44 16v6L59 77 15 62Z"/>
+    <path fill="#586658" d="m16 53 47-17 41 16-46 17Z"/>
+    <path fill="#8a998a" d="m23 53 8-3 36 13-8 3Zm33-12 8-3 36 13-8 3Z"/>
+    <path fill="#729fd4" d="m24 52 4-2 36 13-5 2Zm35-11 4-2 36 13-5 2Z"/>
+    <path fill="#445346" d="M35 45h47v9q-23 19-47 0Z"/>
+    <ellipse fill="#98a69a" cx="59" cy="45" rx="24" ry="10"/>
+    <ellipse fill="#283d3d" cx="59" cy="43" rx="19" ry="8"/>
+    <path fill="#889787" d="m30 27 28-12 26 11-28 14Z"/>
+    <path fill="#465548" d="m30 27 26 13-1 13-22-11Zm26 13 28-14-2 14-27 13Z"/>
+    <path fill="#729fd4" d="m33 27 23 11-5 3-19-10Zm8-5 17-7 5 2-17 7Z"/>
+    <path stroke="#536557" stroke-width="10" d="m62 38 13 5m3-12 14 5"/>
+    <path fill="#a2e5d7" d="m69 36 6-3 3 2-6 3Z"/>
+    <path stroke="#263c3d" stroke-width="6" d="m75 43 13 5m4-12 13 5"/>
+    <path stroke="#a3b2a8" stroke-width="8" d="m87 48 6 2m10-9 6 2"/>
+    <path stroke="#263c3d" stroke-width="4" d="m92 50 2 1m14-8 2 1"/>`,
   "arc-trooper": `
     <ellipse fill="#152b31" cx="59" cy="73" rx="32" ry="5"/>
     <path stroke="#303a43" stroke-width="13" d="m50 48-5 22m20-22 11 22"/>

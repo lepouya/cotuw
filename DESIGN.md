@@ -1973,6 +1973,9 @@ acceptance progress. The following sections define the selected scope.
   two angled receiver panels that sweep together. Owner markings run along
   the cabinet rails and outer panel edges. A pale cyan console lamp pulses
   below the mast.
+- The Sentry Turret has a low braced deck and a swiveling armored head with
+  paired barrels and a pale cyan sight. Owner markings run along the deck
+  rails and the head's angled side plates.
 - Troopers wear faceted copper-brown armor over charcoal fatigues, with a
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.
