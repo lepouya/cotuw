@@ -1967,6 +1967,10 @@ acceptance progress. The following sections define the selected scope.
 - Troopers wear faceted copper-brown armor over charcoal fatigues, with a
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.
+- Scouts wear light sand-colored armor over slate fatigues, with paired
+  cyan optics and an antenna on the radio pack. Owner markings sit on the
+  helmet, shoulder tabs, and pack. They are unarmed and swing their arms
+  freely while moving.
 
 ### M1 Circle presentation
 

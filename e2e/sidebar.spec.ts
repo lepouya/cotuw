@@ -134,6 +134,10 @@ test("production pictures explain disabled cards and keep selection visible", as
   const card = page.locator(".production-card", {
     has: page.locator("#train-scout"),
   });
+  await expect(card.locator(".actor-portrait")).toHaveAttribute(
+    "data-portrait",
+    "arc-scout",
+  );
   await card.focus();
   await expect(page.getByRole("tooltip")).toContainText(
     "Resume the mission to train units",

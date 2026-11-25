@@ -1634,6 +1634,7 @@
     "arc-scout": {
       "name": "Scout",
       "description": "Fast reconnaissance",
+      "portrait": "arc-scout",
       "train": {
         "id": "train-scout",
         "label": "Train Scout"

@@ -25,15 +25,15 @@ clips match their generators, and reject unregistered files in `public/assets`.
   geometry, gait, arm stance, and optional attack layer; only armed recipes
   export attack and aim clips. ARC recipes explicitly compose head, pack, and
   role equipment; weapons are opt-in. The shared exporter does not infer
-  factions from role names. Unarmed Scouts omit rifle geometry. Medics wear pale
-  armor with teal medical markings, square medical packs, scanners, and carry
-  cases. Mechanics wear ochre work armor and hard hats, with twin service tanks,
-  tool pouches, and an open-ended wrench. Both keep separate owner markings and
-  unarmed animation clips. Medics use a scanner gesture in `treat`; Mechanics
-  turn their wrench in `repair`. These full-pose work loops run only during
-  active service. Cultivators carry a ribbed seed pod and a forked growth
-  tool. Their full-pose cultivation loop blends through the shared
-  work-animation contract.
+  factions from role names. Scouts carry paired optics and a radio pack.
+  Medics wear pale armor with teal medical markings, square medical packs,
+  scanners, and carry cases. Mechanics wear ochre work armor and hard hats,
+  with twin service tanks, tool pouches, and an open-ended wrench. Both keep
+  separate owner markings and unarmed animation clips. Medics use a scanner
+  gesture in `treat`; Mechanics turn their wrench in `repair`. These full-pose
+  work loops run only during active service. Cultivators carry a ribbed seed
+  pod and a forked growth tool. Their full-pose cultivation loop blends through
+  the shared work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, Barracks, Relay, and Sentry meshes with idle machinery and activity
   or firing clips; a skinned wolf with idle, walk, run, turn, bite, hit, and

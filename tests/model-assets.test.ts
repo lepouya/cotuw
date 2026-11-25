@@ -290,15 +290,9 @@ test("ARC support uses distinct unarmed geometry within its selection bounds", a
     bodies.push(Array.from(body.getVerticesData(VertexBuffer.PositionKind)!));
     scene.animate();
     // Selection uses a cylinder, including the posed support equipment.
-    if (id !== "arc-scout") {
-      const { radius, height } = posedExtent(instance.root.getChildMeshes());
-      expect(height, `${id} height`).toBeLessThanOrEqual(
-        model.glb.bounds.height,
-      );
-      expect(radius, `${id} radius`).toBeLessThanOrEqual(
-        model.glb.bounds.radius,
-      );
-    }
+    const { radius, height } = posedExtent(instance.root.getChildMeshes());
+    expect(height, `${id} height`).toBeLessThanOrEqual(model.glb.bounds.height);
+    expect(radius, `${id} radius`).toBeLessThanOrEqual(model.glb.bounds.radius);
     instance.dispose();
     asset.dispose();
   }
