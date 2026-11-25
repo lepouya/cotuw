@@ -21,12 +21,11 @@ clips match their generators, and reject unregistered files in `public/assets`.
   violet focus artifacts; Wayfinders wear light hoods and carry a waystone
   stave that follows the right hand. Healers have separate joints for the
   mantle folds. Their open hands and folds move together in `cast`.
-  Artificers wear fitted work gear, a tool harness, belt pouches, and a back
-  frame, leaning in to shape a construct with an awl in `mend`. Each asset ID
-  has one recipe owning its scale, palette, geometry, gait, arm stance, and
-  optional attack layer; only armed recipes export attack and aim clips.
-  ARC recipes explicitly compose head, pack, and
-  role equipment; weapons are opt-in. The shared exporter does not infer
+  Artificers carry a shaping awl on the right forearm and use a two-stroke
+  `mend` loop with a bracing pose. Each asset ID has one recipe owning its
+  scale, palette, geometry, gait, arm stance, and optional attack layer.
+  Only armed recipes export attack and aim clips. ARC recipes explicitly
+  compose head, pack, and role equipment. The shared exporter does not infer
   factions from role names. Scouts carry paired optics and a radio pack.
   Medics wear pale armor with teal medical markings, armored field packs,
   wrist scanners, and carry cases. Mechanics wear ochre work armor, lamp-fitted

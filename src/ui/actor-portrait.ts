@@ -269,16 +269,31 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#dbbd97" d="M49 14Q60 8 71 14L69 24 60 31 51 24Z"/>
     <path fill="none" stroke="#d8debc" stroke-width="2.5" d="M48 14Q60 18 72 14"/>
     <path fill="#ba81e6" d="m60 14 3 3-3 4-3-4Z"/>`,
-  "circle-artificer": elf(
-    "#5b4a33",
-    `
-    <path fill="#7a6544" d="M47 30 73 30 75 52 45 52Z"/>
-    <path fill="none" stroke="#2f2618" stroke-width="4" d="M46 33 74 50M74 33 46 50"/>
-    <path fill="#3a2e1f" d="M42 52H78V58H42Z"/>
-    <path fill="#c9b27b" d="M46 58H51V67H46ZM55 58H60V64H55ZM69 58H74V68H69Z"/>
-    <path fill="none" stroke="#cbbb90" stroke-width="4" stroke-linecap="round" d="M84 70 92 38"/>
-    <path fill="#aa7edd" d="m92 30 6 5-4 8-6-4Z"/>`,
-  ),
+  "circle-artificer": `
+    <ellipse fill="#142c29" cx="60" cy="73" rx="32" ry="5"/>
+    <path fill="#3c4034" d="m68 24 14-4 10 13-3 21-19 6-7-17Z"/>
+    <path fill="#b99b68" d="M76 56Q91 44 87 29L80 19 90 24Q102 40 89 54L84 60Z"/>
+    <path fill="#84add1" d="m86 24 5 3 4 9-6 2-2-8Z"/>
+    <path fill="#b981e1" d="m86 37 4 6-5 8-5-5Z"/>
+    <path fill="#493527" d="m46 48 27-2 4 13-5 14H62l-1-14-7 1-3 13H41Z"/>
+    <path fill="#29362f" d="M43 68h10l-1 6H39Zm20 0h9l5 6H63Z"/>
+    <path fill="#935e3c" d="m44 28 15-5 15 6 2 20-5 15-11-8-15 7 3-15Z"/>
+    <path fill="#d1b682" d="m47 30 5-1 10 18 8-16 5 1-10 21-7 1Z"/>
+    <path fill="#80a9cc" d="m46 30 6-2 4 4-6 4Zm24 0 5 1-1 5-6-2Z"/>
+    <path fill="#493827" d="m46 49 15 2 13-3 2 5-15 4-16-3Z"/>
+    <path fill="#c7aa75" d="m46 52 9 2-2 10-9-2Zm21 2 8-3 3 10-10 3Z"/>
+    <path fill="#86aed0" d="m60 48 5 4-4 5-5-4Z"/>
+    <path fill="none" stroke="#845635" stroke-width="8" stroke-linecap="round"
+      d="m45 35-9 12 4 7m35-19 8 11-5 10"/>
+    <path fill="#c9b084" d="m33 46 7-3 5 9-6 5Zm48-3 6 5-5 9-5-4Z"/>
+    <path fill="#dbbd97" d="m38 54 6-1 4 6-4 4-6-3Zm38 0 6 2-2 6-7-1Z"/>
+    <path fill="#d2ba89" d="m40 58 6 2-10 12-4 1 2-5Z"/>
+    <path fill="#bd86e6" d="m37 67 1 4-6 4 1-5Z"/>
+    <path fill="#293d34" d="M43 14Q57 2 71 13L72 25 65 32 48 29Z"/>
+    <path fill="#c8a77f" d="m48 16-14-6 12 15Zm20 0 14-6-12 15Z"/>
+    <path fill="#dbbd97" d="M47 14Q57 9 69 14L68 24 58 31 49 24Z"/>
+    <path fill="none" stroke="#d1b682" stroke-width="2.5" d="M46 14Q57 18 70 14"/>
+    <path fill="#ba81e6" d="m57 14 3 3-3 4-3-4Z"/>`,
   "circle-briar-ram": `${GROVE_GROUND}
     <path stroke="#3a2a1b" stroke-width="9" stroke-linecap="round" d="M30 50 28 68M46 52 46 69M74 52 76 69M88 50 92 67"/>
     <path fill="#d4c79c" d="M20 44Q22 26 50 25Q80 22 92 36L96 52 22 54Z"/>

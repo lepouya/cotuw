@@ -2036,8 +2036,11 @@ acceptance progress. The following sections define the selected scope.
   sway while moving. Healers are unarmed and lift open palms with violet
   inlays when healing. The production portrait shows the same garb and
   gesture.
-- Artificers wear fitted work gear with prominent tool harnesses for tending
-  constructs.
+- Artificers wear fitted russet work tunics, pale harnesses, and paired
+  belt pouches. A bentwood frame cradles a violet grafting pod on their
+  backs. The harness and frame carry owner markings. They are unarmed
+  and carry a short shaping awl, bracing with the other hand as they tend
+  constructs. The production portrait shows the same kit.
 - Active Healer service shows a leaf cue at the target and Artificer service a
   thorned sprig, distinct from ARC's cross and wrench. Healers raise open
   palms; Artificers lean in to shape the construct. Reduced motion holds the

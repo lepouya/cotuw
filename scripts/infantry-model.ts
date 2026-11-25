@@ -1533,89 +1533,151 @@ const HEALER_GEAR: Part[] = [
 
 const ARTIFICER_GEAR: Part[] = [
   ...mirrored((side, sign): Part[] => [
-    {
-      ...part(
-        `${side}-harness-strap`,
-        "spine",
-        "box",
-        [0.07, 0.62, 0.05],
-        [sign * 0.1, 1.3, 0.23],
-        "armor",
-      ),
-      tiltZ: sign * 0.45,
-    },
+    part(
+      `${side}-harness-strap`,
+      "spine",
+      "leaf-plate",
+      [0.122, 0.53, 0.09],
+      [sign * 0.119, 1.27, 0.197],
+      "armor",
+      -0.12,
+      -sign * 0.46,
+    ),
+    part(
+      `${side}-harness-fastener`,
+      "spine",
+      "leaf-plate",
+      [0.13, 0.21, 0.12],
+      [sign * 0.197, 1.466, 0.137],
+      "owner",
+      -0.58,
+      -sign * 0.43,
+    ),
+    part(
+      `${side}-work-tab`,
+      `${side}-leg`,
+      "mantle-fold",
+      [0.28, 0.53, 0.13],
+      [sign * 0.14, 0.74, 0.14],
+      "cloth",
+      -0.08,
+      sign * 0.09,
+    ),
     part(
       `${side}-tool-pouch`,
       "pelvis",
-      "box",
-      [0.14, 0.18, 0.12],
-      [sign * 0.27, 0.9, 0.12],
+      "shell",
+      [0.165, 0.21, 0.155],
+      [sign * 0.194, 0.92, 0.19],
       "armor",
+      -0.08,
+      -sign * 0.17,
     ),
     part(
       `${side}-bracer`,
       `${side}-forearm`,
-      "cylinder",
-      [0.15, 0.2, 0.15],
+      "leaf-plate",
+      [0.185, 0.25, 0.19],
       [sign * 0.37, 0.95, 0.11],
       "armor",
+      -0.16,
+    ),
+    part(
+      `${side}-frame-rib`,
+      "spine",
+      "leaf-plate",
+      [0.155, 0.59, 0.17],
+      [sign * 0.194, 1.246, -0.308],
+      "armor",
+      Math.PI + 0.14,
+      -sign * 0.23,
+    ),
+    part(
+      `${side}-frame-branch`,
+      "spine",
+      "leaf-plate",
+      [0.135, 0.34, 0.15],
+      [sign * 0.193, 1.469, -0.267],
+      "armor",
+      Math.PI - 0.23,
+      sign * 0.49,
+    ),
+    part(
+      `${side}-frame-band`,
+      "spine",
+      "leaf-plate",
+      [0.148, 0.24, 0.115],
+      [sign * 0.209, 1.435, -0.351],
+      "owner",
+      Math.PI + 0.12,
+      -sign * 0.18,
     ),
   ]),
   part(
     "harness-buckle",
     "spine",
-    "sphere",
-    [0.12, 0.12, 0.06],
-    [0, 1.3, 0.27],
+    "leaf-plate",
+    [0.145, 0.18, 0.1],
+    [0, 1.049, 0.199],
     "owner",
   ),
   part(
-    "tool-belt",
-    "pelvis",
-    "torus",
-    [0.47, 0.1, 0.36],
-    [0, 0.93, 0],
-    "armor",
-  ),
-  part(
-    "tool-frame",
+    "grafting-pod",
     "spine",
-    "box",
-    [0.42, 0.55, 0.14],
-    [0, 1.3, -0.3],
-    "armor",
-  ),
-  part(
-    "frame-shaper",
-    "spine",
-    "cylinder",
-    [0.04, 0.75, 0.04],
-    [0.14, 1.45, -0.38],
+    "leaf-plate",
+    [0.3, 0.56, 0.23],
+    [0, 1.22, -0.306],
     "dark",
+    Math.PI - 0.14,
   ),
   part(
-    "frame-shaper-seed",
+    "pod-window",
     "spine",
-    "leaf",
-    [0.08, 0.14, 0.08],
-    [0.14, 1.86, -0.38],
+    "leaf-plate",
+    [0.13, 0.29, 0.065],
+    [0, 1.258, -0.426],
     "visor",
+    Math.PI - 0.14,
   ),
   part(
-    "shaping-awl",
+    "frame-crosspiece",
+    "spine",
+    "leaf-plate",
+    [0.14, 0.48, 0.16],
+    [0, 1.082, -0.366],
+    "armor",
+    Math.PI,
+    Math.PI / 2,
+  ),
+  part(
+    "awl-grip",
     "right-forearm",
-    "cylinder",
-    [0.05, 0.4, 0.05],
-    [0.38, 0.72, 0.24],
+    "shell",
+    [0.069, 0.18, 0.075],
+    [0.376, 0.793, 0.176],
     "dark",
+    -0.21,
+    -0.12,
   ),
   part(
-    "awl-tip",
+    "awl-shaft",
     "right-forearm",
-    "leaf",
-    [0.07, 0.13, 0.07],
-    [0.38, 0.5, 0.27],
+    "leaf-plate",
+    [0.092, 0.29, 0.075],
+    [0.354, 0.643, 0.211],
+    "armor",
+    -0.24,
+    -0.11,
+  ),
+  part(
+    "awl-inlay",
+    "right-forearm",
+    "leaf-plate",
+    [0.062, 0.103, 0.043],
+    [0.34, 0.558, 0.245],
     "visor",
+    -0.24,
+    -0.11,
   ),
 ];
 
@@ -1737,14 +1799,15 @@ const WORK_POSES = {
     if (joint.endsWith("-mantle"))
       return [0.045 + lift * 0.12, 0, side * lift * 0.045];
   },
-  // A forward lean shaping the construct with the awl.
   mend: (joint, phase) => {
-    const stroke = Math.sin(phase * 2);
-    if (joint === "spine") return [0.24 + Math.sin(phase) * 0.03, 0, 0];
-    if (joint === "right-arm") return [-0.85 + stroke * 0.15, 0, 0.08];
-    if (joint === "right-forearm") return [-0.4 + stroke * 0.3, 0, 0];
-    if (joint === "left-arm") return [-0.7, 0, -0.12];
-    if (joint === "left-forearm") return [-0.45, 0, 0];
+    // Brace with the left hand and make two measured passes with the awl.
+    const press = (1 - Math.cos(phase * 2)) / 2;
+    if (joint === "spine") return [0.19 + press * 0.08, -0.07, 0];
+    if (joint === "head") return [0.13 - press * 0.07, 0.08, 0];
+    if (joint === "right-arm") return [-1.24 - press * 0.14, -0.08, 0.12];
+    if (joint === "right-forearm") return [-0.44 + press * 0.35, -0.08, 0.08];
+    if (joint === "left-arm") return [-0.97, 0.06, -0.2];
+    if (joint === "left-forearm") return [-0.67, 0.12, 0.06];
   },
 } satisfies Record<string, WorkPose>;
 
@@ -1895,15 +1958,25 @@ const INFANTRY_RECIPES = {
   },
   "circle-artificer": {
     work: "mend",
-    scale: 1,
+    scale: 0.96,
     palette: {
-      armor: [0.45, 0.33, 0.2],
-      cloth: [0.36, 0.3, 0.22],
+      armor: [0.82, 0.67, 0.44],
+      cloth: [0.51, 0.32, 0.2],
       ...CIRCLE_TRIM,
     },
-    parts: [...elvenParts([0.45, 0.6, 0.22]), ...ARTIFICER_GEAR],
+    parts: [
+      ...elvenParts([0.39, 0.42, 0.16]).filter(
+        ({ name }) => !/-tabard(-trim)?$/.test(name),
+      ),
+      ...ARTIFICER_GEAR,
+    ],
     stride: 0.85,
-    stance: { ...ARMS_AT_SIDES, swing: 0.12 },
+    stance: {
+      ...ARMS_AT_SIDES,
+      spread: 0.04,
+      swing: 0.18,
+      ready: { "right-forearm": [-0.045, 0, 0] },
+    },
   },
   "circle-wayfinder": {
     scale: 0.88,
