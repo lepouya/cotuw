@@ -31,8 +31,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
   tool pouches, and an open-ended wrench. Both keep separate owner markings and
   unarmed animation clips. Medics use a scanner gesture in `treat`; Mechanics
   turn their wrench in `repair`. These full-pose work loops run only during
-  active service. Cultivators carry a pod and a growth tool; their full-pose
-  cultivation loop blends through the shared work-animation contract.
+  active service. Cultivators carry a ribbed seed pod and a forked growth
+  tool. Their full-pose cultivation loop blends through the shared
+  work-animation contract.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, Barracks, Relay, and Sentry meshes with idle machinery and activity
   or firing clips; a skinned wolf with idle, walk, run, turn, bite, hit, and
@@ -50,7 +51,7 @@ clips match their generators, and reject unregistered files in `public/assets`.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
   Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle
   with an open front arch, Thornspire column, and renewable bloom markers. Each
-  ID has one recipe naming its size, frame, focus height, and basin. Owned
+  ID has one recipe naming its size, frame, and focus height. Owned
   buildings carry an owner marking; neutral sites do not. Named `growth-roots`,
   `growth-ribs`, and `growth-canopy` meshes define three construction layers
   without scaffolding. Active growth pulses; untended or capacity-blocked work

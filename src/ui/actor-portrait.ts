@@ -119,12 +119,14 @@ const PORTRAITS: Record<PortraitId, string> = {
     { helmet: "#3c4955", visor: "#f3b34e" },
   ),
   "circle-cultivator": elf(
-    "#43583a",
+    "#697545",
     `
-    <path stroke="#bdab7c" stroke-width="4" fill="none" d="M79 63 83 29 91 19M83 29 77 19"/>
-    <path fill="#a77ad0" d="m87 18 5-5 4 5-5 7Z"/>
-    <ellipse fill="#8caf69" cx="37" cy="55" rx="10" ry="13"/>
-    <path fill="none" stroke="#c9ba8b" stroke-width="3" d="M37 44V67M30 52 44 57"/>`,
+    <ellipse fill="#697545" cx="35" cy="37" rx="11" ry="15"/>
+    <path fill="#b98be3" d="m35 27 5 10-5 9-5-9Z"/>
+    <path fill="none" stroke="#d3c28d" stroke-width="3" d="M31 25Q23 37 31 49M39 25Q47 37 39 49"/>
+    <path fill="#76abd1" d="M30 22H40V27H30Z"/>
+    <path fill="none" stroke="#d3c28d" stroke-width="4" d="m50 32 9 18 11-18M79 44l8 17-2 10m2-10 10 5"/>
+    <path fill="#b98be3" d="m90 62 5 4-3 6-5-4Z"/>`,
   ),
   "circle-sentinel": elf(
     "#183e34",

@@ -1996,8 +1996,9 @@ acceptance progress. The following sections define the selected scope.
   their shape while the effect fades.
 - Wayfinders have light hooded mantles, tunics, and a slim wayfinding stave,
   with compact silhouettes suited to speed. They remain unarmed.
-- Cultivators wear practical clothing and carry a visible pod and a
-  growth-tending tool.
+- Cultivators wear short olive mantles and pale harness straps. They carry
+  a ribbed seed pod on their backs and a forked growth tool with a violet
+  focus between its tines.
 - Healers have flowing mantles and open-handed casting poses.
 - Artificers wear fitted work gear with prominent tool harnesses for tending
   constructs.

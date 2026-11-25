@@ -624,6 +624,95 @@ function elvenParts(mantle: Vec3): Part[] {
   ];
 }
 
+const CULTIVATOR_GEAR: Part[] = [
+  part(
+    "seed-pod-shell",
+    "spine",
+    "sphere",
+    [0.42, 0.58, 0.3],
+    [0, 1.25, -0.32],
+    "cloth",
+  ),
+  part(
+    "seed-pod-window",
+    "spine",
+    "sphere",
+    [0.16, 0.3, 0.18],
+    [0, 1.29, -0.485],
+    "visor",
+  ),
+  part(
+    "seed-pod-cap",
+    "spine",
+    "sphere",
+    [0.31, 0.13, 0.25],
+    [0, 1.5, -0.31],
+    "owner",
+  ),
+  ...mirrored((side, sign): Part[] => [
+    {
+      ...part(
+        `${side}-pod-rib`,
+        "spine",
+        "leaf",
+        [0.13, 0.53, 0.14],
+        [sign * 0.13, 1.25, -0.47],
+        "armor",
+      ),
+      tiltZ: -sign * 0.31,
+    },
+    {
+      ...part(
+        `${side}-harness-strap`,
+        "spine",
+        "box",
+        [0.062, 0.43, 0.055],
+        [sign * 0.106, 1.25, 0.125],
+        "armor",
+        -0.18,
+      ),
+      tiltZ: -sign * 0.35,
+    },
+  ]),
+  part(
+    "growth-tool-shaft",
+    "right-forearm",
+    "cylinder",
+    [0.065, 0.54, 0.065],
+    [0.38, 0.74, 0.15],
+    "armor",
+  ),
+  part(
+    "growth-tool-grip",
+    "right-forearm",
+    "cylinder",
+    [0.09, 0.2, 0.09],
+    [0.38, 0.8, 0.15],
+    "dark",
+  ),
+  ...mirrored((side, sign): Part[] => [
+    {
+      ...part(
+        `growth-tool-${side}-tine`,
+        "right-forearm",
+        "leaf",
+        [0.08, 0.25, 0.08],
+        [0.38 + sign * 0.078, 0.49, 0.15],
+        "armor",
+      ),
+      tiltZ: sign * 0.58,
+    },
+  ]),
+  part(
+    "growth-tool-focus",
+    "right-forearm",
+    "leaf",
+    [0.1, 0.16, 0.1],
+    [0.38, 0.44, 0.15],
+    "visor",
+  ),
+];
+
 const SENTINEL_GEAR: Part[] = [
   ...mirrored((side, sign): Part[] => [
     {
@@ -953,37 +1042,11 @@ const INFANTRY_RECIPES = {
     work: "cultivate",
     scale: 0.94,
     palette: {
-      armor: [0.68, 0.56, 0.33],
-      cloth: [0.35, 0.4, 0.23],
+      armor: [0.85, 0.73, 0.49],
+      cloth: [0.43, 0.49, 0.26],
       ...CIRCLE_TRIM,
     },
-    parts: [
-      ...elvenParts([0.55, 0.75, 0.25]),
-      part(
-        "cultivation-pod",
-        "pelvis",
-        "sphere",
-        [0.32, 0.4, 0.3],
-        [-0.3, 0.83, 0],
-        "owner",
-      ),
-      part(
-        "growth-tool-handle",
-        "right-forearm",
-        "cylinder",
-        [0.06, 0.75, 0.06],
-        [0.37, 0.83, 0.15],
-        "armor",
-      ),
-      part(
-        "growth-tool-crown",
-        "right-forearm",
-        "leaf",
-        [0.24, 0.24, 0.06],
-        [0.37, 1.2, 0.15],
-        "visor",
-      ),
-    ],
+    parts: [...elvenParts([0.48, 0.62, 0.21]), ...CULTIVATOR_GEAR],
     stride: 0.8,
     stance: ARMS_AT_SIDES,
   },
