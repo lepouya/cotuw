@@ -1596,44 +1596,141 @@ function regeneration(scene: Scene, name: string) {
   });
 }
 
-/** A dark bird facing +Z whose wings beat in its idle clip. */
+/** A dark bird facing +Z with articulated, feathered wings. */
 function bird(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const plumage = surface(scene, "plumage", [0.14, 0.14, 0.17]);
-  const body = MeshBuilder.CreateBox(
-    "body",
-    { width: 0.1, height: 0.08, depth: 0.36 },
+  const plumage = surface(scene, "plumage", [0.2, 0.23, 0.26]);
+  const flights = surface(scene, "flight-feathers", [0.29, 0.33, 0.37]);
+  const panel = (
+    name: string,
+    outline: readonly (readonly [number, number])[],
+    thickness: number,
+    side = 1,
+  ) => {
+    const perimeter =
+      side < 0 ? [outline[0]!, ...outline.slice(1).reverse()] : outline;
+    const count = perimeter.length;
+    const vertex = [-thickness / 2, thickness / 2].flatMap((y) =>
+      perimeter.map(([x, z]) => [side * x, y, z]),
+    );
+    const bottom = perimeter.map((_, i) => i);
+    // The fan starts at the same point on both faces of the notched tips.
+    const face = [
+      bottom,
+      [
+        count,
+        ...bottom
+          .slice(1)
+          .reverse()
+          .map((i) => count + i),
+      ],
+    ];
+    for (let a = 0; a < count; a++) {
+      const b = (a + 1) % count;
+      face.push([b, a, a + count, b + count]);
+    }
+    return MeshBuilder.CreatePolyhedron(
+      name,
+      { custom: { vertex, face } },
+      scene,
+    );
+  };
+
+  const body = MeshBuilder.CreateSphere(
+    "torso",
+    { diameterX: 0.125, diameterY: 0.11, diameterZ: 0.36, segments: 5 },
     scene,
   );
-  body.parent = root;
-  body.material = plumage;
-  const tail = MeshBuilder.CreateBox(
+  const head = MeshBuilder.CreateSphere(
+    "head",
+    { diameterX: 0.095, diameterY: 0.09, diameterZ: 0.12, segments: 4 },
+    scene,
+  );
+  head.position.set(0, 0.025, 0.164);
+  const tail = panel(
     "tail",
-    { width: 0.14, height: 0.02, depth: 0.12 },
+    [
+      [-0.03, 0.08],
+      [-0.084, -0.09],
+      [-0.045, -0.11],
+      [0.045, -0.11],
+      [0.084, -0.09],
+      [0.03, 0.08],
+    ],
+    0.018,
+  );
+  tail.position.z = -0.22;
+  merge(root, "body", [body, head, tail], plumage);
+
+  const bill = MeshBuilder.CreateCylinder(
+    "bill",
+    { diameterTop: 0, diameterBottom: 0.056, height: 0.085, tessellation: 4 },
     scene,
   );
-  tail.parent = root;
-  tail.position.z = -0.22;
-  tail.material = plumage;
+  bill.parent = root;
+  bill.position.set(0, 0.016, 0.245);
+  bill.rotation.x = Math.PI / 2;
+  bill.material = surface(scene, "bill", [0.36, 0.36, 0.32]);
+
   const wings = [-1, 1].map((side) => {
     const shoulder = new TransformNode(`shoulder-${side}`, scene);
     shoulder.parent = root;
-    shoulder.position.x = side * 0.05;
-    const wing = MeshBuilder.CreateBox(
+    shoulder.position.set(side * 0.045, 0.016, 0.016);
+    const wing = panel(
       `wing-${side}`,
-      { width: 0.42, height: 0.015, depth: 0.16 },
-      scene,
+      [
+        [-0.01, 0.055],
+        [-0.01, -0.091],
+        [0.12, -0.111],
+        [0.27, -0.102],
+        [0.29, 0.043],
+        [0.21, 0.105],
+        [0.105, 0.127],
+      ],
+      0.027,
+      side,
     );
     wing.parent = shoulder;
-    wing.position.x = side * 0.21;
     wing.material = plumage;
-    return { shoulder, side };
+
+    const wrist = new TransformNode(`wrist-${side}`, scene);
+    wrist.parent = shoulder;
+    wrist.position.x = side * 0.255;
+    const feathers = panel(
+      `flight-feathers-${side}`,
+      [
+        [0, 0.07],
+        [0, -0.1],
+        [0.08, -0.153],
+        [0.12, -0.148],
+        [0.1, -0.108],
+        [0.195, -0.134],
+        [0.15, -0.082],
+        [0.258, -0.061],
+        [0.224, 0.015],
+        [0.12, 0.075],
+      ],
+      0.016,
+      side,
+    );
+    feathers.parent = wrist;
+    feathers.material = flights;
+    return { shoulder, wrist, side };
   });
   const seconds = 0.5;
-  clip(root, "flap", seconds, (time) => {
-    const beat = Math.sin((time / seconds) * Math.PI * 2) * 0.6;
-    for (const { shoulder, side } of wings) shoulder.rotation.z = side * beat;
-  });
+  clip(
+    root,
+    "flap",
+    seconds,
+    (time) => {
+      const phase = (time / seconds) * Math.PI * 2;
+      for (const { shoulder, wrist, side } of wings) {
+        shoulder.rotation.z = side * Math.sin(phase) * 0.61;
+        wrist.rotation.z = side * (Math.sin(phase - 0.6) * 0.28 - 0.08);
+      }
+    },
+    false,
+  );
 }
 
 /** Each model's builder fills an empty scene with nodes, materials, and clips. */

@@ -1135,6 +1135,8 @@ These systems are outside M1.
   above the highest terrain under their loop. Birds hide over unexplored
   terrain. Clearance includes the flock's varying radii and refreshes after
   terrain edits.
+- Ambient birds have dark bodies, fanned tails, and slate flight feathers.
+  The outer wings flex slightly after the shoulders on each beat.
 - Reduced motion skips activity clips, holds damage effects and birds still,
   preserves a visible damage cue during emission gaps, and shows collapsed
   debris at once.

@@ -206,6 +206,8 @@ challenge, pacing, and useful choices.
     cover Materials depletion and Lifebloom reserve, dormancy, and recovery.
     The ARC foundation and scaffold pass covers rotated placement, all
     three stages, and paused work alongside Circle growth at gameplay zoom.
+    The ambient bird pass covers flock silhouettes and wingbeats over the
+    river in both introductions.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
