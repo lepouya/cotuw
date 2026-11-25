@@ -1112,91 +1112,116 @@ function rubble(scene: Scene, name: string) {
     merge(root, part, pieces[part], surface(scene, `rubble-${part}`, color));
 }
 
-/**
- * Folded living architecture within the unit cube: snapped pale ribs, dark
- * roots, fallen leaves, and violet light that fades as remains collapse.
- */
+/** Broken Circle ribs fold over a root bed and leave embers at the breaks. */
 function livingRubble(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const random = seededRandom(0x11fe);
   const pieces = {
     wood: [] as Mesh[],
     roots: [] as Mesh[],
     leaves: [] as Mesh[],
     "fading-light": [] as Mesh[],
   };
-  const tube = (points: Vector3[], radius: number) =>
-    MeshBuilder.CreateTube(
-      `tube-${pieces.wood.length + pieces.roots.length}`,
-      { path: points, radius, tessellation: 6, cap: 3 },
-      scene,
-    );
-  // Ribs snap and fold inward, leaning against one another.
-  for (let index = 0; index < 7; index++) {
-    const angle = (index / 7) * Math.PI * 2 + random() * 0.4;
-    const reach = 0.25 + random() * 0.2;
-    const x = Math.cos(angle) * reach;
-    const z = Math.sin(angle) * reach;
-    pieces.wood.push(
-      tube(
-        [
-          new Vector3(x, -0.5, z),
-          new Vector3(x * 0.7, -0.5 + 0.35 + random() * 0.3, z * 0.7),
-          new Vector3(x * 0.1, -0.5 + 0.2 + random() * 0.2, z * 0.1),
-        ],
-        0.035 + random() * 0.02,
+  const branch = (
+    part: "wood" | "roots",
+    knots: readonly (readonly [number, number, number, number])[],
+  ) => {
+    pieces[part].push(
+      MeshBuilder.CreateTube(
+        `${part}-${pieces[part].length}`,
+        {
+          path: knots.map(([x, y, z]) => new Vector3(x, y, z)),
+          radiusFunction: (index) => knots[index]![3],
+          tessellation: 6,
+          cap: Mesh.CAP_ALL,
+        },
+        scene,
       ),
     );
-  }
-  for (let index = 0; index < 8; index++) {
-    const angle = random() * Math.PI * 2;
-    const x = Math.cos(angle) * 0.45;
-    const z = Math.sin(angle) * 0.45;
-    pieces.roots.push(
-      tube(
-        [
-          new Vector3(x, -0.5, z),
-          new Vector3(x * 0.6, -0.42, z * 0.6),
-          new Vector3(x * 0.2 + (random() - 0.5) * 0.2, -0.38, z * 0.2),
-        ],
-        0.03,
-      ),
-    );
-  }
-  for (let index = 0; index < 10; index++) {
-    const leaf = MeshBuilder.CreateSphere(
+  };
+  branch("roots", [
+    [-0.39, -0.46, 0.09, 0.013],
+    [-0.23, -0.43, 0.01, 0.056],
+    [-0.08, -0.36, -0.01, 0.099],
+    [0.18, -0.43, 0.1, 0.068],
+    [0.35, -0.46, 0.23, 0.012],
+  ]);
+  branch("roots", [
+    [-0.18, -0.46, 0.32, 0.018],
+    [-0.08, -0.35, 0.16, 0.06],
+    [-0.13, -0.32, -0.03, 0.068],
+    [0.03, -0.41, -0.18, 0.059],
+    [0.13, -0.47, -0.39, 0.012],
+  ]);
+  branch("roots", [
+    [0.04, -0.43, 0.36, 0.02],
+    [0.19, -0.37, 0.18, 0.043],
+    [0.23, -0.32, 0.01, 0.055],
+    [0.39, -0.47, -0.15, 0.014],
+  ]);
+  // The thicker ribs break across a gap before folding over the roots.
+  branch("wood", [
+    [-0.31, -0.39, -0.16, 0.087],
+    [-0.21, -0.18, -0.14, 0.083],
+    [-0.1, 0.04, -0.06, 0.063],
+    [0.06, 0.13, 0.01, 0.045],
+  ]);
+  branch("wood", [
+    [-0.34, -0.39, 0.17, 0.056],
+    [-0.21, -0.21, 0.19, 0.062],
+    [-0.055, -0.05, 0.15, 0.05],
+    [0.094, -0.005, 0.16, 0.025],
+  ]);
+  branch("wood", [
+    [0.34, -0.39, -0.08, 0.06],
+    [0.27, -0.29, -0.035, 0.051],
+    [0.2, -0.15, 0.01, 0.04],
+    [0.15, -0.075, 0.048, 0.028],
+  ]);
+  branch("wood", [
+    [0.1, -0.32, -0.29, 0.026],
+    [0.17, -0.2, -0.22, 0.037],
+    [0.18, -0.26, -0.09, 0.027],
+  ]);
+  for (const [index, [x, y, z, angle, length]] of (
+    [
+      [-0.09, -0.31, -0.23, 1.4, 0.34],
+      [0.03, -0.25, -0.23, 0.66, 0.34],
+      [0.2, -0.3, 0.12, 1, 0.44],
+      [0.13, -0.36, 0.26, 2.8, 0.28],
+      [-0.2, -0.33, 0.21, -0.85, 0.32],
+    ] as const
+  ).entries()) {
+    const leaf = MeshBuilder.CreatePolyhedron(
       `leaf-${index}`,
-      { diameter: 1, segments: 5 },
+      { custom: LEAF_BLADE },
       scene,
     );
-    leaf.scaling.set(0.16 + random() * 0.1, 0.06, 0.1 + random() * 0.08);
-    leaf.position.set(
-      (random() - 0.5) * 0.8,
-      -0.45 + random() * 0.2,
-      (random() - 0.5) * 0.8,
-    );
-    leaf.rotation.set((random() - 0.5) * 0.6, random() * Math.PI, 0);
+    leaf.scaling.set(0.22, 0.15, length);
+    leaf.position.set(x, y, z);
+    leaf.rotation.set(0.33, angle, -0.24);
     pieces.leaves.push(leaf);
   }
-  for (let index = 0; index < 4; index++) {
-    const ember = MeshBuilder.CreateSphere(
+  for (const [index, [x, y, z, size]] of (
+    [
+      [0.079, 0.057, 0.024, 0.064],
+      [0.177, -0.137, 0.036, 0.046],
+      [0.02, -0.3, 0.11, 0.048],
+    ] as const
+  ).entries()) {
+    const ember = MeshBuilder.CreatePolyhedron(
       `ember-${index}`,
-      { diameter: 1, segments: 5 },
+      { type: 1, size },
       scene,
     );
-    ember.scaling.setAll(0.07 + random() * 0.05);
-    ember.position.set(
-      (random() - 0.5) * 0.5,
-      -0.42 + random() * 0.15,
-      (random() - 0.5) * 0.5,
-    );
+    ember.position.set(x, y, z);
+    ember.rotation.set(-0.3, 0.25, 0.48);
     pieces["fading-light"].push(ember);
   }
   for (const [part, color, glow] of [
-    ["wood", [0.72, 0.62, 0.42], 0],
-    ["roots", [0.24, 0.16, 0.1], 0],
-    ["leaves", [0.2, 0.3, 0.16], 0],
-    ["fading-light", [0.6, 0.3, 0.92], 0.9],
+    ["wood", [0.84, 0.71, 0.48], 0],
+    ["roots", [0.29, 0.2, 0.13], 0],
+    ["leaves", [0.15, 0.35, 0.23], 0],
+    ["fading-light", [0.65, 0.35, 0.93], 0.95],
   ] as const)
     merge(
       root,

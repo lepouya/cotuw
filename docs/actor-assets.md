@@ -75,10 +75,11 @@ clips match their generators, and reject unregistered files in `public/assets`.
   since unfinished layers would leave them floating. The Briar Ram uses the
   same stages with a separate skin mesh for each damage material. Its remains
   keep the broken shapes with the core and leaks extinguished. `living-rubble`
-  gives Circle buildings snapped ribs, roots, fallen leaves, and
-  violet `fading-light` embers that dim over 1.6 seconds of collapse, or at once
-  under reduced motion. Living damage effects add `leak` wisps and, when
-  critical, `fragment` wood chips to their falling leaves.
+  gives Circle buildings snapped ribs, dark roots, and fallen leaf plates.
+  Violet embers at the breaks share the `fading-light` mesh, which dims over
+  1.6 seconds or goes dark at once under reduced motion. Living damage effects
+  add `leak` wisps and, when critical, `fragment` wood chips to their falling
+  leaves.
 - Building details and the wolf and Harvester parts in `src/render` supply both
   the built-in models and the export script, which receives named parts and
   adds rigging and clips. A building's details declare `loopSeconds`, the period
@@ -116,9 +117,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
 Each command prints its textures' minimap colors and its clip definitions;
 update matching content-pack graphics when changing the art.
 Generated terrain edges match by construction.
-Foundations and rubble use unit-scale models. Each ARC debris tile rotates
-and scales the same group of fractured concrete, slate panels, and bent
-framing. The group fits inside a half-tile radius before rotation.
+Foundations and rubble use unit-scale models. Debris rotates and scales a
+faction-specific group within each footprint tile. Each group fits inside a
+half-tile radius before rotation.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
 Active support shows a small medical cross, mechanical wrench, Circle leaf, or
 thorned sprig at the target.

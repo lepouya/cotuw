@@ -2074,10 +2074,10 @@ acceptance progress. The following sections define the selected scope.
   moderate and critical damage meshes selected by severity. Runtime emitters
   add fragments and violet leaks. Critical damage meshes include flickering
   lights.
-- Destroyed living buildings fold and collapse into broken wood and roots as
-  their light fades, using Circle rubble selected per building. The Briar
-  Ram's legs buckle and its body settles into an inert husk. Personnel retain
-  biological hit reactions and fallen bodies.
+- Circle buildings collapse into pale snapped ribs, intertwined dark roots,
+  and overlapping fallen leaf plates. Violet embers at the breaks fade after
+  the debris settles. The Briar Ram's legs buckle and its body settles into
+  an inert husk. Personnel retain biological hit reactions and fallen bodies.
 - Circle producers play an exit activity as each unit leaves: entrance arches
   part with a brief violet pulse. Production start plays a soft rustle and
   tone.

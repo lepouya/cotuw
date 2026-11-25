@@ -37,17 +37,20 @@ function posedExtent(meshes: readonly AbstractMesh[]) {
   return { radius, height, width: halfWidth * 2 };
 }
 
-test("ARC rubble stays inside its tile after rotation", async () => {
-  const scene = testScene();
-  const { url } = BASE_CONTENT.props!.rubble!;
-  const asset = await loadModelAsset(scene, { url: glbDataUrl(url) });
-  const rubble = asset.instantiate("rubble");
-  const { radius } = posedExtent(rubble.root.getChildMeshes());
-  expect(radius).toBeGreaterThan(0);
-  expect(radius).toBeLessThanOrEqual(0.5);
-  rubble.dispose();
-  asset.dispose();
-});
+test.each(["rubble", "living-rubble"] as const)(
+  "%s stays inside its tile after rotation",
+  async (id) => {
+    const scene = testScene();
+    const { url } = BASE_CONTENT.props![id]!;
+    const asset = await loadModelAsset(scene, { url: glbDataUrl(url) });
+    const rubble = asset.instantiate("rubble");
+    const { radius } = posedExtent(rubble.root.getChildMeshes());
+    expect(radius).toBeGreaterThan(0);
+    expect(radius).toBeLessThanOrEqual(0.5);
+    rubble.dispose();
+    asset.dispose();
+  },
+);
 
 test("the Construct Nursery opens its gate wide enough for a Briar Ram", async () => {
   const scene = testScene();
