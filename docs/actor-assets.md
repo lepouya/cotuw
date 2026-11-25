@@ -14,9 +14,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   and death clips. Troopers use aim and fire; Sentinels use aim and channeling
   clips. Circle personnel have slender proportions, pointed ears, exposed faces,
   circlets, tunics, and mantles with owner markings. ARC owner markings cover
-  the shoulders, chest, and helmet ridge. Demolition Troopers use charcoal
-  armor, amber visors, a shoulder launcher, and paired rocket tubes, with a
-  slower launch recoil clip. Sentinels wear layered leaf armor and channel
+  the shoulders, chest, and helmet ridge. Demolition Troopers share the
+  faceted field armor geometry with Troopers. Their kit adds an amber visor,
+  a shrouded shoulder launcher, and an owner-marked twin rocket rack. They
+  use a slower launch recoil clip. Sentinels wear layered leaf armor and channel
   violet focus artifacts; Wayfinders wear light hoods and carry a waystone
   stave that follows the right hand. Healers wear long flowing mantles, an
   owner stole, and glowing palms, raising open hands in `cast`. Artificers

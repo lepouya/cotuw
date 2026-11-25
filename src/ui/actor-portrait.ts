@@ -181,22 +181,34 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#ffebaa" d="m63 13 9-1 1 4-9 2Z"/>
     <path fill="#a7b7b5" d="m29 53 7-19-5-7 2-10 6-1-2 9 6 3 6-8 4 3-5 11-6 2-7 19Z"/>
     <path fill="#334648" d="m31 44 7 2-3 9-7-2Z"/>`,
-  "arc-demolition-trooper": infantry(
-    "#4a5763",
-    `
-    <path fill="#9caaaa" d="M26 24H34V53H26ZM36 20H44V49H36Z"/>
-    <path fill="#35414c" d="m26 24 4-9 4 9ZM36 20l4-9 4 9Z"/>
-    <path fill="#223039" d="M24 36H46V43H24Z"/>
-    <path fill="#6d9ad2" d="M57 5H64V15H57ZM55 33H63V44H55Z"/>
-    <path fill="#1b2831" d="M67 27 99 14 110 26 76 40Z"/>
-    <path fill="#596873" d="M67 27 99 14 104 19 72 33Z"/>
-    <path stroke="#b7c4c3" stroke-width="4" d="M70 28 77 37"/>
-    <ellipse fill="#b7c4c3" cx="106" cy="21" rx="8" ry="11" transform="rotate(-27 106 21)"/>
-    <ellipse fill="#111f28" cx="107" cy="21" rx="5" ry="7" transform="rotate(-27 107 21)"/>
-    <path fill="#f3b34e" d="m86 20 7-3 3 4-7 3Z"/>
-    <path stroke="#35414c" stroke-width="9" d="M77 37 72 45 59 40"/>`,
-    { helmet: "#3c4955", visor: "#f3b34e" },
-  ),
+  "arc-demolition-trooper": `
+    <ellipse fill="#152b31" cx="62" cy="73" rx="32" ry="5"/>
+    <path stroke="#364349" stroke-width="13" d="m50 48-5 22m21-22 11 22"/>
+    <path fill="#5d6a73" d="m43 55 12 1-3 13-11-1Zm23 0 11-2 6 14-12 2Z"/>
+    <path fill="#253039" d="M38 67H52V74H35ZM71 67H83L88 74H71Z"/>
+    <path fill="#9caaaa" d="m26 24 8-4v29l-8 3Zm12-4 8-4v29l-8 3Z"/>
+    <path fill="#5d6a73" d="m25 23 3-7 6-3 2 8-3 4-7 2Zm12-4 3-7 6-3 2 8-3 4-7 2Z"/>
+    <path fill="#26343c" d="m24 37 25-8v9l-25 8Z"/>
+    <path fill="#78a3d8" d="m25 39 19-6v4l-19 6Z"/>
+    <path fill="#364349" d="m37 31 9-7 28 4 5 20-9 7-23-1-8-7Z"/>
+    <path fill="#63717a" d="m46 29 23 1 6 6-5 11-22 1-8-8Z"/>
+    <path fill="#78a3d8" d="m52 34 11-1 1 5-12 1Z"/>
+    <path fill="#63717a" d="m32 32 8-5 9 4-2 9-12 2Z"/>
+    <path fill="#78a3d8" d="m33 32 7-4 7 3-3 4-9 1Z"/>
+    <path fill="#687681" d="M45 12 52 5 66 3 76 8 79 16 74 24 46 23Z"/>
+    <path fill="#26343c" d="m46 15 32-2-1 11-9 5-17-3Z"/>
+    <path fill="#f3b34e" d="m52 17 24-2-1 5-20 3Z"/>
+    <path fill="#78a3d8" d="m53 6 13-3 5 3-13 4Z"/>
+    <path stroke="#586671" stroke-width="9" d="m37 41 13 7 18-6m10-5 4 9 10-9"/>
+    <path fill="#26343c" d="m62 30 38-15 8 16-37 16Z"/>
+    <path fill="#697882" d="m65 27 35-13 7 9-34 14-7-4Z"/>
+    <path fill="#a7b7b8" d="m67 26 33-13 3 4-33 13Z"/>
+    <path fill="#26343c" d="m79 19 8-3 4 4-9 4Z"/>
+    <path fill="#f3b34e" d="m81 19 4-1 2 2-5 1Z"/>
+    <path fill="#78a3d8" d="m78 34 10-4 3 4-10 4Z"/>
+    <ellipse fill="#b7c4c3" cx="104" cy="23" rx="8" ry="11" transform="rotate(-26 104 23)"/>
+    <ellipse fill="#17262e" cx="105" cy="23" rx="5" ry="7" transform="rotate(-26 105 23)"/>
+    <path stroke="#63717a" stroke-width="8" d="m57 47 12 1 5-7"/>`,
   "circle-cultivator": elf(
     "#697545",
     `

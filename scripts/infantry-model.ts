@@ -90,28 +90,6 @@ const JOINTS: Joint[] = [
   ]),
 ];
 
-const ARC_BACKPACK: Part[] = [
-  part(
-    "backpack",
-    "spine",
-    "box",
-    [0.42, 0.42, 0.18],
-    [0, 1.31, -0.26],
-    "armor",
-  ),
-];
-const ARC_HEAD: Part[] = [
-  part("helmet", "head", "sphere", [0.43, 0.35, 0.43], [0, 1.69, 0], "armor"),
-  part("visor", "head", "box", [0.35, 0.13, 0.08], [0, 1.69, 0.2], "visor"),
-  part(
-    "helmet-ridge",
-    "head",
-    "box",
-    [0.12, 0.06, 0.43],
-    [0, 1.86, 0],
-    "owner",
-  ),
-];
 const ARC_RIFLE: Part[] = [
   part(
     "rifle-stock",
@@ -555,6 +533,59 @@ const SCOUT_KIT: Part[] = [
   ]),
 ];
 
+const DEMOLITION_PACK: Part[] = [
+  part(
+    "rack-frame",
+    "spine",
+    "shell",
+    [0.64, 0.52, 0.24],
+    [0, 1.32, -0.28],
+    "armor",
+  ),
+  part(
+    "rack-back",
+    "spine",
+    "shell",
+    [0.52, 0.42, 0.1],
+    [0, 1.31, -0.42],
+    "dark",
+  ),
+  ...mirrored((side, sign) => [
+    part(
+      `${side}-rocket-tube`,
+      "spine",
+      "cylinder",
+      [0.22, 0.57, 0.22],
+      [sign * 0.185, 1.42, -0.46],
+      "metal",
+    ),
+    part(
+      `${side}-rocket-cap`,
+      "spine",
+      "shell",
+      [0.24, 0.18, 0.24],
+      [sign * 0.185, 1.785, -0.46],
+      "armor",
+    ),
+  ]),
+  part(
+    "rack-band",
+    "spine",
+    "shell",
+    [0.63, 0.13, 0.14],
+    [0, 1.39, -0.53],
+    "dark",
+  ),
+  part(
+    "rack-mark",
+    "spine",
+    "box",
+    [0.46, 0.073, 0.032],
+    [0, 1.4, -0.6],
+    "owner",
+  ),
+];
+
 const DEMOLITION_GEAR: Part[] = [
   part(
     "launcher-tube",
@@ -562,6 +593,15 @@ const DEMOLITION_GEAR: Part[] = [
     "cylinder",
     [0.32, 1.4, 0.32],
     [0.43, 1.46, 0.35],
+    "dark",
+    Math.PI / 2,
+  ),
+  part(
+    "launcher-shroud",
+    "spine",
+    "shell",
+    [0.41, 0.81, 0.41],
+    [0.43, 1.46, 0.48],
     "armor",
     Math.PI / 2,
   ),
@@ -569,7 +609,7 @@ const DEMOLITION_GEAR: Part[] = [
     "launcher-rear-collar",
     "spine",
     "cylinder",
-    [0.39, 0.18, 0.39],
+    [0.37, 0.15, 0.37],
     [0.43, 1.46, -0.29],
     "metal",
     Math.PI / 2,
@@ -601,165 +641,39 @@ const DEMOLITION_GEAR: Part[] = [
     "dark",
   ),
   part(
-    "launcher-sight",
+    "launcher-rail",
     "spine",
     "box",
-    [0.12, 0.1, 0.2],
-    [0.43, 1.68, 0.7],
+    [0.14, 0.075, 0.56],
+    [0.43, 1.662, 0.49],
+    "metal",
+  ),
+  part(
+    "launcher-sight",
+    "spine",
+    "shell",
+    [0.13, 0.12, 0.18],
+    [0.43, 1.738, 0.68],
+    "dark",
+  ),
+  part(
+    "sight-window",
+    "spine",
+    "box",
+    [0.08, 0.055, 0.04],
+    [0.43, 1.75, 0.6],
     "visor",
   ),
   part(
     "launcher-mark",
     "spine",
-    "box",
-    [0.025, 0.12, 0.2],
-    [0.6, 1.46, 0.7],
+    "shell",
+    [0.055, 0.15, 0.26],
+    [0.635, 1.51, 0.67],
     "owner",
+    Math.PI / 2,
   ),
-  part(
-    "rocket-rack",
-    "spine",
-    "box",
-    [0.62, 0.5, 0.18],
-    [0, 1.32, -0.3],
-    "dark",
-  ),
-  ...mirrored((side, sign) => [
-    part(
-      `${side}-rocket-tube`,
-      "spine",
-      "cylinder",
-      [0.22, 0.75, 0.22],
-      [sign * 0.2, 1.42, -0.44],
-      "metal",
-    ),
-    part(
-      `${side}-rocket-cap`,
-      "spine",
-      "sphere",
-      [0.22, 0.24, 0.22],
-      [sign * 0.2, 1.82, -0.44],
-      "armor",
-    ),
-    part(
-      `${side}-rack-band`,
-      "spine",
-      "box",
-      [0.23, 0.11, 0.23],
-      [sign * 0.2, 1.34, -0.44],
-      "owner",
-    ),
-  ]),
 ];
-
-/** Ground-relative body parts with explicit head, pack, and role equipment. */
-function arcParts({
-  head = ARC_HEAD,
-  backpack = ARC_BACKPACK,
-  gear = [],
-}: {
-  head?: readonly Part[];
-  backpack?: readonly Part[];
-  gear?: readonly Part[];
-} = {}): Part[] {
-  return [
-    part("waist", "pelvis", "box", [0.47, 0.2, 0.3], [0, 0.91, 0], "dark"),
-    part("chest", "spine", "box", [0.63, 0.47, 0.34], [0, 1.31, 0], "cloth"),
-    part(
-      "breastplate",
-      "spine",
-      "box",
-      [0.55, 0.34, 0.12],
-      [0, 1.34, 0.22],
-      "armor",
-    ),
-    part(
-      "chest-mark",
-      "spine",
-      "box",
-      [0.12, 0.13, 0.025],
-      [0, 1.39, 0.292],
-      "owner",
-    ),
-    ...backpack,
-    part(
-      "collar",
-      "spine",
-      "cylinder",
-      [0.33, 0.13, 0.33],
-      [0, 1.54, 0],
-      "dark",
-    ),
-    ...head,
-    ...mirrored((side, sign) => [
-      part(
-        `${side}-pauldron`,
-        `${side}-arm`,
-        "sphere",
-        [0.3, 0.24, 0.34],
-        [sign * 0.37, 1.37, 0],
-        "owner",
-      ),
-      part(
-        `${side}-upper-arm`,
-        `${side}-arm`,
-        "cylinder",
-        [0.15, 0.29, 0.15],
-        [sign * 0.38, 1.18, 0.03],
-        "cloth",
-      ),
-      part(
-        `${side}-forearm`,
-        `${side}-forearm`,
-        "box",
-        [0.17, 0.26, 0.18],
-        [sign * 0.4, 0.96, 0.12],
-        "armor",
-      ),
-      part(
-        `${side}-glove`,
-        `${side}-forearm`,
-        "box",
-        [0.15, 0.13, 0.16],
-        [sign * 0.4, 0.81, 0.16],
-        "dark",
-      ),
-      part(
-        `${side}-thigh`,
-        `${side}-leg`,
-        "cylinder",
-        [0.23, 0.43, 0.23],
-        [sign * 0.17, 0.65, 0],
-        "cloth",
-      ),
-      part(
-        `${side}-knee`,
-        `${side}-shin`,
-        "box",
-        [0.25, 0.18, 0.12],
-        [sign * 0.17, 0.45, 0.1],
-        "armor",
-      ),
-      part(
-        `${side}-shin-plate`,
-        `${side}-shin`,
-        "box",
-        [0.21, 0.32, 0.19],
-        [sign * 0.17, 0.26, 0],
-        "armor",
-      ),
-      part(
-        `${side}-boot`,
-        `${side}-shin`,
-        "box",
-        [0.24, 0.18, 0.37],
-        [sign * 0.17, 0.1, 0.08],
-        "dark",
-      ),
-    ]),
-    ...gear,
-  ];
-}
 
 const MEDIC_PACK: Part[] = [
   part(
@@ -1775,15 +1689,26 @@ const INFANTRY_RECIPES = {
   "arc-demolition-trooper": {
     scale: 1,
     palette: {
-      armor: [0.29, 0.34, 0.39],
-      cloth: [0.1, 0.14, 0.17],
+      armor: [0.37, 0.42, 0.46],
+      cloth: [0.21, 0.24, 0.27],
       owner: [0.97, 0.71, 0.26],
       visor: [1, 0.56, 0.19],
       skin: ARC_SKIN,
     },
-    parts: arcParts({ backpack: [], gear: DEMOLITION_GEAR }),
+    parts: [...arcFieldArmor(DEMOLITION_PACK), ...DEMOLITION_GEAR],
     stride: 0.9,
-    stance: { pitch: -0.65, spread: 0.1, forearm: -0.85, swing: 0.02 },
+    stance: {
+      pitch: -0.65,
+      spread: 0.1,
+      forearm: -0.85,
+      swing: 0.02,
+      ready: {
+        "left-arm": [-0.76, 1.14, 0.04],
+        "left-forearm": [-0.75, 0, 0],
+        "right-arm": [-0.65, 0, 0.05],
+        "right-forearm": [-0.85, 0, 0],
+      },
+    },
     attack: LAUNCHER_FIRE,
   },
   "arc-scout": {

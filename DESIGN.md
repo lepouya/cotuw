@@ -1890,9 +1890,6 @@ acceptance progress. The following sections define the selected scope.
 - ARC's **Demolition Trooper** is fragile, slow-firing infantry with a portable
   heavy launcher that outranges basic defenses. The Field Barracks trains it,
   and Medics restore its health.
-- Demolition Troopers wear charcoal armor and amber visors. A shoulder-mounted
-  launcher and paired rocket tubes on their backs distinguish them from rifle
-  infantry; their production portraits show the same equipment.
 - Launcher shots show an amber pressure flash, a brief smoke-and-ember streak,
   and an impact burst, with distinct ignition and impact sounds. Visuals follow
   committed hits without adding travel time or splash damage. A visible impact
@@ -1975,6 +1972,11 @@ acceptance progress. The following sections define the selected scope.
 - Troopers wear faceted copper-brown armor over charcoal fatigues, with a
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.
+- Demolition Troopers wear faceted charcoal armor with amber visors. A
+  shoulder launcher with a faceted shroud and pale muzzle rim sets their
+  silhouette. Owner markings sit on the armor, launcher, and rear rack
+  with twin rocket tubes. They keep the launcher braced while moving.
+  The production portrait shows the same kit.
 - Scouts wear light sand-colored armor over slate fatigues, with paired
   cyan optics and an antenna on the radio pack. Owner markings sit on the
   helmet, shoulder tabs, and pack. They are unarmed and swing their arms
