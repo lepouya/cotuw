@@ -1958,6 +1958,9 @@ acceptance progress. The following sections define the selected scope.
 - The Materials Refinery has a recessed loading bay with a roll-up door and
   amber approach markings. An owner-marked silo and a roof-mounted fan and
   press distinguish the processing hall from the Command Center.
+- The Harvester has wide guarded treads, a glazed cab with owner markings on
+  the roof and track guards, and a front collector. Its open rear hopper tips
+  to discharge cargo at the Refinery.
 
 ### M1 Circle presentation
 

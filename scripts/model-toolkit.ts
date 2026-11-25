@@ -48,6 +48,7 @@ export function merge(
   mesh.name = name;
   mesh.material = material;
   mesh.parent = root;
+  return mesh;
 }
 
 /**

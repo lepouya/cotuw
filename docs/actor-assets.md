@@ -93,8 +93,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   Sessions give each owner a shared copy in its
   [owner color](content-packs.md), so keep those parts in their own mesh
   rather than baking them into vertex colors. Infantry export owner markings
-  as a third mesh, ARC buildings use owner trim, and the Harvester an owner
-  cab. Neutral models, such as resource sites and wolves, have none.
+  as a third mesh. ARC buildings use owner trim, and the Harvester uses its
+  cab roof and track panels. Neutral resource sites and wolves have none.
 - `npm run assets:terrain`: `scripts/terrain-textures.ts` generates seamless
   dirt, water, clutter, and rock PNGs from periodic gradient and cellular
   noise. Dirt spans eight tiles per repeat with warped soil, damp patches, and

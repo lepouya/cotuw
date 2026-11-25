@@ -448,29 +448,75 @@ function briarRam(scene: Scene, name: string) {
 
 function harvester(scene: Scene, name: string) {
   const body = createHarvesterBody(scene, name);
-  const { root, steel } = body;
+  const { root, steel, rubber } = body;
+  batchStaticParts(root);
   const { drill, beacon: amber } = addHarvesterWorkParts(
     scene,
     root,
     name,
     body,
   );
+  batchStaticParts(drill);
   amber.name = "idle-signal";
   amber.material = surface(scene, "idle-light", HARVESTER_IDLE_LIGHT, 0.25);
   const green = amber.clone("working-signal", root)!;
   green.material = surface(scene, "working-light", HARVESTER_WORK_LIGHT, 0.25);
-  const hopper = MeshBuilder.CreateBox(
-    "harvester-hopper",
-    {
-      width: 0.5,
-      height: 0.28,
-      depth: 0.42,
-    },
-    scene,
-  );
+  const hopper = new TransformNode("harvester-hopper", scene);
   hopper.parent = root;
   hopper.position.set(0, 0.73, -0.35);
-  hopper.material = steel;
+  const hopperPlate = (
+    part: string,
+    width: number,
+    height: number,
+    depth: number,
+    x: number,
+    y: number,
+    z: number,
+    material: StandardMaterial,
+  ) => {
+    const mesh = MeshBuilder.CreateBox(part, { width, height, depth }, scene);
+    mesh.parent = hopper;
+    mesh.position.set(x, y, z);
+    mesh.material = material;
+    return mesh;
+  };
+  hopperPlate("hopper-floor", 0.43, 0.06, 0.49, 0, -0.12, 0, rubber);
+  hopperPlate("hopper-bulkhead", 0.56, 0.26, 0.055, 0, 0.02, 0.245, steel);
+  hopperPlate(
+    "hopper-discharge-lip",
+    0.47,
+    0.08,
+    0.07,
+    0,
+    -0.09,
+    -0.245,
+    steel,
+  );
+  for (const side of [-1, 1]) {
+    hopperPlate(
+      "hopper-side",
+      0.065,
+      0.27,
+      0.55,
+      side * 0.245,
+      0.01,
+      0,
+      steel,
+    ).rotation.z = side * -0.32;
+    hopperPlate(
+      "hopper-rim",
+      0.078,
+      0.048,
+      0.56,
+      side * 0.285,
+      0.14,
+      0,
+      rubber,
+    );
+  }
+  for (const z of [-0.13, 0, 0.13])
+    hopperPlate("hopper-floor-cleat", 0.4, 0.028, 0.033, 0, -0.084, z, steel);
+  batchStaticParts(hopper);
   clip(root, "idle", 2, () => {});
   clip(root, "transit", 1, (seconds) => {
     root.position.y = Math.sin(seconds * Math.PI * 4) * 0.018;
@@ -514,7 +560,7 @@ function harvester(scene: Scene, name: string) {
 }
 
 /** Meshes under animated pivots must keep their local transforms. */
-function batchStaticBuildingParts(root: TransformNode) {
+function batchStaticParts(root: TransformNode) {
   const moving = new Set(
     root
       .getScene()
@@ -534,9 +580,18 @@ function batchStaticBuildingParts(root: TransformNode) {
     parts.push(mesh);
     byMaterial.set(mesh.material, parts);
   }
-  for (const [material, parts] of byMaterial)
-    if (parts.length > 1)
-      merge(root, `${root.name}-static-${material.name}`, parts, material);
+  const toLocal = root.computeWorldMatrix(true).clone().invert();
+  for (const [material, parts] of byMaterial) {
+    if (parts.length === 1) continue;
+    const mesh = merge(
+      root,
+      `${root.name}-static-${material.name}`,
+      parts,
+      material,
+    );
+    // Merge bakes world coordinates. Parts under a pivot need local vertices.
+    if (!toLocal.isIdentity()) mesh.bakeTransformIntoVertices(toLocal);
+  }
 }
 
 /** Exports a building's idle loop and a clip for each activity. */
@@ -565,7 +620,7 @@ function building(
     clip(root, "idle", details.loopSeconds, details.update, false);
     for (const [kind, motion] of Object.entries(details.activities ?? {}))
       clip(root, kind, motion.seconds, motion.pose, false);
-    if (batchStatic) batchStaticBuildingParts(root);
+    if (batchStatic) batchStaticParts(root);
   };
 }
 

@@ -196,6 +196,8 @@ challenge, pacing, and useful choices.
   sites, and buildable ground are clear in play. Review the introductions
   where they share changed assets, run affected asset and browser checks,
   and recheck normal-scale performance before building the cohort bundle.
+  - First model passes cover the Command Center, Heartgrove, Materials
+    Refinery, and Harvester.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
