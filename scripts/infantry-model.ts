@@ -26,7 +26,15 @@ type Joint = { name: string; parent?: string; offset: Vec3 };
 type Part = {
   name: string;
   joint: string;
-  shape: "box" | "sphere" | "cylinder" | "torus" | "leaf" | "shell";
+  shape:
+    | "box"
+    | "sphere"
+    | "cylinder"
+    | "torus"
+    | "leaf"
+    | "shell"
+    | "leaf-plate"
+    | "focus-bough";
   size: Vec3;
   position: Vec3;
   finish: Finish;
@@ -932,63 +940,108 @@ const CULTIVATOR_GEAR: Part[] = [
 
 const SENTINEL_GEAR: Part[] = [
   ...mirrored((side, sign): Part[] => [
-    {
-      ...part(
-        `${side}-leaf-pauldron`,
-        `${side}-arm`,
-        "leaf",
-        [0.29, 0.48, 0.24],
-        [sign * 0.34, 1.43, 0.02],
-        "armor",
-      ),
-      tiltZ: -sign * 0.6,
-    },
-    {
-      ...part(
-        `${side}-leaf-cuirass`,
-        "spine",
-        "leaf",
-        [0.24, 0.45, 0.12],
-        [sign * 0.12, 1.31, 0.18],
-        "armor",
-      ),
-      tiltZ: -sign * 0.3,
-    },
+    part(
+      `${side}-pauldron`,
+      `${side}-arm`,
+      "leaf-plate",
+      [0.29, 0.45, 0.34],
+      [sign * 0.38, 1.48, 0.02],
+      "armor",
+      -0.15,
+      -sign * 0.99,
+    ),
+    part(
+      `${side}-pauldron-overlap`,
+      `${side}-arm`,
+      "leaf-plate",
+      [0.24, 0.32, 0.3],
+      [sign * 0.405, 1.36, 0.05],
+      "armor",
+      -0.2,
+      -sign * 1.26,
+    ),
+    part(
+      `${side}-pauldron-mark`,
+      `${side}-arm`,
+      "leaf-plate",
+      [0.15, 0.29, 0.085],
+      [sign * 0.39, 1.48, 0.135],
+      "owner",
+      -0.36,
+      -sign * 0.99,
+    ),
+    part(
+      `${side}-cuirass`,
+      "spine",
+      "leaf-plate",
+      [0.26, 0.49, 0.16],
+      [sign * 0.121, 1.33, 0.155],
+      "armor",
+      -0.09,
+      -sign * 0.34,
+    ),
+    part(
+      `${side}-bracer`,
+      `${side}-forearm`,
+      "leaf-plate",
+      [0.17, 0.29, 0.19],
+      [sign * 0.38, 0.98, 0.15],
+      "armor",
+      -0.1,
+    ),
+    part(
+      `${side}-hip-guard`,
+      "pelvis",
+      "leaf-plate",
+      [0.18, 0.37, 0.195],
+      [sign * 0.2, 0.91, 0.1],
+      "armor",
+      0.12,
+      sign * 0.26,
+    ),
+    part(
+      `${side}-mantle-tail`,
+      "spine",
+      "leaf-plate",
+      [0.36, 0.83, 0.18],
+      [sign * 0.165, 0.97, -0.29],
+      "cloth",
+      0.16,
+      sign * 0.14,
+    ),
+    part(
+      `${side}-mantle-fastener`,
+      "spine",
+      "leaf-plate",
+      [0.16, 0.34, 0.14],
+      [sign * 0.142, 1.39, -0.19],
+      "owner",
+      Math.PI,
+      sign * 0.31,
+    ),
     part(
       `${side}-focus-grip`,
       "spine",
       "sphere",
-      [0.14, 0.11, 0.14],
-      [sign * 0.24, 1.12, 0.48],
-      "armor",
+      [0.13, 0.13, 0.14],
+      [sign * 0.235, 1.15, 0.51],
+      "dark",
     ),
-    {
-      ...part(
-        `${side}-focus-leaf`,
-        "spine",
-        "leaf",
-        [0.16, 0.44, 0.1],
-        [sign * 0.2, 1.23, 0.54],
-        "armor",
-      ),
-      tiltZ: -sign * 0.5,
-    },
   ]),
   part(
     "focus-frame",
     "spine",
-    "torus",
-    [0.48, 0.16, 0.46],
-    [0, 1.18, 0.5],
+    "focus-bough",
+    [1, 1, 1],
+    [0, 1.19, 0.54],
     "armor",
-    Math.PI / 2,
   ),
   part(
     "focus-core",
     "spine",
-    "leaf",
-    [0.16, 0.29, 0.16],
-    [0, 1.18, 0.54],
+    "leaf-plate",
+    [0.21, 0.3, 0.18],
+    [0, 1.22, 0.6],
     "visor",
   ),
 ];
@@ -1151,8 +1204,9 @@ function part(
   position: Vec3,
   finish: Finish,
   tiltX?: number,
+  tiltZ?: number,
 ): Part {
-  return { name, joint, shape, size, position, finish, tiltX };
+  return { name, joint, shape, size, position, finish, tiltX, tiltZ };
 }
 
 const ARMS_AT_SIDES: Stance = {
@@ -1162,10 +1216,14 @@ const ARMS_AT_SIDES: Stance = {
   swing: 0.19,
 };
 const FOCUS_HELD: Stance = {
-  pitch: -0.4,
-  spread: 0.18,
-  forearm: -0.6,
+  ...ARMS_AT_SIDES,
   swing: 0,
+  ready: {
+    "left-arm": [-0.72, 0.23, 0.18],
+    "right-arm": [-0.72, -0.23, -0.18],
+    "left-forearm": [-0.72, 0, 0],
+    "right-forearm": [-0.72, 0, 0],
+  },
 };
 // ARC parts show no skin, but every palette defines each finish.
 const ARC_SKIN: Vec3 = [0.83, 0.68, 0.53];
@@ -1203,22 +1261,21 @@ const RIFLE_FIRE: Attack = {
   },
 };
 const LAUNCHER_FIRE = recoil("launch", 20, 0.2, 0.06);
-// Both arms push the focus forward and draw it back.
+// The hands and focus share the torso so they move together during release.
 const FOCUS_CHANNEL: Attack = {
   clip: "channel",
   frames: 24,
-  joints: [
-    "spine",
-    "head",
-    "left-arm",
-    "right-arm",
-    "left-forearm",
-    "right-forearm",
-  ],
+  joints: ["spine", "head"],
   pose: (joint, phase) => {
-    const release = Math.sin(phase / 2);
-    if (joint.endsWith("arm")) return [-0.25 * release, 0, 0];
-    return joint === "spine" ? [-0.12 * release, 0, 0] : [0.04 * release, 0, 0];
+    const release = Math.sin(Math.PI * Math.sqrt(phase / (2 * Math.PI)));
+    return [release * (joint === "spine" ? 0.17 : -0.095), 0, 0];
+  },
+  aim: {
+    joints: ["spine", "head"],
+    pose: (joint, phase) => {
+      const amount = phase / (2 * Math.PI);
+      return [amount * (joint === "spine" ? 0.045 : 0.12), 0, 0];
+    },
   },
 };
 
@@ -1357,11 +1414,11 @@ const INFANTRY_RECIPES = {
   "circle-sentinel": {
     scale: 1.04,
     palette: {
-      armor: [0.85, 0.8, 0.61],
-      cloth: [0.13, 0.29, 0.23],
+      armor: [0.91, 0.83, 0.63],
+      cloth: [0.16, 0.37, 0.31],
       ...CIRCLE_TRIM,
     },
-    parts: [...elvenParts([0.8, 1.15, 0.32]), ...SENTINEL_GEAR],
+    parts: [...elvenParts([0.66, 0.93, 0.22]), ...SENTINEL_GEAR],
     stride: 0.8,
     stance: FOCUS_HELD,
     attack: FOCUS_CHANNEL,
@@ -1697,6 +1754,9 @@ const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
       scene,
     ),
   leaf: leafMesh,
+  "leaf-plate": (scene, name) =>
+    MeshBuilder.CreatePolyhedron(name, { custom: LEAF_PLATE }, scene),
+  "focus-bough": focusBough,
   shell: (scene, name) =>
     MeshBuilder.CreateCylinder(
       name,
@@ -1704,6 +1764,53 @@ const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
       scene,
     ).convertToFlatShadedMesh(),
 };
+
+// The outline narrows toward its tips, with a raised rib on the front.
+const LEAF_PLATE = {
+  vertex: [
+    [0, 0.5, -0.13],
+    [-0.39, 0.24, 0.07],
+    [-0.5, -0.05, 0.05],
+    [-0.21, -0.31, -0.04],
+    [0, -0.5, -0.13],
+    [0.21, -0.31, -0.04],
+    [0.5, -0.05, 0.05],
+    [0.39, 0.24, 0.07],
+    [0, 0.1, 0.5],
+    [0, -0.02, -0.5],
+  ],
+  face: Array.from({ length: 8 }, (_, edge) => {
+    const next = (edge + 1) % 8;
+    return [
+      [edge, next, 8],
+      [next, edge, 9],
+    ];
+  }).flat(),
+};
+
+function focusBough(scene: Scene, name: string): Mesh {
+  const halves = [-1, 1].map((side) =>
+    MeshBuilder.CreateTube(
+      name,
+      {
+        path: [
+          new Vector3(0, -0.15, 0),
+          new Vector3(side * 0.17, -0.13, 0),
+          new Vector3(side * 0.233, -0.035, -0.015),
+          new Vector3(side * 0.219, 0.092, -0.008),
+          new Vector3(side * 0.14, 0.184, 0.034),
+          new Vector3(side * 0.058, 0.21, 0.07),
+        ],
+        radiusFunction: (index) =>
+          [0.062, 0.064, 0.062, 0.053, 0.033, 0.008][index]!,
+        tessellation: 7,
+        cap: Mesh.CAP_ALL,
+      },
+      scene,
+    ),
+  );
+  return Mesh.MergeMeshes(halves, true)!;
+}
 
 /** One part's vertices in the rest pose, colored per vertex. */
 function partVertices(

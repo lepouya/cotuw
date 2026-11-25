@@ -124,19 +124,19 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       const spine = () =>
         scene.getTransformNodeByName("shooter-spine")!.rotationQuaternion!.x;
       const step = (frames: number) => {
-        let kick = 0;
+        let peak = 0;
         for (let frame = 0; frame < frames; frame++) {
           instance.animate!({ distance: 0, turn: 0, seconds: 1 / 60 });
           scene.animate();
-          kick = Math.min(kick, spine());
+          peak = Math.max(peak, Math.abs(spine()));
         }
-        return kick;
+        return peak;
       };
       step(2);
       expect(spine()).toBeCloseTo(0);
 
       instance.play!("attack");
-      expect(step(6)).toBeLessThan(-0.02);
+      expect(step(6)).toBeGreaterThan(0.02);
       step(60);
       expect(spine()).toBeCloseTo(0);
     },
@@ -235,7 +235,7 @@ describe.each(glbModels)("%s model", (id, graphics) => {
       const sampleSeconds = graphics.clips.attack === "channel" ? 0.12 : 0.05;
       step(sampleSeconds);
       const first = spine();
-      expect(first).toBeLessThan(-0.02);
+      expect(Math.abs(first)).toBeGreaterThan(0.02);
       instance.play!("attack");
       step(sampleSeconds);
       expect(spine()).toBeCloseTo(first);

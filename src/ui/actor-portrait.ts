@@ -155,13 +155,18 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#b98be3" d="m90 62 5 4-3 6-5-4Z"/>`,
   ),
   "circle-sentinel": elf(
-    "#183e34",
+    "#1a493b",
     `
-    <path fill="#c9c39b" d="M47 29Q34 22 31 39L44 36ZM73 29Q87 22 90 39L77 36Z"/>
-    <path fill="#a7ad83" d="m53 32 7 5 8-5-3 16h-9Z"/>
-    <path fill="none" stroke="#d5c79a" stroke-width="5" d="M49 54Q42 37 58 40M70 54Q78 37 62 40"/>
-    <path fill="#be8bf0" d="M58 41Q68 40 65 50L59 55 54 49Z"/>
-    <path fill="none" stroke="#cda6f6" stroke-width="2" d="m60 35-3-6 7-4M71 46l6-4 5 3"/>`,
+    <path fill="#a49268" d="M48 30Q34 27 26 41Q39 43 48 35ZM72 30Q86 27 94 41Q81 43 72 35Z"/>
+    <path fill="#e1d0a5" d="M47 28Q39 21 26 32Q37 35 47 31ZM73 28Q81 21 94 32Q83 35 73 31Z"/>
+    <path fill="#83add0" d="M43 27Q36 25 31 31L40 31ZM77 27Q84 25 89 31L80 31Z"/>
+    <path fill="#b8aa7a" d="M51 33 59 37 56 51 46 40ZM69 33 61 37 64 51 74 40Z"/>
+    <path fill="#b8aa7a" d="m47 49 5 7-7 8-4-7Zm26 0-5 7 7 8 4-7Z"/>
+    <path fill="#47705a" d="M48 59 56 61 55 72 46 69ZM72 59 64 61 65 72 74 69Z"/>
+    <path fill="none" stroke="#dfcfa4" stroke-width="4" stroke-linecap="round"
+      d="M60 57C45 54 44 44 53 40L57 39M60 57C75 54 76 44 67 40L63 39"/>
+    <path fill="#b87fe1" d="m60 41 7 7-7 8-7-8Z"/>
+    <path fill="#dbb3f6" d="m60 41 4 7-4 4-3-5Z"/>`,
   ),
   "circle-wayfinder": elf(
     "#205e46",

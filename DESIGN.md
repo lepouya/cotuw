@@ -1995,12 +1995,13 @@ acceptance progress. The following sections define the selected scope.
   faces, long tunics, flowing mantles, and circlets. Grown leaf-shaped armor
   and curved artifacts share the buildings' style. Clothing, equipment, and
   posture distinguish roles at gameplay scale.
-- Sentinels have broad layered leaf armor over split tunics and mantles.
-  Their grown focus weapon is a compact, curved frame of pale living wood
-  around a violet core, held in both hands. It releases brief, concentrated
-  magical bolts from a two-handed channeling pose. Bolts have twisting violet
-  strands, branching sparks, and a brief living pulse. Reduced motion holds
-  their shape while the effect fades.
+- Sentinels have broad, overlapping pale leaf armor over deep green split
+  tunics and mantles. Shoulder plates and mantle fasteners carry owner
+  markings. Two curved branches of pale living wood cradle the violet core
+  of a focus held in both hands. Sentinels lean into each cast, and the bolt
+  starts at the focus. Bolts have twisting violet strands, branching sparks,
+  and a brief living pulse. Reduced motion holds their shape while the
+  effect fades.
 - Wayfinders have light hooded mantles, tunics, and a slim wayfinding stave,
   with compact silhouettes suited to speed. They remain unarmed.
 - Cultivators wear short olive mantles and pale harness straps. They carry
