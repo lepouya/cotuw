@@ -116,7 +116,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
 Each command prints its textures' minimap colors and its clip definitions;
 update matching content-pack graphics when changing the art.
 Generated terrain edges match by construction.
-Foundations and rubble are unit-cube models scaled to their placement.
+Foundations and rubble use unit-scale models. Each ARC debris tile rotates
+and scales the same group of fractured concrete, slate panels, and bent
+framing. The group fits inside a half-tile radius before rotation.
 Ground markers, bars, fog, and other interface overlays are runtime geometry.
 Active support shows a small medical cross, mechanical wrench, Circle leaf, or
 thorned sprig at the target.

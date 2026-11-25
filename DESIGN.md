@@ -1969,6 +1969,9 @@ acceptance progress. The following sections define the selected scope.
 - The Sentry Turret has a low braced deck and a swiveling armored head with
   paired barrels and a pale cyan sight. Owner markings run along the deck
   rails and the head's angled side plates.
+- Destroyed ARC buildings leave low piles of fractured concrete, slate
+  armor panels, and bent metal framing. Scorched fragments sit between the
+  larger pieces within the footprint.
 - Troopers wear faceted copper-brown armor over charcoal fatigues, with a
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.

@@ -1000,50 +1000,114 @@ function materialsMound(scene: Scene, name: string) {
   );
 }
 
-/** Broken slabs and bent beams within the unit cube that placement scales. */
+/** Fractured ARC panels and framing, sized to fit a rotated footprint tile. */
 function rubble(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
   const random = seededRandom(0x5ab0);
   const pieces = {
     concrete: [] as Mesh[],
     scorched: [] as Mesh[],
+    armor: [] as Mesh[],
     metal: [] as Mesh[],
   };
-  for (let index = 0; index < 16; index++) {
-    const width = 0.14 + random() * 0.3;
-    const height = 0.25 + random() * 0.65;
-    const depth = 0.14 + random() * 0.3;
-    const chunk = MeshBuilder.CreateBox(
-      `chunk-${index}`,
-      { width, height, depth },
+  const perimeter = [
+    [-0.5, -0.25],
+    [-0.12, -0.5],
+    [0.41, -0.38],
+    [0.5, 0.02],
+    [0.19, 0.5],
+    [-0.4, 0.37],
+  ] as const;
+  const count = perimeter.length;
+  const fracturedSlab = {
+    vertex: [
+      ...perimeter.map(([x, z]) => [x, -0.5, z]),
+      ...perimeter.map(([x, z], index) => [
+        x * 0.88,
+        index % 2 ? 0.22 : 0.5,
+        z * 0.84,
+      ]),
+      [0.02, 0.42, -0.08],
+    ],
+    face: [
+      perimeter.map((_, index) => index),
+      ...perimeter.flatMap((_, index) => {
+        const next = (index + 1) % count;
+        return [
+          [next, index, index + count, next + count],
+          [next + count, index + count, count * 2],
+        ];
+      }),
+    ],
+  };
+  const slab = (
+    id: keyof typeof pieces,
+    size: readonly [number, number, number],
+    position: readonly [number, number, number],
+    rotation: readonly [number, number, number],
+  ) => {
+    const mesh = MeshBuilder.CreatePolyhedron(
+      id,
+      { custom: fracturedSlab },
       scene,
     );
-    chunk.position.set(
-      (random() - 0.5) * (1 - width),
-      -0.5 + height * 0.42,
-      (random() - 0.5) * (1 - depth),
+    mesh.scaling.set(...size);
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    pieces[id].push(mesh);
+  };
+  slab("scorched", [0.69, 0.16, 0.62], [0, -0.41, -0.03], [0, 0.2, 0]);
+  slab("concrete", [0.66, 0.3, 0.36], [-0.04, -0.3, 0.095], [0.2, 0.45, -0.15]);
+  slab(
+    "concrete",
+    [0.43, 0.25, 0.31],
+    [0.12, -0.29, -0.12],
+    [-0.2, -0.6, 0.26],
+  );
+  slab("armor", [0.5, 0.16, 0.36], [-0.115, -0.04, 0.04], [0.47, 0.1, 0.56]);
+  slab("armor", [0.33, 0.13, 0.23], [0.22, -0.17, 0.025], [-0.42, -0.65, 0.4]);
+  for (let index = 0; index < 9; index++) {
+    const angle = (index / 9) * Math.PI * 2 + random() * 0.35;
+    const reach = 0.28 + random() * 0.085;
+    const height = 0.16 + random() * 0.24;
+    slab(
+      index % 3 === 0 ? "scorched" : "concrete",
+      [0.1 + random() * 0.11, height, 0.09 + random() * 0.09],
+      [Math.cos(angle) * reach, -0.47 + height / 2, Math.sin(angle) * reach],
+      [(random() - 0.5) * 0.35, angle, (random() - 0.5) * 0.35],
     );
-    chunk.rotation.set(
-      (random() - 0.5) * 0.5,
-      random() * Math.PI,
-      (random() - 0.5) * 0.5,
-    );
-    pieces[random() < 0.3 ? "scorched" : "concrete"].push(chunk);
   }
-  for (let index = 0; index < 3; index++) {
-    const beam = MeshBuilder.CreateBox(
-      `beam-${index}`,
-      { width: 0.06, height: 0.12, depth: 0.7 + random() * 0.2 },
-      scene,
+  for (const [index, path] of [
+    [
+      [-0.28, -0.36, -0.16],
+      [-0.19, -0.04, -0.19],
+      [0.03, 0.27, -0.02],
+      [0.27, -0.03, 0.15],
+    ],
+    [
+      [-0.24, -0.17, 0.19],
+      [-0.08, -0.06, 0.26],
+      [0.14, 0.04, 0.24],
+      [0.25, -0.26, 0.2],
+    ],
+  ].entries())
+    pieces.metal.push(
+      MeshBuilder.CreateTube(
+        `bent-frame-${index}`,
+        {
+          path: path.map((point) => Vector3.FromArray(point)),
+          radius: 0.041,
+          tessellation: 4,
+          cap: Mesh.CAP_ALL,
+        },
+        scene,
+      ),
     );
-    beam.position.set((random() - 0.5) * 0.5, -0.25, (random() - 0.5) * 0.3);
-    beam.rotation.set(0.35 + random() * 0.3, random() * Math.PI, 0);
-    pieces.metal.push(beam);
-  }
   for (const [part, color] of [
-    ["concrete", [0.3, 0.29, 0.27]],
-    ["scorched", [0.12, 0.11, 0.1]],
-    ["metal", [0.4, 0.38, 0.35]],
+    ["concrete", [0.39, 0.37, 0.33]],
+    ["scorched", [0.18, 0.17, 0.16]],
+    ["armor", [0.49, 0.59, 0.57]],
+    ["metal", [0.26, 0.3, 0.3]],
   ] as const)
     merge(root, part, pieces[part], surface(scene, `rubble-${part}`, color));
 }
