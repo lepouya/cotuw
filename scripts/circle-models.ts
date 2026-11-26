@@ -789,109 +789,134 @@ function addLivingDamage(
   const { crack, leak, split, splinter, wilted, flicker } =
     livingDamageMaterials(scene, name);
   const random = seededRandom(seed);
-  /** A point on a rib's surface, facing away from the building's axis. */
+  /** A short stretch of rib with a frame facing outward from the building. */
   const onRib = () => {
     const rib = ribs[Math.floor(random() * ribs.length)]!;
     const segment = Math.floor(random() * (rib.points.length - 1));
     const t = 0.2 + random() * 0.6;
     const [a, b] = [rib.points[segment]!, rib.points[segment + 1]!];
-    const at = Vector3.Lerp(Vector3.FromArray(a), Vector3.FromArray(b), t);
-    const along = Vector3.FromArray(b).subtract(Vector3.FromArray(a));
-    let out = new Vector3(at.x, 0, at.z);
-    if (out.lengthSquared() < 0.01)
-      out = new Vector3(Math.cos(random() * 7), 0, Math.sin(random() * 7));
-    out.normalize();
-    return { at: at.add(out.scale(rib.radius * 0.9)), along, out, rib };
+    const center = Vector3.Lerp(Vector3.FromArray(a), Vector3.FromArray(b), t);
+    const axis = Vector3.FromArray(b).subtract(Vector3.FromArray(a));
+    const span = Math.min(t, 1 - t) * axis.length() * 2;
+    const along = axis.normalize();
+    let radial = new Vector3(center.x, 0, center.z);
+    if (radial.lengthSquared() < 0.01)
+      radial = new Vector3(Math.cos(random() * 7), 0, Math.sin(random() * 7));
+    radial.normalize();
+    const side = Vector3.Cross(along, radial);
+    if (side.lengthSquared() < 0.01)
+      Vector3.CrossToRef(along, Vector3.Up(), side);
+    side.normalize();
+    const out = Vector3.Cross(side, along).normalize();
+    return { center, span, along, side, out, radius: rib.radius };
   };
-  const part = (
+  const fissure = (
     id: string,
-    material: typeof crack,
-    position: Vector3,
-    size: Vec3,
-    along: Vector3,
-    out: Vector3,
-    shape: "box" | "cone" | "sphere" = "box",
+    material: StandardMaterial,
+    { center, span, along, side, out, radius }: ReturnType<typeof onRib>,
+    depth: number,
+    points: readonly Vec3[],
+    length: number,
   ) => {
-    const mesh =
-      shape === "box"
-        ? MeshBuilder.CreateBox(`${name}-${id}`, { size: 1 }, scene)
-        : shape === "cone"
-          ? MeshBuilder.CreateCylinder(
-              `${name}-${id}`,
-              { height: 1, diameterTop: 0, diameterBottom: 1, tessellation: 5 },
-              scene,
-            )
-          : MeshBuilder.CreateSphere(
-              `${name}-${id}`,
-              { diameter: 1, segments: 5 },
-              scene,
-            );
-    mesh.parent = root;
-    mesh.material = material;
-    mesh.position.copyFrom(position);
-    mesh.scaling.set(...size);
-    // Local Y runs along the rib; local Z faces outward.
-    const up = along.normalizeToNew();
-    const side = Vector3.Cross(up, out).normalize();
-    const forward = Vector3.Cross(side, up).normalize();
-    mesh.rotationQuaternion = Quaternion.FromLookDirectionLH(forward, up);
-    return mesh;
+    const reach = Math.min(span, length);
+    // Angle follows the rib surface so fissures stay attached on oblique faces.
+    const path = points.map(([angle, offset]): Vec3 => {
+      const point = center
+        .add(along.scale(offset * reach))
+        .add(side.scale(Math.sin(angle) * radius * depth))
+        .add(out.scale(Math.cos(angle) * radius * depth));
+      return [point.x, point.y, point.z];
+    });
+    place(
+      tube(
+        scene,
+        `${name}-${id}`,
+        path,
+        points.map((point) => point[2] * radius),
+        4,
+      ),
+      { parent: root, material },
+    );
+  };
+  const glow = (
+    id: string,
+    material: StandardMaterial,
+    { center, along, out, radius }: ReturnType<typeof onRib>,
+    size: Vec3,
+  ) => {
+    const mesh = place(
+      MeshBuilder.CreateSphere(
+        `${name}-${id}`,
+        { diameter: 1, segments: 5 },
+        scene,
+      ),
+      { parent: root, material, scaling: size },
+    );
+    mesh.position.copyFrom(center.add(out.scale(radius * 0.9)));
+    mesh.rotationQuaternion = Quaternion.FromLookDirectionLH(out, along);
   };
   for (let i = 0; i < 6; i++) {
-    const { at, along, out, rib } = onRib();
-    part(
+    const rib = onRib();
+    fissure(
       `damage-moderate-crack-${i}`,
       crack,
-      at,
-      [Math.min(rib.radius * 0.7, 0.12), Math.min(rib.radius * 5, 0.55), 0.05],
-      along,
-      out,
+      rib,
+      0.96,
+      [
+        [-0.8, -0.44, 0.025],
+        [-0.18, -0.15, 0.19],
+        [0.06, 0.16, 0.21],
+        [0.68, 0.46, 0.025],
+      ],
+      0.64,
+    );
+    fissure(
+      `damage-moderate-fork-${i}`,
+      crack,
+      rib,
+      0.96,
+      [
+        [-0.18, -0.15, 0.17],
+        [0.29, -0.25, 0.12],
+        [0.88, -0.19, 0.02],
+      ],
+      0.64,
     );
   }
-  for (let i = 0; i < 3; i++) {
-    const { at, along, out } = onRib();
-    part(
-      `damage-moderate-leak-${i}`,
-      leak,
-      at,
-      [0.09, 0.14, 0.09],
-      along,
-      out,
-      "sphere",
-    );
-  }
+  for (let i = 0; i < 3; i++)
+    glow(`damage-moderate-leak-${i}`, leak, onRib(), [0.09, 0.14, 0.09]);
   for (let i = 0; i < 5; i++) {
-    const { at, along, out, rib } = onRib();
-    part(
+    const rib = onRib();
+    fissure(
       `damage-critical-split-${i}`,
       split,
-      at,
-      [Math.min(rib.radius * 1.3, 0.2), Math.min(rib.radius * 8, 0.85), 0.08],
-      along,
-      out,
+      rib,
+      0.96,
+      [
+        [-0.96, -0.48, 0.06],
+        [-0.32, -0.2, 0.38],
+        [-0.46, 0.09, 0.42],
+        [0.48, 0.29, 0.32],
+        [0.87, 0.48, 0.045],
+      ],
+      0.92,
     );
-    part(
+    fissure(
       `damage-critical-splinter-${i}`,
       splinter,
-      at.add(out.scale(0.08)),
-      [0.06, 0.32, 0.06],
-      out.add(along.normalizeToNew().scale(0.4)),
-      along,
-      "cone",
+      rib,
+      1.08,
+      [
+        [-0.68, -0.19, 0.05],
+        [-0.78, 0.09, 0.22],
+        [0.14, 0.29, 0.16],
+        [0.6, 0.46, 0.03],
+      ],
+      0.92,
     );
   }
-  for (let i = 0; i < 2; i++) {
-    const { at, along, out } = onRib();
-    part(
-      `damage-critical-flicker-${i}`,
-      flicker,
-      at,
-      [0.13, 0.22, 0.13],
-      along,
-      out,
-      "sphere",
-    );
-  }
+  for (let i = 0; i < 2; i++)
+    glow(`damage-critical-flicker-${i}`, flicker, onRib(), [0.13, 0.22, 0.13]);
   // Wilted leaves hang from the outer edge of canopy plates.
   for (const [i, plate] of plates.entries()) {
     if (i % 2) continue;
@@ -900,15 +925,16 @@ function addLivingDamage(
     if (out.lengthSquared() < 0.01) out = new Vector3(0, 0, 1);
     out.normalize();
     const reach = Math.max(plate.size[0], plate.size[2]) * 0.45;
-    part(
-      `damage-critical-wilted-${i}`,
-      wilted,
-      new Vector3(x, y - plate.size[1] * 0.4, z).add(out.scale(reach)),
-      [plate.size[0] * 0.45, plate.size[1] * 1.6, 0.08],
-      new Vector3(0, 1, 0).add(out.scale(0.5)),
-      out,
-      "sphere",
+    const leaf = place(
+      leafBlade(scene, `${name}-damage-critical-wilted-${i}`),
+      {
+        parent: root,
+        material: wilted,
+        rotation: [1.3, Math.atan2(out.x, out.z), 0],
+        scaling: [reach * 0.82, 0.1, reach * 1.5],
+      },
     );
+    leaf.position.set(x + out.x * reach, y - reach * 0.44, z + out.z * reach);
   }
 }
 

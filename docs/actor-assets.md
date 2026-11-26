@@ -75,9 +75,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   Musterhall, and Nursery hinge two leaf panels at their entrances, resting
   slightly apart; the `exit` clip swings them open while a violet glow swells
   on the threshold. The Nursery uses narrower blades to leave a gap between
-  the resting gates. Owned structures add seeded `damage-moderate` cracks and
-  faint leaks along their ribs, and `damage-critical` splits, splinters,
-  wilted leaves, and `flicker` leaks; each stage merges by material.
+  the resting gates. Owned structures add seeded `damage-moderate` forked
+  cracks and faint leaks. `damage-critical` adds wider splits with pale
+  exposed wood, hanging leaf blades, and `flicker` leaks. Cracks and splits
+  follow the rib surfaces. Each stage merges by material.
   The script also builds `living-rubble` and a skinned Briar Ram with
   overlapping wood and leaf plates, thick root legs, a violet core, and a
   thorn-framed head. Owner markings sit on the brow, shoulders, and rear.

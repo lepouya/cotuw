@@ -2092,6 +2092,8 @@ acceptance progress. The following sections define the selected scope.
   falling leaves, pale wood splinters with a dark bark edge, and an unstable,
   flickering core. Broken shapes and falling material convey severity
   alongside light effects. These cues recede as repair restores health.
+  Circle building ribs show forked cracks at moderate damage and wider
+  splits with pale exposed wood and hanging leaf tips at critical damage.
   The Briar Ram's back plates show forked cracks at moderate damage and
   jagged splits with raised pale edges at critical damage. Models supply
   the broken shapes as named damage meshes selected by severity. Runtime
