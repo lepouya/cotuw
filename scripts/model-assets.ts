@@ -1613,15 +1613,30 @@ function fire(scene: Scene, name: string) {
   );
 }
 
-/** A flat falling leaf for damaged living buildings. */
+/** A wilted leaf shed by damaged living constructs. */
 function leaf(scene: Scene, name: string) {
-  const mesh = MeshBuilder.CreateSphere(
+  const mesh = MeshBuilder.CreatePolyhedron(
     name,
-    { diameter: 1, segments: 4 },
+    { custom: LEAF_BLADE },
     scene,
   );
-  mesh.scaling.set(0.35, 0.06, 0.16);
-  mesh.material = surface(scene, name, [0.24, 0.42, 0.19]);
+  mesh.scaling.set(0.29, 0.13, 0.58);
+  mesh.material = surface(scene, name, Color3.White());
+
+  const green = new Color3(0.55, 0.63, 0.24).toLinearSpace();
+  const ochre = new Color3(0.87, 0.65, 0.27).toLinearSpace();
+  const underside = new Color3(0.42, 0.38, 0.14).toLinearSpace();
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+  const colors: number[] = [];
+  for (let index = 0; index < positions.length; index += 3) {
+    const x = positions[index]!;
+    const y = positions[index + 1]!;
+    const z = positions[index + 2]!;
+    const edge = Math.max(Math.abs(x), Math.abs(z)) * 2;
+    const color = y < 0 ? underside : Color3.Lerp(green, ochre, edge);
+    colors.push(color.r, color.g, color.b, 1);
+  }
+  mesh.setVerticesData(VertexBuffer.ColorKind, colors);
 }
 
 /** A splintered chip of pale living wood shed by damaged constructs. */

@@ -221,6 +221,8 @@ challenge, pacing, and useful choices.
     critical Refinery and Harvester, including reduced motion.
     The living leak pass covers moderate and critical Thornspire damage
     and a critical Briar Ram alongside ARC smoke and fire.
+    The falling leaf pass covers both living damage stages on grass and dirt
+    alongside wood chips and violet wisps, including reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

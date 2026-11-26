@@ -92,8 +92,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   gives Circle buildings snapped ribs, dark roots, and fallen leaf plates.
   Violet embers at the breaks share the `fading-light` mesh, which dims over
   1.6 seconds or goes dark at once under reduced motion. Living damage effects
-  add `leak` wisps and, when critical, `fragment` wood chips to their falling
-  leaves.
+  shed folded `leaf` blades with ochre edges and emit `leak` wisps. Critical
+  damage also sheds `fragment` wood chips.
 - Building details and the wolf and Harvester parts in `src/render` supply both
   the built-in models and the export script, which receives named parts and
   adds rigging and clips. A building's details declare `loopSeconds`, the period

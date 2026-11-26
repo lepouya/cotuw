@@ -2086,15 +2086,15 @@ acceptance progress. The following sections define the selected scope.
   paused indicator. The full reserved footprint and progress bar remain
   visible throughout. Loading derives the stage from saved progress.
 - Living buildings and the Briar Ram show cracked wood plates, occasional
-  falling leaves or fragments, and curling violet wisps at 60% health or
-  below. Each wisp has a pale lilac center and fades as it rises.
+  falling leaves with pointed tips and ochre edges, and curling violet wisps
+  at 60% health or below. Each wisp fades as its pale lilac center rises.
   At 30% or below, show deeper splits, drooping foliage, more frequent
-  fragments, and an unstable, flickering core. Broken shapes and falling
-  material convey severity alongside light effects. These cues recede as
-  repair restores health. Models supply the broken shapes as named
-  moderate and critical damage meshes selected by severity. Runtime emitters
-  add fragments and violet leaks. Critical damage meshes include flickering
-  lights.
+  falling leaves, wood fragments, and an unstable, flickering core. Broken
+  shapes and falling material convey severity alongside light effects.
+  These cues recede as repair restores health. Models supply the broken
+  shapes as named moderate and critical damage meshes selected by severity.
+  Runtime emitters add leaves, fragments, and violet leaks. Critical damage
+  meshes include flickering lights.
 - Circle buildings collapse into pale snapped ribs, intertwined dark roots,
   and overlapping fallen leaf plates. Violet embers at the breaks fade after
   the debris settles. The Briar Ram's legs buckle and its body settles into
