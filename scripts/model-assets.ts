@@ -840,15 +840,17 @@ function rocketImpact(scene: Scene, name: string) {
 
 function bolt(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const violet = unlit(scene, name, BOLT_COLOR);
-  const core = unlit(scene, `${name}-core`, new Color3(0.9, 0.8, 1));
-  for (let strand = 0; strand < 3; strand++) {
-    const path = Array.from({ length: 17 }, (_, index) => {
-      const z = index / 16;
-      const wave = Math.sin(z * Math.PI);
+  const core = unlit(scene, `${name}-core`, new Color3(0.91, 0.77, 1));
+  const violet = unlit(scene, name, new Color3(0.76, 0.46, 1));
+  const strands = [core, violet, violet].map((material, strand) => {
+    const path = Array.from({ length: 25 }, (_, index) => {
+      const z = index / 24;
+      const bend = Math.sin(z * Math.PI * 2) * 0.06;
+      const radius = strand === 0 ? 0 : Math.sin(z * Math.PI) * 0.095;
+      const angle = z * Math.PI * 4 + strand * Math.PI;
       return new Vector3(
-        wave * (Math.sin(z * 21 + strand * 2.1) * 0.08),
-        wave * (Math.cos(z * 17 + strand * 2.1) * 0.08),
+        bend + Math.cos(angle) * radius,
+        Math.sin(angle) * radius,
         z,
       );
     });
@@ -856,47 +858,57 @@ function bolt(scene: Scene, name: string) {
       `living-strand-${strand}`,
       {
         path,
-        radius: strand === 0 ? 0.018 : 0.01,
-        tessellation: 5,
+        radiusFunction: (index) =>
+          0.009 +
+          Math.sin((index * Math.PI) / 24) * (strand === 0 ? 0.024 : 0.012),
+        tessellation: 6,
+        cap: Mesh.CAP_ALL,
       },
       scene,
     );
     vine.parent = root;
-    vine.material = strand === 0 ? core : violet;
-  }
-  for (let spark = 0; spark < 6; spark++) {
-    const angle = (spark * Math.PI) / 3;
-    const branch = MeshBuilder.CreateTube(
-      `seed-spark-${spark}`,
+    vine.material = material;
+    return vine;
+  });
+  const petals = Array.from({ length: 4 }, (_, index) => {
+    const angle = ((index + 0.25) * Math.PI) / 2;
+    const point = (radius: number, sweep: number, z: number) =>
+      new Vector3(
+        Math.cos(angle + sweep) * radius,
+        Math.sin(angle + sweep) * radius,
+        z,
+      );
+    return MeshBuilder.CreateTube(
+      "impact-petal",
       {
         path: [
-          new Vector3(0, 0, 1),
-          new Vector3(Math.cos(angle) * 0.09, Math.sin(angle) * 0.09, 0.98),
-          new Vector3(
-            Math.cos(angle + 0.4) * 0.18,
-            Math.sin(angle + 0.4) * 0.18,
-            1,
-          ),
+          point(0, 0, 1),
+          point(0.09, 0.15, 0.976),
+          point(0.16, 0.28, 0.964),
+          point(0.24, 0.46, 0.966),
         ],
-        radius: 0.012,
-        tessellation: 4,
+        radiusFunction: (ring) => [0.012, 0.035, 0.027, 0.004][ring]!,
+        tessellation: 5,
+        cap: Mesh.CAP_ALL,
       },
       scene,
     );
-    branch.parent = root;
-    branch.material = violet;
-  }
-  const strands = root.getChildMeshes();
+  });
+  const bloom = merge(root, "impact-bloom", petals, core);
   clip(
     root,
     "idle",
     0.3,
     (seconds) => {
       strands.forEach((strand, index) => {
-        const pulse = 1 + 0.2 * Math.sin((seconds * Math.PI * 2) / 0.3 + index);
+        const phase = (seconds * Math.PI * 2) / 0.3;
+        const pulse = 1 + 0.24 * Math.sin(phase + index);
         strand.scaling.x = pulse;
         strand.scaling.y = pulse;
       });
+      const opening = 0.78 + 0.38 * Math.sin((seconds * Math.PI) / 0.3);
+      bloom.scaling.x = opening;
+      bloom.scaling.y = opening;
     },
     false,
   );

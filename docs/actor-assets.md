@@ -45,12 +45,14 @@ clips match their generators, and reject unregistered files in `public/assets`.
   buckling death that settles into a husk. A rigid Harvester uses idle,
   transit, deploy, harvest, stow, unload, hit, and death. The script also
   exports crystal resource mounds, animated salvage, foundations,
-  construction scaffolds, debris rubble, tracers, pulsing
-  violet focus strands and sparks; bite marks; splintered strike bursts; smoke
+  construction scaffolds, debris rubble, tracers, braided focus bolts with
+  a four-petaled impact bloom; bite marks; splintered strike bursts; smoke
   puffs; flickering fire; wound drops; a pulsing regeneration halo; and a bird
   with a wing-beat clip. The alpha wolf scales the generated wolf asset.
   Tracers use one tapered mesh with vertex colors grading from amber at the
   muzzle to pale yellow at the target. The shot scales to its length.
+  Focus bolts share a 0.3-second `idle` clip that pulses three strands and
+  opens the impact bloom. The shot scales along its cast-to-impact axis.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,

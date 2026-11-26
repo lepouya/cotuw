@@ -2043,9 +2043,10 @@ acceptance progress. The following sections define the selected scope.
   tunics and mantles. Shoulder plates and mantle fasteners carry owner
   markings. Two curved branches of pale living wood cradle the violet core
   of a focus held in both hands. Sentinels lean into each cast, and the bolt
-  starts at the focus. Bolts have twisting violet strands, branching sparks,
-  and a brief living pulse. Reduced motion holds their shape while the
-  effect fades.
+  starts at the focus.
+- Sentinel and Thornspire bolts carry a pale lilac core braided with two
+  violet strands. Four curved petals flare at the target. Reduced motion
+  holds the braid and petals still while the bolt fades.
 - Wayfinders wear light green hooded mantles with pale leaf clasps. The hood
   frames the face and leaves the ears visible. They carry a slender living
   wood stave with a violet waystone in one hand and swing the other arm

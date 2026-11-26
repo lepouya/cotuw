@@ -209,6 +209,8 @@ challenge, pacing, and useful choices.
     The ambient bird pass covers flock silhouettes and wingbeats over the
     river in both introductions.
     The tracer pass covers Trooper and Sentry shots alongside Circle bolts.
+    The focus bolt pass covers Sentinel and Thornspire casts at two ranges
+    alongside ARC tracers, including pulse, fade, and reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
