@@ -59,6 +59,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   highlight. The damage view sets its scale and falling motion.
   Smoke uses one rounded, translucent mesh per puff with a soot-to-ash
   vertex-color gradient. The damage view spreads, scales, and fades puffs.
+  Fire uses three swept tongues with pale bases and orange tips. The
+  0.6-second `flicker` loop sways the tongues and lifts tapered embers.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,

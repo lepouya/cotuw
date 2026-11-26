@@ -1121,7 +1121,8 @@ These systems are outside M1.
   less and more strongly at 30% or less. Mechanical actors, such as ARC
   buildings and Harvesters, release translucent, curled smoke puffs with
   darker bases and ash-gray tops. Moderate damage emits intermittent puffs.
-  Critical damage emits a dense column with fire and sparks.
+  Critical damage emits a dense column above swept flames with pale bases,
+  orange tips, and rising embers.
   Infantry and wolves shed tapered crimson drops with a coral highlight.
   Moderate damage sheds occasional drops, and critical damage sheds larger,
   more frequent drops. Size, frequency, and fire also convey severity.

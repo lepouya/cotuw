@@ -1534,32 +1534,55 @@ function smoke(scene: Scene, name: string) {
 /** Flickering flame tongues with rising sparks, based at the origin. */
 function fire(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
+  const material = unlit(scene, name, Color3.White());
+  const hot = new Color3(1, 0.96, 0.64).toLinearSpace();
+  const orange = new Color3(1, 0.48, 0.1).toLinearSpace();
   const flames = (
     [
-      [0.34, 0.75, 0, 0, [1, 0.42, 0.08]],
-      [0.24, 0.5, 0.16, 0.08, [1, 0.62, 0.12]],
-      [0.2, 0.45, -0.14, -0.06, [1, 0.62, 0.12]],
-      [0.16, 0.38, 0, 0.02, [1, 0.9, 0.4]],
+      [0.18, 0.8, 0, 0, 0.2, -0.07],
+      [0.13, 0.56, -0.14, 0.075, -0.19, 0.06],
+      [0.12, 0.49, 0.14, -0.1, 0.15, 0.11],
     ] as const
-  ).map(([diameter, height, x, z, color], index) => {
+  ).map(([width, height, x, z, bendX, bendZ], index) => {
     const node = new TransformNode(`flame-${index}`, scene);
     node.parent = root;
     node.position.set(x, 0, z);
-    const cone = MeshBuilder.CreateCylinder(
-      `flame-${index}-cone`,
-      { height, diameterTop: 0, diameterBottom: diameter, tessellation: 5 },
+    const tongue = MeshBuilder.CreateLathe(
+      `flame-${index}-tongue`,
+      {
+        shape: [
+          new Vector3(0, height, 0),
+          new Vector3(width * 0.2, height * 0.73, 0),
+          new Vector3(width * 0.61, height * 0.46, 0),
+          new Vector3(width, height * 0.19, 0),
+          new Vector3(width * 0.8, 0, 0),
+          Vector3.Zero(),
+        ],
+        tessellation: 7,
+      },
       scene,
     );
-    cone.parent = node;
-    cone.position.y = height / 2;
-    cone.material = unlit(scene, `flame-${index}`, new Color3(...color));
+    const positions = tongue.getVerticesData(VertexBuffer.PositionKind)!;
+    const colors: number[] = [];
+    for (let vertex = 0; vertex < positions.length; vertex += 3) {
+      const rise = positions[vertex + 1]! / height;
+      const sweep = rise * rise;
+      positions[vertex] = positions[vertex]! + bendX * sweep;
+      positions[vertex + 2] = positions[vertex + 2]! + bendZ * sweep;
+      const color = Color3.Lerp(hot, orange, Math.min(1, rise * 1.35));
+      colors.push(color.r, color.g, color.b, 1);
+    }
+    tongue.setVerticesData(VertexBuffer.PositionKind, positions);
+    tongue.setVerticesData(VertexBuffer.ColorKind, colors);
+    tongue.parent = node;
+    tongue.material = material;
     return node;
   });
   const sparkMaterial = unlit(scene, "spark", new Color3(1, 0.85, 0.45));
   const sparks = [0, 1, 2].map((index) => {
-    const spark = MeshBuilder.CreateBox(
+    const spark = MeshBuilder.CreatePolyhedron(
       `spark-${index}`,
-      { size: 0.04 },
+      { type: 1, sizeX: 0.024, sizeY: 0.052, sizeZ: 0.024 },
       scene,
     );
     spark.parent = root;
@@ -1568,19 +1591,26 @@ function fire(scene: Scene, name: string) {
     return spark;
   });
   const seconds = 0.6;
-  clip(root, "flicker", seconds, (time) => {
-    const phase = (time / seconds) * Math.PI * 2;
-    flames.forEach((flame, index) => {
-      flame.scaling.y =
-        1 + Math.sin(phase * (index % 2 ? 2 : 1) + index) * 0.18;
-      flame.rotation.z = Math.sin(phase + index * 1.7) * 0.12;
-    });
-    sparks.forEach((spark, index) => {
-      const rise = (time / seconds + index / sparks.length) % 1;
-      spark.position.y = 0.3 + rise * 0.9;
-      spark.scaling.setAll(1 - rise);
-    });
-  });
+  clip(
+    root,
+    "flicker",
+    seconds,
+    (time) => {
+      const phase = (time / seconds) * Math.PI * 2;
+      flames.forEach((flame, index) => {
+        const wave = phase * (index % 2 ? 2 : 1) + index;
+        flame.scaling.y = 1 + Math.sin(wave) * 0.2;
+        flame.rotation.z = Math.cos(wave) * 0.13;
+      });
+      sparks.forEach((spark, index) => {
+        const rise = (time / seconds + index / sparks.length) % 1;
+        spark.position.x += (index - 1) * rise * 0.16;
+        spark.position.y += rise * 0.9;
+        spark.scaling.setAll(Math.min(1, rise * 9) * (1 - rise));
+      });
+    },
+    false,
+  );
 }
 
 /** A flat falling leaf for damaged living buildings. */

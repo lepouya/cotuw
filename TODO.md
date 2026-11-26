@@ -217,6 +217,8 @@ challenge, pacing, and useful choices.
     alongside mechanical smoke at gameplay zoom, including reduced motion.
     The smoke pass covers intermittent puffs and critical columns on ARC
     structures and a Harvester, with fire and Circle damage cues in view.
+    The fire pass covers flame and ember readability under smoke on a
+    critical Refinery and Harvester, including reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
