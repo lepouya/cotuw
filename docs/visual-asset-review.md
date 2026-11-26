@@ -63,16 +63,12 @@ Review the soundtrack, command and alert cues, work and production sounds,
 combat, support, and result cues with the corresponding scenes. Keep the
 audio review tied to the scene's timing and readability.
 
-## First iteration
+## Reviewing a changed asset
 
-Start with the Command Center. Its front entrance, roof profile, and owner
-markings set the ARC opening view. Check that it reads as the headquarters
-from the starting camera, then compare it with the Heartgrove before extending
-the treatment to the first economy buildings and workers. Use the opening
-scenes to judge the material contrast against grass, dirt, and rock.
-
-Review changed assets at the starting camera and after rotating or zooming.
-Check motion, team colors, construction and damage states where applicable,
-and the visual load in a fight. Follow the
+Judge each ARC asset against the Command Center and each Circle asset against
+the Heartgrove, so the factions keep a consistent silhouette and material
+contrast against grass, dirt, and rock. Review changed assets at the starting
+camera and after rotating or zooming. Check motion, team colors, construction
+and damage states where applicable, and the visual load in a fight. Follow the
 [asset and browser checks](verification.md#automated-checks) and the gate in
 [TODO.md](../TODO.md#g-external-feedback-and-milestone-acceptance).

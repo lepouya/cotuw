@@ -1,17 +1,12 @@
 import {
-  Bone,
   Color3,
   Color4,
-  Matrix,
   Mesh,
   MeshBuilder,
-  Quaternion,
-  Skeleton,
   StandardMaterial,
   TransformNode,
   Vector3,
   VertexBuffer,
-  VertexData,
 } from "@babylonjs/core";
 
 import { createBarracksDetails } from "../src/render/barracks.ts";
@@ -37,73 +32,26 @@ import { createRefineryDetails } from "../src/render/refinery.ts";
 import { createRelayDetails } from "../src/render/relay.ts";
 import { createSentryDetails } from "../src/render/sentry.ts";
 import { createWolfParts } from "../src/render/wolf.ts";
+import { CIRCLE_MODELS, leafBlade } from "./circle-models.ts";
+import { exportGlb } from "./glb-export.ts";
 import {
-  CIRCLE_MODELS,
-  LEAF_BLADE,
-  livingDamageMaterials,
-} from "./circle-models.ts";
-import { exportGlb, rigidSkin } from "./glb-export.ts";
-import { clip, merge, surface, unlit } from "./model-toolkit.ts";
+  batches,
+  byMaterial,
+  clip,
+  loft,
+  merge,
+  paint,
+  place,
+  skin,
+  surface,
+  tube,
+  unlit,
+} from "./model-toolkit.ts";
 import { seededRandom } from "./sprite-sheet.ts";
 
 import type { Scene } from "@babylonjs/core";
+import type { Vec3 } from "./model-toolkit.ts";
 import type { TilePlacedActorDetailsFactory } from "../src/render/tile-placed-actor-view.ts";
-
-/**
- * Rigid weights preserve the part hierarchy while exporting a real skin.
- * Static pieces share the body bone and moving pieces bind to their pivots.
- */
-function skin(root: TransformNode) {
-  const scene = root.getScene();
-  const parts = root
-    .getChildMeshes()
-    .filter(
-      (mesh): mesh is Mesh =>
-        mesh instanceof Mesh && mesh.getTotalVertices() > 0,
-    );
-  const vertices = parts.map((part) => {
-    const data = VertexData.ExtractFromMesh(part);
-    data.transform(part.computeWorldMatrix(true));
-    return data;
-  });
-  const body = new TransformNode(`${root.name}-body-joint`, scene);
-  body.parent = root;
-  const joints = parts.map((part) =>
-    part.parent === root ? body : (part.parent as TransformNode),
-  );
-  const skeleton = new Skeleton(`${root.name}-rig`, `${root.name}-rig`, scene);
-  const bones = new Map<TransformNode, Bone>();
-  const add = (node: TransformNode): Bone | null => {
-    if (node === root) return null;
-    if (bones.has(node)) return bones.get(node)!;
-    const parent =
-      node.parent instanceof TransformNode ? add(node.parent) : null;
-    const matrix = Matrix.Compose(
-      node.scaling,
-      Quaternion.FromEulerVector(node.rotation),
-      node.position,
-    );
-    const bone = new Bone(node.name, skeleton, parent, matrix);
-    bone.linkTransformNode(node);
-    bones.set(node, bone);
-    return bone;
-  };
-  for (const joint of joints) add(joint);
-  const pieces = parts.map((part, index) => ({
-    material: part.material!,
-    vertices: vertices[index]!,
-    bone: skeleton.bones.indexOf(bones.get(joints[index]!)!),
-  }));
-  for (const material of new Set(pieces.map((piece) => piece.material)))
-    rigidSkin(
-      `${root.name}-${material.name}-skin`,
-      pieces.filter((piece) => piece.material === material),
-      skeleton,
-      material,
-      root,
-    );
-  for (const part of parts) part.dispose(false, false);
-}
 
 function wolf(scene: Scene, name: string) {
   const { root, head, jaw, tail, limbs } = createWolfParts(scene, name);
@@ -191,375 +139,6 @@ function wolf(scene: Scene, name: string) {
   });
 }
 
-/**
- * A low, broad living construct facing +Z: pale armor plates over dark
- * joints, a sheltered violet core, and a thorn-framed head that strikes.
- */
-function briarRam(scene: Scene, name: string) {
-  const root = new TransformNode(name, scene);
-  const armor = surface(scene, "ram-armor", [0.95, 0.85, 0.65]);
-  const bark = surface(scene, "ram-bark", [0.43, 0.32, 0.2]);
-  const joints = surface(scene, "ram-joints", [0.3, 0.24, 0.16]);
-  const foliage = surface(scene, "ram-foliage", [0.19, 0.39, 0.25]);
-  const core = surface(scene, "ram-core-fading-light", [0.58, 0.28, 0.88], 0.6);
-  const owner = surface(scene, "ram-owner", [0.48, 0.76, 0.59]);
-  const plate = (
-    id: string,
-    size: readonly [number, number, number],
-    position: readonly [number, number, number],
-    material: StandardMaterial,
-    parent: TransformNode = root,
-  ) => {
-    const mesh = MeshBuilder.CreatePolyhedron(
-      id,
-      { custom: LEAF_BLADE },
-      scene,
-    );
-    mesh.parent = parent;
-    mesh.position.set(...position);
-    mesh.scaling.set(...size);
-    mesh.material = material;
-    return mesh;
-  };
-  const branch = (
-    id: string,
-    points: readonly (readonly [number, number, number])[],
-    radii: readonly number[],
-    material: StandardMaterial,
-    parent: TransformNode = root,
-  ) => {
-    const mesh = MeshBuilder.CreateTube(
-      id,
-      {
-        path: points.map((point) => Vector3.FromArray(point)),
-        radiusFunction: (index) => radii[index]!,
-        tessellation: 6,
-        cap: Mesh.CAP_ALL,
-      },
-      scene,
-    );
-    mesh.parent = parent;
-    mesh.material = material;
-  };
-  plate("ram-body", [1.06, 0.65, 1.48], [0, 0.77, -0.03], joints);
-  plate("ram-core", [0.49, 0.22, 0.46], [0, 0.75, 0.38], core).rotation.x =
-    -0.65;
-  // Pale plates overlap toward the tail. Dark leaf edges frame the seams.
-  for (const [index, [width, y, z]] of [
-    [0.88, 0.99, -0.46],
-    [1.05, 1.07, -0.18],
-    [1.21, 1.09, 0.14],
-    [1.12, 1.05, 0.39],
-  ].entries()) {
-    plate(
-      `ram-seam-${index}`,
-      [width!, 0.23, 0.6],
-      [0, y!, z! - 0.07],
-      foliage,
-    );
-    plate(`ram-plate-${index}`, [width!, 0.28, 0.59], [0, y!, z!], armor);
-  }
-  for (const side of [-1, 1]) {
-    plate(
-      `ram-flank-${side}`,
-      [0.39, 0.17, 1.02],
-      [side * 0.43, 0.86, -0.03],
-      bark,
-    ).rotation.z = -side * 1.14;
-    plate(
-      `ram-shoulder-${side}`,
-      [0.37, 0.15, 0.69],
-      [side * 0.42, 0.91, 0.28],
-      armor,
-    ).rotation.set(-0.24, -side * 0.09, -side * 0.95);
-    plate(
-      `ram-shoulder-mark-${side}`,
-      [0.24, 0.055, 0.46],
-      [side * 0.501, 0.978, 0.3],
-      owner,
-    ).rotation.set(-0.24, -side * 0.09, -side * 0.95);
-    plate(
-      `ram-rear-mark-${side}`,
-      [0.25, 0.07, 0.46],
-      [side * 0.269, 1.05, -0.54],
-      owner,
-    ).rotation.set(-0.34, side * 0.27, -side * 0.4);
-  }
-  const head = new TransformNode("ram-head", scene);
-  head.parent = root;
-  head.position.set(0, 0.78, 0.56);
-  plate("ram-skull", [0.57, 0.43, 0.59], [0, 0.02, 0.18], joints, head);
-  plate(
-    "ram-brow",
-    [0.65, 0.22, 0.55],
-    [0, 0.13, 0.16],
-    armor,
-    head,
-  ).rotation.x = 0.42;
-  plate(
-    "ram-muzzle",
-    [0.46, 0.24, 0.35],
-    [0, -0.08, 0.36],
-    bark,
-    head,
-  ).rotation.y = Math.PI;
-  plate(
-    "ram-brow-mark",
-    [0.24, 0.06, 0.29],
-    [0, 0.255, 0.15],
-    owner,
-    head,
-  ).rotation.x = 0.42;
-  for (const side of [-1, 1]) {
-    branch(
-      `ram-thorn-${side}`,
-      [
-        [side * 0.2, -0.03, 0.22],
-        [side * 0.35, 0.02, 0.29],
-        [side * 0.41, 0.1, 0.43],
-        [side * 0.37, 0.22, 0.55],
-        [side * 0.29, 0.35, 0.58],
-      ],
-      [0.116, 0.106, 0.078, 0.044, 0.001],
-      armor,
-      head,
-    );
-    plate(
-      `ram-eye-${side}`,
-      [0.062, 0.06, 0.13],
-      [side * 0.212, 0.09, 0.297],
-      core,
-      head,
-    ).rotation.y = side * 0.38;
-  }
-  for (const side of [-1, 1])
-    plate(
-      `ram-core-vent-${side}`,
-      [0.135, 0.2, 0.34],
-      [side * 0.43, 0.75, 0.29],
-      core,
-    ).rotation.set(-0.18, -side * 0.22, -side * 0.46);
-  const hips = [
-    [-0.36, 0.4],
-    [0.36, 0.4],
-    [-0.32, -0.48],
-    [0.32, -0.48],
-  ].map(([x, z], index) => {
-    const hip = new TransformNode(`ram-leg-${index}`, scene);
-    hip.parent = root;
-    hip.position.set(x!, 0.72, z!);
-    const side = Math.sign(x!);
-    const front = Math.sign(z!);
-    branch(
-      `ram-root-${index}`,
-      [
-        [0, 0.08, 0],
-        [side * 0.07, -0.21, front * 0.07],
-        [side * 0.045, -0.47, -0.09],
-        [side * 0.065, -0.65, -0.025],
-      ],
-      [0.18, 0.151, 0.105, 0.118],
-      joints,
-      hip,
-    );
-    plate(
-      `ram-shin-${index}`,
-      [0.29, 0.18, 0.38],
-      [side * 0.075, -0.32, front * 0.05 + 0.08],
-      bark,
-      hip,
-    ).rotation.x = -1.42;
-    plate(
-      `ram-foot-${index}`,
-      [0.33, 0.21, 0.39],
-      [side * 0.063, -0.66, 0.033],
-      armor,
-      hip,
-    ).rotation.y = side * 0.13;
-    return hip;
-  });
-  // Stage-named materials skin each damage stage into its own mesh.
-  const { crack, leak, split, splinter, flicker } = livingDamageMaterials(
-    scene,
-    "ram",
-  );
-  const sliver = (
-    id: string,
-    size: [number, number, number],
-    position: [number, number, number],
-    rotation: [number, number, number],
-    material: StandardMaterial,
-    parent: TransformNode = root,
-  ) => {
-    const mesh = MeshBuilder.CreateBox(id, { size: 1 }, scene);
-    mesh.parent = parent;
-    mesh.position.set(...position);
-    mesh.scaling.set(...size);
-    mesh.rotation.set(...rotation);
-    mesh.material = material;
-    return mesh;
-  };
-  // Cracks cross the back plates and flanks.
-  for (const [i, [x, y, z]] of (
-    [
-      [0.22, 1.22, 0.15],
-      [-0.17, 1.2, -0.16],
-      [0.08, 1.136, -0.45],
-    ] as const
-  ).entries())
-    branch(
-      `ram-damage-moderate-crack-${i}`,
-      [
-        [x - 0.12, y - 0.022, z - 0.15],
-        [x - 0.06, y, z - 0.04],
-        [x + 0.01, y - 0.02, z - 0.015],
-        [x + 0.11, y - 0.042, z + 0.13],
-      ],
-      [0.01, 0.023, 0.025, 0.009],
-      crack,
-    );
-  for (const side of [-1, 1])
-    sliver(
-      `ram-damage-moderate-crack-flank-${side}`,
-      [0.035, 0.22, 0.055],
-      [side * 0.503, 0.89, -0.18],
-      [side * 0.36, 0, -side * 0.44],
-      crack,
-    );
-  sliver(
-    "ram-damage-moderate-crack-head",
-    [0.04, 0.02, 0.22],
-    [0.126, 0.22, 0.21],
-    [0.37, 0.42, 0],
-    crack,
-    head,
-  );
-  plate(
-    "ram-damage-moderate-leak-0",
-    [0.1, 0.07, 0.13],
-    [0.17, 1.216, 0.12],
-    leak,
-  );
-  plate(
-    "ram-damage-moderate-leak-1",
-    [0.08, 0.16, 0.11],
-    [-0.49, 0.82, -0.18],
-    leak,
-  );
-  // Deeper splits open the plates and splinters jut from the breaks.
-  for (const [i, [x, y, z, turn]] of (
-    [
-      [-0.02, 1.223, 0.33, 0.62],
-      [0.14, 1.182, -0.23, -0.62],
-    ] as const
-  ).entries()) {
-    sliver(
-      `ram-damage-critical-split-${i}`,
-      [0.083, 0.026, 0.37],
-      [x, y, z],
-      [0.16, turn, 0],
-      split,
-    );
-    for (const offset of [-1, 1]) {
-      const shard = MeshBuilder.CreateCylinder(
-        `ram-damage-critical-splinter-${i}-${offset}`,
-        { height: 0.22, diameterTop: 0, diameterBottom: 0.09, tessellation: 5 },
-        scene,
-      );
-      shard.parent = root;
-      shard.position.set(x + offset * 0.065, y + 0.055, z + offset * 0.05);
-      shard.rotation.set(offset * 0.5, turn, offset * 0.4);
-      shard.material = splinter;
-    }
-  }
-  sliver(
-    "ram-damage-critical-split-flank",
-    [0.03, 0.4, 0.1],
-    [0.51, 0.89, -0.16],
-    [0.44, 0, -0.3],
-    split,
-  );
-  plate(
-    "ram-damage-critical-flicker-0",
-    [0.16, 0.12, 0.12],
-    [0.39, 0.77, 0.39],
-    flicker,
-  );
-  plate(
-    "ram-damage-critical-flicker-1",
-    [0.12, 0.1, 0.12],
-    [-0.01, 1.235, 0.34],
-    flicker,
-  );
-  skin(root);
-  const restHead = head.position.clone();
-  clip(root, "idle", 3, (seconds) => {
-    head.rotation.x = Math.sin((seconds / 3) * Math.PI * 2) * 0.03;
-  });
-  // Diagonal pairs step together with deliberate, planted feet.
-  clip(root, "walk", 1.4, (seconds) => {
-    const phase = (seconds / 1.4) * Math.PI * 2;
-    hips.forEach((hip, index) => {
-      hip.rotation.x =
-        Math.sin(phase + (index === 0 || index === 3 ? 0 : Math.PI)) * 0.38;
-    });
-    root.position.y = (1 - Math.cos(phase * 2)) * 0.02;
-    head.rotation.x = Math.sin(phase * 2) * 0.03;
-  });
-  for (const [turn, sign] of [
-    ["turn-left", -1],
-    ["turn-right", 1],
-  ] as const)
-    clip(
-      root,
-      turn,
-      0.4,
-      (seconds) => {
-        const amount = seconds / 0.4;
-        root.rotation.z = -sign * amount * 0.06;
-        head.rotation.y = sign * amount * 0.15;
-      },
-      false,
-    );
-  clip(
-    root,
-    "hit",
-    0.4,
-    (seconds) => {
-      const flinch = Math.sin((seconds / 0.4) * Math.PI);
-      head.rotation.x = -flinch * 0.15;
-      root.rotation.z = flinch * 0.05;
-    },
-    false,
-  );
-  // The hit is already committed when this clip starts. Lunge, then settle.
-  clip(
-    root,
-    "strike",
-    0.6,
-    (seconds) => {
-      const t = seconds / 0.6;
-      const travel = t < 0.2 ? t / 0.2 : (1 - t) / 0.8;
-      const blow = travel ** 2;
-      head.rotation.x = blow * 0.19;
-      head.position.z = restHead.z + blow * 0.23;
-      head.position.y = restHead.y - blow * 0.05;
-      root.position.z = blow * 0.12;
-    },
-    false,
-  );
-  // Legs buckle outward and the body settles into an inert husk.
-  clip(root, "death", 1.2, (seconds) => {
-    const fall = (seconds / 1.2) ** 2;
-    hips.forEach((hip, index) => {
-      hip.rotation.z = (index % 2 ? -1 : 1) * fall * 1.1;
-    });
-    root.position.y = -fall * 0.42;
-    root.rotation.z = fall * 0.18;
-    head.rotation.x = fall * 0.4;
-  });
-}
-
 function harvester(scene: Scene, name: string) {
   const body = createHarvesterBody(scene, name);
   const { root, steel, rubber } = body;
@@ -580,56 +159,47 @@ function harvester(scene: Scene, name: string) {
   hopper.position.set(0, 0.73, -0.35);
   const hopperPlate = (
     part: string,
-    width: number,
-    height: number,
-    depth: number,
-    x: number,
-    y: number,
-    z: number,
+    [width, height, depth]: Vec3,
+    position: Vec3,
     material: StandardMaterial,
-  ) => {
-    const mesh = MeshBuilder.CreateBox(part, { width, height, depth }, scene);
-    mesh.parent = hopper;
-    mesh.position.set(x, y, z);
-    mesh.material = material;
-    return mesh;
-  };
-  hopperPlate("hopper-floor", 0.43, 0.06, 0.49, 0, -0.12, 0, rubber);
-  hopperPlate("hopper-bulkhead", 0.56, 0.26, 0.055, 0, 0.02, 0.245, steel);
+    rotation?: Vec3,
+  ) =>
+    place(MeshBuilder.CreateBox(part, { width, height, depth }, scene), {
+      parent: hopper,
+      material,
+      position,
+      rotation,
+    });
+  hopperPlate("hopper-floor", [0.43, 0.06, 0.49], [0, -0.12, 0], rubber);
+  hopperPlate("hopper-bulkhead", [0.56, 0.26, 0.055], [0, 0.02, 0.245], steel);
   hopperPlate(
     "hopper-discharge-lip",
-    0.47,
-    0.08,
-    0.07,
-    0,
-    -0.09,
-    -0.245,
+    [0.47, 0.08, 0.07],
+    [0, -0.09, -0.245],
     steel,
   );
   for (const side of [-1, 1]) {
     hopperPlate(
       "hopper-side",
-      0.065,
-      0.27,
-      0.55,
-      side * 0.245,
-      0.01,
-      0,
+      [0.065, 0.27, 0.55],
+      [side * 0.245, 0.01, 0],
       steel,
-    ).rotation.z = side * -0.32;
+      [0, 0, side * -0.32],
+    );
     hopperPlate(
       "hopper-rim",
-      0.078,
-      0.048,
-      0.56,
-      side * 0.285,
-      0.14,
-      0,
+      [0.078, 0.048, 0.56],
+      [side * 0.285, 0.14, 0],
       rubber,
     );
   }
   for (const z of [-0.13, 0, 0.13])
-    hopperPlate("hopper-floor-cleat", 0.4, 0.028, 0.033, 0, -0.084, z, steel);
+    hopperPlate(
+      "hopper-floor-cleat",
+      [0.4, 0.028, 0.033],
+      [0, -0.084, z],
+      steel,
+    );
   batchStaticParts(hopper);
   clip(root, "idle", 2, () => {});
   clip(root, "transit", 1, (seconds) => {
@@ -673,45 +243,45 @@ function harvester(scene: Scene, name: string) {
   });
 }
 
-/** Meshes under animated pivots must keep their local transforms. */
-function batchStaticParts(root: TransformNode) {
-  const moving = new Set(
+/** Batches only meshes that share a material and move with the same node. */
+function batchStaticParts(
+  root: TransformNode,
+  preserve: readonly string[] = [],
+) {
+  const boundaries = new Set<unknown>(
     root
       .getScene()
       .animationGroups.flatMap((group) =>
-        group.targetedAnimations.flatMap(({ target }) =>
-          target instanceof TransformNode
-            ? [target, ...target.getDescendants(false)]
-            : [],
-        ),
+        group.targetedAnimations.map(({ target }) => target),
       ),
   );
-  const byMaterial = new Map<StandardMaterial, Mesh[]>();
+  for (const node of root.getDescendants(false))
+    if (preserve.includes(node.name)) boundaries.add(node);
+
+  const groups = new Map<TransformNode, Mesh[]>();
   for (const mesh of root.getChildMeshes()) {
-    if (!(mesh instanceof Mesh) || moving.has(mesh)) continue;
-    if (!(mesh.material instanceof StandardMaterial)) continue;
-    const parts = byMaterial.get(mesh.material) ?? [];
+    if (!(mesh instanceof Mesh) || boundaries.has(mesh)) continue;
+    // Merging disposes source meshes, so leave hierarchy parents in place.
+    if (mesh.getChildren().length > 0) continue;
+    let parent = mesh.parent;
+    while (parent && parent !== root && !boundaries.has(parent))
+      parent = parent.parent;
+    const pivot = parent instanceof TransformNode ? parent : root;
+    const parts = groups.get(pivot) ?? [];
     parts.push(mesh);
-    byMaterial.set(mesh.material, parts);
+    groups.set(pivot, parts);
   }
-  const toLocal = root.computeWorldMatrix(true).clone().invert();
-  for (const [material, parts] of byMaterial) {
-    if (parts.length === 1) continue;
-    const mesh = merge(
-      root,
-      `${root.name}-static-${material.name}`,
-      parts,
-      material,
-    );
-    // Merge bakes world coordinates. Parts under a pivot need local vertices.
-    if (!toLocal.isIdentity()) mesh.bakeTransformIntoVertices(toLocal);
-  }
+  for (const [pivot, parts] of groups)
+    for (const [material, group] of byMaterial(parts)) {
+      if (group.length > 1)
+        merge(pivot, `${pivot.name}-static-${material.name}`, group, material);
+    }
 }
 
 /** Exports a building's idle loop and a clip for each activity. */
 function building(
   factory: TilePlacedActorDetailsFactory,
-  { batchStatic = false }: { batchStatic?: boolean } = {},
+  preserve: readonly string[] = [],
 ) {
   return (scene: Scene, name: string) => {
     const root = new TransformNode(name, scene);
@@ -734,42 +304,23 @@ function building(
     clip(root, "idle", details.loopSeconds, details.update, false);
     for (const [kind, motion] of Object.entries(details.activities ?? {}))
       clip(root, kind, motion.seconds, motion.pose, false);
-    if (batchStatic) batchStaticParts(root);
+    batchStaticParts(root, preserve);
   };
 }
 
 /** A unit-length shot along +Z that hits scale to their range. */
 function tracer(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const profile = [
-    { z: 0, radius: 0.013 },
-    { z: 0.19, radius: 0.017 },
-    { z: 0.61, radius: 0.023 },
-    { z: 0.88, radius: 0.03 },
-    { z: 1, radius: 0.007 },
-  ];
-  const beam = MeshBuilder.CreateTube(
-    "beam",
-    {
-      path: profile.map(({ z }) => new Vector3(0, 0, z)),
-      radiusFunction: (index) => profile[index]!.radius,
-      tessellation: 6,
-      cap: Mesh.CAP_ALL,
-    },
-    scene,
-  );
   const tail = new Color3(1, 0.73, 0.36).toLinearSpace();
   const hot = Color3.Lerp(TRACER_COLOR, Color3.White(), 0.65).toLinearSpace();
-  const positions = beam.getVerticesData(VertexBuffer.PositionKind)!;
-  const colors: number[] = [];
-  for (let i = 2; i < positions.length; i += 3) {
-    const heat = Math.min(1, positions[i]! / 0.88);
-    const color = Color3.Lerp(tail, hot, heat);
-    colors.push(color.r, color.g, color.b, 1);
-  }
-  beam.setVerticesData(VertexBuffer.ColorKind, colors);
-  beam.parent = root;
-  beam.material = unlit(scene, name, Color3.White());
+  const beam = tube(
+    scene,
+    "beam",
+    [0, 0.19, 0.61, 0.88, 1].map((z) => [0, 0, z]),
+    [0.013, 0.017, 0.023, 0.03, 0.007],
+  );
+  paint(beam, (_x, _y, z) => Color3.Lerp(tail, hot, Math.min(1, z / 0.88)));
+  place(beam, { parent: root, material: unlit(scene, name, Color3.White()) });
 }
 
 function rocket(scene: Scene, name: string) {
@@ -848,23 +399,21 @@ function bolt(scene: Scene, name: string) {
       const bend = Math.sin(z * Math.PI * 2) * 0.06;
       const radius = strand === 0 ? 0 : Math.sin(z * Math.PI) * 0.095;
       const angle = z * Math.PI * 4 + strand * Math.PI;
-      return new Vector3(
+      return [
         bend + Math.cos(angle) * radius,
         Math.sin(angle) * radius,
         z,
-      );
+      ] as const;
     });
-    const vine = MeshBuilder.CreateTube(
+    const vine = tube(
+      scene,
       `living-strand-${strand}`,
-      {
-        path,
-        radiusFunction: (index) =>
+      path,
+      path.map(
+        (_, index) =>
           0.009 +
           Math.sin((index * Math.PI) / 24) * (strand === 0 ? 0.024 : 0.012),
-        tessellation: 6,
-        cap: Mesh.CAP_ALL,
-      },
-      scene,
+      ),
     );
     vine.parent = root;
     vine.material = material;
@@ -872,26 +421,22 @@ function bolt(scene: Scene, name: string) {
   });
   const petals = Array.from({ length: 4 }, (_, index) => {
     const angle = ((index + 0.25) * Math.PI) / 2;
-    const point = (radius: number, sweep: number, z: number) =>
-      new Vector3(
-        Math.cos(angle + sweep) * radius,
-        Math.sin(angle + sweep) * radius,
-        z,
-      );
-    return MeshBuilder.CreateTube(
-      "impact-petal",
-      {
-        path: [
-          point(0, 0, 1),
-          point(0.09, 0.15, 0.976),
-          point(0.16, 0.28, 0.964),
-          point(0.24, 0.46, 0.966),
-        ],
-        radiusFunction: (ring) => [0.012, 0.035, 0.027, 0.004][ring]!,
-        tessellation: 5,
-        cap: Mesh.CAP_ALL,
-      },
+    const point = (radius: number, sweep: number, z: number): Vec3 => [
+      Math.cos(angle + sweep) * radius,
+      Math.sin(angle + sweep) * radius,
+      z,
+    ];
+    return tube(
       scene,
+      "impact-petal",
+      [
+        point(0, 0, 1),
+        point(0.09, 0.15, 0.976),
+        point(0.16, 0.28, 0.964),
+        point(0.24, 0.46, 0.966),
+      ],
+      [0.012, 0.035, 0.027, 0.004],
+      5,
     );
   });
   const bloom = merge(root, "impact-bloom", petals, core);
@@ -926,41 +471,25 @@ function bite(scene: Scene, name: string) {
   ];
   const slashes = [-1, 0, 1].map((side) => {
     const length = 1 - Math.abs(side) * 0.17;
-    return MeshBuilder.CreateTube(
-      "claw-slash",
-      {
-        path: profile.map(
-          ({ x, y, z }) =>
-            new Vector3(
-              x * length + side * 0.2,
-              y * length + side * 0.04,
-              z + side * 0.08,
-            ),
-        ),
-        radiusFunction: (index) => profile[index]!.radius * length,
-        tessellation: 6,
-        cap: Mesh.CAP_ALL,
-      },
+    return tube(
       scene,
+      "claw-slash",
+      profile.map(({ x, y, z }) => [
+        x * length + side * 0.2,
+        y * length + side * 0.04,
+        z + side * 0.08,
+      ]),
+      profile.map(({ radius }) => radius * length),
     );
   });
   const marks = Mesh.MergeMeshes(slashes, true, true)!;
   marks.name = "claw-marks";
-  marks.parent = root;
-  marks.material = unlit(scene, name, Color3.White());
   const edge = BITE_COLOR.toLinearSpace();
   const middle = new Color3(1, 0.75, 0.57).toLinearSpace();
-  const positions = marks.getVerticesData(VertexBuffer.PositionKind)!;
-  const colors: number[] = [];
-  for (let index = 1; index < positions.length; index += 3) {
-    const highlight = Math.max(
-      0,
-      1 - Math.abs(positions[index]! - 0.07) / 0.28,
-    );
-    const color = Color3.Lerp(edge, middle, highlight);
-    colors.push(color.r, color.g, color.b, 1);
-  }
-  marks.setVerticesData(VertexBuffer.ColorKind, colors);
+  paint(marks, (_x, y) =>
+    Color3.Lerp(edge, middle, Math.max(0, 1 - Math.abs(y - 0.07) / 0.28)),
+  );
+  place(marks, { parent: root, material: unlit(scene, name, Color3.White()) });
 }
 
 /** Splintered wood and a violet ring where a construct's blow lands. */
@@ -997,44 +526,38 @@ function foundation(scene: Scene, name: string) {
     [1, -1],
     [1, 1],
     [-1, 1],
-  ];
-  const vertex = [
-    ...square.map(([x, z]) => [x! * 0.5, -0.5, z! * 0.5]),
-    ...square.map(([x, z]) => [x! * 0.5, 0.08, z! * 0.5]),
-    ...square.map(([x, z]) => [x! * 0.45, 0.5, z! * 0.45]),
-  ];
-  const face = [
-    [0, 1, 2, 3],
-    [11, 10, 9, 8],
-  ];
+  ] as const;
+  const ring = (half: number, y: number) =>
+    square.map(([x, z]): Vec3 => [x * half, y, z * half]);
   const footing = new Color4(0.23, 0.28, 0.3, 1);
   const shoulder = new Color4(0.43, 0.48, 0.47, 1);
   const deck = new Color4(0.59, 0.63, 0.59, 1);
-  const faceColors = [footing, deck];
-  for (const [offset, color] of [
-    [0, footing],
-    [4, shoulder],
-  ] as const) {
-    for (let i = 0; i < square.length; i++) {
-      const a = offset + i;
-      const b = offset + ((i + 1) % square.length);
-      face.push([b, a, a + 4, b + 4]);
-      faceColors.push(color);
-    }
-  }
+  // Loft faces: bottom, top, then each band of sides from the ground up.
+  const faceColors = [
+    footing,
+    deck,
+    ...square.map(() => footing),
+    ...square.map(() => shoulder),
+  ];
   const mesh = MeshBuilder.CreatePolyhedron(
     name,
-    { custom: { vertex, face }, faceColors },
+    {
+      custom: loft([ring(0.5, -0.5), ring(0.5, 0.08), ring(0.45, 0.5)]),
+      faceColors,
+    },
     scene,
   );
-  mesh.parent = root;
-  mesh.material = surface(scene, name, Color3.White());
+  place(mesh, { parent: root, material: surface(scene, name, Color3.White()) });
 }
 
 /** An exposed vein of tilted ore blades in a low, fractured rock bed. */
 function materialsMound(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const ore = { faces: [] as Mesh[], edges: [] as Mesh[] };
+  const pieces = batches(root, {
+    ore: surface(scene, "materials", MATERIALS_COLOR, 0.24),
+    "ore-bright": surface(scene, "materials-bright", [0.42, 0.75, 0.79], 0.27),
+    bed: surface(scene, "materials-bed", [0.34, 0.31, 0.25]),
+  });
   const outline = [
     [-0.52, -0.33],
     [-0.22, -0.53],
@@ -1044,76 +567,65 @@ function materialsMound(scene: Scene, name: string) {
     [-0.47, 0.32],
   ] as const;
   const shoulders = [0.73, 0.87, 0.8, 0.57, 0.49, 0.62];
-  const vertex = [
-    ...outline.map(([x, z]) => [x, 0, z]),
-    ...outline.map(([x, z], i) => [x * 0.82 + 0.12, shoulders[i]!, z * 0.72]),
+  const crystal = loft(
+    [
+      outline.map(([x, z]): Vec3 => [x, 0, z]),
+      outline.map(([x, z], i): Vec3 => [
+        x * 0.82 + 0.12,
+        shoulders[i]!,
+        z * 0.72,
+      ]),
+    ],
     [0.04, 1, -0.11],
-  ];
-  const face = [[0, 1, 2, 3, 4, 5]];
-  for (let i = 0; i < outline.length; i++) {
-    const next = (i + 1) % outline.length;
-    face.push([next, i, i + 6, next + 6], [next + 6, i + 6, 12]);
-  }
+  );
   for (const [part, x, z, width, height, depth, lean, yaw] of [
-    ["faces", -0.1, 0.02, 0.33, 0.83, 0.27, 0.28, 0.5],
-    ["edges", 0.13, -0.05, 0.28, 0.68, 0.23, 0.43, 0.62],
-    ["faces", 0.21, 0.14, 0.2, 0.46, 0.18, 0.45, 0.8],
-    ["edges", -0.21, 0.16, 0.19, 0.36, 0.18, 0.45, -1.5],
-    ["faces", -0.22, -0.13, 0.18, 0.33, 0.17, 0.34, -2],
-    ["edges", 0.06, 0.25, 0.13, 0.25, 0.14, 0.63, 1.1],
+    ["ore", -0.1, 0.02, 0.33, 0.83, 0.27, 0.28, 0.5],
+    ["ore-bright", 0.13, -0.05, 0.28, 0.68, 0.23, 0.43, 0.62],
+    ["ore", 0.21, 0.14, 0.2, 0.46, 0.18, 0.45, 0.8],
+    ["ore-bright", -0.21, 0.16, 0.19, 0.36, 0.18, 0.45, -1.5],
+    ["ore", -0.22, -0.13, 0.18, 0.33, 0.17, 0.34, -2],
+    ["ore-bright", 0.06, 0.25, 0.13, 0.25, 0.14, 0.63, 1.1],
   ] as const) {
     const blade = MeshBuilder.CreatePolyhedron(
       "blade",
-      { custom: { vertex, face }, sizeX: width, sizeY: height, sizeZ: depth },
+      { custom: crystal, sizeX: width, sizeY: height, sizeZ: depth },
       scene,
     );
-    blade.position.set(x, 0.06, z);
-    blade.rotation.set(lean, yaw, 0);
-    ore[part].push(blade);
+    pieces.add(
+      part,
+      place(blade, { position: [x, 0.06, z], rotation: [lean, yaw, 0] }),
+    );
   }
-  const bed = (
-    [
-      [-0.15, 0, 0.25, 0.13, 0.23, 0.3],
-      [0.15, 0.05, 0.24, 0.16, 0.24, -0.55],
-      [-0.02, -0.23, 0.25, 0.12, 0.14, 0.52],
-      [-0.19, 0.22, 0.16, 0.08, 0.11, -0.38],
-      [0.19, 0.25, 0.15, 0.1, 0.1, 0.2],
-    ] as const
-  ).map(([x, z, width, height, depth, yaw]) => {
+  for (const [x, z, width, height, depth, yaw] of [
+    [-0.15, 0, 0.25, 0.13, 0.23, 0.3],
+    [0.15, 0.05, 0.24, 0.16, 0.24, -0.55],
+    [-0.02, -0.23, 0.25, 0.12, 0.14, 0.52],
+    [-0.19, 0.22, 0.16, 0.08, 0.11, -0.38],
+    [0.19, 0.25, 0.15, 0.1, 0.1, 0.2],
+  ] as const) {
     const stone = MeshBuilder.CreatePolyhedron(
       "stone",
       { type: 2, sizeX: width, sizeY: height, sizeZ: depth },
       scene,
     );
-    stone.position.set(x, height, z);
-    stone.rotation.y = yaw;
-    return stone;
-  });
-  merge(
-    root,
-    "ore",
-    ore.faces,
-    surface(scene, "materials", MATERIALS_COLOR, 0.24),
-  );
-  merge(
-    root,
-    "ore-bright",
-    ore.edges,
-    surface(scene, "materials-bright", [0.42, 0.75, 0.79], 0.27),
-  );
-  merge(root, "bed", bed, surface(scene, "materials-bed", [0.34, 0.31, 0.25]));
+    pieces.add(
+      "bed",
+      place(stone, { position: [x, height, z], rotation: [0, yaw, 0] }),
+    );
+  }
+  pieces.merge();
 }
 
 /** Fractured ARC panels and framing, sized to fit a rotated footprint tile. */
 function rubble(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
   const random = seededRandom(0x5ab0);
-  const pieces = {
-    concrete: [] as Mesh[],
-    scorched: [] as Mesh[],
-    armor: [] as Mesh[],
-    metal: [] as Mesh[],
-  };
+  const pieces = batches(root, {
+    concrete: surface(scene, "rubble-concrete", [0.39, 0.37, 0.33]),
+    scorched: surface(scene, "rubble-scorched", [0.18, 0.17, 0.16]),
+    armor: surface(scene, "rubble-armor", [0.49, 0.59, 0.57]),
+    metal: surface(scene, "rubble-metal", [0.26, 0.3, 0.3]),
+  });
   const perimeter = [
     [-0.5, -0.25],
     [-0.12, -0.5],
@@ -1122,44 +634,30 @@ function rubble(scene: Scene, name: string) {
     [0.19, 0.5],
     [-0.4, 0.37],
   ] as const;
-  const count = perimeter.length;
-  const fracturedSlab = {
-    vertex: [
-      ...perimeter.map(([x, z]) => [x, -0.5, z]),
-      ...perimeter.map(([x, z], index) => [
+  const fracturedSlab = loft(
+    [
+      perimeter.map(([x, z]): Vec3 => [x, -0.5, z]),
+      perimeter.map(([x, z], index): Vec3 => [
         x * 0.88,
         index % 2 ? 0.22 : 0.5,
         z * 0.84,
       ]),
-      [0.02, 0.42, -0.08],
     ],
-    face: [
-      perimeter.map((_, index) => index),
-      ...perimeter.flatMap((_, index) => {
-        const next = (index + 1) % count;
-        return [
-          [next, index, index + count, next + count],
-          [next + count, index + count, count * 2],
-        ];
-      }),
-    ],
-  };
+    [0.02, 0.42, -0.08],
+  );
   const slab = (
-    id: keyof typeof pieces,
-    size: readonly [number, number, number],
-    position: readonly [number, number, number],
-    rotation: readonly [number, number, number],
-  ) => {
-    const mesh = MeshBuilder.CreatePolyhedron(
-      id,
-      { custom: fracturedSlab },
-      scene,
+    part: "concrete" | "scorched" | "armor",
+    scaling: Vec3,
+    position: Vec3,
+    rotation: Vec3,
+  ) =>
+    pieces.add(
+      part,
+      place(
+        MeshBuilder.CreatePolyhedron(part, { custom: fracturedSlab }, scene),
+        { position, rotation, scaling },
+      ),
     );
-    mesh.scaling.set(...size);
-    mesh.position.set(...position);
-    mesh.rotation.set(...rotation);
-    pieces[id].push(mesh);
-  };
   slab("scorched", [0.69, 0.16, 0.62], [0, -0.41, -0.03], [0, 0.2, 0]);
   slab("concrete", [0.66, 0.3, 0.36], [-0.04, -0.3, 0.095], [0.2, 0.45, -0.15]);
   slab(
@@ -1181,181 +679,50 @@ function rubble(scene: Scene, name: string) {
       [(random() - 0.5) * 0.35, angle, (random() - 0.5) * 0.35],
     );
   }
-  for (const [index, path] of [
+  for (const [index, path] of (
     [
-      [-0.28, -0.36, -0.16],
-      [-0.19, -0.04, -0.19],
-      [0.03, 0.27, -0.02],
-      [0.27, -0.03, 0.15],
-    ],
-    [
-      [-0.24, -0.17, 0.19],
-      [-0.08, -0.06, 0.26],
-      [0.14, 0.04, 0.24],
-      [0.25, -0.26, 0.2],
-    ],
-  ].entries())
-    pieces.metal.push(
-      MeshBuilder.CreateTube(
-        `bent-frame-${index}`,
-        {
-          path: path.map((point) => Vector3.FromArray(point)),
-          radius: 0.041,
-          tessellation: 4,
-          cap: Mesh.CAP_ALL,
-        },
-        scene,
-      ),
-    );
-  for (const [part, color] of [
-    ["concrete", [0.39, 0.37, 0.33]],
-    ["scorched", [0.18, 0.17, 0.16]],
-    ["armor", [0.49, 0.59, 0.57]],
-    ["metal", [0.26, 0.3, 0.3]],
-  ] as const)
-    merge(root, part, pieces[part], surface(scene, `rubble-${part}`, color));
-}
-
-/** Broken Circle ribs fold over a root bed and leave embers at the breaks. */
-function livingRubble(scene: Scene, name: string) {
-  const root = new TransformNode(name, scene);
-  const pieces = {
-    wood: [] as Mesh[],
-    roots: [] as Mesh[],
-    leaves: [] as Mesh[],
-    "fading-light": [] as Mesh[],
-  };
-  const branch = (
-    part: "wood" | "roots",
-    knots: readonly (readonly [number, number, number, number])[],
-  ) => {
-    pieces[part].push(
-      MeshBuilder.CreateTube(
-        `${part}-${pieces[part].length}`,
-        {
-          path: knots.map(([x, y, z]) => new Vector3(x, y, z)),
-          radiusFunction: (index) => knots[index]![3],
-          tessellation: 6,
-          cap: Mesh.CAP_ALL,
-        },
-        scene,
-      ),
-    );
-  };
-  branch("roots", [
-    [-0.39, -0.46, 0.09, 0.013],
-    [-0.23, -0.43, 0.01, 0.056],
-    [-0.08, -0.36, -0.01, 0.099],
-    [0.18, -0.43, 0.1, 0.068],
-    [0.35, -0.46, 0.23, 0.012],
-  ]);
-  branch("roots", [
-    [-0.18, -0.46, 0.32, 0.018],
-    [-0.08, -0.35, 0.16, 0.06],
-    [-0.13, -0.32, -0.03, 0.068],
-    [0.03, -0.41, -0.18, 0.059],
-    [0.13, -0.47, -0.39, 0.012],
-  ]);
-  branch("roots", [
-    [0.04, -0.43, 0.36, 0.02],
-    [0.19, -0.37, 0.18, 0.043],
-    [0.23, -0.32, 0.01, 0.055],
-    [0.39, -0.47, -0.15, 0.014],
-  ]);
-  // The thicker ribs break across a gap before folding over the roots.
-  branch("wood", [
-    [-0.31, -0.39, -0.16, 0.087],
-    [-0.21, -0.18, -0.14, 0.083],
-    [-0.1, 0.04, -0.06, 0.063],
-    [0.06, 0.13, 0.01, 0.045],
-  ]);
-  branch("wood", [
-    [-0.34, -0.39, 0.17, 0.056],
-    [-0.21, -0.21, 0.19, 0.062],
-    [-0.055, -0.05, 0.15, 0.05],
-    [0.094, -0.005, 0.16, 0.025],
-  ]);
-  branch("wood", [
-    [0.34, -0.39, -0.08, 0.06],
-    [0.27, -0.29, -0.035, 0.051],
-    [0.2, -0.15, 0.01, 0.04],
-    [0.15, -0.075, 0.048, 0.028],
-  ]);
-  branch("wood", [
-    [0.1, -0.32, -0.29, 0.026],
-    [0.17, -0.2, -0.22, 0.037],
-    [0.18, -0.26, -0.09, 0.027],
-  ]);
-  for (const [index, [x, y, z, angle, length]] of (
-    [
-      [-0.09, -0.31, -0.23, 1.4, 0.34],
-      [0.03, -0.25, -0.23, 0.66, 0.34],
-      [0.2, -0.3, 0.12, 1, 0.44],
-      [0.13, -0.36, 0.26, 2.8, 0.28],
-      [-0.2, -0.33, 0.21, -0.85, 0.32],
+      [
+        [-0.28, -0.36, -0.16],
+        [-0.19, -0.04, -0.19],
+        [0.03, 0.27, -0.02],
+        [0.27, -0.03, 0.15],
+      ],
+      [
+        [-0.24, -0.17, 0.19],
+        [-0.08, -0.06, 0.26],
+        [0.14, 0.04, 0.24],
+        [0.25, -0.26, 0.2],
+      ],
     ] as const
-  ).entries()) {
-    const leaf = MeshBuilder.CreatePolyhedron(
-      `leaf-${index}`,
-      { custom: LEAF_BLADE },
-      scene,
-    );
-    leaf.scaling.set(0.22, 0.15, length);
-    leaf.position.set(x, y, z);
-    leaf.rotation.set(0.33, angle, -0.24);
-    pieces.leaves.push(leaf);
-  }
-  for (const [index, [x, y, z, size]] of (
-    [
-      [0.079, 0.057, 0.024, 0.064],
-      [0.177, -0.137, 0.036, 0.046],
-      [0.02, -0.3, 0.11, 0.048],
-    ] as const
-  ).entries()) {
-    const ember = MeshBuilder.CreatePolyhedron(
-      `ember-${index}`,
-      { type: 1, size },
-      scene,
-    );
-    ember.position.set(x, y, z);
-    ember.rotation.set(-0.3, 0.25, 0.48);
-    pieces["fading-light"].push(ember);
-  }
-  for (const [part, color, glow] of [
-    ["wood", [0.84, 0.71, 0.48], 0],
-    ["roots", [0.29, 0.2, 0.13], 0],
-    ["leaves", [0.15, 0.35, 0.23], 0],
-    ["fading-light", [0.65, 0.35, 0.93], 0.95],
-  ] as const)
-    merge(
-      root,
-      part,
-      pieces[part],
-      surface(scene, `living-rubble-${part}`, color, glow),
-    );
+  ).entries())
+    pieces.add("metal", tube(scene, `bent-frame-${index}`, path, 0.041, 4));
+  pieces.merge();
 }
 
 /** A neutral recovery case with reinforced ends and an amber locator. */
 function salvage(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const pieces = {
-    shell: [] as Mesh[],
-    frame: [] as Mesh[],
-    lamp: [] as Mesh[],
-  };
+  const pieces = batches(root, {
+    shell: surface(scene, "salvage-shell", [0.49, 0.5, 0.46]),
+    frame: surface(scene, "salvage-frame", [0.19, 0.23, 0.23]),
+    lamp: surface(scene, "salvage-lamp", SALVAGE_COLOR, 0.55),
+  });
   const box = (
-    part: keyof typeof pieces,
-    [x, y, z]: readonly [number, number, number],
-    [width, height, depth]: readonly [number, number, number],
-  ) => {
-    const mesh = MeshBuilder.CreateBox(
-      `${part}-${pieces[part].length}`,
-      { width, height, depth },
-      scene,
+    part: "frame" | "lamp",
+    position: Vec3,
+    [width, height, depth]: Vec3,
+  ) =>
+    pieces.add(
+      part,
+      place(
+        MeshBuilder.CreateBox(
+          `${part}-${pieces.count(part)}`,
+          { width, height, depth },
+          scene,
+        ),
+        { position },
+      ),
     );
-    mesh.position.set(x, y, z);
-    pieces[part].push(mesh);
-  };
   const outline = [
     [-0.34, -0.3],
     [0.34, -0.3],
@@ -1366,23 +733,15 @@ function salvage(scene: Scene, name: string) {
     [-0.46, 0.18],
     [-0.46, -0.18],
   ] as const;
-  const vertex = [
-    ...outline.map(([x, z]) => [x * 0.9, -0.23, z * 0.9]),
-    ...outline.map(([x, z]) => [x, 0.13, z]),
-    ...outline.map(([x, z]) => [x * 0.83, 0.24, z * 0.83]),
-  ];
-  const face = [
-    [0, 1, 2, 3, 4, 5, 6, 7],
-    [23, 22, 21, 20, 19, 18, 17, 16],
-  ];
-  for (const offset of [0, 8])
-    for (let i = 0; i < outline.length; i++) {
-      const a = offset + i;
-      const b = offset + ((i + 1) % outline.length);
-      face.push([b, a, a + 8, b + 8]);
-    }
-  pieces.shell.push(
-    MeshBuilder.CreatePolyhedron("case", { custom: { vertex, face } }, scene),
+  const ring = (scale: number, y: number) =>
+    outline.map(([x, z]): Vec3 => [x * scale, y, z * scale]);
+  pieces.add(
+    "shell",
+    MeshBuilder.CreatePolyhedron(
+      "case",
+      { custom: loft([ring(0.9, -0.23), ring(1, 0.13), ring(0.83, 0.24)]) },
+      scene,
+    ),
   );
   box("frame", [0, 0.248, 0], [0.47, 0.06, 0.35]);
   box("lamp", [0, 0.283, 0], [0.37, 0.025, 0.18]);
@@ -1394,24 +753,7 @@ function salvage(scene: Scene, name: string) {
     box("frame", [0, 0.05, side * 0.285], [0.43, 0.13, 0.064]);
     box("lamp", [0, 0.05, side * 0.322], [0.33, 0.061, 0.018]);
   }
-  merge(
-    root,
-    "shell",
-    pieces.shell,
-    surface(scene, "salvage-shell", [0.49, 0.5, 0.46]),
-  );
-  merge(
-    root,
-    "frame",
-    pieces.frame,
-    surface(scene, "salvage-frame", [0.19, 0.23, 0.23]),
-  );
-  merge(
-    root,
-    "lamp",
-    pieces.lamp,
-    surface(scene, "salvage-lamp", SALVAGE_COLOR, 0.55),
-  );
+  pieces.merge();
   clip(
     root,
     "idle",
@@ -1427,32 +769,36 @@ function salvage(scene: Scene, name: string) {
 /** An open braced frame sized to the blueprint's footprint and stage height. */
 function scaffold(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const frame: Mesh[] = [];
-  const fittings: Mesh[] = [];
-  const safety: Mesh[] = [];
+  const pieces = batches(root, {
+    frame: surface(scene, "scaffold-frame", [0.17, 0.24, 0.27]),
+    fittings: surface(scene, "scaffold-fittings", [0.35, 0.43, 0.45]),
+    safety: surface(scene, "scaffold-safety", [0.9, 0.59, 0.19]),
+  });
   const beam = (
-    batch: Mesh[],
-    [width, height, depth]: readonly [number, number, number],
-    [x, y, z]: readonly [number, number, number],
+    part: "frame" | "fittings" | "safety",
+    [width, height, depth]: Vec3,
+    position: Vec3,
     tilt = 0,
     yaw = 0,
-  ) => {
-    const mesh = MeshBuilder.CreateBox(
-      `beam-${batch.length}`,
-      { width, height, depth },
-      scene,
+  ) =>
+    pieces.add(
+      part,
+      place(
+        MeshBuilder.CreateBox(
+          `beam-${pieces.count(part)}`,
+          { width, height, depth },
+          scene,
+        ),
+        { position, rotation: [0, yaw, tilt] },
+      ),
     );
-    mesh.position.set(x, y, z);
-    mesh.rotation.set(0, yaw, tilt);
-    batch.push(mesh);
-  };
   const edge = 0.445;
   const sides = [-edge, edge];
   for (const x of sides)
     for (const z of sides) {
-      beam(frame, [0.055, 0.94, 0.055], [x, 0, z]);
-      beam(fittings, [0.11, 0.1, 0.11], [x, -0.45, z]);
-      beam(safety, [0.091, 0.17, 0.091], [x, 0.415, z]);
+      beam("frame", [0.055, 0.94, 0.055], [x, 0, z]);
+      beam("fittings", [0.11, 0.1, 0.11], [x, -0.45, z]);
+      beam("safety", [0.091, 0.17, 0.091], [x, 0.415, z]);
     }
 
   const lower = -0.36;
@@ -1462,59 +808,43 @@ function scaffold(scene: Scene, name: string) {
   const lean = Math.atan2(span, edge);
   for (const yaw of [0, Math.PI / 2]) {
     for (const side of sides) {
-      const at = (along: number, y: number): [number, number, number] =>
+      const at = (along: number, y: number): Vec3 =>
         yaw ? [side, y, -along] : [along, y, side];
-      beam(frame, [2 * edge, 0.075, 0.05], at(0, lower), 0, yaw);
-      beam(frame, [2 * edge, 0.09, 0.055], at(0, upper), 0, yaw);
-      beam(frame, [0.035, span, 0.035], at(0, (lower + upper) / 2));
+      beam("frame", [2 * edge, 0.075, 0.05], at(0, lower), 0, yaw);
+      beam("frame", [2 * edge, 0.09, 0.055], at(0, upper), 0, yaw);
+      beam("frame", [0.035, span, 0.035], at(0, (lower + upper) / 2));
       for (const sign of [-1, 1]) {
         beam(
-          fittings,
+          "fittings",
           [diagonal, 0.035, 0.026],
           at((sign * edge) / 2, (lower + upper) / 2),
           sign * lean,
           yaw,
         );
-        beam(safety, [0.14, 0.075, 0.065], at(sign * 0.352, upper), 0, yaw);
+        beam("safety", [0.14, 0.075, 0.065], at(sign * 0.352, upper), 0, yaw);
       }
     }
   }
-  merge(
-    root,
-    "frame",
-    frame,
-    surface(scene, "scaffold-frame", [0.17, 0.24, 0.27]),
-  );
-  merge(
-    root,
-    "fittings",
-    fittings,
-    surface(scene, "scaffold-fittings", [0.35, 0.43, 0.45]),
-  );
-  merge(
-    root,
-    "safety",
-    safety,
-    surface(scene, "scaffold-safety", [0.9, 0.59, 0.19]),
-  );
+  pieces.merge();
 }
 
 /** A curled, translucent puff scaled and faded by the damage view. */
 function smoke(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const puff = MeshBuilder.CreateIcoSphere(
-    "puff",
-    { radius: 1, subdivisions: 3, flat: false },
-    scene,
-  );
-  puff.parent = root;
   const material = surface(scene, name, Color3.White());
   material.alpha = 0.86;
-  puff.material = material;
+  const puff = place(
+    MeshBuilder.CreateIcoSphere(
+      "puff",
+      { radius: 1, subdivisions: 3, flat: false },
+      scene,
+    ),
+    { parent: root, material },
+  );
   const soot = new Color3(0.36, 0.36, 0.36);
   const ash = new Color3(0.72, 0.71, 0.68);
+  paint(puff, (_x, y) => Color3.Lerp(soot, ash, (y + 1) / 2));
   const positions = puff.getVerticesData(VertexBuffer.PositionKind)!;
-  const colors: number[] = [];
   for (let index = 0; index < positions.length; index += 3) {
     const x = positions[index]!;
     const y = positions[index + 1]!;
@@ -1524,11 +854,8 @@ function smoke(scene: Scene, name: string) {
     positions[index] = x * radius + 0.13 * y;
     positions[index + 1] = y * 0.47 + 0.06 * roll;
     positions[index + 2] = z * radius + 0.1 * y * y;
-    const color = Color3.Lerp(soot, ash, (y + 1) / 2);
-    colors.push(color.r, color.g, color.b, 1);
   }
   puff.setVerticesData(VertexBuffer.PositionKind, positions);
-  puff.setVerticesData(VertexBuffer.ColorKind, colors);
 }
 
 /** Flickering flame tongues with rising sparks, based at the origin. */
@@ -1562,20 +889,17 @@ function fire(scene: Scene, name: string) {
       },
       scene,
     );
+    paint(tongue, (_x, y) =>
+      Color3.Lerp(hot, orange, Math.min(1, (y / height) * 1.35)),
+    );
     const positions = tongue.getVerticesData(VertexBuffer.PositionKind)!;
-    const colors: number[] = [];
     for (let vertex = 0; vertex < positions.length; vertex += 3) {
-      const rise = positions[vertex + 1]! / height;
-      const sweep = rise * rise;
+      const sweep = (positions[vertex + 1]! / height) ** 2;
       positions[vertex] = positions[vertex]! + bendX * sweep;
       positions[vertex + 2] = positions[vertex + 2]! + bendZ * sweep;
-      const color = Color3.Lerp(hot, orange, Math.min(1, rise * 1.35));
-      colors.push(color.r, color.g, color.b, 1);
     }
     tongue.setVerticesData(VertexBuffer.PositionKind, positions);
-    tongue.setVerticesData(VertexBuffer.ColorKind, colors);
-    tongue.parent = node;
-    tongue.material = material;
+    place(tongue, { parent: node, material });
     return node;
   });
   const sparkMaterial = unlit(scene, "spark", new Color3(1, 0.85, 0.45));
@@ -1615,28 +939,17 @@ function fire(scene: Scene, name: string) {
 
 /** A wilted leaf shed by damaged living constructs. */
 function leaf(scene: Scene, name: string) {
-  const mesh = MeshBuilder.CreatePolyhedron(
-    name,
-    { custom: LEAF_BLADE },
-    scene,
-  );
+  const mesh = leafBlade(scene, name);
   mesh.scaling.set(0.29, 0.13, 0.58);
   mesh.material = surface(scene, name, Color3.White());
-
   const green = new Color3(0.55, 0.63, 0.24).toLinearSpace();
   const ochre = new Color3(0.87, 0.65, 0.27).toLinearSpace();
   const underside = new Color3(0.42, 0.38, 0.14).toLinearSpace();
-  const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
-  const colors: number[] = [];
-  for (let index = 0; index < positions.length; index += 3) {
-    const x = positions[index]!;
-    const y = positions[index + 1]!;
-    const z = positions[index + 2]!;
-    const edge = Math.max(Math.abs(x), Math.abs(z)) * 2;
-    const color = y < 0 ? underside : Color3.Lerp(green, ochre, edge);
-    colors.push(color.r, color.g, color.b, 1);
-  }
-  mesh.setVerticesData(VertexBuffer.ColorKind, colors);
+  paint(mesh, (x, y, z) =>
+    y < 0
+      ? underside
+      : Color3.Lerp(green, ochre, Math.max(Math.abs(x), Math.abs(z)) * 2),
+  );
 }
 
 /** A splintered chip of pale living wood shed by damaged constructs. */
@@ -1651,35 +964,26 @@ function fragment(scene: Scene, name: string) {
 
 /** A faint violet wisp of light leaking from a damaged living core. */
 function leak(scene: Scene, name: string) {
-  const profile = [
-    { x: -0.12, y: -0.18, z: 0.04, radius: 0.008 },
-    { x: -0.06, y: 0.01, z: -0.025, radius: 0.1 },
-    { x: 0.09, y: 0.22, z: -0.07, radius: 0.14 },
-    { x: 0.16, y: 0.43, z: 0, radius: 0.105 },
-    { x: 0.1, y: 0.62, z: 0.14, radius: 0.06 },
-    { x: -0.06, y: 0.8, z: 0.22, radius: 0.006 },
-  ];
-  const mesh = MeshBuilder.CreateTube(
-    name,
-    {
-      path: profile.map(({ x, y, z }) => new Vector3(x, y, z)),
-      radiusFunction: (index) => profile[index]!.radius,
-      tessellation: 7,
-      cap: Mesh.CAP_ALL,
-    },
+  const mesh = tube(
     scene,
+    name,
+    [
+      [-0.12, -0.18, 0.04],
+      [-0.06, 0.01, -0.025],
+      [0.09, 0.22, -0.07],
+      [0.16, 0.43, 0],
+      [0.1, 0.62, 0.14],
+      [-0.06, 0.8, 0.22],
+    ],
+    [0.008, 0.1, 0.14, 0.105, 0.06, 0.006],
+    7,
   );
   mesh.material = unlit(scene, name, Color3.White());
   const violet = BOLT_COLOR.toLinearSpace();
   const lilac = new Color3(0.94, 0.76, 1).toLinearSpace();
-  const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
-  const colors: number[] = [];
-  for (let index = 1; index < positions.length; index += 3) {
-    const glow = Math.max(0, 1 - Math.abs(positions[index]! - 0.22) / 0.42);
-    const color = Color3.Lerp(violet, lilac, glow);
-    colors.push(color.r, color.g, color.b, 1);
-  }
-  mesh.setVerticesData(VertexBuffer.ColorKind, colors);
+  paint(mesh, (_x, y) =>
+    Color3.Lerp(violet, lilac, Math.max(0, 1 - Math.abs(y - 0.22) / 0.42)),
+  );
 }
 
 /** A falling drop for wounded biological actors. */
@@ -1700,21 +1004,12 @@ function wound(scene: Scene, name: string) {
     },
     scene,
   );
-  drop.parent = root;
-  drop.material = unlit(scene, name, Color3.White());
+  place(drop, { parent: root, material: unlit(scene, name, Color3.White()) });
   const crimson = new Color3(0.56, 0.08, 0.14).toLinearSpace();
   const coral = new Color3(0.95, 0.42, 0.36).toLinearSpace();
-  const positions = drop.getVerticesData(VertexBuffer.PositionKind)!;
-  const colors: number[] = [];
-  for (let index = 1; index < positions.length; index += 3) {
-    const highlight = Math.max(
-      0,
-      1 - Math.abs(positions[index]! - 0.012) / 0.07,
-    );
-    const color = Color3.Lerp(crimson, coral, highlight);
-    colors.push(color.r, color.g, color.b, 1);
-  }
-  drop.setVerticesData(VertexBuffer.ColorKind, colors);
+  paint(drop, (_x, y) =>
+    Color3.Lerp(crimson, coral, Math.max(0, 1 - Math.abs(y - 0.012) / 0.07)),
+  );
 }
 
 /** A healing halo and rising marks, distinct from wound drops. */
@@ -1775,29 +1070,11 @@ function bird(scene: Scene, name: string) {
   ) => {
     const perimeter =
       side < 0 ? [outline[0]!, ...outline.slice(1).reverse()] : outline;
-    const count = perimeter.length;
-    const vertex = [-thickness / 2, thickness / 2].flatMap((y) =>
-      perimeter.map(([x, z]) => [side * x, y, z]),
-    );
-    const bottom = perimeter.map((_, i) => i);
-    // The fan starts at the same point on both faces of the notched tips.
-    const face = [
-      bottom,
-      [
-        count,
-        ...bottom
-          .slice(1)
-          .reverse()
-          .map((i) => count + i),
-      ],
-    ];
-    for (let a = 0; a < count; a++) {
-      const b = (a + 1) % count;
-      face.push([b, a, a + count, b + count]);
-    }
+    const ring = (y: number) =>
+      perimeter.map(([x, z]): Vec3 => [side * x, y, z]);
     return MeshBuilder.CreatePolyhedron(
       name,
-      { custom: { vertex, face } },
+      { custom: loft([ring(-thickness / 2), ring(thickness / 2)]) },
       scene,
     );
   };
@@ -1902,18 +1179,21 @@ function bird(scene: Scene, name: string) {
 /** Each model's builder fills an empty scene with nodes, materials, and clips. */
 const BUILDERS = {
   ...CIRCLE_MODELS,
-  "command-center": building(createCommandCenterDetails),
-  barracks: building(createBarracksDetails, { batchStatic: true }),
-  refinery: building(createRefineryDetails, { batchStatic: true }),
-  relay: building(createRelayDetails, { batchStatic: true }),
-  sentry: building(createSentryDetails),
+  // The browser checks use the cabin and canopy as placement landmarks.
+  "command-center": building(createCommandCenterDetails, [
+    "command-center-command-cabin",
+    "command-center-entry-canopy",
+  ]),
+  barracks: building(createBarracksDetails),
+  refinery: building(createRefineryDetails),
+  relay: building(createRelayDetails),
+  // Runtime aim can rotate the turret independently of its authored clips.
+  sentry: building(createSentryDetails, ["sentry-turret"]),
   harvester,
   wolf,
-  "circle-briar-ram": briarRam,
   "materials-mound": materialsMound,
   salvage,
   rubble,
-  "living-rubble": livingRubble,
   foundation,
   scaffold,
   tracer,

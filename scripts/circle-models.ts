@@ -1,17 +1,25 @@
 import {
-  Mesh,
   MeshBuilder,
   Quaternion,
   TransformNode,
   Vector3,
 } from "@babylonjs/core";
 
-import { clip, merge, surface } from "./model-toolkit.ts";
+import {
+  batches,
+  byMaterial,
+  clip,
+  foldedBlade,
+  merge,
+  place,
+  skin,
+  surface,
+  tube,
+} from "./model-toolkit.ts";
 import { seededRandom } from "./sprite-sheet.ts";
 
-import type { Scene, StandardMaterial } from "@babylonjs/core";
-
-type Vec3 = readonly [number, number, number];
+import type { Mesh, Scene, StandardMaterial } from "@babylonjs/core";
+import type { Vec3 } from "./model-toolkit.ts";
 
 /** The Thornspire's crown opens and closes once per shot. */
 const FIRE_SECONDS = 0.4;
@@ -21,28 +29,28 @@ const EXIT_SECONDS = 1.2;
 const ENTRANCE_REST_ANGLE = 0.45;
 const ENTRANCE_OPEN_ANGLE = 1.35;
 
+/** Shared Circle finishes: owner-recolored marks and the violet core light. */
+const OWNER_MARK: Vec3 = [0.48, 0.76, 0.59];
+const CORE_LIGHT: Vec3 = [0.58, 0.28, 0.88];
+const CORE_GLOW = 0.6;
+
 /** Folded, pointed leaf with a raised midrib and a solid underside. */
-export const LEAF_BLADE = {
-  vertex: [
-    [0, 0, -0.5],
-    [-0.34, 0.02, -0.27],
-    [-0.5, 0, 0.04],
-    [-0.28, 0.12, 0.31],
-    [0, 0.32, 0.5],
-    [0.28, 0.12, 0.31],
-    [0.5, 0, 0.04],
-    [0.34, 0.02, -0.27],
-    [0, 0.5, 0.02],
-    [0, -0.24, 0.02],
-  ],
-  face: Array.from({ length: 8 }, (_, edge) => {
-    const next = (edge + 1) % 8;
-    return [
-      [edge, next, 8],
-      [next, edge, 9],
-    ];
-  }).flat(),
-};
+const LEAF_BLADE = foldedBlade([
+  [0, 0, -0.5],
+  [-0.34, 0.02, -0.27],
+  [-0.5, 0, 0.04],
+  [-0.28, 0.12, 0.31],
+  [0, 0.32, 0.5],
+  [0.28, 0.12, 0.31],
+  [0.5, 0, 0.04],
+  [0.34, 0.02, -0.27],
+  [0, 0.5, 0.02],
+  [0, -0.24, 0.02],
+]);
+
+export function leafBlade(scene: Scene, name: string) {
+  return MeshBuilder.CreatePolyhedron(name, { custom: LEAF_BLADE }, scene);
+}
 
 type StructureRecipe = {
   halfWidth: number;
@@ -204,29 +212,37 @@ const FRAMES = {
   },
   /** A low bower leaves the Lifebloom basin open at the front. */
   basin: ({ name, scene, root, wood, stem, plate }: FrameContext) => {
-    const foot = MeshBuilder.CreateCylinder(
-      `${name}-growth-roots-basin-foot`,
+    place(
+      MeshBuilder.CreateCylinder(
+        `${name}-growth-roots-basin-foot`,
+        {
+          height: 0.3,
+          diameterTop: 1.72,
+          diameterBottom: 1.27,
+          tessellation: 20,
+        },
+        scene,
+      ),
       {
-        height: 0.3,
-        diameterTop: 1.72,
-        diameterBottom: 1.27,
-        tessellation: 20,
+        parent: root,
+        material: wood,
+        position: [0, 0.22, 0.12],
+        scaling: [1, 1, 0.67],
       },
-      scene,
     );
-    foot.parent = root;
-    foot.position.set(0, 0.22, 0.12);
-    foot.scaling.z = 0.67;
-    foot.material = wood;
-    const rim = MeshBuilder.CreateTorus(
-      `${name}-growth-roots-basin-rim`,
-      { diameter: 1.75, thickness: 0.15, tessellation: 24 },
-      scene,
+    place(
+      MeshBuilder.CreateTorus(
+        `${name}-growth-roots-basin-rim`,
+        { diameter: 1.75, thickness: 0.15, tessellation: 24 },
+        scene,
+      ),
+      {
+        parent: root,
+        material: wood,
+        position: [0, 0.39, 0.12],
+        scaling: [1, 1, 0.67],
+      },
     );
-    rim.parent = root;
-    rim.position.set(0, 0.39, 0.12);
-    rim.scaling.z = 0.67;
-    rim.material = wood;
     const sap = surface(scene, `${name}-sap`, [0.4, 0.2, 0.72], 0.32);
     plate("growth-ribs-pool", [0, 0.34, 0.12], [1.75, 0.13, 1.17], sap);
     stem(
@@ -419,26 +435,27 @@ const FRAMES = {
       pivot.parent = crown;
       pivot.rotation.y = (i * Math.PI) / 2;
       petals.push(pivot);
-      const petal = MeshBuilder.CreatePolyhedron(
-        `${name}-growth-canopy-crown-${i}`,
-        { custom: LEAF_BLADE },
-        scene,
-      );
-      petal.parent = pivot;
-      petal.material = i % 2 ? leaf : wood;
-      petal.position.set(0, 0.225, 0.205);
-      petal.scaling.set(0.245, 0.18, 0.59);
-      petal.rotation.x = -1.28;
+      place(leafBlade(scene, `${name}-growth-canopy-crown-${i}`), {
+        parent: pivot,
+        material: i % 2 ? leaf : wood,
+        position: [0, 0.225, 0.205],
+        rotation: [-1.28, 0, 0],
+        scaling: [0.245, 0.18, 0.59],
+      });
     }
-    const focus = MeshBuilder.CreatePolyhedron(
-      `${name}-growth-canopy-crown-core`,
-      { type: 1, size: 0.2 },
-      scene,
+    const focus = place(
+      MeshBuilder.CreatePolyhedron(
+        `${name}-growth-canopy-crown-core`,
+        { type: 1, size: 0.2 },
+        scene,
+      ),
+      {
+        parent: crown,
+        material: core,
+        position: [0, 0.2, 0],
+        scaling: [0.76, 1.08, 0.76],
+      },
     );
-    focus.parent = crown;
-    focus.material = core;
-    focus.position.y = 0.2;
-    focus.scaling.set(0.76, 1.08, 0.76);
     return () =>
       clip(
         root,
@@ -737,7 +754,7 @@ type CircleStructureId = keyof typeof CIRCLE_STRUCTURES;
  * Materials for living damage, named by stage so presentation can select
  * them after merging or skinning.
  */
-export function livingDamageMaterials(scene: Scene, prefix: string) {
+function livingDamageMaterials(scene: Scene, prefix: string) {
   const finish = (part: string, color: Vec3, glow = 0) =>
     surface(scene, `${prefix}-${part}`, color, glow);
   return {
@@ -919,7 +936,7 @@ function addEntrance(
     hinge.rotation.y = side * ENTRANCE_REST_ANGLE;
     const panelName = `${name}-growth-canopy-entrance-${side}`;
     const panel = bladePanels
-      ? MeshBuilder.CreatePolyhedron(panelName, { custom: LEAF_BLADE }, scene)
+      ? leafBlade(scene, panelName)
       : MeshBuilder.CreateSphere(
           panelName,
           { diameter: 1, segments: 6 },
@@ -981,24 +998,15 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     "leaves",
     recipe.frame === "tree" ? [0.19, 0.45, 0.26] : [0.12, 0.34, 0.22],
   );
-  const core = finish("core", [0.58, 0.28, 0.88], 0.6);
+  const core = finish("core", CORE_LIGHT, CORE_GLOW);
   const ribs: Rib[] = [];
   const plates: Plate[] = [];
   const stem: FrameContext["stem"] = (id, points, radius, material = wood) => {
     if (id.startsWith("growth-ribs")) ribs.push({ points, radius });
-    const mesh = MeshBuilder.CreateTube(
-      `${name}-${id}`,
-      {
-        path: points.map((point) => Vector3.FromArray(point)),
-        radius,
-        tessellation: 7,
-        cap: 3,
-      },
-      scene,
-    );
-    mesh.parent = root;
-    mesh.material = material;
-    return mesh;
+    return place(tube(scene, `${name}-${id}`, points, radius, 7), {
+      parent: root,
+      material,
+    });
   };
   const plate: FrameContext["plate"] = (
     id,
@@ -1008,18 +1016,16 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     shape,
   ) => {
     const meshName = `${name}-${id}`;
-    const mesh =
+    const mesh = place(
       shape === "blade"
-        ? MeshBuilder.CreatePolyhedron(meshName, { custom: LEAF_BLADE }, scene)
+        ? leafBlade(scene, meshName)
         : MeshBuilder.CreateSphere(
             meshName,
             { diameter: 1, segments: 6 },
             scene,
-          );
-    mesh.parent = root;
-    mesh.material = material;
-    mesh.position.set(...position);
-    mesh.scaling.set(...size);
+          ),
+      { parent: root, material, position, scaling: size },
+    );
     if (id.startsWith("growth-canopy") && material === leaf)
       plates.push({ position, size });
     return mesh;
@@ -1056,7 +1062,7 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     recipe.entrance &&
     addEntrance(scene, name, root, recipe.entrance, leaf, core);
   if (recipe.owned) {
-    const owner = finish("owner", [0.48, 0.76, 0.59]);
+    const owner = finish("owner", OWNER_MARK);
     const marks = recipe.ownerMarks ?? [[0, height * 0.62, halfDepth * 0.85]];
     for (const [index, position] of marks.entries())
       plate(`growth-canopy-owner-${index}`, position, [0.35, 0.3, 0.12], owner);
@@ -1085,21 +1091,15 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
     "damage-moderate",
     "damage-critical",
   ]) {
-    const groups = new Map<StandardMaterial, Mesh[]>();
-    for (const mesh of root.getChildMeshes(true)) {
-      if (
-        !(mesh instanceof Mesh) ||
-        !mesh.name.includes(layer) ||
-        mesh === pulse ||
-        mesh.name.endsWith("entrance-glow")
-      )
-        continue;
-      const material = mesh.material as StandardMaterial;
-      const group = groups.get(material) ?? [];
-      group.push(mesh);
-      groups.set(material, group);
-    }
-    for (const [material, parts] of groups)
+    const layerParts = root
+      .getChildMeshes<Mesh>(true)
+      .filter(
+        (mesh) =>
+          mesh.name.includes(layer) &&
+          mesh !== pulse &&
+          !mesh.name.endsWith("entrance-glow"),
+      );
+    for (const [material, parts] of byMaterial(layerParts))
       merge(root, `${name}-${layer}-${material.name}`, parts, material);
   }
   clip(
@@ -1119,9 +1119,478 @@ function buildCircleStructure(scene: Scene, name: CircleStructureId) {
   addExitClip?.();
 }
 
-export const CIRCLE_MODELS = Object.fromEntries(
-  (Object.keys(CIRCLE_STRUCTURES) as CircleStructureId[]).map((id) => [
-    id,
-    (scene: Scene) => buildCircleStructure(scene, id),
-  ]),
-) as Record<CircleStructureId, (scene: Scene) => void>;
+/**
+ * A low, broad living construct facing +Z: pale armor plates over dark
+ * joints, a sheltered violet core, and a thorn-framed head that strikes.
+ */
+function briarRam(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const armor = surface(scene, "ram-armor", [0.95, 0.85, 0.65]);
+  const bark = surface(scene, "ram-bark", [0.43, 0.32, 0.2]);
+  const joints = surface(scene, "ram-joints", [0.3, 0.24, 0.16]);
+  const foliage = surface(scene, "ram-foliage", [0.19, 0.39, 0.25]);
+  const core = surface(scene, "ram-core-fading-light", CORE_LIGHT, CORE_GLOW);
+  const owner = surface(scene, "ram-owner", OWNER_MARK);
+  const plate = (
+    id: string,
+    scaling: Vec3,
+    position: Vec3,
+    material: StandardMaterial,
+    parent = root,
+  ) => place(leafBlade(scene, id), { parent, material, position, scaling });
+  const branch = (
+    id: string,
+    points: readonly Vec3[],
+    radii: readonly number[],
+    material: StandardMaterial,
+    parent = root,
+  ) => place(tube(scene, id, points, radii), { parent, material });
+  plate("ram-body", [1.06, 0.65, 1.48], [0, 0.77, -0.03], joints);
+  plate("ram-core", [0.49, 0.22, 0.46], [0, 0.75, 0.38], core).rotation.x =
+    -0.65;
+  // Pale plates overlap toward the tail. Dark leaf edges frame the seams.
+  for (const [index, [width, y, z]] of [
+    [0.88, 0.99, -0.46],
+    [1.05, 1.07, -0.18],
+    [1.21, 1.09, 0.14],
+    [1.12, 1.05, 0.39],
+  ].entries()) {
+    plate(
+      `ram-seam-${index}`,
+      [width!, 0.23, 0.6],
+      [0, y!, z! - 0.07],
+      foliage,
+    );
+    plate(`ram-plate-${index}`, [width!, 0.28, 0.59], [0, y!, z!], armor);
+  }
+  for (const side of [-1, 1]) {
+    plate(
+      `ram-flank-${side}`,
+      [0.39, 0.17, 1.02],
+      [side * 0.43, 0.86, -0.03],
+      bark,
+    ).rotation.z = -side * 1.14;
+    plate(
+      `ram-shoulder-${side}`,
+      [0.37, 0.15, 0.69],
+      [side * 0.42, 0.91, 0.28],
+      armor,
+    ).rotation.set(-0.24, -side * 0.09, -side * 0.95);
+    plate(
+      `ram-shoulder-mark-${side}`,
+      [0.24, 0.055, 0.46],
+      [side * 0.501, 0.978, 0.3],
+      owner,
+    ).rotation.set(-0.24, -side * 0.09, -side * 0.95);
+    plate(
+      `ram-rear-mark-${side}`,
+      [0.25, 0.07, 0.46],
+      [side * 0.269, 1.05, -0.54],
+      owner,
+    ).rotation.set(-0.34, side * 0.27, -side * 0.4);
+  }
+  const head = new TransformNode("ram-head", scene);
+  head.parent = root;
+  head.position.set(0, 0.78, 0.56);
+  plate("ram-skull", [0.57, 0.43, 0.59], [0, 0.02, 0.18], joints, head);
+  plate(
+    "ram-brow",
+    [0.65, 0.22, 0.55],
+    [0, 0.13, 0.16],
+    armor,
+    head,
+  ).rotation.x = 0.42;
+  plate(
+    "ram-muzzle",
+    [0.46, 0.24, 0.35],
+    [0, -0.08, 0.36],
+    bark,
+    head,
+  ).rotation.y = Math.PI;
+  plate(
+    "ram-brow-mark",
+    [0.24, 0.06, 0.29],
+    [0, 0.255, 0.15],
+    owner,
+    head,
+  ).rotation.x = 0.42;
+  for (const side of [-1, 1]) {
+    branch(
+      `ram-thorn-${side}`,
+      [
+        [side * 0.2, -0.03, 0.22],
+        [side * 0.35, 0.02, 0.29],
+        [side * 0.41, 0.1, 0.43],
+        [side * 0.37, 0.22, 0.55],
+        [side * 0.29, 0.35, 0.58],
+      ],
+      [0.116, 0.106, 0.078, 0.044, 0.001],
+      armor,
+      head,
+    );
+    plate(
+      `ram-eye-${side}`,
+      [0.062, 0.06, 0.13],
+      [side * 0.212, 0.09, 0.297],
+      core,
+      head,
+    ).rotation.y = side * 0.38;
+  }
+  for (const side of [-1, 1])
+    plate(
+      `ram-core-vent-${side}`,
+      [0.135, 0.2, 0.34],
+      [side * 0.43, 0.75, 0.29],
+      core,
+    ).rotation.set(-0.18, -side * 0.22, -side * 0.46);
+  const hips = [
+    [-0.36, 0.4],
+    [0.36, 0.4],
+    [-0.32, -0.48],
+    [0.32, -0.48],
+  ].map(([x, z], index) => {
+    const hip = new TransformNode(`ram-leg-${index}`, scene);
+    hip.parent = root;
+    hip.position.set(x!, 0.72, z!);
+    const side = Math.sign(x!);
+    const front = Math.sign(z!);
+    branch(
+      `ram-root-${index}`,
+      [
+        [0, 0.08, 0],
+        [side * 0.07, -0.21, front * 0.07],
+        [side * 0.045, -0.47, -0.09],
+        [side * 0.065, -0.65, -0.025],
+      ],
+      [0.18, 0.151, 0.105, 0.118],
+      joints,
+      hip,
+    );
+    plate(
+      `ram-shin-${index}`,
+      [0.29, 0.18, 0.38],
+      [side * 0.075, -0.32, front * 0.05 + 0.08],
+      bark,
+      hip,
+    ).rotation.x = -1.42;
+    plate(
+      `ram-foot-${index}`,
+      [0.33, 0.21, 0.39],
+      [side * 0.063, -0.66, 0.033],
+      armor,
+      hip,
+    ).rotation.y = side * 0.13;
+    return hip;
+  });
+  // Stage-named materials skin each damage stage into its own mesh.
+  const { crack, leak, split, splinter, flicker } = livingDamageMaterials(
+    scene,
+    "ram",
+  );
+  const sliver = (
+    id: string,
+    scaling: Vec3,
+    position: Vec3,
+    rotation: Vec3,
+    material: StandardMaterial,
+    parent = root,
+  ) =>
+    place(MeshBuilder.CreateBox(id, { size: 1 }, scene), {
+      parent,
+      material,
+      position,
+      rotation,
+      scaling,
+    });
+  // Cracks cross the back plates and flanks.
+  for (const [i, [x, y, z]] of (
+    [
+      [0.22, 1.22, 0.15],
+      [-0.17, 1.2, -0.16],
+      [0.08, 1.136, -0.45],
+    ] as const
+  ).entries())
+    branch(
+      `ram-damage-moderate-crack-${i}`,
+      [
+        [x - 0.12, y - 0.022, z - 0.15],
+        [x - 0.06, y, z - 0.04],
+        [x + 0.01, y - 0.02, z - 0.015],
+        [x + 0.11, y - 0.042, z + 0.13],
+      ],
+      [0.01, 0.023, 0.025, 0.009],
+      crack,
+    );
+  for (const side of [-1, 1])
+    sliver(
+      `ram-damage-moderate-crack-flank-${side}`,
+      [0.035, 0.22, 0.055],
+      [side * 0.503, 0.89, -0.18],
+      [side * 0.36, 0, -side * 0.44],
+      crack,
+    );
+  sliver(
+    "ram-damage-moderate-crack-head",
+    [0.04, 0.02, 0.22],
+    [0.126, 0.22, 0.21],
+    [0.37, 0.42, 0],
+    crack,
+    head,
+  );
+  plate(
+    "ram-damage-moderate-leak-0",
+    [0.1, 0.07, 0.13],
+    [0.17, 1.216, 0.12],
+    leak,
+  );
+  plate(
+    "ram-damage-moderate-leak-1",
+    [0.08, 0.16, 0.11],
+    [-0.49, 0.82, -0.18],
+    leak,
+  );
+  // Deeper splits open the plates and splinters jut from the breaks.
+  for (const [i, [x, y, z, turn]] of (
+    [
+      [-0.02, 1.223, 0.33, 0.62],
+      [0.14, 1.182, -0.23, -0.62],
+    ] as const
+  ).entries()) {
+    sliver(
+      `ram-damage-critical-split-${i}`,
+      [0.083, 0.026, 0.37],
+      [x, y, z],
+      [0.16, turn, 0],
+      split,
+    );
+    for (const offset of [-1, 1]) {
+      place(
+        MeshBuilder.CreateCylinder(
+          `ram-damage-critical-splinter-${i}-${offset}`,
+          {
+            height: 0.22,
+            diameterTop: 0,
+            diameterBottom: 0.09,
+            tessellation: 5,
+          },
+          scene,
+        ),
+        {
+          parent: root,
+          material: splinter,
+          position: [x + offset * 0.065, y + 0.055, z + offset * 0.05],
+          rotation: [offset * 0.5, turn, offset * 0.4],
+        },
+      );
+    }
+  }
+  sliver(
+    "ram-damage-critical-split-flank",
+    [0.03, 0.4, 0.1],
+    [0.51, 0.89, -0.16],
+    [0.44, 0, -0.3],
+    split,
+  );
+  plate(
+    "ram-damage-critical-flicker-0",
+    [0.16, 0.12, 0.12],
+    [0.39, 0.77, 0.39],
+    flicker,
+  );
+  plate(
+    "ram-damage-critical-flicker-1",
+    [0.12, 0.1, 0.12],
+    [-0.01, 1.235, 0.34],
+    flicker,
+  );
+  skin(root);
+  const restHead = head.position.clone();
+  clip(root, "idle", 3, (seconds) => {
+    head.rotation.x = Math.sin((seconds / 3) * Math.PI * 2) * 0.03;
+  });
+  // Diagonal pairs step together with deliberate, planted feet.
+  clip(root, "walk", 1.4, (seconds) => {
+    const phase = (seconds / 1.4) * Math.PI * 2;
+    hips.forEach((hip, index) => {
+      hip.rotation.x =
+        Math.sin(phase + (index === 0 || index === 3 ? 0 : Math.PI)) * 0.38;
+    });
+    root.position.y = (1 - Math.cos(phase * 2)) * 0.02;
+    head.rotation.x = Math.sin(phase * 2) * 0.03;
+  });
+  for (const [turn, sign] of [
+    ["turn-left", -1],
+    ["turn-right", 1],
+  ] as const)
+    clip(
+      root,
+      turn,
+      0.4,
+      (seconds) => {
+        const amount = seconds / 0.4;
+        root.rotation.z = -sign * amount * 0.06;
+        head.rotation.y = sign * amount * 0.15;
+      },
+      false,
+    );
+  clip(
+    root,
+    "hit",
+    0.4,
+    (seconds) => {
+      const flinch = Math.sin((seconds / 0.4) * Math.PI);
+      head.rotation.x = -flinch * 0.15;
+      root.rotation.z = flinch * 0.05;
+    },
+    false,
+  );
+  // The hit is already committed when this clip starts. Lunge, then settle.
+  clip(
+    root,
+    "strike",
+    0.6,
+    (seconds) => {
+      const t = seconds / 0.6;
+      const travel = t < 0.2 ? t / 0.2 : (1 - t) / 0.8;
+      const blow = travel ** 2;
+      head.rotation.x = blow * 0.19;
+      head.position.z = restHead.z + blow * 0.23;
+      head.position.y = restHead.y - blow * 0.05;
+      root.position.z = blow * 0.12;
+    },
+    false,
+  );
+  // Legs buckle outward and the body settles into an inert husk.
+  clip(root, "death", 1.2, (seconds) => {
+    const fall = (seconds / 1.2) ** 2;
+    hips.forEach((hip, index) => {
+      hip.rotation.z = (index % 2 ? -1 : 1) * fall * 1.1;
+    });
+    root.position.y = -fall * 0.42;
+    root.rotation.z = fall * 0.18;
+    head.rotation.x = fall * 0.4;
+  });
+}
+
+/** Broken Circle ribs fold over a root bed and leave embers at the breaks. */
+function livingRubble(scene: Scene, name: string) {
+  const root = new TransformNode(name, scene);
+  const pieces = batches(root, {
+    wood: surface(scene, "living-rubble-wood", [0.84, 0.71, 0.48]),
+    roots: surface(scene, "living-rubble-roots", [0.29, 0.2, 0.13]),
+    leaves: surface(scene, "living-rubble-leaves", [0.15, 0.35, 0.23]),
+    "fading-light": surface(
+      scene,
+      "living-rubble-fading-light",
+      [0.65, 0.35, 0.93],
+      0.95,
+    ),
+  });
+  const branch = (
+    part: "wood" | "roots",
+    knots: readonly (readonly [number, number, number, number])[],
+  ) =>
+    pieces.add(
+      part,
+      tube(
+        scene,
+        `${part}-${pieces.count(part)}`,
+        knots.map(([x, y, z]) => [x, y, z]),
+        knots.map(([, , , radius]) => radius),
+      ),
+    );
+  branch("roots", [
+    [-0.39, -0.46, 0.09, 0.013],
+    [-0.23, -0.43, 0.01, 0.056],
+    [-0.08, -0.36, -0.01, 0.099],
+    [0.18, -0.43, 0.1, 0.068],
+    [0.35, -0.46, 0.23, 0.012],
+  ]);
+  branch("roots", [
+    [-0.18, -0.46, 0.32, 0.018],
+    [-0.08, -0.35, 0.16, 0.06],
+    [-0.13, -0.32, -0.03, 0.068],
+    [0.03, -0.41, -0.18, 0.059],
+    [0.13, -0.47, -0.39, 0.012],
+  ]);
+  branch("roots", [
+    [0.04, -0.43, 0.36, 0.02],
+    [0.19, -0.37, 0.18, 0.043],
+    [0.23, -0.32, 0.01, 0.055],
+    [0.39, -0.47, -0.15, 0.014],
+  ]);
+  // The thicker ribs break across a gap before folding over the roots.
+  branch("wood", [
+    [-0.31, -0.39, -0.16, 0.087],
+    [-0.21, -0.18, -0.14, 0.083],
+    [-0.1, 0.04, -0.06, 0.063],
+    [0.06, 0.13, 0.01, 0.045],
+  ]);
+  branch("wood", [
+    [-0.34, -0.39, 0.17, 0.056],
+    [-0.21, -0.21, 0.19, 0.062],
+    [-0.055, -0.05, 0.15, 0.05],
+    [0.094, -0.005, 0.16, 0.025],
+  ]);
+  branch("wood", [
+    [0.34, -0.39, -0.08, 0.06],
+    [0.27, -0.29, -0.035, 0.051],
+    [0.2, -0.15, 0.01, 0.04],
+    [0.15, -0.075, 0.048, 0.028],
+  ]);
+  branch("wood", [
+    [0.1, -0.32, -0.29, 0.026],
+    [0.17, -0.2, -0.22, 0.037],
+    [0.18, -0.26, -0.09, 0.027],
+  ]);
+  for (const [index, [x, y, z, angle, length]] of (
+    [
+      [-0.09, -0.31, -0.23, 1.4, 0.34],
+      [0.03, -0.25, -0.23, 0.66, 0.34],
+      [0.2, -0.3, 0.12, 1, 0.44],
+      [0.13, -0.36, 0.26, 2.8, 0.28],
+      [-0.2, -0.33, 0.21, -0.85, 0.32],
+    ] as const
+  ).entries()) {
+    pieces.add(
+      "leaves",
+      place(leafBlade(scene, `leaf-${index}`), {
+        position: [x, y, z],
+        rotation: [0.33, angle, -0.24],
+        scaling: [0.22, 0.15, length],
+      }),
+    );
+  }
+  for (const [index, [x, y, z, size]] of (
+    [
+      [0.079, 0.057, 0.024, 0.064],
+      [0.177, -0.137, 0.036, 0.046],
+      [0.02, -0.3, 0.11, 0.048],
+    ] as const
+  ).entries()) {
+    pieces.add(
+      "fading-light",
+      place(
+        MeshBuilder.CreatePolyhedron(
+          `ember-${index}`,
+          { type: 1, size },
+          scene,
+        ),
+        { position: [x, y, z], rotation: [-0.3, 0.25, 0.48] },
+      ),
+    );
+  }
+  pieces.merge();
+}
+
+/** Every Circle model builder, keyed by asset ID. */
+export const CIRCLE_MODELS = {
+  ...(Object.fromEntries(
+    (Object.keys(CIRCLE_STRUCTURES) as CircleStructureId[]).map((id) => [
+      id,
+      (scene: Scene) => buildCircleStructure(scene, id),
+    ]),
+  ) as Record<CircleStructureId, (scene: Scene) => void>),
+  "circle-briar-ram": briarRam,
+  "living-rubble": livingRubble,
+};

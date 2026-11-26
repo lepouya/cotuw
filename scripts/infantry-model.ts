@@ -17,6 +17,7 @@ import {
 } from "@babylonjs/core";
 
 import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
+import { foldedBlade, tube } from "./model-toolkit.ts";
 
 import type { Scene } from "@babylonjs/core";
 
@@ -2309,64 +2310,48 @@ const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
 };
 
 // The outline narrows toward its tips, with a raised rib on the front.
-const LEAF_PLATE = {
-  vertex: [
-    [0, 0.5, -0.13],
-    [-0.39, 0.24, 0.07],
-    [-0.5, -0.05, 0.05],
-    [-0.21, -0.31, -0.04],
-    [0, -0.5, -0.13],
-    [0.21, -0.31, -0.04],
-    [0.5, -0.05, 0.05],
-    [0.39, 0.24, 0.07],
-    [0, 0.1, 0.5],
-    [0, -0.02, -0.5],
-  ],
-  face: Array.from({ length: 8 }, (_, edge) => {
-    const next = (edge + 1) % 8;
-    return [
-      [edge, next, 8],
-      [next, edge, 9],
-    ];
-  }).flat(),
-};
+const LEAF_PLATE = foldedBlade([
+  [0, 0.5, -0.13],
+  [-0.39, 0.24, 0.07],
+  [-0.5, -0.05, 0.05],
+  [-0.21, -0.31, -0.04],
+  [0, -0.5, -0.13],
+  [0.21, -0.31, -0.04],
+  [0.5, -0.05, 0.05],
+  [0.39, 0.24, 0.07],
+  [0, 0.1, 0.5],
+  [0, -0.02, -0.5],
+]);
 
 // A broad shoulder seam and a tapered hem share the raised fold.
-const MANTLE_FOLD = {
-  vertex: [
-    [0, 0.5, -0.06],
-    [-0.37, 0.45, 0],
-    [-0.5, 0.04, 0.17],
-    [-0.39, -0.31, 0.03],
-    [0, -0.5, -0.18],
-    [0.39, -0.31, 0.03],
-    [0.5, 0.04, 0.17],
-    [0.37, 0.45, 0],
-    [0, 0.06, 0.46],
-    [0, -0.02, -0.37],
-  ],
-  face: LEAF_PLATE.face,
-};
+const MANTLE_FOLD = foldedBlade([
+  [0, 0.5, -0.06],
+  [-0.37, 0.45, 0],
+  [-0.5, 0.04, 0.17],
+  [-0.39, -0.31, 0.03],
+  [0, -0.5, -0.18],
+  [0.39, -0.31, 0.03],
+  [0.5, 0.04, 0.17],
+  [0.37, 0.45, 0],
+  [0, 0.06, 0.46],
+  [0, -0.02, -0.37],
+]);
 
 function focusBough(scene: Scene, name: string): Mesh {
   const halves = [-1, 1].map((side) =>
-    MeshBuilder.CreateTube(
-      name,
-      {
-        path: [
-          new Vector3(0, -0.15, 0),
-          new Vector3(side * 0.17, -0.13, 0),
-          new Vector3(side * 0.233, -0.035, -0.015),
-          new Vector3(side * 0.219, 0.092, -0.008),
-          new Vector3(side * 0.14, 0.184, 0.034),
-          new Vector3(side * 0.058, 0.21, 0.07),
-        ],
-        radiusFunction: (index) =>
-          [0.062, 0.064, 0.062, 0.053, 0.033, 0.008][index]!,
-        tessellation: 7,
-        cap: Mesh.CAP_ALL,
-      },
+    tube(
       scene,
+      name,
+      [
+        [0, -0.15, 0],
+        [side * 0.17, -0.13, 0],
+        [side * 0.233, -0.035, -0.015],
+        [side * 0.219, 0.092, -0.008],
+        [side * 0.14, 0.184, 0.034],
+        [side * 0.058, 0.21, 0.07],
+      ],
+      [0.062, 0.064, 0.062, 0.053, 0.033, 0.008],
+      7,
     ),
   );
   return Mesh.MergeMeshes(halves, true)!;

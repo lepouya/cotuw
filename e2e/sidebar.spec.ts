@@ -6,6 +6,7 @@ import {
   TOUCH_PROFILES,
 } from "./profiles";
 import {
+  actorPoint,
   activate,
   attachScreenshot,
   expectTerrainReady,
@@ -360,23 +361,8 @@ test("blocked exits disable training until a unit moves away", async ({
     "accepted",
   );
   await page.locator("#tab-units").click();
-  const barracks = await page.evaluate(async () => {
-    const { gameScene, projectToCanvas } = await import("/e2e/harness.ts");
-    const scene = gameScene();
-    const root = scene.getTransformNodeByName(
-      "tile-placed-actor-arc-field-barracks-1-root",
-    )!;
-    const roof = root
-      .getChildMeshes()
-      .find((mesh) => mesh.name.endsWith("-roof"))!;
-    roof.computeWorldMatrix(true);
-    const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas")!;
-    return projectToCanvas(
-      scene,
-      canvas,
-      roof.getBoundingInfo().boundingBox.centerWorld,
-    );
-  });
+  const barracks = await actorPoint(page, "arc-field-barracks-1", [1.2, 0.6]);
+  expect(barracks.clear).toBe(true);
   await page.mouse.click(barracks.x, barracks.y);
   await expect(page.locator("#train-trooper")).toBeEnabled();
   await page.locator("#train-trooper").click();

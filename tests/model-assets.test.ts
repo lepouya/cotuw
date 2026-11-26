@@ -4,6 +4,8 @@ import { expect, test } from "vitest";
 import { testScene } from "./helpers/scene";
 import { BASE_CONTENT } from "./helpers/content";
 import { glbDataUrl } from "./helpers/assets";
+import { INFANTRY_IDS } from "../scripts/infantry-model";
+import { loft } from "../scripts/model-toolkit";
 import { loadModelAsset, modelBuildingDetails } from "../src/render/glb-model";
 import { loadSkinnedActorAppearance } from "../src/render/skinned-actor-appearance";
 import {
@@ -36,6 +38,27 @@ function posedExtent(meshes: readonly AbstractMesh[]) {
   }
   return { radius, height, width: halfWidth * 2 };
 }
+
+test("a loft from one ring to an apex has a closed base and sides", () => {
+  const { face } = loft(
+    [
+      [
+        [-1, 0, -1],
+        [1, 0, -1],
+        [1, 0, 1],
+        [-1, 0, 1],
+      ],
+    ],
+    [0, 1, 0],
+  );
+  expect(face).toEqual([
+    [0, 1, 2, 3],
+    [1, 0, 4],
+    [2, 1, 4],
+    [3, 2, 4],
+    [0, 3, 4],
+  ]);
+});
 
 test.each(["rubble", "living-rubble"] as const)(
   "%s stays inside its tile after rotation",
@@ -348,7 +371,7 @@ test.each(["command-center", "barracks", "refinery", "relay", "salvage"])(
   },
 );
 
-test("ARC support uses distinct unarmed geometry within its selection bounds", async () => {
+test("ARC support uses distinct unarmed geometry", async () => {
   const scene = testScene();
   const bodies = [];
   const urls = [];
@@ -367,11 +390,6 @@ test("ARC support uses distinct unarmed geometry within its selection bounds", a
       .getChildMeshes()
       .find((mesh) => mesh.name.endsWith(`${id}-body`))!;
     bodies.push(Array.from(body.getVerticesData(VertexBuffer.PositionKind)!));
-    scene.animate();
-    // Selection uses a cylinder, including the posed support equipment.
-    const { radius, height } = posedExtent(instance.root.getChildMeshes());
-    expect(height, `${id} height`).toBeLessThanOrEqual(model.glb.bounds.height);
-    expect(radius, `${id} radius`).toBeLessThanOrEqual(model.glb.bounds.radius);
     instance.dispose();
     asset.dispose();
   }
@@ -381,25 +399,31 @@ test("ARC support uses distinct unarmed geometry within its selection bounds", a
   expect(bodies[1]).not.toEqual(bodies[2]);
 });
 
-test.each(["circle-healer", "circle-artificer"])(
-  "%s fits its idle selection bounds",
-  async (id) => {
-    const scene = testScene();
-    const model = BASE_CONTENT.presentation[id]!.model!;
-    if (!("glb" in model)) throw new Error("Expected generated infantry");
-    const asset = await loadSkinnedActorAppearance(scene, {
-      ...model.glb,
-      url: glbDataUrl(model.glb.url),
-    });
-    const instance = asset.instantiate(id, 0);
-    scene.animate();
-    const { radius, height } = posedExtent(instance.root.getChildMeshes());
-    expect(radius).toBeLessThanOrEqual(model.glb.bounds.radius);
-    expect(height).toBeLessThanOrEqual(model.glb.bounds.height);
-    instance.dispose();
-    asset.dispose();
-  },
-);
+// Selection uses a cylinder, so unarmed kit must fit inside it at rest.
+// Armed infantry rings fit the body; weapons may extend past them.
+const unarmedInfantry = INFANTRY_IDS.filter((id) => {
+  const definition = BASE_CONTENT.actors.find((actor) => actor.id === id);
+  if (!definition) throw new Error(`Missing infantry definition for ${id}`);
+  return !definition.weapon;
+});
+
+test.each(unarmedInfantry)("%s fits its idle selection bounds", async (id) => {
+  const scene = testScene();
+  const model = BASE_CONTENT.presentation[id]?.model;
+  if (!model || !("glb" in model))
+    throw new Error(`Missing infantry model for ${id}`);
+  const asset = await loadSkinnedActorAppearance(scene, {
+    ...model.glb,
+    url: glbDataUrl(model.glb.url),
+  });
+  const instance = asset.instantiate(id, 0);
+  scene.animate();
+  const { radius, height } = posedExtent(instance.root.getChildMeshes());
+  expect(radius).toBeLessThanOrEqual(model.glb.bounds.radius);
+  expect(height).toBeLessThanOrEqual(model.glb.bounds.height);
+  instance.dispose();
+  asset.dispose();
+});
 
 test("Demolition infantry carries a distinct launcher within Trooper selection bounds", async () => {
   const scene = testScene();
@@ -409,7 +433,6 @@ test("Demolition infantry carries a distinct launcher within Trooper selection b
     return model.glb;
   });
   expect(models[1].url).not.toBe(models[0].url);
-  // Armed infantry rings fit the body; weapons may extend past them.
   expect(models[1].bounds).toEqual(models[0].bounds);
   expect(models[1].clips.attack).toBe("launch");
   const geometry = [];

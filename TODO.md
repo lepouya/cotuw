@@ -196,33 +196,13 @@ challenge, pacing, and useful choices.
   sites, and buildable ground are clear in play. Review the introductions
   where they share changed assets, run affected asset and browser checks,
   and recheck normal-scale performance before building the cohort bundle.
-  - First model passes cover the Command Center, Heartgrove, Materials
-    Refinery, Harvester, Lifebloom Conservatory, Cultivator, Field Barracks,
-    Musterhall, Trooper, Sentinel, Scout, Wayfinder, Relay Station,
-    Sentry Turret, Thornspire, Medic, Mechanic, Demolition Trooper, Healer,
-    Artificer, Construct Nursery, and Briar Ram. The wolf pass covers the
-    standard wolf and alpha. Recovery model passes cover ARC building
-    rubble, Circle living rubble, and neutral salvage. Resource model passes
-    cover Materials depletion and Lifebloom reserve, dormancy, and recovery.
-    The ARC foundation and scaffold pass covers rotated placement, all
-    three stages, and paused work alongside Circle growth at gameplay zoom.
-    The ambient bird pass covers flock silhouettes and wingbeats over the
-    river in both introductions.
-    The tracer pass covers Trooper and Sentry shots alongside Circle bolts.
-    The focus bolt pass covers Sentinel and Thornspire casts at two ranges
-    alongside ARC tracers, including pulse, fade, and reduced motion.
-    The bite cue pass covers wolf and alpha hits on an ARC Scout and Circle
-    Wayfinder from different angles at gameplay zoom.
-    The wound drop pass covers moderate and critical biological damage
-    alongside mechanical smoke at gameplay zoom, including reduced motion.
-    The smoke pass covers intermittent puffs and critical columns on ARC
-    structures and a Harvester, with fire and Circle damage cues in view.
-    The fire pass covers flame and ember readability under smoke on a
-    critical Refinery and Harvester, including reduced motion.
-    The living leak pass covers moderate and critical Thornspire damage
-    and a critical Briar Ram alongside ARC smoke and fire.
-    The falling leaf pass covers both living damage stages on grass and dirt
-    alongside wood chips and violet wisps, including reduced motion.
+  - First model passes cover every ARC and Circle building and unit, the
+    wolf and alpha, ARC and Circle rubble, salvage, Materials and
+    cultivation sites, foundations and scaffolds, ambient birds, tracers,
+    focus bolts, bite cues, wound drops, smoke, fire, living leaks, and
+    falling leaves. Each pass was reviewed at gameplay zoom in its scenes,
+    alongside the other faction's cues and, for animated effects, under
+    reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

@@ -1947,8 +1947,8 @@
         "glb": {
           "url": "assets/actors/circle-cultivator.glb",
           "bounds": {
-            "radius": 0.5,
-            "height": 1.9
+            "radius": 0.6,
+            "height": 1.95
           },
           "clips": {
             "idle": "idle",

@@ -38,16 +38,12 @@ clips match their generators, and reject unregistered files in `public/assets`.
 - `npm run assets:models`: `scripts/model-assets.ts` exports Command Center,
   Refinery, Barracks, Relay, and Sentry meshes with idle machinery and activity
   or firing clips; a skinned wolf with articulated legs, jaw, and tail, using
-  idle, walk, run, turn, bite, hit, and death; a skinned Briar Ram with
-  overlapping wood and leaf plates, thick root legs, a violet core, and a
-  thorn-framed head. Owner markings sit on the brow, shoulders, and rear.
-  The Ram uses idle, a diagonal walk, turn, a lunging `strike`, hit, and a
-  buckling death that settles into a husk. A rigid Harvester uses idle,
+  idle, walk, run, turn, bite, hit, and death. A rigid Harvester uses idle,
   transit, deploy, harvest, stow, unload, hit, and death. The script also
   exports crystal resource mounds, animated salvage, foundations,
-  construction scaffolds, debris rubble, tracers, braided focus bolts with
-  a four-petaled impact bloom; bite marks; splintered strike bursts; smoke
-  puffs; flickering fire; wound drops; a pulsing regeneration halo; and a bird
+  construction scaffolds, debris rubble, tracers, braided focus bolts with a
+  four-petaled impact bloom, bite marks, splintered strike bursts, smoke
+  puffs, flickering fire, wound drops, a pulsing regeneration halo, and a bird
   with a wing-beat clip. The alpha wolf scales the generated wolf asset.
   Tracers use one tapered mesh with vertex colors grading from amber at the
   muzzle to pale yellow at the target. The shot scales to its length.
@@ -82,6 +78,11 @@ clips match their generators, and reject unregistered files in `public/assets`.
   the resting gates. Owned structures add seeded `damage-moderate` cracks and
   faint leaks along their ribs, and `damage-critical` splits, splinters,
   wilted leaves, and `flicker` leaks; each stage merges by material.
+  The script also builds `living-rubble` and a skinned Briar Ram with
+  overlapping wood and leaf plates, thick root legs, a violet core, and a
+  thorn-framed head. Owner markings sit on the brow, shoulders, and rear.
+  The Ram uses idle, a diagonal walk, turn, a lunging `strike`, hit, and a
+  buckling death that settles into a husk.
 - Presentation shows `damage-moderate` meshes at 60% health or below and adds
   `damage-critical` meshes at 30% or below, hiding both again as repair
   restores health. Critical `flicker` meshes vary in brightness and hold
@@ -101,8 +102,11 @@ clips match their generators, and reject unregistered files in `public/assets`.
   one-shot motions become clips named for each activity or `attack`. The base
   pack loads the resulting GLBs during gameplay. The script also imports
   runtime colors, such as `MATERIALS_COLOR`, so generated models match the
-  stand-ins. The Refinery exporter batches static meshes by material and
-  keeps descendants of animated parts attached to their moving parents.
+  stand-ins. ARC building exporters batch parts by material within each
+  moving assembly, keeping doors, machinery, and turret aim independent.
+- `scripts/model-toolkit.ts` holds the shared generator steps: placement,
+  tapered tubes, lofted rings, folded blades, vertex painting, material
+  batches, rigid skins, and sampled clips.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
 - Relay Stations sweep paired receiver panels and pulse a console lamp.
