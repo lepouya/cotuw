@@ -1119,8 +1119,9 @@ These systems are outside M1.
   badge. The badge remains still under reduced motion and rebuilds on loading.
 - Actors whose presentation names a damage effect show it at 60% health or
   less and more strongly at 30% or less. Mechanical actors, such as ARC
-  buildings and Harvesters, release intermittent smoke puffs when moderately
-  damaged and a dense smoke column with fire and sparks when critical.
+  buildings and Harvesters, release translucent, curled smoke puffs with
+  darker bases and ash-gray tops. Moderate damage emits intermittent puffs.
+  Critical damage emits a dense column with fire and sparks.
   Infantry and wolves shed tapered crimson drops with a coral highlight.
   Moderate damage sheds occasional drops, and critical damage sheds larger,
   more frequent drops. Size, frequency, and fire also convey severity.

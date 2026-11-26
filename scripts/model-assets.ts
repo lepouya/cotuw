@@ -1499,25 +1499,36 @@ function scaffold(scene: Scene, name: string) {
   );
 }
 
-/** A lumpy unit-wide smoke puff that damage effects raise and fade. */
+/** A curled, translucent puff scaled and faded by the damage view. */
 function smoke(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const lumps = (
-    [
-      [0.5, 0, 0, 0],
-      [0.32, 0.22, 0.12, 0.08],
-      [0.3, -0.2, 0.1, -0.1],
-    ] as const
-  ).map(([radius, x, y, z], index) => {
-    const lump = MeshBuilder.CreateIcoSphere(
-      `lump-${index}`,
-      { radius, subdivisions: 1 },
-      scene,
-    );
-    lump.position.set(x, y, z);
-    return lump;
-  });
-  merge(root, "puff", lumps, surface(scene, "smoke", [0.42, 0.42, 0.43]));
+  const puff = MeshBuilder.CreateIcoSphere(
+    "puff",
+    { radius: 1, subdivisions: 3, flat: false },
+    scene,
+  );
+  puff.parent = root;
+  const material = surface(scene, name, Color3.White());
+  material.alpha = 0.86;
+  puff.material = material;
+  const soot = new Color3(0.36, 0.36, 0.36);
+  const ash = new Color3(0.72, 0.71, 0.68);
+  const positions = puff.getVerticesData(VertexBuffer.PositionKind)!;
+  const colors: number[] = [];
+  for (let index = 0; index < positions.length; index += 3) {
+    const x = positions[index]!;
+    const y = positions[index + 1]!;
+    const z = positions[index + 2]!;
+    const roll = Math.sin(4 * x + 3 * y) * Math.cos(4 * z - 2 * y);
+    const radius = 0.42 + 0.07 * y + 0.08 * roll;
+    positions[index] = x * radius + 0.13 * y;
+    positions[index + 1] = y * 0.47 + 0.06 * roll;
+    positions[index + 2] = z * radius + 0.1 * y * y;
+    const color = Color3.Lerp(soot, ash, (y + 1) / 2);
+    colors.push(color.r, color.g, color.b, 1);
+  }
+  puff.setVerticesData(VertexBuffer.PositionKind, positions);
+  puff.setVerticesData(VertexBuffer.ColorKind, colors);
 }
 
 /** Flickering flame tongues with rising sparks, based at the origin. */

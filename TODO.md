@@ -215,6 +215,8 @@ challenge, pacing, and useful choices.
     Wayfinder from different angles at gameplay zoom.
     The wound drop pass covers moderate and critical biological damage
     alongside mechanical smoke at gameplay zoom, including reduced motion.
+    The smoke pass covers intermittent puffs and critical columns on ARC
+    structures and a Harvester, with fire and Circle damage cues in view.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
