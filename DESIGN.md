@@ -2079,8 +2079,8 @@ acceptance progress. The following sections define the selected scope.
   thorns frame its low brow, and violet light shows through gaps beneath the
   shoulders. Owner markings sit on the brow, shoulder plates, and rear shell.
   It walks with a diagonal gait and lunges with its head at melee range. Each
-  blow shows a brief splintering burst at the target. The production portrait
-  shows the layered shell and curved thorns.
+  blow throws a fan of bark-edged pale splinters through two violet arcs at
+  the target. The production portrait shows the layered shell and curved thorns.
 - Circle construction has three stages, each covering one third of progress:
   roots establish and the central structure emerges; ribs and arches rise;
   then armor plates, leaves, and canopy elements unfold into the mature form.

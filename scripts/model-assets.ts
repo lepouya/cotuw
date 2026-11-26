@@ -569,30 +569,91 @@ function bite(scene: Scene, name: string) {
   place(marks, { parent: root, material: unlit(scene, name, Color3.White()) });
 }
 
-/** Splintered wood and a violet ring where a construct's blow lands. */
+/** A fan of split wood and violet arcs at the point of impact. */
 function strike(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const splinter = unlit(scene, name, STRIKE_COLOR);
-  const ring = MeshBuilder.CreateTorus(
-    `${name}-ring`,
-    { diameter: 0.5, thickness: 0.03, tessellation: 18 },
-    scene,
+  const wood = STRIKE_COLOR.toLinearSpace();
+  const pale = new Color3(1, 0.95, 0.78).toLinearSpace();
+  const bark = new Color3(0.58, 0.36, 0.19).toLinearSpace();
+  const splinters = [
+    [-0.32, 0.12, 0.07, 0.25, 0.054, 1.1],
+    [-0.19, 0.29, 0.07, 0.37, 0.059, 0.49],
+    [0.02, 0.34, -0.07, 0.43, 0.063, -0.15],
+    [0.21, 0.24, 0.09, 0.31, 0.063, -0.66],
+    [0.38, 0.08, 0.01, 0.22, 0.054, -1.15],
+    [0.12, -0.12, 0.25, 0.19, 0.054, -2.2],
+    [-0.26, -0.08, -0.17, 0.16, 0.048, 2.3],
+  ] as const;
+  merge(
+    root,
+    "strike-splinters",
+    splinters.map(([x, y, z, length, width, angle], index) => {
+      const shard = loft(
+        [
+          [
+            [-width * 0.56, -length * 0.5, 0],
+            [0, -length * 0.53, -width * 0.35],
+            [width * 0.58, -length * 0.47, 0],
+            [0, -length * 0.43, width * 0.48],
+          ],
+          [
+            [-width, -length * 0.08, 0],
+            [0, length * 0.03, -width * 0.58],
+            [width * 0.86, length * 0.1, 0],
+            [0, length * 0.04, width * 0.54],
+          ],
+        ],
+        [width * 0.28, length * 0.5, -width * 0.13],
+      );
+      const mesh = MeshBuilder.CreatePolyhedron(
+        `strike-shard-${index}`,
+        { custom: shard },
+        scene,
+      );
+      paint(mesh, (_x, height, depth) =>
+        depth > width * 0.3
+          ? bark
+          : Color3.Lerp(wood, pale, Math.max(0, height / length) * 2),
+      );
+      return place(mesh, {
+        position: [x, y, z],
+        rotation: [0.34 - index * 0.12, index * 0.67, angle],
+      });
+    }),
+    unlit(scene, "strike-wood", Color3.White()),
   );
-  ring.parent = root;
-  ring.rotation.x = Math.PI / 2;
-  ring.material = unlit(scene, `${name}-ring`, BOLT_COLOR);
-  for (let i = 0; i < 6; i++) {
-    const angle = (i * Math.PI) / 3 + 0.3;
-    const shard = MeshBuilder.CreateBox(
-      `${name}-shard-${i}`,
-      { width: 0.035, height: 0.26, depth: 0.035 },
+
+  const arcs = [
+    [0.08, 2.71, 0.41, 0.25, 0.07],
+    [3.31, 5.94, 0.32, 0.17, 0.02],
+  ] as const;
+  const violet = BOLT_COLOR.toLinearSpace();
+  const lilac = new Color3(0.96, 0.78, 1).toLinearSpace();
+  const sweeps = arcs.map(([start, end, width, height, lift], index) => {
+    const path = Array.from({ length: 13 }, (_, step): Vec3 => {
+      const angle = start + ((end - start) * step) / 12;
+      return [
+        Math.cos(angle) * width,
+        lift + Math.sin(angle) * height,
+        Math.sin(angle) * 0.19,
+      ];
+    });
+    const sweep = tube(
       scene,
+      `strike-arc-${index}`,
+      path,
+      path.map((_, step) => 0.004 + 0.032 * Math.sin((step * Math.PI) / 12)),
     );
-    shard.parent = root;
-    shard.position.set(Math.cos(angle) * 0.24, Math.sin(angle) * 0.24, 0);
-    shard.rotation.z = angle - Math.PI / 2;
-    shard.material = splinter;
-  }
+    return paint(sweep, (x) =>
+      Color3.Lerp(violet, lilac, Math.max(0, 1 - Math.abs(x) / width)),
+    );
+  });
+  merge(
+    root,
+    "strike-arcs",
+    sweeps,
+    unlit(scene, "strike-violet", Color3.White()),
+  );
 }
 
 /** A terrain-seated slab module with a sloped shoulder and recessed joints. */

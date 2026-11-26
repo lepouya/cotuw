@@ -49,6 +49,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
   muzzle to pale yellow at the target. The shot scales to its length.
   Focus bolts share a 0.3-second `idle` clip that pulses three strands and
   opens the impact bloom. The shot scales along its cast-to-impact axis.
+  Briar Ram strikes use a merged fan of vertex-painted wood splinters and a
+  second mesh with two tapered violet arcs. The burst faces the direction
+  of the hit and fades in place.
   Wolf and alpha bites share one unlit mesh with three tapered slashes.
   Vertex colors give each slash a bright coral center and red tips.
   The wound prop uses an eight-sided teardrop with a coral vertex-color
