@@ -973,6 +973,12 @@ build. TODO.md owns milestone delivery; current controls are described above.
   water. The border follows normal fog and exploration, so scouts reveal it.
   With fog enabled, the outer edge of the scenery fades into the background.
   The border gives the camera more framing room.
+- Worn earth paths lead across muted grass and through cool, fractured
+  rock walls. Rough ground carries denser tufts and loose stone clusters.
+  Shallow water shows the bed through the shore and gives way to broken teal
+  ripples. Rocky scenery outside the playable mask carries less grass, and
+  scenic water uses a cooler tint. Grass bends in staggered gusts and water
+  scrolls in two layers. Reduced motion holds both still.
 
 ### Special movement and transport
 
@@ -1086,6 +1092,9 @@ These systems are outside M1.
 
 ## Building and ambient presentation
 
+- Warm directional light and cool sky fill shape buildings, units, and the
+  terrain. Soft, terrain-following contact shadows sit beneath visible surface
+  actors and follow their footprint or rendered movement.
 - Neutral salvage appears as a hovering, rotating recovery case with a
   faceted shell, dark carry handles, and amber locator lights on its lid and
   sides. The lights distinguish it from resource deposits and building rubble.
@@ -1197,8 +1206,9 @@ These systems are outside M1.
   no vision. Completed Circle buildings do not require a support chain for
   vision.
 - Unexplored terrain is covered in the background color on the main view and
-  minimap; explored terrain outside current vision is dimmed. Fog edges soften
-  inward, so known ground never reveals unexplored tiles.
+  minimap. Explored terrain outside current vision is dimmed toward slate
+  blue while keeping roads and landforms readable. Fog edges soften inward,
+  and scenic borders fade over the final two tiles of the map.
 - Some explored tile must stay within the central third of the view, measured
   along the screen's axes on the ground plane. Panning, focus, Follow,
   minimap navigation, zoom, rotation, Reset View, and resizing move the view

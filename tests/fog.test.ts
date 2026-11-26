@@ -42,16 +42,17 @@ describe("fog overlay", () => {
 
   test("explored scenic border fades at the outer grid edge", () => {
     const map = new TerrainMap({
-      width: 2,
+      width: 4,
       height: 2,
       tileSize: 1,
-      createTerrain: (x) => ({ typeId: "plain", outOfBounds: x === 0 }),
+      createTerrain: (x) => ({ typeId: "plain", outOfBounds: x < 2 }),
     });
-    const fog = fogView([], ["0,0", "0,1", "1,0", "1,1"]);
+    const fog = fogView([], ["0,0", "0,1", "1,0", "1,1", "2,0", "2,1"]);
     const colors = cornerColors(map, fog);
-    expect(colors[(3 + 0) * 4 + 3]).toBe(1);
-    expect(colors[(3 + 1) * 4 + 3]).toBe(0);
-    expect(colors[(3 + 2) * 4 + 3]).toBe(0);
+    const middleRow = colors.slice(5 * 4, 10 * 4);
+    expect(middleRow.filter((_, index) => index % 4 === 3)).toEqual([
+      1, 0.36, 0, 1, 1,
+    ]);
   });
 });
 
@@ -64,7 +65,7 @@ describe("shadeFog", () => {
     const shown = new Uint8ClampedArray(terrain.length);
     shadeFog(map, terrain, shown, fogView(["1,0"], ["0,0"]), [0, 0, 0]);
     expect([...shown]).toEqual([
-      200, 200, 200, 255, 90, 90, 90, 255, 0, 0, 0, 255,
+      200, 200, 200, 255, 104, 104, 104, 255, 0, 0, 0, 255,
     ]);
     shadeFog(map, terrain, shown, undefined, [0, 0, 0]);
     expect([...shown]).toEqual([...terrain]);

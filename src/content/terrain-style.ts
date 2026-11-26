@@ -54,6 +54,8 @@ export type TileType = {
 type TerrainLayerRule = {
   tileType: string;
   color: [number, number, number, number];
+  /** Layer tint and opacity on scenery outside the playable mask. */
+  sceneryColor?: TerrainLayerRule["color"];
   /** Adds a gentle per-tile tint so large areas do not look flat. */
   variation?: boolean;
   /** Shows on this share of tiles, in a fixed pattern; absent shows on all. */
@@ -149,6 +151,7 @@ export function validateTerrainStyle(
         );
       if (
         !isRgba(rule.color) ||
+        (rule.sceneryColor !== undefined && !isRgba(rule.sceneryColor)) ||
         !isOptionalBoolean(rule.variation) ||
         !isOptionalBoolean(rule.shoreFade) ||
         (rule.coverage !== undefined && !isAlpha(rule.coverage)) ||

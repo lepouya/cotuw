@@ -29,6 +29,7 @@ import type { SaveInfo } from "./simulation/mission-file";
 import { rosterIncludes } from "./simulation/ownership";
 import { createSupportNetworkView } from "./render/support-network";
 import { createFogOverlay } from "./render/fog";
+import { createContactShadows } from "./render/contact-shadows";
 import { exploredFrontier } from "./render/camera-frontier";
 import { contentRoles } from "./ui/content-roles";
 import { createNetworkControls } from "./ui/network-controls";
@@ -375,6 +376,14 @@ async function assembleGameSession(
     ownerMaterials,
   });
   own(actorViews);
+  const contactShadows = own(
+    createContactShadows(
+      view.scene,
+      map,
+      definitions,
+      view.lighting.sun.direction,
+    ),
+  );
   const tilePlacedViews = createTilePlacedActorViewRegistry(
     view.scene,
     map,
@@ -1295,7 +1304,7 @@ async function assembleGameSession(
     if (!reducedMotion()) pickupSeconds += frameSeconds;
     tilePlacedViews.animate(idleSeconds, frameSeconds);
     materialsView?.animate(pickupSeconds);
-    const { shownMobile } = player.actors();
+    const { shown, shownMobile } = player.actors();
     combatEffects.update(frameSeconds);
     frameEffects.update(frameSeconds);
     updateWrecks(frameSeconds);
@@ -1314,6 +1323,7 @@ async function assembleGameSession(
         workPaused: !playing,
       }),
     );
+    contactShadows.update(shown, actorViews.groundPosition);
     serviceEffects.update(
       extractServiceEffects(services, player.shownActor, drawn),
       playing ? frameSeconds : 0,

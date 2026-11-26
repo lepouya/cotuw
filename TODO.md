@@ -213,6 +213,9 @@ challenge, pacing, and useful choices.
     with the pulse running and under reduced motion.
   - Harvester wrecks were reviewed beside an operational Harvester at gameplay
     zoom, with settled remains facing two directions.
+  - Terrain textures, grass sway, scenery, lighting, contact shadows, and fog
+    were reviewed at gameplay zoom in both skirmish starts and introductions,
+    the center crossing, the shoreline, and the Circle den and bird loop.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

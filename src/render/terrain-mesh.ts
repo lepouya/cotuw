@@ -252,14 +252,16 @@ export function createTerrainMeshes(
   let disposed = false;
   const animationObserver = scene.onBeforeRenderObservable.add(() => {
     const elapsedSeconds = scene.getEngine().getDeltaTime() / 1000;
+    const still = reducedMotion();
 
     // One offset unit is one full repeat, so wrapping never moves the phase.
-    for (const [texture, speed] of animatedTextures) {
-      texture.uOffset = (texture.uOffset + speed.u * elapsedSeconds) % 1;
-      texture.vOffset = (texture.vOffset + speed.v * elapsedSeconds) % 1;
+    if (!still) {
+      for (const [texture, speed] of animatedTextures) {
+        texture.uOffset = (texture.uOffset + speed.u * elapsedSeconds) % 1;
+        texture.vOffset = (texture.vOffset + speed.v * elapsedSeconds) % 1;
+      }
+      clipSeconds += elapsedSeconds;
     }
-    clipSeconds += elapsedSeconds;
-    const still = reducedMotion();
     for (const { material, clip, frames, lagSeconds, frameAt } of clipPlayers) {
       const frame = frameAt(still ? 0 : clipSeconds - lagSeconds);
       const texture = frames.get(clip.frames[frame]!.cell);

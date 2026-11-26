@@ -131,13 +131,14 @@ clips match their generators, and reject unregistered files in `public/assets`.
   cab roof and track panels. Neutral resource sites and wolves have none.
 - `npm run assets:terrain`: `scripts/terrain-textures.ts` generates seamless
   dirt, water, clutter, and rock PNGs from periodic gradient and cellular
-  noise. Dirt spans eight tiles per repeat with warped soil, damp patches, and
-  pebbles. Water uses broad crests across four tiles per repeat; motion comes
-  from scrolling two layers. Clutter scatters lit, irregular stones in
-  clusters. Rock covers hillsides and cliffs with cracked, faceted plates
-  across four tiles per repeat. Hill shapes come from the mission heightfield.
+  noise. Dirt spans eight tiles per repeat with worn earth, damp patches, and
+  pebbles. Water uses broken crests on two independently scrolling layers.
+  Clutter scatters loose chips around larger stones. Rock covers hillsides and
+  cliffs with bands of fractured plates across four tiles per repeat. Hill
+  shapes come from the mission heightfield.
 - `npm run assets:grass`: `scripts/grass-sheet.ts` generates dense and sparse
-  grass sprite sheets with looping sway.
+  grass sprite sheets. A periodic wind field bends neighboring tufts together,
+  and phased tiles carry the gust across the ground.
 - `npm run assets:effects`: `scripts/muzzle-flash-sheet.ts` generates the
   Trooper's muzzle-flash sprite sheet. `scripts/launch-flash-sheet.ts` generates
   the launcher's broader amber pressure flash and exhaust cloud.

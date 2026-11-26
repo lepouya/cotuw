@@ -184,15 +184,15 @@ function drawStone(
 function dirt(frame: Frame) {
   const warped = warp(0xd1a0, 90);
   const soil = fractalNoise(0xd171, 6, 6);
-  const damp = fractalNoise(0xda40, 4, 3);
+  const damp = fractalNoise(0xda40, 6, 3);
   const grain = seededRandom(0xd17);
   fill(frame, (x, y) => {
-    const shade = soil(...warped(x, y)) * 0.16 + (grain() - 0.5) * 0.06;
-    const wet = smoothstep(0.05, 0.4, damp(x, y)) * 0.5;
+    const shade = soil(...warped(x, y)) * 0.19 + (grain() - 0.5) * 0.08;
+    const wet = smoothstep(-0.09, 0.38, damp(x, y)) * 0.5;
     const tone = 1 + shade;
     return mixRgba(
-      [0.48 * tone, 0.355 * tone, 0.25 * tone, 1],
-      [0.35, 0.255, 0.175, 1],
+      [0.53 * tone, 0.432 * tone, 0.322 * tone, 1],
+      [0.38, 0.323, 0.25, 1],
       wet,
     );
   });
@@ -206,14 +206,14 @@ function dirt(frame: Frame) {
       0.35,
     ]);
   }
-  for (let pebble = 0; pebble < 700; pebble++) {
+  for (let pebble = 0; pebble < 970; pebble++) {
     const shade = scatter() * 0.12;
     drawStone(
       frame,
       scatter() * PERIOD,
       scatter() * PERIOD,
-      1 + scatter() ** 2 * 2.5,
-      [0.46 + shade, 0.4 + shade, 0.32 + shade, 0.9],
+      1 + scatter() ** 3 * 3.8,
+      [0.43 + shade, 0.38 + shade, 0.31 + shade, 0.82],
       scatter,
     );
   }
@@ -221,20 +221,16 @@ function dirt(frame: Frame) {
 
 function water(frame: Frame) {
   const broad = valueNoise(0xd171, 4);
-  const medium = valueNoise(0x5011, 12);
+  const medium = fractalNoise(0x5011, 8, 3);
   fill(frame, (x, y) => {
+    const swell = broad(x, y);
+    const chop = medium(x, y);
     const ripple = Math.sin(
-      ((y * 6 + x) / PERIOD + broad(x, y) * 0.6) * Math.PI * 2,
+      ((y * 9 + x * 2) / PERIOD + swell * 1.12 + chop * 0.29) * Math.PI * 2,
     );
-    const crest = Math.max(0, ripple) ** 3;
-    const strength = 0.45 + medium(x, y) * 0.55;
-    const shade = (broad(x, y) - 0.5) * 0.05 + crest * strength * 0.28;
-    return [
-      0.17 + shade,
-      0.48 + shade,
-      0.54 + shade,
-      0.2 + crest * strength * 0.7,
-    ];
+    const crest = smoothstep(0.6, 1, ripple) * smoothstep(-0.29, 0.35, chop);
+    const shade = (swell - 0.5) * 0.09 + crest * 0.3;
+    return [0.13 + shade, 0.41 + shade, 0.5 + shade, 0.12 + crest * 0.73];
   });
 }
 
@@ -248,21 +244,22 @@ function clutter(frame: Frame) {
       x,
       y,
       radius,
-      [0.42 + shade, 0.38 + shade, 0.33 + shade, 1],
+      [0.43 + shade, 0.43 + shade, 0.38 + shade, 1],
       scatter,
     );
   };
-  for (let cluster = 0; cluster < 110; cluster++) {
+  for (let cluster = 0; cluster < 84; cluster++) {
     const x = scatter() * PERIOD;
     const y = scatter() * PERIOD;
-    const count = 2 + Math.floor(scatter() * 7);
+    stone(x, y, 7 + scatter() * 6);
+    const count = 3 + Math.floor(scatter() * 7);
     for (let index = 0; index < count; index++) {
       const angle = scatter() * Math.PI * 2;
       const distance = scatter() * 22;
       stone(
         x + Math.cos(angle) * distance,
         y + Math.sin(angle) * distance,
-        (3 + scatter() * 7) * (1 - distance / 40),
+        (2 + scatter() * 7) * (1 - distance / 40),
       );
     }
   }
@@ -326,19 +323,20 @@ function rock(frame: Frame) {
   const grain = seededRandom(0x70c5);
   fill(frame, (x, y) => {
     const [wx, wy] = warped(x, y);
-    const plate = plates(wx, wy);
-    const chip = chips(wx, wy);
+    const plate = plates(wx, wy * 2);
+    const chip = chips(wx, wy * 2);
     const facet = facets[plate.cell]! * 0.75 + facets[chip.cell]! * 0.25;
     const shade =
-      (facet - 0.75) * 0.5 + detail(x, y) * 0.24 + (grain() - 0.5) * 0.05;
+      (facet - 0.75) * 0.62 + detail(x, y) * 0.22 + (grain() - 0.5) * 0.06;
     const crack = Math.max(
-      (1 - smoothstep(0.5, 3, plate.gap)) * 0.65,
-      (1 - smoothstep(0, 1, chip.gap)) * 0.12,
+      (1 - smoothstep(0.5, 5, plate.gap)) * 0.54,
+      (1 - smoothstep(0, 1.8, chip.gap)) * 0.14,
     );
     // A lit lip along the upper side of each crack.
-    const lip = smoothstep(3, 5, plate.gap) * (1 - smoothstep(5, 8, plate.gap));
-    const light = (1 + shade + lip * 0.06) * (1 - crack);
-    return [0.5 * light, 0.47 * light, 0.43 * light, 1];
+    const lip =
+      smoothstep(4, 7, plate.gap) * (1 - smoothstep(8, 13, plate.gap));
+    const light = (1 + shade + lip * 0.075) * (1 - crack);
+    return [0.45 * light, 0.47 * light, 0.46 * light, 1];
   });
   const scatter = seededRandom(0x11c4);
   for (let patch = 0; patch < 90; patch++) {
@@ -350,7 +348,7 @@ function rock(frame: Frame) {
         x + (scatter() - 0.5) * 18,
         y + (scatter() - 0.5) * 18,
         1 + scatter() * 2.5,
-        [0.5 + scatter() * 0.1, 0.54, 0.32, 0.45],
+        [0.46 + scatter() * 0.1, 0.49, 0.33, 0.43],
       );
   }
 }

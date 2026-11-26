@@ -537,7 +537,7 @@ test("feathering invalidates the neighboring chunk at a tile edit", async ({
 });
 
 test(
-  "loads layered terrain textures and advances both water passes",
+  "loads layered terrain textures and animates water unless motion is reduced",
   { tag: WEBKIT },
   async ({ page }) => {
     await page.goto("/?level=sandbox");
@@ -545,7 +545,9 @@ test(
     const textureState = await page.evaluate(async () => {
       const { color, createTestView, frames, TEST_TILE_TYPES } =
         await import("/e2e/harness.ts");
-      const { scene, dispose } = createTestView({
+      const { createTerrainMeshes } =
+        await import("/src/render/terrain-mesh.ts");
+      const { scene, map, dispose } = createTestView({
         map: {
           width: 3,
           height: 3,
@@ -570,7 +572,10 @@ test(
           ],
         },
         size: { width: 720, height: 720 },
-        terrain: true,
+      });
+      let still = false;
+      const terrain = createTerrainMeshes(scene, map, {
+        reducedMotion: () => still,
       });
       await scene.whenReadyAsync();
       await frames(2);
@@ -613,6 +618,12 @@ test(
         };
         requestAnimationFrame(waitForMovement);
       });
+      still = true;
+      const stoppedOffsets = [water?.uOffset, ripples?.uOffset];
+      await frames(2);
+      const waterHeld =
+        stoppedOffsets[0] === water?.uOffset &&
+        stoppedOffsets[1] === ripples?.uOffset;
 
       const state = {
         texturesReady:
@@ -626,6 +637,7 @@ test(
           water?.hasAlpha === true &&
           ripples?.hasAlpha === true,
         waterMoved,
+        waterHeld,
         rippleScale: ripples?.uScale,
         wrapModes: [water?.wrapU, water?.wrapV, ripples?.wrapU, ripples?.wrapV],
         firstTwoTileUvs,
@@ -638,6 +650,7 @@ test(
           "terrain-0-0-layer-3-tile-clutter",
         ].map((name) => scene.getMeshByName(name)?.alphaIndex),
       };
+      terrain.dispose();
       dispose();
       return state;
     });
@@ -646,6 +659,7 @@ test(
       texturesReady: true,
       alphaChannels: true,
       waterMoved: true,
+      waterHeld: true,
       rippleScale: 1.37,
       // Babylon's WRAP_ADDRESSMODE constant is 1.
       wrapModes: [1, 1, 1, 1],

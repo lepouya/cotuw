@@ -504,7 +504,7 @@ test(
         edge: alpha(0, 96),
       };
     });
-    expect(fog.remembered).toBeCloseTo(0.55);
+    expect(fog.remembered).toBeCloseTo(0.48);
     expect(fog.hidden).toBe(1);
     expect(fog.edge).toBe(1);
 
@@ -563,8 +563,12 @@ test("Follow tracks a moving unit until a pan, and Escape ends it before clearin
 });
 
 test("the radial menu offers Focus and Follow on units", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await openWithTrooper(page);
-  const { point } = await pose(page);
+  await openViews(page);
+  await page.getByRole("button", { name: "Top-down" }).click();
+  const point = await actorPoint(page, "trained-unit-1", [0.85, 0.65, 0.45]);
+  expect(point.clear).toBe(true);
   await page.mouse.click(point.x, point.y, { button: "right" });
   const menu = page.getByRole("menu", { name: "Context actions" });
   await expect(menu.getByRole("menuitem", { name: /Focus/ })).toBeVisible();

@@ -3,7 +3,7 @@ import { expectTerrainReady } from "./page-helpers";
 
 import type { ArcRotateCamera } from "@babylonjs/core";
 
-test("building visibility follows fog in a mission without an economy", async ({
+test("buildings and their shadows follow fog in a mission without an economy", async ({
   page,
 }) => {
   await page.goto("/");
@@ -71,10 +71,15 @@ test("building visibility follows fog in a mission without an economy", async ({
       while (canvas.dataset.modelsReady !== "true") await frames(1);
       view.engine.stopRenderLoop();
       view.scene.render();
-      const drawn = () =>
-        !!view.scene.getTransformNodeByName(
+      const drawn = () => ({
+        building: !!view.scene.getTransformNodeByName(
           "tile-placed-actor-hostile-building-root",
-        );
+        ),
+        // The scout contributes one shadow throughout the scene.
+        shadowVertices: view.scene
+          .getMeshByName("contact-shadows")!
+          .getTotalVertices(),
+      });
       const initial = drawn();
       const visit = (x: number) => {
         view.simulation.submitCommand(
@@ -103,10 +108,10 @@ test("building visibility follows fog in a mission without an economy", async ({
     }
   });
   expect(result).toEqual({
-    initial: true,
-    hidden: false,
+    initial: { building: true, shadowVertices: 50 },
+    hidden: { building: false, shadowVertices: 25 },
     detected: false,
-    returned: true,
+    returned: { building: true, shadowVertices: 50 },
   });
 });
 

@@ -10,7 +10,7 @@ import type { FogView } from "../simulation/vision";
 const FOG_OFFSET = 0.02;
 /** Draws after every terrain layer's blend slot. */
 const FOG_ALPHA_INDEX = 1000;
-export const EXPLORED_FOG_ALPHA = 0.55;
+export const EXPLORED_FOG_ALPHA = 0.48;
 
 export type FogOverlay = {
   /** Redraws only when the fog version or terrain changes. */
@@ -143,15 +143,15 @@ export function cornerColors(
       let alpha = 0;
       if (fog) {
         // Fade the outer edge of scenic terrain into the background.
-        let scenicEdge =
-          x === 0 || x === map.width || z === 0 || z === map.height;
+        const edgeDistance = Math.min(x, map.width - x, z, map.height - z);
+        let scenicEdge = edgeDistance <= 1;
         for (let tileZ = z - 1; tileZ <= z; tileZ += 1)
           for (let tileX = x - 1; tileX <= x; tileX += 1) {
             if (!map.containsTile(tileX, tileZ)) continue;
             alpha = Math.max(alpha, fogAlpha(fog, tileX, tileZ));
             scenicEdge &&= map.terrainAt(tileX, tileZ).outOfBounds === true;
           }
-        if (scenicEdge) alpha = 1;
+        if (scenicEdge) alpha = Math.max(alpha, edgeDistance === 0 ? 1 : 0.36);
       }
       colors.push(1, 1, 1, alpha);
     }

@@ -15,7 +15,7 @@ export function terrainLayers(
     Object.entries(style.tileTypes).map(([id, type]) => [id, { ...type, id }]),
   );
   const layers = new Map(Object.entries(style.layers));
-  return (x, z, { typeId }, map) => {
+  return (x, z, { typeId, outOfBounds }, map) => {
     let depth: number | undefined;
     return (layers.get(typeId) ?? []).flatMap((rule) => {
       if (
@@ -25,7 +25,8 @@ export function terrainLayers(
         return [];
       if (rule.shoreFade && style.shore && depth === undefined)
         depth = shoreDepth(style.shore.depthTiles, map, x, z, typeId);
-      const [red, green, blue, alpha] = rule.color;
+      const [red, green, blue, alpha] =
+        (outOfBounds && rule.sceneryColor) || rule.color;
       const tint = rule.variation
         ? Math.sin(x * 0.23) * 0.025 + Math.cos(z * 0.19) * 0.02
         : 0;

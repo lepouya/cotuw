@@ -20,7 +20,7 @@ const COLUMNS = 4;
 /** Disc samples per pixel of blade length, so strokes stay continuous. */
 const SAMPLES_PER_PIXEL = 2;
 /** Frames near the ends of each sway hold longer, like a gust easing. */
-const FRAME_SECONDS = [0.14, 0.16, 0.22, 0.16, 0.14, 0.16, 0.22, 0.16];
+const FRAME_SECONDS = [0.18, 0.18, 0.26, 0.2, 0.18, 0.18, 0.26, 0.2];
 
 /** The content pack's clip for every grass sheet. */
 export const GRASS_CLIP = {
@@ -41,8 +41,8 @@ type GrassStyle = {
 
 /** Sheets by content-pack tile type: dense rough ground and lighter plains. */
 export const GRASS_SHEETS: Readonly<Record<string, GrassStyle>> = {
-  grass: { seed: 0x6a55, tufts: 150, carpet: 2600, clumping: 0.45 },
-  "grass-sparse": { seed: 0x51e7, tufts: 55, carpet: 900, clumping: 0.85 },
+  grass: { seed: 0x6a55, tufts: 144, carpet: 2250, clumping: 0.66 },
+  "grass-sparse": { seed: 0x51e7, tufts: 60, carpet: 660, clumping: 0.9 },
 };
 
 type Blade = {
@@ -62,8 +62,7 @@ type Blade = {
 export function buildGrassSheet(style: GrassStyle): PNG {
   const random = seededRandom(style.seed);
   const between = (low: number, high: number) => low + (high - low) * random();
-  // Whole waves per period keep the field seamless. The unused fourth offset
-  // holds the seeded sequence the committed sheets came from.
+  // Whole waves per period keep both density and wind seamless.
   const offsets = Array.from({ length: 4 }, () => random() * Math.PI * 2);
   const wave = (x: number, y: number, fx: number, fy: number, k: number) =>
     Math.sin(((fx * x + fy * y) / PERIOD) * Math.PI * 2 + offsets[k]!);
@@ -85,12 +84,14 @@ export function buildGrassSheet(style: GrassStyle): PNG {
   };
   /** Sparse ground looks drier. */
   const colors = (dense: number, light: number): [Rgba, Rgba] => {
-    const dry = (1 - dense) * 0.12 + between(-0.05, 0.05);
+    const dry = (1 - dense) * 0.23 + between(-0.035, 0.035);
     return [
-      [0.2 + dry, 0.3 + dry * 0.4, 0.11, 0.95],
-      [0.5 + dry + light, 0.62 + light, 0.25, 0.9],
+      [0.16 + dry, 0.264 + dry * 0.24, 0.124 + dry * 0.3, 0.95],
+      [0.37 + dry + light, 0.535 + light, 0.268 + dry * 0.3, 0.9],
     ];
   };
+  const windPhase = (x: number, y: number) =>
+    0.27 * wave(x, y, 1, 1, 3) + 0.1 * wave(x, y, 2, -1, 1);
   const blades: Blade[] = [];
   const shades: { x: number; y: number }[] = [];
   for (let index = 0; index < style.carpet; index++) {
@@ -100,11 +101,11 @@ export function buildGrassSheet(style: GrassStyle): PNG {
       x,
       y,
       angle: between(0, Math.PI * 2),
-      length: between(5, 12),
-      width: between(0.7, 1.2),
+      length: between(4, 10),
+      width: between(0.8, 1.35),
       bend: between(-0.4, 0.4),
-      sway: between(1, 3),
-      phase: random() * 2,
+      sway: between(0.5, 1.9),
+      phase: windPhase(x, y) + between(-0.14, 0.14),
       root,
       tip,
     });
@@ -112,19 +113,19 @@ export function buildGrassSheet(style: GrassStyle): PNG {
   for (let tuft = 0; tuft < style.tufts; tuft++) {
     const { x, y, dense } = place();
     shades.push({ x, y });
-    // Neighboring tufts sway slightly out of step.
-    const phase = between(0, 0.9);
-    const [root, tip] = colors(dense, 0);
+    const phase = windPhase(x, y);
+    const heading = between(-Math.PI, Math.PI);
+    const [root, tip] = colors(dense, between(-0.04, 0.08));
     const count = Math.floor(between(8, 15));
     for (let blade = 0; blade < count; blade++)
       blades.push({
         x: x + between(-4, 4),
         y: y + between(-4, 4),
-        angle: between(0, Math.PI * 2),
-        length: between(10, 26),
-        width: between(1, 1.9),
+        angle: heading + between(-1.55, 1.55),
+        length: between(11, 24),
+        width: between(1.1, 2.1),
         bend: between(-0.5, 0.5),
-        sway: between(3, 6),
+        sway: between(3, 7),
         phase,
         root,
         tip,
@@ -154,7 +155,7 @@ export function buildGrassSheet(style: GrassStyle): PNG {
         drawDisc(
           frame,
           blade.x + (tipX - blade.x) * t - dy * curl + gust * t * t,
-          blade.y + (tipY - blade.y) * t + dx * curl,
+          blade.y + (tipY - blade.y) * t + dx * curl - gust * t * t * 0.32,
           blade.width * (1 - t) + 0.5,
           color,
         );
