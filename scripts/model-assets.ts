@@ -1636,13 +1636,35 @@ function fragment(scene: Scene, name: string) {
 
 /** A faint violet wisp of light leaking from a damaged living core. */
 function leak(scene: Scene, name: string) {
-  const mesh = MeshBuilder.CreateSphere(
+  const profile = [
+    { x: -0.12, y: -0.18, z: 0.04, radius: 0.008 },
+    { x: -0.06, y: 0.01, z: -0.025, radius: 0.1 },
+    { x: 0.09, y: 0.22, z: -0.07, radius: 0.14 },
+    { x: 0.16, y: 0.43, z: 0, radius: 0.105 },
+    { x: 0.1, y: 0.62, z: 0.14, radius: 0.06 },
+    { x: -0.06, y: 0.8, z: 0.22, radius: 0.006 },
+  ];
+  const mesh = MeshBuilder.CreateTube(
     name,
-    { diameter: 1, segments: 5 },
+    {
+      path: profile.map(({ x, y, z }) => new Vector3(x, y, z)),
+      radiusFunction: (index) => profile[index]!.radius,
+      tessellation: 7,
+      cap: Mesh.CAP_ALL,
+    },
     scene,
   );
-  mesh.scaling.set(0.12, 0.22, 0.12);
-  mesh.material = unlit(scene, name, new Color3(0.68, 0.38, 1));
+  mesh.material = unlit(scene, name, Color3.White());
+  const violet = BOLT_COLOR.toLinearSpace();
+  const lilac = new Color3(0.94, 0.76, 1).toLinearSpace();
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+  const colors: number[] = [];
+  for (let index = 1; index < positions.length; index += 3) {
+    const glow = Math.max(0, 1 - Math.abs(positions[index]! - 0.22) / 0.42);
+    const color = Color3.Lerp(violet, lilac, glow);
+    colors.push(color.r, color.g, color.b, 1);
+  }
+  mesh.setVerticesData(VertexBuffer.ColorKind, colors);
 }
 
 /** A falling drop for wounded biological actors. */

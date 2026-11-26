@@ -219,6 +219,8 @@ challenge, pacing, and useful choices.
     structures and a Harvester, with fire and Circle damage cues in view.
     The fire pass covers flame and ember readability under smoke on a
     critical Refinery and Harvester, including reduced motion.
+    The living leak pass covers moderate and critical Thornspire damage
+    and a critical Briar Ram alongside ARC smoke and fire.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

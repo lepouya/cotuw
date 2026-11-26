@@ -2086,7 +2086,8 @@ acceptance progress. The following sections define the selected scope.
   paused indicator. The full reserved footprint and progress bar remain
   visible throughout. Loading derives the stage from saved progress.
 - Living buildings and the Briar Ram show cracked wood plates, occasional
-  falling leaves or fragments, and faint violet leaks at 60% health or below.
+  falling leaves or fragments, and curling violet wisps at 60% health or
+  below. Each wisp has a pale lilac center and fades as it rises.
   At 30% or below, show deeper splits, drooping foliage, more frequent
   fragments, and an unstable, flickering core. Broken shapes and falling
   material convey severity alongside light effects. These cues recede as

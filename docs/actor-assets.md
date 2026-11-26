@@ -61,6 +61,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   vertex-color gradient. The damage view spreads, scales, and fades puffs.
   Fire uses three swept tongues with pale bases and orange tips. The
   0.6-second `flicker` loop sways the tongues and lifts tapered embers.
+  Living leaks use one curved, tapered mesh with a violet-to-lilac gradient.
+  The damage view raises and fades each wisp.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
