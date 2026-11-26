@@ -211,6 +211,8 @@ challenge, pacing, and useful choices.
     The tracer pass covers Trooper and Sentry shots alongside Circle bolts.
     The focus bolt pass covers Sentinel and Thornspire casts at two ranges
     alongside ARC tracers, including pulse, fade, and reduced motion.
+    The bite cue pass covers wolf and alpha hits on an ARC Scout and Circle
+    Wayfinder from different angles at gameplay zoom.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

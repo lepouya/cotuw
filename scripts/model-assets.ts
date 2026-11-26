@@ -917,18 +917,50 @@ function bolt(scene: Scene, name: string) {
 /** Three slanted claw slashes across the strike direction. */
 function bite(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const material = unlit(scene, name, BITE_COLOR);
-  for (const side of [-1, 0, 1]) {
-    const slash = MeshBuilder.CreateBox(
-      `claw-${side}`,
-      { width: 0.025, height: 0.5, depth: 0.025 },
+  const profile = [
+    { x: -0.14, y: -0.34, z: 0.035, radius: 0.003 },
+    { x: -0.09, y: -0.19, z: -0.015, radius: 0.025 },
+    { x: 0, y: 0.04, z: -0.04, radius: 0.038 },
+    { x: 0.11, y: 0.22, z: -0.015, radius: 0.028 },
+    { x: 0.22, y: 0.32, z: 0.035, radius: 0.003 },
+  ];
+  const slashes = [-1, 0, 1].map((side) => {
+    const length = 1 - Math.abs(side) * 0.17;
+    return MeshBuilder.CreateTube(
+      "claw-slash",
+      {
+        path: profile.map(
+          ({ x, y, z }) =>
+            new Vector3(
+              x * length + side * 0.2,
+              y * length + side * 0.04,
+              z + side * 0.08,
+            ),
+        ),
+        radiusFunction: (index) => profile[index]!.radius * length,
+        tessellation: 6,
+        cap: Mesh.CAP_ALL,
+      },
       scene,
     );
-    slash.parent = root;
-    slash.position.x = side * 0.12;
-    slash.rotation.z = -0.5;
-    slash.material = material;
+  });
+  const marks = Mesh.MergeMeshes(slashes, true, true)!;
+  marks.name = "claw-marks";
+  marks.parent = root;
+  marks.material = unlit(scene, name, Color3.White());
+  const edge = BITE_COLOR.toLinearSpace();
+  const middle = new Color3(1, 0.75, 0.57).toLinearSpace();
+  const positions = marks.getVerticesData(VertexBuffer.PositionKind)!;
+  const colors: number[] = [];
+  for (let index = 1; index < positions.length; index += 3) {
+    const highlight = Math.max(
+      0,
+      1 - Math.abs(positions[index]! - 0.07) / 0.28,
+    );
+    const color = Color3.Lerp(edge, middle, highlight);
+    colors.push(color.r, color.g, color.b, 1);
   }
+  marks.setVerticesData(VertexBuffer.ColorKind, colors);
 }
 
 /** Splintered wood and a violet ring where a construct's blow lands. */

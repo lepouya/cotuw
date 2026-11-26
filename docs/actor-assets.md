@@ -53,6 +53,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   muzzle to pale yellow at the target. The shot scales to its length.
   Focus bolts share a 0.3-second `idle` clip that pulses three strands and
   opens the impact bloom. The shot scales along its cast-to-impact axis.
+  Wolf and alpha bites share one unlit mesh with three tapered slashes.
+  Vertex colors give each slash a bright coral center and red tips.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,

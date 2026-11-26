@@ -1740,8 +1740,9 @@ recall rules apply unchanged.
   dealt or took damage in the last three seconds, then fade over one second.
   The fill drains continuously and turns amber at 60% and red at 30%. The
   sidebar shows exact health for one selected actor. Rifle hits draw a brief
-  tracer, wolf bites draw claw marks on the target, and accepted attack orders
-  flash a red target marker.
+  tracer. Wolf and alpha bites flash three curved coral claw marks across
+  the target at the angle of the strike. Accepted attack orders flash a red
+  target marker.
 - Combat values and wolf timers are data-driven in the base content pack.
   On Normal, one Trooper must defeat one normal wolf, a Scout must not, and
   the five-wolf den requires multiple Troopers.
