@@ -94,7 +94,7 @@ clips match their generators, and reject unregistered files in `public/assets`.
   Violet embers at the breaks share the `fading-light` mesh, which dims over
   1.6 seconds or goes dark at once under reduced motion. Living damage effects
   shed folded `leaf` blades with ochre edges and emit `leak` wisps. Critical
-  damage also sheds `fragment` wood chips.
+  damage also sheds `fragment` splinters with pale exposed wood and a bark edge.
 - Building details and the wolf and Harvester parts in `src/render` supply both
   the built-in models and the export script, which receives named parts and
   adds rigging and clips. A building's details declare `loopSeconds`, the period

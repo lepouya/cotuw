@@ -954,12 +954,30 @@ function leaf(scene: Scene, name: string) {
 
 /** A splintered chip of pale living wood shed by damaged constructs. */
 function fragment(scene: Scene, name: string) {
-  const mesh = MeshBuilder.CreatePolyhedron(
-    name,
-    { type: 2, sizeX: 0.12, sizeY: 0.05, sizeZ: 0.2 },
-    scene,
+  const splinter = loft(
+    [
+      [
+        [-0.08, -0.19, -0.04],
+        [0.01, -0.21, -0.08],
+        [0.07, -0.19, -0.04],
+        [0.06, -0.16, 0.05],
+        [-0.07, -0.17, 0.06],
+      ],
+      [
+        [-0.12, 0.02, -0.04],
+        [-0.01, 0.09, -0.09],
+        [0.11, 0.03, -0.04],
+        [0.09, 0.08, 0.07],
+        [-0.1, 0.04, 0.08],
+      ],
+    ],
+    [0.13, 0.26, 0.015],
   );
-  mesh.material = surface(scene, name, [0.82, 0.72, 0.5]);
+  const mesh = MeshBuilder.CreatePolyhedron(name, { custom: splinter }, scene);
+  mesh.material = surface(scene, name, Color3.White());
+  const wood = new Color3(0.99, 0.9, 0.65).toLinearSpace();
+  const bark = new Color3(0.47, 0.33, 0.18).toLinearSpace();
+  paint(mesh, (_x, _y, z) => (z >= 0.05 ? bark : wood));
 }
 
 /** A faint violet wisp of light leaking from a damaged living core. */

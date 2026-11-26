@@ -199,8 +199,8 @@ challenge, pacing, and useful choices.
   - First model passes cover every ARC and Circle building and unit, the
     wolf and alpha, ARC and Circle rubble, salvage, Materials and
     cultivation sites, foundations and scaffolds, ambient birds, tracers,
-    focus bolts, bite cues, wound drops, smoke, fire, living leaks, and
-    falling leaves. Each pass was reviewed at gameplay zoom in its scenes,
+    focus bolts, bite cues, wound drops, smoke, fire, living leaks, falling
+    leaves, and wood splinters. Each pass was reviewed at gameplay zoom,
     alongside the other faction's cues and, for animated effects, under
     reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
