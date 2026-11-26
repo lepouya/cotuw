@@ -1994,7 +1994,8 @@ acceptance progress. The following sections define the selected scope.
   shoulder launcher with a faceted shroud and pale muzzle rim sets their
   silhouette. Owner markings sit on the armor, launcher, and rear rack
   with twin rocket tubes. They keep the launcher braced while moving.
-  The production portrait shows the same kit.
+  The production portrait shows the same kit. Their shots leave a scalloped
+  smoke wake behind a tapered amber streak with a pale leading tip.
 - Scouts wear light sand-colored armor over slate fatigues, with paired
   cyan optics and an antenna on the radio pack. Owner markings sit on the
   helmet, shoulder tabs, and pack. They are unarmed and swing their arms

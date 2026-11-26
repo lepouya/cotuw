@@ -325,29 +325,56 @@ function tracer(scene: Scene, name: string) {
 
 function rocket(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const hot = unlit(scene, `${name}-hot`, ROCKET_COLOR);
-  const smoke = surface(scene, `${name}-smoke`, [0.6, 0.59, 0.53], 0.3);
-  const core = MeshBuilder.CreateBox(
-    "rocket-streak",
-    { width: 0.065, height: 0.065, depth: 1 },
+  const core = tube(
     scene,
+    "rocket-streak",
+    [0.46, 0.63, 0.8, 0.92, 0.97, 1].map((z) => [0, 0, z]),
+    [0.006, 0.016, 0.033, 0.055, 0.039, 0.009],
   );
-  core.parent = root;
-  core.position.z = 0.5;
-  core.material = hot;
-  const parts: Mesh[] = [];
-  for (let index = 0; index < 5; index++) {
-    const puff = MeshBuilder.CreateSphere(
-      `trail-${index}`,
-      { diameter: 0.16 - index * 0.018, segments: 4 },
-      scene,
-    );
-    puff.parent = root;
-    puff.position.set(Math.sin(index * 2) * 0.04, 0.03, 0.1 + index * 0.17);
-    puff.scaling.z = 0.7;
-    parts.push(puff);
-  }
-  merge(root, "rocket-smoke", parts, smoke);
+  const ember = new Color3(0.88, 0.35, 0.1).toLinearSpace();
+  const gold = ROCKET_COLOR.toLinearSpace();
+  const pale = new Color3(1, 0.93, 0.65).toLinearSpace();
+  paint(core, (_x, _y, z) =>
+    z < 0.8
+      ? Color3.Lerp(ember, gold, (z - 0.46) / 0.34)
+      : Color3.Lerp(gold, pale, (z - 0.8) / 0.2),
+  );
+  place(core, {
+    parent: root,
+    material: unlit(scene, `${name}-hot`, Color3.White()),
+  });
+
+  const puffs = [
+    [-0.07, 0.07, 0.08, 0.24, 0.09],
+    [0.045, 0.08, 0.19, 0.29, 0.13],
+    [-0.058, 0.04, 0.31, 0.24, 0.12],
+    [0.05, 0.052, 0.42, 0.23, 0.11],
+    [-0.045, 0.029, 0.53, 0.2, 0.1],
+    [0.031, 0.023, 0.64, 0.16, 0.09],
+    [-0.025, 0.01, 0.74, 0.13, 0.075],
+  ] as const;
+  const smoke = surface(scene, `${name}-smoke`, Color3.White());
+  smoke.alpha = 0.8;
+  const wake = merge(
+    root,
+    "rocket-smoke",
+    puffs.map(([x, y, z, width, length], index) =>
+      place(
+        MeshBuilder.CreateIcoSphere(
+          `trail-${index}`,
+          { radius: 0.5, subdivisions: 2 },
+          scene,
+        ),
+        { position: [x, y, z], scaling: [width, width * 0.86, length] },
+      ),
+    ),
+    smoke,
+  );
+  const ash = new Color3(0.67, 0.64, 0.57);
+  const soot = new Color3(0.39, 0.36, 0.33);
+  paint(wake, (_x, y, z) =>
+    Color3.Lerp(soot, ash, Math.max(0, Math.min(1, 0.64 - z * 0.75 + y * 1.6))),
+  );
 }
 
 function rocketImpact(scene: Scene, name: string) {

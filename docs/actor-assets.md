@@ -59,8 +59,9 @@ clips match their generators, and reject unregistered files in `public/assets`.
   0.6-second `flicker` loop sways the tongues and lifts tapered embers.
   Living leaks use one curved, tapered mesh with a violet-to-lilac gradient.
   The damage view raises and fades each wisp.
-  Launcher shots use a smoke-and-ember streak plus a separately sized impact
-  burst, so longer shots do not stretch the impact.
+  Launcher shots use one vertex-painted smoke wake and one tapered streak
+  with a pale tip. The trail stretches from muzzle to target. The impact
+  burst keeps its own scale.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
   Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle,
   Thornspire ribs and crown, and renewable blooms. Each ID has one recipe
