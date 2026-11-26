@@ -10,6 +10,7 @@ import {
   byMaterial,
   clip,
   foldedBlade,
+  loft,
   merge,
   place,
   skin,
@@ -1309,18 +1310,29 @@ function briarRam(scene: Scene, name: string) {
       [-0.17, 1.2, -0.16],
       [0.08, 1.136, -0.45],
     ] as const
-  ).entries())
+  ).entries()) {
     branch(
       `ram-damage-moderate-crack-${i}`,
       [
-        [x - 0.12, y - 0.022, z - 0.15],
-        [x - 0.06, y, z - 0.04],
-        [x + 0.01, y - 0.02, z - 0.015],
-        [x + 0.11, y - 0.042, z + 0.13],
+        [x - 0.17, y - 0.012, z - 0.16],
+        [x - 0.07, y + 0.01, z - 0.04],
+        [x + 0.03, y + 0.003, z - 0.025],
+        [x + 0.15, y - 0.025, z + 0.14],
       ],
-      [0.01, 0.023, 0.025, 0.009],
+      [0.005, 0.035, 0.032, 0.006],
       crack,
     );
+    branch(
+      `ram-damage-moderate-fork-${i}`,
+      [
+        [x - 0.07, y + 0.01, z - 0.04],
+        [x - 0.13, y - 0.005, z + 0.027],
+        [x - 0.21, y - 0.034, z + 0.05],
+      ],
+      [0.024, 0.017, 0.004],
+      crack,
+    );
+  }
   for (const side of [-1, 1])
     sliver(
       `ram-damage-moderate-crack-flank-${side}`,
@@ -1349,40 +1361,56 @@ function briarRam(scene: Scene, name: string) {
     [-0.49, 0.82, -0.18],
     leak,
   );
-  // Deeper splits open the plates and splinters jut from the breaks.
+  // Lift the broken inner edge of each split plate above the shell.
+  const brokenLip = loft([
+    [
+      [-0.48, -0.45, -0.42],
+      [0.04, -0.45, -0.5],
+      [0.46, -0.45, -0.17],
+      [0.28, -0.45, 0.5],
+      [-0.46, -0.45, 0.28],
+    ],
+    [
+      [-0.42, -0.06, -0.4],
+      [0.02, 0.38, -0.44],
+      [0.4, 0.51, -0.17],
+      [0.22, 0.22, 0.43],
+      [-0.4, 0.06, 0.27],
+    ],
+  ]);
   for (const [i, [x, y, z, turn]] of (
     [
-      [-0.02, 1.223, 0.33, 0.62],
-      [0.14, 1.182, -0.23, -0.62],
+      [-0.02, 1.237, 0.3, 0.62],
+      [0.1, 1.204, -0.27, -0.62],
     ] as const
   ).entries()) {
-    sliver(
+    const bend = Math.sign(turn);
+    branch(
       `ram-damage-critical-split-${i}`,
-      [0.083, 0.026, 0.37],
-      [x, y, z],
-      [0.16, turn, 0],
+      [
+        [x - bend * 0.22, y - 0.055, z - 0.25],
+        [x - bend * 0.09, y, z - 0.11],
+        [x + bend * 0.035, y + 0.006, z - 0.025],
+        [x + bend * 0.025, y - 0.005, z + 0.1],
+        [x + bend * 0.2, y - 0.047, z + 0.26],
+      ],
+      [0.014, 0.061, 0.07, 0.054, 0.012],
       split,
     );
-    for (const offset of [-1, 1]) {
-      place(
-        MeshBuilder.CreateCylinder(
-          `ram-damage-critical-splinter-${i}-${offset}`,
-          {
-            height: 0.22,
-            diameterTop: 0,
-            diameterBottom: 0.09,
-            tessellation: 5,
-          },
-          scene,
-        ),
-        {
-          parent: root,
-          material: splinter,
-          position: [x + offset * 0.065, y + 0.055, z + offset * 0.05],
-          rotation: [offset * 0.5, turn, offset * 0.4],
-        },
-      );
-    }
+    place(
+      MeshBuilder.CreatePolyhedron(
+        `ram-damage-critical-splinter-${i}`,
+        { custom: brokenLip },
+        scene,
+      ),
+      {
+        parent: root,
+        material: splinter,
+        position: [x - 0.17, y + 0.012, z],
+        rotation: [0.13, turn, -0.42],
+        scaling: [0.29, 0.25, 0.4],
+      },
+    );
   }
   sliver(
     "ram-damage-critical-split-flank",

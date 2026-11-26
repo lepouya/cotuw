@@ -88,9 +88,11 @@ clips match their generators, and reject unregistered files in `public/assets`.
   restores health. Critical `flicker` meshes vary in brightness and hold
   still under reduced motion. Buildings under construction hide both stages,
   since unfinished layers would leave them floating. The Briar Ram uses the
-  same stages with a separate skin mesh for each damage material. Its remains
-  keep the broken shapes with the core and leaks extinguished. `living-rubble`
-  gives Circle buildings snapped ribs, dark roots, and fallen leaf plates.
+  same stages with a separate skin mesh for each damage material. Forked cracks
+  mark moderate shell damage. Critical splits have raised, broken plate edges.
+  Its remains keep the broken shapes with the core and leaks extinguished.
+  `living-rubble` gives Circle buildings snapped ribs, dark roots, and fallen
+  leaf plates.
   Violet embers at the breaks share the `fading-light` mesh, which dims over
   1.6 seconds or goes dark at once under reduced motion. Living damage effects
   shed folded `leaf` blades with ochre edges and emit `leak` wisps. Critical

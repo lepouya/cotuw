@@ -2092,9 +2092,11 @@ acceptance progress. The following sections define the selected scope.
   falling leaves, pale wood splinters with a dark bark edge, and an unstable,
   flickering core. Broken shapes and falling material convey severity
   alongside light effects. These cues recede as repair restores health.
-  Models supply the broken shapes as named moderate and critical damage meshes
-  selected by severity. Runtime emitters add leaves, fragments, and violet
-  leaks. Critical damage meshes include flickering lights.
+  The Briar Ram's back plates show forked cracks at moderate damage and
+  jagged splits with raised pale edges at critical damage. Models supply
+  the broken shapes as named damage meshes selected by severity. Runtime
+  emitters add leaves, fragments, and violet leaks. Critical damage meshes
+  include flickering lights.
 - Circle buildings collapse into pale snapped ribs, intertwined dark roots,
   and overlapping fallen leaf plates. Violet embers at the breaks fade after
   the debris settles. The Briar Ram's legs buckle and its body settles into

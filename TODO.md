@@ -203,6 +203,8 @@ challenge, pacing, and useful choices.
     leaves, and wood splinters. Each pass was reviewed at gameplay zoom,
     alongside the other faction's cues and, for animated effects, under
     reduced motion.
+  - The Briar Ram damage pass covers healthy, moderate, and critical shells
+    at gameplay zoom.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
