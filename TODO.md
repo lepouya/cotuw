@@ -213,6 +213,8 @@ challenge, pacing, and useful choices.
     alongside ARC tracers, including pulse, fade, and reduced motion.
     The bite cue pass covers wolf and alpha hits on an ARC Scout and Circle
     Wayfinder from different angles at gameplay zoom.
+    The wound drop pass covers moderate and critical biological damage
+    alongside mechanical smoke at gameplay zoom, including reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

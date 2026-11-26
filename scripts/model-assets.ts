@@ -1607,13 +1607,36 @@ function leak(scene: Scene, name: string) {
 /** A falling drop for wounded biological actors. */
 function wound(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const drop = MeshBuilder.CreatePolyhedron(
+  const drop = MeshBuilder.CreateLathe(
     "drop",
-    { type: 1, sizeX: 0.035, sizeY: 0.06, sizeZ: 0.035 },
+    {
+      shape: [
+        new Vector3(0, 0.12, 0),
+        new Vector3(0.025, 0.052, 0),
+        new Vector3(0.052, 0.012, 0),
+        new Vector3(0.06, -0.028, 0),
+        new Vector3(0.046, -0.062, 0),
+        new Vector3(0, -0.077, 0),
+      ],
+      tessellation: 8,
+    },
     scene,
   );
   drop.parent = root;
-  drop.material = surface(scene, "wound", [0.5, 0.04, 0.05]);
+  drop.material = unlit(scene, name, Color3.White());
+  const crimson = new Color3(0.56, 0.08, 0.14).toLinearSpace();
+  const coral = new Color3(0.95, 0.42, 0.36).toLinearSpace();
+  const positions = drop.getVerticesData(VertexBuffer.PositionKind)!;
+  const colors: number[] = [];
+  for (let index = 1; index < positions.length; index += 3) {
+    const highlight = Math.max(
+      0,
+      1 - Math.abs(positions[index]! - 0.012) / 0.07,
+    );
+    const color = Color3.Lerp(crimson, coral, highlight);
+    colors.push(color.r, color.g, color.b, 1);
+  }
+  drop.setVerticesData(VertexBuffer.ColorKind, colors);
 }
 
 /** A healing halo and rising marks, distinct from wound drops. */

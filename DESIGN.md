@@ -1121,9 +1121,9 @@ These systems are outside M1.
   less and more strongly at 30% or less. Mechanical actors, such as ARC
   buildings and Harvesters, release intermittent smoke puffs when moderately
   damaged and a dense smoke column with fire and sparks when critical.
-  Biological actors, which are infantry and wolves, drip occasional drops when
-  moderately damaged and frequent ones when critical. Effect size, frequency,
-  and fire, not color alone, convey severity.
+  Infantry and wolves shed tapered crimson drops with a coral highlight.
+  Moderate damage sheds occasional drops, and critical damage sheds larger,
+  more frequent drops. Size, frequency, and fire also convey severity.
 - Wolves whose presentation enables regeneration show a green halo with
   rising cross marks while actively healing at home. The effect follows the
   idle pose, stays still under reduced motion, and disappears when healing

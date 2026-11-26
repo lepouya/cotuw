@@ -55,6 +55,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   opens the impact bloom. The shot scales along its cast-to-impact axis.
   Wolf and alpha bites share one unlit mesh with three tapered slashes.
   Vertex colors give each slash a bright coral center and red tips.
+  The wound prop uses an eight-sided teardrop with a coral vertex-color
+  highlight. The damage view sets its scale and falling motion.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
