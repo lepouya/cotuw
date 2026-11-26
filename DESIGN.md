@@ -1126,11 +1126,11 @@ These systems are outside M1.
   Infantry and wolves shed tapered crimson drops with a coral highlight.
   Moderate damage sheds occasional drops, and critical damage sheds larger,
   more frequent drops. Size, frequency, and fire also convey severity.
-- Wolves whose presentation enables regeneration show a green halo with
-  rising cross marks while actively healing at home. The effect follows the
-  idle pose, stays still under reduced motion, and disappears when healing
-  stops, the wolf becomes hidden, or it is destroyed. Loading rebuilds it
-  from the wolf's current state.
+- Wolves whose presentation enables regeneration show three green arcs
+  around their feet and rising mint crosses while actively healing at home.
+  The effect follows the idle pose, stays still under reduced motion, and
+  disappears when healing stops, the wolf becomes hidden, or it is destroyed.
+  Loading rebuilds it from the wolf's current state.
 - Destroyed buildings collapse: their debris slumps from building height to
   rubble over 0.8 seconds.
 - Missions may author bird flocks that circle a point at a fixed altitude

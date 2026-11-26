@@ -1171,43 +1171,73 @@ function wound(scene: Scene, name: string) {
 /** A healing halo and rising marks, distinct from wound drops. */
 function regeneration(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const material = unlit(scene, "regeneration", new Color3(0.25, 1, 0.65));
-  const halo = MeshBuilder.CreateTorus(
+  const material = unlit(scene, name, Color3.White());
+  const jade = new Color3(0.11, 0.53, 0.36).toLinearSpace();
+  const green = new Color3(0.38, 0.99, 0.68).toLinearSpace();
+  const mint = new Color3(0.78, 1, 0.84).toLinearSpace();
+  const halo = merge(
+    root,
     "healing-halo",
-    {
-      diameter: 1.1,
-      thickness: 0.025,
-      tessellation: 24,
-    },
-    scene,
+    [0, 1, 2].map((index) => {
+      const path = Array.from({ length: 15 }, (_, step): Vec3 => {
+        const angle = (index * Math.PI * 2) / 3 + 0.13 + step * 0.13;
+        return [Math.sin(angle) * 0.64, 0, Math.cos(angle) * 0.64];
+      });
+      const arc = tube(
+        scene,
+        "healing-arc",
+        path,
+        path.map((_, step) => 0.012 + 0.041 * Math.sin((step * Math.PI) / 14)),
+      );
+      return place(arc, { scaling: [1, 0.45, 1] });
+    }),
+    material,
   );
-  halo.parent = root;
-  halo.position.y = 0.06;
-  halo.material = material;
+  paint(halo, (_x, y) =>
+    Color3.Lerp(jade, green, Math.max(0, Math.min(1, 0.5 + y * 21))),
+  );
+  halo.position.y = 0.075;
+
+  const corners = [
+    [-0.12, -0.021],
+    [-0.108, -0.033],
+    [0.108, -0.033],
+    [0.12, -0.021],
+    [0.12, 0.021],
+    [0.108, 0.033],
+    [-0.108, 0.033],
+    [-0.12, 0.021],
+  ] as const;
+  const ring = (z: number, scale: number) =>
+    corners.map(([x, y]): Vec3 => [x * scale, y * scale, z]);
+  const bar = loft([ring(-0.024, 0.84), ring(0, 1), ring(0.024, 0.84)]);
   const marks = [0, 1, 2].map((index) => {
     const mark = new TransformNode(`healing-mark-${index}`, scene);
     mark.parent = root;
     const angle = (index * Math.PI * 2) / 3;
-    mark.position.set(Math.sin(angle) * 0.4, 0.3, Math.cos(angle) * 0.4);
-    for (const [width, height] of [
-      [0.14, 0.04],
-      [0.04, 0.14],
-    ]) {
-      const bar = MeshBuilder.CreateBox(
-        "healing-cross",
-        { width, height, depth: 0.04 },
-        scene,
-      );
-      bar.parent = mark;
-      bar.material = material;
-    }
+    const cross = merge(
+      mark,
+      "healing-cross",
+      [0, Math.PI / 2].map((rotation) =>
+        place(
+          MeshBuilder.CreatePolyhedron("healing-bar", { custom: bar }, scene),
+          { rotation: [0, 0, rotation] },
+        ),
+      ),
+      material,
+    );
+    paint(cross, (_x, y, z) =>
+      Color3.Lerp(green, mint, Math.min(1, Math.abs(z) * 25 + 0.3 + y * 2.5)),
+    );
+    mark.position.set(Math.sin(angle) * 0.47, 0.35, Math.cos(angle) * 0.47);
+    mark.rotation.y = angle + Math.PI / 6;
     return mark;
   });
   clip(root, "pulse", 1.5, (seconds) => {
     halo.scaling.setAll(1 + Math.sin((seconds * Math.PI * 2) / 1.5) * 0.08);
     marks.forEach((mark, index) => {
       const progress = (seconds / 1.5 + index / 3) % 1;
-      mark.position.y = 0.2 + progress * 0.65;
+      mark.position.y = 0.25 + progress * 0.65;
       mark.scaling.setAll(0.7 + Math.sin(progress * Math.PI) * 0.3);
     });
   });

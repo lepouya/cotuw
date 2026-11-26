@@ -209,6 +209,8 @@ challenge, pacing, and useful choices.
     ARC tracers and Circle bolts at gameplay zoom.
   - The Briar Ram strike burst was reviewed against ARC buildings from two
     attack facings at gameplay zoom.
+  - Regeneration cues were reviewed on both wolf sizes at gameplay zoom,
+    with the pulse running and under reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

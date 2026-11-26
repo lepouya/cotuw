@@ -263,8 +263,10 @@ The pack's `props` names foundations, scaffolds, rubble, mounds, salvage,
 tracers, bite marks, smoke, fire, wound drops, regeneration, and birds by URL,
 with an optional idle clip. The salvage case batches its shell, frame, and
 amber lights by material. Its root carries the hover and rotation clip.
-Fire plays its flicker and regeneration its pulse. The bird's `flap` clip
-poses each wing at its shoulder and wrist on a half-second loop.
+Fire plays its flicker. The regeneration cue batches three tapered ground
+arcs into one mesh. Its 1.5-second `pulse` clip scales the arcs together
+and raises three beveled crosses on staggered phases. The bird's `flap`
+clip poses each wing at its shoulder and wrist on a half-second loop.
 Each foundation tile uses one beveled slab mesh with vertex colors for the
 deck, shoulders, and footing. The scaffold's rails, braces, and amber fittings
 batch by material within a unit cube. Construction stages scale it around the
