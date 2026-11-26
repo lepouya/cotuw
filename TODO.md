@@ -211,6 +211,8 @@ challenge, pacing, and useful choices.
     attack facings at gameplay zoom.
   - Regeneration cues were reviewed on both wolf sizes at gameplay zoom,
     with the pulse running and under reduced motion.
+  - Harvester wrecks were reviewed beside an operational Harvester at gameplay
+    zoom, with settled remains facing two directions.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

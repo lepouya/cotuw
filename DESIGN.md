@@ -1967,7 +1967,8 @@ acceptance progress. The following sections define the selected scope.
   press distinguish the processing hall from the Command Center.
 - The Harvester has wide guarded treads, a glazed cab with owner markings on
   the roof and track guards, and a front collector. Its open rear hopper tips
-  to discharge cargo at the Refinery.
+  to discharge cargo at the Refinery. A destroyed Harvester rolls onto one
+  tread with its collector hanging crooked and its hopper twisted open.
 - The Field Barracks has low, armored dormitory wings with banded windows.
   A raised owner-marked entrance separates them. Its doors slide into the
   wings when troops deploy, and pale lights mark the threshold.

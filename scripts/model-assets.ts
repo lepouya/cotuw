@@ -236,10 +236,16 @@ function harvester(scene: Scene, name: string) {
     false,
   );
   clip(root, "death", 0.8, (seconds) => {
-    const fall = (seconds / 0.8) ** 2;
-    root.rotation.z = -fall * 0.5;
-    root.position.y = -fall * 0.12;
-    drill.rotation.x = fall * 0.8;
+    const progress = seconds / 0.8;
+    const fall = progress ** 2 * (3 - 2 * progress);
+    const roll = (fall * Math.PI) / 2;
+    root.rotation.z = -roll;
+    // Roll over the outside edge of the tread at its lowest point.
+    root.position.y = 0.54 * Math.sin(roll) + 0.045 * (1 - Math.cos(roll));
+    drill.position.set(fall * 0.17, 0.65 - fall * 0.26, 0.8 + fall * 0.11);
+    drill.rotation.set(fall * 0.85, fall * 0.38, -fall * 0.3);
+    hopper.position.set(fall * 0.1, 0.73 + fall * 0.07, -0.35 - fall * 0.16);
+    hopper.rotation.set(-fall * 0.51, -fall * 0.46, fall * 0.24);
   });
 }
 

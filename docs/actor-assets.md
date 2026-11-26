@@ -45,6 +45,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   four-petaled impact bloom, bite marks, splintered strike bursts, smoke
   puffs, flickering fire, wound drops, a pulsing regeneration halo, and a bird
   with a wing-beat clip. The alpha wolf scales the generated wolf asset.
+  The Harvester's death clip rolls the chassis over a tread edge and
+  displaces the collector and hopper on their existing pivots.
   Tracers use one tapered mesh with vertex colors grading from amber at the
   muzzle to pale yellow at the target. The shot scales to its length.
   Focus bolts share a 0.3-second `idle` clip that pulses three strands and
