@@ -61,7 +61,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   The damage view raises and fades each wisp.
   Launcher shots use one vertex-painted smoke wake and one tapered streak
   with a pale tip. The trail stretches from muzzle to target. The impact
-  burst keeps its own scale.
+  uses a vertex-painted flare with tapered sparks and a translucent ash
+  mesh. Its `burst` clip expands both at a scale independent of shot length.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,
   Conservatory basin and canopy, vaulted Musterhall, Construct Nursery cradle,
   Thornspire ribs and crown, and renewable blooms. Each ID has one recipe

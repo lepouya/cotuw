@@ -1996,6 +1996,8 @@ acceptance progress. The following sections define the selected scope.
   with twin rocket tubes. They keep the launcher braced while moving.
   The production portrait shows the same kit. Their shots leave a scalloped
   smoke wake behind a tapered amber streak with a pale leading tip.
+  Impacts bloom into a pale fireball with tapered amber sparks and a low
+  ring of ash.
 - Scouts wear light sand-colored armor over slate fatigues, with paired
   cyan optics and an antenna on the radio pack. Owner markings sit on the
   helmet, shoulder tabs, and pack. They are unarmed and swing their arms

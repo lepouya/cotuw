@@ -205,8 +205,8 @@ challenge, pacing, and useful choices.
     reduced motion.
   - Damage-stage passes cover healthy, moderate, and critical Briar Ram
     shells and Circle building ribs at gameplay zoom.
-  - The rocket trail pass covers two shot lengths alongside ARC tracers and
-    Circle bolts at gameplay zoom.
+  - Rocket trails and impacts were reviewed at two shot lengths alongside
+    ARC tracers and Circle bolts at gameplay zoom.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

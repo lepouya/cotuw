@@ -381,32 +381,82 @@ function rocketImpact(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
   const bloom = new TransformNode("impact-bloom", scene);
   bloom.parent = root;
-  const hot = unlit(scene, "impact-hot", new Color3(1, 0.63, 0.15));
-  const parts: Mesh[] = [];
-  for (let index = 0; index < 9; index++) {
-    const angle = (index / 9) * Math.PI * 2;
-    const ray = MeshBuilder.CreateBox(
-      `impact-ray-${index}`,
-      { width: 0.07, height: 0.6, depth: 0.07 },
-      scene,
-    );
-    ray.parent = bloom;
-    ray.rotation.z = angle;
-    ray.position.set(
-      Math.sin(angle) * 0.15,
-      Math.cos(angle) * 0.15,
-      Math.sin(index * 3) * 0.12,
-    );
-    parts.push(ray);
-  }
-  const core = MeshBuilder.CreateSphere(
-    "impact-core",
-    { diameter: 0.4, segments: 6 },
-    scene,
+
+  const lobes = [
+    [0, 0.03, 0, 0.28],
+    [-0.17, 0.06, 0.06, 0.19],
+    [0.17, -0.02, -0.065, 0.18],
+    [0.04, 0.16, 0.09, 0.16],
+    [-0.045, -0.055, -0.17, 0.15],
+  ] as const;
+  const sparks = [
+    [0.51, 0.24, 0.16],
+    [-0.42, 0.34, -0.22],
+    [0.08, 0.53, -0.12],
+    [-0.19, 0.22, 0.48],
+    [0.31, -0.13, -0.41],
+    [-0.48, -0.15, 0.19],
+    [0.17, -0.22, 0.37],
+  ] as const;
+  const flare = merge(
+    bloom,
+    "impact-flare",
+    [
+      ...lobes.map(([x, y, z, radius], index) =>
+        place(
+          MeshBuilder.CreateIcoSphere(
+            `impact-lobe-${index}`,
+            { radius, subdivisions: 2 },
+            scene,
+          ),
+          { position: [x, y, z], scaling: [1, 0.85, 1] },
+        ),
+      ),
+      ...sparks.map(([x, y, z], index) =>
+        tube(
+          scene,
+          `impact-spark-${index}`,
+          [0.59, 0.77, 1].map((reach) => [x * reach, y * reach, z * reach]),
+          [0.018, 0.044, 0.004],
+        ),
+      ),
+    ],
+    unlit(scene, "impact-hot", Color3.White()),
   );
-  core.parent = bloom;
-  parts.push(core);
-  merge(bloom, "impact-flare", parts, hot);
+  const pale = new Color3(1, 0.94, 0.69).toLinearSpace();
+  const amber = new Color3(1, 0.63, 0.19).toLinearSpace();
+  const ember = new Color3(0.92, 0.31, 0.1).toLinearSpace();
+  paint(flare, (x, y, z) => {
+    const distance = Math.hypot(x, y * 0.85, z);
+    return distance < 0.36
+      ? Color3.Lerp(pale, amber, Math.max(0, (distance - 0.24) / 0.12))
+      : Color3.Lerp(amber, ember, Math.min(1, (distance - 0.36) / 0.21));
+  });
+
+  const smoke = surface(scene, "impact-ash", [0.43, 0.38, 0.33]);
+  smoke.alpha = 0.64;
+  const puffs = [
+    [-0.29, -0.04, -0.09, 0.23],
+    [0.27, -0.08, -0.19, 0.24],
+    [0.12, -0.11, 0.28, 0.22],
+    [-0.2, -0.13, 0.27, 0.19],
+    [-0.04, -0.06, -0.33, 0.21],
+  ] as const;
+  merge(
+    bloom,
+    "impact-smoke",
+    puffs.map(([x, y, z, radius], index) =>
+      place(
+        MeshBuilder.CreateIcoSphere(
+          `impact-ash-${index}`,
+          { radius, subdivisions: 2 },
+          scene,
+        ),
+        { position: [x, y, z], scaling: [1, 0.66, 1] },
+      ),
+    ),
+    smoke,
+  );
   clip(
     root,
     "burst",
