@@ -10,6 +10,7 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  VertexBuffer,
   VertexData,
 } from "@babylonjs/core";
 
@@ -740,15 +741,35 @@ function building(
 /** A unit-length shot along +Z that hits scale to their range. */
 function tracer(scene: Scene, name: string) {
   const root = new TransformNode(name, scene);
-  const material = unlit(scene, name, TRACER_COLOR);
-  const beam = MeshBuilder.CreateBox(
+  const profile = [
+    { z: 0, radius: 0.013 },
+    { z: 0.19, radius: 0.017 },
+    { z: 0.61, radius: 0.023 },
+    { z: 0.88, radius: 0.03 },
+    { z: 1, radius: 0.007 },
+  ];
+  const beam = MeshBuilder.CreateTube(
     "beam",
-    { width: 0.025, height: 0.025, depth: 1 },
+    {
+      path: profile.map(({ z }) => new Vector3(0, 0, z)),
+      radiusFunction: (index) => profile[index]!.radius,
+      tessellation: 6,
+      cap: Mesh.CAP_ALL,
+    },
     scene,
   );
+  const tail = new Color3(1, 0.73, 0.36).toLinearSpace();
+  const hot = Color3.Lerp(TRACER_COLOR, Color3.White(), 0.65).toLinearSpace();
+  const positions = beam.getVerticesData(VertexBuffer.PositionKind)!;
+  const colors: number[] = [];
+  for (let i = 2; i < positions.length; i += 3) {
+    const heat = Math.min(1, positions[i]! / 0.88);
+    const color = Color3.Lerp(tail, hot, heat);
+    colors.push(color.r, color.g, color.b, 1);
+  }
+  beam.setVerticesData(VertexBuffer.ColorKind, colors);
   beam.parent = root;
-  beam.position.z = 0.5;
-  beam.material = material;
+  beam.material = unlit(scene, name, Color3.White());
 }
 
 function rocket(scene: Scene, name: string) {

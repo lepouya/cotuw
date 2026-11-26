@@ -49,6 +49,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   violet focus strands and sparks; bite marks; splintered strike bursts; smoke
   puffs; flickering fire; wound drops; a pulsing regeneration halo; and a bird
   with a wing-beat clip. The alpha wolf scales the generated wolf asset.
+  Tracers use one tapered mesh with vertex colors grading from amber at the
+  muzzle to pale yellow at the target. The shot scales to its length.
   Launcher shots use a smoke-and-ember streak plus a separately sized impact
   burst, so longer shots do not stretch the impact.
 - `scripts/circle-models.ts` supplies the Heartgrove's trunk and crown,

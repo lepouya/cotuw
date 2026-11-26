@@ -1985,6 +1985,8 @@ acceptance progress. The following sections define the selected scope.
 - Troopers wear faceted copper-brown armor over charcoal fatigues, with a
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.
+- Trooper and Sentry tracers shade from amber at the muzzle to a pale,
+  tapered tip at the target.
 - Demolition Troopers wear faceted charcoal armor with amber visors. A
   shoulder launcher with a faceted shroud and pale muzzle rim sets their
   silhouette. Owner markings sit on the armor, launcher, and rear rack
