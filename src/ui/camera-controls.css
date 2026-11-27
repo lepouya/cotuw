@@ -5,25 +5,41 @@
   display: grid;
   grid-template-columns: repeat(3, 2.75rem);
   gap: 0.2rem;
+  padding: 0.25rem;
+  border: 1px solid #445b58;
+  border-radius: 0.3rem;
+  background: rgb(9 18 22 / 78%);
+  box-shadow: 0 0.45rem 1.4rem rgb(0 0 0 / 42%);
 }
 .camera-controls button {
   text-align: center;
   padding: 0.3rem;
-  background: rgb(20 39 41 / 90%);
+  border-color: #536b67;
+  background: rgb(22 41 46 / 92%);
+}
+.camera-controls button:hover {
+  border-color: #7c958d;
+  background: #254147;
 }
 .camera-controls button[aria-pressed="true"] {
-  color: #eac97f;
-  border-color: #d8bd79;
-  background: #304e4d;
+  color: #f4e4b5;
+  border-color: #d5b373;
+  box-shadow: inset 0 -2px #d5b373;
+  background: #2d433e;
 }
 /* Opens beside the cluster so short landscape screens keep every button. */
 .camera-views {
   position: absolute;
-  left: calc(100% + 0.2rem);
+  left: calc(100% + 0.35rem);
   bottom: 0;
   display: grid;
   grid-template-columns: repeat(2, auto);
   gap: 0.2rem;
+  padding: 0.25rem;
+  border: 1px solid #445b58;
+  border-radius: 0.3rem;
+  background: rgb(9 18 22 / 86%);
+  box-shadow: 0 0.45rem 1.4rem rgb(0 0 0 / 45%);
 }
 .edge-pan-control {
   grid-column: 1 / -1;
@@ -32,9 +48,9 @@
   gap: 0.4rem;
   min-height: 2.75rem;
   padding: 0.4rem;
-  border: 1px solid #607161;
-  border-radius: 0.2rem;
-  background: rgb(20 39 41 / 90%);
+  border: 1px solid #536b67;
+  border-radius: 0.22rem;
+  background: rgb(22 41 46 / 92%);
   font-size: 0.75rem;
   cursor: pointer;
 }

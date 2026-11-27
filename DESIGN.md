@@ -586,6 +586,10 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   for ARC, deep forest-slate for Circle) and keeps Goals in its own header
   column on compact viewports; and the minimap sits inside a gilded-bronze
   bezel with subtle inner corner ticks.
+  Introductory guides, production cards, tooltips, Goals entries, shortcut
+  keycaps, camera controls, radial menus, and notification toasts share the
+  same twilight-slate surfaces, gilded accents, and serif headings where they
+  frame player decisions.
   Explicit `?level=<scenario ID>` links open bundled levels for development.
   New mission opens the setup screen described in the Circle development
   slice, with independent difficulty and faction choices. The faction cards

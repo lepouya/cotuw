@@ -228,6 +228,9 @@ challenge, pacing, and useful choices.
     units, building rubble, and salvage at gameplay zoom; infantry death poses
     and muted/extinguished remains materials keep surviving actors readable
     during rebuilding.
+  - Gameplay overlays, guides, Goals, production cards, tooltips, shortcut
+    badges, camera controls, radial menu, notifications, and all actor
+    portraits were reviewed and unified with the twilight-and-bronze palette.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

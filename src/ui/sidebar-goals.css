@@ -1,3 +1,10 @@
+.game-sidebar #panel-goals h2 {
+  color: #f4f0df;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.15rem;
+  font-weight: 400;
+}
+
 .game-sidebar .animation-control {
   display: flex;
   align-items: center;
@@ -15,21 +22,35 @@
 }
 
 .game-sidebar .scenario-goals {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 0;
   padding: 0;
   list-style: none;
-  font-size: 0.8rem;
-  line-height: 2.2;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.game-sidebar .scenario-goals li {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #354c4a;
+  border-left: 3px solid #6b827d;
+  border-radius: 0.22rem;
+  background: rgb(9 18 22 / 55%);
 }
 
 .game-sidebar .goal-complete {
   color: #98d5b0;
+  border-left-color: #6ec791;
 }
 
 .game-sidebar .goal-failed {
   color: #f0a096;
+  border-left-color: #e07b6f;
 }
 
 .game-sidebar .goal-directive {
   margin: 0.2rem 0 0.85rem;
+  color: #c7d5cf;
   line-height: 1.5;
 }

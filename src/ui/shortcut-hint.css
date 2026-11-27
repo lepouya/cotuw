@@ -1,11 +1,15 @@
 .shortcut-hint {
   display: inline-block;
-  margin-inline-start: 0.2em;
-  padding-inline: 0.2em;
-  border: 1px solid currentColor;
+  margin-inline-start: 0.25em;
+  padding: 0.04em 0.3em;
+  border: 1px solid rgb(214 177 107 / 44%);
   border-radius: 0.2em;
+  color: #e2c580;
+  background: rgb(8 16 20 / 72%);
   font: inherit;
-  font-size: 0.8em;
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.25;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
