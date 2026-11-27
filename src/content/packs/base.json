@@ -2875,14 +2875,14 @@
       },
       "circle-frontier": {
         "clips": ["circle-frontier"],
-        "gain": 0.6,
+        "gain": 0.85,
         "cooldown": 0,
         "voices": 1,
         "priority": 0
       },
       "circle-ridge": {
         "clips": ["circle-ridge"],
-        "gain": 0.6,
+        "gain": 0.85,
         "cooldown": 0,
         "voices": 1,
         "priority": 0
@@ -2995,7 +2995,7 @@
       },
       "harvester-engine": {
         "clips": ["harvester-engine"],
-        "gain": 0.55,
+        "gain": 0.32,
         "cooldown": 0,
         "voices": 6,
         "priority": 0,

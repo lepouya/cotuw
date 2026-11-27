@@ -4,20 +4,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Unquiet World · Audio audition</title>
 <style>
-body { color: #dde8ea; background: #101c23; font: 16px system-ui;
-  max-width: 960px; margin: auto; padding: 24px; }
-h1, h2, h3 { font-weight: 600; } p { line-height: 1.5; }
-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px; } article { background: #1a2b35; padding: 16px; border-radius: 8px; }
-audio { width: 100%; min-height: 48px; display: block; margin-bottom: 12px; }
-a { color: #9fe1e5; display: inline-block; padding: 8px 0; }
-button { font: inherit; padding: 12px 20px; cursor: pointer; margin-bottom: 12px; }
+* { box-sizing: border-box; }
+body { color: #e8ecdf; background: linear-gradient(175deg, #102026, #091216);
+  font: 15px/1.5 Arial, sans-serif; max-width: 1040px; margin: auto; padding: 24px 16px 40px; }
+h1, h2 { color: #f4f0df; font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
+h1 { margin: 0 0 8px; font-size: 1.9rem; }
+h2 { margin: 28px 0 12px; font-size: 1.25rem; border-bottom: 1px solid #354c4a; padding-bottom: 6px; }
+h3 { margin: 0 0 6px; color: #f1e4be; font-size: 0.98rem; font-weight: 600; }
+p { margin: 0 0 10px; color: #c4d3cd; }
+section { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: 14px; }
+article { background: linear-gradient(160deg, #192f34, #101f24); border: 1px solid #48605c;
+  padding: 14px; border-radius: 6px; box-shadow: inset 0 1px rgb(244 240 223 / 6%); }
+audio { width: 100%; min-height: 44px; display: block; margin-bottom: 10px; }
+a { color: #d8bf89; display: inline-block; padding: 4px 0; font-size: 0.85rem; }
+button { min-height: 44px; font: inherit; font-size: 0.85rem; padding: 8px 14px; cursor: pointer;
+  margin-bottom: 10px; border: 1px solid #59726c; border-radius: 4px; color: #f4f0df;
+  background: #1b3136; }
+button:hover { border-color: #b79c63; background: #264348; }
+#stop { border-color: #d6b16b; color: #151f1c; background: #d6b16b; font-weight: 700; }
+#stop:hover { background: #ead09a; }
+.scenes { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
+.scenes button { margin-bottom: 0; }
 </style>
 <h1>Unquiet World · Audio audition</h1>
 <p>ARC synths and Circle plucked strings, breathy woodwinds, and wooden percussion.
 Original synthesized audio. Music repeats every 48 seconds at 80 BPM.
-Play machinery and cues over either track to compare the mix.</p>
+Play scene mixes or individual loops and cues to compare timing and headroom.</p>
+<div class="scenes" role="group" aria-label="Scene audition presets">
 <button type="button" id="stop">Stop all</button>
+<button type="button" data-scene="arc-base">Scene: ARC base &amp; income</button>
+<button type="button" data-scene="circle-base">Scene: Circle base &amp; cultivation</button>
+<button type="button" data-scene="battle">Scene: Skirmish battle</button>
+<button type="button" data-scene="support">Scene: Support &amp; recovery</button>
+<button type="button" data-scene="victory">Scene: Victory phrase</button>
+<button type="button" data-scene="defeat">Scene: Defeat phrase</button>
+</div>
 <p id="status" role="status"></p>
 <h2>Background music</h2><section><article>
 <h3>Unquiet Frontier</h3>
@@ -408,12 +430,48 @@ Play machinery and cues over either track to compare the mix.</p>
 </article></section>
 <script>
 const players = [...document.querySelectorAll('audio')];
+let sceneTimers = [];
+const clearScene = () => {
+  for (const timer of sceneTimers) clearTimeout(timer);
+  sceneTimers = [];
+};
+const stopAll = () => {
+  clearScene();
+  for (const player of players) { player.pause(); player.currentTime = 0; }
+};
+const trigger = (id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.currentTime = 0;
+  el.play().catch(() => {
+    document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
+  });
+};
+const SCENES = {
+  'arc-base': ['unquiet-frontier', 'harvester-work', 'harvester-engine', [400, 'refinery-door-open'], [1600, 'training-start'], [3100, 'unit-trained']],
+  'circle-base': ['circle-frontier', 'circle-cultivation', 'circle-growth', [500, 'circle-production-start'], [1900, 'circle-producer-exit'], [3200, 'circle-unit-trained']],
+  'battle': ['beneath-the-ridge', [200, 'rifle-1'], [650, 'circle-cast-1'], [1150, 'launcher-launch'], [1850, 'launcher-impact'], [2400, 'ram-strike-1'], [3100, 'alert']],
+  'support': ['circle-ridge', 'healer-service', 'mechanical-service', [700, 'living-structure-hit'], [1800, 'living-destroyed']],
+  'victory': [[0, 'objective-complete'], [1800, 'victory']],
+  'defeat': [[0, 'alert'], [1100, 'defeat']],
+};
 for (const button of document.querySelectorAll('[data-play]')) {
   button.addEventListener('click', () => {
+    clearScene();
     document.querySelector('#status').textContent = '';
     document.getElementById(button.dataset.play).play().catch(() => {
       document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
     });
+  });
+}
+for (const button of document.querySelectorAll('[data-scene]')) {
+  button.addEventListener('click', () => {
+    stopAll();
+    document.querySelector('#status').textContent = '';
+    for (const step of SCENES[button.dataset.scene] || []) {
+      if (Array.isArray(step)) sceneTimers.push(setTimeout(() => trigger(step[1]), step[0]));
+      else trigger(step);
+    }
   });
 }
 for (const player of players) {
@@ -425,8 +483,6 @@ for (const player of players) {
           other.dataset.bus === player.dataset.bus) other.pause();
   });
 }
-document.querySelector('#stop').addEventListener('click', () => {
-  for (const player of players) { player.pause(); player.currentTime = 0; }
-});
+document.querySelector('#stop').addEventListener('click', stopAll);
 </script>
 </html>

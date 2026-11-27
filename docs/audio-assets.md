@@ -2,9 +2,10 @@
 
 Run `npm run assets:audio` to regenerate the WAV files and audition page in
 `public/assets/audio`. `npm run assets` also includes them. With the development
-server running, open `/assets/audio/index.html` to play cues over music and
-download files. Playback requires a click or tap. Stop all silences every
-player. Starting a second music track pauses the first; starting a second cue
+server running, open `/assets/audio/index.html` to play scene audition presets
+(ARC base, Circle base, skirmish battle, support/recovery, and victory/defeat
+phrases) or individual cues over music and download files. Playback requires a
+click or tap. Stop all silences every player and cancels any queued scene cues. Starting a second music track pauses the first; starting a second cue
 pauses the first cue. Machinery loops can play together with music and cues.
 The page also ships in the browser build.
 
