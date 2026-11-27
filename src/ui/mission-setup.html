@@ -11,19 +11,25 @@
   <fieldset class="setup-choices faction-choices">
     <legend>Faction</legend>
     <button id="choose-arc" class="setup-choice" type="button">
-      <strong>Anomaly Response Command</strong>
-      <span id="choose-arc-description"></span>
+      <span class="setup-faction-text">
+        <strong>Anomaly Response Command</strong>
+        <span id="choose-arc-description"></span>
+      </span>
     </button>
     <button id="choose-circle" class="setup-choice" type="button">
-      <strong>Circle of Repose</strong>
-      <span id="choose-circle-description"></span>
+      <span class="setup-faction-text">
+        <strong>Circle of Repose</strong>
+        <span id="choose-circle-description"></span>
+      </span>
     </button>
   </fieldset>
   <fieldset id="difficulty-choices" class="setup-choices difficulty-choices">
     <legend>Difficulty</legend>
   </fieldset>
   <div class="setup-actions">
-    <button id="start-mission" type="button">Start</button>
+    <button id="start-mission" class="primary-action" type="button">
+      Start
+    </button>
     <button id="cancel-mission-setup" type="button">Back</button>
   </div>
 </section>

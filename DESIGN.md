@@ -573,9 +573,13 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   in-game audio settings. Main menu releases the current mission and returns
   to this screen. Exit closes the desktop app; browsers show a close-tab
   message. The title screen shows the game version.
+  The title and mission loading screens share a frontier valley illustration
+  with an ARC outpost and a Circle grove. Loading shows an indeterminate
+  indicator that stays still under reduced motion.
   Explicit `?level=<scenario ID>` links open bundled levels for development.
   New mission opens the setup screen described in the Circle development
-  slice, with independent difficulty and faction choices.
+  slice, with independent difficulty and faction choices. The faction cards
+  show each headquarters portrait and the opening objectives for that mode.
 - Primary click selects or issues the contextual default command. Clicking a
   selected actor keeps it selected. Primary drag box-selects friendly mobile
   units. Shift-click toggles individual units; Shift-drag adds boxed units.

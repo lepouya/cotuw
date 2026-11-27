@@ -226,6 +226,11 @@ function bindDialogs(
     invalidatePanel();
     status.textContent = "";
     panel = next;
+    dialog.classList.toggle(
+      "home-menu",
+      next === "actions" && view?.mode === "home",
+    );
+    dialog.classList.toggle("setup-menu", next === "setup");
     for (const [name, { content }] of Object.entries(panels))
       content.hidden = name !== next;
     title.textContent = panels[next].title ?? view?.title ?? "";

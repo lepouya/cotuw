@@ -1,4 +1,5 @@
 import { DIFFICULTIES, DIFFICULTY_IDS } from "../simulation/mission-setup";
+import { createPortrait } from "./actor-portrait";
 import { createElement, mountFeature } from "./dom";
 import markup from "./mission-setup.html?raw";
 import "./mission-setup.css";
@@ -78,6 +79,8 @@ export function createMissionSetup(
       ],
       describeFactions,
     );
+    element("choose-arc").prepend(createPortrait("headquarters"));
+    element("choose-circle").prepend(createPortrait("circle-heartgrove"));
     group("faction", [
       { id: "arc", button: element("choose-arc") },
       { id: "circle", button: element("choose-circle") },

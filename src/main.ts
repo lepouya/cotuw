@@ -14,6 +14,8 @@ import { createTopBar } from "./ui/top-bar";
 const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const canvas = byId<HTMLCanvasElement>("game-canvas");
+const shell = document.querySelector<HTMLElement>(".game-shell")!;
+const missionLoading = byId("mission-loading");
 
 const notifications = createNotifications(byId("mission-alerts"));
 const audio = createAudioMixer();
@@ -59,6 +61,10 @@ const app = createApplication({
   topBar,
   setTitleScreen: (atTitle) =>
     document.body.classList.toggle("at-title", atTitle),
+  setMissionLoading: (loading) => {
+    shell.inert = loading;
+    missionLoading.hidden = !loading;
+  },
   // Development links that assign AI also offer its diagnostics.
   aiOverlay: link.has("ai"),
 });

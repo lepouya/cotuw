@@ -19,10 +19,15 @@ test("title controls work before the mission renderer loads", async ({
   page,
 }) => {
   let rendererRequests = 0;
+  let failRenderer!: () => void;
+  const holdRenderer = new Promise<void>((resolve) => {
+    failRenderer = resolve;
+  });
   await page.route(
     (url) => url.pathname === "/src/session.ts",
-    (route) => {
+    async (route) => {
       rendererRequests++;
+      await holdRenderer;
       return route.abort();
     },
   );
@@ -36,9 +41,14 @@ test("title controls work before the mission renderer loads", async ({
   await expect(page.locator("#mission-introduction")).toBeFocused();
   expect(rendererRequests).toBe(0);
   await page.locator("#start-mission").click();
+  await expect(page.locator("#mission-loading")).toBeVisible();
+  await expect(page.locator(".game-shell")).toHaveAttribute("inert", "");
+  failRenderer();
   await expect(page.locator("#game-menu-status")).toContainText(
     "The mission could not start.",
   );
+  await expect(page.locator("#mission-loading")).toBeHidden();
+  await expect(page.locator(".game-shell")).not.toHaveAttribute("inert", "");
   await expect(page.locator("#new-mission")).toBeEnabled();
   expect(rendererRequests).toBe(1);
 });
@@ -112,6 +122,7 @@ forEachProfile([...PROFILES, DESKTOP_WINDOW_PROFILE], (profile) => {
       );
       await expect(page.locator("#materials-counter")).toHaveText("150");
       await expect(page.locator(".game-shell")).toBeVisible();
+      await expect(page.locator("#mission-loading")).toBeHidden();
       await press("open-menu");
       await expect(slider).toHaveValue(volume);
       await expect(page.locator("#audio-sound-mute")).toHaveAttribute(

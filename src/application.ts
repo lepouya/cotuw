@@ -90,6 +90,7 @@ export type ApplicationOptions = {
   >;
   topBar: Pick<ReturnType<typeof createTopBar>, "update">;
   setTitleScreen: (atTitle: boolean) => void;
+  setMissionLoading: (loading: boolean) => void;
   /** Offers each session's AI diagnostics panel, for development links. */
   aiOverlay?: boolean;
 };
@@ -109,6 +110,7 @@ export function createApplication({
   notifications,
   topBar,
   setTitleScreen,
+  setMissionLoading,
   aiOverlay,
 }: ApplicationOptions) {
   /** Level sources by scenario ID; loading a level file adds or replaces one. */
@@ -312,6 +314,7 @@ export function createApplication({
       await releaseMission();
       const generation = missionGeneration;
       const current = () => generation === missionGeneration;
+      setMissionLoading(true);
       setTitleScreen(false);
       const { createGameSession } = await import("./session");
       mission = next;
@@ -388,6 +391,8 @@ export function createApplication({
       console.error("The mission failed to start.", error);
       showTitle();
       dialogs.report("The mission could not start. Try New mission or Load.");
+    } finally {
+      setMissionLoading(false);
     }
   }
 

@@ -219,6 +219,8 @@ challenge, pacing, and useful choices.
   - Rifle and launcher flash sheets were reviewed with simultaneous tracers,
     rocket effects, and a Circle focus bolt at gameplay zoom and under
     reduced motion.
+  - The title artwork, mission selection, faction cards, and loading screen
+    were reviewed in desktop, compact window, and phone layouts.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

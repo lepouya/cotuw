@@ -408,11 +408,15 @@ export function createActorPortrait(
   definition: ActorDefinition,
   portrait?: PortraitId,
 ): SVGSVGElement {
+  return createPortrait(portrait ?? rolePortrait(definition));
+}
+
+/** A decorative illustration selected directly by its authored ID. */
+export function createPortrait(id: PortraitId): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 120 80");
   svg.setAttribute("aria-hidden", "true");
   svg.classList.add("actor-portrait");
-  const id = portrait ?? rolePortrait(definition);
   svg.setAttribute("data-portrait", id);
   svg.innerHTML = PORTRAITS[id];
   return svg;

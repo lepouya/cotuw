@@ -1,6 +1,6 @@
 .setup-choices {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.65rem;
   margin: 0 0 1rem;
 }
 
@@ -11,8 +11,13 @@ fieldset.setup-choices {
 }
 
 .setup-choices legend {
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
   padding: 0;
+  color: #d8bf89;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 .difficulty-choices {
@@ -26,17 +31,37 @@ fieldset.setup-choices {
 
 .setup-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.65rem;
+}
+
+.setup-actions button {
+  min-width: min(6rem, 45%);
+  text-align: center;
+}
+
+.setup-actions #start-mission {
+  border-color: #d6b16b;
+  color: #151f1c;
+  background: #d6b16b;
+  font-weight: 700;
+}
+
+.setup-actions #start-mission:hover {
+  background: #ead09a;
+}
+
+.setup-actions #start-mission:focus-visible {
+  outline-color: #223334;
 }
 
 .setup-choice {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  padding: 1rem;
+  gap: 0.5rem;
+  padding: 0.8rem;
   text-align: left;
-  border-color: #809c86;
-  background: #223c37;
+  border-color: #59746c;
+  background: #1a2e32;
 }
 
 .mode-choices .setup-choice,
@@ -46,8 +71,44 @@ fieldset.setup-choices {
 }
 
 .setup-choice[aria-pressed="true"] {
-  border-color: #cfac62;
-  background: #3a4b3e;
+  border-color: #d5b373;
+  box-shadow: inset 0 -2px #d5b373;
+  background: #34443c;
+}
+
+.setup-choice:hover {
+  border-color: #d5b373;
+}
+
+.faction-choices .setup-choice {
+  display: grid;
+  grid-template-columns: clamp(3rem, 8vw, 5.5rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(115deg, #223e48, #14282d);
+}
+
+.faction-choices #choose-circle {
+  background: linear-gradient(115deg, #293f32, #172a28);
+}
+
+.faction-choices .setup-choice[aria-pressed="true"] {
+  background: linear-gradient(115deg, #35504b, #283831);
+}
+
+.faction-choices #choose-circle[aria-pressed="true"] {
+  background: linear-gradient(115deg, #41543b, #26382e);
+}
+
+.faction-choices .actor-portrait {
+  width: 100%;
+  height: auto;
+  grid-row: auto;
+}
+
+.setup-faction-text {
+  display: grid;
+  gap: 0.35rem;
 }
 
 .setup-choice strong {
@@ -57,11 +118,56 @@ fieldset.setup-choices {
 }
 
 .setup-choice span {
+  color: #d0dbd5;
   line-height: 1.45;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .faction-choices {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 480px) {
+  .setup-choices {
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .setup-choices legend {
+    margin-bottom: 0.2rem;
+  }
+
+  .faction-choices .setup-choice {
+    padding: 0.45rem 0.55rem;
+  }
+
+  .setup-choice strong {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 601px) and (max-height: 480px) {
+  #mission-setup {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+  }
+
+  .mode-choices,
+  .faction-choices {
+    grid-column: 1 / -1;
+  }
+
+  .difficulty-choices {
+    margin-bottom: 0;
+  }
+
+  .setup-actions {
+    align-self: end;
+  }
+
+  .setup-actions button {
+    min-width: 4.5rem;
   }
 }

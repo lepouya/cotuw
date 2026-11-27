@@ -114,6 +114,7 @@ async function application() {
     },
     topBar: { update: vi.fn() },
     setTitleScreen: vi.fn(),
+    setMissionLoading: vi.fn(),
   });
   await app.initialize({});
   await app.load();
