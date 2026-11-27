@@ -1083,8 +1083,8 @@ These systems are outside M1.
   Generated amber and green lamps preserve its state when motion is reduced.
 - Frame effects play a content pack's texture clip once on a camera-facing
   square anchored in the actor's model space, so they turn with it. An actor's
-  presentation names them by trigger. The Trooper's muzzle flash plays on
-  `attack`.
+  presentation names them by trigger. Trooper and Demolition Trooper flashes
+  play on `attack`.
 - Reduced motion skips trigger clips, settles collector transitions, holds
   locomotion on its first frame and aim at its held pose, suppresses turn
   leans, holds frame effects on their first frame, and shows death clips' last
@@ -1909,7 +1909,7 @@ acceptance progress. The following sections define the selected scope.
 - ARC's **Demolition Trooper** is fragile, slow-firing infantry with a portable
   heavy launcher that outranges basic defenses. The Field Barracks trains it,
   and Medics restore its health.
-- Launcher shots show an amber pressure flash, a brief smoke-and-ember streak,
+- Launcher shots show an amber pressure ring, a brief smoke-and-ember streak,
   and an impact burst, with distinct ignition and impact sounds. Visuals follow
   committed hits without adding travel time or splash damage. A visible impact
   draws no trail toward a hidden shooter. Reduced motion holds effect shapes
@@ -2000,13 +2000,15 @@ acceptance progress. The following sections define the selected scope.
   cyan visor and owner markings on the helmet, shoulders, and pack. They
   keep the rifle braced in both hands while moving and lean into their aim.
 - Trooper and Sentry tracers shade from amber at the muzzle to a pale,
-  tapered tip at the target.
+  tapered tip at the target. Trooper rifles flash with a compact pale core
+  and uneven amber spikes that shrink as the sparks scatter.
 - Demolition Troopers wear faceted charcoal armor with amber visors. A
   shoulder launcher with a faceted shroud and pale muzzle rim sets their
   silhouette. Owner markings sit on the armor, launcher, and rear rack
   with twin rocket tubes. They keep the launcher braced while moving.
-  The production portrait shows the same kit. Their shots leave a scalloped
-  smoke wake behind a tapered amber streak with a pale leading tip.
+  The production portrait shows the same kit. The muzzle flash opens into
+  an uneven amber ring with embers and curling exhaust. Their shots leave a
+  scalloped smoke wake behind a tapered amber streak with a pale leading tip.
   Impacts bloom into a pale fireball with tapered amber sparks and a low
   ring of ash.
 - Scouts wear light sand-colored armor over slate fatigues, with paired

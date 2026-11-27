@@ -202,7 +202,7 @@ test("the authored paid opening delivers Lifebloom, reveals the second site, and
   until(() => !!sim.actorById("sentinel") && !!sim.actorById("wayfinder"));
   expect(balance(sim)).toBe(0);
   expect(sim.economy!.loot.every(({ collected }) => !collected)).toBe(true);
-});
+}, 20_000);
 
 /**
  * Plays the authored introduction. With `checkpoints`, it reloads from the

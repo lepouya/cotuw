@@ -216,6 +216,9 @@ challenge, pacing, and useful choices.
   - Terrain textures, grass sway, scenery, lighting, contact shadows, and fog
     were reviewed at gameplay zoom in both skirmish starts and introductions,
     the center crossing, the shoreline, and the Circle den and bird loop.
+  - Rifle and launcher flash sheets were reviewed with simultaneous tracers,
+    rocket effects, and a Circle focus bolt at gameplay zoom and under
+    reduced motion.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

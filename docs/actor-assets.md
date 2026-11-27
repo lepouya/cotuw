@@ -140,8 +140,8 @@ clips match their generators, and reject unregistered files in `public/assets`.
   grass sprite sheets. A periodic wind field bends neighboring tufts together,
   and phased tiles carry the gust across the ground.
 - `npm run assets:effects`: `scripts/muzzle-flash-sheet.ts` generates the
-  Trooper's muzzle-flash sprite sheet. `scripts/launch-flash-sheet.ts` generates
-  the launcher's broader amber pressure flash and exhaust cloud.
+  Trooper's tapered muzzle flash and sparks. `scripts/launch-flash-sheet.ts`
+  generates the launcher's expanding amber pressure ring and curled exhaust.
 
 Each command prints its textures' minimap colors and its clip definitions;
 update matching content-pack graphics when changing the art.
