@@ -423,6 +423,16 @@ function bindDialogs(
       version.hidden = !!next.mission;
       dialog.classList.toggle("title-menu", !next.mission);
       dialog.classList.toggle("result-menu", !!next.summary);
+      if (next.mode === "result") {
+        const lower = next.title.toLowerCase();
+        dialog.dataset.outcome = lower.includes("victory")
+          ? "victory"
+          : lower.includes("defeat")
+            ? "defeat"
+            : "draw";
+      } else {
+        delete dialog.dataset.outcome;
+      }
       summary.show(next.summary);
       if (!dialog.open) dialog.showModal();
       showPanel("actions");

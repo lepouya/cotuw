@@ -3,17 +3,30 @@
   grid-template-columns: 1fr auto;
   gap: 0.4rem 0.75rem;
   margin: 0 0 1rem;
-  border: 1px solid #354c48;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #3c5350;
+  border-radius: 0.28rem;
+  background: rgb(8 16 20 / 45%);
+}
+.audio-controls legend {
+  padding-inline: 0.35rem;
+  color: #d8bf89;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .audio-controls label,
 .audio-controls p {
   grid-column: 1 / -1;
   margin: 0;
+  font-size: 0.82rem;
 }
 .audio-controls input {
   width: 100%;
   min-width: 0;
   min-height: 44px;
+  accent-color: #d6b16b;
 }
 .audio-controls button {
   min-height: 44px;

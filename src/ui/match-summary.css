@@ -4,34 +4,55 @@
 
 .summary-tabs {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.summary-tabs button {
+  min-width: 6rem;
+  text-align: center;
 }
 
 .summary-tabs [aria-selected="true"] {
-  border-color: #cfac62;
-  background: #3a4b3e;
+  color: #f4e4b5;
+  border-color: #d5b373;
+  box-shadow: inset 0 -2px #d5b373;
+  background: #2d433e;
+  font-weight: 700;
 }
 
 .summary-table {
   width: 100%;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .summary-table caption {
-  padding-bottom: 0.3rem;
-  color: #f1e4be;
-  font-weight: 600;
+  padding-bottom: 0.35rem;
+  color: #d8bf89;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   text-align: left;
 }
 
 .summary-table th,
 .summary-table td {
-  padding: 0.25rem 0.4rem;
-  border-top: 1px solid #2c4644;
+  padding: 0.32rem 0.5rem;
+  border-top: 1px solid #2e4847;
   text-align: right;
+}
+
+.summary-table thead th {
+  color: #f4f0df;
+  font-weight: 600;
+}
+
+.summary-table tbody tr:nth-child(even) {
+  background: rgb(8 16 20 / 28%);
 }
 
 .summary-table th[scope="row"],
@@ -71,11 +92,17 @@
 
 .summary-chart {
   margin: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #354c4a;
+  border-radius: 0.25rem;
+  background: rgb(8 16 20 / 48%);
 }
 
 .summary-chart figcaption {
-  margin-bottom: 0.2rem;
-  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+  color: #f1e4be;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .summary-chart svg {

@@ -1,28 +1,56 @@
 .save-form {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.55rem;
+}
+.save-form label {
+  color: #d8bf89;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .save-form input {
   min-height: 2.75rem;
-  padding: 0.5rem;
-  border: 1px solid #607161;
-  border-radius: 0.2rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #536b67;
+  border-radius: 0.24rem;
   color: #f4f0df;
-  background: #0f1f20;
+  background: rgb(8 16 20 / 82%);
   font: inherit;
+}
+.save-form input:focus-visible {
+  outline: 2px solid #eac97f;
+  outline-offset: -2px;
+  border-color: #d6b16b;
+}
+#confirm-save {
+  border-color: #d6b16b;
+  color: #151f1c;
+  background: #d6b16b;
+  font-weight: 700;
+}
+#confirm-save:hover:not(:disabled) {
+  background: #ead09a;
+}
+#confirm-save:focus-visible {
+  outline-color: #223334;
 }
 .save-entries {
   display: grid;
-  gap: 0.4rem;
-  margin: 0 0 0.75rem;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
   padding: 0;
   list-style: none;
 }
 .save-entries li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 0.4rem;
+  gap: 0.45rem;
   align-items: center;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #3c5350;
+  border-radius: 0.24rem;
+  background: rgb(8 16 20 / 50%);
 }
 /* Incompatible rows have no Load action; Delete keeps its column. */
 .save-entries li > button:last-child {
@@ -30,7 +58,9 @@
 }
 .save-entries small {
   display: block;
-  color: #a9b7ab;
+  margin-top: 0.15rem;
+  color: #a9bbb3;
+  font-size: 0.74rem;
 }
 .save-entries .save-incompatible {
   color: #e7b98a;

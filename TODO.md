@@ -231,6 +231,9 @@ challenge, pacing, and useful choices.
   - Gameplay overlays, guides, Goals, production cards, tooltips, shortcut
     badges, camera controls, radial menu, notifications, and all actor
     portraits were reviewed and unified with the twilight-and-bronze palette.
+  - Pause, Save, Load, Options, Victory, Defeat, and Match Summary (Overview
+    and Graphs) panels were reviewed and styled to match the title and HUD
+    palette, with distinct Victory and Defeat accents.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

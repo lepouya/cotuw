@@ -590,6 +590,10 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   keycaps, camera controls, radial menus, and notification toasts share the
   same twilight-slate surfaces, gilded accents, and serif headings where they
   frame player decisions.
+  Pause, Save, Load, Options, and result/summary dialogs share this modal
+  styling, with gilded primary actions, dark twilight inputs and sliders,
+  framed summary tables and chart cards, and distinct Victory (gilded-emerald)
+  versus Defeat (muted crimson) result accents.
   Explicit `?level=<scenario ID>` links open bundled levels for development.
   New mission opens the setup screen described in the Circle development
   slice, with independent difficulty and faction choices. The faction cards
