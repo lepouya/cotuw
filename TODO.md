@@ -221,6 +221,9 @@ challenge, pacing, and useful choices.
     reduced motion.
   - The title artwork, mission selection, faction cards, and loading screen
     were reviewed in desktop, compact window, and phone layouts.
+  - The application icon, browser favicon, top bar, command sidebar, and
+    minimap frame were reviewed for both ARC and Circle across desktop,
+    compact window, and phone layouts.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

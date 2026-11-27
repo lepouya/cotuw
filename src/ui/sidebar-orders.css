@@ -1,12 +1,15 @@
 .game-sidebar .placement-panel {
-  padding: 0.8rem 1rem;
-  border-top: 1px solid #354c48;
+  padding: 0.8rem 0.9rem;
+  border-top: 1px solid #48605c;
+  background: rgb(12 24 29 / 68%);
 }
 
 .game-sidebar .unit-controls {
   position: relative;
   padding: 0.5rem 0.75rem;
-  border-top: 1px solid #354c48;
+  border-top: 1px solid #48605c;
+  background: linear-gradient(180deg, #122328, #0b161a);
+  box-shadow: inset 0 1px rgb(244 240 223 / 5%);
 }
 
 .game-sidebar .unit-controls .action-row {
@@ -20,9 +23,10 @@
 }
 
 .game-sidebar .unit-controls button[aria-pressed="true"] {
-  color: #eac97f;
-  border-color: #d8bd79;
-  background: #304e4d;
+  color: #f4e4b5;
+  border-color: #d5b373;
+  box-shadow: inset 0 -2px #d5b373;
+  background: #2d433e;
 }
 
 .game-sidebar #control-groups {

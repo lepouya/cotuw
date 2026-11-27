@@ -134,17 +134,18 @@ h3 {
 button {
   min-height: 2.75rem;
   padding: 0.65rem;
-  border: 1px solid #607161;
-  border-radius: 0.2rem;
+  border: 1px solid #59726c;
+  border-radius: 0.22rem;
   color: #f4f0df;
-  background: #223b3c;
+  background: #1b3136;
   font: inherit;
   font-size: 0.78rem;
   text-align: left;
   cursor: pointer;
 }
 button:hover {
-  background: #304e4d;
+  border-color: #7b938b;
+  background: #274449;
 }
 button:focus-visible {
   outline: 2px solid #eac97f;
@@ -212,11 +213,17 @@ summary {
   right: clamp(1rem, 3vw, 2.5rem);
   width: clamp(7rem, 17vw, 12rem);
   aspect-ratio: 1;
-  border: 1px solid rgb(179 157 98 / 55%);
-  border-radius: 0.25rem;
-  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
+  border: 2px solid #8a7a52;
+  border-radius: 0.3rem;
+  outline: 1px solid rgb(7 15 19 / 90%);
+  box-shadow:
+    0 0 0 1px rgb(214 177 107 / 24%),
+    0 0.65rem 1.8rem rgb(4 10 14 / 70%);
   cursor: pointer;
   touch-action: none;
+}
+.minimap:hover {
+  border-color: #b79c63;
 }
 
 @media (max-height: 600px) {

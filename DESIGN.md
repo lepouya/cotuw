@@ -576,6 +576,16 @@ The [M1 checklist](TODO.md) tracks implementation of these ownership rules.
   The title and mission loading screens share a frontier valley illustration
   with an ARC outpost and a Circle grove. Loading shows an indeterminate
   indicator that stays still under reduced motion.
+  The application icon and browser favicon frame a symmetrical gilded frontier
+  citadel against snow-touched twilight peaks inside a gilded-slate bezel so it
+  remains legible on dark and light surfaces down to 16 px.
+  The in-game frame carries the same twilight-slate and gilded-bronze palette:
+  the top bar groups Menu and a recessed speed tray on the left with the
+  resource readout, mission clock, and alerts anchored on the right; the
+  command sidebar tints its header subtly by player faction (cool steel-teal
+  for ARC, deep forest-slate for Circle) and keeps Goals in its own header
+  column on compact viewports; and the minimap sits inside a gilded-bronze
+  bezel with subtle inner corner ticks.
   Explicit `?level=<scenario ID>` links open bundled levels for development.
   New mission opens the setup screen described in the Circle development
   slice, with independent difficulty and faction choices. The faction cards

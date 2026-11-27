@@ -2,43 +2,87 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
   min-height: 0;
-  border-right: 1px solid #5e654e;
-  background: linear-gradient(160deg, #142729, #091719);
-  box-shadow: 0.3rem 0 1rem rgb(0 0 0 / 20%);
+  border-right: 1px solid #4c635f;
+  background: linear-gradient(175deg, #162a2e 0%, #0e1c21 48%, #091317 100%);
+  box-shadow:
+    inset -1px 0 rgb(244 240 223 / 5%),
+    0.35rem 0 1.25rem rgb(0 0 0 / 38%);
   z-index: 1;
 }
 
 .game-sidebar .sidebar-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 0.5rem;
   min-height: 2.75rem;
-  padding: 0.65rem 1rem;
-  position: relative;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid #385050;
+  background: linear-gradient(135deg, rgb(28 52 58 / 76%), rgb(13 26 31 / 42%));
+}
+
+.game-sidebar[data-faction="arc"] .sidebar-header {
+  border-bottom-color: #3d5860;
+  background: linear-gradient(135deg, rgb(34 62 72 / 80%), rgb(15 31 37 / 45%));
+}
+
+.game-sidebar[data-faction="circle"] .sidebar-header {
+  border-bottom-color: #415b4c;
+  background: linear-gradient(135deg, rgb(41 63 50 / 80%), rgb(18 36 33 / 45%));
+}
+
+.game-sidebar .sidebar-header > :not(#tab-goals) {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.game-sidebar .sidebar-header h1 {
+  margin: 0.3rem 0 0.15rem;
+  font-size: 1.32rem;
+  line-height: 1.15;
+}
+
+.game-sidebar .sidebar-header .muted {
+  margin: 0.15rem 0 0;
 }
 
 .game-sidebar .sidebar-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-block: 1px solid #354c48;
+  border-bottom: 1px solid #3c5350;
+  background: rgb(8 16 20 / 55%);
 }
 
 .game-sidebar .sidebar-tabs button {
   border: 0;
   border-radius: 0;
-  padding: 0.5rem 0.2rem;
+  padding: 0.5rem 0.25rem;
   text-align: center;
+  color: #c3d2cc;
   background: transparent;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+}
+
+.game-sidebar .sidebar-tabs button:first-child {
+  border-right: 1px solid #2b403f;
+}
+
+.game-sidebar .sidebar-tabs button:hover {
+  color: #f4f0df;
+  background: rgb(35 58 60 / 45%);
 }
 
 .game-sidebar .sidebar-tabs button[aria-selected="true"] {
-  color: #eac97f;
-  background: #233a37;
-  box-shadow: inset 0 -2px #d8bd79;
+  color: #f4e4b5;
+  background: linear-gradient(180deg, #273e3c, #1c3030);
+  box-shadow: inset 0 -2px #d6b16b;
+  font-weight: 700;
 }
 
 .game-sidebar .sidebar-content {
   flex: 1;
   min-height: 0;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0.9rem;
   overflow-y: auto;
 }
 
@@ -49,15 +93,21 @@
 }
 
 .game-sidebar #tab-goals {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  min-height: 2rem;
-  padding: 0.4rem;
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: start;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.65rem;
+  text-align: center;
+  border-color: #5b746f;
+  background: rgb(16 32 37 / 86%);
 }
 
-.game-sidebar .sidebar-header h1 {
-  margin-right: 3rem;
+.game-sidebar #tab-goals[aria-expanded="true"] {
+  color: #f4e4b5;
+  border-color: #d5b373;
+  box-shadow: inset 0 -2px #d5b373;
+  background: #2d433e;
 }
 
 .game-sidebar .actor-list {
@@ -71,7 +121,12 @@
   }
 
   .game-sidebar .sidebar-header {
-    padding: 0.6rem 0.75rem;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+  }
+
+  .game-sidebar .sidebar-header .eyebrow {
+    line-height: 1.3;
   }
 
   .game-sidebar .sidebar-header h1,
@@ -84,7 +139,10 @@
   }
 
   .game-sidebar #tab-goals {
-    top: 0.2rem;
+    grid-row: 1;
+    align-self: center;
+    min-height: 2.1rem;
+    padding: 0.3rem 0.55rem;
   }
 }
 
@@ -95,6 +153,6 @@
   }
 
   .game-sidebar .sidebar-header h1 {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
   }
 }

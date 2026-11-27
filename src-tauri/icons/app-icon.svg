@@ -1,20 +1,99 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#17353a"/>
-      <stop offset="1" stop-color="#0b151d"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#173038"/>
+      <stop offset="0.56" stop-color="#102229"/>
+      <stop offset="1" stop-color="#091318"/>
     </linearGradient>
-    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#e0c07a"/>
-      <stop offset="1" stop-color="#a5743e"/>
+    <radialGradient id="dusk" cx="0.5" cy="0.43" r="0.46">
+      <stop offset="0" stop-color="#e8b274" stop-opacity="0.72"/>
+      <stop offset="0.45" stop-color="#b86c4b" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#102229" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e6c884"/>
+      <stop offset="0.5" stop-color="#768b84"/>
+      <stop offset="1" stop-color="#b5894b"/>
     </linearGradient>
+    <linearGradient id="peak-far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4e707a"/>
+      <stop offset="1" stop-color="#1d353d"/>
+    </linearGradient>
+    <linearGradient id="peak-near" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c4e56"/>
+      <stop offset="1" stop-color="#112228"/>
+    </linearGradient>
+    <linearGradient id="citadel-lit" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3dfaa"/>
+      <stop offset="0.52" stop-color="#d4ae64"/>
+      <stop offset="1" stop-color="#9b6f38"/>
+    </linearGradient>
+    <linearGradient id="citadel-shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9a35d"/>
+      <stop offset="1" stop-color="#7c562a"/>
+    </linearGradient>
+    <linearGradient id="beacon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff0c2"/>
+      <stop offset="1" stop-color="#e5a74a"/>
+    </linearGradient>
+    <clipPath id="badge">
+      <rect x="24" y="24" width="976" height="976" rx="212"/>
+    </clipPath>
   </defs>
-  <rect width="1024" height="1024" rx="224" fill="url(#sky)"/>
-  <path d="M188 746 512 242l324 504H188Z" fill="#1e4d4b"/>
-  <path d="M256 750h512v88H256z" fill="url(#stone)"/>
-  <path d="M320 750V482h96v-98h72v98h48v-152h72v152h48v-98h72v98h96v268H320Z"
-        fill="url(#stone)"/>
-  <path d="M392 750V586h240v164H392Z" fill="#102a30"/>
-  <path d="M478 750V650h68v100h-68Z" fill="#cfac62"/>
-  <circle cx="512" cy="222" r="42" fill="#cfac62"/>
+
+  <g clip-path="url(#badge)">
+    <!-- Twilight alpine sky with focused warm dusk break -->
+    <rect width="1024" height="1024" fill="url(#sky)"/>
+    <rect width="1024" height="1024" fill="url(#dusk)"/>
+
+    <!-- Distant snow-touched alpine peaks -->
+    <path d="M24 648 258 318 416 498 512 228 608 498 766 318 1000 648V1000H24Z" fill="url(#peak-far)"/>
+    <!-- Crisp sunlit snow highlights on the upper ridges -->
+    <path d="M512 228 564 374 512 332 460 374Z" fill="#d7e4e6" fill-opacity="0.72"/>
+    <path d="M258 318 320 406 266 382 214 414Z" fill="#bdd1d6" fill-opacity="0.55"/>
+    <path d="M766 318 810 414 758 382 704 406Z" fill="#bdd1d6" fill-opacity="0.55"/>
+
+    <!-- Midground pine-clad valley slopes -->
+    <path d="M24 734 294 552 512 632 730 552 1000 734V1000H24Z" fill="url(#peak-near)"/>
+    <!-- Subtle valley mist band -->
+    <rect x="24" y="656" width="976" height="96" fill="#4f747c" fill-opacity="0.16"/>
+
+    <!-- Foreground dark ridge plinth -->
+    <path d="M24 812 512 752 1000 812V1000H24Z" fill="#0b171c"/>
+
+    <!-- Symmetrical frontier citadel silhouette -->
+    <!-- Stepped armored foundation -->
+    <path d="M188 796 226 734H798L836 796Z" fill="url(#citadel-shade)"/>
+    <path d="M226 734H798L780 752H244Z" fill="#f2deaa" fill-opacity="0.45"/>
+
+    <!-- Outer sloped bastions -->
+    <path d="M248 734 282 518 378 494V734Z" fill="url(#citadel-shade)"/>
+    <path d="M776 734 742 518 646 494V734Z" fill="url(#citadel-shade)"/>
+
+    <!-- Central keep and upper watchtower -->
+    <path d="M352 734 388 430 444 408V346L512 316 580 346V408L636 430 672 734Z" fill="url(#citadel-lit)"/>
+
+    <!-- Inner armored bevels for depth -->
+    <path d="M444 408H580L566 430H458Z" fill="#6d4c25" fill-opacity="0.55"/>
+    <path d="M388 430 458 430 434 734H352Z" fill="#fff2c9" fill-opacity="0.14"/>
+
+    <!-- Deep recessed sanctuary gate -->
+    <path d="M424 734V572Q512 532 600 572V734Z" fill="#0c1b21"/>
+    <!-- Glowing amber command slit above the gate -->
+    <rect x="438" y="472" width="148" height="32" rx="6" fill="url(#beacon)"/>
+    <!-- Subtle luminous core inside the central arch -->
+    <path d="M484 734V632Q512 612 540 632V734Z" fill="#7ad3cc" fill-opacity="0.88"/>
+    <path d="M498 734V648Q512 638 526 648V734Z" fill="#e6fbf8" fill-opacity="0.9"/>
+
+    <!-- Bastion amber embrasures -->
+    <rect x="304" y="576" width="46" height="22" rx="4" fill="url(#beacon)"/>
+    <rect x="674" y="576" width="46" height="22" rx="4" fill="url(#beacon)"/>
+
+    <!-- Watchtower spire finial -->
+    <path d="M512 246 534 304 512 320 490 304Z" fill="#f6e4b4"/>
+  </g>
+
+  <!-- Crisp gilded-slate badge rim for legibility on dark and light surfaces -->
+  <rect x="33" y="33" width="958" height="958" rx="204" fill="none" stroke="url(#rim)" stroke-width="18"/>
+  <rect x="52" y="52" width="920" height="920" rx="186" fill="none" stroke="#081115" stroke-opacity="0.55" stroke-width="6"/>
 </svg>

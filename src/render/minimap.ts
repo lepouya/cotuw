@@ -211,6 +211,7 @@ export function createMinimap(
     );
     drawActors(context, actorMarkers);
     drawFootprint(context, footprint);
+    drawFrame(context, canvas.clientWidth, canvas.clientHeight);
     const steady = reducedMotion();
     context.lineWidth = 2;
     context.strokeStyle = PING_COLOR;
@@ -605,6 +606,38 @@ function drawFootprint(
   context.lineTo(front.x - side.x, front.y - side.y);
   context.closePath();
   context.fill();
+}
+
+/** Draws a subtle gilded inner hairline and corner ticks inside the minimap frame. */
+function drawFrame(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  if (width < 24 || height < 24) return;
+  const inset = 3.5;
+  const tick = Math.min(10, Math.round(Math.min(width, height) * 0.08));
+  context.save();
+  context.lineWidth = 1;
+  context.strokeStyle = "rgb(214 177 107 / 22%)";
+  context.strokeRect(inset, inset, width - inset * 2, height - inset * 2);
+  context.strokeStyle = "rgb(234 201 127 / 62%)";
+  context.beginPath();
+  for (const [x, dx] of [
+    [inset, tick],
+    [width - inset, -tick],
+  ] as const) {
+    for (const [y, dy] of [
+      [inset, tick],
+      [height - inset, -tick],
+    ] as const) {
+      context.moveTo(x + dx, y);
+      context.lineTo(x, y);
+      context.lineTo(x, y + dy);
+    }
+  }
+  context.stroke();
+  context.restore();
 }
 
 function midpoint(a: ScreenPoint, b: ScreenPoint): ScreenPoint {

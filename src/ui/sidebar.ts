@@ -18,6 +18,11 @@ export type { SidebarOptions, SidebarState } from "./sidebar-context";
 /** Composes mission-owned sections from content and player-visible state. */
 export function createSidebar(root: HTMLElement, options: SidebarOptions) {
   return mountFeature(root, "", ({ signal }) => {
+    if (options.playerFaction) root.dataset.faction = options.playerFaction;
+    else delete root.dataset.faction;
+    signal.addEventListener("abort", () => {
+      delete root.dataset.faction;
+    });
     const context = createSidebarContext(root, options, signal);
     const production = createSidebarProduction(context, () =>
       navigation.focusUnits(),
