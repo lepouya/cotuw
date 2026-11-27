@@ -2213,44 +2213,62 @@ function buildInfantry(
         "right-forearm",
       ],
     );
-  // Knees buckle, then the body falls back faster and faster and lies still.
+  // Knees buckle, then the body collapses into a grounded asymmetric slump.
   const fallen = (phase: number) => (phase / (Math.PI * 2)) ** 2;
   const death = clip("death", 24, (joint, phase) => {
     const fall = fallen(phase);
     const buckle = Math.sin(phase / 2);
     switch (joint) {
       case "pelvis":
-        return [-1.45 * fall, 0, 0];
+        return [-1.48 * fall, 0.14 * fall, 0.22 * fall];
       case "left-leg":
+        return [0.36 * fall - 0.3 * buckle, 0.12 * fall, -0.18 * fall];
       case "right-leg":
-        return [0.15 * fall - 0.3 * buckle, 0, 0];
+        return [0.08 * fall - 0.24 * buckle, -0.08 * fall, 0.14 * fall];
       case "left-shin":
+        return [0.58 * fall + 0.45 * buckle, 0, 0];
       case "right-shin":
-        return [0.6 * buckle, 0, 0];
-      // Held arms relax as the body falls.
-      case "left-arm":
-      case "right-arm": {
+        return [0.18 * fall + 0.45 * buckle, 0, 0];
+      // Arms drape asymmetrically so held gear settles low instead of upright.
+      case "left-arm": {
         const [pitch, yaw, roll] = neutral(joint);
-        const direction = joint === "left-arm" ? -1 : 1;
-        const spread = direction * (stance.spread + 0.5);
+        const spread = -(stance.spread + 0.65);
         return [
-          pitch * (1 - fall),
-          yaw * (1 - fall),
+          pitch + (0.28 - pitch) * fall,
+          yaw + (-0.25 - yaw) * fall,
           roll + (spread - roll) * fall,
         ];
       }
-      case "left-forearm":
+      case "right-arm": {
+        const [pitch, yaw, roll] = neutral(joint);
+        const spread = stance.spread + 0.32;
+        return [
+          pitch + (0.72 - pitch) * fall,
+          yaw + (0.38 - yaw) * fall,
+          roll + (spread - roll) * fall,
+        ];
+      }
+      case "left-forearm": {
+        const ready = stance.ready?.[joint];
+        const base = ready ? ready[0] : neutral(joint)[0];
+        return [base + (-0.35 - base) * fall, 0, 0];
+      }
       case "right-forearm": {
         const ready = stance.ready?.[joint];
-        return ready ? [ready[0] * (1 - fall), 0, 0] : neutral(joint);
+        const base = ready ? ready[0] : neutral(joint)[0];
+        return [base + (-0.65 - base) * fall, 0, 0];
       }
       case "head":
-        return [-0.2 * fall, 0, 0];
+        return [-0.18 * fall, 0.32 * fall, 0.26 * fall];
       default:
         return neutral(joint);
     }
   });
-  shift(death, 24, (phase) => [0, -0.6 * fallen(phase), -0.25 * fallen(phase)]);
+  shift(death, 24, (phase) => [
+    0,
+    -0.66 * fallen(phase),
+    -0.25 * fallen(phase),
+  ]);
 }
 
 /** Keys `value` across one cycle, where phase runs from 0 to 2π. */

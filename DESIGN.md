@@ -1090,6 +1090,10 @@ These systems are outside M1.
   Remains stay 60 simulation seconds, and building debris holds its footprint
   that long. Fallen units leave view after 30 seconds. When more than 25
   fallen units would show, older ones fade out early over five seconds.
+  Fallen units mute and weather their materials while keeping recognizable
+  owner hues, and extinguish active visors, lamps, and magical focuses so
+  surviving actors and rebuilding routes stand out clearly. Infantry death
+  clips collapse into an asymmetric, grounded slump.
   The Harvester lowers its collector into the work loop when gathering starts
   and stows it when gathering ends. Reversing a transition keeps its current
   collector position. Loading settles into the current work or idle pose.

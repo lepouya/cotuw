@@ -378,11 +378,57 @@ test("fallen units keep their owner's colors", () => {
   const [marking] = scene
     .getTransformNodeByName("wreck-fallen")!
     .getChildMeshes();
-  expect((marking!.material as StandardMaterial).diffuseColor).toEqual(
-    new Color3(1, 0, 0),
-  );
+  const color = (marking!.material as StandardMaterial).diffuseColor;
+  // Keeps the owner's dominant red hue while muting brightness behind live units.
+  expect(color.r).toBeGreaterThan(color.g * 4);
+  expect(color.r).toBeGreaterThan(color.b * 4);
+  expect(color.r).toBeLessThan(0.8);
   views.dispose();
   ownerMaterials.dispose();
+  appearance.dispose();
+});
+
+test("fallen units extinguish active visor and focus glows", () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
+  const template = MeshBuilder.CreateBox("visor", {}, scene);
+  const glow = new StandardMaterial("visor-glow", scene);
+  glow.diffuseColor = new Color3(0.4, 0.9, 1);
+  glow.emissiveColor = new Color3(0.3, 0.8, 1);
+  glow.disableLighting = true;
+  template.material = glow;
+  const appearance = createMeshAppearance(template, {
+    radius: 0.5,
+    height: 1,
+  });
+  const views = createWreckView(scene, map, {
+    appearanceFor: () => appearance,
+    tilesFor: () => [],
+  });
+  updateWrecks(
+    views,
+    [
+      {
+        actorId: "fallen-visor",
+        definitionId: "trooper",
+        owner: "east",
+        tick: 0,
+        worldPosition: { x: 0, z: 0 },
+        facing: 0,
+      },
+    ],
+    0,
+    0,
+  );
+  const [visor] = scene
+    .getTransformNodeByName("wreck-fallen-visor")!
+    .getChildMeshes();
+  const muted = visor!.material as StandardMaterial;
+  expect(muted).not.toBe(glow);
+  expect(muted.disableLighting).toBe(false);
+  expect(muted.emissiveColor).toEqual(Color3.Black());
+  expect(muted.diffuseColor.r).toBeLessThan(0.2);
+  views.dispose();
   appearance.dispose();
 });
 

@@ -1,6 +1,7 @@
 import {
   AbstractMesh,
   Color3,
+  PBRMaterial,
   StandardMaterial,
   TransformNode,
 } from "@babylonjs/core";
@@ -10,7 +11,7 @@ import { stableUnit } from "./actor";
 import { changeFrozen, setTransformsFrozen } from "./frozen-transforms";
 import { hierarchyMeshes, modelPartName, unitCubeInstance } from "./glb-model";
 
-import type { Scene } from "@babylonjs/core";
+import type { Material, Scene } from "@babylonjs/core";
 import type { TerrainMap } from "../map";
 import type { Wreck } from "../simulation/combat";
 import type { TileCoord } from "../simulation/grid";
@@ -32,6 +33,25 @@ const LIGHT_FADE_SECONDS = 1.6;
 const UNIT_REMAINS_SECONDS = 30;
 /** Keeps this many fallen units before fading older ones early. */
 const MAX_UNIT_REMAINS = 25;
+/** Neutral ash-slate target for muting fallen unit materials. */
+const REMAINS_TINT = new Color3(0.14, 0.15, 0.14);
+const REMAINS_DARK_GLOW = new Color3(0.12, 0.14, 0.15);
+
+/** Darkens and desaturates a color while preserving owner hue identity. */
+function muteColor(color: Color3, blend: number, scale: number): Color3 {
+  return Color3.Lerp(color, REMAINS_TINT, blend).scale(scale);
+}
+
+/** Whether a material represents an active visor, lamp, or focus glow. */
+function isActiveGlow(material: PBRMaterial | StandardMaterial): boolean {
+  if (material instanceof PBRMaterial) {
+    if (material.unlit) return true;
+    const e = material.emissiveColor;
+    return e.r + e.g + e.b > 0.15;
+  }
+  const e = material.emissiveColor;
+  return material.disableLighting || e.r + e.g + e.b > 0.15;
+}
 
 export type WreckViewOptions = {
   appearanceFor: (definitionId: string) => ActorAppearance | undefined;
@@ -62,6 +82,44 @@ export function createWreckView(
   const rubble = new StandardMaterial("wreck-rubble", scene);
   rubble.diffuseColor = new Color3(0.2, 0.19, 0.17);
   rubble.specularColor = Color3.Black();
+  /** Cached muted copies of live unit materials so remains recede behind active actors. */
+  const mutedMaterials = new Map<Material, Material>();
+  const muteMaterial = (source: Material): Material => {
+    const cached = mutedMaterials.get(source);
+    if (cached) return cached;
+    if (source instanceof PBRMaterial) {
+      const clone = source.clone(`${source.name}-remains`);
+      if (isActiveGlow(source)) {
+        clone.unlit = false;
+        clone.emissiveColor = Color3.Black();
+        clone.albedoColor = REMAINS_DARK_GLOW.clone();
+        clone.roughness = 0.88;
+        clone.metallic = 0.1;
+      } else {
+        clone.emissiveColor = source.emissiveColor.scale(0.1);
+        clone.albedoColor = muteColor(source.albedoColor, 0.36, 0.7);
+        clone.roughness = Math.max(source.roughness ?? 0.7, 0.86);
+        clone.metallic = (source.metallic ?? 0) * 0.35;
+      }
+      mutedMaterials.set(source, clone);
+      return clone;
+    }
+    if (source instanceof StandardMaterial) {
+      const clone = source.clone(`${source.name}-remains`);
+      if (isActiveGlow(source)) {
+        clone.disableLighting = false;
+        clone.emissiveColor = Color3.Black();
+        clone.diffuseColor = REMAINS_DARK_GLOW.clone();
+      } else {
+        clone.emissiveColor = source.emissiveColor.scale(0.1);
+        clone.diffuseColor = muteColor(source.diffuseColor, 0.36, 0.7);
+      }
+      clone.specularColor = Color3.Black();
+      mutedMaterials.set(source, clone);
+      return clone;
+    }
+    return source;
+  };
   const views = new Map<
     string,
     {
@@ -171,7 +229,11 @@ export function createWreckView(
           `wreck-${wreck.actorId}`,
           stableUnit(wreck.actorId),
         );
-        ownerMaterials?.apply(hierarchyMeshes(instance.root), wreck.owner);
+        const instanceMeshes = hierarchyMeshes(instance.root);
+        ownerMaterials?.apply(instanceMeshes, wreck.owner);
+        for (const mesh of instanceMeshes) {
+          if (mesh.material) mesh.material = muteMaterial(mesh.material);
+        }
         const { x, z } = wreck.worldPosition;
         root.position.set(x, map.heightAtWorldPosition(x, z), z);
         groundUpdates.push(() => {
@@ -340,6 +402,8 @@ export function createWreckView(
       map.onChangedObservable.remove(terrainObserver);
       for (const view of views.values()) view.dispose();
       views.clear();
+      for (const material of mutedMaterials.values()) material.dispose();
+      mutedMaterials.clear();
       rubble.dispose();
     },
   };

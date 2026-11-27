@@ -224,6 +224,10 @@ challenge, pacing, and useful choices.
   - The application icon, browser favicon, top bar, command sidebar, and
     minimap frame were reviewed for both ARC and Circle across desktop,
     compact window, and phone layouts.
+  - Unit remains and wrecks across both factions were reviewed beside live
+    units, building rubble, and salvage at gameplay zoom; infantry death poses
+    and muted/extinguished remains materials keep surviving actors readable
+    during rebuilding.
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;
