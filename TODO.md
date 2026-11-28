@@ -187,7 +187,7 @@ challenge, pacing, and useful choices.
 
 - [x] **1.76** Completed the Phase G visual and audio polish pass before 1.65:
   revamped all 44 bundled GLBs, damage stages, combat/flash effects, terrain
-  and atmosphere, procedural title cover art, mission setup and loading
+  and atmosphere, title cover art, mission setup and loading
   screens, application icon and favicon, in-game frame (preserving 53 px
   top-bar height), muted/extinguished unit remains and asymmetric infantry
   death poses, gameplay overlays/guides/cards/goals, pause/save/options/result

@@ -26,7 +26,6 @@
     "assets:effects": "node --no-experimental-webstorage scripts/generate-assets.ts effects",
     "assets:infantry": "node --no-experimental-webstorage scripts/generate-assets.ts infantry",
     "assets:models": "node --no-experimental-webstorage scripts/generate-assets.ts models",
-    "assets:art": "node --no-experimental-webstorage scripts/generate-assets.ts art",
     "format": "npm run format:ts && npm run format:rs",
     "format:ts": "prettier --write .",
     "format:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",

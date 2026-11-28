@@ -21,7 +21,6 @@ import {
 } from "./muzzle-flash-sheet.ts";
 import { minimapColor } from "./sprite-sheet.ts";
 import { buildTerrainTexture, TERRAIN_TEXTURES } from "./terrain-textures.ts";
-import { buildFrontierTitleArt } from "./title-art.ts";
 
 import type { MusicId, SoundId } from "./audio-assets.ts";
 import type { TextureClip } from "../src/content/texture-clip.ts";
@@ -87,9 +86,6 @@ export const ASSET_FAMILIES: Readonly<Record<string, AssetFamily>> = {
       path: `models/${kind}.glb`,
       build: () => exportModelAsset(kind),
     })),
-  },
-  art: {
-    assets: [{ path: "ui/frontier-title.png", build: buildFrontierTitleArt }],
   },
 };
 
