@@ -2,13 +2,6 @@
   display: grid;
   gap: 0.55rem;
 }
-.save-form label {
-  color: #d8bf89;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
 .save-form input {
   min-height: 2.75rem;
   padding: 0.5rem 0.65rem;
@@ -22,18 +15,6 @@
   outline: 2px solid #eac97f;
   outline-offset: -2px;
   border-color: #d6b16b;
-}
-#confirm-save {
-  border-color: #d6b16b;
-  color: #151f1c;
-  background: #d6b16b;
-  font-weight: 700;
-}
-#confirm-save:hover:not(:disabled) {
-  background: #ead09a;
-}
-#confirm-save:focus-visible {
-  outline-color: #223334;
 }
 .save-entries {
   display: grid;

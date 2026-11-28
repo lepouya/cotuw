@@ -10,11 +10,6 @@
 }
 .audio-controls legend {
   padding-inline: 0.35rem;
-  color: #d8bf89;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 .audio-controls label,
 .audio-controls p {

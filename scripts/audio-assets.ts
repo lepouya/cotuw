@@ -316,7 +316,7 @@ function harvesterLoop(target: Mix, drilling: boolean) {
     frequency:
       Math.round(
         ((drilling ? 160 : 25) + (next() + 1) * (drilling ? 1100 : 240)) *
-          seconds,
+        seconds,
       ) / seconds,
     phase: next() * Math.PI,
   }));
@@ -337,7 +337,7 @@ function harvesterLoop(target: Mix, drilling: boolean) {
     const motor = Math.sin(TAU * 52 * t + 0.2 * sine(6, t));
     return (
       (0.72 + 0.1 * sine(2, t) + 0.08 * sine(7, t)) *
-        (0.48 * motor + 0.18 * sine(104, t) + 0.07 * sine(208, t)) +
+      (0.48 * motor + 0.18 * sine(104, t) + 0.07 * sine(208, t)) +
       0.025 * texture
     );
   });
@@ -544,7 +544,7 @@ const SOUND_RECIPES: Record<SoundId, (target: Mix) => void> = {
       (t) =>
         0.12 * sine(72, t) +
         (0.5 + 0.5 * Math.cos(TAU * 2 * t)) ** 8 *
-          (0.45 * sine(240, t) + 0.2 * sine(690, t) + 0.1 * sine(1110, t)),
+        (0.45 * sine(240, t) + 0.2 * sine(690, t) + 0.1 * sine(1110, t)),
     );
   },
   "command-accepted": (target) => {
@@ -964,6 +964,81 @@ export function buildMusic(id: MusicId): Uint8Array {
   return wav(target, 0.28);
 }
 
+type AudioId = SoundId | MusicId;
+/** Audition presets: loops start at once, cues after their delay in ms. */
+const AUDITION_SCENES: Readonly<
+  Record<
+    string,
+    { label: string; steps: readonly (AudioId | [number, AudioId])[] }
+  >
+> = {
+  "arc-base": {
+    label: "ARC base & income",
+    steps: [
+      "unquiet-frontier",
+      "harvester-work",
+      "harvester-engine",
+      [400, "refinery-door-open"],
+      [1600, "training-start"],
+      [3100, "unit-trained"],
+    ],
+  },
+  "circle-base": {
+    label: "Circle base & cultivation",
+    steps: [
+      "circle-frontier",
+      "circle-cultivation",
+      "circle-growth",
+      [500, "circle-production-start"],
+      [1900, "circle-producer-exit"],
+      [3200, "circle-unit-trained"],
+    ],
+  },
+  battle: {
+    label: "Skirmish battle",
+    steps: [
+      "beneath-the-ridge",
+      [200, "rifle-1"],
+      [650, "circle-cast-1"],
+      [1150, "launcher-launch"],
+      [1850, "launcher-impact"],
+      [2400, "ram-strike-1"],
+      [3100, "alert"],
+    ],
+  },
+  support: {
+    label: "Support & recovery",
+    steps: [
+      "circle-ridge",
+      "healer-service",
+      "mechanical-service",
+      [700, "living-structure-hit"],
+      [1800, "living-destroyed"],
+    ],
+  },
+  victory: {
+    label: "Victory phrase",
+    steps: [
+      [0, "objective-complete"],
+      [1800, "victory"],
+    ],
+  },
+  defeat: {
+    label: "Defeat phrase",
+    steps: [
+      [0, "alert"],
+      [1100, "defeat"],
+    ],
+  },
+};
+
+const escapeHtml = (text: string) =>
+  text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 export function buildAudioPreview(): Uint8Array {
   type Entry = [
     id: string,
@@ -1023,54 +1098,55 @@ Original synthesized audio. Music repeats every 48 seconds at 80 BPM.
 Play scene mixes or individual loops and cues to compare timing and headroom.</p>
 <div class="scenes" role="group" aria-label="Scene audition presets">
 <button type="button" id="stop">Stop all</button>
-<button type="button" data-scene="arc-base">Scene: ARC base &amp; income</button>
-<button type="button" data-scene="circle-base">Scene: Circle base &amp; cultivation</button>
-<button type="button" data-scene="battle">Scene: Skirmish battle</button>
-<button type="button" data-scene="support">Scene: Support &amp; recovery</button>
-<button type="button" data-scene="victory">Scene: Victory phrase</button>
-<button type="button" data-scene="defeat">Scene: Defeat phrase</button>
+${Object.entries(AUDITION_SCENES)
+      .map(
+        ([id, { label }]) =>
+          `<button type="button" data-scene="${id}">Scene: ${escapeHtml(label)}</button>`,
+      )
+      .join("\n")}
 </div>
 <p id="status" role="status"></p>
 <h2>Background music</h2><section>${entries("music", Object.entries(MUSIC_ASSETS))}</section>
 <h2>Machinery loops</h2><section>${entries("machine", sounds.filter(loops))}</section>
 <h2>Gameplay cues</h2><section>${entries(
-    "cue",
-    sounds.filter((sound) => !loops(sound)),
-  )}</section>
+        "cue",
+        sounds.filter((sound) => !loops(sound)),
+      )}</section>
 <script>
 const players = [...document.querySelectorAll('audio')];
+const scenePlaying = new Set();
 let sceneTimers = [];
 const clearScene = () => {
   for (const timer of sceneTimers) clearTimeout(timer);
   sceneTimers = [];
+  scenePlaying.clear();
 };
 const stopAll = () => {
   clearScene();
   for (const player of players) { player.pause(); player.currentTime = 0; }
 };
-const trigger = (id) => {
-  const el = document.getElementById(id);
+const playAudio = (el, fromScene = false) => {
   if (!el) return;
-  el.currentTime = 0;
+  if (fromScene) {
+    el.pause();
+    el.currentTime = 0;
+    scenePlaying.add(el);
+  }
   el.play().catch(() => {
+    scenePlaying.delete(el);
     document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
   });
 };
-const SCENES = {
-  'arc-base': ['unquiet-frontier', 'harvester-work', 'harvester-engine', [400, 'refinery-door-open'], [1600, 'training-start'], [3100, 'unit-trained']],
-  'circle-base': ['circle-frontier', 'circle-cultivation', 'circle-growth', [500, 'circle-production-start'], [1900, 'circle-producer-exit'], [3200, 'circle-unit-trained']],
-  'battle': ['beneath-the-ridge', [200, 'rifle-1'], [650, 'circle-cast-1'], [1150, 'launcher-launch'], [1850, 'launcher-impact'], [2400, 'ram-strike-1'], [3100, 'alert']],
-  'support': ['circle-ridge', 'healer-service', 'mechanical-service', [700, 'living-structure-hit'], [1800, 'living-destroyed']],
-  'victory': [[0, 'objective-complete'], [1800, 'victory']],
-  'defeat': [[0, 'alert'], [1100, 'defeat']],
-};
+const SCENES = ${JSON.stringify(
+        Object.fromEntries(
+          Object.entries(AUDITION_SCENES).map(([id, { steps }]) => [id, steps]),
+        ),
+      )};
 for (const button of document.querySelectorAll('[data-play]')) {
   button.addEventListener('click', () => {
     clearScene();
     document.querySelector('#status').textContent = '';
-    document.getElementById(button.dataset.play).play().catch(() => {
-      document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
-    });
+    playAudio(document.getElementById(button.dataset.play));
   });
 }
 for (const button of document.querySelectorAll('[data-scene]')) {
@@ -1078,8 +1154,8 @@ for (const button of document.querySelectorAll('[data-scene]')) {
     stopAll();
     document.querySelector('#status').textContent = '';
     for (const step of SCENES[button.dataset.scene] || []) {
-      if (Array.isArray(step)) sceneTimers.push(setTimeout(() => trigger(step[1]), step[0]));
-      else trigger(step);
+      if (Array.isArray(step)) sceneTimers.push(setTimeout(() => playAudio(document.getElementById(step[1]), true), step[0]));
+      else playAudio(document.getElementById(step), true);
     }
   });
 }
@@ -1087,8 +1163,12 @@ for (const player of players) {
   player.volume = player.dataset.bus === 'music' ? 0.4 :
     player.dataset.bus === 'machine' ? 0.55 : 0.7;
   player.addEventListener('play', () => {
+    const fromScene = scenePlaying.delete(player);
+    if (!fromScene) clearScene();
     for (const other of players)
+      // Scene presets let cues overlap, as they do in play.
       if (other !== player && player.dataset.bus !== 'machine' &&
+          !(fromScene && player.dataset.bus === 'cue') &&
           other.dataset.bus === player.dataset.bus) other.pause();
   });
 }

@@ -2,23 +2,15 @@
 // procedural frontier title art.
 import { PNG } from "pngjs";
 
-import { seededRandom } from "../sprite-sheet.ts";
+import { clamp, mix, seededRandom } from "../sprite-sheet.ts";
+
+export { clamp, mix, smoothstep } from "../sprite-sheet.ts";
 
 export const WIDTH = 1600;
 export const HEIGHT = 900;
 
 export type Rgb = readonly [number, number, number];
 export type Point = readonly [number, number];
-
-export const clamp = (value: number, min: number, max: number) =>
-  value < min ? min : value > max ? max : value;
-
-export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
-
-export const smoothstep = (edge0: number, edge1: number, x: number) => {
-  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-};
 
 export const mixRgb = (a: Rgb, b: Rgb, t: number): Rgb => [
   mix(a[0], b[0], t),
@@ -160,6 +152,7 @@ export class Canvas {
     this.data[i + 2] = this.data[i + 2]! + b * strength;
   }
 
+  /** Adds light that falls off from the center of an ellipse. */
   drawGlow(
     cx: number,
     cy: number,
@@ -169,26 +162,19 @@ export class Canvas {
     intensity: number,
     falloff = 2.2,
   ): void {
-    const x0 = Math.max(0, Math.floor(cx - rx));
-    const x1 = Math.min(this.width - 1, Math.ceil(cx + rx));
-    const y0 = Math.max(0, Math.floor(cy - ry));
-    const y1 = Math.min(this.height - 1, Math.ceil(cy + ry));
-    const invRx = 1 / Math.max(rx, 0.5);
-    const invRy = 1 / Math.max(ry, 0.5);
-    for (let y = y0; y <= y1; y++) {
-      const dy = (y + 0.5 - cy) * invRy;
-      const dy2 = dy * dy;
-      if (dy2 >= 1) continue;
-      for (let x = x0; x <= x1; x++) {
-        const dx = (x + 0.5 - cx) * invRx;
-        const d2 = dx * dx + dy2;
-        if (d2 >= 1) continue;
-        const w = Math.pow(1 - Math.sqrt(d2), falloff) * intensity;
-        this.add(x, y, color[0], color[1], color[2], w);
-      }
-    }
+    this.eachInEllipse(cx, cy, rx, ry, (x, y, distance) =>
+      this.add(
+        x,
+        y,
+        color[0],
+        color[1],
+        color[2],
+        Math.pow(1 - distance, falloff) * intensity,
+      ),
+    );
   }
 
+  /** Blends an ellipse whose opacity falls off toward its edge. */
   drawSoftEllipse(
     cx: number,
     cy: number,
@@ -197,6 +183,26 @@ export class Canvas {
     color: Rgb,
     alpha: number,
     softness = 1.6,
+  ): void {
+    this.eachInEllipse(cx, cy, rx, ry, (x, y, distance) =>
+      this.blend(
+        x,
+        y,
+        color[0],
+        color[1],
+        color[2],
+        Math.pow(1 - distance, softness) * alpha,
+      ),
+    );
+  }
+
+  /** Visits pixels inside an ellipse with their normalized center distance. */
+  private eachInEllipse(
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    visit: (x: number, y: number, distance: number) => void,
   ): void {
     const x0 = Math.max(0, Math.floor(cx - rx));
     const x1 = Math.min(this.width - 1, Math.ceil(cx + rx));
@@ -211,9 +217,7 @@ export class Canvas {
       for (let x = x0; x <= x1; x++) {
         const dx = (x + 0.5 - cx) * invRx;
         const d2 = dx * dx + dy2;
-        if (d2 >= 1) continue;
-        const w = Math.pow(1 - Math.sqrt(d2), softness) * alpha;
-        this.blend(x, y, color[0], color[1], color[2], w);
+        if (d2 < 1) visit(x, y, Math.sqrt(d2));
       }
     }
   }

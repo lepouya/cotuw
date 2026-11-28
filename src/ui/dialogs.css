@@ -55,12 +55,6 @@
 
 #explanation {
   max-width: min(26rem, 90vw);
-  padding: 1.25rem 1.4rem;
-  border-color: #8a7a52;
-  background: linear-gradient(155deg, #1a3033, #0f1d23);
-  box-shadow:
-    inset 0 1px rgb(214 177 107 / 28%),
-    0 1.25rem 3.5rem rgb(0 0 0 / 55%);
 }
 
 #explanation h2 {
@@ -80,19 +74,7 @@
 #explanation button {
   min-width: 7rem;
   margin-top: 0.4rem;
-  border-color: #d6b16b;
-  color: #151f1c;
-  background: #d6b16b;
-  font-weight: 700;
   text-align: center;
-}
-
-#explanation button:hover {
-  background: #ead09a;
-}
-
-#explanation button:focus-visible {
-  outline-color: #223334;
 }
 
 #game-menu.result-menu {
@@ -186,48 +168,21 @@
 }
 
 .home-menu #game-menu-actions button {
-  border-color: #778e89;
-  background: rgb(15 32 37 / 88%);
   font-size: 0.875rem;
 }
 
-.home-menu #game-menu-actions button:hover {
+.home-menu #game-menu-actions button:not(.primary-action) {
+  border-color: #778e89;
+  background: rgb(15 32 37 / 88%);
+}
+
+.home-menu #game-menu-actions button:not(.primary-action):hover {
   background: #244046;
-}
-
-.home-menu #game-menu-actions #new-mission {
-  border-color: #d6b16b;
-  color: #151f1c;
-  background: #d6b16b;
-  font-weight: 700;
-}
-
-.home-menu #game-menu-actions #new-mission:hover {
-  background: #ead09a;
-}
-
-.home-menu #new-mission:focus-visible {
-  outline-color: #223334;
 }
 
 #game-menu-actions .primary-action,
 #return-to-title {
   grid-column: 1 / -1;
-}
-
-.primary-action {
-  border-color: #d6b16b;
-  color: #151f1c;
-  background: #d6b16b;
-  font-weight: 700;
-}
-
-.primary-action:hover {
-  background: #ead09a;
-}
-
-.primary-action:focus-visible {
-  outline-color: #223334;
 }
 
 #game-version {

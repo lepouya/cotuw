@@ -1,10 +1,13 @@
 import {
   blendPixel,
+  clamp,
   createFrame,
   drawDisc,
+  mix,
   mixRgba,
   packSheet,
   seededRandom,
+  smoothstep,
   wrap,
 } from "./sprite-sheet.ts";
 
@@ -16,12 +19,6 @@ const PERIOD = 1023;
 const LIGHT = [-0.45, -0.55, 0.7].map(
   (value, _, all) => value / Math.hypot(...all),
 );
-
-const mix = (from: number, to: number, t: number) => from + (to - from) * t;
-const smoothstep = (from: number, to: number, value: number) => {
-  const t = Math.max(0, Math.min(1, (value - from) / (to - from)));
-  return t * t * (3 - 2 * t);
-};
 
 /** Seeded, periodic value noise with smooth interpolation between samples. */
 function valueNoise(seed: number, cells: number) {
@@ -99,8 +96,7 @@ function fill(frame: Frame, color: (x: number, y: number) => Rgba) {
       const value = color(x, y);
       const alpha = value[3];
       for (let channel = 0; channel < 3; channel++)
-        frame.pixels[index + channel] =
-          Math.max(0, Math.min(1, value[channel]!)) * alpha;
+        frame.pixels[index + channel] = clamp(value[channel]!, 0, 1) * alpha;
       frame.pixels[index + 3] = alpha;
     }
 }
@@ -147,7 +143,7 @@ function drawStone(
   for (let py = top; py <= top + reach * 2; py++)
     for (let px = left; px <= left + reach * 2; px++) {
       const [distance, edge] = outline(px - 0.3 - x, py - 0.1 - y);
-      const coverage = Math.max(0, Math.min(1, (edge + 1.2 - distance) / 2));
+      const coverage = clamp((edge + 1.2 - distance) / 2, 0, 1);
       if (coverage > 0)
         blendPixel(frame, px, py, [0.09, 0.07, 0.05, alpha * 0.45], coverage);
     }
@@ -156,7 +152,7 @@ function drawStone(
       const dx = px + 0.5 - x;
       const dy = py + 0.5 - y;
       const [distance, edge] = outline(dx, dy);
-      const coverage = Math.max(0, Math.min(1, edge + 0.5 - distance));
+      const coverage = clamp(edge + 0.5 - distance, 0, 1);
       if (coverage === 0) continue;
       // A dome normal from the share of the way to the outline.
       const reachShare = Math.min(1, distance / edge);

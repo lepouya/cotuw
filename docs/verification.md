@@ -108,6 +108,8 @@ should leave committed output unchanged unless their sources changed.
   audio, and application wiring. Retain browser checks that can fail while the
   corresponding unit test passes. Screenshots attached to reports are review
   artifacts; most checks assert behavior rather than compare image baselines.
+  Judge appearance by hand with the
+  [visual asset review](visual-asset-review.md).
 - The complete `e2e/mission.spec.ts` flow owns the authored economy-to-victory
   progression, victory, and free-play construction and production with mouse
   and phone touch. Focused economy specs cover distinct interactions such as
@@ -258,8 +260,8 @@ Scenes start at the named scale with combat units, Harvesters, scouts, Medics,
 and Mechanics. A probe orders Troopers to replace losses. Queued replacements
 count toward the target, and each owner orders one more for every unit it lost
 within the last training time, so the fielded population averages near the
-target and can run up to 10% over it after a lull in combat. Reports give the fielded population throughout
-measurement.
+target and can run up to 10% over it after a lull in combat. Reports give the
+fielded population throughout measurement.
 
 - By default both owners play the `arc-skirmish` profile with the probe
   handling training and authored buildings setting the scale. The AI directs

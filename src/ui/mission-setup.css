@@ -13,11 +13,6 @@ fieldset.setup-choices {
 .setup-choices legend {
   margin-bottom: 0.5rem;
   padding: 0;
-  color: #d8bf89;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
 }
 
 .difficulty-choices {
@@ -37,21 +32,6 @@ fieldset.setup-choices {
 .setup-actions button {
   min-width: min(6rem, 45%);
   text-align: center;
-}
-
-.setup-actions #start-mission {
-  border-color: #d6b16b;
-  color: #151f1c;
-  background: #d6b16b;
-  font-weight: 700;
-}
-
-.setup-actions #start-mission:hover {
-  background: #ead09a;
-}
-
-.setup-actions #start-mission:focus-visible {
-  outline-color: #223334;
 }
 
 .setup-choice {

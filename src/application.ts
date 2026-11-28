@@ -40,7 +40,12 @@ import type { createTopBar } from "./ui/top-bar";
 
 type MenuText = Pick<
   MenuView,
-  "title" | "description" | "continueLabel" | "canInspect" | "summary"
+  | "title"
+  | "description"
+  | "continueLabel"
+  | "canInspect"
+  | "summary"
+  | "outcome"
 >;
 
 /** Text for menus without a result; a continue label offers continuing play. */
@@ -207,6 +212,7 @@ export function createApplication({
       continueLabel,
       canInspect,
       summary: isSkirmishResult(result) ? matchSummary() : undefined,
+      outcome: mode === "result" ? result.kind : undefined,
     });
   }
 

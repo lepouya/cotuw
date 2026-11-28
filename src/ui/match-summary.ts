@@ -28,7 +28,7 @@ function overview({ owners, sections }: MatchSummary) {
     createElement(
       "table",
       { class: "summary-table" },
-      createElement("caption", {}, heading),
+      createElement("caption", { class: "section-label" }, heading),
       createElement(
         "thead",
         {},

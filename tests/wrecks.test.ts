@@ -1,6 +1,8 @@
 import {
   Color3,
+  Material,
   MeshBuilder,
+  PBRMaterial,
   StandardMaterial,
   TransformNode,
 } from "@babylonjs/core";
@@ -430,6 +432,75 @@ test("fallen units extinguish active visor and focus glows", () => {
   expect(muted.diffuseColor.r).toBeLessThan(0.2);
   views.dispose();
   appearance.dispose();
+});
+
+test("fallen units weather PBR materials, extinguish unlit glows, and leave custom materials intact", () => {
+  const scene = testScene();
+  const map = new TerrainMap({ width: 10, height: 10, tileSize: 1 });
+  const armor = new PBRMaterial("armor-pbr", scene);
+  armor.albedoColor = new Color3(0.8, 0.2, 0.2);
+  armor.emissiveColor = new Color3(0.04, 0.04, 0.04);
+  armor.roughness = 0.5;
+  armor.metallic = 0.8;
+  const visor = new PBRMaterial("visor-pbr", scene);
+  visor.albedoColor = new Color3(0.4, 0.9, 1);
+  visor.emissiveColor = new Color3(0.3, 0.8, 1);
+  visor.unlit = true;
+  const custom = new Material("custom-mat", scene);
+  const appearance: ActorAppearance = {
+    bounds: { radius: 0.5, height: 1 },
+    instantiate: (name) => {
+      const root = new TransformNode(name, scene);
+      for (const [part, material] of [
+        ["armor", armor],
+        ["visor", visor],
+        ["custom", custom],
+      ] as const) {
+        const mesh = MeshBuilder.CreateBox(`${name}-${part}`, {}, scene);
+        mesh.material = material;
+        mesh.parent = root;
+      }
+      return { root, dispose: () => root.dispose() };
+    },
+    dispose: () => {},
+  };
+  const views = createWreckView(scene, map, {
+    appearanceFor: () => appearance,
+    tilesFor: () => [],
+  });
+  updateWrecks(
+    views,
+    [
+      {
+        actorId: "fallen-pbr",
+        definitionId: "trooper",
+        owner: "east",
+        tick: 0,
+        worldPosition: { x: 0, z: 0 },
+        facing: 0,
+      },
+    ],
+    0,
+    0,
+  );
+  const meshes = scene
+    .getTransformNodeByName("wreck-fallen-pbr")!
+    .getChildMeshes();
+  const mutedArmor = meshes[0]!.material as PBRMaterial;
+  const mutedVisor = meshes[1]!.material as PBRMaterial;
+  expect(mutedArmor).not.toBe(armor);
+  expect(mutedArmor.roughness).toBeGreaterThanOrEqual(0.86);
+  expect(mutedArmor.metallic).toBeCloseTo(0.8 * 0.35);
+  expect(mutedArmor.albedoColor.r).toBeLessThan(armor.albedoColor.r);
+  expect(mutedVisor).not.toBe(visor);
+  expect(mutedVisor.unlit).toBe(false);
+  expect(mutedVisor.emissiveColor).toEqual(Color3.Black());
+  expect(meshes[2]!.material).toBe(custom);
+  views.dispose();
+  expect(scene.materials).toContain(custom);
+  armor.dispose();
+  visor.dispose();
+  custom.dispose();
 });
 
 test("living rubble is chosen per building and its light fades as it collapses", async () => {

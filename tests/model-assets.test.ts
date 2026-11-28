@@ -388,7 +388,7 @@ test("ARC support uses distinct unarmed geometry", async () => {
     const instance = asset.instantiate(id, 0);
     const body = instance.root
       .getChildMeshes()
-      .find((mesh) => mesh.name.endsWith(`${id}-body`))!;
+      .find((mesh) => mesh.name.endsWith(`${id}-body-skin`))!;
     bodies.push(Array.from(body.getVerticesData(VertexBuffer.PositionKind)!));
     instance.dispose();
     asset.dispose();
@@ -444,7 +444,7 @@ test("Demolition infantry carries a distinct launcher within Trooper selection b
     const instance = asset.instantiate(`infantry-${index}`, 0);
     const body = instance.root
       .getChildMeshes()
-      .find((mesh) => mesh.name.endsWith("-body"))!;
+      .find((mesh) => mesh.name.endsWith("-body-skin"))!;
     geometry.push(Array.from(body.getVerticesData(VertexBuffer.PositionKind)!));
     instance.dispose();
     asset.dispose();

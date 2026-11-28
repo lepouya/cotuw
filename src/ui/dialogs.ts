@@ -12,6 +12,7 @@ import "./dialogs.css";
 
 import type { MatchSummary } from "../match-summary";
 import type { ScenarioPopup } from "../simulation/mission-file";
+import type { MissionResult } from "../simulation/mission-result";
 import type { AudioControlDevice } from "./audio-controls";
 import type { FeatureScope } from "./dom";
 import type { MissionChoice } from "./mission-setup";
@@ -26,6 +27,8 @@ export type MenuView = {
   canInspect?: boolean;
   /** A finished skirmish's summary, shown above the menu actions. */
   summary?: MatchSummary;
+  /** Styles a result menu by its verdict. */
+  outcome?: MissionResult["kind"];
   mission?: { saveName: string; canSave: boolean; canRestart: boolean };
 };
 
@@ -423,16 +426,8 @@ function bindDialogs(
       version.hidden = !!next.mission;
       dialog.classList.toggle("title-menu", !next.mission);
       dialog.classList.toggle("result-menu", !!next.summary);
-      if (next.mode === "result") {
-        const lower = next.title.toLowerCase();
-        dialog.dataset.outcome = lower.includes("victory")
-          ? "victory"
-          : lower.includes("defeat")
-            ? "defeat"
-            : "draw";
-      } else {
-        delete dialog.dataset.outcome;
-      }
+      if (next.outcome) dialog.dataset.outcome = next.outcome;
+      else delete dialog.dataset.outcome;
       summary.show(next.summary);
       if (!dialog.open) dialog.showModal();
       showPanel("actions");

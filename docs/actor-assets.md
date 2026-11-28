@@ -5,6 +5,8 @@ read code and seeded parameters, never an image, model, or editor source file.
 `scripts/assets.ts` registers every generated file by family; add a new asset
 there. Tests compare each committed file with fresh generation, check that pack
 clips match their generators, and reject unregistered files in `public/assets`.
+Review changed assets in their scenes with the
+[visual asset review](visual-asset-review.md).
 
 ## Inventory
 
@@ -116,7 +118,10 @@ clips match their generators, and reject unregistered files in `public/assets`.
   moving assembly, keeping doors, machinery, and turret aim independent.
 - `scripts/model-toolkit.ts` holds the shared generator steps: placement,
   tapered tubes, lofted rings, folded blades, vertex painting, material
-  batches, rigid skins, and sampled clips.
+  batches, rigid skins, and sampled clips. Every skinned model, including
+  infantry, binds parts to their parent nodes with `skin` and samples poses
+  with `clip`. Infantry clips key joint rotations and the pelvis position
+  every second frame.
 - Models use generated materials and vertex colors. They require no separate
   painted texture files.
 - Relay Stations sweep paired receiver panels and pulse a console lamp.

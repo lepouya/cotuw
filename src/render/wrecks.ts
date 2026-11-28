@@ -38,19 +38,39 @@ const REMAINS_TINT = new Color3(0.14, 0.15, 0.14);
 const REMAINS_DARK_GLOW = new Color3(0.12, 0.14, 0.15);
 
 /** Darkens and desaturates a color while preserving owner hue identity. */
-function muteColor(color: Color3, blend: number, scale: number): Color3 {
-  return Color3.Lerp(color, REMAINS_TINT, blend).scale(scale);
+function muteColor(color: Color3): Color3 {
+  return Color3.Lerp(color, REMAINS_TINT, 0.36).scale(0.7);
 }
 
-/** Whether a material represents an active visor, lamp, or focus glow. */
-function isActiveGlow(material: PBRMaterial | StandardMaterial): boolean {
-  if (material instanceof PBRMaterial) {
-    if (material.unlit) return true;
-    const e = material.emissiveColor;
-    return e.r + e.g + e.b > 0.15;
+/**
+ * A weathered copy of a live unit material, so remains recede behind active
+ * actors. Visors, lamps, and focus glows go dark.
+ */
+function remainsMaterial(source: Material): Material | undefined {
+  const pbr = source instanceof PBRMaterial;
+  if (!pbr && !(source instanceof StandardMaterial)) return undefined;
+  const { r, g, b } = source.emissiveColor;
+  const glowing =
+    (pbr ? source.unlit : source.disableLighting) || r + g + b > 0.15;
+  const clone = source.clone(`${source.name}-remains`);
+  clone.emissiveColor = glowing
+    ? Color3.Black()
+    : source.emissiveColor.scale(0.1);
+  if (clone instanceof PBRMaterial && pbr) {
+    clone.unlit = false;
+    clone.albedoColor = glowing
+      ? REMAINS_DARK_GLOW.clone()
+      : muteColor(source.albedoColor);
+    clone.roughness = glowing ? 0.88 : Math.max(source.roughness ?? 0.7, 0.86);
+    clone.metallic = glowing ? 0.1 : (source.metallic ?? 0) * 0.35;
+  } else if (clone instanceof StandardMaterial && !pbr) {
+    clone.disableLighting = false;
+    clone.diffuseColor = glowing
+      ? REMAINS_DARK_GLOW.clone()
+      : muteColor(source.diffuseColor);
+    clone.specularColor = Color3.Black();
   }
-  const e = material.emissiveColor;
-  return material.disableLighting || e.r + e.g + e.b > 0.15;
+  return clone;
 }
 
 export type WreckViewOptions = {
@@ -82,43 +102,14 @@ export function createWreckView(
   const rubble = new StandardMaterial("wreck-rubble", scene);
   rubble.diffuseColor = new Color3(0.2, 0.19, 0.17);
   rubble.specularColor = Color3.Black();
-  /** Cached muted copies of live unit materials so remains recede behind active actors. */
   const mutedMaterials = new Map<Material, Material>();
-  const muteMaterial = (source: Material): Material => {
-    const cached = mutedMaterials.get(source);
-    if (cached) return cached;
-    if (source instanceof PBRMaterial) {
-      const clone = source.clone(`${source.name}-remains`);
-      if (isActiveGlow(source)) {
-        clone.unlit = false;
-        clone.emissiveColor = Color3.Black();
-        clone.albedoColor = REMAINS_DARK_GLOW.clone();
-        clone.roughness = 0.88;
-        clone.metallic = 0.1;
-      } else {
-        clone.emissiveColor = source.emissiveColor.scale(0.1);
-        clone.albedoColor = muteColor(source.albedoColor, 0.36, 0.7);
-        clone.roughness = Math.max(source.roughness ?? 0.7, 0.86);
-        clone.metallic = (source.metallic ?? 0) * 0.35;
-      }
-      mutedMaterials.set(source, clone);
-      return clone;
+  const muteMaterial = (source: Material) => {
+    let muted = mutedMaterials.get(source);
+    if (!muted) {
+      muted = remainsMaterial(source) ?? source;
+      mutedMaterials.set(source, muted);
     }
-    if (source instanceof StandardMaterial) {
-      const clone = source.clone(`${source.name}-remains`);
-      if (isActiveGlow(source)) {
-        clone.disableLighting = false;
-        clone.emissiveColor = Color3.Black();
-        clone.diffuseColor = REMAINS_DARK_GLOW.clone();
-      } else {
-        clone.emissiveColor = source.emissiveColor.scale(0.1);
-        clone.diffuseColor = muteColor(source.diffuseColor, 0.36, 0.7);
-      }
-      clone.specularColor = Color3.Black();
-      mutedMaterials.set(source, clone);
-      return clone;
-    }
-    return source;
+    return muted;
   };
   const views = new Map<
     string,
@@ -402,7 +393,8 @@ export function createWreckView(
       map.onChangedObservable.remove(terrainObserver);
       for (const view of views.values()) view.dispose();
       views.clear();
-      for (const material of mutedMaterials.values()) material.dispose();
+      for (const [source, muted] of mutedMaterials)
+        if (muted !== source) muted.dispose();
       mutedMaterials.clear();
       rubble.dispose();
     },

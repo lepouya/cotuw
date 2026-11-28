@@ -1,27 +1,28 @@
 // Builds the infantry GLBs. The asset tests rebuild them to check
 // the committed files are current.
 import {
-  Animation,
-  AnimationGroup,
-  Bone,
   Color3,
-  Matrix,
   Mesh,
   MeshBuilder,
   PBRMaterial,
-  Quaternion,
-  Skeleton,
   TransformNode,
-  Vector3,
   VertexData,
 } from "@babylonjs/core";
 
-import { exportGlb, FRAMES_PER_SECOND, rigidSkin } from "./glb-export.ts";
-import { foldedBlade, tube } from "./model-toolkit.ts";
+import { exportGlb, FRAMES_PER_SECOND } from "./glb-export.ts";
+import {
+  clip,
+  foldedBlade,
+  paint,
+  place,
+  skin,
+  tube,
+} from "./model-toolkit.ts";
+import { mix } from "./sprite-sheet.ts";
 
 import type { Scene } from "@babylonjs/core";
+import type { Vec3 } from "./model-toolkit.ts";
 
-type Vec3 = [number, number, number];
 type Finish = "armor" | "cloth" | "owner" | "visor" | "dark" | "skin" | "metal";
 type Joint = { name: string; parent?: string; offset: Vec3 };
 type Part = {
@@ -46,6 +47,7 @@ type Part = {
 };
 type Pose = (joint: string, phase: number) => Vec3;
 
+/** Frames between animation keys; poses change slowly enough to halve them. */
 const KEY_STEP = 2;
 const DARK: Vec3 = [0.09, 0.13, 0.15];
 const METAL: Vec3 = [0.62, 0.68, 0.7];
@@ -2017,25 +2019,15 @@ function buildInfantry(
   const { parts, stance, attack } = recipe;
   const root = new TransformNode(name, scene);
   root.scaling.setAll(recipe.scale);
-  const skeleton = new Skeleton(`${name}-rig`, `${name}-rig`, scene);
-  const bones = new Map<string, Bone>();
+  const joints = new Map<string, TransformNode>();
   for (const { name: label, parent, offset } of [
     ...JOINTS,
     ...(recipe.joints ?? []),
   ]) {
-    const parentBone = parent ? bones.get(parent)! : null;
     const joint = new TransformNode(label, scene);
-    joint.parent = parentBone?.getTransformNode() ?? root;
+    joint.parent = parent ? joints.get(parent)! : root;
     joint.position.set(...offset);
-    joint.rotationQuaternion = Quaternion.Identity();
-    const bone = new Bone(
-      label,
-      skeleton,
-      parentBone,
-      Matrix.Translation(...offset),
-    );
-    bone.linkTransformNode(joint);
-    bones.set(label, bone);
+    joints.set(label, joint);
   }
 
   // glTF colors are linear. A vertex-colored body, the glowing visor, and
@@ -2056,67 +2048,67 @@ function buildInfantry(
   owner.metallic = 0;
   owner.roughness = 0.6;
 
-  // Owner parts take their color from the material, which sessions replace.
-  const colorOf = ({ finish }: Part) =>
-    finish === "owner" ? Color3.White() : linear(palette[finish]);
-  const skinned = (label: string, pieces: Part[], material: PBRMaterial) =>
-    rigidSkin(
-      `${name}-${label}`,
-      pieces.map((each) => ({
-        vertices: partVertices(scene, each, colorOf(each)),
-        bone: skeleton.bones.indexOf(bones.get(each.joint)!),
-      })),
-      skeleton,
-      material,
-      root,
-    );
-  skinned(
-    "body",
-    parts.filter(({ finish }) => finish !== "visor" && finish !== "owner"),
-    body,
-  );
-  skinned(
-    "visor",
-    parts.filter(({ finish }) => finish === "visor"),
-    visor,
-  );
-  skinned(
-    "owner",
-    parts.filter(({ finish }) => finish === "owner"),
-    owner,
-  );
+  // Parts are authored in model space, then ride their joint.
+  for (const {
+    name: label,
+    joint,
+    shape,
+    size,
+    position,
+    finish,
+    tiltX = 0,
+    tiltZ = 0,
+  } of parts) {
+    const mesh = place(SHAPES[shape](scene, label), {
+      parent: root,
+      material: finish === "visor" ? visor : finish === "owner" ? owner : body,
+      position,
+      rotation: [tiltX, 0, tiltZ],
+      scaling: size,
+    });
+    // Owner parts take their color from the material, which sessions replace.
+    const color = finish === "owner" ? Color3.White() : linear(palette[finish]);
+    paint(mesh, () => color);
+    mesh.setParent(joints.get(joint)!);
+  }
+  skin(root);
 
-  const clip = (
+  /** Keys each joint's pose over one cycle, where phase runs from 0 to 2π. */
+  const cycle = (
     clipName: string,
-    endFrame: number,
+    frames: number,
     pose: Pose,
-    joints = [...bones.keys()],
-  ) => {
-    const group = new AnimationGroup(clipName, scene);
-    for (const joint of joints) {
-      group.addTargetedAnimation(
-        keyed(`${clipName}-${joint}`, "rotationQuaternion", endFrame, (phase) =>
-          Quaternion.FromEulerAngles(...pose(joint, phase)),
-        ),
-        bones.get(joint)!.getTransformNode(),
-      );
-    }
-    return group;
-  };
-  /** Keys the pelvis moving `offset` from its rest position. */
-  const shift = (
-    group: AnimationGroup,
-    endFrame: number,
-    offset: (phase: number) => Vec3,
-  ) => {
-    const rest = new Vector3(...JOINTS[0].offset);
-    group.addTargetedAnimation(
-      keyed(`${group.name}-pelvis`, "position", endFrame, (phase) =>
-        rest.add(new Vector3(...offset(phase))),
-      ),
-      bones.get("pelvis")!.getTransformNode(),
+    {
+      joints: posed = [...joints.keys()],
+      shift,
+      layered = false,
+    }: {
+      joints?: readonly string[];
+      /** Moves the pelvis from its rest position. */
+      shift?: (phase: number) => Vec3;
+      /** Keys only the joints that move, for additive layers. */
+      layered?: boolean;
+    } = {},
+  ) =>
+    clip(
+      root,
+      clipName,
+      frames / FRAMES_PER_SECOND,
+      (seconds) => {
+        const phase = ((seconds * FRAMES_PER_SECOND) / frames) * Math.PI * 2;
+        for (const joint of posed)
+          joints.get(joint)!.rotation.set(...pose(joint, phase));
+        if (shift)
+          joints.get("pelvis")!.position.addInPlaceFromFloats(...shift(phase));
+      },
+      // Complete poses key every joint's rotation and the pelvis position.
+      !layered &&
+        ((node, property) =>
+          joints.get(node.name) === node &&
+          (property === "rotationQuaternion" ||
+            (property === "position" && node.name === "pelvis"))),
+      KEY_STEP,
     );
-  };
   const neutral = (joint: string): Vec3 => {
     const ready = stance.ready?.[joint];
     if (ready) return ready;
@@ -2126,51 +2118,56 @@ function buildInfantry(
     return [0, 0, 0];
   };
 
-  const idle = clip("idle", 60, (joint, phase) =>
-    joint === "head" ? [Math.sin(phase) * 0.025, 0, 0] : neutral(joint),
+  cycle(
+    "idle",
+    60,
+    (joint, phase) =>
+      joint === "head" ? [Math.sin(phase) * 0.025, 0, 0] : neutral(joint),
+    { shift: (phase) => [0, (Math.cos(phase) - 1) * 0.004, 0] },
   );
-  shift(idle, 60, (phase) => [0, (Math.cos(phase) - 1) * 0.004, 0]);
   if (recipe.work) {
     const pose = WORK_POSES[recipe.work];
-    const work = clip(
+    cycle(
       recipe.work,
       60,
       (joint, phase) => pose(joint, phase) ?? neutral(joint),
     );
-    // Keys the pelvis at rest because blending needs idle's channels.
-    shift(work, 60, () => [0, 0, 0]);
   }
-  const walk = clip("walk", 30, (joint, phase) => {
-    const stride = Math.sin(phase) * recipe.stride;
-    switch (joint) {
-      case "left-leg":
-        return [stride * 0.62, 0, 0];
-      case "right-leg":
-        return [-stride * 0.62, 0, 0];
-      case "left-shin":
-        return [-Math.max(0, stride) * 0.52, 0, 0];
-      case "right-shin":
-        return [-Math.max(0, -stride) * 0.52, 0, 0];
-      case "left-arm":
-      case "right-arm": {
-        const [pitch, yaw, roll] = neutral(joint);
-        const direction = joint === "left-arm" ? -1 : 1;
-        return [pitch + direction * stride * stance.swing, yaw, roll];
+  cycle(
+    "walk",
+    30,
+    (joint, phase) => {
+      const stride = Math.sin(phase) * recipe.stride;
+      switch (joint) {
+        case "left-leg":
+          return [stride * 0.62, 0, 0];
+        case "right-leg":
+          return [-stride * 0.62, 0, 0];
+        case "left-shin":
+          return [-Math.max(0, stride) * 0.52, 0, 0];
+        case "right-shin":
+          return [-Math.max(0, -stride) * 0.52, 0, 0];
+        case "left-arm":
+        case "right-arm": {
+          const [pitch, yaw, roll] = neutral(joint);
+          const direction = joint === "left-arm" ? -1 : 1;
+          return [pitch + direction * stride * stance.swing, yaw, roll];
+        }
+        case "spine":
+          return [0, 0, Math.sin(phase * 2) * 0.035];
+        default:
+          return recipe.walkPose?.(joint, phase) ?? neutral(joint);
       }
-      case "spine":
-        return [0, 0, Math.sin(phase * 2) * 0.035];
-      default:
-        return recipe.walkPose?.(joint, phase) ?? neutral(joint);
-    }
-  });
-  // Lowest with the legs apart, highest as they pass.
-  shift(walk, 30, (phase) => [0, (Math.cos(phase * 2) - 1) * 0.015, 0]);
+    },
+    // Lowest with the legs apart, highest as they pass.
+    { shift: (phase) => [0, (Math.cos(phase * 2) - 1) * 0.015, 0] },
+  );
   // Turn clips are additive: neutral at the first frame, full lean at the last.
   for (const [clipName, direction] of [
     ["turn-left", -1],
     ["turn-right", 1],
   ] as const) {
-    clip(
+    cycle(
       clipName,
       10,
       (joint, phase) => {
@@ -2179,11 +2176,15 @@ function buildInfantry(
           ? [0, direction * 0.14 * lean, 0]
           : [0, direction * 0.08 * lean, 0];
       },
-      ["spine", "head"],
+      { joints: ["spine", "head"], layered: true },
     );
   }
-  if (attack) clip(attack.clip, attack.frames, attack.pose, attack.joints);
-  clip(
+  if (attack)
+    cycle(attack.clip, attack.frames, attack.pose, {
+      joints: attack.joints,
+      layered: true,
+    });
+  cycle(
     "hit",
     10,
     (joint, phase) => {
@@ -2192,10 +2193,10 @@ function buildInfantry(
         ? [0.22 * flinch, 0, -0.12 * flinch]
         : [-0.15 * flinch, 0, 0];
     },
-    ["spine", "head"],
+    { joints: ["spine", "head"], layered: true },
   );
   if (attack)
-    clip(
+    cycle(
       "aim",
       10,
       attack.aim?.pose ??
@@ -2205,94 +2206,73 @@ function buildInfantry(
           if (joint.endsWith("arm")) return [-0.25 * amount, 0, 0];
           return [-0.08 * amount, 0, 0];
         }),
-      attack.aim?.joints ?? [
-        "spine",
-        "left-arm",
-        "right-arm",
-        "left-forearm",
-        "right-forearm",
-      ],
+      {
+        joints: attack.aim?.joints ?? [
+          "spine",
+          "left-arm",
+          "right-arm",
+          "left-forearm",
+          "right-forearm",
+        ],
+        layered: true,
+      },
     );
   // Knees buckle, then the body collapses into a grounded asymmetric slump.
   const fallen = (phase: number) => (phase / (Math.PI * 2)) ** 2;
-  const death = clip("death", 24, (joint, phase) => {
-    const fall = fallen(phase);
-    const buckle = Math.sin(phase / 2);
-    switch (joint) {
-      case "pelvis":
-        return [-1.48 * fall, 0.14 * fall, 0.22 * fall];
-      case "left-leg":
-        return [0.36 * fall - 0.3 * buckle, 0.12 * fall, -0.18 * fall];
-      case "right-leg":
-        return [0.08 * fall - 0.24 * buckle, -0.08 * fall, 0.14 * fall];
-      case "left-shin":
-        return [0.58 * fall + 0.45 * buckle, 0, 0];
-      case "right-shin":
-        return [0.18 * fall + 0.45 * buckle, 0, 0];
-      // Arms drape asymmetrically so held gear settles low instead of upright.
-      case "left-arm": {
-        const [pitch, yaw, roll] = neutral(joint);
-        const spread = -(stance.spread + 0.65);
-        return [
-          pitch + (0.28 - pitch) * fall,
-          yaw + (-0.25 - yaw) * fall,
-          roll + (spread - roll) * fall,
-        ];
+  cycle(
+    "death",
+    24,
+    (joint, phase) => {
+      const fall = fallen(phase);
+      const buckle = Math.sin(phase / 2);
+      switch (joint) {
+        case "pelvis":
+          return [-1.48 * fall, 0.14 * fall, 0.22 * fall];
+        case "left-leg":
+          return [0.36 * fall - 0.3 * buckle, 0.12 * fall, -0.18 * fall];
+        case "right-leg":
+          return [0.08 * fall - 0.24 * buckle, -0.08 * fall, 0.14 * fall];
+        case "left-shin":
+          return [0.58 * fall + 0.45 * buckle, 0, 0];
+        case "right-shin":
+          return [0.18 * fall + 0.45 * buckle, 0, 0];
+        // Arms drape asymmetrically so held gear settles low instead of upright.
+        case "left-arm":
+          return settle(
+            neutral(joint),
+            [0.28, -0.25, -(stance.spread + 0.65)],
+            fall,
+          );
+        case "right-arm":
+          return settle(
+            neutral(joint),
+            [0.72, 0.38, stance.spread + 0.32],
+            fall,
+          );
+        case "left-forearm":
+        case "right-forearm":
+          return settle(
+            neutral(joint),
+            [joint === "left-forearm" ? -0.35 : -0.65, 0, 0],
+            fall,
+          );
+        case "head":
+          return [-0.18 * fall, 0.32 * fall, 0.26 * fall];
+        default:
+          return neutral(joint);
       }
-      case "right-arm": {
-        const [pitch, yaw, roll] = neutral(joint);
-        const spread = stance.spread + 0.32;
-        return [
-          pitch + (0.72 - pitch) * fall,
-          yaw + (0.38 - yaw) * fall,
-          roll + (spread - roll) * fall,
-        ];
-      }
-      case "left-forearm": {
-        const ready = stance.ready?.[joint];
-        const base = ready ? ready[0] : neutral(joint)[0];
-        return [base + (-0.35 - base) * fall, 0, 0];
-      }
-      case "right-forearm": {
-        const ready = stance.ready?.[joint];
-        const base = ready ? ready[0] : neutral(joint)[0];
-        return [base + (-0.65 - base) * fall, 0, 0];
-      }
-      case "head":
-        return [-0.18 * fall, 0.32 * fall, 0.26 * fall];
-      default:
-        return neutral(joint);
-    }
-  });
-  shift(death, 24, (phase) => [
-    0,
-    -0.66 * fallen(phase),
-    -0.25 * fallen(phase),
-  ]);
+    },
+    { shift: (phase) => [0, -0.66 * fallen(phase), -0.25 * fallen(phase)] },
+  );
 }
 
-/** Keys `value` across one cycle, where phase runs from 0 to 2π. */
-function keyed(
-  name: string,
-  property: "rotationQuaternion" | "position",
-  endFrame: number,
-  value: (phase: number) => Quaternion | Vector3,
-): Animation {
-  const animation = new Animation(
-    name,
-    property,
-    FRAMES_PER_SECOND,
-    property === "position"
-      ? Animation.ANIMATIONTYPE_VECTOR3
-      : Animation.ANIMATIONTYPE_QUATERNION,
-    Animation.ANIMATIONLOOPMODE_CYCLE,
-  );
-  const keys = [];
-  for (let frame = 0; frame <= endFrame; frame += KEY_STEP) {
-    keys.push({ frame, value: value((frame / endFrame) * Math.PI * 2) });
-  }
-  animation.setKeys(keys);
-  return animation;
+/** Moves each angle of `from` toward `to` by `amount`. */
+function settle(from: Vec3, to: Vec3, amount: number): Vec3 {
+  return [
+    mix(from[0], to[0], amount),
+    mix(from[1], to[1], amount),
+    mix(from[2], to[2], amount),
+  ];
 }
 
 const SHAPES: Record<Part["shape"], (scene: Scene, name: string) => Mesh> = {
@@ -2373,30 +2353,6 @@ function focusBough(scene: Scene, name: string): Mesh {
     ),
   );
   return Mesh.MergeMeshes(halves, true)!;
-}
-
-/** One part's vertices in the rest pose, colored per vertex. */
-function partVertices(
-  scene: Scene,
-  { name, shape, size, position, tiltX = 0, tiltZ = 0 }: Part,
-  color: Color3,
-): VertexData {
-  const mesh = SHAPES[shape](scene, name);
-  mesh.scaling.set(...size);
-  mesh.position.set(...position);
-  mesh.rotation.x = tiltX;
-  mesh.rotation.z = tiltZ;
-  mesh.bakeCurrentTransformIntoVertices();
-  const vertices = VertexData.ExtractFromMesh(mesh);
-  mesh.dispose();
-  const count = vertices.positions!.length / 3;
-  vertices.colors = Array.from({ length: count }, () => [
-    color.r,
-    color.g,
-    color.b,
-    1,
-  ]).flat();
-  return vertices;
 }
 
 function leafMesh(scene: Scene, name: string): Mesh {

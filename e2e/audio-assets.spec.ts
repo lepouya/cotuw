@@ -94,6 +94,15 @@ forEachProfile(MOUSE_AND_PHONE_PROFILES, (profile) => {
             players.every((player) => (player as HTMLAudioElement).paused),
           ),
       ).toBe(true);
+      // Scene presets overlap cues, while manual audio playback still pauses earlier cues.
+      await press('[data-scene="victory"]');
+      await expect.poll(() => playing("objective-complete")).toBe(true);
+      await page
+        .locator("#victory")
+        .evaluate((el: HTMLAudioElement) => el.play());
+      await expect.poll(() => playing("victory")).toBe(true);
+      expect(await playing("objective-complete")).toBe(false);
+      await press("#stop");
       await expect(page.locator("#status")).toBeEmpty();
       expect(
         await page.evaluate(

@@ -4,6 +4,18 @@ import { PNG } from "pngjs";
 
 export type Rgba = readonly [number, number, number, number];
 
+export const clamp = (value: number, min: number, max: number) =>
+  value < min ? min : value > max ? max : value;
+
+export const mix = (from: number, to: number, t: number) =>
+  from + (to - from) * t;
+
+/** Hermite easing of `value` between two edges, clamped to [0, 1]. */
+export const smoothstep = (from: number, to: number, value: number) => {
+  const t = clamp((value - from) / (to - from), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
 /** `value` within `[0, period)`, so coordinates repeat every period. */
 export function wrap(value: number, period: number): number {
   return ((value % period) + period) % period;
@@ -11,9 +23,12 @@ export function wrap(value: number, period: number): number {
 
 /** The color `t` of the way from `from` to `to`. */
 export function mixRgba(from: Rgba, to: Rgba, t: number): Rgba {
-  const channel = (index: 0 | 1 | 2 | 3) =>
-    from[index] + (to[index] - from[index]) * t;
-  return [channel(0), channel(1), channel(2), channel(3)];
+  return [
+    mix(from[0], to[0], t),
+    mix(from[1], to[1], t),
+    mix(from[2], to[2], t),
+    mix(from[3], to[3], t),
+  ];
 }
 
 /** A frame that repeats every `period` pixels, in premultiplied 0-1 RGBA. */
@@ -37,9 +52,10 @@ export function drawDisc(
   const reach = Math.ceil(radius + 1);
   for (let py = Math.floor(y - reach); py <= Math.ceil(y + reach); py++)
     for (let px = Math.floor(x - reach); px <= Math.ceil(x + reach); px++) {
-      const coverage = Math.min(
+      const coverage = clamp(
+        radius + 0.5 - Math.hypot(px + 0.5 - x, py + 0.5 - y),
+        0,
         1,
-        Math.max(0, radius + 0.5 - Math.hypot(px + 0.5 - x, py + 0.5 - y)),
       );
       if (coverage > 0) blendPixel(frame, px, py, color, coverage);
     }

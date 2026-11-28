@@ -1,4 +1,4 @@
-# Phase G visual asset review
+# Visual asset review
 
 Review order follows when assets first appear in the introductions and
 Normal skirmishes, how long they stay visible, and how often players use them

@@ -430,38 +430,35 @@ Play scene mixes or individual loops and cues to compare timing and headroom.</p
 </article></section>
 <script>
 const players = [...document.querySelectorAll('audio')];
+const scenePlaying = new Set();
 let sceneTimers = [];
 const clearScene = () => {
   for (const timer of sceneTimers) clearTimeout(timer);
   sceneTimers = [];
+  scenePlaying.clear();
 };
 const stopAll = () => {
   clearScene();
   for (const player of players) { player.pause(); player.currentTime = 0; }
 };
-const trigger = (id) => {
-  const el = document.getElementById(id);
+const playAudio = (el, fromScene = false) => {
   if (!el) return;
-  el.currentTime = 0;
+  if (fromScene) {
+    el.pause();
+    el.currentTime = 0;
+    scenePlaying.add(el);
+  }
   el.play().catch(() => {
+    scenePlaying.delete(el);
     document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
   });
 };
-const SCENES = {
-  'arc-base': ['unquiet-frontier', 'harvester-work', 'harvester-engine', [400, 'refinery-door-open'], [1600, 'training-start'], [3100, 'unit-trained']],
-  'circle-base': ['circle-frontier', 'circle-cultivation', 'circle-growth', [500, 'circle-production-start'], [1900, 'circle-producer-exit'], [3200, 'circle-unit-trained']],
-  'battle': ['beneath-the-ridge', [200, 'rifle-1'], [650, 'circle-cast-1'], [1150, 'launcher-launch'], [1850, 'launcher-impact'], [2400, 'ram-strike-1'], [3100, 'alert']],
-  'support': ['circle-ridge', 'healer-service', 'mechanical-service', [700, 'living-structure-hit'], [1800, 'living-destroyed']],
-  'victory': [[0, 'objective-complete'], [1800, 'victory']],
-  'defeat': [[0, 'alert'], [1100, 'defeat']],
-};
+const SCENES = {"arc-base":["unquiet-frontier","harvester-work","harvester-engine",[400,"refinery-door-open"],[1600,"training-start"],[3100,"unit-trained"]],"circle-base":["circle-frontier","circle-cultivation","circle-growth",[500,"circle-production-start"],[1900,"circle-producer-exit"],[3200,"circle-unit-trained"]],"battle":["beneath-the-ridge",[200,"rifle-1"],[650,"circle-cast-1"],[1150,"launcher-launch"],[1850,"launcher-impact"],[2400,"ram-strike-1"],[3100,"alert"]],"support":["circle-ridge","healer-service","mechanical-service",[700,"living-structure-hit"],[1800,"living-destroyed"]],"victory":[[0,"objective-complete"],[1800,"victory"]],"defeat":[[0,"alert"],[1100,"defeat"]]};
 for (const button of document.querySelectorAll('[data-play]')) {
   button.addEventListener('click', () => {
     clearScene();
     document.querySelector('#status').textContent = '';
-    document.getElementById(button.dataset.play).play().catch(() => {
-      document.querySelector('#status').textContent = 'Playback unavailable. Download the WAV to listen.';
-    });
+    playAudio(document.getElementById(button.dataset.play));
   });
 }
 for (const button of document.querySelectorAll('[data-scene]')) {
@@ -469,8 +466,8 @@ for (const button of document.querySelectorAll('[data-scene]')) {
     stopAll();
     document.querySelector('#status').textContent = '';
     for (const step of SCENES[button.dataset.scene] || []) {
-      if (Array.isArray(step)) sceneTimers.push(setTimeout(() => trigger(step[1]), step[0]));
-      else trigger(step);
+      if (Array.isArray(step)) sceneTimers.push(setTimeout(() => playAudio(document.getElementById(step[1]), true), step[0]));
+      else playAudio(document.getElementById(step), true);
     }
   });
 }
@@ -478,8 +475,12 @@ for (const player of players) {
   player.volume = player.dataset.bus === 'music' ? 0.4 :
     player.dataset.bus === 'machine' ? 0.55 : 0.7;
   player.addEventListener('play', () => {
+    const fromScene = scenePlaying.delete(player);
+    if (!fromScene) clearScene();
     for (const other of players)
+      // Scene presets let cues overlap, as they do in play.
       if (other !== player && player.dataset.bus !== 'machine' &&
+          !(fromScene && player.dataset.bus === 'cue') &&
           other.dataset.bus === player.dataset.bus) other.pause();
   });
 }

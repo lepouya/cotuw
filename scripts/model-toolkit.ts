@@ -201,16 +201,25 @@ export function merge(
   return mesh;
 }
 
+/** Selects the node channels a clip keys. */
+export type ChannelFilter = (
+  node: TransformNode,
+  property: "position" | "rotationQuaternion" | "scaling",
+) => boolean;
+
 /**
  * Samples authored poses into glTF node channels; playback needs no builder.
- * Without `completePose`, channels that never move are left out.
+ * `completePose` keys every channel, or those it selects; when false,
+ * channels that never move are left out. `keyStep` samples every that many
+ * frames, always keying the last frame.
  */
 export function clip(
   root: TransformNode,
   name: string,
   seconds: number,
   pose: (seconds: number) => void,
-  completePose = true,
+  completePose: boolean | ChannelFilter = true,
+  keyStep = 1,
 ): void {
   const nodes = [
     root,
@@ -231,17 +240,17 @@ export function clip(
       node.rotation.copyFrom(rest[index]!.rotation);
       node.scaling.copyFrom(rest[index]!.scaling);
     });
+  if (keyStep <= 0) throw new RangeError("keyStep must be positive");
   const endFrame = seconds * FRAMES_PER_SECOND;
-  const frames = Math.ceil(endFrame);
   const keys = nodes.map(() => ({
     position: [] as { frame: number; value: Vector3 }[],
     rotationQuaternion: [] as { frame: number; value: Quaternion }[],
     scaling: [] as { frame: number; value: Vector3 }[],
   }));
-  for (let frame = 0; frame <= frames; frame++) {
+  for (let frame = 0, keyFrame = -1; keyFrame < endFrame; frame += keyStep) {
     restore();
     // Include the exact endpoint between sample frames.
-    const keyFrame = Math.min(frame, endFrame);
+    keyFrame = Math.min(frame, endFrame);
     pose(keyFrame / FRAMES_PER_SECOND);
     nodes.forEach((node, index) => {
       keys[index]!.position.push({
@@ -269,15 +278,16 @@ export function clip(
     ] as const) {
       const values = keys[index]![property];
       const first = values[0]!.value.asArray();
-      if (
-        !completePose &&
-        values.every(({ value }) =>
-          value
-            .asArray()
-            .every((component, channel) => component === first[channel]),
-        )
-      )
-        continue;
+      const keyed =
+        typeof completePose === "function"
+          ? completePose(node, property)
+          : completePose ||
+            values.some(({ value }) =>
+              value
+                .asArray()
+                .some((component, channel) => component !== first[channel]),
+            );
+      if (!keyed) continue;
       const animation = new Animation(
         `${name}-${node.name}-${property}`,
         property,
@@ -295,7 +305,7 @@ export function clip(
 /**
  * Rigid weights preserve the part hierarchy while exporting a real skin.
  * Static pieces share the body bone and moving pieces bind to their pivots.
- * Each material becomes one skinned mesh.
+ * Each material becomes one skinned mesh named after it.
  */
 export function skin(root: TransformNode) {
   const scene = root.getScene();
@@ -305,16 +315,20 @@ export function skin(root: TransformNode) {
       (mesh): mesh is Mesh =>
         mesh instanceof Mesh && mesh.getTotalVertices() > 0,
     );
+  // Skinned meshes sit under the root, so bind vertices in its space.
+  const toRoot = root.computeWorldMatrix(true).clone().invert();
   const vertices = parts.map((part) => {
     const data = VertexData.ExtractFromMesh(part);
-    data.transform(part.computeWorldMatrix(true));
+    data.transform(part.computeWorldMatrix(true).multiply(toRoot));
     return data;
   });
-  const body = new TransformNode(`${root.name}-body-joint`, scene);
-  body.parent = root;
-  const joints = parts.map((part) =>
-    part.parent === root ? body : (part.parent as TransformNode),
-  );
+  let body: TransformNode | undefined;
+  const joints = parts.map((part) => {
+    if (part.parent !== root) return part.parent as TransformNode;
+    body ??= new TransformNode(`${root.name}-body-joint`, scene);
+    body.parent = root;
+    return body;
+  });
   const skeleton = new Skeleton(`${root.name}-rig`, `${root.name}-rig`, scene);
   const bones = new Map<TransformNode, Bone>();
   const add = (node: TransformNode): Bone | null => {
@@ -324,7 +338,7 @@ export function skin(root: TransformNode) {
       node.parent instanceof TransformNode ? add(node.parent) : null;
     const matrix = Matrix.Compose(
       node.scaling,
-      Quaternion.FromEulerVector(node.rotation),
+      node.rotationQuaternion ?? Quaternion.FromEulerVector(node.rotation),
       node.position,
     );
     const bone = new Bone(node.name, skeleton, parent, matrix);
@@ -340,7 +354,7 @@ export function skin(root: TransformNode) {
   }));
   for (const material of new Set(pieces.map((piece) => piece.material)))
     rigidSkin(
-      `${root.name}-${material.name}-skin`,
+      `${material.name}-skin`,
       pieces.filter((piece) => piece.material === material),
       skeleton,
       material,

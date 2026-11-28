@@ -129,7 +129,7 @@ export function createKeyboardOptions(
       listen,
     );
     root.append(
-      el("h3", {}, "Keyboard"),
+      el("h3", { class: "section-label" }, "Keyboard"),
       el("label", { for: layout.id }, "Keyboard layout"),
       layout,
       el(
