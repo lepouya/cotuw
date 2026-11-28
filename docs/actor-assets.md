@@ -176,10 +176,14 @@ tile units above the roof. Shots land halfway up the target as drawn.
 
 `src/ui/actor-portrait.ts` draws original SVG card illustrations. Content's
 optional `portrait` binding selects one; otherwise the actor's gameplay role
-chooses a generic icon. The Medic portrait shows pale armor, teal medical
-markings, a carry case, and a scanner; the Mechanic shows ochre work gear,
-a hard hat, and a wrench. The Demolition Trooper shows charcoal armor, an amber
-visor, a shoulder launcher, and paired rocket tubes. Circle portraits show
+chooses a generic icon. The `headquarters`, `refinery`, and `harvester`
+portraits match the ARC Command Center (flank pods, cyan bridge windows, entry
+canopy, roof fan, and radar array), Materials Refinery (slatted garage bay,
+roof fan, press, and banded silo), and Harvester (tracked ochre hull, blue cab
+roof with beacon, rear hopper, and rotary drill). The Medic portrait shows pale
+armor, teal medical markings, a carry case, and a scanner; the Mechanic shows
+ochre work gear, a hard hat, and a wrench. The Demolition Trooper shows
+charcoal armor, an amber visor, a shoulder launcher, and paired rocket tubes. Circle portraits show
 exposed elven faces, pointed ears, tunics, and role-specific gear: the
 Cultivator's pod and tending tool, Sentinel leaf armor and focus, and Wayfinder
 hood and stave, Healer mantle and glowing palms, and Artificer harness and

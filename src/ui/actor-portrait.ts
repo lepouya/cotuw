@@ -367,30 +367,98 @@ const PORTRAITS: Record<PortraitId, string> = {
     <path fill="#3b7049" d="M72 67Q73 50 80 45Q84 56 80 67ZM93 64Q88 52 94 43Q102 51 103 62Z"/>
     <path fill="#a983de" d="m71 55 4 3-2 7-4-3Zm30-5 4 3 1 6-4-2Z"/>
     <path fill="#83aed0" d="m83 32 7-2 2 5-7 3Z"/>`,
-  refinery: `${FOUNDATION}
-    <path fill="#8ea4a0" d="M70 14 82 10 94 14 94 38 82 44 70 38Z"/>
-    <path fill="#527477" d="M70 14 82 19 94 14 82 10Z"/>
-    <path fill="#dab76e" d="M35 23 45 19 53 23 53 34 43 38 35 34Z"/>
-    <path stroke="#a7c7c4" stroke-width="4" fill="none" d="M45 22V12H65V25"/>`,
-  headquarters: `${FOUNDATION}
-    <path fill="#9ab1ab" d="M45 18 60 12 76 18 60 25Z"/>
-    <path fill="#6d8c88" d="M45 18 60 25 76 18 76 28 60 35 45 28Z"/>
-    <path stroke="#dab76e" stroke-width="3" d="M61 16V2M54 6H68"/>`,
+  refinery: `
+    <path fill="#233e42" d="M8 59 26 42 108 44 114 61 90 73 10 68Z"/>
+    <path fill="#26383b" d="M10 57 26 43 104 45 111 59 89 70 10 65Z"/>
+    <path fill="#5d4d33" d="M14 36 33 27 88 30 88 57 14 54Z"/>
+    <path fill="#786342" d="M14 36 44 38 44 59 14 56Z"/>
+    <path fill="#465c60" d="M12 34 31 24 47 25 32 37 12 36Z"/>
+    <path fill="#729fd4" d="M15 33 30 25 36 26 21 34Z"/>
+    <path fill="#465c60" d="M30 33 48 21 90 24 76 38 30 36Z"/>
+    <path fill="#98a69a" d="M36 32 51 22 86 25 73 36 36 34Z"/>
+    <ellipse fill="#26383b" cx="54" cy="29" rx="10" ry="4.5"/>
+    <path stroke="#98a69a" stroke-width="2" d="M47 29h14M50 26l8 6M58 26l-8 6"/>
+    <path fill="#26383b" d="M68 23h9v7h-9Z"/>
+    <path fill="#98a69a" d="M70 17h5v9h-5Z"/>
+    <path fill="#465c60" d="M37 38h8v22h-8Zm31 2h8v22h-8Z"/>
+    <path fill="#26383b" d="M45 43h23v18H45Z"/>
+    <path fill="#98a69a" d="M46 44h21v16H46Z"/>
+    <path stroke="#465c60" stroke-width="2" d="M47 48h19M47 52h19M47 56h19"/>
+    <path fill="#729fd4" d="M35 37h43v6H35Z"/>
+    <path fill="#f3b34e" d="M39 45h3v5h-3Zm31 1h3v5h-3Z"/>
+    <path stroke="#e5a338" stroke-width="2" d="M45 62 41 66M68 63 65 67"/>
+    <path fill="#26383b" d="M84 48h23v10q-11 6-23 0Z"/>
+    <path fill="#465c60" d="M85 20h21v30q-10 6-21 0Z"/>
+    <path fill="#5a7477" d="M85 20h10v30q-5 2-10 0Z"/>
+    <path fill="#729fd4" d="M84 26q11 5 23 0v5q-11 5-23 0Z"/>
+    <ellipse fill="#98a69a" cx="95.5" cy="20" rx="11.5" ry="4.5"/>
+    <ellipse fill="#f3b34e" cx="95.5" cy="17.5" rx="3.2" ry="2.2"/>
+    <path fill="#98a69a" d="M85 45 96 47 96 52 85 50Z"/>
+    <path fill="#26383b" d="M88 53h12v9q-6 3-12 0Z"/>
+    <path fill="#5a7477" d="M91 46h6v12h-6Z"/>`,
+  headquarters: `
+    <path fill="#233e42" d="M12 58 38 42 108 55 82 74 12 64Z"/>
+    <path fill="#26383b" d="M15 55 40 41 104 52 81 70 15 61Z"/>
+    <path fill="#364a4e" d="M18 42 27 37 27 57 16 55Z"/>
+    <path fill="#98a69a" d="M19 40 27 36 30 37 22 42Z"/>
+    <path fill="#729fd4" d="M21 39 27 36 29 37 23 40Z"/>
+    <path fill="#465c60" d="M26 35 76 41 76 64 26 57Z"/>
+    <path fill="#364a4e" d="M76 41 96 31 98 54 76 64Z"/>
+    <path fill="#465c60" d="M87 37 97 34 102 54 91 58Z"/>
+    <path fill="#98a69a" d="M85 35 95 32 99 35 88 38Z"/>
+    <path fill="#729fd4" d="M88 35 95 33 97 35 90 37Z"/>
+    <path fill="#26383b" d="M94 42 99 41 101 50 96 51Z"/>
+    <path fill="#26383b" d="M23 33 49 23 99 30 77 43 23 36Z"/>
+    <path fill="#98a69a" d="M29 32 51 24 93 30 75 40 29 34Z"/>
+    <path fill="#729fd4" d="M31 31 48 25 53 26 36 32Zm43 6 16-7 4 1-16 7Z"/>
+    <path fill="#26383b" d="M30 39 72 44v7L30 46Z"/>
+    <path fill="#71d8de" d="M33 41 43 42v4l-10-1Zm14 2 10 1v4l-10-1Zm13 1 10 1v4l-10-1Z"/>
+    <path fill="#98a69a" d="M40 50 61 53v13L40 63Z"/>
+    <path fill="#26383b" d="M43 52 58 54v11L43 63Z"/>
+    <path stroke="#465c60" stroke-width="1.5" d="M50.5 53v11"/>
+    <path fill="#729fd4" d="M35 48 65 52l-3 5-30-4Z"/>
+    <path fill="#98a69a" d="M36 62 61 65 56 69 31 66Z"/>
+    <path fill="#26383b" d="M33 66 56 69 52 72 29 69Z"/>
+    <ellipse fill="#26383b" cx="72" cy="31" rx="8" ry="3.6"/>
+    <path stroke="#98a69a" stroke-width="2" d="M66 31h12M72 28v6"/>
+    <ellipse fill="#26383b" cx="50" cy="26" rx="7" ry="3.2"/>
+    <path fill="#465c60" d="M46 18h8v8h-8Z"/>
+    <path fill="#98a69a" d="M48.5 11h3v8h-3Z"/>
+    <path fill="#465c60" d="M34 5 66 10 65 18 33 13Z"/>
+    <path fill="#26383b" d="M38 7 62 11 61 16 37 12Z"/>
+    <path stroke="#71d8de" stroke-width="2" d="M40 10 60 13"/>
+    <path fill="#729fd4" d="M33 5 38 6 37 14 32 13Zm29 5 5 1-1 7-5-1Z"/>`,
   building: `${FOUNDATION}
     <path fill="#152b31" d="M68 47 89 38 89 54 68 63Z"/>
     <path stroke="#b9cac0" stroke-width="3" d="M29 27 43 32M38 23 53 28"/>
     <path stroke="#dab76e" stroke-width="3" d="M87 25V7"/>
     <path fill="#dab76e" d="M88 7 105 10 88 15Z"/>`,
   harvester: `
-    <ellipse fill="#152b31" cx="61" cy="66" rx="43" ry="9"/>
-    <path stroke="#17272c" stroke-width="12" d="M25 54 49 65M70 64 98 52"/>
-    <path fill="#527477" d="M20 40 65 26 104 41 60 59Z"/>
-    <path fill="#355257" d="M20 40 60 59 60 65 20 49Z"/>
-    <path fill="#dab76e" d="M60 59 104 41 104 49 60 65Z"/>
-    <path fill="#8da5a1" d="M55 29 80 20 96 26 96 41 70 51 55 43Z"/>
-    <path fill="#173941" d="M31 33 49 27 60 32 60 42 44 48 31 42Z"/>
-    <path stroke="#b8c9c1" stroke-width="5" d="M26 43V63"/>
-    <path fill="#86d4b0" d="M20 63H32L26 72Z"/>`,
+    <ellipse fill="#152b31" cx="62" cy="68" rx="44" ry="8"/>
+    <path fill="#222c30" d="M26 52 62 40 76 47 40 60Z"/>
+    <path fill="#ab782d" d="M23 47 60 35 72 41 35 53Z"/>
+    <path fill="#3f484b" d="M34 40 76 28 98 38 56 54Z"/>
+    <path fill="#222c30" d="M51 58 96 41q7 2 5 10L56 69q-8-2-5-11Z"/>
+    <path stroke="#4b575b" stroke-width="2.5" d="M59 64v-4M69 60v-4M79 56v-4M89 52v-4"/>
+    <path fill="#cf943a" d="M45 53 96 35 102 39 51 59Z"/>
+    <path fill="#729fd4" d="M60 51 87 41 88 45 61 55Z"/>
+    <path fill="#d89a3c" d="M26 42 52 34 65 42 40 52Z"/>
+    <path fill="#83c8d4" d="M29 45 35 43 37 46 31 48Zm14 4 6-2 2 3-6 2Z"/>
+    <path fill="#ab782d" d="M58 26 84 18 96 27 94 40 66 49Z"/>
+    <path fill="#222c30" d="M62 29 82 23 91 29 71 38Z"/>
+    <path stroke="#cf943a" stroke-width="2.2" d="M66 30 82 25M69 33.5 86 28"/>
+    <path fill="#cf943a" d="M57 26 70 35 67 48 54 38Z"/>
+    <path fill="#e5ae51" d="M69 35 95 26 93 40 67 49Z"/>
+    <path stroke="#222c30" stroke-width="3" d="M57 26 84 17M69 35 96 26"/>
+    <path fill="#3f484b" d="M38 25 56 19 67 26 67 40 49 46 38 39Z"/>
+    <path fill="#4b7c88" d="M39 27 49 33 49 41 39 35Zm11 6 15-5v8l-15 5Z"/>
+    <path fill="#729fd4" d="M35 23 56 16 70 24 49 32Z"/>
+    <ellipse fill="#f3b34e" cx="53" cy="18" rx="5.5" ry="3.2"/>
+    <ellipse fill="#ffdf8e" cx="53" cy="16.5" rx="3.2" ry="1.6"/>
+    <path fill="#3f484b" d="M22 46 33 42 36 48 25 52Z"/>
+    <ellipse fill="#cf943a" cx="27" cy="49" rx="6" ry="8" transform="rotate(-18 27 49)"/>
+    <path fill="#222c30" d="M26 42 10 51 28 57Z"/>
+    <path fill="#e5ae51" d="M18 44 24 42 25 47 19 48Zm-1 8 6-1 1 5-6 1Zm6-11 4-1 2 4-5 1Z"/>`,
   armed: infantry(
     "#77938a",
     `<path stroke="#142a30" stroke-width="7" d="M37 43 93 34"/>
