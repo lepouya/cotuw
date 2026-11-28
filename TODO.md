@@ -185,59 +185,16 @@ Complete the visual polish pass before building the external playtest bundle.
 Automated matches establish correctness; human play establishes clarity,
 challenge, pacing, and useful choices.
 
-- [ ] **1.76** Polish models, textures, and scene presentation before 1.65.
-  Work through the [visual asset review](docs/visual-asset-review.md), which
-  orders assets by first encounter and frequency of use.
-  Review both faction starts and a representative battle at gameplay zoom.
-  Use the 1.57 feedback and the scene review to record the scoped assets and
-  scenes in the [ARC](DESIGN.md#m1-arc-presentation) and
-  [Circle](DESIGN.md#m1-circle-presentation) art direction. Verify that the
-  factions look distinct and that unit roles, owner colors, resource
-  sites, and buildable ground are clear in play. Review the introductions
-  where they share changed assets, run affected asset and browser checks,
-  and recheck normal-scale performance before building the cohort bundle.
-  - First model passes cover every ARC and Circle building and unit, the
-    wolf and alpha, ARC and Circle rubble, salvage, Materials and
-    cultivation sites, foundations and scaffolds, ambient birds, tracers,
-    focus bolts, bite cues, wound drops, smoke, fire, living leaks, falling
-    leaves, and wood splinters. Each pass was reviewed at gameplay zoom,
-    alongside the other faction's cues and, for animated effects, under
-    reduced motion.
-  - Damage-stage passes cover healthy, moderate, and critical Briar Ram
-    shells and Circle building ribs at gameplay zoom.
-  - Rocket trails and impacts were reviewed at two shot lengths alongside
-    ARC tracers and Circle bolts at gameplay zoom.
-  - The Briar Ram strike burst was reviewed against ARC buildings from two
-    attack facings at gameplay zoom.
-  - Regeneration cues were reviewed on both wolf sizes at gameplay zoom,
-    with the pulse running and under reduced motion.
-  - Harvester wrecks were reviewed beside an operational Harvester at gameplay
-    zoom, with settled remains facing two directions.
-  - Terrain textures, grass sway, scenery, lighting, contact shadows, and fog
-    were reviewed at gameplay zoom in both skirmish starts and introductions,
-    the center crossing, the shoreline, and the Circle den and bird loop.
-  - Rifle and launcher flash sheets were reviewed with simultaneous tracers,
-    rocket effects, and a Circle focus bolt at gameplay zoom and under
-    reduced motion.
-  - The title artwork, mission selection, faction cards, and loading screen
-    were reviewed in desktop, compact window, and phone layouts.
-  - The application icon, browser favicon, top bar, command sidebar, and
-    minimap frame were reviewed for both ARC and Circle across desktop,
-    compact window, and phone layouts.
-  - Unit remains and wrecks across both factions were reviewed beside live
-    units, building rubble, and salvage at gameplay zoom; infantry death poses
-    and muted/extinguished remains materials keep surviving actors readable
-    during rebuilding.
-  - Gameplay overlays, guides, Goals, production cards, tooltips, shortcut
-    badges, camera controls, radial menu, notifications, and all actor
-    portraits were reviewed and unified with the twilight-and-bronze palette.
-  - Pause, Save, Load, Options, Victory, Defeat, and Match Summary (Overview
-    and Graphs) panels were reviewed and styled to match the title and HUD
-    palette, with distinct Victory and Defeat accents.
-  - Soundtrack, work/service loops, and combat/result cues were audited for
-    loudness balance (`circle-frontier`/`circle-ridge` raised to match ARC
-    music; `harvester-engine` lowered beneath music beside `harvester-work`),
-    and `/assets/audio/index.html` gained scene audition presets.
+- [x] **1.76** Completed the Phase G visual and audio polish pass before 1.65:
+  revamped all 44 bundled GLBs, damage stages, combat/flash effects, terrain
+  and atmosphere, procedural title cover art, mission setup and loading
+  screens, application icon and favicon, in-game frame (preserving 53 px
+  top-bar height), muted/extinguished unit remains and asymmetric infantry
+  death poses, gameplay overlays/guides/cards/goals, pause/save/options/result
+  panels, and audio mix balance with scene audition presets. Reviewed both
+  skirmish starts, introductions, and a representative ARC-versus-Circle
+  battle at gameplay zoom, and rechecked normal-scale performance (sustaining
+  120 simulation ticks/s at 2× in Chromium and WebKit at 1920 × 1080).
 - [ ] **1.65** After 1.76, distribute the integrated build through the agreed
   channel and run full skirmish playtests with both factions. Observe in-game
   onboarding, time to key milestones, assistance, confusion, and abandonment;

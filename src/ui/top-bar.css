@@ -3,7 +3,7 @@
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
-  padding: 0.28rem 0.6rem;
+  padding: 0.25rem 0.6rem;
   border-bottom: 1px solid #4c635f;
   background: linear-gradient(180deg, #172b30, #0d1a1f);
   box-shadow:
@@ -18,11 +18,20 @@
   gap: 0.25rem;
 }
 .time-controls {
-  padding: 0.14rem;
-  border: 1px solid #3c5350;
-  border-radius: 0.25rem;
+  gap: 0;
+  border: 1px solid #48605c;
+  border-radius: 0.24rem;
   background: rgb(8 17 21 / 72%);
-  gap: 0.15rem;
+  overflow: hidden;
+}
+.time-controls button {
+  min-height: calc(2.75rem - 2px);
+  border: 0;
+  border-right: 1px solid #354c4a;
+  border-radius: 0;
+}
+.time-controls button:last-child {
+  border-right: 0;
 }
 #top-bar-status {
   margin-inline-start: auto;
@@ -93,9 +102,6 @@
   .top-bar {
     padding: 0.2rem 0.4rem;
     gap: 0.35rem;
-  }
-  .time-controls {
-    padding: 0.1rem;
   }
   #top-bar-status {
     gap: 0.3rem;
